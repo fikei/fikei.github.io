@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soundscape — Audio-Reactive Wave Visualization</title>
     <meta name="description" content="Real-time audio visualization using simplex-noise wave grid that reacts to microphone input">
-    <link rel="icon" type="image/png" href="../images/icons/favicon.ico"/>
+    <link rel="icon" type="image/png" href="https://cdn.glitch.me/597fe374-3d18-46a5-b99c-ceff1f8ffd79%2Ffavicon.png"/>
 
     <!-- Space Grotesk Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -400,7 +400,22 @@
 <body>
     <!-- SVG Visualization Container -->
     <div id="visualization-container">
-        <svg id="wave-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <svg id="wave-svg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- Neon glow filter -->
+                <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur1"/>
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur2"/>
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur3"/>
+                    <feMerge>
+                        <feMergeNode in="blur3"/>
+                        <feMergeNode in="blur2"/>
+                        <feMergeNode in="blur1"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+        </svg>
     </div>
 
     <!-- Loading Screen -->
@@ -421,6 +436,24 @@
     <!-- Controls Sidebar -->
     <aside class="sidebar" id="sidebar">
         <h2>CTRL</h2>
+
+        <!-- Theme Selection -->
+        <section class="control-section">
+            <h3>THEME</h3>
+            <select class="theme-select" id="themeSelect">
+                <option value="linear">LINEAR</option>
+                <option value="neon">NEON</option>
+            </select>
+        </section>
+
+        <!-- Mode Selection -->
+        <section class="control-section">
+            <h3>MODE</h3>
+            <div class="density-options">
+                <div class="density-option active" data-mode="hole">HOLE</div>
+                <div class="density-option" data-mode="crunch">CRUNCH</div>
+            </div>
+        </section>
 
         <!-- Frequency Emphasis -->
         <section class="control-section">
@@ -482,23 +515,6 @@
                 <div class="density-option active" data-density="medium">M</div>
                 <div class="density-option" data-density="high">H</div>
             </div>
-        </section>
-
-        <!-- Mode Selection -->
-        <section class="control-section">
-            <h3>MODE</h3>
-            <div class="density-options">
-                <div class="density-option active" data-mode="hole">HOLE</div>
-                <div class="density-option" data-mode="crunch">CRUNCH</div>
-            </div>
-        </section>
-
-        <!-- Theme Selection -->
-        <section class="control-section">
-            <h3>THEME</h3>
-            <select class="theme-select" id="themeSelect">
-                <option value="linear">LINEAR</option>
-            </select>
         </section>
 
         <!-- Reset Button -->
@@ -585,6 +601,26 @@
             // Color gradients (grayscale only)
             gradients: {
                 default: { colors: ['#ffffff', '#999999'], bg: '#000000' }
+            },
+
+            // Theme configurations
+            themes: {
+                linear: {
+                    colors: ['#ffffff', '#999999'],
+                    bg: '#000000',
+                    opacity: 0.6
+                },
+                neon: {
+                    blurBase: 2,
+                    blurMultiplier: 8,
+                    saturationBase: 80,
+                    saturationMultiplier: 20,
+                    lightnessBase: 50,
+                    lightnessMultiplier: 10,
+                    bg: '#000000',
+                    opacity: 0.9,
+                    baseHues: [180, 300, 60, 120, 340] // cyan, magenta, yellow, lime, pink
+                }
             }
         };
 
@@ -637,7 +673,15 @@
 
             // Control visibility
             controlsVisible: true,
-            idleTimeout: null
+            idleTimeout: null,
+
+            // Audio levels (for theme renderers)
+            audioLevels: {
+                low: 0,
+                mid: 0,
+                high: 0
+            },
+            currentTime: 0
         };
 
         // =====================================================
@@ -775,18 +819,29 @@
         }
 
         function updateColors() {
-            const gradient = config.gradients[state.settings.gradient];
+            const theme = config.themes[state.settings.theme];
 
             // Update background
-            document.body.style.background = gradient.bg;
+            document.body.style.background = theme.bg;
 
-            // Update line colors with gradient
-            state.paths.forEach((path, i) => {
-                const progress = i / state.paths.length;
-                const colorIndex = Math.floor(progress * gradient.colors.length);
-                const color = gradient.colors[Math.min(colorIndex, gradient.colors.length - 1)];
-                path.setAttribute('stroke', color);
-            });
+            // Update line colors based on theme
+            if (state.settings.theme === 'linear') {
+                // Linear uses gradient colors
+                state.paths.forEach((path, i) => {
+                    const progress = i / state.paths.length;
+                    const colorIndex = Math.floor(progress * theme.colors.length);
+                    const color = theme.colors[Math.min(colorIndex, theme.colors.length - 1)];
+                    path.setAttribute('stroke', color);
+                    path.removeAttribute('filter');
+                    path.setAttribute('opacity', theme.opacity);
+                });
+            } else if (state.settings.theme === 'neon') {
+                // Neon theme colors are set dynamically in drawLinesNeon
+                // Just ensure paths are ready
+                state.paths.forEach((path) => {
+                    path.setAttribute('opacity', theme.opacity);
+                });
+            }
         }
 
         // =====================================================
@@ -888,6 +943,9 @@
         }
 
         function movePoints(time) {
+            // Store time for theme renderers
+            state.currentTime = time;
+
             // Handle grid transition animation
             if (state.transitioning) {
                 state.transitionProgress += 0.05; // Smooth transition speed
@@ -926,6 +984,11 @@
             const lowLevel = (lowSum / (state.bufferLength * 0.3) / 255) * state.settings.lowEmphasis;
             const midLevel = (midSum / (state.bufferLength * 0.4) / 255) * state.settings.midEmphasis;
             const highLevel = (highSum / (state.bufferLength * 0.3) / 255) * state.settings.highEmphasis;
+
+            // Store audio levels for theme renderers
+            state.audioLevels.low = lowLevel;
+            state.audioLevels.mid = midLevel;
+            state.audioLevels.high = highLevel;
 
             // Bass creates global background shift
             const bassShiftX = Math.sin(time * 0.001) * lowLevel * 40 * state.settings.intensity;
@@ -1071,7 +1134,13 @@
             });
         }
 
-        function drawLines() {
+        // =====================================================
+        // THEME RENDERERS
+        // =====================================================
+
+        function drawLinesLinear() {
+            const theme = config.themes.linear;
+
             state.lines.forEach((points, lineIndex) => {
                 if (points.length < 2 || !state.paths[lineIndex]) return;
 
@@ -1091,9 +1160,82 @@
                     pathData += ` L ${x} ${y}`;
                 }
 
-                // Update path
-                state.paths[lineIndex].setAttribute('d', pathData);
+                // Update path (ensure no filter for linear)
+                const path = state.paths[lineIndex];
+                path.setAttribute('d', pathData);
+                path.removeAttribute('filter');
+                path.setAttribute('opacity', theme.opacity);
             });
+        }
+
+        function drawLinesNeon() {
+            const theme = config.themes.neon;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            // Calculate glow blur based on bass
+            const blurRadius = theme.blurBase + low * theme.blurMultiplier;
+
+            // Update SVG filter
+            const filter = elements.svg.querySelector('#neon-glow');
+            if (filter) {
+                const blur1 = filter.querySelector('feGaussianBlur[result="blur1"]');
+                const blur2 = filter.querySelector('feGaussianBlur[result="blur2"]');
+                const blur3 = filter.querySelector('feGaussianBlur[result="blur3"]');
+
+                if (blur1) blur1.setAttribute('stdDeviation', blurRadius * 0.5);
+                if (blur2) blur2.setAttribute('stdDeviation', blurRadius);
+                if (blur3) blur3.setAttribute('stdDeviation', blurRadius * 1.5);
+            }
+
+            // Calculate hue shift based on mids
+            const hueShift = (mid * 360 + time * 0.05) % 360;
+
+            state.lines.forEach((points, lineIndex) => {
+                if (points.length < 2 || !state.paths[lineIndex]) return;
+
+                // Calculate color for this line
+                const baseHueIndex = lineIndex % theme.baseHues.length;
+                const baseHue = theme.baseHues[baseHueIndex];
+                const hue = (baseHue + hueShift) % 360;
+                const saturation = theme.saturationBase + high * theme.saturationMultiplier;
+                const lightness = theme.lightnessBase + high * theme.lightnessMultiplier;
+                const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+
+                // Start path
+                const firstPoint = points[0];
+                let pathData = `M ${
+                    firstPoint.x + firstPoint.wave.x + firstPoint.audio.x
+                } ${
+                    firstPoint.y + firstPoint.wave.y + firstPoint.audio.y
+                }`;
+
+                // Draw line segments
+                for (let i = 1; i < points.length; i++) {
+                    const p = points[i];
+                    const x = p.x + p.wave.x + p.cursor.x + p.audio.x;
+                    const y = p.y + p.wave.y + p.cursor.y + p.audio.y;
+                    pathData += ` L ${x} ${y}`;
+                }
+
+                // Update path with color and filter
+                const path = state.paths[lineIndex];
+                path.setAttribute('d', pathData);
+                path.setAttribute('stroke', color);
+                path.setAttribute('filter', 'url(#neon-glow)');
+                path.setAttribute('opacity', theme.opacity);
+            });
+        }
+
+        // Theme renderer dispatcher
+        const themeRenderers = {
+            linear: drawLinesLinear,
+            neon: drawLinesNeon
+        };
+
+        function drawLines() {
+            const renderer = themeRenderers[state.settings.theme] || drawLinesLinear;
+            renderer();
         }
 
         // =====================================================
@@ -1190,6 +1332,16 @@
             document.getElementById('themeSelect').addEventListener('change', (e) => {
                 state.settings.theme = e.target.value;
                 console.log(`🎨 Theme changed to: ${state.settings.theme.toUpperCase()}`);
+
+                // Reset path attributes for theme change
+                state.paths.forEach((path) => {
+                    path.removeAttribute('filter');
+                    path.setAttribute('opacity', '0.6');
+                    path.setAttribute('stroke', '#ffffff');
+                });
+
+                // Update colors for new theme
+                updateColors();
             });
 
             // Reset button
