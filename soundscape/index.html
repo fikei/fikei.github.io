@@ -1007,6 +1007,14 @@
         }
 
         function hideControls() {
+            // Don't hide if sidebar is open
+            const sidebarOpen = elements.sidebar.classList.contains('open');
+            if (sidebarOpen) {
+                // Restart the timeout to check again later
+                state.idleTimeout = setTimeout(hideControls, 2000);
+                return;
+            }
+
             state.controlsVisible = false;
             elements.statusBar.classList.add('hidden-control');
             elements.sidebarToggle.classList.add('hidden-control');
