@@ -7,9 +7,6 @@
     <meta name="description" content="Real-time audio visualization using simplex-noise wave grid that reacts to microphone input">
     <link rel="icon" type="image/png" href="../images/icons/favicon.ico"/>
 
-    <!-- Simplex Noise Library -->
-    <script src="https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/simplex-noise.min.js"></script>
-
     <!-- Space Grotesk Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -459,7 +456,40 @@
         // SOUNDSCAPE: Audio-Reactive Wave Visualization
         // =====================================================
 
-        const { createNoise2D } = window.SimplexNoise;
+        // Simple 2D noise function (Perlin-like)
+        function createNoise2D() {
+            const permutation = [];
+            for (let i = 0; i < 256; i++) permutation[i] = i;
+            for (let i = 255; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [permutation[i], permutation[j]] = [permutation[j], permutation[i]];
+            }
+            const p = [...permutation, ...permutation];
+
+            const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+            const lerp = (t, a, b) => a + t * (b - a);
+            const grad = (hash, x, y) => {
+                const h = hash & 15;
+                const u = h < 8 ? x : y;
+                const v = h < 4 ? y : h === 12 || h === 14 ? x : 0;
+                return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+            };
+
+            return function(x, y) {
+                const X = Math.floor(x) & 255;
+                const Y = Math.floor(y) & 255;
+                x -= Math.floor(x);
+                y -= Math.floor(y);
+                const u = fade(x);
+                const v = fade(y);
+                const a = p[X] + Y;
+                const b = p[X + 1] + Y;
+                return lerp(v,
+                    lerp(u, grad(p[a], x, y), grad(p[b], x - 1, y)),
+                    lerp(u, grad(p[a + 1], x, y - 1), grad(p[b + 1], x - 1, y - 1))
+                );
+            };
+        }
 
         // ===== DOM ELEMENTS =====
         const elements = {
