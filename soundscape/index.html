@@ -880,6 +880,11 @@
                 elements.statusBar.classList.add('active');
 
                 console.log('✅ Audio capture started');
+                console.log('🎤 Analyser config:', {
+                    fftSize: state.analyser.fftSize,
+                    bufferLength: state.bufferLength,
+                    smoothing: state.analyser.smoothingTimeConstant
+                });
 
                 // Start idle timeout for controls
                 showControls();
@@ -989,6 +994,18 @@
             state.audioLevels.low = lowLevel;
             state.audioLevels.mid = midLevel;
             state.audioLevels.high = highLevel;
+
+            // Debug logging (every 60 frames ~= 1 second)
+            if (Math.random() < 0.016) {
+                console.log('🎵 Audio Levels:', {
+                    low: lowLevel.toFixed(3),
+                    mid: midLevel.toFixed(3),
+                    high: highLevel.toFixed(3),
+                    lowSum,
+                    midSum,
+                    highSum
+                });
+            }
 
             // Bass creates global background shift
             const bassShiftX = Math.sin(time * 0.001) * lowLevel * 40 * state.settings.intensity;
@@ -1204,6 +1221,18 @@
             const movementAmplitude = 100 + low * 200;
             const sizeMultiplier = 1.0 + high * 0.5;
 
+            // Debug logging for NEON renderer (every ~1 second)
+            if (Math.random() < 0.016) {
+                console.log('🎨 NEON Render:', {
+                    audioLevels: { low, mid, high },
+                    hueShift: hueShift.toFixed(1),
+                    saturation: saturation.toFixed(1),
+                    lightness: lightness.toFixed(1),
+                    movementAmplitude: movementAmplitude.toFixed(1),
+                    sizeMultiplier: sizeMultiplier.toFixed(2)
+                });
+            }
+
             // Create multiple gradient centers for organic look
             const numCenters = theme.baseHues.length;
 
@@ -1289,6 +1318,17 @@
                 if (blur1) blur1.setAttribute('stdDeviation', blurRadius * 0.5);
                 if (blur2) blur2.setAttribute('stdDeviation', blurRadius);
                 if (blur3) blur3.setAttribute('stdDeviation', blurRadius * 1.5);
+
+                // Debug blur values
+                if (Math.random() < 0.016) {
+                    console.log('✨ Blur Filter:', {
+                        low,
+                        blurRadius: blurRadius.toFixed(2),
+                        blur1: (blurRadius * 0.5).toFixed(2),
+                        blur2: blurRadius.toFixed(2),
+                        blur3: (blurRadius * 1.5).toFixed(2)
+                    });
+                }
             }
         }
 
