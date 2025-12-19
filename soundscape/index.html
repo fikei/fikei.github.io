@@ -418,9 +418,9 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>INTENSITY</span>
-                    <span class="control-value" id="intensityValue">1.5</span>
+                    <span class="control-value" id="intensityValue">2.5</span>
                 </div>
-                <input type="range" id="intensitySlider" min="0" max="4" step="0.1" value="1.5">
+                <input type="range" id="intensitySlider" min="0" max="5" step="0.1" value="2.5">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -505,8 +505,8 @@
         // ===== CONFIGURATION =====
         const config = {
             // Audio settings
-            fftSize: 512,
-            smoothing: 0.8,
+            fftSize: 256,
+            smoothing: 0.3,
 
             // Grid settings
             densityPresets: {
@@ -535,7 +535,7 @@
                 lowEmphasis: 1.0,
                 midEmphasis: 1.0,
                 highEmphasis: 1.0,
-                intensity: 1.5,
+                intensity: 2.5,
                 speed: 1.0,
                 density: 'medium',
                 gradient: 'default'
@@ -796,14 +796,14 @@
                     p.wave.x = Math.cos(noiseValue) * config.waveAmplitude;
                     p.wave.y = Math.sin(noiseValue) * (config.waveAmplitude * 0.5);
 
-                    // 2. Audio reactivity
+                    // 2. Audio reactivity (stronger response)
                     const audioNoiseValue = state.noise(
                         (p.x + time * 0.02) * 0.005,
                         (p.y + time * 0.015) * 0.005
                     );
 
-                    p.audio.x = Math.cos(audioNoiseValue) * audioIntensity * 30;
-                    p.audio.y = Math.sin(audioNoiseValue) * audioIntensity * 20;
+                    p.audio.x = Math.cos(audioNoiseValue) * audioIntensity * 80;
+                    p.audio.y = Math.sin(audioNoiseValue) * audioIntensity * 60;
 
                     // 3. Mouse interaction
                     const dx = p.x - state.mouse.sx;
@@ -942,7 +942,7 @@
                 lowEmphasis: 1.0,
                 midEmphasis: 1.0,
                 highEmphasis: 1.0,
-                intensity: 1.5,
+                intensity: 2.5,
                 speed: 1.0,
                 density: 'medium',
                 gradient: 'default'
@@ -952,13 +952,13 @@
             document.getElementById('lowEmphasis').value = 1.0;
             document.getElementById('midEmphasis').value = 1.0;
             document.getElementById('highEmphasis').value = 1.0;
-            document.getElementById('intensitySlider').value = 1.5;
+            document.getElementById('intensitySlider').value = 2.5;
             document.getElementById('speedSlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
             document.getElementById('highValue').textContent = '1.0';
-            document.getElementById('intensityValue').textContent = '1.5';
+            document.getElementById('intensityValue').textContent = '2.5';
             document.getElementById('speedValue').textContent = '1.0';
 
             // Reset density
