@@ -502,9 +502,9 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>SMOOTHING</span>
-                    <span class="control-value" id="smoothingValue">0.5</span>
+                    <span class="control-value" id="smoothingValue">0.3</span>
                 </div>
-                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.5">
+                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.3">
             </div>
         </section>
 
@@ -582,8 +582,8 @@
         // ===== CONFIGURATION =====
         const config = {
             // Audio settings
-            fftSize: 256,
-            smoothing: 0.5,
+            fftSize: 128, // Reduced from 256 for lower latency
+            smoothing: 0.3, // Reduced from 0.5 for faster response
 
             // Grid settings
             densityPresets: {
@@ -649,7 +649,7 @@
                 highEmphasis: 1.0,
                 intensity: 2.5,
                 speed: 1.0,
-                smoothing: 0.5,
+                smoothing: 0.3,
                 density: 'medium',
                 gradient: 'default',
                 mode: 'hole',
@@ -697,7 +697,10 @@
                 mid: 0,
                 high: 0
             },
-            currentTime: 0
+            currentTime: 0,
+
+            // User-created gradient centers (for NEON theme)
+            userGradientCenters: []
         };
 
         // =====================================================
@@ -1287,7 +1290,8 @@
             }
 
             // Create multiple gradient centers for organic look
-            const numCenters = theme.baseHues.length;
+            const numBaseCenters = theme.baseHues.length;
+            const numUserCenters = state.userGradientCenters.length;
 
             // Get or create gradient definitions in defs
             let defsElement = elements.svg.querySelector('defs');
@@ -1299,13 +1303,14 @@
             // Clear and recreate gradient mesh
             gradientMeshGroup.innerHTML = '';
 
-            for (let i = 0; i < numCenters; i++) {
+            // Render base gradient centers
+            for (let i = 0; i < numBaseCenters; i++) {
                 // Calculate organic position using noise
                 const noiseX = state.noise(time * 0.0005 + i * 10, i * 20) * movementAmplitude;
                 const noiseY = state.noise(time * 0.0007 + i * 15, i * 25 + 100) * movementAmplitude;
 
                 // Base position distributed around the screen
-                const baseX = canvasWidth * (0.2 + (i / numCenters) * 0.6);
+                const baseX = canvasWidth * (0.2 + (i / numBaseCenters) * 0.6);
                 const baseY = canvasHeight * (0.3 + Math.sin(i * 2) * 0.4);
 
                 const cx = baseX + noiseX;
@@ -1345,6 +1350,60 @@
                     const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
                     stopElement.setAttribute('offset', stop.offset);
                     stopElement.setAttribute('stop-color', `hsl(${hue}, ${saturation}%, ${lightness}%)`);
+                    stopElement.setAttribute('stop-opacity', stop.opacity);
+                    gradient.appendChild(stopElement);
+                });
+
+                // Create circle with gradient fill
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', radius);
+                circle.setAttribute('fill', `url(#${gradientId})`);
+                circle.setAttribute('filter', 'url(#neon-glow)');
+
+                gradientMeshGroup.appendChild(circle);
+            }
+
+            // Render user-created gradient centers
+            for (let i = 0; i < numUserCenters; i++) {
+                const userCenter = state.userGradientCenters[i];
+                const cx = userCenter.x;
+                const cy = userCenter.y;
+
+                // Calculate size - larger for user centers to make them more prominent
+                const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.5;
+                const radius = baseRadius * sizeMultiplier * 1.2; // 20% larger
+
+                // Create radial gradient for this user center
+                const gradientId = `neon-user-${i}`;
+                let gradient = defsElement.querySelector(`#${gradientId}`);
+                if (!gradient) {
+                    gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+                    gradient.setAttribute('id', gradientId);
+                    defsElement.appendChild(gradient);
+                }
+
+                gradient.setAttribute('cx', '50%');
+                gradient.setAttribute('cy', '50%');
+                gradient.setAttribute('r', '50%');
+
+                // Use a different hue based on user center index
+                const userHue = (theme.baseHues[i % theme.baseHues.length] + hueShift + 45) % 360;
+
+                // Create gradient stops with higher initial opacity for user centers
+                const stops = [
+                    { offset: '0%', opacity: 0.95 },
+                    { offset: '30%', opacity: 0.75 },
+                    { offset: '60%', opacity: 0.4 },
+                    { offset: '100%', opacity: 0 }
+                ];
+
+                gradient.innerHTML = '';
+                stops.forEach(stop => {
+                    const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                    stopElement.setAttribute('offset', stop.offset);
+                    stopElement.setAttribute('stop-color', `hsl(${userHue}, ${saturation}%, ${lightness}%)`);
                     stopElement.setAttribute('stop-opacity', stop.opacity);
                     gradient.appendChild(stopElement);
                 });
@@ -1654,6 +1713,31 @@
             window.addEventListener('resize', () => {
                 setupWaveGrid();
             });
+
+            // Click to add gradient centers (NEON theme only)
+            window.addEventListener('click', (e) => {
+                // Only add gradient centers for NEON theme
+                if (state.settings.theme !== 'neon') return;
+
+                // Don't add if clicking on UI elements
+                if (e.target.closest('.sidebar') || e.target.closest('.sidebar-toggle')) return;
+
+                // Add new gradient center at click position
+                const newCenter = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    createdAt: Date.now()
+                };
+
+                state.userGradientCenters.push(newCenter);
+
+                // Keep only the most recent 3 centers
+                if (state.userGradientCenters.length > 3) {
+                    state.userGradientCenters.shift(); // Remove the oldest
+                }
+
+                console.log(`✨ Added gradient center at (${e.clientX}, ${e.clientY}). Total: ${state.userGradientCenters.length}`);
+            });
         }
 
         function setupSlider(sliderId, valueId, callback) {
@@ -1675,7 +1759,7 @@
                 highEmphasis: 1.0,
                 intensity: 2.5,
                 speed: 1.0,
-                smoothing: 0.5,
+                smoothing: 0.3,
                 density: 'medium',
                 gradient: 'default',
                 mode: 'hole',
@@ -1688,19 +1772,22 @@
             document.getElementById('highEmphasis').value = 1.0;
             document.getElementById('intensitySlider').value = 2.5;
             document.getElementById('speedSlider').value = 1.0;
-            document.getElementById('smoothingSlider').value = 0.5;
+            document.getElementById('smoothingSlider').value = 0.3;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
             document.getElementById('highValue').textContent = '1.0';
             document.getElementById('intensityValue').textContent = '2.5';
             document.getElementById('speedValue').textContent = '1.0';
-            document.getElementById('smoothingValue').textContent = '0.5';
+            document.getElementById('smoothingValue').textContent = '0.3';
 
             // Update analyser if active
             if (state.analyser) {
-                state.analyser.smoothingTimeConstant = 0.5;
+                state.analyser.smoothingTimeConstant = 0.3;
             }
+
+            // Clear user-created gradient centers
+            state.userGradientCenters = [];
 
             // Reset density
             document.querySelectorAll('[data-density]').forEach(o => o.classList.remove('active'));
