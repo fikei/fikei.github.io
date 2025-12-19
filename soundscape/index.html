@@ -466,7 +466,7 @@
             <h3>MODE</h3>
             <div class="density-options">
                 <div class="density-option active" data-mode="hole">HOLE</div>
-                <div class="density-option" data-mode="swing">SWING</div>
+                <div class="density-option" data-mode="crunch">CRUNCH</div>
             </div>
         </section>
 
@@ -923,11 +923,11 @@
                 }
             }
 
-            // SWING MODE: Calculate wave front positions
-            const swingMidAngle = time * 0.0008 + state.noise(time * 0.0002, 0) * Math.PI * 2;
-            const swingHighAngle = time * 0.001 + state.noise(time * 0.0003, 100) * Math.PI * 2;
-            const swingMidOffset = Math.sin(time * 0.0005) * canvasWidth * 0.5;
-            const swingHighOffset = Math.sin(time * 0.0007) * canvasWidth * 0.5;
+            // CRUNCH MODE: Calculate wave front positions
+            const crunchMidAngle = time * 0.0008 + state.noise(time * 0.0002, 0) * Math.PI * 2;
+            const crunchHighAngle = time * 0.001 + state.noise(time * 0.0003, 100) * Math.PI * 2;
+            const crunchMidOffset = Math.sin(time * 0.0005) * canvasWidth * 0.5;
+            const crunchHighOffset = Math.sin(time * 0.0007) * canvasWidth * 0.5;
 
             // Update all points
             state.lines.forEach((points) => {
@@ -975,30 +975,30 @@
                             highForceY = Math.sin(angle) * highStrength * 100 * state.settings.intensity;
                         }
                     } else {
-                        // SWING MODE: Directional wave sweep across screen
+                        // CRUNCH MODE: Directional wave sweep across screen
                         // Calculate distance from wave front for mids
-                        const midWaveX = Math.cos(swingMidAngle);
-                        const midWaveY = Math.sin(swingMidAngle);
-                        const midDistFromFront = (p.x - canvasWidth * 0.5) * midWaveX + (p.y - canvasHeight * 0.5) * midWaveY + swingMidOffset;
+                        const midWaveX = Math.cos(crunchMidAngle);
+                        const midWaveY = Math.sin(crunchMidAngle);
+                        const midDistFromFront = (p.x - canvasWidth * 0.5) * midWaveX + (p.y - canvasHeight * 0.5) * midWaveY + crunchMidOffset;
                         const midWaveWidth = 400;
 
                         if (Math.abs(midDistFromFront) < midWaveWidth) {
                             const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midLevel;
-                            const perpAngle = swingMidAngle + Math.PI * 0.5;
+                            const perpAngle = crunchMidAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.01, p.y * 0.01 + time * 0.001) > 0 ? 1 : -1;
                             midForceX = Math.cos(perpAngle) * midStrength * 120 * state.settings.intensity * waveDir;
                             midForceY = Math.sin(perpAngle) * midStrength * 120 * state.settings.intensity * waveDir;
                         }
 
                         // Calculate distance from wave front for highs
-                        const highWaveX = Math.cos(swingHighAngle);
-                        const highWaveY = Math.sin(swingHighAngle);
-                        const highDistFromFront = (p.x - canvasWidth * 0.5) * highWaveX + (p.y - canvasHeight * 0.5) * highWaveY + swingHighOffset;
+                        const highWaveX = Math.cos(crunchHighAngle);
+                        const highWaveY = Math.sin(crunchHighAngle);
+                        const highDistFromFront = (p.x - canvasWidth * 0.5) * highWaveX + (p.y - canvasHeight * 0.5) * highWaveY + crunchHighOffset;
                         const highWaveWidth = 300;
 
                         if (Math.abs(highDistFromFront) < highWaveWidth) {
                             const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highLevel;
-                            const perpAngle = swingHighAngle + Math.PI * 0.5;
+                            const perpAngle = crunchHighAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.015, p.y * 0.015 + time * 0.0015) > 0 ? 1 : -1;
                             highForceX = Math.cos(perpAngle) * highStrength * 150 * state.settings.intensity * waveDir;
                             highForceY = Math.sin(perpAngle) * highStrength * 150 * state.settings.intensity * waveDir;
