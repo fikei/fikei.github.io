@@ -109,10 +109,17 @@
             gap: 0.5rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            opacity: 1;
+            transition: opacity 0.5s ease;
         }
 
         .status-bar.active {
             display: flex;
+        }
+
+        .status-bar.hidden-control {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .status-indicator {
@@ -142,12 +149,18 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.15s ease;
+            opacity: 1;
+            transition: opacity 0.5s ease, background 0.15s ease;
         }
 
         .sidebar-toggle:hover {
             background: #ffffff;
             color: #000000;
+        }
+
+        .sidebar-toggle.hidden-control {
+            opacity: 0;
+            pointer-events: none;
         }
 
         /* ===== CONTROLS SIDEBAR ===== */
@@ -584,8 +597,13 @@
                 v: 0,
                 vs: 0,
                 a: 0,
-                set: false
-            }
+                set: false,
+                onScreen: false
+            },
+
+            // Control visibility
+            controlsVisible: true,
+            idleTimeout: null
         };
 
         // =====================================================
@@ -726,6 +744,9 @@
 
                 console.log('✅ Audio capture started');
 
+                // Start idle timeout for controls
+                showControls();
+
                 // Start animation loop
                 requestAnimationFrame(animate);
 
@@ -812,20 +833,27 @@
             let midCursorX, midCursorY, highCursorX, highCursorY;
 
             if (state.settings.mode === 'hole') {
-                // HOLE MODE: Virtual cursor positions for ripple effects
-                midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
-                midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+                // HOLE MODE: Follow cursor if on screen, random if not
+                if (state.mouse.onScreen) {
+                    midCursorX = state.mouse.sx;
+                    midCursorY = state.mouse.sy;
+                    highCursorX = state.mouse.sx;
+                    highCursorY = state.mouse.sy;
+                } else {
+                    // Random virtual cursor positions
+                    midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
+                    midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
 
-                highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
-                highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
-            } else {
-                // SWING MODE: Use actual cursor position
-                midCursorX = state.mouse.sx;
-                midCursorY = state.mouse.sy;
-
-                highCursorX = state.mouse.sx;
-                highCursorY = state.mouse.sy;
+                    highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
+                    highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
+                }
             }
+
+            // SWING MODE: Calculate wave front positions
+            const swingMidAngle = time * 0.0008 + state.noise(time * 0.0002, 0) * Math.PI * 2;
+            const swingHighAngle = time * 0.001 + state.noise(time * 0.0003, 100) * Math.PI * 2;
+            const swingMidOffset = Math.sin(time * 0.0005) * canvasWidth * 0.5;
+            const swingHighOffset = Math.sin(time * 0.0007) * canvasWidth * 0.5;
 
             // Update all points
             state.lines.forEach((points) => {
@@ -840,50 +868,67 @@
                     p.wave.x = Math.cos(noiseValue) * config.waveAmplitude + bassShiftX;
                     p.wave.y = Math.sin(noiseValue) * (config.waveAmplitude * 0.5) + bassShiftY;
 
-                    // 2. Mids create ripple effect
-                    const midDx = p.x - midCursorX;
-                    const midDy = p.y - midCursorY;
-                    const midDist = Math.hypot(midDx, midDy);
-                    const midRadius = 300 * midLevel;
-
                     let midForceX = 0;
                     let midForceY = 0;
-
-                    if (midDist < midRadius && midDist > 0) {
-                        const midStrength = (1 - midDist / midRadius) * midLevel;
-                        let angle = Math.atan2(midDy, midDx);
-
-                        // SWING MODE: Randomize direction
-                        if (state.settings.mode === 'swing') {
-                            const randomOffset = state.noise(time * 0.001, p.x * 0.01) * Math.PI;
-                            angle += randomOffset;
-                        }
-
-                        midForceX = Math.cos(angle) * midStrength * 80 * state.settings.intensity;
-                        midForceY = Math.sin(angle) * midStrength * 80 * state.settings.intensity;
-                    }
-
-                    // 3. Highs create sharper ripple effect
-                    const highDx = p.x - highCursorX;
-                    const highDy = p.y - highCursorY;
-                    const highDist = Math.hypot(highDx, highDy);
-                    const highRadius = 200 * highLevel;
-
                     let highForceX = 0;
                     let highForceY = 0;
 
-                    if (highDist < highRadius && highDist > 0) {
-                        const highStrength = (1 - highDist / highRadius) * highLevel;
-                        let angle = Math.atan2(highDy, highDx);
+                    if (state.settings.mode === 'hole') {
+                        // HOLE MODE: Radial ripples from cursor position
+                        // 2. Mids create ripple effect
+                        const midDx = p.x - midCursorX;
+                        const midDy = p.y - midCursorY;
+                        const midDist = Math.hypot(midDx, midDy);
+                        const midRadius = 300 * midLevel;
 
-                        // SWING MODE: Randomize direction
-                        if (state.settings.mode === 'swing') {
-                            const randomOffset = state.noise(time * 0.0015, p.y * 0.01) * Math.PI * 1.5;
-                            angle += randomOffset;
+                        if (midDist < midRadius && midDist > 0) {
+                            const midStrength = (1 - midDist / midRadius) * midLevel;
+                            const angle = Math.atan2(midDy, midDx);
+                            midForceX = Math.cos(angle) * midStrength * 80 * state.settings.intensity;
+                            midForceY = Math.sin(angle) * midStrength * 80 * state.settings.intensity;
                         }
 
-                        highForceX = Math.cos(angle) * highStrength * 100 * state.settings.intensity;
-                        highForceY = Math.sin(angle) * highStrength * 100 * state.settings.intensity;
+                        // 3. Highs create sharper ripple effect
+                        const highDx = p.x - highCursorX;
+                        const highDy = p.y - highCursorY;
+                        const highDist = Math.hypot(highDx, highDy);
+                        const highRadius = 200 * highLevel;
+
+                        if (highDist < highRadius && highDist > 0) {
+                            const highStrength = (1 - highDist / highRadius) * highLevel;
+                            const angle = Math.atan2(highDy, highDx);
+                            highForceX = Math.cos(angle) * highStrength * 100 * state.settings.intensity;
+                            highForceY = Math.sin(angle) * highStrength * 100 * state.settings.intensity;
+                        }
+                    } else {
+                        // SWING MODE: Directional wave sweep across screen
+                        // Calculate distance from wave front for mids
+                        const midWaveX = Math.cos(swingMidAngle);
+                        const midWaveY = Math.sin(swingMidAngle);
+                        const midDistFromFront = (p.x - canvasWidth * 0.5) * midWaveX + (p.y - canvasHeight * 0.5) * midWaveY + swingMidOffset;
+                        const midWaveWidth = 400;
+
+                        if (Math.abs(midDistFromFront) < midWaveWidth) {
+                            const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midLevel;
+                            const perpAngle = swingMidAngle + Math.PI * 0.5;
+                            const waveDir = state.noise(p.x * 0.01, p.y * 0.01 + time * 0.001) > 0 ? 1 : -1;
+                            midForceX = Math.cos(perpAngle) * midStrength * 120 * state.settings.intensity * waveDir;
+                            midForceY = Math.sin(perpAngle) * midStrength * 120 * state.settings.intensity * waveDir;
+                        }
+
+                        // Calculate distance from wave front for highs
+                        const highWaveX = Math.cos(swingHighAngle);
+                        const highWaveY = Math.sin(swingHighAngle);
+                        const highDistFromFront = (p.x - canvasWidth * 0.5) * highWaveX + (p.y - canvasHeight * 0.5) * highWaveY + swingHighOffset;
+                        const highWaveWidth = 300;
+
+                        if (Math.abs(highDistFromFront) < highWaveWidth) {
+                            const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highLevel;
+                            const perpAngle = swingHighAngle + Math.PI * 0.5;
+                            const waveDir = state.noise(p.x * 0.015, p.y * 0.015 + time * 0.0015) > 0 ? 1 : -1;
+                            highForceX = Math.cos(perpAngle) * highStrength * 150 * state.settings.intensity * waveDir;
+                            highForceY = Math.sin(perpAngle) * highStrength * 150 * state.settings.intensity * waveDir;
+                        }
                     }
 
                     // Combine audio forces
@@ -943,6 +988,28 @@
                 // Update path
                 state.paths[lineIndex].setAttribute('d', pathData);
             });
+        }
+
+        // =====================================================
+        // CONTROL VISIBILITY
+        // =====================================================
+
+        function showControls() {
+            if (!state.controlsVisible) {
+                state.controlsVisible = true;
+                elements.statusBar.classList.remove('hidden-control');
+                elements.sidebarToggle.classList.remove('hidden-control');
+            }
+
+            // Reset idle timeout
+            clearTimeout(state.idleTimeout);
+            state.idleTimeout = setTimeout(hideControls, 2000); // Hide after 2 seconds of no movement
+        }
+
+        function hideControls() {
+            state.controlsVisible = false;
+            elements.statusBar.classList.add('hidden-control');
+            elements.sidebarToggle.classList.add('hidden-control');
         }
 
         // =====================================================
@@ -1012,6 +1079,7 @@
             window.addEventListener('mousemove', (e) => {
                 state.mouse.x = e.clientX;
                 state.mouse.y = e.clientY;
+                state.mouse.onScreen = true;
 
                 if (!state.mouse.set) {
                     state.mouse.sx = state.mouse.x;
@@ -1020,6 +1088,18 @@
                     state.mouse.ly = state.mouse.y;
                     state.mouse.set = true;
                 }
+
+                // Show controls on mouse movement
+                showControls();
+            });
+
+            // Track when mouse leaves the screen
+            window.addEventListener('mouseleave', () => {
+                state.mouse.onScreen = false;
+            });
+
+            window.addEventListener('mouseenter', () => {
+                state.mouse.onScreen = true;
             });
 
             // Window resize
