@@ -445,9 +445,9 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>SMOOTHING</span>
-                    <span class="control-value" id="smoothingValue">0.3</span>
+                    <span class="control-value" id="smoothingValue">1.0</span>
                 </div>
-                <input type="range" id="smoothingSlider" min="0" max="0.9" step="0.1" value="0.3">
+                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="1.0">
             </div>
         </section>
 
@@ -535,7 +535,7 @@
         const config = {
             // Audio settings
             fftSize: 256,
-            smoothing: 0.3,
+            smoothing: 1.0,
 
             // Grid settings
             densityPresets: {
@@ -566,7 +566,7 @@
                 highEmphasis: 1.0,
                 intensity: 2.5,
                 speed: 1.0,
-                smoothing: 0.3,
+                smoothing: 1.0,
                 density: 'medium',
                 gradient: 'default',
                 mode: 'hole'
@@ -585,6 +585,8 @@
             lines: [],
             noise: null,
             boundingRect: null,
+            transitioning: false,
+            transitionProgress: 1.0,
 
             // Mouse tracking
             mouse: {
@@ -631,10 +633,10 @@
         // =====================================================
 
         function setupWaveGrid() {
-            // Clear existing grid
-            state.paths.forEach(path => path.remove());
-            state.paths = [];
-            state.lines = [];
+            // Store old grid for transition
+            const oldLines = state.lines.length > 0 ? state.lines.map(line =>
+                line.map(p => ({ x: p.x, y: p.y }))
+            ) : null;
 
             // Get container dimensions
             state.boundingRect = elements.container.getBoundingClientRect();
@@ -660,32 +662,80 @@
 
             console.log(`📊 Creating ${totalLines} lines with ${totalPoints} points each`);
 
-            // Create grid lines
-            for (let i = 0; i < totalLines; i++) {
-                const points = [];
+            // Check if we need to rebuild or just transition
+            const needsRebuild = state.lines.length !== totalLines ||
+                                (state.lines.length > 0 && state.lines[0].length !== totalPoints);
 
-                // Create points for this line
-                for (let j = 0; j < totalPoints; j++) {
-                    points.push({
-                        x: xStart + xGap * i,
-                        y: yStart + yGap * j,
-                        wave: { x: 0, y: 0 },      // Noise-based wave motion
-                        cursor: { x: 0, y: 0, vx: 0, vy: 0 }, // Mouse interaction
-                        audio: { x: 0, y: 0 }       // Audio reactivity
-                    });
+            if (needsRebuild) {
+                // Clear existing grid
+                state.paths.forEach(path => path.remove());
+                state.paths = [];
+                state.lines = [];
+
+                // Create grid lines
+                for (let i = 0; i < totalLines; i++) {
+                    const points = [];
+
+                    // Create points for this line
+                    for (let j = 0; j < totalPoints; j++) {
+                        const targetX = xStart + xGap * i;
+                        const targetY = yStart + yGap * j;
+
+                        // Try to find nearest old point for smooth transition
+                        let startX = targetX;
+                        let startY = targetY;
+
+                        if (oldLines && oldLines.length > 0) {
+                            const oldLineIndex = Math.min(i, oldLines.length - 1);
+                            const oldLine = oldLines[oldLineIndex];
+                            if (oldLine && oldLine.length > 0) {
+                                const oldPointIndex = Math.min(j, oldLine.length - 1);
+                                startX = oldLine[oldPointIndex].x;
+                                startY = oldLine[oldPointIndex].y;
+                            }
+                        }
+
+                        points.push({
+                            x: startX,
+                            y: startY,
+                            targetX: targetX,
+                            targetY: targetY,
+                            wave: { x: 0, y: 0 },
+                            cursor: { x: 0, y: 0, vx: 0, vy: 0 },
+                            audio: { x: 0, y: 0 }
+                        });
+                    }
+
+                    // Create SVG path
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('stroke-width', '1');
+                    path.setAttribute('stroke-linecap', 'round');
+                    path.setAttribute('stroke-linejoin', 'round');
+                    path.setAttribute('opacity', '0.6');
+                    elements.svg.appendChild(path);
+
+                    state.paths.push(path);
+                    state.lines.push(points);
                 }
 
-                // Create SVG path
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('fill', 'none');
-                path.setAttribute('stroke-width', '1');
-                path.setAttribute('stroke-linecap', 'round');
-                path.setAttribute('stroke-linejoin', 'round');
-                path.setAttribute('opacity', '0.6');
-                elements.svg.appendChild(path);
+                // Start transition if we had an old grid
+                if (oldLines) {
+                    state.transitioning = true;
+                    state.transitionProgress = 0.0;
+                }
+            } else {
+                // Just update target positions
+                for (let i = 0; i < totalLines; i++) {
+                    for (let j = 0; j < totalPoints; j++) {
+                        const p = state.lines[i][j];
+                        p.targetX = xStart + xGap * i;
+                        p.targetY = yStart + yGap * j;
+                    }
+                }
 
-                state.paths.push(path);
-                state.lines.push(points);
+                state.transitioning = true;
+                state.transitionProgress = 0.0;
             }
 
             // Apply colors
@@ -761,6 +811,10 @@
         // ANIMATION LOOP
         // =====================================================
 
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
         function animate(time = 0) {
             if (!state.isActive) return;
 
@@ -802,6 +856,26 @@
         }
 
         function movePoints(time) {
+            // Handle grid transition animation
+            if (state.transitioning) {
+                state.transitionProgress += 0.05; // Smooth transition speed
+                if (state.transitionProgress >= 1.0) {
+                    state.transitionProgress = 1.0;
+                    state.transitioning = false;
+                }
+
+                // Interpolate all points to their target positions
+                const easeProgress = easeInOutCubic(state.transitionProgress);
+                state.lines.forEach((points) => {
+                    points.forEach((p) => {
+                        if (p.targetX !== undefined && p.targetY !== undefined) {
+                            p.x += (p.targetX - p.x) * easeProgress * 0.2;
+                            p.y += (p.targetY - p.y) * easeProgress * 0.2;
+                        }
+                    });
+                });
+            }
+
             // Get audio frequency data
             let lowSum = 0, midSum = 0, highSum = 0;
 
@@ -1135,7 +1209,7 @@
                 highEmphasis: 1.0,
                 intensity: 2.5,
                 speed: 1.0,
-                smoothing: 0.3,
+                smoothing: 1.0,
                 density: 'medium',
                 gradient: 'default',
                 mode: 'hole'
@@ -1147,18 +1221,18 @@
             document.getElementById('highEmphasis').value = 1.0;
             document.getElementById('intensitySlider').value = 2.5;
             document.getElementById('speedSlider').value = 1.0;
-            document.getElementById('smoothingSlider').value = 0.3;
+            document.getElementById('smoothingSlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
             document.getElementById('highValue').textContent = '1.0';
             document.getElementById('intensityValue').textContent = '2.5';
             document.getElementById('speedValue').textContent = '1.0';
-            document.getElementById('smoothingValue').textContent = '0.3';
+            document.getElementById('smoothingValue').textContent = '1.0';
 
             // Update analyser if active
             if (state.analyser) {
-                state.analyser.smoothingTimeConstant = 0.3;
+                state.analyser.smoothingTimeConstant = 1.0;
             }
 
             // Reset density
