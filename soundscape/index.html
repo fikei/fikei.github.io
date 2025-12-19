@@ -1503,6 +1503,168 @@
                 gradientMeshGroup.innerHTML = '';
             }
 
+            // Get canvas element
+            const canvas = document.getElementById('glitch-canvas');
+            if (!canvas) return;
+
+            // Check if image is loaded
+            if (state.glitchImage.loaded && state.glitchImage.img) {
+                // IMAGE-BASED RENDERING
+                renderGlitchImage(canvas, theme, low, mid, high, time);
+            } else {
+                // LINE-BASED RENDERING (fallback)
+                // Hide canvas
+                canvas.style.display = 'none';
+
+                renderGlitchLines(theme, low, mid, high);
+            }
+        }
+
+        function renderGlitchImage(canvas, theme, low, mid, high, time) {
+            const ctx = canvas.getContext('2d');
+            const img = state.glitchImage.img;
+
+            // Show canvas
+            canvas.style.display = 'block';
+
+            // Hide SVG lines
+            state.paths.forEach(path => {
+                path.setAttribute('d', '');
+                path.setAttribute('opacity', '0');
+            });
+
+            // Clean up glitch paths
+            const allGlitchPaths = elements.svg.querySelectorAll('[id^="glitch-"]');
+            allGlitchPaths.forEach(path => path.remove());
+
+            // Set canvas size and position
+            canvas.width = state.glitchImage.width;
+            canvas.height = state.glitchImage.height;
+            canvas.style.left = `${state.glitchImage.x}px`;
+            canvas.style.top = `${state.glitchImage.y}px`;
+
+            // Calculate glitch parameters
+            const channelSeparation = theme.channelSeparationBase + low * theme.channelSeparationMultiplier;
+            const glitchIntensity = mid * theme.glitchIntensityMultiplier;
+            const quantization = Math.max(1, theme.quantizationBase + high * theme.quantizationMultiplier);
+
+            // Calculate 3D rotation based on audio
+            const rotationX = mid * 45; // Mids control pitch (X-axis rotation)
+            const rotationY = high * 45; // Highs control yaw (Y-axis rotation)
+            const rotationZ = low * 15; // Bass controls roll (Z-axis rotation)
+
+            // Apply 3D transform to canvas
+            const perspective = 1000;
+            canvas.style.transformStyle = 'preserve-3d';
+            canvas.style.transform = `perspective(${perspective}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg) rotateZ(${rotationZ}deg)`;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply quantization/pixelation by scaling down and up
+            const pixelSize = Math.max(1, Math.floor(quantization));
+            const scaledWidth = Math.floor(canvas.width / pixelSize);
+            const scaledHeight = Math.floor(canvas.height / pixelSize);
+
+            // Create temporary canvas for RGB channel separation
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Draw pixelated base image
+            tempCtx.imageSmoothingEnabled = false;
+            tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+            tempCtx.drawImage(tempCanvas, 0, 0, scaledWidth, scaledHeight, 0, 0, canvas.width, canvas.height);
+
+            // Get image data for RGB channel manipulation
+            const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            // Apply random glitch displacement to scan lines
+            const scanlineGlitchChance = mid * 0.2;
+            for (let y = 0; y < canvas.height; y++) {
+                if (Math.random() < scanlineGlitchChance) {
+                    const offset = Math.floor((Math.random() - 0.5) * glitchIntensity * 20);
+                    if (offset !== 0) {
+                        const rowStart = y * canvas.width * 4;
+                        const rowData = data.slice(rowStart, rowStart + canvas.width * 4);
+
+                        for (let x = 0; x < canvas.width; x++) {
+                            const sourceX = Math.max(0, Math.min(canvas.width - 1, x - offset));
+                            const sourceIdx = sourceX * 4;
+                            const targetIdx = rowStart + x * 4;
+
+                            data[targetIdx] = rowData[sourceIdx];
+                            data[targetIdx + 1] = rowData[sourceIdx + 1];
+                            data[targetIdx + 2] = rowData[sourceIdx + 2];
+                            data[targetIdx + 3] = rowData[sourceIdx + 3];
+                        }
+                    }
+                }
+            }
+
+            // Create three canvases for RGB channel separation
+            const redCanvas = document.createElement('canvas');
+            redCanvas.width = canvas.width;
+            redCanvas.height = canvas.height;
+            const redCtx = redCanvas.getContext('2d');
+
+            const greenCanvas = document.createElement('canvas');
+            greenCanvas.width = canvas.width;
+            greenCanvas.height = canvas.height;
+            const greenCtx = greenCanvas.getContext('2d');
+
+            const blueCanvas = document.createElement('canvas');
+            blueCanvas.width = canvas.width;
+            blueCanvas.height = canvas.height;
+            const blueCtx = blueCanvas.getContext('2d');
+
+            // Extract individual color channels
+            const redData = ctx.createImageData(canvas.width, canvas.height);
+            const greenData = ctx.createImageData(canvas.width, canvas.height);
+            const blueData = ctx.createImageData(canvas.width, canvas.height);
+
+            for (let i = 0; i < data.length; i += 4) {
+                // Red channel
+                redData.data[i] = data[i];
+                redData.data[i + 1] = 0;
+                redData.data[i + 2] = 0;
+                redData.data[i + 3] = data[i + 3];
+
+                // Green channel
+                greenData.data[i] = 0;
+                greenData.data[i + 1] = data[i + 1];
+                greenData.data[i + 2] = 0;
+                greenData.data[i + 3] = data[i + 3];
+
+                // Blue channel
+                blueData.data[i] = 0;
+                blueData.data[i + 1] = 0;
+                blueData.data[i + 2] = data[i + 2];
+                blueData.data[i + 3] = data[i + 3];
+            }
+
+            redCtx.putImageData(redData, 0, 0);
+            greenCtx.putImageData(greenData, 0, 0);
+            blueCtx.putImageData(blueData, 0, 0);
+
+            // Composite the channels with separation
+            ctx.globalCompositeOperation = 'lighter';
+
+            // Red channel (offset left)
+            ctx.drawImage(redCanvas, -channelSeparation, 0);
+
+            // Green channel (centered)
+            ctx.drawImage(greenCanvas, 0, 0);
+
+            // Blue channel (offset right and down)
+            ctx.drawImage(blueCanvas, channelSeparation, channelSeparation * 0.5);
+
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        function renderGlitchLines(theme, low, mid, high) {
             // Calculate glitch parameters
             const channelSeparation = theme.channelSeparationBase + low * theme.channelSeparationMultiplier;
             const glitchIntensity = mid * theme.glitchIntensityMultiplier;
@@ -1822,6 +1984,56 @@
 
                 console.log(`✨ Added gradient center at (${e.clientX}, ${e.clientY}). Total: ${state.userGradientCenters.length}`);
             });
+
+            // Click & drag to resize image (GLITCH theme only)
+            const glitchCanvas = document.getElementById('glitch-canvas');
+            if (glitchCanvas) {
+                glitchCanvas.addEventListener('mousedown', (e) => {
+                    // Only handle resize for GLITCH theme with loaded image
+                    if (state.settings.theme !== 'glitch' || !state.glitchImage.loaded) return;
+
+                    state.glitchImage.isDragging = true;
+                    state.glitchImage.dragStartX = e.clientX;
+                    state.glitchImage.dragStartY = e.clientY;
+                    state.glitchImage.dragStartWidth = state.glitchImage.width;
+                    state.glitchImage.dragStartHeight = state.glitchImage.height;
+
+                    glitchCanvas.style.cursor = 'grabbing';
+                    e.preventDefault();
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!state.glitchImage.isDragging) return;
+
+                    // Calculate drag distance
+                    const dx = e.clientX - state.glitchImage.dragStartX;
+                    const dy = e.clientY - state.glitchImage.dragStartY;
+                    const dragDistance = Math.hypot(dx, dy);
+                    const dragDirection = dx + dy > 0 ? 1 : -1;
+
+                    // Calculate new size (proportional to drag distance)
+                    const scaleFactor = 1 + (dragDirection * dragDistance / 500);
+                    const newWidth = Math.max(100, state.glitchImage.dragStartWidth * scaleFactor);
+                    const aspectRatio = state.glitchImage.img.height / state.glitchImage.img.width;
+                    const newHeight = newWidth * aspectRatio;
+
+                    // Update image dimensions
+                    state.glitchImage.width = newWidth;
+                    state.glitchImage.height = newHeight;
+
+                    // Re-center the image
+                    state.glitchImage.x = (state.boundingRect.width - newWidth) / 2;
+                    state.glitchImage.y = (state.boundingRect.height - newHeight) / 2;
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (state.glitchImage.isDragging) {
+                        state.glitchImage.isDragging = false;
+                        glitchCanvas.style.cursor = 'grab';
+                        console.log(`🖼️ Image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                    }
+                });
+            }
         }
 
         function setupSlider(sliderId, valueId, callback) {
