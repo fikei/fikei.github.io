@@ -789,7 +789,17 @@
             const lowLevel = (lowSum / (state.bufferLength * 0.3) / 255) * state.settings.lowEmphasis;
             const midLevel = (midSum / (state.bufferLength * 0.4) / 255) * state.settings.midEmphasis;
             const highLevel = (highSum / (state.bufferLength * 0.3) / 255) * state.settings.highEmphasis;
-            const audioIntensity = ((lowLevel + midLevel + highLevel) / 3) * state.settings.intensity;
+
+            // Bass creates global background shift
+            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 40 * state.settings.intensity;
+            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 30 * state.settings.intensity;
+
+            // Highs and mids create "virtual cursor" positions for ripple effects
+            const midCursorX = canvas.width * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
+            const midCursorY = canvas.height * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+
+            const highCursorX = canvas.width * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
+            const highCursorY = canvas.height * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
 
             // Update all points
             state.lines.forEach((points) => {
@@ -801,19 +811,46 @@
                         (p.y + timeScale * 0.375) * 0.002
                     ) * 8;
 
-                    p.wave.x = Math.cos(noiseValue) * config.waveAmplitude;
-                    p.wave.y = Math.sin(noiseValue) * (config.waveAmplitude * 0.5);
+                    p.wave.x = Math.cos(noiseValue) * config.waveAmplitude + bassShiftX;
+                    p.wave.y = Math.sin(noiseValue) * (config.waveAmplitude * 0.5) + bassShiftY;
 
-                    // 2. Audio reactivity (stronger response)
-                    const audioNoiseValue = state.noise(
-                        (p.x + time * 0.02) * 0.005,
-                        (p.y + time * 0.015) * 0.005
-                    );
+                    // 2. Mids create ripple effect (like cursor)
+                    const midDx = p.x - midCursorX;
+                    const midDy = p.y - midCursorY;
+                    const midDist = Math.hypot(midDx, midDy);
+                    const midRadius = 300 * midLevel;
 
-                    p.audio.x = Math.cos(audioNoiseValue) * audioIntensity * 80;
-                    p.audio.y = Math.sin(audioNoiseValue) * audioIntensity * 60;
+                    let midForceX = 0;
+                    let midForceY = 0;
 
-                    // 3. Mouse interaction
+                    if (midDist < midRadius && midDist > 0) {
+                        const midStrength = (1 - midDist / midRadius) * midLevel;
+                        const angle = Math.atan2(midDy, midDx);
+                        midForceX = Math.cos(angle) * midStrength * 80 * state.settings.intensity;
+                        midForceY = Math.sin(angle) * midStrength * 80 * state.settings.intensity;
+                    }
+
+                    // 3. Highs create sharper ripple effect
+                    const highDx = p.x - highCursorX;
+                    const highDy = p.y - highCursorY;
+                    const highDist = Math.hypot(highDx, highDy);
+                    const highRadius = 200 * highLevel;
+
+                    let highForceX = 0;
+                    let highForceY = 0;
+
+                    if (highDist < highRadius && highDist > 0) {
+                        const highStrength = (1 - highDist / highRadius) * highLevel;
+                        const angle = Math.atan2(highDy, highDx);
+                        highForceX = Math.cos(angle) * highStrength * 100 * state.settings.intensity;
+                        highForceY = Math.sin(angle) * highStrength * 100 * state.settings.intensity;
+                    }
+
+                    // Combine audio forces
+                    p.audio.x = midForceX + highForceX;
+                    p.audio.y = midForceY + highForceY;
+
+                    // 4. Mouse interaction
                     const dx = p.x - state.mouse.sx;
                     const dy = p.y - state.mouse.sy;
                     const distance = Math.hypot(dx, dy);
