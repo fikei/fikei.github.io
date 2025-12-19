@@ -443,11 +443,12 @@
             <select class="theme-select" id="themeSelect">
                 <option value="linear">LINEAR</option>
                 <option value="neon">NEON</option>
+                <option value="glitch">GLITCH</option>
             </select>
         </section>
 
-        <!-- Mode Selection -->
-        <section class="control-section">
+        <!-- Mode Selection (LINEAR theme only) -->
+        <section class="control-section" id="modeSection">
             <h3>MODE</h3>
             <div class="density-options">
                 <div class="density-option active" data-mode="hole">HOLE</div>
@@ -625,6 +626,16 @@
                     sizeMultiplierRange: 1.5, // Will multiply size by 1.0-2.5x
                     movementBase: 150,
                     movementMultiplier: 300
+                },
+                glitch: {
+                    bg: '#000000',
+                    opacity: 0.85,
+                    colors: ['#FF0000', '#00FFFF', '#FF00FF', '#00FF00'], // R, C, M, G
+                    channelSeparationBase: 2,
+                    channelSeparationMultiplier: 12, // Bass increases RGB separation
+                    glitchIntensityMultiplier: 8, // Mids control random displacement
+                    quantizationBase: 1,
+                    quantizationMultiplier: 8 // Highs increase pixelation
                 }
             }
         };
@@ -732,10 +743,10 @@
             const density = config.densityPresets[state.settings.density];
             const { xGap, yGap } = density;
 
-            // Calculate grid dimensions
-            const padding = 200;
+            // Calculate grid dimensions - oversized to hide edges
+            const padding = 400; // Increased padding to ensure edges are never visible
             const oWidth = width + padding;
-            const oHeight = height + 30;
+            const oHeight = height + padding;
             const totalLines = Math.ceil(oWidth / xGap);
             const totalPoints = Math.ceil(oHeight / yGap);
             const xStart = (width - xGap * totalLines) / 2;
@@ -823,11 +834,26 @@
             updateColors();
         }
 
+        function updateModeVisibility() {
+            const modeSection = document.getElementById('modeSection');
+            if (modeSection) {
+                // Only show mode selection for LINEAR theme
+                if (state.settings.theme === 'linear') {
+                    modeSection.style.display = 'block';
+                } else {
+                    modeSection.style.display = 'none';
+                }
+            }
+        }
+
         function updateColors() {
             const theme = config.themes[state.settings.theme];
 
             // Update background
             document.body.style.background = theme.bg;
+
+            // Update mode visibility based on theme
+            updateModeVisibility();
 
             // Update line colors based on theme
             if (state.settings.theme === 'linear') {
@@ -843,6 +869,12 @@
             } else if (state.settings.theme === 'neon') {
                 // Neon theme colors are set dynamically in drawLinesNeon
                 // Just ensure paths are ready
+                state.paths.forEach((path) => {
+                    path.setAttribute('opacity', theme.opacity);
+                });
+            } else if (state.settings.theme === 'glitch') {
+                // Glitch theme colors are set dynamically in drawLinesGlitch
+                // Reset path attributes
                 state.paths.forEach((path) => {
                     path.setAttribute('opacity', theme.opacity);
                 });
@@ -1197,6 +1229,7 @@
                 const path = state.paths[lineIndex];
                 path.setAttribute('d', pathData);
                 path.removeAttribute('filter');
+                path.removeAttribute('transform');
                 path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
             });
         }
@@ -1352,10 +1385,112 @@
             }
         }
 
+        function drawLinesGlitch() {
+            const theme = config.themes.glitch;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            // Hide NEON gradient mesh if it exists
+            const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
+            if (gradientMeshGroup) {
+                gradientMeshGroup.innerHTML = '';
+            }
+
+            // Calculate glitch parameters
+            const channelSeparation = theme.channelSeparationBase + low * theme.channelSeparationMultiplier;
+            const glitchIntensity = mid * theme.glitchIntensityMultiplier;
+            const quantization = theme.quantizationBase + high * theme.quantizationMultiplier;
+
+            state.lines.forEach((points, lineIndex) => {
+                if (points.length < 2 || !state.paths[lineIndex]) return;
+
+                const path = state.paths[lineIndex];
+
+                // Random glitch displacement per line (controlled by mids)
+                const lineGlitch = (Math.random() < mid * 0.3) ? Math.random() * glitchIntensity * 30 : 0;
+
+                // Quantize position (pixelate effect controlled by highs)
+                const quantize = (val) => Math.round(val / quantization) * quantization;
+
+                // Build path with quantized positions
+                const firstPoint = points[0];
+                const fx = quantize(firstPoint.x + firstPoint.wave.x + firstPoint.cursor.x + firstPoint.audio.x + lineGlitch);
+                const fy = quantize(firstPoint.y + firstPoint.wave.y + firstPoint.cursor.y + firstPoint.audio.y);
+
+                let pathData = `M ${fx} ${fy}`;
+
+                for (let i = 1; i < points.length; i++) {
+                    const p = points[i];
+                    const x = quantize(p.x + p.wave.x + p.cursor.x + p.audio.x + lineGlitch);
+                    const y = quantize(p.y + p.wave.y + p.cursor.y + p.audio.y);
+                    pathData += ` L ${x} ${y}`;
+                }
+
+                // RGB Channel Separation - render same path 3 times with color channels offset
+                const colorIndex = lineIndex % theme.colors.length;
+                const baseColor = theme.colors[colorIndex];
+
+                // Red channel (offset left)
+                const pathR = state.paths[lineIndex];
+                pathR.setAttribute('d', pathData);
+                pathR.setAttribute('stroke', baseColor);
+                pathR.setAttribute('opacity', theme.opacity);
+                pathR.setAttribute('transform', `translate(${-channelSeparation}, 0)`);
+                pathR.removeAttribute('filter');
+
+                // Create or get additional paths for G and B channels
+                let pathG = elements.svg.querySelector(`#glitch-g-${lineIndex}`);
+                if (!pathG) {
+                    pathG = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    pathG.setAttribute('id', `glitch-g-${lineIndex}`);
+                    pathG.setAttribute('fill', 'none');
+                    pathG.setAttribute('stroke-width', '1');
+                    pathG.setAttribute('stroke-linecap', 'round');
+                    pathG.setAttribute('stroke-linejoin', 'round');
+                    elements.svg.appendChild(pathG);
+                }
+
+                let pathB = elements.svg.querySelector(`#glitch-b-${lineIndex}`);
+                if (!pathB) {
+                    pathB = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    pathB.setAttribute('id', `glitch-b-${lineIndex}`);
+                    pathB.setAttribute('fill', 'none');
+                    pathB.setAttribute('stroke-width', '1');
+                    pathB.setAttribute('stroke-linecap', 'round');
+                    pathB.setAttribute('stroke-linejoin', 'round');
+                    elements.svg.appendChild(pathB);
+                }
+
+                // Green channel (no offset)
+                const greenColor = theme.colors[(colorIndex + 1) % theme.colors.length];
+                pathG.setAttribute('d', pathData);
+                pathG.setAttribute('stroke', greenColor);
+                pathG.setAttribute('opacity', theme.opacity);
+                pathG.setAttribute('transform', 'translate(0, 0)');
+
+                // Blue channel (offset right/down)
+                const blueColor = theme.colors[(colorIndex + 2) % theme.colors.length];
+                pathB.setAttribute('d', pathData);
+                pathB.setAttribute('stroke', blueColor);
+                pathB.setAttribute('opacity', theme.opacity);
+                pathB.setAttribute('transform', `translate(${channelSeparation}, ${channelSeparation * 0.5})`);
+            });
+
+            // Clean up extra glitch paths if lines were reduced
+            const allGlitchPaths = elements.svg.querySelectorAll('[id^="glitch-"]');
+            allGlitchPaths.forEach(path => {
+                const match = path.id.match(/glitch-[gb]-(\d+)/);
+                if (match && parseInt(match[1]) >= state.lines.length) {
+                    path.remove();
+                }
+            });
+        }
+
         // Theme renderer dispatcher
         const themeRenderers = {
             linear: drawLinesLinear,
-            neon: drawLinesNeon
+            neon: drawLinesNeon,
+            glitch: drawLinesGlitch
         };
 
         function drawLines() {
@@ -1460,17 +1595,20 @@
                     state.settings.theme = e.target.value;
                     console.log(`🎨 Theme changed to: ${state.settings.theme.toUpperCase()}`);
 
-                    // Clean up gradient mesh if switching to LINEAR
-                    if (state.settings.theme === 'linear') {
-                        const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
-                        if (gradientMeshGroup) {
-                            gradientMeshGroup.innerHTML = '';
-                        }
+                    // Clean up theme-specific elements
+                    const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
+                    if (gradientMeshGroup) {
+                        gradientMeshGroup.innerHTML = '';
                     }
+
+                    // Clean up glitch paths
+                    const allGlitchPaths = elements.svg.querySelectorAll('[id^="glitch-"]');
+                    allGlitchPaths.forEach(path => path.remove());
 
                     // Reset path attributes for theme change
                     state.paths.forEach((path) => {
                         path.removeAttribute('filter');
+                        path.removeAttribute('transform');
                         path.setAttribute('opacity', '0.6');
                         path.setAttribute('stroke', '#ffffff');
                     });
