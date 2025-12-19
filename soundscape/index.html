@@ -416,6 +416,8 @@
                 </filter>
             </defs>
         </svg>
+        <!-- Canvas for GLITCH theme image -->
+        <canvas id="glitch-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
     </div>
 
     <!-- Loading Screen -->
@@ -454,6 +456,26 @@
                 <div class="density-option active" data-mode="hole">HOLE</div>
                 <div class="density-option" data-mode="crunch">CRUNCH</div>
             </div>
+        </section>
+
+        <!-- NEON Theme Controls -->
+        <section class="control-section" id="neonControlsSection" style="display: none;">
+            <h3>NEON</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BURST SIZE</span>
+                    <span class="control-value" id="burstSizeValue">1.0</span>
+                </div>
+                <input type="range" id="burstSizeSlider" min="0.3" max="2.0" step="0.1" value="1.0">
+            </div>
+        </section>
+
+        <!-- Image Upload (GLITCH theme only) -->
+        <section class="control-section" id="imageUploadSection" style="display: none;">
+            <h3>IMAGE</h3>
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            <button class="btn btn-reset" id="uploadImageBtn" style="margin-top: 0;">UPLOAD IMAGE</button>
+            <p style="font-size: 10px; color: #666; margin-top: 0.5rem; line-height: 1.4;">Click & drag to resize. Audio controls 3D rotation.</p>
         </section>
 
         <!-- Frequency Emphasis -->
@@ -653,7 +675,8 @@
                 density: 'medium',
                 gradient: 'default',
                 mode: 'hole',
-                theme: 'linear'
+                theme: 'linear',
+                burstSize: 1.0
             },
 
             // Audio
@@ -700,7 +723,23 @@
             currentTime: 0,
 
             // User-created gradient centers (for NEON theme)
-            userGradientCenters: []
+            userGradientCenters: [],
+
+            // GLITCH theme image state
+            glitchImage: {
+                img: null,
+                loaded: false,
+                width: 400,
+                height: 300,
+                x: 0,
+                y: 0,
+                rotation3D: { x: 0, y: 0, z: 0 },
+                isDragging: false,
+                dragStartX: 0,
+                dragStartY: 0,
+                dragStartWidth: 0,
+                dragStartHeight: 0
+            }
         };
 
         // =====================================================
@@ -839,13 +878,22 @@
 
         function updateModeVisibility() {
             const modeSection = document.getElementById('modeSection');
+            const neonControlsSection = document.getElementById('neonControlsSection');
+            const imageUploadSection = document.getElementById('imageUploadSection');
+
             if (modeSection) {
                 // Only show mode selection for LINEAR theme
-                if (state.settings.theme === 'linear') {
-                    modeSection.style.display = 'block';
-                } else {
-                    modeSection.style.display = 'none';
-                }
+                modeSection.style.display = state.settings.theme === 'linear' ? 'block' : 'none';
+            }
+
+            if (neonControlsSection) {
+                // Only show NEON controls for NEON theme
+                neonControlsSection.style.display = state.settings.theme === 'neon' ? 'block' : 'none';
+            }
+
+            if (imageUploadSection) {
+                // Only show image upload for GLITCH theme
+                imageUploadSection.style.display = state.settings.theme === 'glitch' ? 'block' : 'none';
             }
         }
 
@@ -1318,7 +1366,7 @@
 
                 // Calculate size based on audio and position
                 const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.6;
-                const radius = baseRadius * sizeMultiplier;
+                const radius = baseRadius * sizeMultiplier * state.settings.burstSize;
 
                 // Create radial gradient for this center
                 const gradientId = `neon-radial-${i}`;
@@ -1373,7 +1421,7 @@
 
                 // Calculate size - larger for user centers to make them more prominent
                 const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.5;
-                const radius = baseRadius * sizeMultiplier * 1.2; // 20% larger
+                const radius = baseRadius * sizeMultiplier * 1.2 * state.settings.burstSize; // 20% larger + burst size
 
                 // Create radial gradient for this user center
                 const gradientId = `neon-user-${i}`;
@@ -1626,6 +1674,11 @@
                 }
             });
 
+            // NEON burst size slider
+            setupSlider('burstSizeSlider', 'burstSizeValue', (value) => {
+                state.settings.burstSize = value;
+            });
+
             // Density options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -1714,6 +1767,37 @@
                 setupWaveGrid();
             });
 
+            // Image upload for GLITCH theme
+            const uploadImageBtn = document.getElementById('uploadImageBtn');
+            const imageUpload = document.getElementById('imageUpload');
+
+            if (uploadImageBtn && imageUpload) {
+                uploadImageBtn.addEventListener('click', () => {
+                    imageUpload.click();
+                });
+
+                imageUpload.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                state.glitchImage.img = img;
+                                state.glitchImage.loaded = true;
+                                state.glitchImage.width = Math.min(img.width, 600);
+                                state.glitchImage.height = (state.glitchImage.width / img.width) * img.height;
+                                state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+                                state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                                console.log(`✅ Image loaded: ${img.width}x${img.height}`);
+                            };
+                            img.src = event.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
             // Click to add gradient centers (NEON theme only)
             window.addEventListener('click', (e) => {
                 // Only add gradient centers for NEON theme
@@ -1763,7 +1847,8 @@
                 density: 'medium',
                 gradient: 'default',
                 mode: 'hole',
-                theme: 'linear'
+                theme: 'linear',
+                burstSize: 1.0
             };
 
             // Update UI
@@ -1773,6 +1858,7 @@
             document.getElementById('intensitySlider').value = 2.5;
             document.getElementById('speedSlider').value = 1.0;
             document.getElementById('smoothingSlider').value = 0.3;
+            document.getElementById('burstSizeSlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -1780,6 +1866,7 @@
             document.getElementById('intensityValue').textContent = '2.5';
             document.getElementById('speedValue').textContent = '1.0';
             document.getElementById('smoothingValue').textContent = '0.3';
+            document.getElementById('burstSizeValue').textContent = '1.0';
 
             // Update analyser if active
             if (state.analyser) {
