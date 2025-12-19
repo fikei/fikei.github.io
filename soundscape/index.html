@@ -1141,6 +1141,12 @@
         function drawLinesLinear() {
             const theme = config.themes.linear;
 
+            // Hide NEON gradient mesh if it exists
+            const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
+            if (gradientMeshGroup) {
+                gradientMeshGroup.innerHTML = '';
+            }
+
             state.lines.forEach((points, lineIndex) => {
                 if (points.length < 2 || !state.paths[lineIndex]) return;
 
@@ -1173,10 +1179,107 @@
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
 
-            // Calculate glow blur based on bass
-            const blurRadius = theme.blurBase + low * theme.blurMultiplier;
+            // Hide all line paths for NEON theme
+            state.paths.forEach(path => {
+                path.setAttribute('d', '');
+                path.setAttribute('opacity', '0');
+            });
 
-            // Update SVG filter
+            // Get canvas dimensions
+            const canvasWidth = state.boundingRect.width;
+            const canvasHeight = state.boundingRect.height;
+
+            // Get or create gradient mesh container
+            let gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
+            if (!gradientMeshGroup) {
+                gradientMeshGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                gradientMeshGroup.setAttribute('id', 'neon-gradient-mesh');
+                elements.svg.appendChild(gradientMeshGroup);
+            }
+
+            // Calculate audio-reactive parameters
+            const hueShift = (mid * 360 + time * 0.05) % 360;
+            const saturation = theme.saturationBase + high * theme.saturationMultiplier;
+            const lightness = theme.lightnessBase + high * theme.lightnessMultiplier;
+            const movementAmplitude = 100 + low * 200;
+            const sizeMultiplier = 1.0 + high * 0.5;
+
+            // Create multiple gradient centers for organic look
+            const numCenters = theme.baseHues.length;
+
+            // Get or create gradient definitions in defs
+            let defsElement = elements.svg.querySelector('defs');
+            if (!defsElement) {
+                defsElement = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                elements.svg.insertBefore(defsElement, elements.svg.firstChild);
+            }
+
+            // Clear and recreate gradient mesh
+            gradientMeshGroup.innerHTML = '';
+
+            for (let i = 0; i < numCenters; i++) {
+                // Calculate organic position using noise
+                const noiseX = state.noise(time * 0.0005 + i * 10, i * 20) * movementAmplitude;
+                const noiseY = state.noise(time * 0.0007 + i * 15, i * 25 + 100) * movementAmplitude;
+
+                // Base position distributed around the screen
+                const baseX = canvasWidth * (0.2 + (i / numCenters) * 0.6);
+                const baseY = canvasHeight * (0.3 + Math.sin(i * 2) * 0.4);
+
+                const cx = baseX + noiseX;
+                const cy = baseY + noiseY;
+
+                // Calculate size based on audio and position
+                const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.6;
+                const radius = baseRadius * sizeMultiplier;
+
+                // Create radial gradient for this center
+                const gradientId = `neon-radial-${i}`;
+                let gradient = defsElement.querySelector(`#${gradientId}`);
+                if (!gradient) {
+                    gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+                    gradient.setAttribute('id', gradientId);
+                    defsElement.appendChild(gradient);
+                }
+
+                gradient.setAttribute('cx', '50%');
+                gradient.setAttribute('cy', '50%');
+                gradient.setAttribute('r', '50%');
+
+                // Calculate hue for this center
+                const baseHue = theme.baseHues[i];
+                const hue = (baseHue + hueShift) % 360;
+
+                // Create gradient stops for smooth fade
+                const stops = [
+                    { offset: '0%', opacity: 0.8 },
+                    { offset: '40%', opacity: 0.6 },
+                    { offset: '70%', opacity: 0.3 },
+                    { offset: '100%', opacity: 0 }
+                ];
+
+                gradient.innerHTML = '';
+                stops.forEach(stop => {
+                    const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                    stopElement.setAttribute('offset', stop.offset);
+                    stopElement.setAttribute('stop-color', `hsl(${hue}, ${saturation}%, ${lightness}%)`);
+                    stopElement.setAttribute('stop-opacity', stop.opacity);
+                    gradient.appendChild(stopElement);
+                });
+
+                // Create circle with gradient fill
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', radius);
+                circle.setAttribute('fill', `url(#${gradientId})`);
+                circle.setAttribute('filter', 'url(#neon-glow)');
+
+                gradientMeshGroup.appendChild(circle);
+            }
+
+            // Update glow filter based on bass
+            const blurRadius = theme.blurBase + low * theme.blurMultiplier;
             const filter = elements.svg.querySelector('#neon-glow');
             if (filter) {
                 const blur1 = filter.querySelector('feGaussianBlur[result="blur1"]');
@@ -1187,44 +1290,6 @@
                 if (blur2) blur2.setAttribute('stdDeviation', blurRadius);
                 if (blur3) blur3.setAttribute('stdDeviation', blurRadius * 1.5);
             }
-
-            // Calculate hue shift based on mids
-            const hueShift = (mid * 360 + time * 0.05) % 360;
-
-            state.lines.forEach((points, lineIndex) => {
-                if (points.length < 2 || !state.paths[lineIndex]) return;
-
-                // Calculate color for this line
-                const baseHueIndex = lineIndex % theme.baseHues.length;
-                const baseHue = theme.baseHues[baseHueIndex];
-                const hue = (baseHue + hueShift) % 360;
-                const saturation = theme.saturationBase + high * theme.saturationMultiplier;
-                const lightness = theme.lightnessBase + high * theme.lightnessMultiplier;
-                const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-
-                // Start path
-                const firstPoint = points[0];
-                let pathData = `M ${
-                    firstPoint.x + firstPoint.wave.x + firstPoint.cursor.x + firstPoint.audio.x
-                } ${
-                    firstPoint.y + firstPoint.wave.y + firstPoint.cursor.y + firstPoint.audio.y
-                }`;
-
-                // Draw line segments
-                for (let i = 1; i < points.length; i++) {
-                    const p = points[i];
-                    const x = p.x + p.wave.x + p.cursor.x + p.audio.x;
-                    const y = p.y + p.wave.y + p.cursor.y + p.audio.y;
-                    pathData += ` L ${x} ${y}`;
-                }
-
-                // Update path with color and filter
-                const path = state.paths[lineIndex];
-                path.setAttribute('d', pathData);
-                path.setAttribute('stroke', color);
-                path.setAttribute('filter', 'url(#neon-glow)');
-                path.setAttribute('opacity', theme.opacity);
-            });
         }
 
         // Theme renderer dispatcher
