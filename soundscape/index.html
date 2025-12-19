@@ -794,12 +794,16 @@
             const bassShiftX = Math.sin(time * 0.001) * lowLevel * 40 * state.settings.intensity;
             const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 30 * state.settings.intensity;
 
-            // Highs and mids create "virtual cursor" positions for ripple effects
-            const midCursorX = canvas.width * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
-            const midCursorY = canvas.height * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+            // Get canvas dimensions
+            const canvasWidth = state.boundingRect.width;
+            const canvasHeight = state.boundingRect.height;
 
-            const highCursorX = canvas.width * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
-            const highCursorY = canvas.height * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
+            // Highs and mids create "virtual cursor" positions for ripple effects
+            const midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
+            const midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+
+            const highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
+            const highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
 
             // Update all points
             state.lines.forEach((points) => {
