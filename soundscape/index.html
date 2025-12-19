@@ -448,6 +448,15 @@
             </div>
         </section>
 
+        <!-- Mode Selection -->
+        <section class="control-section">
+            <h3>MODE</h3>
+            <div class="density-options">
+                <div class="density-option active" data-mode="hole">HOLE</div>
+                <div class="density-option" data-mode="swing">SWING</div>
+            </div>
+        </section>
+
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
     </aside>
@@ -546,7 +555,8 @@
                 speed: 1.0,
                 smoothing: 0.3,
                 density: 'medium',
-                gradient: 'default'
+                gradient: 'default',
+                mode: 'hole'
             },
 
             // Audio
@@ -798,12 +808,24 @@
             const canvasWidth = state.boundingRect.width;
             const canvasHeight = state.boundingRect.height;
 
-            // Highs and mids create "virtual cursor" positions for ripple effects
-            const midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
-            const midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+            // MODE-DEPENDENT BEHAVIOR
+            let midCursorX, midCursorY, highCursorX, highCursorY;
 
-            const highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
-            const highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
+            if (state.settings.mode === 'hole') {
+                // HOLE MODE: Virtual cursor positions for ripple effects
+                midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
+                midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+
+                highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
+                highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
+            } else {
+                // SWING MODE: Use actual cursor position
+                midCursorX = state.mouse.sx;
+                midCursorY = state.mouse.sy;
+
+                highCursorX = state.mouse.sx;
+                highCursorY = state.mouse.sy;
+            }
 
             // Update all points
             state.lines.forEach((points) => {
@@ -818,7 +840,7 @@
                     p.wave.x = Math.cos(noiseValue) * config.waveAmplitude + bassShiftX;
                     p.wave.y = Math.sin(noiseValue) * (config.waveAmplitude * 0.5) + bassShiftY;
 
-                    // 2. Mids create ripple effect (like cursor)
+                    // 2. Mids create ripple effect
                     const midDx = p.x - midCursorX;
                     const midDy = p.y - midCursorY;
                     const midDist = Math.hypot(midDx, midDy);
@@ -829,7 +851,14 @@
 
                     if (midDist < midRadius && midDist > 0) {
                         const midStrength = (1 - midDist / midRadius) * midLevel;
-                        const angle = Math.atan2(midDy, midDx);
+                        let angle = Math.atan2(midDy, midDx);
+
+                        // SWING MODE: Randomize direction
+                        if (state.settings.mode === 'swing') {
+                            const randomOffset = state.noise(time * 0.001, p.x * 0.01) * Math.PI;
+                            angle += randomOffset;
+                        }
+
                         midForceX = Math.cos(angle) * midStrength * 80 * state.settings.intensity;
                         midForceY = Math.sin(angle) * midStrength * 80 * state.settings.intensity;
                     }
@@ -845,7 +874,14 @@
 
                     if (highDist < highRadius && highDist > 0) {
                         const highStrength = (1 - highDist / highRadius) * highLevel;
-                        const angle = Math.atan2(highDy, highDx);
+                        let angle = Math.atan2(highDy, highDx);
+
+                        // SWING MODE: Randomize direction
+                        if (state.settings.mode === 'swing') {
+                            const randomOffset = state.noise(time * 0.0015, p.y * 0.01) * Math.PI * 1.5;
+                            angle += randomOffset;
+                        }
+
                         highForceX = Math.cos(angle) * highStrength * 100 * state.settings.intensity;
                         highForceY = Math.sin(angle) * highStrength * 100 * state.settings.intensity;
                     }
@@ -951,10 +987,21 @@
             // Density options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
-                    document.querySelectorAll('.density-option').forEach(o => o.classList.remove('active'));
-                    option.classList.add('active');
-                    state.settings.density = option.dataset.density;
-                    setupWaveGrid();
+                    // Handle density change
+                    if (option.dataset.density) {
+                        document.querySelectorAll('[data-density]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.density = option.dataset.density;
+                        setupWaveGrid();
+                    }
+
+                    // Handle mode change
+                    if (option.dataset.mode) {
+                        document.querySelectorAll('[data-mode]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.mode = option.dataset.mode;
+                        console.log(`🔄 Mode changed to: ${state.settings.mode.toUpperCase()}`);
+                    }
                 });
             });
 
@@ -1002,7 +1049,8 @@
                 speed: 1.0,
                 smoothing: 0.3,
                 density: 'medium',
-                gradient: 'default'
+                gradient: 'default',
+                mode: 'hole'
             };
 
             // Update UI
@@ -1026,8 +1074,12 @@
             }
 
             // Reset density
-            document.querySelectorAll('.density-option').forEach(o => o.classList.remove('active'));
+            document.querySelectorAll('[data-density]').forEach(o => o.classList.remove('active'));
             document.querySelector('[data-density="medium"]').classList.add('active');
+
+            // Reset mode
+            document.querySelectorAll('[data-mode]').forEach(o => o.classList.remove('active'));
+            document.querySelector('[data-mode="hole"]').classList.add('active');
 
             // Rebuild grid and colors
             setupWaveGrid();
