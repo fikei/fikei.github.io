@@ -608,18 +608,23 @@
                 linear: {
                     colors: ['#ffffff', '#999999'],
                     bg: '#000000',
-                    opacity: 0.6
+                    opacity: 0.6,
+                    opacityMultiplier: 0.4 // Dynamic opacity range
                 },
                 neon: {
-                    blurBase: 2,
-                    blurMultiplier: 8,
-                    saturationBase: 80,
-                    saturationMultiplier: 20,
-                    lightnessBase: 50,
-                    lightnessMultiplier: 10,
+                    blurBase: 3,
+                    blurMultiplier: 20,
+                    saturationBase: 85,
+                    saturationMultiplier: 15,
+                    lightnessBase: 55,
+                    lightnessRange: 35, // Will range from (55-35) to (55+35) = 20-90%
                     bg: '#000000',
                     opacity: 0.9,
-                    baseHues: [180, 300, 60, 120, 340] // cyan, magenta, yellow, lime, pink
+                    baseHues: [180, 300, 60, 120, 340], // cyan, magenta, yellow, lime, pink
+                    sizeMultiplierBase: 1.0,
+                    sizeMultiplierRange: 1.5, // Will multiply size by 1.0-2.5x
+                    movementBase: 150,
+                    movementMultiplier: 300
                 }
             }
         };
@@ -1007,9 +1012,9 @@
                 });
             }
 
-            // Bass creates global background shift
-            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 40 * state.settings.intensity;
-            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 30 * state.settings.intensity;
+            // Bass creates global background shift - more dramatic
+            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 60 * state.settings.intensity;
+            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 50 * state.settings.intensity;
 
             // Get canvas dimensions
             const canvasWidth = state.boundingRect.width;
@@ -1061,59 +1066,59 @@
 
                     if (state.settings.mode === 'hole') {
                         // HOLE MODE: Radial ripples from cursor position
-                        // 2. Mids create ripple effect
+                        // 2. Mids create ripple effect - MORE DRAMATIC
                         const midDx = p.x - midCursorX;
                         const midDy = p.y - midCursorY;
                         const midDist = Math.hypot(midDx, midDy);
-                        const midRadius = 300 * midLevel;
+                        const midRadius = 400 * midLevel;
 
                         if (midDist < midRadius && midDist > 0) {
                             const midStrength = (1 - midDist / midRadius) * midLevel;
                             const angle = Math.atan2(midDy, midDx);
-                            midForceX = Math.cos(angle) * midStrength * 80 * state.settings.intensity;
-                            midForceY = Math.sin(angle) * midStrength * 80 * state.settings.intensity;
+                            midForceX = Math.cos(angle) * midStrength * 120 * state.settings.intensity;
+                            midForceY = Math.sin(angle) * midStrength * 120 * state.settings.intensity;
                         }
 
-                        // 3. Highs create sharper ripple effect
+                        // 3. Highs create sharper ripple effect - MORE DRAMATIC
                         const highDx = p.x - highCursorX;
                         const highDy = p.y - highCursorY;
                         const highDist = Math.hypot(highDx, highDy);
-                        const highRadius = 200 * highLevel;
+                        const highRadius = 250 * highLevel;
 
                         if (highDist < highRadius && highDist > 0) {
                             const highStrength = (1 - highDist / highRadius) * highLevel;
                             const angle = Math.atan2(highDy, highDx);
-                            highForceX = Math.cos(angle) * highStrength * 100 * state.settings.intensity;
-                            highForceY = Math.sin(angle) * highStrength * 100 * state.settings.intensity;
+                            highForceX = Math.cos(angle) * highStrength * 150 * state.settings.intensity;
+                            highForceY = Math.sin(angle) * highStrength * 150 * state.settings.intensity;
                         }
                     } else {
-                        // CRUNCH MODE: Directional wave sweep across screen
+                        // CRUNCH MODE: Directional wave sweep across screen - MORE DRAMATIC
                         // Calculate distance from wave front for mids
                         const midWaveX = Math.cos(crunchMidAngle);
                         const midWaveY = Math.sin(crunchMidAngle);
                         const midDistFromFront = (p.x - canvasWidth * 0.5) * midWaveX + (p.y - canvasHeight * 0.5) * midWaveY + crunchMidOffset;
-                        const midWaveWidth = 400;
+                        const midWaveWidth = 500;
 
                         if (Math.abs(midDistFromFront) < midWaveWidth) {
                             const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midLevel;
                             const perpAngle = crunchMidAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.01, p.y * 0.01 + time * 0.001) > 0 ? 1 : -1;
-                            midForceX = Math.cos(perpAngle) * midStrength * 120 * state.settings.intensity * waveDir;
-                            midForceY = Math.sin(perpAngle) * midStrength * 120 * state.settings.intensity * waveDir;
+                            midForceX = Math.cos(perpAngle) * midStrength * 180 * state.settings.intensity * waveDir;
+                            midForceY = Math.sin(perpAngle) * midStrength * 180 * state.settings.intensity * waveDir;
                         }
 
                         // Calculate distance from wave front for highs
                         const highWaveX = Math.cos(crunchHighAngle);
                         const highWaveY = Math.sin(crunchHighAngle);
                         const highDistFromFront = (p.x - canvasWidth * 0.5) * highWaveX + (p.y - canvasHeight * 0.5) * highWaveY + crunchHighOffset;
-                        const highWaveWidth = 300;
+                        const highWaveWidth = 400;
 
                         if (Math.abs(highDistFromFront) < highWaveWidth) {
                             const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highLevel;
                             const perpAngle = crunchHighAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.015, p.y * 0.015 + time * 0.0015) > 0 ? 1 : -1;
-                            highForceX = Math.cos(perpAngle) * highStrength * 150 * state.settings.intensity * waveDir;
-                            highForceY = Math.sin(perpAngle) * highStrength * 150 * state.settings.intensity * waveDir;
+                            highForceX = Math.cos(perpAngle) * highStrength * 220 * state.settings.intensity * waveDir;
+                            highForceY = Math.sin(perpAngle) * highStrength * 220 * state.settings.intensity * waveDir;
                         }
                     }
 
@@ -1157,12 +1162,17 @@
 
         function drawLinesLinear() {
             const theme = config.themes.linear;
+            const { low, mid, high } = state.audioLevels;
 
             // Hide NEON gradient mesh if it exists
             const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
             if (gradientMeshGroup) {
                 gradientMeshGroup.innerHTML = '';
             }
+
+            // Calculate overall audio energy for dramatic effect
+            const totalEnergy = (low + mid + high) / 3;
+            const dynamicOpacity = theme.opacity + totalEnergy * theme.opacityMultiplier;
 
             state.lines.forEach((points, lineIndex) => {
                 if (points.length < 2 || !state.paths[lineIndex]) return;
@@ -1183,11 +1193,11 @@
                     pathData += ` L ${x} ${y}`;
                 }
 
-                // Update path (ensure no filter for linear)
+                // Update path with dynamic opacity
                 const path = state.paths[lineIndex];
                 path.setAttribute('d', pathData);
                 path.removeAttribute('filter');
-                path.setAttribute('opacity', theme.opacity);
+                path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
             });
         }
 
@@ -1217,9 +1227,19 @@
             // Calculate audio-reactive parameters
             const hueShift = (mid * 360 + time * 0.05) % 360;
             const saturation = theme.saturationBase + high * theme.saturationMultiplier;
-            const lightness = theme.lightnessBase + high * theme.lightnessMultiplier;
-            const movementAmplitude = 100 + low * 200;
-            const sizeMultiplier = 1.0 + high * 0.5;
+
+            // Lightness: Low frequencies darken, high frequencies brighten
+            // Range from 20% (dark) to 90% (bright)
+            const lightnessFromLow = -low * theme.lightnessRange * 0.5; // Darken with bass
+            const lightnessFromHigh = high * theme.lightnessRange * 0.7; // Brighten with highs
+            const lightness = theme.lightnessBase + lightnessFromLow + lightnessFromHigh;
+
+            // Movement: More dramatic with bass
+            const movementAmplitude = theme.movementBase + low * theme.movementMultiplier;
+
+            // Size: Dramatic pulsing with all frequencies combined
+            const combinedEnergy = (low * 0.5 + mid * 0.3 + high * 0.2);
+            const sizeMultiplier = theme.sizeMultiplierBase + combinedEnergy * theme.sizeMultiplierRange;
 
             // Debug logging for NEON renderer (every ~1 second)
             if (Math.random() < 0.016) {
@@ -1434,20 +1454,33 @@
             });
 
             // Theme selector
-            document.getElementById('themeSelect').addEventListener('change', (e) => {
-                state.settings.theme = e.target.value;
-                console.log(`🎨 Theme changed to: ${state.settings.theme.toUpperCase()}`);
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) {
+                themeSelect.addEventListener('change', (e) => {
+                    state.settings.theme = e.target.value;
+                    console.log(`🎨 Theme changed to: ${state.settings.theme.toUpperCase()}`);
 
-                // Reset path attributes for theme change
-                state.paths.forEach((path) => {
-                    path.removeAttribute('filter');
-                    path.setAttribute('opacity', '0.6');
-                    path.setAttribute('stroke', '#ffffff');
+                    // Clean up gradient mesh if switching to LINEAR
+                    if (state.settings.theme === 'linear') {
+                        const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
+                        if (gradientMeshGroup) {
+                            gradientMeshGroup.innerHTML = '';
+                        }
+                    }
+
+                    // Reset path attributes for theme change
+                    state.paths.forEach((path) => {
+                        path.removeAttribute('filter');
+                        path.setAttribute('opacity', '0.6');
+                        path.setAttribute('stroke', '#ffffff');
+                    });
+
+                    // Update colors for new theme
+                    updateColors();
+
+                    console.log(`✅ Theme switched to ${state.settings.theme.toUpperCase()}`);
                 });
-
-                // Update colors for new theme
-                updateColors();
-            });
+            }
 
             // Reset button
             document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
