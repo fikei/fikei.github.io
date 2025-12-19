@@ -290,6 +290,29 @@
             border-color: #ffffff;
         }
 
+        /* Theme Dropdown */
+        .theme-select {
+            width: 100%;
+            padding: 0.5rem;
+            background: #000000;
+            border: 1px solid #333333;
+            color: #ffffff;
+            font-size: 10px;
+            font-family: 'Space Grotesk', monospace;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+        }
+
+        .theme-select:hover {
+            border-color: #ffffff;
+        }
+
+        .theme-select:focus {
+            outline: none;
+            border-color: #ffffff;
+        }
+
         /* Buttons */
         .btn {
             width: 100%;
@@ -470,6 +493,14 @@
             </div>
         </section>
 
+        <!-- Theme Selection -->
+        <section class="control-section">
+            <h3>THEME</h3>
+            <select class="theme-select" id="themeSelect">
+                <option value="linear">LINEAR</option>
+            </select>
+        </section>
+
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
     </aside>
@@ -569,7 +600,8 @@
                 smoothing: 1.0,
                 density: 'medium',
                 gradient: 'default',
-                mode: 'hole'
+                mode: 'hole',
+                theme: 'linear'
             },
 
             // Audio
@@ -1154,6 +1186,12 @@
                 });
             });
 
+            // Theme selector
+            document.getElementById('themeSelect').addEventListener('change', (e) => {
+                state.settings.theme = e.target.value;
+                console.log(`🎨 Theme changed to: ${state.settings.theme.toUpperCase()}`);
+            });
+
             // Reset button
             document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
 
@@ -1212,7 +1250,8 @@
                 smoothing: 1.0,
                 density: 'medium',
                 gradient: 'default',
-                mode: 'hole'
+                mode: 'hole',
+                theme: 'linear'
             };
 
             // Update UI
@@ -1242,6 +1281,9 @@
             // Reset mode
             document.querySelectorAll('[data-mode]').forEach(o => o.classList.remove('active'));
             document.querySelector('[data-mode="hole"]').classList.add('active');
+
+            // Reset theme
+            document.getElementById('themeSelect').value = 'linear';
 
             // Rebuild grid and colors
             setupWaveGrid();
