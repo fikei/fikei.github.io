@@ -418,6 +418,18 @@
         </svg>
         <!-- Canvas for GLITCH theme image -->
         <canvas id="glitch-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
+        <!-- Upload overlay for GLITCH theme -->
+        <div id="upload-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10; cursor: pointer; align-items: center; justify-content: center;">
+            <div style="text-align: center;">
+                <p id="upload-text" style="font-size: 24px; font-weight: 400; letter-spacing: 0.1em; color: #ffffff;">UPLOAD IMAGE</p>
+            </div>
+        </div>
+        <!-- Drag overlay for GLITCH theme -->
+        <div id="drag-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 15; pointer-events: none; align-items: center; justify-content: center; border: 3px dashed #ffffff; box-sizing: border-box;">
+            <div style="text-align: center;">
+                <p style="font-size: 48px; font-weight: 700; letter-spacing: 0.2em; color: #ffffff;">UPLOAD</p>
+            </div>
+        </div>
     </div>
 
     <!-- Loading Screen -->
@@ -470,12 +482,23 @@
             </div>
         </section>
 
-        <!-- Image Upload (GLITCH theme only) -->
-        <section class="control-section" id="imageUploadSection" style="display: none;">
-            <h3>IMAGE</h3>
-            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-            <button class="btn btn-reset" id="uploadImageBtn" style="margin-top: 0;">UPLOAD IMAGE</button>
-            <p style="font-size: 10px; color: #666; margin-top: 0.5rem; line-height: 1.4;">Click & drag to resize. Audio controls 3D rotation.</p>
+        <!-- GLITCH Theme Controls -->
+        <section class="control-section" id="glitchControlsSection" style="display: none;">
+            <h3>GLITCH</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>ROTATION</span>
+                    <span class="control-value" id="rotationIntensityValue">1.0</span>
+                </div>
+                <input type="range" id="rotationIntensitySlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>GLITCH</span>
+                    <span class="control-value" id="glitchIntensityValue">1.0</span>
+                </div>
+                <input type="range" id="glitchIntensitySlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
         </section>
 
         <!-- Frequency Emphasis -->
@@ -676,7 +699,9 @@
                 gradient: 'default',
                 mode: 'hole',
                 theme: 'linear',
-                burstSize: 1.0
+                burstSize: 1.0,
+                rotationIntensity: 1.0,
+                glitchEffectIntensity: 1.0
             },
 
             // Audio
@@ -879,7 +904,8 @@
         function updateModeVisibility() {
             const modeSection = document.getElementById('modeSection');
             const neonControlsSection = document.getElementById('neonControlsSection');
-            const imageUploadSection = document.getElementById('imageUploadSection');
+            const glitchControlsSection = document.getElementById('glitchControlsSection');
+            const uploadOverlay = document.getElementById('upload-overlay');
 
             if (modeSection) {
                 // Only show mode selection for LINEAR theme
@@ -891,9 +917,15 @@
                 neonControlsSection.style.display = state.settings.theme === 'neon' ? 'block' : 'none';
             }
 
-            if (imageUploadSection) {
-                // Only show image upload for GLITCH theme
-                imageUploadSection.style.display = state.settings.theme === 'glitch' ? 'block' : 'none';
+            if (glitchControlsSection) {
+                // Only show GLITCH controls for GLITCH theme
+                glitchControlsSection.style.display = state.settings.theme === 'glitch' ? 'block' : 'none';
+            }
+
+            if (uploadOverlay) {
+                // Show upload overlay for GLITCH theme when no image is loaded
+                const shouldShowOverlay = state.settings.theme === 'glitch' && !state.glitchImage.loaded;
+                uploadOverlay.style.display = shouldShowOverlay ? 'flex' : 'none';
             }
         }
 
@@ -1543,15 +1575,17 @@
             canvas.style.left = `${state.glitchImage.x}px`;
             canvas.style.top = `${state.glitchImage.y}px`;
 
-            // Calculate glitch parameters
-            const channelSeparation = theme.channelSeparationBase + low * theme.channelSeparationMultiplier;
-            const glitchIntensity = mid * theme.glitchIntensityMultiplier;
-            const quantization = Math.max(1, theme.quantizationBase + high * theme.quantizationMultiplier);
+            // Calculate glitch parameters with user intensity multipliers
+            const glitchEffectIntensity = state.settings.glitchEffectIntensity;
+            const channelSeparation = (theme.channelSeparationBase + low * theme.channelSeparationMultiplier) * glitchEffectIntensity;
+            const glitchIntensity = mid * theme.glitchIntensityMultiplier * glitchEffectIntensity;
+            const quantization = Math.max(1, (theme.quantizationBase + high * theme.quantizationMultiplier) * glitchEffectIntensity);
 
-            // Calculate 3D rotation based on audio
-            const rotationX = mid * 45; // Mids control pitch (X-axis rotation)
-            const rotationY = high * 45; // Highs control yaw (Y-axis rotation)
-            const rotationZ = low * 15; // Bass controls roll (Z-axis rotation)
+            // Calculate 3D rotation based on audio with user intensity multiplier
+            const rotationIntensity = state.settings.rotationIntensity;
+            const rotationX = mid * 45 * rotationIntensity; // Mids control pitch (X-axis rotation)
+            const rotationY = high * 45 * rotationIntensity; // Highs control yaw (Y-axis rotation)
+            const rotationZ = low * 15 * rotationIntensity; // Bass controls roll (Z-axis rotation)
 
             // Apply 3D transform to canvas
             const perspective = 1000;
@@ -1841,6 +1875,16 @@
                 state.settings.burstSize = value;
             });
 
+            // GLITCH rotation intensity slider
+            setupSlider('rotationIntensitySlider', 'rotationIntensityValue', (value) => {
+                state.settings.rotationIntensity = value;
+            });
+
+            // GLITCH effect intensity slider
+            setupSlider('glitchIntensitySlider', 'glitchIntensityValue', (value) => {
+                state.settings.glitchEffectIntensity = value;
+            });
+
             // Density options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -1929,35 +1973,88 @@
                 setupWaveGrid();
             });
 
-            // Image upload for GLITCH theme
-            const uploadImageBtn = document.getElementById('uploadImageBtn');
-            const imageUpload = document.getElementById('imageUpload');
+            // Image upload overlay click handler
+            const uploadOverlay = document.getElementById('upload-overlay');
+            if (uploadOverlay) {
+                uploadOverlay.addEventListener('click', () => {
+                    // Create hidden file input
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = 'image/*';
+                    fileInput.style.display = 'none';
 
-            if (uploadImageBtn && imageUpload) {
-                uploadImageBtn.addEventListener('click', () => {
-                    imageUpload.click();
+                    fileInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            loadImageFile(file);
+                        }
+                    });
+
+                    document.body.appendChild(fileInput);
+                    fileInput.click();
+                    document.body.removeChild(fileInput);
+                });
+            }
+
+            // Drag & drop image upload
+            const dragOverlay = document.getElementById('drag-overlay');
+            const visualizationContainer = document.getElementById('visualization-container');
+
+            if (visualizationContainer && dragOverlay) {
+                // Prevent default drag behavior
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    visualizationContainer.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
                 });
 
-                imageUpload.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const img = new Image();
-                            img.onload = () => {
-                                state.glitchImage.img = img;
-                                state.glitchImage.loaded = true;
-                                state.glitchImage.width = Math.min(img.width, 600);
-                                state.glitchImage.height = (state.glitchImage.width / img.width) * img.height;
-                                state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                                state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
-                                console.log(`✅ Image loaded: ${img.width}x${img.height}`);
-                            };
-                            img.src = event.target.result;
-                        };
-                        reader.readAsDataURL(file);
+                // Show drag overlay when dragging over
+                visualizationContainer.addEventListener('dragenter', (e) => {
+                    if (state.settings.theme === 'glitch' && !state.glitchImage.loaded) {
+                        dragOverlay.style.display = 'flex';
                     }
                 });
+
+                visualizationContainer.addEventListener('dragleave', (e) => {
+                    // Only hide if we're leaving the container entirely
+                    if (e.target === visualizationContainer) {
+                        dragOverlay.style.display = 'none';
+                    }
+                });
+
+                visualizationContainer.addEventListener('drop', (e) => {
+                    dragOverlay.style.display = 'none';
+
+                    if (state.settings.theme === 'glitch') {
+                        const files = e.dataTransfer.files;
+                        if (files.length > 0 && files[0].type.startsWith('image/')) {
+                            loadImageFile(files[0]);
+                        }
+                    }
+                });
+            }
+
+            // Helper function to load image file
+            function loadImageFile(file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        state.glitchImage.img = img;
+                        state.glitchImage.loaded = true;
+                        state.glitchImage.width = Math.min(img.width, 600);
+                        state.glitchImage.height = (state.glitchImage.width / img.width) * img.height;
+                        state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+                        state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                        console.log(`✅ Image loaded: ${img.width}x${img.height}`);
+
+                        // Hide upload overlay
+                        updateModeVisibility();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
             }
 
             // Click to add gradient centers (NEON theme only)
@@ -2060,7 +2157,9 @@
                 gradient: 'default',
                 mode: 'hole',
                 theme: 'linear',
-                burstSize: 1.0
+                burstSize: 1.0,
+                rotationIntensity: 1.0,
+                glitchEffectIntensity: 1.0
             };
 
             // Update UI
@@ -2071,6 +2170,8 @@
             document.getElementById('speedSlider').value = 1.0;
             document.getElementById('smoothingSlider').value = 0.3;
             document.getElementById('burstSizeSlider').value = 1.0;
+            document.getElementById('rotationIntensitySlider').value = 1.0;
+            document.getElementById('glitchIntensitySlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -2079,6 +2180,8 @@
             document.getElementById('speedValue').textContent = '1.0';
             document.getElementById('smoothingValue').textContent = '0.3';
             document.getElementById('burstSizeValue').textContent = '1.0';
+            document.getElementById('rotationIntensityValue').textContent = '1.0';
+            document.getElementById('glitchIntensityValue').textContent = '1.0';
 
             // Update analyser if active
             if (state.analyser) {
