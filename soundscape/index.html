@@ -2053,26 +2053,13 @@
             tempCanvas.height = canvas.height;
             const tempCtx = tempCanvas.getContext('2d');
 
-            // Calculate dimensions to cover canvas while maintaining aspect ratio
-            const canvasAspect = canvas.width / canvas.height;
-            const imgAspect = img.width / img.height;
-            let drawWidth, drawHeight, drawX, drawY;
+            // Use stored image dimensions and position from state.glitchImage
+            const drawWidth = state.glitchImage.width;
+            const drawHeight = state.glitchImage.height;
+            const drawX = state.glitchImage.x;
+            const drawY = state.glitchImage.y;
 
-            if (imgAspect > canvasAspect) {
-                // Image is wider - fit to height
-                drawHeight = canvas.height;
-                drawWidth = drawHeight * imgAspect;
-                drawX = (canvas.width - drawWidth) / 2;
-                drawY = 0;
-            } else {
-                // Image is taller - fit to width
-                drawWidth = canvas.width;
-                drawHeight = drawWidth / imgAspect;
-                drawX = 0;
-                drawY = (canvas.height - drawHeight) / 2;
-            }
-
-            // Draw pixelated base image to fill canvas
+            // Draw pixelated base image with user-defined size
             tempCtx.imageSmoothingEnabled = false;
             tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
             tempCtx.drawImage(tempCanvas, 0, 0, scaledWidth, scaledHeight, drawX, drawY, drawWidth, drawHeight);
@@ -3774,17 +3761,13 @@
                 console.log(`✨ Added gradient center at (${e.clientX}, ${e.clientY}). Total: ${state.userGradientCenters.length}`);
             });
 
-            // Click & drag to resize image (both GLITCH and NEON themes)
-            const glitchCanvas = document.getElementById('glitch-canvas');
-            const neonCanvas = document.getElementById('neon-canvas');
+            // Click & drag to resize GLITCH background image
+            const themeCanvas = document.getElementById('theme-canvas');
 
-            // Add resize handler to both canvases
-            [glitchCanvas, neonCanvas].forEach(canvas => {
-                if (!canvas) return;
-
-                canvas.addEventListener('mousedown', (e) => {
-                    // Only handle resize when image is loaded
-                    if (!state.glitchImage.loaded) return;
+            if (themeCanvas) {
+                themeCanvas.addEventListener('mousedown', (e) => {
+                    // Only handle resize when GLITCH theme is active and image is loaded
+                    if (state.settings.theme !== 'glitch' || !state.glitchImage.loaded) return;
 
                     state.glitchImage.isDragging = true;
                     state.glitchImage.dragStartX = e.clientX;
@@ -3792,10 +3775,10 @@
                     state.glitchImage.dragStartWidth = state.glitchImage.width;
                     state.glitchImage.dragStartHeight = state.glitchImage.height;
 
-                    canvas.style.cursor = 'grabbing';
+                    themeCanvas.style.cursor = 'grabbing';
                     e.preventDefault();
                 });
-            });
+            }
 
             // Handle mouse move for resize
             window.addEventListener('mousemove', (e) => {
@@ -3827,11 +3810,10 @@
                 if (state.glitchImage.isDragging) {
                     state.glitchImage.isDragging = false;
 
-                    // Reset cursor on both canvases
-                    if (glitchCanvas) glitchCanvas.style.cursor = 'grab';
-                    if (neonCanvas) neonCanvas.style.cursor = 'grab';
+                    // Reset cursor on theme canvas
+                    if (themeCanvas) themeCanvas.style.cursor = 'grab';
 
-                    console.log(`🖼️ Image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                    console.log(`🖼️ GLITCH image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                 }
             });
         }
