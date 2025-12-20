@@ -2461,6 +2461,63 @@
         // SAVE/LOAD STATE
         // =====================================================
 
+        function setupImageInteraction(canvas, imageIndex) {
+            canvas.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+
+                // Select this image
+                state.selectedImageIndex = imageIndex;
+                updateModeVisibility(); // Update UI to show image theme selector
+
+                const imageObj = state.imageObjects[imageIndex];
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // Check if clicking near edges for resize (within 20px)
+                const edgeThreshold = 20;
+                const nearRightEdge = mouseX > canvas.width - edgeThreshold;
+                const nearBottomEdge = mouseY > canvas.height - edgeThreshold;
+
+                if (nearRightEdge || nearBottomEdge) {
+                    // Start resize
+                    imageObj.isResizing = true;
+                    imageObj.dragStartX = e.clientX;
+                    imageObj.dragStartY = e.clientY;
+                    imageObj.dragStartWidth = imageObj.width;
+                    imageObj.dragStartHeight = imageObj.height;
+                    canvas.style.cursor = 'nwse-resize';
+                } else {
+                    // Start drag
+                    imageObj.isDragging = true;
+                    imageObj.dragStartX = e.clientX - imageObj.x;
+                    imageObj.dragStartY = e.clientY - imageObj.y;
+                    canvas.style.cursor = 'grabbing';
+                }
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                const imageObj = state.imageObjects[imageIndex];
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // Update cursor based on position
+                if (!imageObj.isDragging && !imageObj.isResizing) {
+                    const edgeThreshold = 20;
+                    const nearRightEdge = mouseX > canvas.width - edgeThreshold;
+                    const nearBottomEdge = mouseY > canvas.height - edgeThreshold;
+
+                    if (nearRightEdge || nearBottomEdge) {
+                        canvas.style.cursor = 'nwse-resize';
+                    } else {
+                        canvas.style.cursor = 'move';
+                    }
+                }
+            });
+        }
+
         async function saveCanvasState() {
             try {
                 // Collect all state data
@@ -3362,64 +3419,6 @@
                     img.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
-            }
-
-            // Setup image interaction (click, drag, resize)
-            function setupImageInteraction(canvas, imageIndex) {
-                canvas.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-
-                    // Select this image
-                    state.selectedImageIndex = imageIndex;
-                    updateModeVisibility(); // Update UI to show image theme selector
-
-                    const imageObj = state.imageObjects[imageIndex];
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const mouseY = e.clientY - rect.top;
-
-                    // Check if clicking near edges for resize (within 20px)
-                    const edgeThreshold = 20;
-                    const nearRightEdge = mouseX > canvas.width - edgeThreshold;
-                    const nearBottomEdge = mouseY > canvas.height - edgeThreshold;
-
-                    if (nearRightEdge || nearBottomEdge) {
-                        // Start resize
-                        imageObj.isResizing = true;
-                        imageObj.dragStartX = e.clientX;
-                        imageObj.dragStartY = e.clientY;
-                        imageObj.dragStartWidth = imageObj.width;
-                        imageObj.dragStartHeight = imageObj.height;
-                        canvas.style.cursor = 'nwse-resize';
-                    } else {
-                        // Start drag
-                        imageObj.isDragging = true;
-                        imageObj.dragStartX = e.clientX - imageObj.x;
-                        imageObj.dragStartY = e.clientY - imageObj.y;
-                        canvas.style.cursor = 'grabbing';
-                    }
-                });
-
-                canvas.addEventListener('mousemove', (e) => {
-                    const imageObj = state.imageObjects[imageIndex];
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const mouseY = e.clientY - rect.top;
-
-                    // Update cursor based on position
-                    if (!imageObj.isDragging && !imageObj.isResizing) {
-                        const edgeThreshold = 20;
-                        const nearRightEdge = mouseX > canvas.width - edgeThreshold;
-                        const nearBottomEdge = mouseY > canvas.height - edgeThreshold;
-
-                        if (nearRightEdge || nearBottomEdge) {
-                            canvas.style.cursor = 'nwse-resize';
-                        } else {
-                            canvas.style.cursor = 'move';
-                        }
-                    }
-                });
             }
 
             // Global mouse handlers for dragging and resizing
