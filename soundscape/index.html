@@ -145,13 +145,13 @@
             background: #000000;
             border: 1px solid #ffffff;
             color: white;
-            font-size: 10px;
+            font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease, transform 0.2s ease;
         }
 
         .sidebar-toggle:hover {
@@ -164,11 +164,16 @@
             pointer-events: none;
         }
 
+        .sidebar.open ~ .sidebar-toggle {
+            right: 201px; /* Push with sidebar (200px + 1px border) */
+            transform: rotate(180deg); /* Flip caret to point left */
+        }
+
         /* ===== FULLSCREEN TOGGLE BUTTON ===== */
         .fullscreen-toggle {
             position: fixed;
-            top: 1rem;
-            right: 3rem;
+            bottom: 1rem;
+            right: 1rem;
             z-index: 101;
             width: 30px;
             height: 30px;
@@ -181,7 +186,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
         }
 
         .fullscreen-toggle:hover {
@@ -192,6 +197,66 @@
         .fullscreen-toggle.hidden-control {
             opacity: 0;
             pointer-events: none;
+        }
+
+        .sidebar.open ~ .fullscreen-toggle {
+            right: 201px; /* Push with sidebar */
+        }
+
+        /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
+        .add-image-button {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            z-index: 101;
+            width: 30px;
+            height: 30px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: white;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.5s ease, background 0.15s ease;
+        }
+
+        .add-image-button:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .add-image-dropdown {
+            position: fixed;
+            bottom: 3rem;
+            left: 1rem;
+            z-index: 100;
+            background: #000000;
+            border: 1px solid #ffffff;
+            display: none;
+            min-width: 120px;
+        }
+
+        .add-image-dropdown.show {
+            display: block;
+        }
+
+        .add-image-dropdown-item {
+            padding: 0.5rem 1rem;
+            font-size: 10px;
+            color: #ffffff;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: background 0.15s ease;
+        }
+
+        .add-image-dropdown-item:hover {
+            background: #ffffff;
+            color: #000000;
         }
 
         /* ===== CONTROLS SIDEBAR ===== */
@@ -369,29 +434,6 @@
             color: #000000;
         }
 
-        .btn-upload {
-            position: absolute;
-            bottom: 1rem;
-            right: 1rem;
-            width: 40px;
-            height: 40px;
-            background: #000000;
-            border: 1px solid #ffffff;
-            color: white;
-            font-size: 24px;
-            line-height: 1;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-
-        .btn-upload:hover {
-            background: #ffffff;
-            color: #000000;
-        }
-
         /* ===== ERROR SCREEN ===== */
         .error-screen {
             position: fixed;
@@ -500,10 +542,16 @@
     </div>
 
     <!-- Sidebar Toggle -->
-    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls">+</button>
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls">›</button>
 
     <!-- Fullscreen Toggle -->
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
+
+    <!-- Add Image Button & Dropdown -->
+    <button class="add-image-button" id="addImageButton" aria-label="Add image">+</button>
+    <div class="add-image-dropdown" id="addImageDropdown">
+        <div class="add-image-dropdown-item" id="addImageMenuItem">Add Image</div>
+    </div>
 
     <!-- Controls Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -667,9 +715,6 @@
 
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
-
-        <!-- Image Upload Button -->
-        <button class="btn btn-upload" id="uploadBtn" title="Upload Image">+</button>
     </aside>
 
     <!-- Error Screen -->
@@ -2463,10 +2508,29 @@
             // Reset button
             document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
 
-            // Upload button
-            const uploadBtn = document.getElementById('uploadBtn');
-            if (uploadBtn) {
-                uploadBtn.addEventListener('click', () => {
+            // Add image button and dropdown
+            const addImageButton = document.getElementById('addImageButton');
+            const addImageDropdown = document.getElementById('addImageDropdown');
+            const addImageMenuItem = document.getElementById('addImageMenuItem');
+
+            if (addImageButton && addImageDropdown && addImageMenuItem) {
+                // Toggle dropdown on button click
+                addImageButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    addImageDropdown.classList.toggle('show');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!addImageButton.contains(e.target) && !addImageDropdown.contains(e.target)) {
+                        addImageDropdown.classList.remove('show');
+                    }
+                });
+
+                // Handle "Add Image" menu item click
+                addImageMenuItem.addEventListener('click', () => {
+                    addImageDropdown.classList.remove('show');
+
                     const fileInput = document.createElement('input');
                     fileInput.type = 'file';
                     fileInput.accept = 'image/*';
