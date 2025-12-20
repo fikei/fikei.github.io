@@ -1986,8 +1986,242 @@
                 gradientMeshGroup.innerHTML = '';
             }
 
-            // Always render line-based glitch for background
-            renderGlitchLines(theme, low, mid, high);
+            // Hide all line paths for GLITCH theme (show black background)
+            state.paths.forEach((path) => {
+                path.setAttribute('d', '');
+            });
+
+            // If an image is loaded, render it with glitch effect
+            if (state.glitchImage.loaded && state.glitchImage.img) {
+                const canvas = document.getElementById('theme-canvas');
+                if (canvas) {
+                    canvas.style.display = 'block';
+
+                    // Set canvas size to fill entire container
+                    canvas.width = state.boundingRect.width;
+                    canvas.height = state.boundingRect.height;
+                    canvas.style.width = state.boundingRect.width + 'px';
+                    canvas.style.height = state.boundingRect.height + 'px';
+                    canvas.style.left = '0px';
+                    canvas.style.top = '0px';
+
+                    renderGlitchImageBackground(
+                        canvas,
+                        theme,
+                        low,
+                        mid,
+                        high,
+                        time,
+                        state.glitchImage.img
+                    );
+                }
+            } else {
+                // Hide canvas when no image is loaded
+                const canvas = document.getElementById('theme-canvas');
+                if (canvas) {
+                    canvas.style.display = 'none';
+                }
+            }
+        }
+
+        function renderGlitchImageBackground(canvas, theme, low, mid, high, time, img) {
+            const ctx = canvas.getContext('2d');
+
+            if (!img) return;
+
+            // Calculate glitch parameters with user intensity multipliers
+            const glitchEffectIntensity = state.settings.glitchEffectIntensity;
+            const channelSeparation = (theme.channelSeparationBase + low * theme.channelSeparationMultiplier) * glitchEffectIntensity;
+            const glitchIntensity = mid * theme.glitchIntensityMultiplier * glitchEffectIntensity;
+            const quantization = Math.max(1, (theme.quantizationBase + high * theme.quantizationMultiplier) * glitchEffectIntensity);
+
+            // Calculate 3D rotation based on audio with user intensity multiplier
+            const rotationIntensity = state.settings.rotationIntensity;
+            const rotationX = mid * 45 * rotationIntensity;
+            const rotationY = high * 45 * rotationIntensity;
+            const rotationZ = low * 15 * rotationIntensity;
+
+            // Apply 3D transform to canvas
+            const perspective = 1000;
+            canvas.style.transformStyle = 'preserve-3d';
+            canvas.style.transform = `perspective(${perspective}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg) rotateZ(${rotationZ}deg)`;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply quantization/pixelation by scaling down and up
+            const pixelSize = Math.max(1, Math.floor(quantization));
+            const scaledWidth = Math.floor(canvas.width / pixelSize);
+            const scaledHeight = Math.floor(canvas.height / pixelSize);
+
+            // Create temporary canvas for RGB channel separation
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Calculate dimensions to cover canvas while maintaining aspect ratio
+            const canvasAspect = canvas.width / canvas.height;
+            const imgAspect = img.width / img.height;
+            let drawWidth, drawHeight, drawX, drawY;
+
+            if (imgAspect > canvasAspect) {
+                // Image is wider - fit to height
+                drawHeight = canvas.height;
+                drawWidth = drawHeight * imgAspect;
+                drawX = (canvas.width - drawWidth) / 2;
+                drawY = 0;
+            } else {
+                // Image is taller - fit to width
+                drawWidth = canvas.width;
+                drawHeight = drawWidth / imgAspect;
+                drawX = 0;
+                drawY = (canvas.height - drawHeight) / 2;
+            }
+
+            // Draw pixelated base image to fill canvas
+            tempCtx.imageSmoothingEnabled = false;
+            tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+            tempCtx.drawImage(tempCanvas, 0, 0, scaledWidth, scaledHeight, drawX, drawY, drawWidth, drawHeight);
+
+            // Get image data for RGB channel manipulation
+            const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            // Apply glitch effects (scanlines, blocks, etc) - same as renderGlitchImage
+            const scanlineGlitchChance = mid * 0.3 * glitchEffectIntensity;
+            for (let y = 0; y < canvas.height; y++) {
+                if (Math.random() < scanlineGlitchChance) {
+                    const offset = Math.floor((Math.random() - 0.5) * glitchIntensity * 30);
+                    if (offset !== 0) {
+                        const rowStart = y * canvas.width * 4;
+                        const rowData = data.slice(rowStart, rowStart + canvas.width * 4);
+
+                        for (let x = 0; x < canvas.width; x++) {
+                            const sourceX = Math.max(0, Math.min(canvas.width - 1, x - offset));
+                            const sourceIdx = sourceX * 4;
+                            const targetIdx = rowStart + x * 4;
+
+                            data[targetIdx] = rowData[sourceIdx];
+                            data[targetIdx + 1] = rowData[sourceIdx + 1];
+                            data[targetIdx + 2] = rowData[sourceIdx + 2];
+                            data[targetIdx + 3] = rowData[sourceIdx + 3];
+                        }
+                    }
+                }
+            }
+
+            // Add random block corruption
+            const blockGlitchChance = low * 0.15 * glitchEffectIntensity;
+            const numBlocks = Math.floor(low * 10 * glitchEffectIntensity);
+            for (let b = 0; b < numBlocks; b++) {
+                if (Math.random() < blockGlitchChance) {
+                    const blockX = Math.floor(Math.random() * canvas.width);
+                    const blockY = Math.floor(Math.random() * canvas.height);
+                    const blockWidth = Math.floor(Math.random() * glitchIntensity * 40 + 10);
+                    const blockHeight = Math.floor(Math.random() * glitchIntensity * 20 + 5);
+                    const glitchType = Math.random();
+
+                    for (let y = blockY; y < Math.min(blockY + blockHeight, canvas.height); y++) {
+                        for (let x = blockX; x < Math.min(blockX + blockWidth, canvas.width); x++) {
+                            const idx = (y * canvas.width + x) * 4;
+
+                            if (glitchType < 0.33) {
+                                data[idx] = 255 - data[idx];
+                                data[idx + 1] = 255 - data[idx + 1];
+                                data[idx + 2] = 255 - data[idx + 2];
+                            } else if (glitchType < 0.66) {
+                                const temp = data[idx];
+                                data[idx] = data[idx + 2];
+                                data[idx + 2] = temp;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Put modified image data back
+            tempCtx.putImageData(imageData, 0, 0);
+
+            // RGB Channel Separation
+            const glitchMode = state.settings.glitchMode || 'rgb';
+            const redCanvas = document.createElement('canvas');
+            const greenCanvas = document.createElement('canvas');
+            const blueCanvas = document.createElement('canvas');
+
+            redCanvas.width = greenCanvas.width = blueCanvas.width = canvas.width;
+            redCanvas.height = greenCanvas.height = blueCanvas.height = canvas.height;
+
+            const redCtx = redCanvas.getContext('2d');
+            const greenCtx = greenCanvas.getContext('2d');
+            const blueCtx = blueCanvas.getContext('2d');
+
+            const redData = ctx.createImageData(canvas.width, canvas.height);
+            const greenData = ctx.createImageData(canvas.width, canvas.height);
+            const blueData = ctx.createImageData(canvas.width, canvas.height);
+
+            for (let i = 0; i < data.length; i += 4) {
+                if (glitchMode === 'rgb') {
+                    redData.data[i] = data[i];
+                    redData.data[i + 1] = 0;
+                    redData.data[i + 2] = 0;
+                    redData.data[i + 3] = data[i + 3];
+
+                    greenData.data[i] = 0;
+                    greenData.data[i + 1] = data[i + 1];
+                    greenData.data[i + 2] = 0;
+                    greenData.data[i + 3] = data[i + 3];
+
+                    blueData.data[i] = 0;
+                    blueData.data[i + 1] = 0;
+                    blueData.data[i + 2] = data[i + 2];
+                    blueData.data[i + 3] = data[i + 3];
+                } else if (glitchMode === 'br') {
+                    redData.data[i] = data[i];
+                    redData.data[i + 1] = 0;
+                    redData.data[i + 2] = 0;
+                    redData.data[i + 3] = data[i + 3];
+
+                    greenData.data[i] = 0;
+                    greenData.data[i + 1] = data[i + 1];
+                    greenData.data[i + 2] = data[i + 2];
+                    greenData.data[i + 3] = data[i + 3];
+
+                    blueData.data[i] = 0;
+                    blueData.data[i + 1] = 0;
+                    blueData.data[i + 2] = 0;
+                    blueData.data[i + 3] = 0;
+                } else if (glitchMode === 'gray') {
+                    redData.data[i] = data[i];
+                    redData.data[i + 1] = data[i + 1];
+                    redData.data[i + 2] = data[i + 2];
+                    redData.data[i + 3] = data[i + 3];
+
+                    greenData.data[i] = data[i];
+                    greenData.data[i + 1] = data[i + 1];
+                    greenData.data[i + 2] = data[i + 2];
+                    greenData.data[i + 3] = data[i + 3];
+
+                    blueData.data[i] = data[i];
+                    blueData.data[i + 1] = data[i + 1];
+                    blueData.data[i + 2] = data[i + 2];
+                    blueData.data[i + 3] = data[i + 3];
+                }
+            }
+
+            redCtx.putImageData(redData, 0, 0);
+            greenCtx.putImageData(greenData, 0, 0);
+            blueCtx.putImageData(blueData, 0, 0);
+
+            // Composite the channels with separation
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'lighter';
+
+            ctx.drawImage(redCanvas, -channelSeparation, 0);
+            ctx.drawImage(greenCanvas, 0, 0);
+            ctx.drawImage(blueCanvas, channelSeparation, 0);
+
+            ctx.globalCompositeOperation = 'source-over';
         }
 
         function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0, baseRotation = 0) {
