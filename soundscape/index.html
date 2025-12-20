@@ -487,6 +487,16 @@
             <h3>GLITCH</h3>
             <div class="control-group">
                 <div class="control-label">
+                    <span>MODE</span>
+                </div>
+                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="density-option active" data-glitch-mode="rgb">RGB</div>
+                    <div class="density-option" data-glitch-mode="br">B&R</div>
+                    <div class="density-option" data-glitch-mode="gray">GRAY</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">
                     <span>ROTATION</span>
                     <span class="control-value" id="rotationIntensityValue">1.0</span>
                 </div>
@@ -701,7 +711,8 @@
                 theme: 'linear',
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
-                glitchEffectIntensity: 1.0
+                glitchEffectIntensity: 1.0,
+                glitchMode: 'rgb'
             },
 
             // Audio
@@ -1706,7 +1717,20 @@
                 }
             }
 
-            // Create three canvases for RGB channel separation
+            // Get glitch mode
+            const glitchMode = state.settings.glitchMode;
+
+            // Apply grayscale conversion if in GRAY mode
+            if (glitchMode === 'gray') {
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                    data[i] = gray;
+                    data[i + 1] = gray;
+                    data[i + 2] = gray;
+                }
+            }
+
+            // Create canvases for channel separation
             const redCanvas = document.createElement('canvas');
             redCanvas.width = canvas.width;
             redCanvas.height = canvas.height;
@@ -1722,29 +1746,63 @@
             blueCanvas.height = canvas.height;
             const blueCtx = blueCanvas.getContext('2d');
 
-            // Extract individual color channels
+            // Extract individual color channels based on mode
             const redData = ctx.createImageData(canvas.width, canvas.height);
             const greenData = ctx.createImageData(canvas.width, canvas.height);
             const blueData = ctx.createImageData(canvas.width, canvas.height);
 
             for (let i = 0; i < data.length; i += 4) {
-                // Red channel
-                redData.data[i] = data[i];
-                redData.data[i + 1] = 0;
-                redData.data[i + 2] = 0;
-                redData.data[i + 3] = data[i + 3];
+                if (glitchMode === 'rgb') {
+                    // RGB mode: Full RGB separation
+                    redData.data[i] = data[i];
+                    redData.data[i + 1] = 0;
+                    redData.data[i + 2] = 0;
+                    redData.data[i + 3] = data[i + 3];
 
-                // Green channel
-                greenData.data[i] = 0;
-                greenData.data[i + 1] = data[i + 1];
-                greenData.data[i + 2] = 0;
-                greenData.data[i + 3] = data[i + 3];
+                    greenData.data[i] = 0;
+                    greenData.data[i + 1] = data[i + 1];
+                    greenData.data[i + 2] = 0;
+                    greenData.data[i + 3] = data[i + 3];
 
-                // Blue channel
-                blueData.data[i] = 0;
-                blueData.data[i + 1] = 0;
-                blueData.data[i + 2] = data[i + 2];
-                blueData.data[i + 3] = data[i + 3];
+                    blueData.data[i] = 0;
+                    blueData.data[i + 1] = 0;
+                    blueData.data[i + 2] = data[i + 2];
+                    blueData.data[i + 3] = data[i + 3];
+                } else if (glitchMode === 'br') {
+                    // B&R mode: Red and Cyan (like 3D glasses)
+                    redData.data[i] = data[i];
+                    redData.data[i + 1] = 0;
+                    redData.data[i + 2] = 0;
+                    redData.data[i + 3] = data[i + 3];
+
+                    // Cyan channel (green + blue)
+                    greenData.data[i] = 0;
+                    greenData.data[i + 1] = data[i + 1];
+                    greenData.data[i + 2] = data[i + 2];
+                    greenData.data[i + 3] = data[i + 3];
+
+                    // Blue stays empty for B&R mode
+                    blueData.data[i] = 0;
+                    blueData.data[i + 1] = 0;
+                    blueData.data[i + 2] = 0;
+                    blueData.data[i + 3] = 0;
+                } else if (glitchMode === 'gray') {
+                    // Grayscale mode: Use grayscale for all channels
+                    redData.data[i] = data[i];
+                    redData.data[i + 1] = data[i + 1];
+                    redData.data[i + 2] = data[i + 2];
+                    redData.data[i + 3] = data[i + 3];
+
+                    greenData.data[i] = data[i];
+                    greenData.data[i + 1] = data[i + 1];
+                    greenData.data[i + 2] = data[i + 2];
+                    greenData.data[i + 3] = data[i + 3];
+
+                    blueData.data[i] = data[i];
+                    blueData.data[i + 1] = data[i + 1];
+                    blueData.data[i + 2] = data[i + 2];
+                    blueData.data[i + 3] = data[i + 3];
+                }
             }
 
             redCtx.putImageData(redData, 0, 0);
@@ -1758,20 +1816,34 @@
             const randomOffsetX = (Math.random() - 0.5) * channelSeparation * 0.5;
             const randomOffsetY = (Math.random() - 0.5) * channelSeparation * 0.5;
 
-            // Red channel (offset left with random variation)
-            const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
-            const redOffsetY = randomOffsetY * mid;
-            ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
+            if (glitchMode === 'rgb' || glitchMode === 'gray') {
+                // RGB mode: All three channels with separation
+                // Red channel (offset left with random variation)
+                const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
+                const redOffsetY = randomOffsetY * mid;
+                ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
 
-            // Green channel (slightly offset with random jitter)
-            const greenOffsetX = (Math.random() - 0.5) * channelSeparation * 0.3 * mid;
-            const greenOffsetY = (Math.random() - 0.5) * channelSeparation * 0.3 * high;
-            ctx.drawImage(greenCanvas, greenOffsetX, greenOffsetY);
+                // Green channel (slightly offset with random jitter)
+                const greenOffsetX = (Math.random() - 0.5) * channelSeparation * 0.3 * mid;
+                const greenOffsetY = (Math.random() - 0.5) * channelSeparation * 0.3 * high;
+                ctx.drawImage(greenCanvas, greenOffsetX, greenOffsetY);
 
-            // Blue channel (offset right and down with variation)
-            const blueOffsetX = channelSeparation + randomOffsetX * high * 2;
-            const blueOffsetY = channelSeparation * 0.5 + randomOffsetY * low;
-            ctx.drawImage(blueCanvas, blueOffsetX, blueOffsetY);
+                // Blue channel (offset right and down with variation)
+                const blueOffsetX = channelSeparation + randomOffsetX * high * 2;
+                const blueOffsetY = channelSeparation * 0.5 + randomOffsetY * low;
+                ctx.drawImage(blueCanvas, blueOffsetX, blueOffsetY);
+            } else if (glitchMode === 'br') {
+                // B&R mode: Only red and cyan (like 3D glasses)
+                // Red channel (offset left)
+                const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
+                const redOffsetY = randomOffsetY * mid;
+                ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
+
+                // Cyan channel (offset right) - stored in greenCanvas
+                const cyanOffsetX = channelSeparation + randomOffsetX * high * 2;
+                const cyanOffsetY = randomOffsetY * low;
+                ctx.drawImage(greenCanvas, cyanOffsetX, cyanOffsetY);
+            }
 
             ctx.globalCompositeOperation = 'source-over';
         }
@@ -1980,6 +2052,14 @@
                         option.classList.add('active');
                         state.settings.mode = option.dataset.mode;
                         console.log(`🔄 Mode changed to: ${state.settings.mode.toUpperCase()}`);
+                    }
+
+                    // Handle glitch mode change
+                    if (option.dataset.glitchMode) {
+                        document.querySelectorAll('[data-glitch-mode]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.glitchMode = option.dataset.glitchMode;
+                        console.log(`🎨 GLITCH mode changed to: ${state.settings.glitchMode.toUpperCase()}`);
                     }
                 });
             });
@@ -2237,7 +2317,8 @@
                 theme: 'linear',
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
-                glitchEffectIntensity: 1.0
+                glitchEffectIntensity: 1.0,
+                glitchMode: 'rgb'
             };
 
             // Update UI
@@ -2276,6 +2357,10 @@
             // Reset mode
             document.querySelectorAll('[data-mode]').forEach(o => o.classList.remove('active'));
             document.querySelector('[data-mode="hole"]').classList.add('active');
+
+            // Reset glitch mode
+            document.querySelectorAll('[data-glitch-mode]').forEach(o => o.classList.remove('active'));
+            document.querySelector('[data-glitch-mode="rgb"]').classList.add('active');
 
             // Reset theme
             document.getElementById('themeSelect').value = 'linear';
