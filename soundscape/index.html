@@ -556,6 +556,115 @@
     <aside class="sidebar" id="sidebar">
         <h2>CTRL</h2>
 
+        <!-- Image Controls (visible when image is selected) -->
+        <section class="control-section" id="imageControlsSection" style="display: none;">
+            <h3>EFFECT</h3>
+            <select class="theme-select" id="imageThemeSelect">
+                <option value="none">NONE</option>
+                <option value="linear">LINEAR</option>
+                <option value="neon">NEON</option>
+                <option value="glitch">GLITCH</option>
+            </select>
+
+            <h3 style="margin-top: 2rem;">IMAGE</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>TRANSPARENCY</span>
+                    <span class="control-value" id="imageTransparencyValue">1.0</span>
+                </div>
+                <input type="range" id="imageTransparencySlider" min="0" max="1" step="0.05" value="1">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>ROTATION</span>
+                    <span class="control-value" id="imageRotationValue">0</span>
+                </div>
+                <input type="range" id="imageRotationSlider" min="0" max="360" step="1" value="0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BLUR</span>
+                    <span class="control-value" id="imageBlurValue">0</span>
+                </div>
+                <input type="range" id="imageBlurSlider" min="0" max="20" step="0.5" value="0">
+            </div>
+
+            <h3 style="margin-top: 2rem;">THEME</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>THEME BLUR</span>
+                    <span class="control-value" id="themeBlurValue">0</span>
+                </div>
+                <input type="range" id="themeBlurSlider" min="0" max="20" step="0.5" value="0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>THEME OPACITY</span>
+                    <span class="control-value" id="themeOpacityValue">1.0</span>
+                </div>
+                <input type="range" id="themeOpacitySlider" min="0" max="1" step="0.05" value="1">
+            </div>
+
+            <!-- Frequency Emphasis (for image theme) -->
+            <div class="control-group">
+                <div class="control-label">
+                    <span>FREQ LOW</span>
+                    <span class="control-value" id="imageLowValue">1.0</span>
+                </div>
+                <input type="range" id="imageLowEmphasis" min="0" max="3" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>FREQ MID</span>
+                    <span class="control-value" id="imageMidValue">1.0</span>
+                </div>
+                <input type="range" id="imageMidEmphasis" min="0" max="3" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>FREQ HIGH</span>
+                    <span class="control-value" id="imageHighValue">1.0</span>
+                </div>
+                <input type="range" id="imageHighEmphasis" min="0" max="3" step="0.1" value="1">
+            </div>
+
+            <!-- Wave Settings (for image theme) -->
+            <div class="control-group">
+                <div class="control-label">
+                    <span>WAVE INTENSITY</span>
+                    <span class="control-value" id="imageIntensityValue">2.5</span>
+                </div>
+                <input type="range" id="imageIntensitySlider" min="0" max="5" step="0.1" value="2.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>WAVE SPEED</span>
+                    <span class="control-value" id="imageSpeedValue">1.0</span>
+                </div>
+                <input type="range" id="imageSpeedSlider" min="0.1" max="2" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>WAVE SMOOTHING</span>
+                    <span class="control-value" id="imageSmoothingValue">0.3</span>
+                </div>
+                <input type="range" id="imageSmoothingSlider" min="0" max="1" step="0.1" value="0.3">
+            </div>
+
+            <!-- Density (for image theme) -->
+            <div class="control-label" style="margin-top: 1rem;">
+                <span>DENSITY</span>
+            </div>
+            <div class="density-options">
+                <div class="density-option" data-image-density="low">L</div>
+                <div class="density-option active" data-image-density="medium">M</div>
+                <div class="density-option" data-image-density="high">H</div>
+            </div>
+        </section>
+
         <!-- Background Controls (visible when no image selected) -->
         <section class="control-section" id="backgroundControlsSection">
             <h3>BACKGROUND THEME</h3>
@@ -704,56 +813,6 @@
 
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
-
-        <!-- Image Controls (visible when image is selected) -->
-        <section class="control-section" id="imageControlsSection" style="display: none;">
-            <h3>IMAGE THEME</h3>
-            <select class="theme-select" id="imageThemeSelect">
-                <option value="linear">LINEAR</option>
-                <option value="neon">NEON</option>
-                <option value="glitch">GLITCH</option>
-            </select>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>TRANSPARENCY</span>
-                    <span class="control-value" id="imageTransparencyValue">1.0</span>
-                </div>
-                <input type="range" id="imageTransparencySlider" min="0" max="1" step="0.05" value="1">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>ROTATION</span>
-                    <span class="control-value" id="imageRotationValue">0</span>
-                </div>
-                <input type="range" id="imageRotationSlider" min="0" max="360" step="1" value="0">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>BLUR</span>
-                    <span class="control-value" id="imageBlurValue">0</span>
-                </div>
-                <input type="range" id="imageBlurSlider" min="0" max="20" step="0.5" value="0">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>THEME BLUR</span>
-                    <span class="control-value" id="themeBlurValue">0</span>
-                </div>
-                <input type="range" id="themeBlurSlider" min="0" max="20" step="0.5" value="0">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>THEME OPACITY</span>
-                    <span class="control-value" id="themeOpacityValue">1.0</span>
-                </div>
-                <input type="range" id="themeOpacitySlider" min="0" max="1" step="0.05" value="1">
-            </div>
-        </section>
     </aside>
 
     <!-- Error Screen -->
@@ -1907,7 +1966,7 @@
             renderGlitchLines(theme, low, mid, high);
         }
 
-        function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0) {
+        function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0, baseRotation = 0) {
             const ctx = canvas.getContext('2d');
 
             if (!img) return;
@@ -1922,7 +1981,7 @@
             const rotationIntensity = state.settings.rotationIntensity;
             const rotationX = mid * 45 * rotationIntensity; // Mids control pitch (X-axis rotation)
             const rotationY = high * 45 * rotationIntensity; // Highs control yaw (Y-axis rotation)
-            const rotationZ = low * 15 * rotationIntensity; // Bass controls roll (Z-axis rotation)
+            const rotationZ = low * 15 * rotationIntensity + baseRotation; // Bass controls roll (Z-axis rotation) + user rotation
 
             // Apply 3D transform to canvas
             const perspective = 1000;
@@ -2310,9 +2369,11 @@
                 // Apply transparency
                 canvas.style.opacity = imageObj.transparency;
 
-                // Apply rotation
-                canvas.style.transform = `rotate(${imageObj.rotation}deg)`;
-                canvas.style.transformOrigin = 'center center';
+                // Apply rotation (glitch theme handles its own rotation via 3D transform)
+                if (imageObj.theme !== 'glitch') {
+                    canvas.style.transform = `rotate(${imageObj.rotation}deg)`;
+                    canvas.style.transformOrigin = 'center center';
+                }
 
                 // Apply blur filter
                 if (imageObj.blur > 0) {
@@ -2331,10 +2392,14 @@
                 }
 
                 // Render based on image's assigned theme
-                if (imageObj.theme === 'neon') {
+                if (imageObj.theme === 'none') {
+                    // No effect - just draw the plain image
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(imageObj.img, 0, 0, canvas.width, canvas.height);
+                } else if (imageObj.theme === 'neon') {
                     renderNeonImage(canvas, config.themes.neon, low, mid, high, time, imageObj.width, imageObj.height, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity);
                 } else if (imageObj.theme === 'glitch') {
-                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity);
+                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity, imageObj.rotation);
                 } else if (imageObj.theme === 'linear') {
                     // For LINEAR theme on image, just draw the image with some audio-reactive effects
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2827,7 +2892,7 @@
                                 y: y,
                                 width: width,
                                 height: height,
-                                theme: state.settings.theme, // Default to current background theme
+                                theme: 'none', // Default to no effect
                                 transparency: 1.0, // Default to fully opaque
                                 rotation: 0, // Rotation in degrees
                                 blur: 0, // Blur amount in pixels
