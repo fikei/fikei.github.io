@@ -244,6 +244,14 @@
             pointer-events: none;
         }
 
+        body.hide-cursor {
+            cursor: none !important;
+        }
+
+        body.hide-cursor * {
+            cursor: none !important;
+        }
+
         .add-image-dropdown {
             position: fixed;
             bottom: 3rem;
@@ -3193,17 +3201,19 @@
                     const isHidden = statusBar && statusBar.classList.contains('hidden-control');
 
                     if (isHidden) {
-                        // Show UI
+                        // Show UI and cursor
                         if (statusBar) statusBar.classList.remove('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.remove('hidden-control');
                         if (addImageBtn) addImageBtn.classList.remove('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
+                        document.body.classList.remove('hide-cursor');
                     } else {
-                        // Hide UI
+                        // Hide UI and cursor
                         if (statusBar) statusBar.classList.add('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.add('hidden-control');
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
+                        document.body.classList.add('hide-cursor');
                     }
                 }
 
