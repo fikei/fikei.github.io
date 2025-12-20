@@ -165,6 +165,36 @@
             pointer-events: none;
         }
 
+        /* ===== FULLSCREEN TOGGLE BUTTON ===== */
+        .fullscreen-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 3rem;
+            z-index: 101;
+            width: 30px;
+            height: 30px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.5s ease, background 0.15s ease;
+        }
+
+        .fullscreen-toggle:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .fullscreen-toggle.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         /* ===== CONTROLS SIDEBAR ===== */
         .sidebar {
             position: fixed;
@@ -449,6 +479,9 @@
 
     <!-- Sidebar Toggle -->
     <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls">+</button>
+
+    <!-- Fullscreen Toggle -->
+    <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
 
     <!-- Controls Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -1963,6 +1996,11 @@
                 state.controlsVisible = true;
                 elements.statusBar.classList.remove('hidden-control');
                 elements.sidebarToggle.classList.remove('hidden-control');
+
+                const fullscreenToggle = document.getElementById('fullscreenToggle');
+                if (fullscreenToggle) {
+                    fullscreenToggle.classList.remove('hidden-control');
+                }
             }
 
             // Reset idle timeout
@@ -1982,6 +2020,11 @@
             state.controlsVisible = false;
             elements.statusBar.classList.add('hidden-control');
             elements.sidebarToggle.classList.add('hidden-control');
+
+            const fullscreenToggle = document.getElementById('fullscreenToggle');
+            if (fullscreenToggle) {
+                fullscreenToggle.classList.add('hidden-control');
+            }
         }
 
         // =====================================================
@@ -1993,6 +2036,31 @@
             elements.sidebarToggle.addEventListener('click', () => {
                 elements.sidebar.classList.toggle('open');
             });
+
+            // Fullscreen toggle
+            const fullscreenToggle = document.getElementById('fullscreenToggle');
+            if (fullscreenToggle) {
+                fullscreenToggle.addEventListener('click', () => {
+                    if (!document.fullscreenElement) {
+                        // Enter fullscreen
+                        document.documentElement.requestFullscreen().catch(err => {
+                            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                        });
+                    } else {
+                        // Exit fullscreen
+                        document.exitFullscreen();
+                    }
+                });
+
+                // Update button icon when fullscreen state changes
+                document.addEventListener('fullscreenchange', () => {
+                    if (document.fullscreenElement) {
+                        fullscreenToggle.textContent = '⛶'; // Exit fullscreen icon
+                    } else {
+                        fullscreenToggle.textContent = '⛶'; // Enter fullscreen icon
+                    }
+                });
+            }
 
             // Frequency emphasis sliders
             setupSlider('lowEmphasis', 'lowValue', (value) => {
