@@ -561,6 +561,145 @@
             </select>
         </section>
 
+        <!-- Mode Selection (LINEAR theme only) -->
+        <section class="control-section" id="modeSection">
+            <h3>MODE</h3>
+            <div class="density-options">
+                <div class="density-option active" data-mode="hole">HOLE</div>
+                <div class="density-option" data-mode="crunch">CRUNCH</div>
+            </div>
+        </section>
+
+        <!-- NEON Theme Controls -->
+        <section class="control-section" id="neonControlsSection" style="display: none;">
+            <h3>NEON</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>COLOR MODE</span>
+                </div>
+                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="density-option active" data-neon-mode="bright">BRIGHT</div>
+                    <div class="density-option" data-neon-mode="gray">GRAY</div>
+                    <div class="density-option" data-neon-mode="pastel">PASTEL</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BURST SIZE</span>
+                    <span class="control-value" id="burstSizeValue">1.0</span>
+                </div>
+                <input type="range" id="burstSizeSlider" min="0.3" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>WARM/COOL</span>
+                    <span class="control-value" id="colorTempValue">1.0</span>
+                </div>
+                <input type="range" id="colorTempSlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SAT RANGE</span>
+                    <span class="control-value" id="satRangeValue">1.0</span>
+                </div>
+                <input type="range" id="satRangeSlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
+        </section>
+
+        <!-- GLITCH Theme Controls -->
+        <section class="control-section" id="glitchControlsSection" style="display: none;">
+            <h3>GLITCH</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MODE</span>
+                </div>
+                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="density-option active" data-glitch-mode="rgb">RGB</div>
+                    <div class="density-option" data-glitch-mode="br">B&R</div>
+                    <div class="density-option" data-glitch-mode="gray">GRAY</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>ROTATION</span>
+                    <span class="control-value" id="rotationIntensityValue">1.0</span>
+                </div>
+                <input type="range" id="rotationIntensitySlider" min="0" max="5.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>GLITCH</span>
+                    <span class="control-value" id="glitchIntensityValue">1.0</span>
+                </div>
+                <input type="range" id="glitchIntensitySlider" min="0" max="5.0" step="0.1" value="1.0">
+            </div>
+        </section>
+
+        <!-- Frequency Emphasis -->
+        <section class="control-section">
+            <h3>FREQ</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>LOW</span>
+                    <span class="control-value" id="lowValue">1.0</span>
+                </div>
+                <input type="range" id="lowEmphasis" min="0" max="3" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MID</span>
+                    <span class="control-value" id="midValue">1.0</span>
+                </div>
+                <input type="range" id="midEmphasis" min="0" max="3" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>HIGH</span>
+                    <span class="control-value" id="highValue">1.0</span>
+                </div>
+                <input type="range" id="highEmphasis" min="0" max="3" step="0.1" value="1">
+            </div>
+        </section>
+
+        <!-- Wave Settings -->
+        <section class="control-section">
+            <h3>WAVE</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>INTENSITY</span>
+                    <span class="control-value" id="intensityValue">2.5</span>
+                </div>
+                <input type="range" id="intensitySlider" min="0" max="5" step="0.1" value="2.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SPEED</span>
+                    <span class="control-value" id="speedValue">1.0</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.1" max="2" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SMOOTHING</span>
+                    <span class="control-value" id="smoothingValue">0.3</span>
+                </div>
+                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.3">
+            </div>
+        </section>
+
+        <!-- Grid Density -->
+        <section class="control-section">
+            <h3>DENSITY</h3>
+            <div class="density-options">
+                <div class="density-option" data-density="low">L</div>
+                <div class="density-option active" data-density="medium">M</div>
+                <div class="density-option" data-density="high">H</div>
+            </div>
+        </section>
+
+        <!-- Reset Button -->
+        <button class="btn btn-reset" id="resetBtn">RESET</button>
+
         <!-- Image Controls (visible when image is selected) -->
         <section class="control-section" id="imageControlsSection" style="display: none;">
             <h3>IMAGE THEME</h3>
@@ -956,6 +1095,9 @@
 
         function updateModeVisibility() {
             const backgroundControlsSection = document.getElementById('backgroundControlsSection');
+            const modeSection = document.getElementById('modeSection');
+            const neonControlsSection = document.getElementById('neonControlsSection');
+            const glitchControlsSection = document.getElementById('glitchControlsSection');
             const imageControlsSection = document.getElementById('imageControlsSection');
             const imageThemeSelect = document.getElementById('imageThemeSelect');
             const uploadOverlay = document.getElementById('upload-overlay');
@@ -965,6 +1107,19 @@
             // Show background controls when no image is selected
             if (backgroundControlsSection) {
                 backgroundControlsSection.style.display = hasSelectedImage ? 'none' : 'block';
+            }
+
+            // Show/hide theme-specific background controls
+            if (modeSection) {
+                modeSection.style.display = !hasSelectedImage && state.settings.theme === 'linear' ? 'block' : 'none';
+            }
+
+            if (neonControlsSection) {
+                neonControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'neon' ? 'block' : 'none';
+            }
+
+            if (glitchControlsSection) {
+                glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
             }
 
             // Show image controls when an image is selected
@@ -2378,6 +2533,103 @@
                     imageObj.themeOpacity = value;
                 }
             });
+
+            // Frequency emphasis sliders
+            setupSlider('lowEmphasis', 'lowValue', (value) => {
+                state.settings.lowEmphasis = value;
+            });
+
+            setupSlider('midEmphasis', 'midValue', (value) => {
+                state.settings.midEmphasis = value;
+            });
+
+            setupSlider('highEmphasis', 'highValue', (value) => {
+                state.settings.highEmphasis = value;
+            });
+
+            // Wave settings sliders
+            setupSlider('intensitySlider', 'intensityValue', (value) => {
+                state.settings.intensity = value;
+            });
+
+            setupSlider('speedSlider', 'speedValue', (value) => {
+                state.settings.speed = value;
+            });
+
+            setupSlider('smoothingSlider', 'smoothingValue', (value) => {
+                state.settings.smoothing = value;
+                if (state.analyser) {
+                    state.analyser.smoothingTimeConstant = value;
+                }
+            });
+
+            // NEON burst size slider
+            setupSlider('burstSizeSlider', 'burstSizeValue', (value) => {
+                state.settings.burstSize = value;
+            });
+
+            // NEON color temperature slider
+            setupSlider('colorTempSlider', 'colorTempValue', (value) => {
+                state.settings.colorTemp = value;
+            });
+
+            // NEON saturation range slider
+            setupSlider('satRangeSlider', 'satRangeValue', (value) => {
+                state.settings.satRange = value;
+            });
+
+            // GLITCH rotation intensity slider
+            setupSlider('rotationIntensitySlider', 'rotationIntensityValue', (value) => {
+                state.settings.rotationIntensity = value;
+            });
+
+            // GLITCH effect intensity slider
+            setupSlider('glitchIntensitySlider', 'glitchIntensityValue', (value) => {
+                state.settings.glitchEffectIntensity = value;
+            });
+
+            // Density and mode options
+            document.querySelectorAll('.density-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    // Handle density change
+                    if (option.dataset.density) {
+                        document.querySelectorAll('[data-density]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.density = option.dataset.density;
+                        setupWaveGrid();
+                    }
+
+                    // Handle mode change
+                    if (option.dataset.mode) {
+                        document.querySelectorAll('[data-mode]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.mode = option.dataset.mode;
+                        console.log(`🔄 Mode changed to: ${state.settings.mode.toUpperCase()}`);
+                    }
+
+                    // Handle glitch mode change
+                    if (option.dataset.glitchMode) {
+                        document.querySelectorAll('[data-glitch-mode]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.glitchMode = option.dataset.glitchMode;
+                        console.log(`🎨 GLITCH mode changed to: ${state.settings.glitchMode.toUpperCase()}`);
+                    }
+
+                    // Handle neon mode change
+                    if (option.dataset.neonMode) {
+                        document.querySelectorAll('[data-neon-mode]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.neonMode = option.dataset.neonMode;
+                        console.log(`🎨 NEON mode changed to: ${state.settings.neonMode.toUpperCase()}`);
+                    }
+                });
+            });
+
+            // Reset button
+            const resetBtn = document.getElementById('resetBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', resetToDefaults);
+            }
 
             // Add image button and dropdown
             const addImageButton = document.getElementById('addImageButton');
