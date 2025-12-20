@@ -712,13 +712,6 @@
             </div>
             <div class="control-group">
                 <div class="control-label">
-                    <span>BURST SIZE</span>
-                    <span class="control-value" id="burstSizeValue">1.0</span>
-                </div>
-                <input type="range" id="burstSizeSlider" min="0.3" max="2.0" step="0.1" value="1.0">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
                     <span>WARM/COOL</span>
                     <span class="control-value" id="colorTempValue">1.0</span>
                 </div>
@@ -2648,7 +2641,6 @@
                 state.settings.neonColorMode = canvasState.background.neonColorMode || 'rainbow';
                 state.settings.neonWarmCool = canvasState.background.neonWarmCool || 0.5;
                 state.settings.neonSatRange = canvasState.background.neonSatRange || 0.5;
-                state.settings.neonBurstSize = canvasState.background.neonBurstSize || 0.5;
 
                 // Restore audio settings
                 state.settings.lowEmphasis = canvasState.audioSettings.lowEmphasis;
@@ -2662,6 +2654,14 @@
 
                 // Restore density
                 state.settings.density = canvasState.density;
+
+                // Derive burst size from density
+                const densityToBurstSize = {
+                    'low': 0.5,
+                    'medium': 1.0,
+                    'high': 1.5
+                };
+                state.settings.neonBurstSize = densityToBurstSize[state.settings.density] || 1.0;
 
                 // Restore image objects
                 for (const imageObjData of canvasState.imageObjects) {
@@ -2869,8 +2869,7 @@
                 { id: 'rotationSlider', value: state.settings.rotationIntensity, display: 'rotationValue' },
                 { id: 'glitchSlider', value: state.settings.glitchEffectIntensity, display: 'glitchValue' },
                 { id: 'neonWarmCoolSlider', value: state.settings.neonWarmCool, display: 'neonWarmCoolValue' },
-                { id: 'neonSatRangeSlider', value: state.settings.neonSatRange, display: 'neonSatRangeValue' },
-                { id: 'neonBurstSizeSlider', value: state.settings.neonBurstSize, display: 'neonBurstSizeValue' }
+                { id: 'neonSatRangeSlider', value: state.settings.neonSatRange, display: 'neonSatRangeValue' }
             ];
 
             sliderMappings.forEach(mapping => {
@@ -3132,11 +3131,6 @@
                 }
             });
 
-            // NEON burst size slider
-            setupSlider('burstSizeSlider', 'burstSizeValue', (value) => {
-                state.settings.burstSize = value;
-            });
-
             // NEON color temperature slider
             setupSlider('colorTempSlider', 'colorTempValue', (value) => {
                 state.settings.colorTemp = value;
@@ -3166,6 +3160,15 @@
                         option.classList.add('active');
                         state.settings.density = option.dataset.density;
                         setupWaveGrid();
+
+                        // Map density to burst size for NEON theme
+                        const densityToBurstSize = {
+                            'low': 0.5,
+                            'medium': 1.0,
+                            'high': 1.5
+                        };
+                        state.settings.neonBurstSize = densityToBurstSize[option.dataset.density] || 1.0;
+                        console.log(`🎨 NEON burst size set to: ${state.settings.neonBurstSize} (density: ${option.dataset.density})`);
                     }
 
                     // Handle mode change
@@ -3627,7 +3630,6 @@
             document.getElementById('intensitySlider').value = 2.5;
             document.getElementById('speedSlider').value = 1.0;
             document.getElementById('smoothingSlider').value = 0.3;
-            document.getElementById('burstSizeSlider').value = 1.0;
             document.getElementById('colorTempSlider').value = 1.0;
             document.getElementById('satRangeSlider').value = 1.0;
             document.getElementById('rotationIntensitySlider').value = 1.0;
@@ -3639,7 +3641,6 @@
             document.getElementById('intensityValue').textContent = '2.5';
             document.getElementById('speedValue').textContent = '1.0';
             document.getElementById('smoothingValue').textContent = '0.3';
-            document.getElementById('burstSizeValue').textContent = '1.0';
             document.getElementById('colorTempValue').textContent = '1.0';
             document.getElementById('satRangeValue').textContent = '1.0';
             document.getElementById('rotationIntensityValue').textContent = '1.0';
