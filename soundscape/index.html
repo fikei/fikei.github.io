@@ -451,7 +451,9 @@
         </svg>
         <!-- Canvas for GLITCH theme image -->
         <canvas id="glitch-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
-        <!-- Upload overlay for GLITCH theme -->
+        <!-- Canvas for NEON theme image -->
+        <canvas id="neon-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
+        <!-- Upload overlay -->
         <div id="upload-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10; cursor: pointer; align-items: center; justify-content: center;">
             <div style="text-align: center;">
                 <p id="upload-text" style="font-size: 10px; font-weight: 400; letter-spacing: 0.1em; color: #ffffff; text-transform: uppercase;">Upload Image...</p>
@@ -997,8 +999,8 @@
             }
 
             if (uploadOverlay) {
-                // Show upload overlay for GLITCH theme when no image is loaded
-                const shouldShowOverlay = state.settings.theme === 'glitch' && !state.glitchImage.loaded;
+                // Show upload overlay for GLITCH or NEON theme when no image is loaded
+                const shouldShowOverlay = (state.settings.theme === 'glitch' || state.settings.theme === 'neon') && !state.glitchImage.loaded;
                 uploadOverlay.style.display = shouldShowOverlay ? 'flex' : 'none';
             }
         }
@@ -1406,6 +1408,17 @@
             const canvasWidth = state.boundingRect.width;
             const canvasHeight = state.boundingRect.height;
 
+            // Check if image is loaded
+            const neonCanvas = document.getElementById('neon-canvas');
+            if (state.glitchImage.loaded && state.glitchImage.img && neonCanvas) {
+                // IMAGE-BASED RENDERING
+                renderNeonImage(neonCanvas, theme, low, mid, high, time, canvasWidth, canvasHeight);
+                return;
+            } else if (neonCanvas) {
+                // Hide canvas if no image
+                neonCanvas.style.display = 'none';
+            }
+
             // Get or create gradient mesh container
             let gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
             if (!gradientMeshGroup) {
@@ -1650,6 +1663,100 @@
                     });
                 }
             }
+        }
+
+        function renderNeonImage(canvas, theme, low, mid, high, time, canvasWidth, canvasHeight) {
+            const ctx = canvas.getContext('2d');
+            const img = state.glitchImage.img;
+
+            // Show canvas
+            canvas.style.display = 'block';
+
+            // Hide SVG gradient mesh
+            const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
+            if (gradientMeshGroup) {
+                gradientMeshGroup.innerHTML = '';
+            }
+
+            // Set canvas size and position
+            canvas.width = state.glitchImage.width;
+            canvas.height = state.glitchImage.height;
+            canvas.style.left = `${state.glitchImage.x}px`;
+            canvas.style.top = `${state.glitchImage.y}px`;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw base image
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // Get color mode settings
+            const colorMode = state.settings.neonMode;
+            const colorTempIntensity = state.settings.colorTemp;
+            const satRangeIntensity = state.settings.satRange;
+
+            // Calculate audio-reactive parameters
+            const hueShift = (mid * 360 + time * 0.05) % 360;
+
+            // Saturation mapping
+            const baseSaturation = theme.saturationBase + high * theme.saturationMultiplier;
+            const saturationFromLow = low * 30 * satRangeIntensity;
+            const saturationFromHigh = -high * 20 * satRangeIntensity;
+            const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
+
+            // Lightness
+            const lightnessFromLow = -low * theme.lightnessRange * 0.5;
+            const lightnessFromHigh = high * theme.lightnessRange * 0.7;
+            const lightness = theme.lightnessBase + lightnessFromLow + lightnessFromHigh;
+
+            // Blur based on bass
+            const blurRadius = theme.blurBase + low * theme.blurMultiplier;
+
+            // Apply gradient overlay effect
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
+            );
+
+            // Calculate color based on mode
+            let hue, finalSaturation, finalLightness;
+
+            if (colorMode === 'gray') {
+                hue = 0;
+                finalSaturation = 0;
+                finalLightness = lightness;
+            } else if (colorMode === 'pastel') {
+                const frequencyBalance = (high - low) * colorTempIntensity;
+                const frequencyHue = 120 - frequencyBalance * 90;
+                hue = ((frequencyHue + hueShift * 0.5) % 360);
+                finalSaturation = Math.max(40, Math.min(70, saturation * 0.7));
+                finalLightness = Math.max(60, Math.min(85, lightness + 10));
+            } else {
+                // Bright mode
+                hue = (180 + hueShift) % 360; // Cyan base
+                finalSaturation = saturation;
+                finalLightness = lightness;
+            }
+
+            // Create gradient stops
+            gradient.addColorStop(0, `hsla(${hue}, ${finalSaturation}%, ${finalLightness}%, 0.6)`);
+            gradient.addColorStop(0.5, `hsla(${(hue + 60) % 360}, ${finalSaturation}%, ${finalLightness}%, 0.3)`);
+            gradient.addColorStop(1, `hsla(${(hue + 120) % 360}, ${finalSaturation}%, ${finalLightness}%, 0)`);
+
+            // Apply gradient overlay with blend mode
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Apply blur filter if supported
+            if (blurRadius > 0) {
+                ctx.filter = `blur(${blurRadius}px)`;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.drawImage(canvas, 0, 0);
+                ctx.filter = 'none';
+            }
+
+            ctx.globalCompositeOperation = 'source-over';
         }
 
         function drawLinesGlitch() {
@@ -1927,39 +2034,50 @@
             blueCtx.putImageData(blueData, 0, 0);
 
             // Composite the channels with separation and random variations
-            ctx.globalCompositeOperation = 'lighter';
-
-            // Add random variation to channel separation based on audio
             const randomOffsetX = (Math.random() - 0.5) * channelSeparation * 0.5;
             const randomOffsetY = (Math.random() - 0.5) * channelSeparation * 0.5;
 
-            if (glitchMode === 'rgb' || glitchMode === 'gray') {
-                // RGB mode: All three channels with separation
-                // Red channel (offset left with random variation)
-                const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
-                const redOffsetY = randomOffsetY * mid;
-                ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
+            if (glitchMode === 'gray') {
+                // GRAY mode: Single render to avoid overexposure
+                // Apply subtle offset variations for glitch effect
+                ctx.globalCompositeOperation = 'source-over';
 
-                // Green channel (slightly offset with random jitter)
-                const greenOffsetX = (Math.random() - 0.5) * channelSeparation * 0.3 * mid;
-                const greenOffsetY = (Math.random() - 0.5) * channelSeparation * 0.3 * high;
-                ctx.drawImage(greenCanvas, greenOffsetX, greenOffsetY);
+                const offsetX = (Math.random() - 0.5) * channelSeparation * 0.5 * low;
+                const offsetY = (Math.random() - 0.5) * channelSeparation * 0.5 * mid;
 
-                // Blue channel (offset right and down with variation)
-                const blueOffsetX = channelSeparation + randomOffsetX * high * 2;
-                const blueOffsetY = channelSeparation * 0.5 + randomOffsetY * low;
-                ctx.drawImage(blueCanvas, blueOffsetX, blueOffsetY);
-            } else if (glitchMode === 'br') {
-                // B&R mode: Only red and cyan (like 3D glasses)
-                // Red channel (offset left)
-                const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
-                const redOffsetY = randomOffsetY * mid;
-                ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
+                ctx.putImageData(imageData, offsetX, offsetY);
+            } else {
+                // RGB and B&R modes: Use lighter blend mode for color separation
+                ctx.globalCompositeOperation = 'lighter';
 
-                // Cyan channel (offset right) - stored in greenCanvas
-                const cyanOffsetX = channelSeparation + randomOffsetX * high * 2;
-                const cyanOffsetY = randomOffsetY * low;
-                ctx.drawImage(greenCanvas, cyanOffsetX, cyanOffsetY);
+                if (glitchMode === 'rgb') {
+                    // RGB mode: All three channels with separation
+                    // Red channel (offset left with random variation)
+                    const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
+                    const redOffsetY = randomOffsetY * mid;
+                    ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
+
+                    // Green channel (slightly offset with random jitter)
+                    const greenOffsetX = (Math.random() - 0.5) * channelSeparation * 0.3 * mid;
+                    const greenOffsetY = (Math.random() - 0.5) * channelSeparation * 0.3 * high;
+                    ctx.drawImage(greenCanvas, greenOffsetX, greenOffsetY);
+
+                    // Blue channel (offset right and down with variation)
+                    const blueOffsetX = channelSeparation + randomOffsetX * high * 2;
+                    const blueOffsetY = channelSeparation * 0.5 + randomOffsetY * low;
+                    ctx.drawImage(blueCanvas, blueOffsetX, blueOffsetY);
+                } else if (glitchMode === 'br') {
+                    // B&R mode: Only red and cyan (like 3D glasses)
+                    // Red channel (offset left)
+                    const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
+                    const redOffsetY = randomOffsetY * mid;
+                    ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
+
+                    // Cyan channel (offset right) - stored in greenCanvas
+                    const cyanOffsetX = channelSeparation + randomOffsetX * high * 2;
+                    const cyanOffsetY = randomOffsetY * low;
+                    ctx.drawImage(greenCanvas, cyanOffsetX, cyanOffsetY);
+                }
             }
 
             ctx.globalCompositeOperation = 'source-over';
@@ -2339,7 +2457,7 @@
 
                 // Show drag overlay when dragging over
                 visualizationContainer.addEventListener('dragenter', (e) => {
-                    if (state.settings.theme === 'glitch' && !state.glitchImage.loaded) {
+                    if ((state.settings.theme === 'glitch' || state.settings.theme === 'neon') && !state.glitchImage.loaded) {
                         dragOverlay.style.display = 'flex';
                     }
                 });
@@ -2354,7 +2472,7 @@
                 visualizationContainer.addEventListener('drop', (e) => {
                     dragOverlay.style.display = 'none';
 
-                    if (state.settings.theme === 'glitch') {
+                    if (state.settings.theme === 'glitch' || state.settings.theme === 'neon') {
                         const files = e.dataTransfer.files;
                         if (files.length > 0 && files[0].type.startsWith('image/')) {
                             loadImageFile(files[0]);
@@ -2371,11 +2489,36 @@
                     img.onload = () => {
                         state.glitchImage.img = img;
                         state.glitchImage.loaded = true;
-                        state.glitchImage.width = Math.min(img.width, 600);
-                        state.glitchImage.height = (state.glitchImage.width / img.width) * img.height;
-                        state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                        state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
-                        console.log(`✅ Image loaded: ${img.width}x${img.height}`);
+
+                        // GLITCH theme: Scale to fill entire canvas
+                        // NEON theme: Scale to reasonable size
+                        if (state.settings.theme === 'glitch') {
+                            // Fill canvas by scaling to cover
+                            const canvasAspect = state.boundingRect.width / state.boundingRect.height;
+                            const imgAspect = img.width / img.height;
+
+                            if (imgAspect > canvasAspect) {
+                                // Image is wider - fit to height
+                                state.glitchImage.height = state.boundingRect.height;
+                                state.glitchImage.width = state.glitchImage.height * imgAspect;
+                            } else {
+                                // Image is taller - fit to width
+                                state.glitchImage.width = state.boundingRect.width;
+                                state.glitchImage.height = state.glitchImage.width / imgAspect;
+                            }
+
+                            // Center the image
+                            state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+                            state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                        } else {
+                            // NEON theme: Scale to fit reasonably
+                            state.glitchImage.width = Math.min(img.width, 600);
+                            state.glitchImage.height = (state.glitchImage.width / img.width) * img.height;
+                            state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+                            state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                        }
+
+                        console.log(`✅ Image loaded: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
 
                         // Hide upload overlay
                         updateModeVisibility();
@@ -2410,12 +2553,17 @@
                 console.log(`✨ Added gradient center at (${e.clientX}, ${e.clientY}). Total: ${state.userGradientCenters.length}`);
             });
 
-            // Click & drag to resize image (GLITCH theme only)
+            // Click & drag to resize image (both GLITCH and NEON themes)
             const glitchCanvas = document.getElementById('glitch-canvas');
-            if (glitchCanvas) {
-                glitchCanvas.addEventListener('mousedown', (e) => {
-                    // Only handle resize for GLITCH theme with loaded image
-                    if (state.settings.theme !== 'glitch' || !state.glitchImage.loaded) return;
+            const neonCanvas = document.getElementById('neon-canvas');
+
+            // Add resize handler to both canvases
+            [glitchCanvas, neonCanvas].forEach(canvas => {
+                if (!canvas) return;
+
+                canvas.addEventListener('mousedown', (e) => {
+                    // Only handle resize when image is loaded
+                    if (!state.glitchImage.loaded) return;
 
                     state.glitchImage.isDragging = true;
                     state.glitchImage.dragStartX = e.clientX;
@@ -2423,42 +2571,48 @@
                     state.glitchImage.dragStartWidth = state.glitchImage.width;
                     state.glitchImage.dragStartHeight = state.glitchImage.height;
 
-                    glitchCanvas.style.cursor = 'grabbing';
+                    canvas.style.cursor = 'grabbing';
                     e.preventDefault();
                 });
+            });
 
-                window.addEventListener('mousemove', (e) => {
-                    if (!state.glitchImage.isDragging) return;
+            // Handle mouse move for resize
+            window.addEventListener('mousemove', (e) => {
+                if (!state.glitchImage.isDragging) return;
 
-                    // Calculate drag distance
-                    const dx = e.clientX - state.glitchImage.dragStartX;
-                    const dy = e.clientY - state.glitchImage.dragStartY;
-                    const dragDistance = Math.hypot(dx, dy);
-                    const dragDirection = dx + dy > 0 ? 1 : -1;
+                // Calculate drag distance
+                const dx = e.clientX - state.glitchImage.dragStartX;
+                const dy = e.clientY - state.glitchImage.dragStartY;
+                const dragDistance = Math.hypot(dx, dy);
+                const dragDirection = dx + dy > 0 ? 1 : -1;
 
-                    // Calculate new size (proportional to drag distance)
-                    const scaleFactor = 1 + (dragDirection * dragDistance / 500);
-                    const newWidth = Math.max(100, state.glitchImage.dragStartWidth * scaleFactor);
-                    const aspectRatio = state.glitchImage.img.height / state.glitchImage.img.width;
-                    const newHeight = newWidth * aspectRatio;
+                // Calculate new size (proportional to drag distance)
+                const scaleFactor = 1 + (dragDirection * dragDistance / 500);
+                const newWidth = Math.max(100, state.glitchImage.dragStartWidth * scaleFactor);
+                const aspectRatio = state.glitchImage.img.height / state.glitchImage.img.width;
+                const newHeight = newWidth * aspectRatio;
 
-                    // Update image dimensions
-                    state.glitchImage.width = newWidth;
-                    state.glitchImage.height = newHeight;
+                // Update image dimensions
+                state.glitchImage.width = newWidth;
+                state.glitchImage.height = newHeight;
 
-                    // Re-center the image
-                    state.glitchImage.x = (state.boundingRect.width - newWidth) / 2;
-                    state.glitchImage.y = (state.boundingRect.height - newHeight) / 2;
-                });
+                // Re-center the image
+                state.glitchImage.x = (state.boundingRect.width - newWidth) / 2;
+                state.glitchImage.y = (state.boundingRect.height - newHeight) / 2;
+            });
 
-                window.addEventListener('mouseup', () => {
-                    if (state.glitchImage.isDragging) {
-                        state.glitchImage.isDragging = false;
-                        glitchCanvas.style.cursor = 'grab';
-                        console.log(`🖼️ Image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
-                    }
-                });
-            }
+            // Handle mouse up to finish resize
+            window.addEventListener('mouseup', () => {
+                if (state.glitchImage.isDragging) {
+                    state.glitchImage.isDragging = false;
+
+                    // Reset cursor on both canvases
+                    if (glitchCanvas) glitchCanvas.style.cursor = 'grab';
+                    if (neonCanvas) neonCanvas.style.cursor = 'grab';
+
+                    console.log(`🖼️ Image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                }
+            });
         }
 
         function setupSlider(sliderId, valueId, callback) {
