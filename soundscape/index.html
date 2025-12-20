@@ -151,7 +151,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease, transform 0.2s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, transform 0.2s ease;
         }
 
         .sidebar-toggle:hover {
@@ -165,7 +165,6 @@
         }
 
         .sidebar.open ~ .sidebar-toggle {
-            right: 201px; /* Push with sidebar (200px + 1px border) */
             transform: rotate(180deg); /* Flip caret to point left */
         }
 
@@ -186,7 +185,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
+            transition: opacity 0.5s ease, background 0.15s ease;
         }
 
         .fullscreen-toggle:hover {
@@ -197,10 +196,6 @@
         .fullscreen-toggle.hidden-control {
             opacity: 0;
             pointer-events: none;
-        }
-
-        .sidebar.open ~ .fullscreen-toggle {
-            right: 201px; /* Push with sidebar */
         }
 
         /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
@@ -582,6 +577,38 @@
                 </div>
                 <input type="range" id="imageTransparencySlider" min="0" max="1" step="0.05" value="1">
             </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>ROTATION</span>
+                    <span class="control-value" id="imageRotationValue">0</span>
+                </div>
+                <input type="range" id="imageRotationSlider" min="0" max="360" step="1" value="0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BLUR</span>
+                    <span class="control-value" id="imageBlurValue">0</span>
+                </div>
+                <input type="range" id="imageBlurSlider" min="0" max="20" step="0.5" value="0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>THEME BLUR</span>
+                    <span class="control-value" id="themeBlurValue">0</span>
+                </div>
+                <input type="range" id="themeBlurSlider" min="0" max="20" step="0.5" value="0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>THEME OPACITY</span>
+                    <span class="control-value" id="themeOpacityValue">1.0</span>
+                </div>
+                <input type="range" id="themeOpacitySlider" min="0" max="1" step="0.05" value="1">
+            </div>
         </section>
     </aside>
 
@@ -931,8 +958,6 @@
             const backgroundControlsSection = document.getElementById('backgroundControlsSection');
             const imageControlsSection = document.getElementById('imageControlsSection');
             const imageThemeSelect = document.getElementById('imageThemeSelect');
-            const imageTransparencySlider = document.getElementById('imageTransparencySlider');
-            const imageTransparencyValue = document.getElementById('imageTransparencyValue');
             const uploadOverlay = document.getElementById('upload-overlay');
 
             const hasSelectedImage = state.selectedImageIndex !== -1 && state.imageObjects[state.selectedImageIndex];
@@ -949,9 +974,22 @@
                 // Update image controls to match selected image's properties
                 if (hasSelectedImage) {
                     const imageObj = state.imageObjects[state.selectedImageIndex];
+
+                    // Update all sliders and their value displays
                     if (imageThemeSelect) imageThemeSelect.value = imageObj.theme;
-                    if (imageTransparencySlider) imageTransparencySlider.value = imageObj.transparency;
-                    if (imageTransparencyValue) imageTransparencyValue.textContent = imageObj.transparency.toFixed(2);
+
+                    const updateSlider = (sliderId, valueId, value, decimals = 2) => {
+                        const slider = document.getElementById(sliderId);
+                        const valueEl = document.getElementById(valueId);
+                        if (slider) slider.value = value;
+                        if (valueEl) valueEl.textContent = decimals === 0 ? value : value.toFixed(decimals);
+                    };
+
+                    updateSlider('imageTransparencySlider', 'imageTransparencyValue', imageObj.transparency, 2);
+                    updateSlider('imageRotationSlider', 'imageRotationValue', imageObj.rotation, 0);
+                    updateSlider('imageBlurSlider', 'imageBlurValue', imageObj.blur, 1);
+                    updateSlider('themeBlurSlider', 'themeBlurValue', imageObj.themeBlur, 1);
+                    updateSlider('themeOpacitySlider', 'themeOpacityValue', imageObj.themeOpacity, 2);
                 }
             }
 
@@ -1612,7 +1650,7 @@
             }
         }
 
-        function renderNeonImage(canvas, theme, low, mid, high, time, canvasWidth, canvasHeight, img) {
+        function renderNeonImage(canvas, theme, low, mid, high, time, canvasWidth, canvasHeight, img, themeBlur = 0, themeOpacity = 1.0) {
             const ctx = canvas.getContext('2d');
 
             if (!img) return;
@@ -1671,15 +1709,17 @@
                 finalLightness = lightness;
             }
 
-            // Create gradient stops
-            gradient.addColorStop(0, `hsla(${hue}, ${finalSaturation}%, ${finalLightness}%, 0.6)`);
-            gradient.addColorStop(0.5, `hsla(${(hue + 60) % 360}, ${finalSaturation}%, ${finalLightness}%, 0.3)`);
+            // Create gradient stops (apply theme opacity)
+            gradient.addColorStop(0, `hsla(${hue}, ${finalSaturation}%, ${finalLightness}%, ${0.6 * themeOpacity})`);
+            gradient.addColorStop(0.5, `hsla(${(hue + 60) % 360}, ${finalSaturation}%, ${finalLightness}%, ${0.3 * themeOpacity})`);
             gradient.addColorStop(1, `hsla(${(hue + 120) % 360}, ${finalSaturation}%, ${finalLightness}%, 0)`);
 
             // Apply gradient overlay with blend mode
             ctx.globalCompositeOperation = 'screen';
+            ctx.globalAlpha = themeOpacity;
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1.0;
 
             // Apply blur filter if supported
             if (blurRadius > 0) {
@@ -1707,7 +1747,7 @@
             renderGlitchLines(theme, low, mid, high);
         }
 
-        function renderGlitchImage(canvas, theme, low, mid, high, time, img) {
+        function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0) {
             const ctx = canvas.getContext('2d');
 
             if (!img) return;
@@ -2110,6 +2150,17 @@
                 // Apply transparency
                 canvas.style.opacity = imageObj.transparency;
 
+                // Apply rotation
+                canvas.style.transform = `rotate(${imageObj.rotation}deg)`;
+                canvas.style.transformOrigin = 'center center';
+
+                // Apply blur filter
+                if (imageObj.blur > 0) {
+                    canvas.style.filter = `blur(${imageObj.blur}px)`;
+                } else {
+                    canvas.style.filter = 'none';
+                }
+
                 // Add selection outline if selected
                 if (index === state.selectedImageIndex) {
                     canvas.style.border = '2px solid #ffffff';
@@ -2121,15 +2172,15 @@
 
                 // Render based on image's assigned theme
                 if (imageObj.theme === 'neon') {
-                    renderNeonImage(canvas, config.themes.neon, low, mid, high, time, imageObj.width, imageObj.height, imageObj.img);
+                    renderNeonImage(canvas, config.themes.neon, low, mid, high, time, imageObj.width, imageObj.height, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity);
                 } else if (imageObj.theme === 'glitch') {
-                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, imageObj.img);
+                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity);
                 } else if (imageObj.theme === 'linear') {
                     // For LINEAR theme on image, just draw the image with some audio-reactive effects
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    // Apply audio-reactive opacity
-                    ctx.globalAlpha = 0.8 + (mid * 0.2);
+                    // Apply audio-reactive opacity combined with theme opacity
+                    ctx.globalAlpha = (0.8 + (mid * 0.2)) * imageObj.themeOpacity;
                     ctx.drawImage(imageObj.img, 0, 0, canvas.width, canvas.height);
                     ctx.globalAlpha = 1.0;
                 }
@@ -2285,6 +2336,46 @@
                 const imageObj = state.imageObjects[state.selectedImageIndex];
                 if (imageObj) {
                     imageObj.transparency = value;
+                }
+            });
+
+            // Image rotation slider
+            setupSlider('imageRotationSlider', 'imageRotationValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.rotation = value;
+                }
+            });
+
+            // Image blur slider
+            setupSlider('imageBlurSlider', 'imageBlurValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.blur = value;
+                }
+            });
+
+            // Theme blur slider
+            setupSlider('themeBlurSlider', 'themeBlurValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.themeBlur = value;
+                }
+            });
+
+            // Theme opacity slider
+            setupSlider('themeOpacitySlider', 'themeOpacityValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.themeOpacity = value;
                 }
             });
 
@@ -2475,6 +2566,10 @@
                                 height: height,
                                 theme: state.settings.theme, // Default to current background theme
                                 transparency: 1.0, // Default to fully opaque
+                                rotation: 0, // Rotation in degrees
+                                blur: 0, // Blur amount in pixels
+                                themeBlur: 0, // Blur on theme effect
+                                themeOpacity: 1.0, // Opacity of theme effect
                                 canvas: canvas,
                                 isDragging: false,
                                 isResizing: false,
