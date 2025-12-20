@@ -223,6 +223,11 @@
             color: #000000;
         }
 
+        .add-image-button.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         .add-image-dropdown {
             position: fixed;
             bottom: 3rem;
@@ -2417,11 +2422,13 @@
                 });
             }
 
-            // 'h' key to toggle UI visibility (status bar and fullscreen button only)
+            // 'h' key to toggle UI visibility (all nav icons)
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'h' || e.key === 'H') {
                     const statusBar = document.getElementById('statusBar');
                     const fullscreenBtn = document.getElementById('fullscreenToggle');
+                    const addImageBtn = document.getElementById('addImageButton');
+                    const sidebarToggle = document.getElementById('sidebarToggle');
 
                     // Check if UI is currently hidden
                     const isHidden = statusBar && statusBar.classList.contains('hidden-control');
@@ -2430,10 +2437,14 @@
                         // Show UI
                         if (statusBar) statusBar.classList.remove('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.remove('hidden-control');
+                        if (addImageBtn) addImageBtn.classList.remove('hidden-control');
+                        if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
                     } else {
-                        // Hide UI (but NOT the sidebar toggle button)
+                        // Hide UI
                         if (statusBar) statusBar.classList.add('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.add('hidden-control');
+                        if (addImageBtn) addImageBtn.classList.add('hidden-control');
+                        if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
                     }
                 }
             });
