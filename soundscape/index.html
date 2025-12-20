@@ -151,7 +151,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, transform 0.2s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, transform 0.2s ease, right 0.2s ease;
         }
 
         .sidebar-toggle:hover {
@@ -166,6 +166,7 @@
 
         .sidebar.open ~ .sidebar-toggle {
             transform: rotate(180deg); /* Flip caret to point left */
+            right: calc(200px + 1rem); /* Float to left of sidebar */
         }
 
         /* ===== FULLSCREEN TOGGLE BUTTON ===== */
@@ -185,7 +186,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
         }
 
         .fullscreen-toggle:hover {
@@ -196,6 +197,10 @@
         .fullscreen-toggle.hidden-control {
             opacity: 0;
             pointer-events: none;
+        }
+
+        .sidebar.open ~ .fullscreen-toggle {
+            right: calc(200px + 1rem); /* Float to left of sidebar */
         }
 
         /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
