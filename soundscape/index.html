@@ -490,14 +490,14 @@
                     <span>ROTATION</span>
                     <span class="control-value" id="rotationIntensityValue">1.0</span>
                 </div>
-                <input type="range" id="rotationIntensitySlider" min="0" max="2.0" step="0.1" value="1.0">
+                <input type="range" id="rotationIntensitySlider" min="0" max="5.0" step="0.1" value="1.0">
             </div>
             <div class="control-group">
                 <div class="control-label">
                     <span>GLITCH</span>
                     <span class="control-value" id="glitchIntensityValue">1.0</span>
                 </div>
-                <input type="range" id="glitchIntensitySlider" min="0" max="2.0" step="0.1" value="1.0">
+                <input type="range" id="glitchIntensitySlider" min="0" max="5.0" step="0.1" value="1.0">
             </div>
         </section>
 
@@ -1615,11 +1615,11 @@
             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
 
-            // Apply random glitch displacement to scan lines
-            const scanlineGlitchChance = mid * 0.2;
+            // Apply random glitch displacement to scan lines (controlled by mids)
+            const scanlineGlitchChance = mid * 0.3;
             for (let y = 0; y < canvas.height; y++) {
                 if (Math.random() < scanlineGlitchChance) {
-                    const offset = Math.floor((Math.random() - 0.5) * glitchIntensity * 20);
+                    const offset = Math.floor((Math.random() - 0.5) * glitchIntensity * 30);
                     if (offset !== 0) {
                         const rowStart = y * canvas.width * 4;
                         const rowData = data.slice(rowStart, rowStart + canvas.width * 4);
@@ -1633,6 +1633,74 @@
                             data[targetIdx + 1] = rowData[sourceIdx + 1];
                             data[targetIdx + 2] = rowData[sourceIdx + 2];
                             data[targetIdx + 3] = rowData[sourceIdx + 3];
+                        }
+                    }
+                }
+            }
+
+            // Add random block corruption based on bass (creates chunky glitches)
+            const blockGlitchChance = low * 0.15;
+            const numBlocks = Math.floor(low * 10);
+            for (let b = 0; b < numBlocks; b++) {
+                if (Math.random() < blockGlitchChance) {
+                    const blockX = Math.floor(Math.random() * canvas.width);
+                    const blockY = Math.floor(Math.random() * canvas.height);
+                    const blockWidth = Math.floor(Math.random() * glitchIntensity * 40 + 10);
+                    const blockHeight = Math.floor(Math.random() * glitchIntensity * 20 + 5);
+
+                    // Random glitch type
+                    const glitchType = Math.random();
+
+                    for (let y = blockY; y < Math.min(blockY + blockHeight, canvas.height); y++) {
+                        for (let x = blockX; x < Math.min(blockX + blockWidth, canvas.width); x++) {
+                            const idx = (y * canvas.width + x) * 4;
+
+                            if (glitchType < 0.33) {
+                                // Color inversion
+                                data[idx] = 255 - data[idx];
+                                data[idx + 1] = 255 - data[idx + 1];
+                                data[idx + 2] = 255 - data[idx + 2];
+                            } else if (glitchType < 0.66) {
+                                // Channel swap
+                                const temp = data[idx];
+                                data[idx] = data[idx + 2];
+                                data[idx + 2] = temp;
+                            } else {
+                                // Random shift within block
+                                const shiftX = Math.floor((Math.random() - 0.5) * 20);
+                                const sourceX = Math.max(0, Math.min(canvas.width - 1, x + shiftX));
+                                const sourceIdx = (y * canvas.width + sourceX) * 4;
+                                data[idx] = data[sourceIdx];
+                                data[idx + 1] = data[sourceIdx + 1];
+                                data[idx + 2] = data[sourceIdx + 2];
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Add vertical tears based on highs (sudden glitch lines)
+            const tearChance = high * 0.2;
+            const numTears = Math.floor(high * 5);
+            for (let t = 0; t < numTears; t++) {
+                if (Math.random() < tearChance) {
+                    const tearX = Math.floor(Math.random() * canvas.width);
+                    const tearWidth = Math.floor(Math.random() * 5 + 1);
+                    const tearOffset = Math.floor((Math.random() - 0.5) * glitchIntensity * 15);
+
+                    for (let y = 0; y < canvas.height; y++) {
+                        for (let dx = 0; dx < tearWidth; dx++) {
+                            const x = tearX + dx;
+                            if (x >= 0 && x < canvas.width) {
+                                const sourceY = Math.max(0, Math.min(canvas.height - 1, y + tearOffset));
+                                const targetIdx = (y * canvas.width + x) * 4;
+                                const sourceIdx = (sourceY * canvas.width + x) * 4;
+
+                                data[targetIdx] = data[sourceIdx];
+                                data[targetIdx + 1] = data[sourceIdx + 1];
+                                data[targetIdx + 2] = data[sourceIdx + 2];
+                                data[targetIdx + 3] = data[sourceIdx + 3];
+                            }
                         }
                     }
                 }
@@ -1683,17 +1751,27 @@
             greenCtx.putImageData(greenData, 0, 0);
             blueCtx.putImageData(blueData, 0, 0);
 
-            // Composite the channels with separation
+            // Composite the channels with separation and random variations
             ctx.globalCompositeOperation = 'lighter';
 
-            // Red channel (offset left)
-            ctx.drawImage(redCanvas, -channelSeparation, 0);
+            // Add random variation to channel separation based on audio
+            const randomOffsetX = (Math.random() - 0.5) * channelSeparation * 0.5;
+            const randomOffsetY = (Math.random() - 0.5) * channelSeparation * 0.5;
 
-            // Green channel (centered)
-            ctx.drawImage(greenCanvas, 0, 0);
+            // Red channel (offset left with random variation)
+            const redOffsetX = -channelSeparation + randomOffsetX * low * 2;
+            const redOffsetY = randomOffsetY * mid;
+            ctx.drawImage(redCanvas, redOffsetX, redOffsetY);
 
-            // Blue channel (offset right and down)
-            ctx.drawImage(blueCanvas, channelSeparation, channelSeparation * 0.5);
+            // Green channel (slightly offset with random jitter)
+            const greenOffsetX = (Math.random() - 0.5) * channelSeparation * 0.3 * mid;
+            const greenOffsetY = (Math.random() - 0.5) * channelSeparation * 0.3 * high;
+            ctx.drawImage(greenCanvas, greenOffsetX, greenOffsetY);
+
+            // Blue channel (offset right and down with variation)
+            const blueOffsetX = channelSeparation + randomOffsetX * high * 2;
+            const blueOffsetY = channelSeparation * 0.5 + randomOffsetY * low;
+            ctx.drawImage(blueCanvas, blueOffsetX, blueOffsetY);
 
             ctx.globalCompositeOperation = 'source-over';
         }
