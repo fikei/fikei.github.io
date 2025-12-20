@@ -550,7 +550,12 @@
     <button class="add-image-button" id="addImageButton" aria-label="Add image">+</button>
     <div class="add-image-dropdown" id="addImageDropdown">
         <div class="add-image-dropdown-item" id="addImageMenuItem">Add Image</div>
+        <div class="add-image-dropdown-item" id="saveCanvasMenuItem">Save Canvas</div>
+        <div class="add-image-dropdown-item" id="loadCanvasMenuItem">Load Canvas</div>
     </div>
+
+    <!-- Hidden file inputs for canvas load -->
+    <input type="file" id="loadCanvasInput" accept=".json" style="display: none;">
 
     <!-- Controls Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -2453,6 +2458,375 @@
         }
 
         // =====================================================
+        // SAVE/LOAD STATE
+        // =====================================================
+
+        async function saveCanvasState() {
+            try {
+                // Collect all state data
+                const canvasState = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    background: {
+                        theme: state.settings.theme,
+                        mode: state.settings.mode,
+                        glitchMode: state.settings.glitchMode,
+                        rotationIntensity: state.settings.rotationIntensity,
+                        glitchEffectIntensity: state.settings.glitchEffectIntensity,
+                        neonColorMode: state.settings.neonColorMode,
+                        neonWarmCool: state.settings.neonWarmCool,
+                        neonSatRange: state.settings.neonSatRange,
+                        neonBurstSize: state.settings.neonBurstSize
+                    },
+                    audioSettings: {
+                        lowEmphasis: state.settings.lowEmphasis,
+                        midEmphasis: state.settings.midEmphasis,
+                        highEmphasis: state.settings.highEmphasis
+                    },
+                    waveSettings: {
+                        intensity: state.settings.waveIntensity,
+                        speed: state.settings.waveSpeed,
+                        smoothing: state.settings.waveSmoothing
+                    },
+                    density: state.settings.density,
+                    imageObjects: []
+                };
+
+                // Convert each image object to serializable format
+                for (const imageObj of state.imageObjects) {
+                    // Convert image to base64
+                    const canvas = document.createElement('canvas');
+                    canvas.width = imageObj.img.width;
+                    canvas.height = imageObj.img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(imageObj.img, 0, 0);
+                    const imageData = canvas.toDataURL('image/png');
+
+                    canvasState.imageObjects.push({
+                        x: imageObj.x,
+                        y: imageObj.y,
+                        width: imageObj.width,
+                        height: imageObj.height,
+                        theme: imageObj.theme,
+                        transparency: imageObj.transparency,
+                        rotation: imageObj.rotation,
+                        blur: imageObj.blur,
+                        themeBlur: imageObj.themeBlur,
+                        themeOpacity: imageObj.themeOpacity,
+                        imageData: imageData
+                    });
+                }
+
+                // Convert to JSON and download
+                const jsonString = JSON.stringify(canvasState, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `soundscape-${new Date().getTime()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                console.log('✅ Canvas state saved successfully');
+            } catch (error) {
+                console.error('❌ Error saving canvas state:', error);
+                alert('Error saving canvas state. Check console for details.');
+            }
+        }
+
+        function loadCanvasStateFromFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const canvasState = JSON.parse(event.target.result);
+                    restoreCanvasState(canvasState);
+                } catch (error) {
+                    console.error('❌ Error loading canvas state:', error);
+                    alert('Error loading canvas state. Check console for details.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function restoreCanvasState(canvasState) {
+            try {
+                console.log('🔄 Restoring canvas state...');
+
+                // Clear existing image objects
+                state.imageObjects.forEach(obj => {
+                    if (obj.canvas && obj.canvas.parentNode) {
+                        obj.canvas.parentNode.removeChild(obj.canvas);
+                    }
+                });
+                state.imageObjects = [];
+                state.selectedImageIndex = -1;
+
+                // Restore background theme
+                state.settings.theme = canvasState.background.theme;
+                state.settings.mode = canvasState.background.mode;
+                state.settings.glitchMode = canvasState.background.glitchMode || 'rgb';
+                state.settings.rotationIntensity = canvasState.background.rotationIntensity || 1.0;
+                state.settings.glitchEffectIntensity = canvasState.background.glitchEffectIntensity || 1.0;
+                state.settings.neonColorMode = canvasState.background.neonColorMode || 'rainbow';
+                state.settings.neonWarmCool = canvasState.background.neonWarmCool || 0.5;
+                state.settings.neonSatRange = canvasState.background.neonSatRange || 0.5;
+                state.settings.neonBurstSize = canvasState.background.neonBurstSize || 0.5;
+
+                // Restore audio settings
+                state.settings.lowEmphasis = canvasState.audioSettings.lowEmphasis;
+                state.settings.midEmphasis = canvasState.audioSettings.midEmphasis;
+                state.settings.highEmphasis = canvasState.audioSettings.highEmphasis;
+
+                // Restore wave settings
+                state.settings.waveIntensity = canvasState.waveSettings.intensity;
+                state.settings.waveSpeed = canvasState.waveSettings.speed;
+                state.settings.waveSmoothing = canvasState.waveSettings.smoothing;
+
+                // Restore density
+                state.settings.density = canvasState.density;
+
+                // Restore image objects
+                for (const imageObjData of canvasState.imageObjects) {
+                    await restoreImageObject(imageObjData);
+                }
+
+                // Update UI to reflect loaded state
+                updateModeVisibility();
+                syncControlsWithState();
+
+                console.log('✅ Canvas state restored successfully');
+            } catch (error) {
+                console.error('❌ Error restoring canvas state:', error);
+                alert('Error restoring canvas state. Check console for details.');
+            }
+        }
+
+        function restoreImageObject(imageObjData) {
+            return new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                canvas.style.position = 'absolute';
+                canvas.style.cursor = 'move';
+                canvas.style.pointerEvents = 'auto';
+                canvas.className = 'image-object-canvas';
+                document.getElementById('visualization-container').appendChild(canvas);
+
+                if (imageObjData.imageData) {
+                    // Image data exists - load it
+                    const img = new Image();
+                    img.onload = () => {
+                        const imageObject = {
+                            img: img,
+                            x: imageObjData.x,
+                            y: imageObjData.y,
+                            width: imageObjData.width,
+                            height: imageObjData.height,
+                            theme: imageObjData.theme,
+                            transparency: imageObjData.transparency,
+                            rotation: imageObjData.rotation,
+                            blur: imageObjData.blur,
+                            themeBlur: imageObjData.themeBlur,
+                            themeOpacity: imageObjData.themeOpacity,
+                            canvas: canvas,
+                            isDragging: false,
+                            isResizing: false,
+                            dragStartX: 0,
+                            dragStartY: 0,
+                            dragStartWidth: 0,
+                            dragStartHeight: 0
+                        };
+
+                        state.imageObjects.push(imageObject);
+                        const imageIndex = state.imageObjects.length - 1;
+                        setupImageInteraction(canvas, imageIndex);
+
+                        console.log(`✅ Image object restored: ${imageObjData.width.toFixed(0)}x${imageObjData.height.toFixed(0)}, theme: ${imageObject.theme}`);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.error('❌ Failed to load image data, creating placeholder');
+                        createImagePlaceholder(canvas, imageObjData);
+                        resolve();
+                    };
+                    img.src = imageObjData.imageData;
+                } else {
+                    // No image data - create placeholder
+                    createImagePlaceholder(canvas, imageObjData);
+                    resolve();
+                }
+            });
+        }
+
+        function createImagePlaceholder(canvas, imageObjData) {
+            // Create a placeholder image object
+            const placeholderCanvas = document.createElement('canvas');
+            placeholderCanvas.width = 200;
+            placeholderCanvas.height = 200;
+            const ctx = placeholderCanvas.getContext('2d');
+
+            // Draw placeholder (gray box with dashed border)
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(0, 0, 200, 200);
+            ctx.strokeStyle = '#666666';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 10]);
+            ctx.strokeRect(0, 0, 200, 200);
+            ctx.setLineDash([]);
+
+            // Add text
+            ctx.fillStyle = '#999999';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('DROP IMAGE', 100, 90);
+            ctx.fillText('HERE', 100, 110);
+
+            const placeholderImg = new Image();
+            placeholderImg.onload = () => {
+                const imageObject = {
+                    img: placeholderImg,
+                    x: imageObjData.x,
+                    y: imageObjData.y,
+                    width: imageObjData.width,
+                    height: imageObjData.height,
+                    theme: imageObjData.theme,
+                    transparency: imageObjData.transparency,
+                    rotation: imageObjData.rotation,
+                    blur: imageObjData.blur,
+                    themeBlur: imageObjData.themeBlur,
+                    themeOpacity: imageObjData.themeOpacity,
+                    canvas: canvas,
+                    isDragging: false,
+                    isResizing: false,
+                    dragStartX: 0,
+                    dragStartY: 0,
+                    dragStartWidth: 0,
+                    dragStartHeight: 0,
+                    isPlaceholder: true
+                };
+
+                state.imageObjects.push(imageObject);
+                const imageIndex = state.imageObjects.length - 1;
+                setupImageInteraction(canvas, imageIndex);
+                setupPlaceholderDropZone(canvas, imageIndex);
+
+                console.log(`⚠️ Placeholder created at ${imageObjData.x.toFixed(0)}, ${imageObjData.y.toFixed(0)}`);
+            };
+            placeholderImg.src = placeholderCanvas.toDataURL();
+        }
+
+        function setupPlaceholderDropZone(canvas, imageIndex) {
+            // Add drag & drop functionality to placeholder
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                canvas.style.opacity = '0.5';
+            });
+
+            canvas.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                canvas.style.opacity = '1.0';
+            });
+
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                canvas.style.opacity = '1.0';
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('image/')) {
+                    replacePlaceholderWithImage(imageIndex, files[0]);
+                }
+            });
+        }
+
+        function replacePlaceholderWithImage(imageIndex, file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const imageObj = state.imageObjects[imageIndex];
+                    imageObj.img = img;
+                    imageObj.isPlaceholder = false;
+                    console.log(`✅ Placeholder replaced with image at index ${imageIndex}`);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function syncControlsWithState() {
+            // Sync theme dropdown
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) themeSelect.value = state.settings.theme;
+
+            // Sync mode buttons
+            const modeButtons = document.querySelectorAll('[data-mode]');
+            modeButtons.forEach(btn => {
+                if (btn.dataset.mode === state.settings.mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Sync density buttons
+            const densityButtons = document.querySelectorAll('[data-density]');
+            densityButtons.forEach(btn => {
+                if (btn.dataset.density === state.settings.density) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Sync sliders
+            const sliderMappings = [
+                { id: 'lowEmphasis', value: state.settings.lowEmphasis, display: 'lowValue' },
+                { id: 'midEmphasis', value: state.settings.midEmphasis, display: 'midValue' },
+                { id: 'highEmphasis', value: state.settings.highEmphasis, display: 'highValue' },
+                { id: 'intensitySlider', value: state.settings.waveIntensity, display: 'intensityValue' },
+                { id: 'speedSlider', value: state.settings.waveSpeed, display: 'speedValue' },
+                { id: 'smoothingSlider', value: state.settings.waveSmoothing, display: 'smoothingValue' },
+                { id: 'rotationSlider', value: state.settings.rotationIntensity, display: 'rotationValue' },
+                { id: 'glitchSlider', value: state.settings.glitchEffectIntensity, display: 'glitchValue' },
+                { id: 'neonWarmCoolSlider', value: state.settings.neonWarmCool, display: 'neonWarmCoolValue' },
+                { id: 'neonSatRangeSlider', value: state.settings.neonSatRange, display: 'neonSatRangeValue' },
+                { id: 'neonBurstSizeSlider', value: state.settings.neonBurstSize, display: 'neonBurstSizeValue' }
+            ];
+
+            sliderMappings.forEach(mapping => {
+                const slider = document.getElementById(mapping.id);
+                const display = document.getElementById(mapping.display);
+                if (slider) slider.value = mapping.value;
+                if (display) display.textContent = mapping.value.toFixed(1);
+            });
+
+            // Sync glitch mode
+            const glitchModeButtons = document.querySelectorAll('[data-glitch-mode]');
+            glitchModeButtons.forEach(btn => {
+                if (btn.dataset.glitchMode === state.settings.glitchMode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Sync neon color mode
+            const neonColorModeButtons = document.querySelectorAll('[data-neon-mode]');
+            neonColorModeButtons.forEach(btn => {
+                if (btn.dataset.neonMode === state.settings.neonColorMode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        // =====================================================
         // CONTROLS SETUP
         // =====================================================
 
@@ -2746,6 +3120,32 @@
                     fileInput.click();
                     document.body.removeChild(fileInput);
                 });
+
+                // Handle "Save Canvas" menu item click
+                const saveCanvasMenuItem = document.getElementById('saveCanvasMenuItem');
+                if (saveCanvasMenuItem) {
+                    saveCanvasMenuItem.addEventListener('click', () => {
+                        addImageDropdown.classList.remove('show');
+                        saveCanvasState();
+                    });
+                }
+
+                // Handle "Load Canvas" menu item click
+                const loadCanvasMenuItem = document.getElementById('loadCanvasMenuItem');
+                const loadCanvasInput = document.getElementById('loadCanvasInput');
+                if (loadCanvasMenuItem && loadCanvasInput) {
+                    loadCanvasMenuItem.addEventListener('click', () => {
+                        addImageDropdown.classList.remove('show');
+                        loadCanvasInput.click();
+                    });
+
+                    loadCanvasInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            loadCanvasStateFromFile(file);
+                        }
+                    });
+                }
             }
 
             // Mouse tracking
