@@ -2863,6 +2863,7 @@
 
             // 'h' key to toggle UI visibility (all nav icons)
             document.addEventListener('keydown', (e) => {
+                // 'h' key - toggle UI visibility
                 if (e.key === 'h' || e.key === 'H') {
                     const statusBar = document.getElementById('statusBar');
                     const fullscreenBtn = document.getElementById('fullscreenToggle');
@@ -2885,6 +2886,36 @@
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
                     }
+                }
+
+                // 'Escape' key - deselect image
+                if (e.key === 'Escape' && state.selectedImageIndex !== -1) {
+                    state.selectedImageIndex = -1;
+                    updateModeVisibility();
+                    console.log('🔲 Image deselected');
+                }
+
+                // 'Delete' or 'Backspace' key - remove selected image
+                if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedImageIndex !== -1) {
+                    // Prevent default browser back navigation on Backspace
+                    e.preventDefault();
+
+                    const imageIndex = state.selectedImageIndex;
+                    const imageObj = state.imageObjects[imageIndex];
+
+                    // Remove canvas from DOM
+                    if (imageObj.canvas && imageObj.canvas.parentNode) {
+                        imageObj.canvas.parentNode.removeChild(imageObj.canvas);
+                    }
+
+                    // Remove from array
+                    state.imageObjects.splice(imageIndex, 1);
+
+                    // Deselect
+                    state.selectedImageIndex = -1;
+                    updateModeVisibility();
+
+                    console.log(`🗑️ Image removed at index ${imageIndex}`);
                 }
             });
 
@@ -3234,8 +3265,16 @@
                     dragOverlay.style.display = 'none';
 
                     const files = e.dataTransfer.files;
-                    if (files.length > 0 && files[0].type.startsWith('image/')) {
-                        loadImageFile(files[0]);
+                    if (files.length > 0) {
+                        const file = files[0];
+                        // Check if it's a JSON file (canvas state)
+                        if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                            console.log('📁 Loading canvas state from dropped JSON file');
+                            loadCanvasStateFromFile(file);
+                        } else if (file.type.startsWith('image/')) {
+                            // It's an image file
+                            loadImageFile(file);
+                        }
                     }
                 });
             }
