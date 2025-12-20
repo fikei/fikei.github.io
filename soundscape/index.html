@@ -615,14 +615,6 @@
             <div id="imageEffectSettings">
                 <h3 style="margin-top: 2rem;">EFFECT SETTINGS</h3>
                 <div class="control-group">
-                    <div class="control-label">
-                        <span>THEME BLUR</span>
-                        <span class="control-value" id="themeBlurValue">0</span>
-                    </div>
-                    <input type="range" id="themeBlurSlider" min="0" max="20" step="0.5" value="0">
-                </div>
-
-                <div class="control-group">
                 <div class="control-label">
                     <span>THEME OPACITY</span>
                     <span class="control-value" id="themeOpacityValue">1.0</span>
@@ -1231,7 +1223,6 @@
                     updateSlider('imageTransparencySlider', 'imageTransparencyValue', imageObj.transparency, 2);
                     updateSlider('imageRotationSlider', 'imageRotationValue', imageObj.rotation, 0);
                     updateSlider('imageBlurSlider', 'imageBlurValue', imageObj.blur, 1);
-                    updateSlider('themeBlurSlider', 'themeBlurValue', imageObj.themeBlur, 1);
                     updateSlider('themeOpacitySlider', 'themeOpacityValue', imageObj.themeOpacity, 2);
                 }
             }
@@ -1742,10 +1733,11 @@
                 let hue, finalSaturation, finalLightness;
 
                 if (colorMode === 'gray') {
-                    // Grayscale mode: no hue, zero saturation
+                    // Grayscale mode: no hue, zero saturation, full lightness range
                     hue = 0;
                     finalSaturation = 0;
-                    finalLightness = lightness;
+                    // Expand lightness range for grayscale: 0% (black) to 100% (white)
+                    finalLightness = Math.max(0, Math.min(100, lightness));
                 } else if (colorMode === 'pastel') {
                     // Pastel mode: Map warm colors to highs, cool colors to lows
                     // Cool (blue/cyan): 180-240, Warm (red/orange/yellow): 0-60
@@ -1821,10 +1813,10 @@
                 let userHue, userSaturation, userLightness;
 
                 if (colorMode === 'gray') {
-                    // Grayscale mode
+                    // Grayscale mode: full lightness range
                     userHue = 0;
                     userSaturation = 0;
-                    userLightness = lightness;
+                    userLightness = Math.max(0, Math.min(100, lightness));
                 } else if (colorMode === 'pastel') {
                     // Pastel mode with frequency mapping
                     const frequencyBalance = (high - low) * colorTempIntensity;
@@ -1938,7 +1930,8 @@
             if (colorMode === 'gray') {
                 hue = 0;
                 finalSaturation = 0;
-                finalLightness = lightness;
+                // Expand lightness range for grayscale: 0% (black) to 100% (white)
+                finalLightness = Math.max(0, Math.min(100, lightness));
             } else if (colorMode === 'pastel') {
                 const frequencyBalance = (high - low) * colorTempIntensity;
                 const frequencyHue = 120 - frequencyBalance * 90;
@@ -3345,15 +3338,6 @@
             });
 
             // Theme blur slider
-            setupSlider('themeBlurSlider', 'themeBlurValue', (value) => {
-                if (state.selectedImageIndex === -1) return;
-
-                const imageObj = state.imageObjects[state.selectedImageIndex];
-                if (imageObj) {
-                    imageObj.themeBlur = value;
-                }
-            });
-
             // Theme opacity slider
             setupSlider('themeOpacitySlider', 'themeOpacityValue', (value) => {
                 if (state.selectedImageIndex === -1) return;
