@@ -215,11 +215,6 @@
             transform: translateX(0);
         }
 
-        .sidebar.hidden-control {
-            opacity: 0;
-            pointer-events: none;
-        }
-
         .sidebar h2 {
             font-size: 10px;
             margin-bottom: 2rem;
@@ -518,6 +513,16 @@
         <section class="control-section">
             <h3>THEME</h3>
             <select class="theme-select" id="themeSelect">
+                <option value="linear">LINEAR</option>
+                <option value="neon">NEON</option>
+                <option value="glitch">GLITCH</option>
+            </select>
+        </section>
+
+        <!-- Image Theme Selection (only visible when image is selected) -->
+        <section class="control-section" id="imageThemeSection" style="display: none;">
+            <h3>IMAGE THEME</h3>
+            <select class="theme-select" id="imageThemeSelect">
                 <option value="linear">LINEAR</option>
                 <option value="neon">NEON</option>
                 <option value="glitch">GLITCH</option>
@@ -854,7 +859,7 @@
             // User-created gradient centers (for NEON theme)
             userGradientCenters: [],
 
-            // GLITCH theme image state
+            // GLITCH theme image state (for background replacement)
             glitchImage: {
                 img: null,
                 loaded: false,
@@ -868,7 +873,11 @@
                 dragStartY: 0,
                 dragStartWidth: 0,
                 dragStartHeight: 0
-            }
+            },
+
+            // Image objects (for LINEAR/NEON overlay images)
+            imageObjects: [],
+            selectedImageIndex: -1
         };
 
         // =====================================================
@@ -1009,6 +1018,8 @@
             const modeSection = document.getElementById('modeSection');
             const neonControlsSection = document.getElementById('neonControlsSection');
             const glitchControlsSection = document.getElementById('glitchControlsSection');
+            const imageThemeSection = document.getElementById('imageThemeSection');
+            const imageThemeSelect = document.getElementById('imageThemeSelect');
             const uploadOverlay = document.getElementById('upload-overlay');
 
             if (modeSection) {
@@ -1024,6 +1035,18 @@
             if (glitchControlsSection) {
                 // Only show GLITCH controls for GLITCH theme
                 glitchControlsSection.style.display = state.settings.theme === 'glitch' ? 'block' : 'none';
+            }
+
+            // Show image theme section when an image is selected
+            if (imageThemeSection) {
+                const hasSelectedImage = state.selectedImageIndex !== -1 && state.imageObjects[state.selectedImageIndex];
+                imageThemeSection.style.display = hasSelectedImage ? 'block' : 'none';
+
+                // Update image theme selector value to match selected image's theme
+                if (hasSelectedImage && imageThemeSelect) {
+                    const imageObj = state.imageObjects[state.selectedImageIndex];
+                    imageThemeSelect.value = imageObj.theme;
+                }
             }
 
             if (uploadOverlay) {
@@ -1436,17 +1459,7 @@
             const canvasWidth = state.boundingRect.width;
             const canvasHeight = state.boundingRect.height;
 
-            // Check if image is loaded
-            const neonCanvas = document.getElementById('neon-canvas');
-            if (state.glitchImage.loaded && state.glitchImage.img && neonCanvas) {
-                // IMAGE-BASED RENDERING
-                renderNeonImage(neonCanvas, theme, low, mid, high, time, canvasWidth, canvasHeight);
-                return;
-            } else if (neonCanvas) {
-                // Hide canvas if no image
-                neonCanvas.style.display = 'none';
-            }
-
+            // Always render gradient mesh background
             // Get or create gradient mesh container
             let gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
             if (!gradientMeshGroup) {
@@ -1693,24 +1706,10 @@
             }
         }
 
-        function renderNeonImage(canvas, theme, low, mid, high, time, canvasWidth, canvasHeight) {
+        function renderNeonImage(canvas, theme, low, mid, high, time, canvasWidth, canvasHeight, img) {
             const ctx = canvas.getContext('2d');
-            const img = state.glitchImage.img;
 
-            // Show canvas
-            canvas.style.display = 'block';
-
-            // Hide SVG gradient mesh
-            const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
-            if (gradientMeshGroup) {
-                gradientMeshGroup.innerHTML = '';
-            }
-
-            // Set canvas size and position
-            canvas.width = state.glitchImage.width;
-            canvas.height = state.glitchImage.height;
-            canvas.style.left = `${state.glitchImage.x}px`;
-            canvas.style.top = `${state.glitchImage.y}px`;
+            if (!img) return;
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1798,45 +1797,14 @@
                 gradientMeshGroup.innerHTML = '';
             }
 
-            // Get canvas element
-            const canvas = document.getElementById('glitch-canvas');
-            if (!canvas) return;
-
-            // Check if image is loaded
-            if (state.glitchImage.loaded && state.glitchImage.img) {
-                // IMAGE-BASED RENDERING
-                renderGlitchImage(canvas, theme, low, mid, high, time);
-            } else {
-                // LINE-BASED RENDERING (fallback)
-                // Hide canvas
-                canvas.style.display = 'none';
-
-                renderGlitchLines(theme, low, mid, high);
-            }
+            // Always render line-based glitch for background
+            renderGlitchLines(theme, low, mid, high);
         }
 
-        function renderGlitchImage(canvas, theme, low, mid, high, time) {
+        function renderGlitchImage(canvas, theme, low, mid, high, time, img) {
             const ctx = canvas.getContext('2d');
-            const img = state.glitchImage.img;
 
-            // Show canvas
-            canvas.style.display = 'block';
-
-            // Hide SVG lines
-            state.paths.forEach(path => {
-                path.setAttribute('d', '');
-                path.setAttribute('opacity', '0');
-            });
-
-            // Clean up glitch paths
-            const allGlitchPaths = elements.svg.querySelectorAll('[id^="glitch-"]');
-            allGlitchPaths.forEach(path => path.remove());
-
-            // Set canvas size and position
-            canvas.width = state.glitchImage.width;
-            canvas.height = state.glitchImage.height;
-            canvas.style.left = `${state.glitchImage.x}px`;
-            canvas.style.top = `${state.glitchImage.y}px`;
+            if (!img) return;
 
             // Calculate glitch parameters with user intensity multipliers
             const glitchEffectIntensity = state.settings.glitchEffectIntensity;
@@ -2210,8 +2178,53 @@
         };
 
         function drawLines() {
+            // Render background theme
             const renderer = themeRenderers[state.settings.theme] || drawLinesLinear;
             renderer();
+
+            // Render image objects (for all themes)
+            renderImageObjects();
+        }
+
+        function renderImageObjects() {
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            state.imageObjects.forEach((imageObj, index) => {
+                const canvas = imageObj.canvas;
+                const ctx = canvas.getContext('2d');
+
+                // Update canvas size and position
+                canvas.width = imageObj.width;
+                canvas.height = imageObj.height;
+                canvas.style.left = `${imageObj.x}px`;
+                canvas.style.top = `${imageObj.y}px`;
+                canvas.style.display = 'block';
+
+                // Add selection outline if selected
+                if (index === state.selectedImageIndex) {
+                    canvas.style.border = '2px solid #ffffff';
+                    canvas.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
+                } else {
+                    canvas.style.border = 'none';
+                    canvas.style.boxShadow = 'none';
+                }
+
+                // Render based on image's assigned theme
+                if (imageObj.theme === 'neon') {
+                    renderNeonImage(canvas, config.themes.neon, low, mid, high, time, imageObj.width, imageObj.height, imageObj.img);
+                } else if (imageObj.theme === 'glitch') {
+                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, imageObj.img);
+                } else if (imageObj.theme === 'linear') {
+                    // For LINEAR theme on image, just draw the image with some audio-reactive effects
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Apply audio-reactive opacity
+                    ctx.globalAlpha = 0.8 + (mid * 0.2);
+                    ctx.drawImage(imageObj.img, 0, 0, canvas.width, canvas.height);
+                    ctx.globalAlpha = 1.0;
+                }
+            });
         }
 
         // =====================================================
@@ -2295,11 +2308,21 @@
                     const statusBar = document.getElementById('statusBar');
                     const fullscreenBtn = document.getElementById('fullscreenToggle');
 
-                    // Toggle hidden-control class on all UI elements
-                    elements.sidebar.classList.toggle('hidden-control');
-                    elements.sidebarToggle.classList.toggle('hidden-control');
-                    if (statusBar) statusBar.classList.toggle('hidden-control');
-                    if (fullscreenBtn) fullscreenBtn.classList.toggle('hidden-control');
+                    // Check if UI is currently hidden
+                    const isHidden = elements.sidebarToggle.classList.contains('hidden-control');
+
+                    if (isHidden) {
+                        // Show UI
+                        elements.sidebarToggle.classList.remove('hidden-control');
+                        if (statusBar) statusBar.classList.remove('hidden-control');
+                        if (fullscreenBtn) fullscreenBtn.classList.remove('hidden-control');
+                    } else {
+                        // Hide UI
+                        elements.sidebar.classList.remove('open'); // Close sidebar
+                        elements.sidebarToggle.classList.add('hidden-control');
+                        if (statusBar) statusBar.classList.add('hidden-control');
+                        if (fullscreenBtn) fullscreenBtn.classList.add('hidden-control');
+                    }
                 }
             });
 
@@ -2426,6 +2449,20 @@
                 });
             }
 
+            // Image theme selector
+            const imageThemeSelect = document.getElementById('imageThemeSelect');
+            if (imageThemeSelect) {
+                imageThemeSelect.addEventListener('change', (e) => {
+                    if (state.selectedImageIndex === -1) return;
+
+                    const imageObj = state.imageObjects[state.selectedImageIndex];
+                    if (imageObj) {
+                        imageObj.theme = e.target.value;
+                        console.log(`🎨 Image theme changed to: ${imageObj.theme.toUpperCase()}`);
+                    }
+                });
+            }
+
             // Reset button
             document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
 
@@ -2549,12 +2586,11 @@
                 reader.onload = (event) => {
                     const img = new Image();
                     img.onload = () => {
-                        state.glitchImage.img = img;
-                        state.glitchImage.loaded = true;
-
-                        // GLITCH theme: Scale to fill entire canvas
-                        // NEON theme: Scale to reasonable size
                         if (state.settings.theme === 'glitch') {
+                            // GLITCH theme: Load into glitchImage for background replacement
+                            state.glitchImage.img = img;
+                            state.glitchImage.loaded = true;
+
                             // Fill canvas by scaling to cover
                             const canvasAspect = state.boundingRect.width / state.boundingRect.height;
                             const imgAspect = img.width / img.height;
@@ -2572,15 +2608,49 @@
                             // Center the image
                             state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
                             state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
-                        } else {
-                            // NEON theme: Scale to fit reasonably
-                            state.glitchImage.width = Math.min(img.width, 600);
-                            state.glitchImage.height = (state.glitchImage.width / img.width) * img.height;
-                            state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                            state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
-                        }
 
-                        console.log(`✅ Image loaded: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                            console.log(`✅ GLITCH image loaded: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                        } else {
+                            // LINEAR/NEON theme: Create image object overlay
+                            const canvas = document.createElement('canvas');
+                            canvas.style.position = 'absolute';
+                            canvas.style.cursor = 'move';
+                            canvas.style.pointerEvents = 'auto';
+                            canvas.className = 'image-object-canvas';
+                            document.getElementById('visualization-container').appendChild(canvas);
+
+                            // Scale to reasonable size
+                            const width = Math.min(img.width, 600);
+                            const height = (width / img.width) * img.height;
+                            const x = (state.boundingRect.width - width) / 2;
+                            const y = (state.boundingRect.height - height) / 2;
+
+                            // Create image object
+                            const imageObject = {
+                                img: img,
+                                x: x,
+                                y: y,
+                                width: width,
+                                height: height,
+                                theme: state.settings.theme, // Default to current background theme
+                                canvas: canvas,
+                                isDragging: false,
+                                isResizing: false,
+                                dragStartX: 0,
+                                dragStartY: 0,
+                                dragStartWidth: 0,
+                                dragStartHeight: 0
+                            };
+
+                            state.imageObjects.push(imageObject);
+                            const imageIndex = state.imageObjects.length - 1;
+                            state.selectedImageIndex = imageIndex; // Select the newly added image
+
+                            // Add event listeners for selection and dragging
+                            setupImageInteraction(canvas, imageIndex);
+
+                            console.log(`✅ Image object created: ${img.width}x${img.height} → ${width.toFixed(0)}x${height.toFixed(0)}, theme: ${imageObject.theme}`);
+                        }
 
                         // Hide upload overlay
                         updateModeVisibility();
@@ -2590,13 +2660,120 @@
                 reader.readAsDataURL(file);
             }
 
+            // Setup image interaction (click, drag, resize)
+            function setupImageInteraction(canvas, imageIndex) {
+                canvas.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+
+                    // Select this image
+                    state.selectedImageIndex = imageIndex;
+                    updateModeVisibility(); // Update UI to show image theme selector
+
+                    const imageObj = state.imageObjects[imageIndex];
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    // Check if clicking near edges for resize (within 20px)
+                    const edgeThreshold = 20;
+                    const nearRightEdge = mouseX > canvas.width - edgeThreshold;
+                    const nearBottomEdge = mouseY > canvas.height - edgeThreshold;
+
+                    if (nearRightEdge || nearBottomEdge) {
+                        // Start resize
+                        imageObj.isResizing = true;
+                        imageObj.dragStartX = e.clientX;
+                        imageObj.dragStartY = e.clientY;
+                        imageObj.dragStartWidth = imageObj.width;
+                        imageObj.dragStartHeight = imageObj.height;
+                        canvas.style.cursor = 'nwse-resize';
+                    } else {
+                        // Start drag
+                        imageObj.isDragging = true;
+                        imageObj.dragStartX = e.clientX - imageObj.x;
+                        imageObj.dragStartY = e.clientY - imageObj.y;
+                        canvas.style.cursor = 'grabbing';
+                    }
+                });
+
+                canvas.addEventListener('mousemove', (e) => {
+                    const imageObj = state.imageObjects[imageIndex];
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    // Update cursor based on position
+                    if (!imageObj.isDragging && !imageObj.isResizing) {
+                        const edgeThreshold = 20;
+                        const nearRightEdge = mouseX > canvas.width - edgeThreshold;
+                        const nearBottomEdge = mouseY > canvas.height - edgeThreshold;
+
+                        if (nearRightEdge || nearBottomEdge) {
+                            canvas.style.cursor = 'nwse-resize';
+                        } else {
+                            canvas.style.cursor = 'move';
+                        }
+                    }
+                });
+            }
+
+            // Global mouse handlers for dragging and resizing
+            window.addEventListener('mousemove', (e) => {
+                if (state.selectedImageIndex === -1) return;
+
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (!imageObj) return;
+
+                if (imageObj.isDragging) {
+                    // Drag to move
+                    imageObj.x = e.clientX - imageObj.dragStartX;
+                    imageObj.y = e.clientY - imageObj.dragStartY;
+                } else if (imageObj.isResizing) {
+                    // Drag to resize
+                    const deltaX = e.clientX - imageObj.dragStartX;
+                    const deltaY = e.clientY - imageObj.dragStartY;
+
+                    const newWidth = Math.max(100, imageObj.dragStartWidth + deltaX);
+                    const newHeight = Math.max(100, imageObj.dragStartHeight + deltaY);
+
+                    // Maintain aspect ratio
+                    const aspectRatio = imageObj.img.width / imageObj.img.height;
+                    imageObj.width = newWidth;
+                    imageObj.height = newWidth / aspectRatio;
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                // Stop dragging/resizing for all image objects
+                state.imageObjects.forEach((imageObj) => {
+                    if (imageObj.isDragging || imageObj.isResizing) {
+                        imageObj.isDragging = false;
+                        imageObj.isResizing = false;
+                        imageObj.canvas.style.cursor = 'move';
+                    }
+                });
+            });
+
+            // Click on background to deselect images
+            const visualizationContainer = document.getElementById('visualization-container');
+            if (visualizationContainer) {
+                visualizationContainer.addEventListener('click', (e) => {
+                    // Only deselect if clicking directly on the container (not on an image canvas)
+                    if (e.target === visualizationContainer || e.target.id === 'wave-svg') {
+                        state.selectedImageIndex = -1;
+                        updateModeVisibility(); // Update UI to hide image theme selector
+                    }
+                });
+            }
+
             // Click to add gradient centers (NEON theme only)
             window.addEventListener('click', (e) => {
                 // Only add gradient centers for NEON theme
                 if (state.settings.theme !== 'neon') return;
 
-                // Don't add if clicking on UI elements
-                if (e.target.closest('.sidebar') || e.target.closest('.sidebar-toggle')) return;
+                // Don't add if clicking on UI elements or image canvases
+                if (e.target.closest('.sidebar') || e.target.closest('.sidebar-toggle') || e.target.classList.contains('image-object-canvas')) return;
 
                 // Add new gradient center at click position
                 const newCenter = {
