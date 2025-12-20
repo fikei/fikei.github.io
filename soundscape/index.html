@@ -29,7 +29,6 @@
             height: 100vh;
             width: 100vw;
             position: relative;
-            cursor: none;
         }
 
         /* ===== SVG VISUALIZATION CONTAINER ===== */
@@ -216,6 +215,11 @@
             transform: translateX(0);
         }
 
+        .sidebar.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         .sidebar h2 {
             font-size: 10px;
             margin-bottom: 2rem;
@@ -370,6 +374,29 @@
             color: #000000;
         }
 
+        .btn-upload {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: white;
+            font-size: 24px;
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .btn-upload:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
         /* ===== ERROR SCREEN ===== */
         .error-screen {
             position: fixed;
@@ -449,11 +476,9 @@
                 </filter>
             </defs>
         </svg>
-        <!-- Canvas for GLITCH theme image -->
-        <canvas id="glitch-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
-        <!-- Canvas for NEON theme image -->
-        <canvas id="neon-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
-        <!-- Upload overlay -->
+        <!-- Canvas for theme images -->
+        <canvas id="theme-canvas" style="display: none; position: absolute; cursor: grab;"></canvas>
+        <!-- Upload overlay (GLITCH only) -->
         <div id="upload-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10; cursor: pointer; align-items: center; justify-content: center;">
             <div style="text-align: center;">
                 <p id="upload-text" style="font-size: 10px; font-weight: 400; letter-spacing: 0.1em; color: #ffffff; text-transform: uppercase;">Upload Image...</p>
@@ -637,6 +662,9 @@
 
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
+
+        <!-- Image Upload Button -->
+        <button class="btn btn-upload" id="uploadBtn" title="Upload Image">+</button>
     </aside>
 
     <!-- Error Screen -->
@@ -999,8 +1027,8 @@
             }
 
             if (uploadOverlay) {
-                // Show upload overlay for GLITCH or NEON theme when no image is loaded
-                const shouldShowOverlay = (state.settings.theme === 'glitch' || state.settings.theme === 'neon') && !state.glitchImage.loaded;
+                // Show upload overlay for GLITCH theme only when no image is loaded
+                const shouldShowOverlay = state.settings.theme === 'glitch' && !state.glitchImage.loaded;
                 uploadOverlay.style.display = shouldShowOverlay ? 'flex' : 'none';
             }
         }
@@ -2261,6 +2289,20 @@
                 });
             }
 
+            // 'h' key to toggle UI visibility
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'h' || e.key === 'H') {
+                    const statusBar = document.getElementById('statusBar');
+                    const fullscreenBtn = document.getElementById('fullscreenToggle');
+
+                    // Toggle hidden-control class on all UI elements
+                    elements.sidebar.classList.toggle('hidden-control');
+                    elements.sidebarToggle.classList.toggle('hidden-control');
+                    if (statusBar) statusBar.classList.toggle('hidden-control');
+                    if (fullscreenBtn) fullscreenBtn.classList.toggle('hidden-control');
+                }
+            });
+
             // Frequency emphasis sliders
             setupSlider('lowEmphasis', 'lowValue', (value) => {
                 state.settings.lowEmphasis = value;
@@ -2387,6 +2429,28 @@
             // Reset button
             document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
 
+            // Upload button
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn) {
+                uploadBtn.addEventListener('click', () => {
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = 'image/*';
+                    fileInput.style.display = 'none';
+
+                    fileInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            loadImageFile(file);
+                        }
+                    });
+
+                    document.body.appendChild(fileInput);
+                    fileInput.click();
+                    document.body.removeChild(fileInput);
+                });
+            }
+
             // Mouse tracking
             window.addEventListener('mousemove', (e) => {
                 state.mouse.x = e.clientX;
@@ -2457,7 +2521,7 @@
 
                 // Show drag overlay when dragging over
                 visualizationContainer.addEventListener('dragenter', (e) => {
-                    if ((state.settings.theme === 'glitch' || state.settings.theme === 'neon') && !state.glitchImage.loaded) {
+                    if (!state.glitchImage.loaded) {
                         dragOverlay.style.display = 'flex';
                     }
                 });
@@ -2472,11 +2536,9 @@
                 visualizationContainer.addEventListener('drop', (e) => {
                     dragOverlay.style.display = 'none';
 
-                    if (state.settings.theme === 'glitch' || state.settings.theme === 'neon') {
-                        const files = e.dataTransfer.files;
-                        if (files.length > 0 && files[0].type.startsWith('image/')) {
-                            loadImageFile(files[0]);
-                        }
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].type.startsWith('image/')) {
+                        loadImageFile(files[0]);
                     }
                 });
             }
