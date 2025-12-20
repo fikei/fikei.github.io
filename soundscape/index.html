@@ -152,7 +152,12 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, transform 0.2s ease, right 0.2s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
+        }
+
+        .sidebar-toggle .caret {
+            display: inline-block;
+            transition: transform 0.2s ease;
         }
 
         .sidebar-toggle:hover {
@@ -166,8 +171,11 @@
         }
 
         .sidebar-toggle.sidebar-is-open {
-            transform: rotate(180deg); /* Flip caret to point left */
             right: calc(200px + 1rem); /* Float to left of sidebar */
+        }
+
+        .sidebar-toggle.sidebar-is-open .caret {
+            transform: rotate(180deg); /* Flip caret to point left */
         }
 
         /* ===== FULLSCREEN TOGGLE BUTTON ===== */
@@ -549,7 +557,7 @@
     </div>
 
     <!-- Sidebar Toggle -->
-    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls">›</button>
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls"><span class="caret">›</span></button>
 
     <!-- Fullscreen Toggle -->
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
@@ -604,16 +612,17 @@
                 <input type="range" id="imageBlurSlider" min="0" max="20" step="0.5" value="0">
             </div>
 
-            <h3 style="margin-top: 2rem;">THEME</h3>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>THEME BLUR</span>
-                    <span class="control-value" id="themeBlurValue">0</span>
+            <div id="imageEffectSettings">
+                <h3 style="margin-top: 2rem;">EFFECT SETTINGS</h3>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>THEME BLUR</span>
+                        <span class="control-value" id="themeBlurValue">0</span>
+                    </div>
+                    <input type="range" id="themeBlurSlider" min="0" max="20" step="0.5" value="0">
                 </div>
-                <input type="range" id="themeBlurSlider" min="0" max="20" step="0.5" value="0">
-            </div>
 
-            <div class="control-group">
+                <div class="control-group">
                 <div class="control-label">
                     <span>THEME OPACITY</span>
                     <span class="control-value" id="themeOpacityValue">1.0</span>
@@ -667,14 +676,15 @@
                 <input type="range" id="imageSmoothingSlider" min="0" max="1" step="0.1" value="0.3">
             </div>
 
-            <!-- Density (for image theme) -->
-            <div class="control-label" style="margin-top: 1rem;">
-                <span>DENSITY</span>
-            </div>
-            <div class="density-options">
-                <div class="density-option" data-image-density="low">L</div>
-                <div class="density-option active" data-image-density="medium">M</div>
-                <div class="density-option" data-image-density="high">H</div>
+                <!-- Density (for image theme) -->
+                <div class="control-label" style="margin-top: 1rem;">
+                    <span>DENSITY</span>
+                </div>
+                <div class="density-options">
+                    <div class="density-option" data-image-density="low">L</div>
+                    <div class="density-option active" data-image-density="medium">M</div>
+                    <div class="density-option" data-image-density="high">H</div>
+                </div>
             </div>
         </section>
 
@@ -1201,7 +1211,15 @@
                     const imageObj = state.imageObjects[state.selectedImageIndex];
 
                     // Update all sliders and their value displays
-                    if (imageThemeSelect) imageThemeSelect.value = imageObj.theme;
+                    if (imageThemeSelect) {
+                        imageThemeSelect.value = imageObj.theme;
+
+                        // Hide/show effect settings based on theme
+                        const effectSettings = document.getElementById('imageEffectSettings');
+                        if (effectSettings) {
+                            effectSettings.style.display = imageObj.theme === 'none' ? 'none' : 'block';
+                        }
+                    }
 
                     const updateSlider = (sliderId, valueId, value, decimals = 2) => {
                         const slider = document.getElementById(sliderId);
@@ -3048,6 +3066,16 @@
                     if (imageObj) {
                         imageObj.theme = e.target.value;
                         console.log(`🎨 Image theme changed to: ${imageObj.theme.toUpperCase()}`);
+
+                        // Hide/show effect settings based on theme
+                        const effectSettings = document.getElementById('imageEffectSettings');
+                        if (effectSettings) {
+                            if (e.target.value === 'none') {
+                                effectSettings.style.display = 'none';
+                            } else {
+                                effectSettings.style.display = 'block';
+                            }
+                        }
                     }
                 });
             }
