@@ -511,10 +511,34 @@
             <h3>NEON</h3>
             <div class="control-group">
                 <div class="control-label">
+                    <span>COLOR MODE</span>
+                </div>
+                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="density-option active" data-neon-mode="bright">BRIGHT</div>
+                    <div class="density-option" data-neon-mode="gray">GRAY</div>
+                    <div class="density-option" data-neon-mode="pastel">PASTEL</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">
                     <span>BURST SIZE</span>
                     <span class="control-value" id="burstSizeValue">1.0</span>
                 </div>
                 <input type="range" id="burstSizeSlider" min="0.3" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>WARM/COOL</span>
+                    <span class="control-value" id="colorTempValue">1.0</span>
+                </div>
+                <input type="range" id="colorTempSlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SAT RANGE</span>
+                    <span class="control-value" id="satRangeValue">1.0</span>
+                </div>
+                <input type="range" id="satRangeSlider" min="0" max="2.0" step="0.1" value="1.0">
             </div>
         </section>
 
@@ -748,7 +772,10 @@
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
                 glitchEffectIntensity: 1.0,
-                glitchMode: 'rgb'
+                glitchMode: 'rgb',
+                neonMode: 'bright',
+                colorTemp: 1.0,
+                satRange: 1.0
             },
 
             // Audio
@@ -1387,9 +1414,19 @@
                 elements.svg.appendChild(gradientMeshGroup);
             }
 
+            // Get color mode settings
+            const colorMode = state.settings.neonMode;
+            const colorTempIntensity = state.settings.colorTemp;
+            const satRangeIntensity = state.settings.satRange;
+
             // Calculate audio-reactive parameters
             const hueShift = (mid * 360 + time * 0.05) % 360;
-            const saturation = theme.saturationBase + high * theme.saturationMultiplier;
+
+            // Saturation mapping: high frequencies = less saturated, low frequencies = more saturated
+            const baseSaturation = theme.saturationBase + high * theme.saturationMultiplier;
+            const saturationFromLow = low * 30 * satRangeIntensity; // Bass increases saturation
+            const saturationFromHigh = -high * 20 * satRangeIntensity; // Highs decrease saturation
+            const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
 
             // Lightness: Low frequencies darken, high frequencies brighten
             // Range from 20% (dark) to 90% (bright)
@@ -1460,9 +1497,33 @@
                 gradient.setAttribute('cy', '50%');
                 gradient.setAttribute('r', '50%');
 
-                // Calculate hue for this center
-                const baseHue = theme.baseHues[i];
-                const hue = (baseHue + hueShift) % 360;
+                // Calculate hue for this center based on color mode
+                let hue, finalSaturation, finalLightness;
+
+                if (colorMode === 'gray') {
+                    // Grayscale mode: no hue, zero saturation
+                    hue = 0;
+                    finalSaturation = 0;
+                    finalLightness = lightness;
+                } else if (colorMode === 'pastel') {
+                    // Pastel mode: Map warm colors to highs, cool colors to lows
+                    // Cool (blue/cyan): 180-240, Warm (red/orange/yellow): 0-60
+                    const frequencyBalance = (high - low) * colorTempIntensity; // -1 to 1 range
+                    // Map: -1 (low/cool) = 210 (cyan-blue), +1 (high/warm) = 30 (orange-red)
+                    const frequencyHue = 120 - frequencyBalance * 90; // 210 to 30
+                    const baseHue = theme.baseHues[i];
+                    hue = ((frequencyHue + baseHue * 0.3 + hueShift * 0.5) % 360);
+
+                    // Pastel colors: higher saturation but softer
+                    finalSaturation = Math.max(40, Math.min(70, saturation * 0.7));
+                    finalLightness = Math.max(60, Math.min(85, lightness + 10)); // Lighter for pastel
+                } else {
+                    // Bright mode (default): Original vibrant colors
+                    const baseHue = theme.baseHues[i];
+                    hue = (baseHue + hueShift) % 360;
+                    finalSaturation = saturation;
+                    finalLightness = lightness;
+                }
 
                 // Create gradient stops for smooth fade
                 const stops = [
@@ -1476,7 +1537,7 @@
                 stops.forEach(stop => {
                     const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
                     stopElement.setAttribute('offset', stop.offset);
-                    stopElement.setAttribute('stop-color', `hsl(${hue}, ${saturation}%, ${lightness}%)`);
+                    stopElement.setAttribute('stop-color', `hsl(${hue}, ${finalSaturation}%, ${finalLightness}%)`);
                     stopElement.setAttribute('stop-opacity', stop.opacity);
                     gradient.appendChild(stopElement);
                 });
@@ -1515,8 +1576,28 @@
                 gradient.setAttribute('cy', '50%');
                 gradient.setAttribute('r', '50%');
 
-                // Use a different hue based on user center index
-                const userHue = (theme.baseHues[i % theme.baseHues.length] + hueShift + 45) % 360;
+                // Calculate hue for user center based on color mode
+                let userHue, userSaturation, userLightness;
+
+                if (colorMode === 'gray') {
+                    // Grayscale mode
+                    userHue = 0;
+                    userSaturation = 0;
+                    userLightness = lightness;
+                } else if (colorMode === 'pastel') {
+                    // Pastel mode with frequency mapping
+                    const frequencyBalance = (high - low) * colorTempIntensity;
+                    const frequencyHue = 120 - frequencyBalance * 90;
+                    const baseHue = theme.baseHues[i % theme.baseHues.length];
+                    userHue = ((frequencyHue + baseHue * 0.3 + hueShift * 0.5 + 45) % 360);
+                    userSaturation = Math.max(40, Math.min(70, saturation * 0.7));
+                    userLightness = Math.max(60, Math.min(85, lightness + 10));
+                } else {
+                    // Bright mode
+                    userHue = (theme.baseHues[i % theme.baseHues.length] + hueShift + 45) % 360;
+                    userSaturation = saturation;
+                    userLightness = lightness;
+                }
 
                 // Create gradient stops with higher initial opacity for user centers
                 const stops = [
@@ -1530,7 +1611,7 @@
                 stops.forEach(stop => {
                     const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
                     stopElement.setAttribute('offset', stop.offset);
-                    stopElement.setAttribute('stop-color', `hsl(${userHue}, ${saturation}%, ${lightness}%)`);
+                    stopElement.setAttribute('stop-color', `hsl(${userHue}, ${userSaturation}%, ${userLightness}%)`);
                     stopElement.setAttribute('stop-opacity', stop.opacity);
                     gradient.appendChild(stopElement);
                 });
@@ -2096,6 +2177,16 @@
                 state.settings.burstSize = value;
             });
 
+            // NEON color temperature slider
+            setupSlider('colorTempSlider', 'colorTempValue', (value) => {
+                state.settings.colorTemp = value;
+            });
+
+            // NEON saturation range slider
+            setupSlider('satRangeSlider', 'satRangeValue', (value) => {
+                state.settings.satRange = value;
+            });
+
             // GLITCH rotation intensity slider
             setupSlider('rotationIntensitySlider', 'rotationIntensityValue', (value) => {
                 state.settings.rotationIntensity = value;
@@ -2131,6 +2222,14 @@
                         option.classList.add('active');
                         state.settings.glitchMode = option.dataset.glitchMode;
                         console.log(`🎨 GLITCH mode changed to: ${state.settings.glitchMode.toUpperCase()}`);
+                    }
+
+                    // Handle neon mode change
+                    if (option.dataset.neonMode) {
+                        document.querySelectorAll('[data-neon-mode]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.neonMode = option.dataset.neonMode;
+                        console.log(`🎨 NEON mode changed to: ${state.settings.neonMode.toUpperCase()}`);
                     }
                 });
             });
@@ -2389,7 +2488,10 @@
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
                 glitchEffectIntensity: 1.0,
-                glitchMode: 'rgb'
+                glitchMode: 'rgb',
+                neonMode: 'bright',
+                colorTemp: 1.0,
+                satRange: 1.0
             };
 
             // Update UI
@@ -2400,6 +2502,8 @@
             document.getElementById('speedSlider').value = 1.0;
             document.getElementById('smoothingSlider').value = 0.3;
             document.getElementById('burstSizeSlider').value = 1.0;
+            document.getElementById('colorTempSlider').value = 1.0;
+            document.getElementById('satRangeSlider').value = 1.0;
             document.getElementById('rotationIntensitySlider').value = 1.0;
             document.getElementById('glitchIntensitySlider').value = 1.0;
 
@@ -2410,6 +2514,8 @@
             document.getElementById('speedValue').textContent = '1.0';
             document.getElementById('smoothingValue').textContent = '0.3';
             document.getElementById('burstSizeValue').textContent = '1.0';
+            document.getElementById('colorTempValue').textContent = '1.0';
+            document.getElementById('satRangeValue').textContent = '1.0';
             document.getElementById('rotationIntensityValue').textContent = '1.0';
             document.getElementById('glitchIntensityValue').textContent = '1.0';
 
@@ -2432,6 +2538,10 @@
             // Reset glitch mode
             document.querySelectorAll('[data-glitch-mode]').forEach(o => o.classList.remove('active'));
             document.querySelector('[data-glitch-mode="rgb"]').classList.add('active');
+
+            // Reset neon mode
+            document.querySelectorAll('[data-neon-mode]').forEach(o => o.classList.remove('active'));
+            document.querySelector('[data-neon-mode="bright"]').classList.add('active');
 
             // Reset theme
             document.getElementById('themeSelect').value = 'linear';
