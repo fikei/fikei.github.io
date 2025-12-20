@@ -165,7 +165,7 @@
             pointer-events: none;
         }
 
-        .sidebar.open ~ .sidebar-toggle {
+        .sidebar-toggle.sidebar-is-open {
             transform: rotate(180deg); /* Flip caret to point left */
             right: calc(200px + 1rem); /* Float to left of sidebar */
         }
@@ -201,7 +201,7 @@
             pointer-events: none;
         }
 
-        .sidebar.open ~ .fullscreen-toggle {
+        .fullscreen-toggle.sidebar-is-open {
             right: calc(200px + 1rem); /* Float to left of sidebar */
         }
 
@@ -217,7 +217,7 @@
             border: 1px solid #ffffff;
             border-radius: 0;
             color: white;
-            font-size: 16px;
+            font-size: 12px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -2439,6 +2439,11 @@
                 if (fullscreenToggle) {
                     fullscreenToggle.classList.remove('hidden-control');
                 }
+
+                const addImageBtn = document.getElementById('addImageButton');
+                if (addImageBtn) {
+                    addImageBtn.classList.remove('hidden-control');
+                }
             }
 
             // Reset idle timeout
@@ -2462,6 +2467,11 @@
             const fullscreenToggle = document.getElementById('fullscreenToggle');
             if (fullscreenToggle) {
                 fullscreenToggle.classList.add('hidden-control');
+            }
+
+            const addImageBtn = document.getElementById('addImageButton');
+            if (addImageBtn) {
+                addImageBtn.classList.add('hidden-control');
             }
         }
 
@@ -2899,6 +2909,19 @@
             // Sidebar toggle
             elements.sidebarToggle.addEventListener('click', () => {
                 elements.sidebar.classList.toggle('open');
+
+                // Also toggle class on buttons for animation
+                const sidebarOpen = elements.sidebar.classList.contains('open');
+                const sidebarToggle = document.getElementById('sidebarToggle');
+                const fullscreenToggle = document.getElementById('fullscreenToggle');
+
+                if (sidebarOpen) {
+                    if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
+                    if (fullscreenToggle) fullscreenToggle.classList.add('sidebar-is-open');
+                } else {
+                    if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
+                    if (fullscreenToggle) fullscreenToggle.classList.remove('sidebar-is-open');
+                }
             });
 
             // Fullscreen toggle
