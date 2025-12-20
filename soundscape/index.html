@@ -1616,7 +1616,7 @@
             const data = imageData.data;
 
             // Apply random glitch displacement to scan lines (controlled by mids)
-            const scanlineGlitchChance = mid * 0.3;
+            const scanlineGlitchChance = mid * 0.3 * glitchEffectIntensity;
             for (let y = 0; y < canvas.height; y++) {
                 if (Math.random() < scanlineGlitchChance) {
                     const offset = Math.floor((Math.random() - 0.5) * glitchIntensity * 30);
@@ -1639,8 +1639,8 @@
             }
 
             // Add random block corruption based on bass (creates chunky glitches)
-            const blockGlitchChance = low * 0.15;
-            const numBlocks = Math.floor(low * 10);
+            const blockGlitchChance = low * 0.15 * glitchEffectIntensity;
+            const numBlocks = Math.floor(low * 10 * glitchEffectIntensity);
             for (let b = 0; b < numBlocks; b++) {
                 if (Math.random() < blockGlitchChance) {
                     const blockX = Math.floor(Math.random() * canvas.width);
@@ -1680,8 +1680,8 @@
             }
 
             // Add vertical tears based on highs (sudden glitch lines)
-            const tearChance = high * 0.2;
-            const numTears = Math.floor(high * 5);
+            const tearChance = high * 0.2 * glitchEffectIntensity;
+            const numTears = Math.floor(high * 5 * glitchEffectIntensity);
             for (let t = 0; t < numTears; t++) {
                 if (Math.random() < tearChance) {
                     const tearX = Math.floor(Math.random() * canvas.width);
