@@ -257,6 +257,17 @@
     <!-- Controls Screen -->
     <div class="controls-screen" id="controlsScreen">
         <div class="control-section">
+            <h3>Background Theme</h3>
+            <div class="mode-buttons">
+                <button class="mode-button" data-theme="linear">LINEAR</button>
+                <button class="mode-button" data-theme="neon">NEON</button>
+                <button class="mode-button" data-theme="glitch">GLITCH</button>
+                <button class="mode-button" data-theme="stars">STARS</button>
+                <button class="mode-button" data-theme="wave">WAVE</button>
+            </div>
+        </div>
+
+        <div class="control-section">
             <h3>Wave Settings</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -444,8 +455,15 @@
 
                 // Update mode buttons
                 if (key === 'mode') {
-                    document.querySelectorAll('.mode-button').forEach(btn => {
+                    document.querySelectorAll('.mode-button[data-mode]').forEach(btn => {
                         btn.classList.toggle('active', btn.dataset.mode === value);
+                    });
+                }
+
+                // Update theme buttons
+                if (key === 'theme') {
+                    document.querySelectorAll('.mode-button[data-theme]').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.theme === value);
                     });
                 }
             });
@@ -469,13 +487,23 @@
                 }
             });
 
-            // Mode buttons
-            const modeButtons = document.querySelectorAll('.mode-button');
+            // Mode buttons (for wave mode)
+            const modeButtons = document.querySelectorAll('.mode-button[data-mode]');
             modeButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     modeButtons.forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
-                    updateDesktop({ mode: button.dataset.mode });
+                    updateDesktop({ settings: { mode: button.dataset.mode } });
+                });
+            });
+
+            // Theme buttons
+            const themeButtons = document.querySelectorAll('.mode-button[data-theme]');
+            themeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    themeButtons.forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    updateDesktop({ settings: { theme: button.dataset.theme } });
                 });
             });
         }
