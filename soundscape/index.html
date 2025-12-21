@@ -1083,6 +1083,20 @@
                 </div>
                 <input type="range" id="starHueSlider" min="0" max="360" step="1" value="217">
             </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SATURATION</span>
+                    <span class="control-value" id="starSaturationValue">61%</span>
+                </div>
+                <input type="range" id="starSaturationSlider" min="0" max="100" step="1" value="61">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BASE SPEED</span>
+                    <span class="control-value" id="starSpeedValue">1.0</span>
+                </div>
+                <input type="range" id="starSpeedSlider" min="0" max="5.0" step="0.1" value="1.0">
+            </div>
         </section>
 
         <!-- Frequency Emphasis -->
@@ -1303,7 +1317,9 @@
                 neonMode: 'bright',
                 colorTemp: 1.0,
                 image3DMotion: 0.0,  // 3D motion intensity for image objects (0 = off)
-                starHue: 217  // Star base color hue (0-360)
+                starHue: 217,  // Star base color hue (0-360)
+                starSaturation: 61,  // Star color saturation (0-100%)
+                starSpeed: 1.0  // Star base speed multiplier (0-5)
             },
 
             // Audio
@@ -3038,7 +3054,7 @@
                     this.orbitX = w / 2;
                     this.orbitY = h / 2;
                     this.timePassed = Math.random() * theme.maxStars;
-                    this.speed = (Math.random() * this.orbitRadius * theme.baseSpeed);
+                    this.baseSpeed = (Math.random() * this.orbitRadius * theme.baseSpeed);
                     this.alpha = (Math.random() * (theme.alphaMax - theme.alphaMin) + theme.alphaMin) * theme.brightness;
                     state.stars.starArray.push(this);
                 }
@@ -3056,14 +3072,15 @@
             const canvas = state.stars.gradientCanvas;
             const ctx = state.stars.gradientCtx;
             const hue = state.settings.starHue;
+            const saturation = state.settings.starSaturation;
             const half = canvas.width / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
             gradient.addColorStop(0.025, '#fff');
-            gradient.addColorStop(0.1, `hsl(${hue}, 61%, 33%)`);
-            gradient.addColorStop(0.25, `hsl(${hue}, 64%, 6%)`);
+            gradient.addColorStop(0.1, `hsl(${hue}, ${saturation}%, 33%)`);
+            gradient.addColorStop(0.25, `hsl(${hue}, ${Math.min(saturation + 3, 100)}%, 6%)`);
             gradient.addColorStop(1, 'transparent');
 
             ctx.fillStyle = gradient;
@@ -3138,7 +3155,8 @@
                 );
 
                 // Update orbit with audio-reactive speed
-                star.timePassed += star.speed * speedBoost;
+                // baseSpeed * user speed multiplier * audio boost
+                star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
             });
         }
 
@@ -4140,6 +4158,33 @@
                 });
             }
 
+            // STARS saturation slider
+            const starSaturationSlider = document.getElementById('starSaturationSlider');
+            const starSaturationValue = document.getElementById('starSaturationValue');
+            if (starSaturationSlider && starSaturationValue) {
+                starSaturationSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starSaturation = value;
+                    starSaturationValue.textContent = `${Math.round(value)}%`;
+                    // Update star gradient with new saturation
+                    if (state.stars.initialized) {
+                        updateStarGradient();
+                    }
+                });
+            }
+
+            // STARS speed slider
+            const starSpeedSlider = document.getElementById('starSpeedSlider');
+            const starSpeedValue = document.getElementById('starSpeedValue');
+            if (starSpeedSlider && starSpeedValue) {
+                starSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starSpeed = value;
+                    starSpeedValue.textContent = value.toFixed(1);
+                    // Speed affects orbit velocity, no need to reinitialize
+                });
+            }
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -4745,7 +4790,9 @@
                 neonMode: 'bright',
                 colorTemp: 1.0,
                 image3DMotion: 0.0,
-                starHue: 217
+                starHue: 217,
+                starSaturation: 61,
+                starSpeed: 1.0
             };
 
             // Update UI
@@ -4761,6 +4808,8 @@
             document.getElementById('glitchContrastSlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
             document.getElementById('starHueSlider').value = 217;
+            document.getElementById('starSaturationSlider').value = 61;
+            document.getElementById('starSpeedSlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -4774,6 +4823,8 @@
             document.getElementById('glitchContrastValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
             document.getElementById('starHueValue').textContent = '217°';
+            document.getElementById('starSaturationValue').textContent = '61%';
+            document.getElementById('starSpeedValue').textContent = '1.0';
 
             // Update analyser if active
             if (state.analyser) {
