@@ -218,7 +218,7 @@
         .pairing-code-display {
             position: fixed;
             bottom: 1rem;
-            right: calc(30px + 1rem + 0.5rem); /* To the left of fullscreen button */
+            left: calc(30px + 1rem + 0.5rem); /* To the right of fullscreen button */
             z-index: 101;
             height: 30px;
             background: #000000;
@@ -230,7 +230,7 @@
             color: #ffffff;
             letter-spacing: 0.2em;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
+            transition: opacity 0.5s ease, background 0.15s ease;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -240,10 +240,6 @@
         .pairing-code-display:hover {
             background: #ffffff;
             color: #000000;
-        }
-
-        .pairing-code-display.sidebar-is-open {
-            right: calc(200px + 30px + 1rem + 0.5rem);
         }
 
         .pairing-code-display.hidden-control {
@@ -299,7 +295,7 @@
         .fullscreen-toggle {
             position: fixed;
             bottom: 1rem;
-            right: 1rem;
+            left: 1rem;
             z-index: 101;
             width: 30px;
             height: 30px;
@@ -313,7 +309,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
+            transition: opacity 0.5s ease, background 0.15s ease;
         }
 
         .fullscreen-toggle:hover {
@@ -326,15 +322,11 @@
             pointer-events: none;
         }
 
-        .fullscreen-toggle.sidebar-is-open {
-            right: calc(200px + 1rem); /* Float to left of sidebar */
-        }
-
         /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
         .add-image-button {
             position: fixed;
             bottom: 1rem;
-            left: 1rem;
+            right: 1rem;
             z-index: 101;
             width: 30px;
             height: 30px;
@@ -348,7 +340,7 @@
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
         }
 
         .add-image-button:hover {
@@ -359,6 +351,10 @@
         .add-image-button.hidden-control {
             opacity: 0;
             pointer-events: none;
+        }
+
+        .add-image-button.sidebar-is-open {
+            right: calc(200px + 1rem); /* Float to left of sidebar */
         }
 
         body.hide-cursor {
@@ -372,16 +368,21 @@
         .add-image-dropdown {
             position: fixed;
             bottom: 3rem;
-            left: 1rem;
+            right: 1rem;
             z-index: 100;
             background: #000000;
             border: 1px solid #ffffff;
             display: none;
             min-width: 120px;
+            transition: right 0.2s ease;
         }
 
         .add-image-dropdown.show {
             display: block;
+        }
+
+        .add-image-dropdown.sidebar-is-open {
+            right: calc(200px + 1rem);
         }
 
         .add-image-dropdown-item {
@@ -4429,17 +4430,17 @@
                 // Also toggle class on buttons for animation
                 const sidebarOpen = elements.sidebar.classList.contains('open');
                 const sidebarToggle = document.getElementById('sidebarToggle');
-                const fullscreenToggle = document.getElementById('fullscreenToggle');
-                const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+                const addImageButton = document.getElementById('addImageButton');
+                const addImageDropdown = document.getElementById('addImageDropdown');
 
                 if (sidebarOpen) {
                     if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
-                    if (fullscreenToggle) fullscreenToggle.classList.add('sidebar-is-open');
-                    if (pairingCodeDisplay) pairingCodeDisplay.classList.add('sidebar-is-open');
+                    if (addImageButton) addImageButton.classList.add('sidebar-is-open');
+                    if (addImageDropdown) addImageDropdown.classList.add('sidebar-is-open');
                 } else {
                     if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
-                    if (fullscreenToggle) fullscreenToggle.classList.remove('sidebar-is-open');
-                    if (pairingCodeDisplay) pairingCodeDisplay.classList.remove('sidebar-is-open');
+                    if (addImageButton) addImageButton.classList.remove('sidebar-is-open');
+                    if (addImageDropdown) addImageDropdown.classList.remove('sidebar-is-open');
                 }
             });
 
