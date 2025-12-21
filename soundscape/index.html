@@ -1078,7 +1078,7 @@
             <h3>STARS</h3>
             <div class="control-group">
                 <div class="control-label">
-                    <span>COLOR HUE</span>
+                    <span>HUE</span>
                     <span class="control-value" id="starHueValue">217°</span>
                 </div>
                 <input type="range" id="starHueSlider" min="0" max="360" step="1" value="217">
@@ -1138,6 +1138,13 @@
                     <span class="control-value" id="starMaxOpacityValue">1.0</span>
                 </div>
                 <input type="range" id="starMaxOpacitySlider" min="0" max="1.0" step="0.05" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Z-AXIS SPEED</span>
+                    <span class="control-value" id="starZSpeedValue">0.0</span>
+                </div>
+                <input type="range" id="starZSpeedSlider" min="0" max="5.0" step="0.1" value="0">
             </div>
         </section>
 
@@ -1367,7 +1374,8 @@
                 starAudioBoost: 3.0,  // Audio-reactive speed multiplier (0-10)
                 starTwinkle: 20,  // Twinkle rate (1-50, higher = less frequent)
                 starMinOpacity: 0.2,  // Minimum star opacity (0-1)
-                starMaxOpacity: 1.0  // Maximum star opacity (0-1)
+                starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
+                starZSpeed: 0  // Z-axis movement speed (0-5, creates depth effect)
             },
 
             // Audio
@@ -3098,13 +3106,16 @@
             class Star {
                 constructor() {
                     this.orbitRadius = Math.floor(Math.random() * maxOrbit);
-                    this.radius = Math.floor(Math.random() * (60 - this.orbitRadius / 12) + this.orbitRadius / 12);
+                    this.baseRadius = Math.floor(Math.random() * (60 - this.orbitRadius / 12) + this.orbitRadius / 12);
+                    this.radius = this.baseRadius; // Will be scaled by z
                     this.orbitX = w / 2;
                     this.orbitY = h / 2;
                     this.timePassed = Math.random() * state.settings.starCount;
                     this.baseSpeed = (Math.random() * this.orbitRadius * theme.baseSpeed);
                     // Use user settings for opacity range and brightness
                     this.alpha = (Math.random() * (state.settings.starMaxOpacity - state.settings.starMinOpacity) + state.settings.starMinOpacity) * state.settings.starBrightness;
+                    // Z-axis depth (0 = far, 1 = close)
+                    this.z = Math.random();
                     state.stars.starArray.push(this);
                 }
             }
@@ -3174,15 +3185,37 @@
             ctx.fillRect(0, 0, w, h);
 
             // Calculate audio-reactive speed multiplier
-            // Bass increases orbit speed using user setting
-            const speedBoost = 1.0 + (low * state.settings.starAudioBoost);
+            // Bass SLOWS DOWN orbit speed using user setting
+            const speedBoost = 1.0 - (low * (state.settings.starAudioBoost / 10));
 
             // Draw stars
             ctx.globalCompositeOperation = 'lighter';
 
             state.stars.starArray.forEach((star) => {
-                const x = Math.sin(star.timePassed) * star.orbitRadius + star.orbitX;
-                const y = Math.cos(star.timePassed) * star.orbitRadius + star.orbitY;
+                // Update Z position (move towards camera)
+                if (state.settings.starZSpeed > 0) {
+                    star.z += state.settings.starZSpeed * 0.001;
+
+                    // Reset star if it passes the camera
+                    if (star.z >= 1.0) {
+                        star.z = 0;
+                        star.timePassed = Math.random() * state.settings.starCount;
+                    }
+                }
+
+                // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
+                const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+
+                // Scale orbit radius and star size by perspective
+                const scaledOrbitRadius = star.orbitRadius * scale;
+                star.radius = star.baseRadius * scale;
+
+                // High frequencies shift the orbit center position
+                const centerOffsetX = Math.sin(time * 0.001) * high * 100;
+                const centerOffsetY = Math.cos(time * 0.001) * high * 100;
+
+                const x = Math.sin(star.timePassed) * scaledOrbitRadius + star.orbitX + centerOffsetX;
+                const y = Math.cos(star.timePassed) * scaledOrbitRadius + star.orbitY + centerOffsetY;
 
                 // Twinkle effect using user setting
                 const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
@@ -3195,7 +3228,10 @@
                 // Mid frequencies add brightness boost
                 const brightnessBoost = mid * 0.3;
 
-                ctx.globalAlpha = star.alpha + brightnessBoost;
+                // Alpha also scales with distance (closer = brighter)
+                const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
+
+                ctx.globalAlpha = perspectiveAlpha;
                 ctx.drawImage(
                     state.stars.gradientCanvas,
                     x - star.radius / 2,
@@ -4319,6 +4355,18 @@
                 });
             }
 
+            // STARS Z-axis speed slider
+            const starZSpeedSlider = document.getElementById('starZSpeedSlider');
+            const starZSpeedValue = document.getElementById('starZSpeedValue');
+            if (starZSpeedSlider && starZSpeedValue) {
+                starZSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starZSpeed = value;
+                    starZSpeedValue.textContent = value.toFixed(1);
+                    // Z-speed affects rendering in real-time, no reinit needed
+                });
+            }
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -4932,7 +4980,8 @@
                 starAudioBoost: 3.0,
                 starTwinkle: 20,
                 starMinOpacity: 0.2,
-                starMaxOpacity: 1.0
+                starMaxOpacity: 1.0,
+                starZSpeed: 0
             };
 
             // Update UI
@@ -4956,6 +5005,7 @@
             document.getElementById('starTwinkleSlider').value = 20;
             document.getElementById('starMinOpacitySlider').value = 0.2;
             document.getElementById('starMaxOpacitySlider').value = 1.0;
+            document.getElementById('starZSpeedSlider').value = 0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -4977,6 +5027,7 @@
             document.getElementById('starTwinkleValue').textContent = '20';
             document.getElementById('starMinOpacityValue').textContent = '0.20';
             document.getElementById('starMaxOpacityValue').textContent = '1.00';
+            document.getElementById('starZSpeedValue').textContent = '0.0';
 
             // Update analyser if active
             if (state.analyser) {
