@@ -6138,6 +6138,12 @@
                 console.log('📱 Mobile device connected');
                 mobileConnected = true;
 
+                // Close pairing panel
+                const pairingPanel = document.getElementById('pairingPanel');
+                if (pairingPanel) {
+                    pairingPanel.style.display = 'none';
+                }
+
                 // Send initial state to mobile
                 sendStateToMobile();
             });
