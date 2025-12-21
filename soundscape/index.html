@@ -6132,6 +6132,12 @@
             socket.on('disconnect', () => {
                 console.log('🔌 Disconnected from WebSocket server');
                 mobileConnected = false;
+
+                // Restore pairing code display
+                const pairingCodeValue = document.getElementById('pairingCodeValue');
+                if (pairingCodeValue && pairingCode) {
+                    pairingCodeValue.textContent = pairingCode;
+                }
             });
 
             socket.on('mobile:connected', () => {
@@ -6144,6 +6150,12 @@
                     pairingPanel.style.display = 'none';
                 }
 
+                // Update pairing code display to show "Connected"
+                const pairingCodeValue = document.getElementById('pairingCodeValue');
+                if (pairingCodeValue) {
+                    pairingCodeValue.textContent = 'CONNECTED';
+                }
+
                 // Send initial state to mobile
                 sendStateToMobile();
             });
@@ -6151,6 +6163,12 @@
             socket.on('mobile:disconnected', () => {
                 console.log('📱 Mobile device disconnected');
                 mobileConnected = false;
+
+                // Restore pairing code display
+                const pairingCodeValue = document.getElementById('pairingCodeValue');
+                if (pairingCodeValue && pairingCode) {
+                    pairingCodeValue.textContent = pairingCode;
+                }
             });
 
             socket.on('control-update', (update) => {
