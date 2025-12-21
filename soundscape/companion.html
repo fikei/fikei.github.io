@@ -151,6 +151,130 @@
             text-transform: uppercase;
         }
 
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #333333;
+            margin-bottom: 2rem;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: #666666;
+            font-family: monospace;
+            font-size: 10px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-button.active {
+            color: #ffffff;
+            border-bottom-color: #ffffff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Media List */
+        .media-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .media-item {
+            padding: 1rem;
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .media-item:hover {
+            background: #2a2a2a;
+            border-color: #666666;
+        }
+
+        .media-item.selected {
+            background: #ffffff;
+            color: #000000;
+            border-color: #ffffff;
+        }
+
+        .media-item-info {
+            flex: 1;
+        }
+
+        .media-item-name {
+            font-size: 10px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .media-item-type {
+            font-size: 8px;
+            color: #666666;
+            text-transform: uppercase;
+        }
+
+        .media-item.selected .media-item-type {
+            color: #666666;
+        }
+
+        .add-media-button {
+            width: 100%;
+            padding: 1rem;
+            background: #1a1a1a;
+            border: 1px dashed #666666;
+            color: #ffffff;
+            font-family: monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .add-media-button:hover {
+            background: #2a2a2a;
+            border-color: #ffffff;
+        }
+
+        .media-controls {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .media-controls.active {
+            display: block;
+        }
+
+        .empty-state {
+            padding: 2rem;
+            text-align: center;
+            color: #666666;
+            font-size: 10px;
+        }
+
         .control-group {
             margin-bottom: 1.5rem;
         }
@@ -256,19 +380,27 @@
 
     <!-- Controls Screen -->
     <div class="controls-screen" id="controlsScreen">
-        <div class="control-section">
-            <h3>Background Theme</h3>
-            <div class="mode-buttons">
-                <button class="mode-button" data-theme="linear">LINEAR</button>
-                <button class="mode-button" data-theme="neon">NEON</button>
-                <button class="mode-button" data-theme="glitch">GLITCH</button>
-                <button class="mode-button" data-theme="stars">STARS</button>
-                <button class="mode-button" data-theme="wave">WAVE</button>
-            </div>
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-button active" data-tab="themes">Themes</button>
+            <button class="tab-button" data-tab="media">Media</button>
         </div>
 
-        <div class="control-section">
-            <h3>Wave Settings</h3>
+        <!-- Themes Tab -->
+        <div class="tab-content active" id="themesTab">
+            <div class="control-section">
+                <h3>Background Theme</h3>
+                <div class="mode-buttons">
+                    <button class="mode-button" data-theme="linear">LINEAR</button>
+                    <button class="mode-button" data-theme="neon">NEON</button>
+                    <button class="mode-button" data-theme="glitch">GLITCH</button>
+                    <button class="mode-button" data-theme="stars">STARS</button>
+                    <button class="mode-button" data-theme="wave">WAVE</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Wave Settings</h3>
             <div class="control-group">
                 <div class="control-label">
                     <span>INTENSITY</span>
@@ -325,6 +457,63 @@
                 <input type="range" id="highEmphasis" min="0" max="3" step="0.1" value="1.0">
             </div>
         </div>
+        </div>
+
+        <!-- Media Tab -->
+        <div class="tab-content" id="mediaTab">
+            <div class="control-section">
+                <h3>Media Items</h3>
+                <div class="media-list" id="mediaList">
+                    <div class="empty-state">No media added yet</div>
+                </div>
+                <button class="add-media-button" id="addMediaButton">+ Add Media</button>
+            </div>
+
+            <!-- Media Controls (shown when item selected) -->
+            <div class="media-controls" id="mediaControls">
+                <div class="control-section">
+                    <h3 id="selectedMediaName">Media Controls</h3>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>TRANSPARENCY</span>
+                            <span class="control-value" id="mediaTransparencyValue">1.0</span>
+                        </div>
+                        <input type="range" id="mediaTransparencySlider" min="0" max="1" step="0.1" value="1.0">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>ROTATION</span>
+                            <span class="control-value" id="mediaRotationValue">0°</span>
+                        </div>
+                        <input type="range" id="mediaRotationSlider" min="0" max="360" step="1" value="0">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>BLUR</span>
+                            <span class="control-value" id="mediaBlurValue">0</span>
+                        </div>
+                        <input type="range" id="mediaBlurSlider" min="0" max="20" step="1" value="0">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>THEME</span>
+                        </div>
+                        <div class="mode-buttons">
+                            <button class="mode-button" data-media-theme="none">NONE</button>
+                            <button class="mode-button" data-media-theme="linear">LINEAR</button>
+                            <button class="mode-button" data-media-theme="neon">NEON</button>
+                            <button class="mode-button" data-media-theme="glitch">GLITCH</button>
+                        </div>
+                    </div>
+
+                    <button class="add-media-button" id="deleteMediaButton">Delete Media</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -332,6 +521,8 @@
         let socket = null;
         let sessionCode = null;
         let isConnected = false;
+        let mediaItems = [];
+        let selectedMediaIndex = -1;
 
         // DOM elements
         const pairingScreen = document.getElementById('pairingScreen');
@@ -415,6 +606,10 @@
                 if (state.settings) {
                     updateMobileUI(state.settings);
                 }
+                if (state.imageObjects) {
+                    mediaItems = state.imageObjects;
+                    renderMediaList();
+                }
             });
 
             socket.on('connect_error', (error) => {
@@ -469,8 +664,174 @@
             });
         }
 
+        // Tab switching
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.dataset.tab;
+
+                    // Remove active from all tabs
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+
+                    // Add active to clicked tab
+                    button.classList.add('active');
+                    document.getElementById(`${tabName}Tab`).classList.add('active');
+                });
+            });
+        }
+
+        // Render media list
+        function renderMediaList() {
+            const mediaList = document.getElementById('mediaList');
+            const mediaControls = document.getElementById('mediaControls');
+
+            if (mediaItems.length === 0) {
+                mediaList.innerHTML = '<div class="empty-state">No media added yet</div>';
+                mediaControls.classList.remove('active');
+                return;
+            }
+
+            mediaList.innerHTML = mediaItems.map((item, index) => `
+                <div class="media-item ${index === selectedMediaIndex ? 'selected' : ''}" data-index="${index}">
+                    <div class="media-item-info">
+                        <div class="media-item-name">${item.isVideo ? 'Video' : 'Image'} ${index + 1}</div>
+                        <div class="media-item-type">${item.isVideo ? 'VIDEO' : 'IMAGE'}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            document.querySelectorAll('.media-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const index = parseInt(item.dataset.index);
+                    selectMedia(index);
+                });
+            });
+        }
+
+        // Select media item
+        function selectMedia(index) {
+            selectedMediaIndex = index;
+            renderMediaList();
+
+            // Show media controls
+            const mediaControls = document.getElementById('mediaControls');
+            const selectedMediaName = document.getElementById('selectedMediaName');
+            const media = mediaItems[index];
+
+            selectedMediaName.textContent = `${media.isVideo ? 'Video' : 'Image'} ${index + 1}`;
+
+            // Update control values
+            document.getElementById('mediaTransparencySlider').value = media.transparency || 1.0;
+            document.getElementById('mediaTransparencyValue').textContent = (media.transparency || 1.0).toFixed(1);
+
+            document.getElementById('mediaRotationSlider').value = media.rotation || 0;
+            document.getElementById('mediaRotationValue').textContent = `${media.rotation || 0}°`;
+
+            document.getElementById('mediaBlurSlider').value = media.blur || 0;
+            document.getElementById('mediaBlurValue').textContent = media.blur || 0;
+
+            // Update theme buttons
+            document.querySelectorAll('.mode-button[data-media-theme]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mediaTheme === (media.theme || 'none'));
+            });
+
+            mediaControls.classList.add('active');
+        }
+
+        // Setup media controls
+        function setupMediaControls() {
+            // Add media button
+            const addMediaButton = document.getElementById('addMediaButton');
+            if (addMediaButton) {
+                addMediaButton.addEventListener('click', () => {
+                    // Send request to desktop to add media
+                    updateDesktop({ action: 'addMedia' });
+                });
+            }
+
+            // Delete media button
+            const deleteMediaButton = document.getElementById('deleteMediaButton');
+            if (deleteMediaButton) {
+                deleteMediaButton.addEventListener('click', () => {
+                    if (selectedMediaIndex !== -1) {
+                        updateDesktop({
+                            action: 'deleteMedia',
+                            mediaIndex: selectedMediaIndex
+                        });
+                        selectedMediaIndex = -1;
+                    }
+                });
+            }
+
+            // Media property sliders
+            const mediaTransparency = document.getElementById('mediaTransparencySlider');
+            if (mediaTransparency) {
+                mediaTransparency.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('mediaTransparencyValue').textContent = value.toFixed(1);
+                    updateDesktop({
+                        action: 'updateMedia',
+                        mediaIndex: selectedMediaIndex,
+                        property: 'transparency',
+                        value: value
+                    });
+                });
+            }
+
+            const mediaRotation = document.getElementById('mediaRotationSlider');
+            if (mediaRotation) {
+                mediaRotation.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById('mediaRotationValue').textContent = `${value}°`;
+                    updateDesktop({
+                        action: 'updateMedia',
+                        mediaIndex: selectedMediaIndex,
+                        property: 'rotation',
+                        value: value
+                    });
+                });
+            }
+
+            const mediaBlur = document.getElementById('mediaBlurSlider');
+            if (mediaBlur) {
+                mediaBlur.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById('mediaBlurValue').textContent = value;
+                    updateDesktop({
+                        action: 'updateMedia',
+                        mediaIndex: selectedMediaIndex,
+                        property: 'blur',
+                        value: value
+                    });
+                });
+            }
+
+            // Media theme buttons
+            const mediaThemeButtons = document.querySelectorAll('.mode-button[data-media-theme]');
+            mediaThemeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    mediaThemeButtons.forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    updateDesktop({
+                        action: 'updateMedia',
+                        mediaIndex: selectedMediaIndex,
+                        property: 'theme',
+                        value: button.dataset.mediaTheme
+                    });
+                });
+            });
+        }
+
         // Setup control bindings
         function setupControls() {
+            setupTabs();
+            setupMediaControls();
+
             // Sliders
             const sliders = ['intensity', 'speed', 'smoothing', 'lowEmphasis', 'midEmphasis', 'highEmphasis'];
 
