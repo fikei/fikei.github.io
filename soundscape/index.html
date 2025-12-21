@@ -3388,6 +3388,9 @@
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
 
+            // Hide SVG paths for STARS theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
+
             // Initialize stars on first render
             if (!state.stars.initialized) {
                 initializeStars();
@@ -3535,6 +3538,9 @@
             const theme = config.themes.wave;
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
+
+            // Hide SVG paths for WAVE theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
 
             // Initialize stars on first render (we reuse stars array for wave theme)
             if (!state.stars.initialized) {
