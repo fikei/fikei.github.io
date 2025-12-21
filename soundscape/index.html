@@ -1001,6 +1001,7 @@
                 <option value="linear">LINEAR</option>
                 <option value="neon">NEON</option>
                 <option value="glitch">GLITCH</option>
+                <option value="stars">STARS</option>
             </select>
         </section>
 
@@ -1069,6 +1070,18 @@
                     <span class="control-value" id="glitchContrastValue">1.0</span>
                 </div>
                 <input type="range" id="glitchContrastSlider" min="0" max="3.0" step="0.1" value="1.0">
+            </div>
+        </section>
+
+        <!-- STARS Theme Controls -->
+        <section class="control-section" id="starsControlsSection" style="display: none;">
+            <h3>STARS</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>COLOR HUE</span>
+                    <span class="control-value" id="starHueValue">217°</span>
+                </div>
+                <input type="range" id="starHueSlider" min="0" max="360" step="1" value="217">
             </div>
         </section>
 
@@ -1252,6 +1265,18 @@
                     glitchIntensityMultiplier: 8, // Mids control random displacement
                     quantizationBase: 1,
                     quantizationMultiplier: 8 // Highs increase pixelation
+                },
+                stars: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    maxStars: 1200,
+                    hue: 217, // Base color hue (0-360)
+                    brightness: 0.8, // Overall star brightness (0-1)
+                    baseSpeed: 0.00002, // Base orbit speed
+                    speedMultiplier: 3.0, // Audio-reactive speed boost
+                    twinkleIntensity: 20, // How often stars twinkle (higher = less frequent)
+                    alphaMin: 0.2, // Minimum alpha for stars
+                    alphaMax: 1.0 // Maximum alpha for stars
                 }
             }
         };
@@ -1277,7 +1302,8 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                image3DMotion: 0.0  // 3D motion intensity for image objects (0 = off)
+                image3DMotion: 0.0,  // 3D motion intensity for image objects (0 = off)
+                starHue: 217  // Star base color hue (0-360)
             },
 
             // Audio
@@ -1340,6 +1366,15 @@
                 dragStartY: 0,
                 dragStartWidth: 0,
                 dragStartHeight: 0
+            },
+
+            // STARS theme state
+            stars: {
+                initialized: false,
+                starArray: [],
+                gradientCanvas: null,
+                gradientCtx: null,
+                count: 0
             },
 
             // Image objects (for LINEAR/NEON overlay images)
@@ -1491,6 +1526,7 @@
             const modeSection = document.getElementById('modeSection');
             const neonControlsSection = document.getElementById('neonControlsSection');
             const glitchControlsSection = document.getElementById('glitchControlsSection');
+            const starsControlsSection = document.getElementById('starsControlsSection');
             const imageControlsSection = document.getElementById('imageControlsSection');
             const imageThemeSelect = document.getElementById('imageThemeSelect');
             const uploadOverlay = document.getElementById('upload-overlay');
@@ -1513,6 +1549,10 @@
 
             if (glitchControlsSection) {
                 glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
+            }
+
+            if (starsControlsSection) {
+                starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
             }
 
             // Show image controls when an image is selected
@@ -1611,6 +1651,12 @@
             // Update mode visibility based on theme
             updateModeVisibility();
 
+            // Handle stars canvas visibility
+            const starsCanvas = document.getElementById('stars-canvas');
+            if (starsCanvas) {
+                starsCanvas.style.display = state.settings.theme === 'stars' ? 'block' : 'none';
+            }
+
             // Update line colors based on theme
             if (state.settings.theme === 'linear') {
                 // Linear uses gradient colors
@@ -1633,6 +1679,11 @@
                 // Reset path attributes
                 state.paths.forEach((path) => {
                     path.setAttribute('opacity', theme.opacity);
+                });
+            } else if (state.settings.theme === 'stars') {
+                // Stars theme: hide SVG paths (stars are rendered on canvas)
+                state.paths.forEach((path) => {
+                    path.setAttribute('opacity', '0');
                 });
             }
         }
@@ -2953,11 +3004,150 @@
             });
         }
 
+        // =====================================================
+        // STARS THEME RENDERER
+        // =====================================================
+
+        function initializeStars() {
+            const theme = config.themes.stars;
+            const w = state.boundingRect.width;
+            const h = state.boundingRect.height;
+
+            // Create cached gradient texture for stars
+            const gradientCanvas = document.createElement('canvas');
+            const gradientCtx = gradientCanvas.getContext('2d');
+            gradientCanvas.width = 100;
+            gradientCanvas.height = 100;
+
+            state.stars.gradientCanvas = gradientCanvas;
+            state.stars.gradientCtx = gradientCtx;
+
+            // Update gradient with current hue
+            updateStarGradient();
+
+            // Initialize star array
+            state.stars.starArray = [];
+            state.stars.count = 0;
+
+            const maxOrbit = Math.round(Math.sqrt(w * w + h * h)) / 2;
+
+            class Star {
+                constructor() {
+                    this.orbitRadius = Math.floor(Math.random() * maxOrbit);
+                    this.radius = Math.floor(Math.random() * (60 - this.orbitRadius / 12) + this.orbitRadius / 12);
+                    this.orbitX = w / 2;
+                    this.orbitY = h / 2;
+                    this.timePassed = Math.random() * theme.maxStars;
+                    this.speed = (Math.random() * this.orbitRadius * theme.baseSpeed);
+                    this.alpha = (Math.random() * (theme.alphaMax - theme.alphaMin) + theme.alphaMin) * theme.brightness;
+                    state.stars.starArray.push(this);
+                }
+            }
+
+            for (let i = 0; i < theme.maxStars; i++) {
+                new Star();
+            }
+
+            state.stars.initialized = true;
+            console.log(`✨ Initialized ${theme.maxStars} stars`);
+        }
+
+        function updateStarGradient() {
+            const canvas = state.stars.gradientCanvas;
+            const ctx = state.stars.gradientCtx;
+            const hue = state.settings.starHue;
+            const half = canvas.width / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+            gradient.addColorStop(0.025, '#fff');
+            gradient.addColorStop(0.1, `hsl(${hue}, 61%, 33%)`);
+            gradient.addColorStop(0.25, `hsl(${hue}, 64%, 6%)`);
+            gradient.addColorStop(1, 'transparent');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(half, half, half, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawLinesStars() {
+            const theme = config.themes.stars;
+            const { low, mid, high } = state.audioLevels;
+
+            // Initialize stars on first render
+            if (!state.stars.initialized) {
+                initializeStars();
+            }
+
+            // Get or create stars canvas
+            let starsCanvas = document.getElementById('stars-canvas');
+            if (!starsCanvas) {
+                starsCanvas = document.createElement('canvas');
+                starsCanvas.id = 'stars-canvas';
+                starsCanvas.style.position = 'fixed';
+                starsCanvas.style.top = '0';
+                starsCanvas.style.left = '0';
+                starsCanvas.style.width = '100%';
+                starsCanvas.style.height = '100%';
+                starsCanvas.style.pointerEvents = 'none';
+                starsCanvas.style.zIndex = '0';
+                document.body.insertBefore(starsCanvas, document.body.firstChild);
+            }
+
+            const ctx = starsCanvas.getContext('2d');
+            const w = starsCanvas.width = state.boundingRect.width;
+            const h = starsCanvas.height = state.boundingRect.height;
+
+            // Clear with fade effect
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.8;
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Calculate audio-reactive speed multiplier
+            // Bass increases orbit speed
+            const speedBoost = 1.0 + (low * theme.speedMultiplier);
+
+            // Draw stars
+            ctx.globalCompositeOperation = 'lighter';
+
+            state.stars.starArray.forEach((star) => {
+                const x = Math.sin(star.timePassed) * star.orbitRadius + star.orbitX;
+                const y = Math.cos(star.timePassed) * star.orbitRadius + star.orbitY;
+
+                // Twinkle effect
+                const twinkle = Math.floor(Math.random() * theme.twinkleIntensity);
+                if (twinkle === 1 && star.alpha > theme.alphaMin) {
+                    star.alpha -= 0.05;
+                } else if (twinkle === 2 && star.alpha < theme.alphaMax * theme.brightness) {
+                    star.alpha += 0.05;
+                }
+
+                // Mid frequencies add brightness boost
+                const brightnessBoost = mid * 0.3;
+
+                ctx.globalAlpha = star.alpha + brightnessBoost;
+                ctx.drawImage(
+                    state.stars.gradientCanvas,
+                    x - star.radius / 2,
+                    y - star.radius / 2,
+                    star.radius,
+                    star.radius
+                );
+
+                // Update orbit with audio-reactive speed
+                star.timePassed += star.speed * speedBoost;
+            });
+        }
+
         // Theme renderer dispatcher
         const themeRenderers = {
             linear: drawLinesLinear,
             neon: drawLinesNeon,
-            glitch: drawLinesGlitch
+            glitch: drawLinesGlitch,
+            stars: drawLinesStars
         };
 
         function drawLines() {
@@ -3935,6 +4125,21 @@
                 state.settings.glitchContrast = value;
             });
 
+            // STARS hue slider
+            const starHueSlider = document.getElementById('starHueSlider');
+            const starHueValue = document.getElementById('starHueValue');
+            if (starHueSlider && starHueValue) {
+                starHueSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starHue = value;
+                    starHueValue.textContent = `${Math.round(value)}°`;
+                    // Update star gradient with new hue
+                    if (state.stars.initialized) {
+                        updateStarGradient();
+                    }
+                });
+            }
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -4539,7 +4744,8 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                image3DMotion: 0.0
+                image3DMotion: 0.0,
+                starHue: 217
             };
 
             // Update UI
@@ -4554,6 +4760,7 @@
             document.getElementById('glitchIntensitySlider').value = 1.0;
             document.getElementById('glitchContrastSlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
+            document.getElementById('starHueSlider').value = 217;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -4566,6 +4773,7 @@
             document.getElementById('glitchIntensityValue').textContent = '1.0';
             document.getElementById('glitchContrastValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
+            document.getElementById('starHueValue').textContent = '217°';
 
             // Update analyser if active
             if (state.analyser) {
