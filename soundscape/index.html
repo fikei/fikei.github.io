@@ -216,30 +216,35 @@
         .pairing-toggle {
             position: fixed;
             bottom: 1rem;
-            right: 1rem;
-            z-index: 20;
-            width: 40px;
-            height: 40px;
+            right: calc(30px + 1rem + 0.5rem); /* To the left of fullscreen button */
+            z-index: 101;
+            width: 30px;
+            height: 30px;
             background: #000000;
             border: 1px solid #ffffff;
+            border-radius: 0;
             color: #ffffff;
-            font-size: 20px;
+            font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: all 0.15s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
         }
 
         .pairing-toggle:hover {
             background: #ffffff;
-            transform: scale(1.05);
+            color: #000000;
         }
 
         .pairing-toggle.hidden-control {
             opacity: 0;
             pointer-events: none;
+        }
+
+        .pairing-toggle.sidebar-is-open {
+            right: calc(200px + 30px + 1rem + 0.5rem); /* Float to left of sidebar with fullscreen button */
         }
 
         /* ===== SIDEBAR TOGGLE BUTTON ===== */
@@ -4420,13 +4425,16 @@
                 const sidebarOpen = elements.sidebar.classList.contains('open');
                 const sidebarToggle = document.getElementById('sidebarToggle');
                 const fullscreenToggle = document.getElementById('fullscreenToggle');
+                const pairingToggle = document.getElementById('pairingToggle');
 
                 if (sidebarOpen) {
                     if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.add('sidebar-is-open');
+                    if (pairingToggle) pairingToggle.classList.add('sidebar-is-open');
                 } else {
                     if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.remove('sidebar-is-open');
+                    if (pairingToggle) pairingToggle.classList.remove('sidebar-is-open');
                 }
             });
 
@@ -4461,6 +4469,7 @@
                 if (e.key === 'h' || e.key === 'H') {
                     const statusBar = document.getElementById('statusBar');
                     const fullscreenBtn = document.getElementById('fullscreenToggle');
+                    const pairingBtn = document.getElementById('pairingToggle');
                     const addImageBtn = document.getElementById('addImageButton');
                     const sidebarToggle = document.getElementById('sidebarToggle');
 
@@ -4471,6 +4480,7 @@
                         // Show UI and cursor
                         if (statusBar) statusBar.classList.remove('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.remove('hidden-control');
+                        if (pairingBtn) pairingBtn.classList.remove('hidden-control');
                         if (addImageBtn) addImageBtn.classList.remove('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
                         document.body.classList.remove('hide-cursor');
@@ -4478,6 +4488,7 @@
                         // Hide UI and cursor
                         if (statusBar) statusBar.classList.add('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.add('hidden-control');
+                        if (pairingBtn) pairingBtn.classList.add('hidden-control');
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
                         document.body.classList.add('hide-cursor');
