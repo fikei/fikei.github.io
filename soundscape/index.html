@@ -3618,11 +3618,11 @@
         function drawLinesWave() {
             const theme = config.themes.wave;
             const { low, mid, high } = state.audioLevels;
-            const time = state.currentTime * 0.001; // Convert to seconds
+            const time = state.currentTime;
 
-            // Initialize on first render
-            if (!state.wave.initialized) {
-                initializeWave();
+            // Initialize stars on first render (we reuse stars array for wave theme)
+            if (!state.stars.initialized) {
+                initializeStars();
             }
 
             // Get or create wave canvas
@@ -3647,130 +3647,148 @@
             const w = waveCanvas.width = state.boundingRect.width;
             const h = waveCanvas.height = state.boundingRect.height;
 
-            // Clear with theme background
-            ctx.fillStyle = theme.bg;
-            ctx.fillRect(0, 0, w, h);
+            // Clear canvas
+            ctx.clearRect(0, 0, w, h);
 
-            // Get color based on mode
-            let baseHue, baseSat;
-            const colorMode = theme.colorModes[state.settings.waveColorMode] || theme.colorModes.mono;
+            // Audio smoothing and speed boost
+            const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
+            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
+            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
 
-            if (state.settings.waveColorMode === 'mono') {
-                baseHue = state.settings.waveHue;
-                baseSat = state.settings.waveSaturation;
-            } else {
-                baseHue = colorMode.baseHue;
-                baseSat = colorMode.saturation;
-            }
+            // Draw based on mode
+            ctx.globalCompositeOperation = 'lighter';
 
-            // Audio-reactive intensity (bass affects amplitude)
-            const intensity = state.settings.waveDistortion * (1.0 + low * 2.0);
-            const speedMultiplier = state.settings.waveSpeed;
+            const mode = state.settings.waveMode;
 
-            // Get grid density
-            const density = theme.gridDensity[state.settings.waveDensity] || theme.gridDensity.medium;
-            const cols = density.cols;
-            const rows = density.rows;
+            if (mode === 'planes') {
+                // PLANES MODE: Original gradient stars
+                state.stars.starArray.forEach((star) => {
+                    // Update Z position (move towards camera)
+                    if (state.settings.starZSpeed > 0) {
+                        star.z += state.settings.starZSpeed * 0.001;
+                        if (star.z >= 1.0) {
+                            star.z = 0;
+                            star.timePassed = Math.random() * state.settings.starCount;
+                        }
+                    }
 
-            // Helper function to calculate displaced position (shader-like)
-            function getDisplacedPos(i, j) {
-                const normX = i / (cols - 1);
-                const normY = j / (rows - 1);
-                const baseX = normX * w;
-                const baseY = normY * h;
+                    const scale = 0.2 + star.z * 0.8;
+                    const speedBoost = 1.0 + high * state.settings.starAudioBoost;
+                    const scaledOrbitRadius = star.orbitRadius * scale * state.settings.starDiameter;
 
-                // Vertex shader displacement: sine and cosine waves
-                const displaceY = Math.sin(baseX * 0.01 + time * speedMultiplier) * 15 * intensity;
-                const displaceX = Math.cos(baseY * 0.008 + time * speedMultiplier * 1.5) * 8 * intensity;
+                    // High frequencies shift center position
+                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
 
-                // Fragment shader noise pattern
-                const noise = Math.sin(normX * 20.0 + time * speedMultiplier) * Math.cos(normY * 15.0 + time * speedMultiplier * 0.8)
-                    + Math.sin(normX * 35.0 - time * speedMultiplier * 2.0) * Math.cos(normY * 25.0 + time * speedMultiplier * 1.2) * 0.5;
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
 
-                const x = baseX + displaceX + noise * 3;
-                const y = baseY + displaceY + noise * 3;
+                    // Get pre-rendered gradient from cache
+                    ctx.drawImage(
+                        state.stars.gradientCanvas,
+                        0, 0, 50, 50,
+                        x - 25 * star.size * state.settings.starBrightness,
+                        y - 25 * star.size * state.settings.starBrightness,
+                        50 * star.size * state.settings.starBrightness,
+                        50 * star.size * state.settings.starBrightness
+                    );
 
-                return { x, y, noise, normX, normY };
-            }
+                    // Update orbit
+                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                });
 
-            // Draw filled mesh quads with gradients (shader-like)
-            for (let i = 0; i < cols - 1; i++) {
-                for (let j = 0; j < rows - 1; j++) {
-                    const p1 = getDisplacedPos(i, j);
-                    const p2 = getDisplacedPos(i + 1, j);
-                    const p3 = getDisplacedPos(i + 1, j + 1);
-                    const p4 = getDisplacedPos(i, j + 1);
+            } else if (mode === 'grids') {
+                // GRIDS MODE: Draw layered grid patterns
+                const layers = state.settings.waveLayers;
+                const hue = state.settings.waveHue;
+                const sat = state.settings.waveSaturation;
 
-                    // Color mixing based on noise and position (fragment shader style)
-                    const avgNoise = (p1.noise + p2.noise + p3.noise + p4.noise) / 4;
-                    const colorMix = avgNoise * 0.5 + 0.5; // Normalize to 0-1
+                for (let layer = 0; layer < layers; layer++) {
+                    const layerDepth = layer / layers;
+                    const layerScale = 0.3 + layerDepth * 0.7;
+                    const cellSize = 40 + layer * 20;
 
-                    // Create gradient from dark to light based on noise
-                    const lightness1 = 10 + colorMix * 30; // Dark color
-                    const lightness2 = 40 + colorMix * 40; // Bright color
+                    // Audio-reactive rotation per layer
+                    const rotation = time * 0.0001 * state.settings.starSpeed + layer * 0.3;
 
-                    // Audio-reactive brightness (mids affect brightness)
-                    const midBoost = mid * 20;
+                    ctx.save();
+                    ctx.translate(state.stars.centerX, state.stars.centerY);
+                    ctx.rotate(rotation + high * 0.5);
+                    ctx.scale(layerScale * state.settings.starDiameter, layerScale * state.settings.starDiameter);
 
-                    // Create radial gradient for quad (glow effect)
-                    const centerX = (p1.x + p2.x + p3.x + p4.x) / 4;
-                    const centerY = (p1.y + p2.y + p3.y + p4.y) / 4;
-                    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 50);
+                    // Draw grid with radial gradient shading
+                    const gridSize = Math.max(w, h) / cellSize;
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, gridSize * cellSize / 2);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, 60%, ${0.3 + mid * 0.2})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, 40%, ${0.2 + mid * 0.1})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, 20%, ${0.05})`);
+                    ctx.strokeStyle = gradient;
 
-                    gradient.addColorStop(0, `hsla(${baseHue}, ${baseSat}%, ${lightness2 + midBoost}%, ${0.1 + state.settings.waveGlow * 0.2})`);
-                    gradient.addColorStop(1, `hsla(${baseHue}, ${baseSat}%, ${lightness1}%, ${0.05 + state.settings.waveGlow * 0.1})`);
+                    for (let i = -gridSize; i < gridSize; i++) {
+                        for (let j = -gridSize; j < gridSize; j++) {
+                            const x = i * cellSize;
+                            const y = j * cellSize;
+
+                            // Audio-reactive distortion
+                            const distortion = Math.sin(i * 0.5 + time * 0.001) * Math.cos(j * 0.5 + time * 0.001) * low * 10;
+
+                            ctx.strokeRect(x + distortion, y + distortion, cellSize, cellSize);
+                        }
+                    }
+
+                    ctx.restore();
+                }
+
+            } else if (mode === 'dots') {
+                // DOTS MODE: Simple layered dots
+                const layers = state.settings.waveLayers;
+                const hue = state.settings.waveHue;
+                const sat = state.settings.waveSaturation;
+                const speedBoost = 1.0 + high * state.settings.starAudioBoost;
+
+                state.stars.starArray.forEach((star) => {
+                    // Assign layer based on star index
+                    const layer = Math.floor(star.z * layers);
+                    const layerDepth = layer / layers;
+
+                    // Update Z position
+                    if (state.settings.starZSpeed > 0) {
+                        star.z += state.settings.starZSpeed * 0.001;
+                        if (star.z >= 1.0) {
+                            star.z = 0;
+                            star.timePassed = Math.random() * state.settings.starCount;
+                        }
+                    }
+
+                    const scale = 0.3 + layerDepth * 0.7;
+                    const scaledOrbitRadius = star.orbitRadius * scale;
+
+                    // High frequencies shift center
+                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+
+                    // Draw dot with shading
+                    const dotSize = (2 + layerDepth * 4) * state.settings.starBrightness;
+                    const brightness = 30 + layerDepth * 50 + mid * 30;
+
+                    // Radial gradient for shading
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${star.alpha + mid * 0.3})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, ${brightness * 0.3}%, 0)`);
 
                     ctx.fillStyle = gradient;
                     ctx.beginPath();
-                    ctx.moveTo(p1.x, p1.y);
-                    ctx.lineTo(p2.x, p2.y);
-                    ctx.lineTo(p3.x, p3.y);
-                    ctx.lineTo(p4.x, p4.y);
-                    ctx.closePath();
+                    ctx.arc(x, y, dotSize * 2, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Draw subtle wireframe (optional, based on glow setting)
-                    if (state.settings.waveGlow > 0.3) {
-                        ctx.strokeStyle = `hsla(${baseHue}, ${baseSat}%, ${60 + high * 40}%, ${0.1 + state.settings.waveGlow * 0.2})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.stroke();
-                    }
-                }
+                    // Update orbit
+                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                });
             }
-
-            // Draw orbital dots over mesh (high-reactive)
-            const dotSpeedMultiplier = 1.0 + mid * 1.5;
-
-            state.wave.orbitalDots.forEach(dot => {
-                // Audio-reactive orbit radius (bass expands)
-                const radius = dot.baseRadius * (1.0 + low * 0.3);
-
-                // Update angle with mid-reactive speed
-                dot.angle += dot.speed * dotSpeedMultiplier * speedMultiplier;
-
-                const x = dot.centerX + Math.cos(dot.angle) * radius;
-                const y = dot.centerY + Math.sin(dot.angle) * radius;
-
-                // High-reactive glow
-                const dotGlow = state.settings.waveGlow * (0.6 + high * 0.4);
-
-                // Draw dot with radial gradient glow
-                const dotGradient = ctx.createRadialGradient(x, y, 0, x, y, theme.dotSize * 4);
-                dotGradient.addColorStop(0, `hsla(${baseHue}, ${baseSat}%, 100%, ${dotGlow})`);
-                dotGradient.addColorStop(0.5, `hsla(${baseHue}, ${baseSat}%, 80%, ${dotGlow * 0.5})`);
-                dotGradient.addColorStop(1, `hsla(${baseHue}, ${baseSat}%, 60%, 0)`);
-
-                ctx.fillStyle = dotGradient;
-                ctx.beginPath();
-                ctx.arc(x, y, theme.dotSize * 4, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Core dot
-                ctx.fillStyle = `hsla(${baseHue}, ${baseSat}%, 100%, ${dotGlow * 1.2})`;
-                ctx.beginPath();
-                ctx.arc(x, y, theme.dotSize, 0, Math.PI * 2);
-                ctx.fill();
-            });
 
             ctx.globalAlpha = 1.0;
         }
