@@ -6046,6 +6046,12 @@
                     if (response.success) {
                         pairingCode = response.code;
                         console.log('📱 Pairing code generated:', pairingCode);
+
+                        // Update UI if pairing panel is already open
+                        const pairingCodeEl = document.getElementById('pairingCode');
+                        if (pairingCodeEl && pairingCodeEl.textContent === 'Connecting...') {
+                            pairingCodeEl.textContent = pairingCode;
+                        }
                     } else {
                         console.error('❌ Failed to create session');
                     }
@@ -6077,6 +6083,13 @@
 
             socket.on('connect_error', (error) => {
                 console.error('❌ WebSocket connection error:', error);
+                console.error('Make sure the WebSocket server is running at:', socketUrl);
+
+                // Update UI if pairing panel is open
+                const pairingCodeEl = document.getElementById('pairingCode');
+                if (pairingCodeEl && pairingCodeEl.textContent === 'Connecting...') {
+                    pairingCodeEl.textContent = 'Connection Failed';
+                }
             });
         }
 
@@ -6151,7 +6164,18 @@
                 pairingToggle.addEventListener('click', () => {
                     pairingPanel.style.display = 'flex';
                     // Update URL and code
-                    if (pairingCodeEl) pairingCodeEl.textContent = pairingCode;
+                    if (pairingCodeEl) {
+                        if (pairingCode) {
+                            pairingCodeEl.textContent = pairingCode;
+                        } else {
+                            pairingCodeEl.textContent = 'Connecting...';
+                            // Try to reconnect if not connected
+                            if (!socket || !socket.connected) {
+                                console.log('⚠️ WebSocket not connected, attempting to reconnect...');
+                                initializePairing();
+                            }
+                        }
+                    }
                     if (pairingUrlEl) {
                         const baseUrl = window.location.href.replace('/index.html', '').replace(/\/$/, '');
                         pairingUrlEl.textContent = `${baseUrl}/companion.html`;
