@@ -772,9 +772,10 @@
         <!-- Mode Selection (LINEAR theme only) -->
         <section class="control-section" id="modeSection">
             <h3>MODE</h3>
-            <div class="density-options">
+            <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="density-option active" data-mode="hole">HOLE</div>
                 <div class="density-option" data-mode="crunch">CRUNCH</div>
+                <div class="density-option" data-mode="static">STATIC</div>
             </div>
         </section>
 
@@ -1677,6 +1678,7 @@
         function drawLinesLinear() {
             const theme = config.themes.linear;
             const { low, mid, high } = state.audioLevels;
+            const isStaticMode = state.settings.mode === 'static';
 
             // Hide NEON gradient mesh if it exists
             const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
@@ -1693,17 +1695,21 @@
 
                 // Start path
                 const firstPoint = points[0];
+                const cursorOffsetX = isStaticMode ? 0 : firstPoint.cursor.x;
+                const cursorOffsetY = isStaticMode ? 0 : firstPoint.cursor.y;
                 let pathData = `M ${
-                    firstPoint.x + firstPoint.wave.x + firstPoint.cursor.x + firstPoint.audio.x
+                    firstPoint.x + firstPoint.wave.x + cursorOffsetX + firstPoint.audio.x
                 } ${
-                    firstPoint.y + firstPoint.wave.y + firstPoint.cursor.y + firstPoint.audio.y
+                    firstPoint.y + firstPoint.wave.y + cursorOffsetY + firstPoint.audio.y
                 }`;
 
                 // Draw line segments
                 for (let i = 1; i < points.length; i++) {
                     const p = points[i];
-                    const x = p.x + p.wave.x + p.cursor.x + p.audio.x;
-                    const y = p.y + p.wave.y + p.cursor.y + p.audio.y;
+                    const pCursorX = isStaticMode ? 0 : p.cursor.x;
+                    const pCursorY = isStaticMode ? 0 : p.cursor.y;
+                    const x = p.x + p.wave.x + pCursorX + p.audio.x;
+                    const y = p.y + p.wave.y + pCursorY + p.audio.y;
                     pathData += ` L ${x} ${y}`;
                 }
 
