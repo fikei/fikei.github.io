@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Soundscape — Audio-Reactive Wave Visualization</title>
     <meta name="description" content="Real-time audio visualization using simplex-noise wave grid that reacts to microphone input">
     <link rel="icon" type="image/png" href="https://cdn.glitch.me/597fe374-3d18-46a5-b99c-ceff1f8ffd79%2Ffavicon.png"/>
@@ -6026,11 +6027,12 @@
             // Determine WebSocket server URL
             let socketUrl;
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Local development
                 socketUrl = 'http://localhost:3000';
-            } else if (window.location.hostname.includes('onrender.com')) {
-                socketUrl = 'https://fikei-github-io.onrender.com';
             } else {
-                socketUrl = `${window.location.protocol}//${window.location.host}`;
+                // Production: Always use Render deployment for WebSocket server
+                // GitHub Pages can't run WebSocket servers, so we use Render
+                socketUrl = 'https://fikei-github-io.onrender.com';
             }
 
             console.log('🔌 Connecting to WebSocket server:', socketUrl);
