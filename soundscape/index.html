@@ -620,6 +620,14 @@
                 <input type="range" id="imageBlurSlider" min="0" max="20" step="0.5" value="0">
             </div>
 
+            <div class="control-group">
+                <div class="control-label">
+                    <span>3D MOTION</span>
+                    <span class="control-value" id="image3DMotionValue">0.0</span>
+                </div>
+                <input type="range" id="image3DMotionSlider" min="0" max="2" step="0.1" value="0">
+            </div>
+
             <div id="imageEffectSettings">
                 <h3 style="margin-top: 2rem;">EFFECT SETTINGS</h3>
                 <div class="control-group">
@@ -969,7 +977,8 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                satRange: 1.0
+                satRange: 1.0,
+                image3DMotion: 0.0  // 3D motion intensity for image objects (0 = off)
             },
 
             // Audio
@@ -2224,10 +2233,11 @@
             const quantization = Math.max(1, (theme.quantizationBase + high * theme.quantizationMultiplier) * glitchEffectIntensity);
 
             // Calculate 3D rotation based on audio with user intensity multiplier
-            const rotationIntensity = state.settings.rotationIntensity;
-            const rotationX = mid * 45 * rotationIntensity; // Mids control pitch (X-axis rotation)
-            const rotationY = high * 45 * rotationIntensity; // Highs control yaw (Y-axis rotation)
-            const rotationZ = low * 15 * rotationIntensity + baseRotation; // Bass controls roll (Z-axis rotation) + user rotation
+            // Use image3DMotion setting for image objects
+            const motionIntensity = state.settings.image3DMotion;
+            const rotationX = mid * 45 * motionIntensity; // Mids control pitch (X-axis rotation)
+            const rotationY = high * 45 * motionIntensity; // Highs control yaw (Y-axis rotation)
+            const rotationZ = low * 15 * motionIntensity + baseRotation; // Bass controls roll (Z-axis rotation) + user rotation
 
             // Apply 3D transform to canvas
             const perspective = 1000;
@@ -2615,10 +2625,24 @@
                 // Apply transparency
                 canvas.style.opacity = imageObj.transparency;
 
-                // Apply rotation (glitch theme handles its own rotation via 3D transform)
+                // Apply rotation and 3D motion
+                const motion3D = state.settings.image3DMotion;
                 if (imageObj.theme !== 'glitch') {
-                    canvas.style.transform = `rotate(${imageObj.rotation}deg)`;
-                    canvas.style.transformOrigin = 'center center';
+                    // Non-glitch themes: Apply rotation and optional 3D motion
+                    if (motion3D > 0) {
+                        // Apply 3D motion based on audio
+                        const rotationX = mid * 45 * motion3D; // Mids control pitch (X-axis rotation)
+                        const rotationY = high * 45 * motion3D; // Highs control yaw (Y-axis rotation)
+                        const rotationZ = low * 15 * motion3D + imageObj.rotation; // Bass controls roll + user rotation
+                        const perspective = 1000;
+                        canvas.style.transformStyle = 'preserve-3d';
+                        canvas.style.transform = `perspective(${perspective}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg) rotateZ(${rotationZ}deg)`;
+                        canvas.style.transformOrigin = 'center center';
+                    } else {
+                        // No 3D motion, just apply simple rotation
+                        canvas.style.transform = `rotate(${imageObj.rotation}deg)`;
+                        canvas.style.transformOrigin = 'center center';
+                    }
                 }
 
                 // Apply blur filter
@@ -3334,7 +3358,11 @@
                 }
             });
 
-            // Theme blur slider
+            // 3D Motion slider (global setting for all images)
+            setupSlider('image3DMotionSlider', 'image3DMotionValue', (value) => {
+                state.settings.image3DMotion = value;
+            });
+
             // Theme opacity slider
             setupSlider('themeOpacitySlider', 'themeOpacityValue', (value) => {
                 if (state.selectedImageIndex === -1) return;
@@ -3858,7 +3886,8 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                satRange: 1.0
+                satRange: 1.0,
+                image3DMotion: 0.0
             };
 
             // Update UI
@@ -3872,6 +3901,7 @@
             document.getElementById('satRangeSlider').value = 1.0;
             document.getElementById('rotationIntensitySlider').value = 1.0;
             document.getElementById('glitchIntensitySlider').value = 1.0;
+            document.getElementById('image3DMotionSlider').value = 0.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -3883,6 +3913,7 @@
             document.getElementById('satRangeValue').textContent = '1.0';
             document.getElementById('rotationIntensityValue').textContent = '1.0';
             document.getElementById('glitchIntensityValue').textContent = '1.0';
+            document.getElementById('image3DMotionValue').textContent = '0.0';
 
             // Update analyser if active
             if (state.analyser) {
