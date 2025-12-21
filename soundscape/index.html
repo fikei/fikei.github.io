@@ -799,20 +799,22 @@
         <div class="add-image-dropdown-item" id="loadCanvasMenuItem" style="display: none;">Load Canvas</div>
     </div>
 
-    <!-- Video URL Popup -->
-    <div class="video-popup" id="videoPopup" style="display: none;">
+    <!-- Unified Media Upload Popup -->
+    <div class="video-popup" id="mediaPopup" style="display: none;">
         <div class="video-popup-content">
-            <h3>ADD VIDEO BY URL</h3>
-            <input type="text" id="videoUrlInput" placeholder="Enter video URL" />
+            <h3 id="mediaPopupTitle">ADD MEDIA</h3>
+            <input type="text" id="mediaUrlInput" placeholder="Enter URL (direct video/image file only)" />
+            <p style="text-align: center; margin: 0.5rem 0; font-size: 8px; color: #999; text-transform: uppercase;">Or <a href="#" id="mediaBrowseLink" style="color: #fff; text-decoration: underline; cursor: pointer;">browse</a> from desktop</p>
             <div class="video-popup-buttons">
-                <button id="videoPopupAdd">ADD</button>
-                <button id="videoPopupCancel">CANCEL</button>
+                <button id="mediaPopupAdd">ADD</button>
+                <button id="mediaPopupCancel">CANCEL</button>
             </div>
         </div>
     </div>
 
-    <!-- Hidden file inputs for canvas load -->
+    <!-- Hidden file inputs -->
     <input type="file" id="loadCanvasInput" accept=".json" style="display: none;">
+    <input type="file" id="mediaFileInput" accept="image/*,video/*" style="display: none;">
 
     <!-- Controls Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -4951,25 +4953,43 @@
                     }
                 });
 
+                // Unified media modal handlers
+                const mediaPopup = document.getElementById('mediaPopup');
+                const mediaPopupAdd = document.getElementById('mediaPopupAdd');
+                const mediaPopupCancel = document.getElementById('mediaPopupCancel');
+                const mediaUrlInput = document.getElementById('mediaUrlInput');
+                const mediaBrowseLink = document.getElementById('mediaBrowseLink');
+                const mediaFileInput = document.getElementById('mediaFileInput');
+
+                let currentMediaType = 'image'; // Track whether we're adding image or video
+
+                function openMediaModal(type) {
+                    currentMediaType = type;
+                    const mediaPopupTitle = document.getElementById('mediaPopupTitle');
+
+                    if (type === 'video') {
+                        mediaPopupTitle.textContent = 'ADD VIDEO';
+                        mediaUrlInput.placeholder = 'Enter video URL (direct .mp4, .webm file only)';
+                        mediaFileInput.accept = 'video/*';
+                    } else if (type === 'image') {
+                        mediaPopupTitle.textContent = 'ADD IMAGE';
+                        mediaUrlInput.placeholder = 'Enter image URL (direct .jpg, .png file only)';
+                        mediaFileInput.accept = 'image/*';
+                    } else if (type === 'background') {
+                        mediaPopupTitle.textContent = 'UPLOAD BACKGROUND IMAGE';
+                        mediaUrlInput.placeholder = 'Enter image URL (direct .jpg, .png file only)';
+                        mediaFileInput.accept = 'image/*';
+                    }
+
+                    mediaUrlInput.value = '';
+                    mediaPopup.style.display = 'flex';
+                    mediaUrlInput.focus();
+                }
+
                 // Handle "Add Image" menu item click
                 addImageMenuItem.addEventListener('click', () => {
                     addImageDropdown.classList.remove('show');
-
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.accept = 'image/*';
-                    fileInput.style.display = 'none';
-
-                    fileInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            loadImageFile(file);
-                        }
-                    });
-
-                    document.body.appendChild(fileInput);
-                    fileInput.click();
-                    document.body.removeChild(fileInput);
+                    openMediaModal('image');
                 });
 
                 // Handle "Add Video" menu item click
@@ -4977,49 +4997,72 @@
                 if (addVideoMenuItem) {
                     addVideoMenuItem.addEventListener('click', () => {
                         addImageDropdown.classList.remove('show');
-                        const videoPopup = document.getElementById('videoPopup');
-                        const videoUrlInput = document.getElementById('videoUrlInput');
-                        if (videoPopup && videoUrlInput) {
-                            videoUrlInput.value = '';
-                            videoPopup.style.display = 'flex';
-                            videoUrlInput.focus();
-                        }
+                        openMediaModal('video');
                     });
                 }
 
-                // Handle video popup buttons
-                const videoPopupAdd = document.getElementById('videoPopupAdd');
-                const videoPopupCancel = document.getElementById('videoPopupCancel');
-                const videoPopup = document.getElementById('videoPopup');
-                const videoUrlInput = document.getElementById('videoUrlInput');
-
-                if (videoPopupAdd && videoPopup && videoUrlInput) {
-                    videoPopupAdd.addEventListener('click', () => {
-                        const url = videoUrlInput.value.trim();
+                if (mediaPopupAdd && mediaPopup && mediaUrlInput) {
+                    mediaPopupAdd.addEventListener('click', () => {
+                        const url = mediaUrlInput.value.trim();
                         if (url) {
-                            loadVideoFromUrl(url);
-                            videoPopup.style.display = 'none';
+                            if (currentMediaType === 'video') {
+                                loadVideoFromUrl(url);
+                            } else {
+                                loadImageFromUrl(url);
+                            }
+                            mediaPopup.style.display = 'none';
                         }
                     });
                 }
 
-                if (videoPopupCancel && videoPopup) {
-                    videoPopupCancel.addEventListener('click', () => {
-                        videoPopup.style.display = 'none';
+                if (mediaPopupCancel && mediaPopup) {
+                    mediaPopupCancel.addEventListener('click', () => {
+                        mediaPopup.style.display = 'none';
                     });
                 }
 
-                // Close video popup on Escape key
-                if (videoPopup && videoUrlInput) {
-                    videoUrlInput.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') {
-                            videoPopup.style.display = 'none';
-                        } else if (e.key === 'Enter') {
-                            const url = videoUrlInput.value.trim();
-                            if (url) {
-                                loadVideoFromUrl(url);
-                                videoPopup.style.display = 'none';
+                if (mediaBrowseLink && mediaFileInput) {
+                    mediaBrowseLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        mediaFileInput.click();
+                    });
+
+                    mediaFileInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            if (file.type.startsWith('video/')) {
+                                loadVideoFile(file);
+                            } else if (file.type.startsWith('image/')) {
+                                loadImageFile(file);
                             }
+                            mediaPopup.style.display = 'none';
+                            mediaFileInput.value = ''; // Reset for next use
+                        }
+                    });
+                }
+
+                // Close media popup on Escape key and Enter key
+                if (mediaPopup && mediaUrlInput) {
+                    mediaUrlInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            mediaPopup.style.display = 'none';
+                        } else if (e.key === 'Enter') {
+                            const url = mediaUrlInput.value.trim();
+                            if (url) {
+                                if (currentMediaType === 'video') {
+                                    loadVideoFromUrl(url);
+                                } else {
+                                    loadImageFromUrl(url);
+                                }
+                                mediaPopup.style.display = 'none';
+                            }
+                        }
+                    });
+
+                    // Close popup when clicking outside
+                    mediaPopup.addEventListener('click', (e) => {
+                        if (e.target === mediaPopup) {
+                            mediaPopup.style.display = 'none';
                         }
                     });
                 }
@@ -5087,22 +5130,8 @@
             const uploadOverlay = document.getElementById('upload-overlay');
             if (uploadOverlay) {
                 uploadOverlay.addEventListener('click', () => {
-                    // Create hidden file input
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.accept = 'image/*';
-                    fileInput.style.display = 'none';
-
-                    fileInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            loadImageFile(file);
-                        }
-                    });
-
-                    document.body.appendChild(fileInput);
-                    fileInput.click();
-                    document.body.removeChild(fileInput);
+                    // Open unified media modal for background image upload
+                    openMediaModal('background');
                 });
             }
 
@@ -5225,6 +5254,176 @@
                 });
 
                 video.src = url;
+                video.load();
+            }
+
+            function loadImageFromUrl(url) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+
+                img.onload = () => {
+                    if (state.settings.theme === 'glitch') {
+                        // GLITCH theme: Load into glitchImage for background replacement
+                        state.glitchImage.img = img;
+                        state.glitchImage.loaded = true;
+
+                        // Fill canvas by scaling to cover
+                        const canvasAspect = state.boundingRect.width / state.boundingRect.height;
+                        const imgAspect = img.width / img.height;
+
+                        if (imgAspect > canvasAspect) {
+                            // Image is wider - fit to height
+                            state.glitchImage.height = state.boundingRect.height;
+                            state.glitchImage.width = state.glitchImage.height * imgAspect;
+                        } else {
+                            // Image is taller - fit to width
+                            state.glitchImage.width = state.boundingRect.width;
+                            state.glitchImage.height = state.glitchImage.width / imgAspect;
+                        }
+
+                        // Center the image
+                        state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+                        state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+
+                        console.log(`✅ GLITCH image loaded from URL: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                    } else {
+                        // LINEAR/NEON theme: Create image object overlay
+                        const canvas = document.createElement('canvas');
+                        canvas.style.position = 'absolute';
+                        canvas.style.cursor = 'move';
+                        canvas.style.pointerEvents = 'auto';
+                        canvas.className = 'image-object-canvas';
+                        document.getElementById('visualization-container').appendChild(canvas);
+
+                        // Scale to reasonable size
+                        const width = Math.min(img.width, 600);
+                        const height = (width / img.width) * img.height;
+                        const x = (state.boundingRect.width - width) / 2;
+                        const y = (state.boundingRect.height - height) / 2;
+
+                        // Create image object
+                        const imageObject = {
+                            img: img,
+                            x: x,
+                            y: y,
+                            width: width,
+                            height: height,
+                            theme: 'none',
+                            transparency: 1.0,
+                            rotation: 0,
+                            blur: 0,
+                            themeBlur: 0,
+                            themeOpacity: 1.0,
+                            flashFrequencyEnabled: false,
+                            flashFrequencyThreshold: 0.5,
+                            flashVolumeEnabled: false,
+                            flashVolumeThreshold: 0.5,
+                            canvas: canvas,
+                            isDragging: false,
+                            isResizing: false,
+                            dragStartX: 0,
+                            dragStartY: 0,
+                            dragStartWidth: 0,
+                            dragStartHeight: 0
+                        };
+
+                        state.imageObjects.push(imageObject);
+                        const imageIndex = state.imageObjects.length - 1;
+                        state.selectedImageIndex = imageIndex;
+
+                        // Add event listeners for selection and dragging
+                        setupImageInteraction(canvas, imageIndex);
+
+                        console.log(`✅ Image object created from URL: ${img.width}x${img.height} → ${width.toFixed(0)}x${height.toFixed(0)}`);
+
+                        // Update mode visibility
+                        updateModeVisibility();
+                    }
+                };
+
+                img.onerror = (e) => {
+                    console.error('❌ Failed to load image from URL:', url, e);
+                    alert('Failed to load image. Please check the URL and ensure CORS is enabled.');
+                };
+
+                img.src = url;
+            }
+
+            function loadVideoFile(file) {
+                const video = document.createElement('video');
+                video.muted = true;
+
+                const fileURL = URL.createObjectURL(file);
+
+                video.addEventListener('loadedmetadata', () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.style.position = 'absolute';
+                    canvas.style.cursor = 'move';
+                    canvas.style.pointerEvents = 'auto';
+                    canvas.className = 'image-object-canvas';
+                    document.getElementById('visualization-container').appendChild(canvas);
+
+                    // Scale to reasonable size
+                    const width = Math.min(video.videoWidth, 600);
+                    const height = (width / video.videoWidth) * video.videoHeight;
+                    const x = (state.boundingRect.width - width) / 2;
+                    const y = (state.boundingRect.height - height) / 2;
+
+                    // Create video object
+                    const videoObject = {
+                        video: video,
+                        isVideo: true,
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        theme: 'none',
+                        transparency: 1.0,
+                        rotation: 0,
+                        blur: 0,
+                        themeBlur: 0,
+                        themeOpacity: 1.0,
+                        flashFrequencyEnabled: false,
+                        flashFrequencyThreshold: 0.5,
+                        flashVolumeEnabled: false,
+                        flashVolumeThreshold: 0.5,
+                        loop: true,
+                        trimStart: 0,
+                        trimEnd: video.duration,
+                        duration: video.duration,
+                        canvas: canvas,
+                        isDragging: false,
+                        isResizing: false,
+                        dragStartX: 0,
+                        dragStartY: 0,
+                        dragStartWidth: 0,
+                        dragStartHeight: 0
+                    };
+
+                    state.imageObjects.push(videoObject);
+                    const videoIndex = state.imageObjects.length - 1;
+                    state.selectedImageIndex = videoIndex;
+
+                    // Add event listeners for selection and dragging
+                    setupImageInteraction(canvas, videoIndex);
+
+                    // Start playing the video
+                    video.loop = true;
+                    video.play().catch(e => console.warn('Video autoplay prevented:', e));
+
+                    console.log(`✅ Video file loaded: ${video.videoWidth}x${video.videoHeight} → ${width.toFixed(0)}x${height.toFixed(0)}, duration: ${video.duration.toFixed(2)}s`);
+
+                    // Update mode visibility
+                    updateModeVisibility();
+                });
+
+                video.addEventListener('error', (e) => {
+                    console.error('❌ Failed to load video file:', e);
+                    alert('Failed to load video file.');
+                    URL.revokeObjectURL(fileURL);
+                });
+
+                video.src = fileURL;
                 video.load();
             }
 
