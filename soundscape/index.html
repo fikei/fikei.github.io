@@ -214,43 +214,41 @@
             color: #000000;
         }
 
-        /* Pairing Code Display (Bottom Left) */
+        /* Pairing Code Display (Bottom Left, next to fullscreen button) */
         .pairing-code-display {
             position: fixed;
             bottom: 1rem;
-            left: 1rem;
+            right: calc(30px + 1rem + 0.5rem); /* To the left of fullscreen button */
             z-index: 101;
+            height: 30px;
             background: #000000;
             border: 1px solid #ffffff;
-            padding: 0.5rem 1rem;
+            border-radius: 0;
+            padding: 0 0.75rem;
             font-family: monospace;
             font-size: 10px;
             color: #ffffff;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.2em;
             opacity: 1;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
             display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            align-items: flex-start;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .pairing-code-display:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .pairing-code-display.sidebar-is-open {
+            right: calc(200px + 30px + 1rem + 0.5rem);
         }
 
         .pairing-code-display.hidden-control {
             opacity: 0;
             pointer-events: none;
-        }
-
-        .pairing-code-label {
-            font-size: 8px;
-            color: #999999;
-        }
-
-        .pairing-code-value {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: 0.3em;
-            color: #ffffff;
         }
 
         /* ===== SIDEBAR TOGGLE BUTTON ===== */
@@ -794,8 +792,7 @@
 
     <!-- Pairing Code Display -->
     <div class="pairing-code-display" id="pairingCodeDisplay">
-        <div class="pairing-code-label">Companion Code</div>
-        <div class="pairing-code-value" id="pairingCodeValue">------</div>
+        <span id="pairingCodeValue">------</span>
     </div>
 
     <!-- Sidebar Toggle -->
@@ -4433,13 +4430,16 @@
                 const sidebarOpen = elements.sidebar.classList.contains('open');
                 const sidebarToggle = document.getElementById('sidebarToggle');
                 const fullscreenToggle = document.getElementById('fullscreenToggle');
+                const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
 
                 if (sidebarOpen) {
                     if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.add('sidebar-is-open');
+                    if (pairingCodeDisplay) pairingCodeDisplay.classList.add('sidebar-is-open');
                 } else {
                     if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.remove('sidebar-is-open');
+                    if (pairingCodeDisplay) pairingCodeDisplay.classList.remove('sidebar-is-open');
                 }
             });
 
@@ -4465,6 +4465,23 @@
                     } else {
                         fullscreenToggle.textContent = '⛶'; // Enter fullscreen icon
                     }
+                });
+            }
+
+            // Pairing code display click - show pairing panel
+            const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+            const pairingPanel = document.getElementById('pairingPanel');
+            const pairingClose = document.getElementById('pairingClose');
+
+            if (pairingCodeDisplay && pairingPanel) {
+                pairingCodeDisplay.addEventListener('click', () => {
+                    pairingPanel.style.display = 'flex';
+                });
+            }
+
+            if (pairingClose && pairingPanel) {
+                pairingClose.addEventListener('click', () => {
+                    pairingPanel.style.display = 'none';
                 });
             }
 
@@ -6056,6 +6073,18 @@
                         const pairingCodeValue = document.getElementById('pairingCodeValue');
                         if (pairingCodeValue) {
                             pairingCodeValue.textContent = pairingCode;
+                        }
+
+                        // Update the pairing panel
+                        const pairingCodeElement = document.getElementById('pairingCode');
+                        if (pairingCodeElement) {
+                            pairingCodeElement.textContent = pairingCode;
+                        }
+
+                        const pairingUrlElement = document.getElementById('pairingUrl');
+                        if (pairingUrlElement) {
+                            const companionUrl = `${window.location.origin}${window.location.pathname.replace('index.html', '')}companion.html`;
+                            pairingUrlElement.textContent = companionUrl;
                         }
                     } else {
                         console.error('❌ Failed to create session');
