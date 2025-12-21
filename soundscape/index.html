@@ -216,30 +216,35 @@
         .pairing-toggle {
             position: fixed;
             bottom: 1rem;
-            right: 1rem;
-            z-index: 20;
-            width: 40px;
-            height: 40px;
+            right: calc(30px + 1rem + 0.5rem); /* To the left of fullscreen button */
+            z-index: 101;
+            width: 30px;
+            height: 30px;
             background: #000000;
             border: 1px solid #ffffff;
+            border-radius: 0;
             color: #ffffff;
-            font-size: 20px;
+            font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: all 0.15s ease;
+            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
         }
 
         .pairing-toggle:hover {
             background: #ffffff;
-            transform: scale(1.05);
+            color: #000000;
         }
 
         .pairing-toggle.hidden-control {
             opacity: 0;
             pointer-events: none;
+        }
+
+        .pairing-toggle.sidebar-is-open {
+            right: calc(200px + 30px + 1rem + 0.5rem); /* Float to left of sidebar with fullscreen button */
         }
 
         /* ===== SIDEBAR TOGGLE BUTTON ===== */
@@ -772,8 +777,8 @@
     <!-- Pairing Code Display -->
     <div class="pairing-panel" id="pairingPanel" style="display: none;">
         <div class="pairing-content">
-            <h3>MOBILE CONTROL</h3>
-            <p class="pairing-instruction">Open on mobile:</p>
+            <h3>COMPANION CONTROL</h3>
+            <p class="pairing-instruction">Open on companion device:</p>
             <p class="pairing-url" id="pairingUrl">Loading...</p>
             <p class="pairing-instruction">Enter code:</p>
             <div class="pairing-code" id="pairingCode">------</div>
@@ -782,7 +787,7 @@
     </div>
 
     <!-- Pairing Toggle Button -->
-    <button class="pairing-toggle" id="pairingToggle" aria-label="Mobile control">📱</button>
+    <button class="pairing-toggle" id="pairingToggle" aria-label="Companion control">📱</button>
 
     <!-- Sidebar Toggle -->
     <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls"><span class="caret">›</span></button>
@@ -799,20 +804,22 @@
         <div class="add-image-dropdown-item" id="loadCanvasMenuItem" style="display: none;">Load Canvas</div>
     </div>
 
-    <!-- Video URL Popup -->
-    <div class="video-popup" id="videoPopup" style="display: none;">
+    <!-- Unified Media Upload Popup -->
+    <div class="video-popup" id="mediaPopup" style="display: none;">
         <div class="video-popup-content">
-            <h3>ADD VIDEO BY URL</h3>
-            <input type="text" id="videoUrlInput" placeholder="Enter video URL" />
+            <h3 id="mediaPopupTitle">ADD MEDIA</h3>
+            <input type="text" id="mediaUrlInput" placeholder="Enter URL (direct video/image file only)" />
+            <p style="text-align: center; margin: 0.5rem 0; font-size: 8px; color: #999; text-transform: uppercase;">Or <a href="#" id="mediaBrowseLink" style="color: #fff; text-decoration: underline; cursor: pointer;">browse</a> from desktop</p>
             <div class="video-popup-buttons">
-                <button id="videoPopupAdd">ADD</button>
-                <button id="videoPopupCancel">CANCEL</button>
+                <button id="mediaPopupAdd">ADD</button>
+                <button id="mediaPopupCancel">CANCEL</button>
             </div>
         </div>
     </div>
 
-    <!-- Hidden file inputs for canvas load -->
+    <!-- Hidden file inputs -->
     <input type="file" id="loadCanvasInput" accept=".json" style="display: none;">
+    <input type="file" id="mediaFileInput" accept="image/*,video/*" style="display: none;">
 
     <!-- Controls Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -1002,6 +1009,7 @@
                 <option value="neon">NEON</option>
                 <option value="glitch">GLITCH</option>
                 <option value="stars">STARS</option>
+                <option value="wave">WAVE</option>
             </select>
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
@@ -1080,16 +1088,16 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>HUE</span>
-                    <span class="control-value" id="starHueValue">217°</span>
+                    <span class="control-value" id="starHueValue">44°</span>
                 </div>
-                <input type="range" id="starHueSlider" min="0" max="360" step="1" value="217">
+                <input type="range" id="starHueSlider" min="0" max="360" step="1" value="44">
             </div>
             <div class="control-group">
                 <div class="control-label">
                     <span>SATURATION</span>
-                    <span class="control-value" id="starSaturationValue">61%</span>
+                    <span class="control-value" id="starSaturationValue">12%</span>
                 </div>
-                <input type="range" id="starSaturationSlider" min="0" max="100" step="1" value="61">
+                <input type="range" id="starSaturationSlider" min="0" max="100" step="1" value="12">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -1160,6 +1168,104 @@
                     <span class="control-value" id="starSmoothingValue">0.5</span>
                 </div>
                 <input type="range" id="starSmoothingSlider" min="0" max="1.0" step="0.1" value="0.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>DIAMETER</span>
+                    <span class="control-value" id="starDiameterValue">1.0x</span>
+                </div>
+                <input type="range" id="starDiameterSlider" min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MODE</span>
+                </div>
+                <select id="starModeSelect" class="mode-select">
+                    <option value="planes">PLANES</option>
+                    <option value="grids">GRIDS</option>
+                    <option value="dots">DOTS</option>
+                </select>
+            </div>
+            <div class="control-group" id="starLayersControl">
+                <div class="control-label">
+                    <span>LAYERS</span>
+                    <span class="control-value" id="starLayersValue">3</span>
+                </div>
+                <input type="range" id="starLayersSlider" min="1" max="10" step="1" value="3">
+            </div>
+        </section>
+
+        <!-- WAVE Theme Controls -->
+        <section class="control-section" id="waveControlsSection" style="display: none;">
+            <h3>WAVE</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>HUE</span>
+                    <span class="control-value" id="waveHueValue">280°</span>
+                </div>
+                <input type="range" id="waveHueSlider" min="0" max="360" step="1" value="280">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SATURATION</span>
+                    <span class="control-value" id="waveSaturationValue">70%</span>
+                </div>
+                <input type="range" id="waveSaturationSlider" min="0" max="100" step="1" value="70">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>DISTORTION</span>
+                    <span class="control-value" id="waveDistortionValue">1.5</span>
+                </div>
+                <input type="range" id="waveDistortionSlider" min="0" max="5.0" step="0.1" value="1.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SPEED</span>
+                    <span class="control-value" id="waveSpeedValue">1.0</span>
+                </div>
+                <input type="range" id="waveSpeedSlider" min="0" max="3.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>GRID DENSITY</span>
+                </div>
+                <div class="density-options">
+                    <div class="density-option" data-wave-density="low">L</div>
+                    <div class="density-option active" data-wave-density="medium">M</div>
+                    <div class="density-option" data-wave-density="high">H</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>GLOW</span>
+                    <span class="control-value" id="waveGlowValue">1.0</span>
+                </div>
+                <input type="range" id="waveGlowSlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>DOT COUNT</span>
+                    <span class="control-value" id="waveDotCountValue">200</span>
+                </div>
+                <input type="range" id="waveDotCountSlider" min="50" max="500" step="10" value="200">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>ORBIT SIZE</span>
+                    <span class="control-value" id="waveOrbitSizeValue">100</span>
+                </div>
+                <input type="range" id="waveOrbitSizeSlider" min="50" max="300" step="10" value="100">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>COLOR MODE</span>
+                </div>
+                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="density-option active" data-wave-color="mono">MONO</div>
+                    <div class="density-option" data-wave-color="warm">WARM</div>
+                    <div class="density-option" data-wave-color="cool">COOL</div>
+                </div>
             </div>
         </section>
 
@@ -1355,6 +1461,36 @@
                     twinkleIntensity: 20, // How often stars twinkle (higher = less frequent)
                     alphaMin: 0.2, // Minimum alpha for stars
                     alphaMax: 1.0 // Maximum alpha for stars
+                },
+                wave: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    hue: 280, // Purple hue
+                    saturation: 70, // Color saturation
+
+                    // Mesh grid properties
+                    gridDensity: {
+                        low: { cols: 15, rows: 10 },
+                        medium: { cols: 20, rows: 12 },
+                        high: { cols: 30, rows: 18 }
+                    },
+                    nodeSize: 3,
+                    noiseScale: 0.05,
+                    distortionIntensity: 1.5,
+                    speed: 1.0,
+                    glow: 1.0,
+
+                    // Orbital dots
+                    dotCount: 200,
+                    orbitRadius: 100,
+                    dotSize: 2,
+
+                    // Color modes
+                    colorModes: {
+                        mono: { baseHue: 0, saturation: 0 },
+                        warm: { baseHue: 30, saturation: 60 },
+                        cool: { baseHue: 200, saturation: 60 }
+                    }
                 }
             }
         };
@@ -1381,8 +1517,8 @@
                 neonMode: 'bright',
                 colorTemp: 1.0,
                 image3DMotion: 0.0,  // 3D motion intensity for image objects (0 = off)
-                starHue: 217,  // Star base color hue (0-360)
-                starSaturation: 61,  // Star color saturation (0-100%)
+                starHue: 44,  // Star base color hue (0-360)
+                starSaturation: 12,  // Star color saturation (0-100%)
                 starSpeed: 1.0,  // Star base speed multiplier (0-5)
                 starCount: 1200,  // Number of stars (100-2000)
                 starBrightness: 0.8,  // Overall star brightness (0-1)
@@ -1392,7 +1528,21 @@
                 starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
                 starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
                 starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
-                starSmoothing: 0.5  // Audio smoothing for stars (0-1)
+                starSmoothing: 0.5,  // Audio smoothing for stars (0-1)
+                starDiameter: 1.0,  // Animation diameter multiplier (0.5-2.0)
+                starMode: 'planes',  // Visual mode: planes, grids, dots
+                starLayers: 3,  // Number of layers for grids/dots mode (1-10)
+
+                // WAVE theme settings
+                waveHue: 280,  // Color hue (0-360)
+                waveSaturation: 70,  // Color saturation (0-100%)
+                waveDistortion: 1.5,  // Distortion intensity (0-5)
+                waveSpeed: 1.0,  // Animation speed (0-3)
+                waveDensity: 'medium',  // Grid density (low/medium/high)
+                waveGlow: 1.0,  // Glow intensity (0-2)
+                waveDotCount: 200,  // Number of orbital dots (50-500)
+                waveOrbitSize: 100,  // Orbit radius in pixels (50-300)
+                waveColorMode: 'mono'  // Color mode (mono/warm/cool)
             },
 
             // Audio
@@ -1463,7 +1613,18 @@
                 starArray: [],
                 gradientCanvas: null,
                 gradientCtx: null,
-                count: 0
+                count: 0,
+                centerX: null,  // Current center X (smoothed)
+                centerY: null,  // Current center Y (smoothed)
+                targetCenterX: null,  // Target center X (click position)
+                targetCenterY: null   // Target center Y (click position)
+            },
+
+            wave: {
+                initialized: false,
+                gridNodes: [],
+                orbitalDots: [],
+                noiseOffset: 0
             },
 
             // Image objects (for LINEAR/NEON overlay images)
@@ -1621,7 +1782,8 @@
                 linear: 'Audio affects: wave distortion, color intensity, path movement',
                 neon: 'Audio affects: gradient colors, mesh animation, brightness pulses',
                 glitch: 'Audio affects: rotation speed, glitch intensity, RGB separation',
-                stars: 'Audio affects: orbit speed (bass slows), brightness (mids), center position (highs)'
+                stars: 'Audio affects: orbit speed (bass slows), brightness (mids), center position (highs)',
+                wave: 'Audio affects: grid distortion (bass), orbit speed (mids), glow intensity (highs)'
             };
 
             themeDescription.textContent = descriptions[state.settings.theme] || '';
@@ -1661,10 +1823,16 @@
                 starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
             }
 
-            // Hide WAVE settings for STARS theme
+            const waveControlsSection = document.getElementById('waveControlsSection');
+            if (waveControlsSection) {
+                waveControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'wave' ? 'block' : 'none';
+            }
+
+            // Hide global WAVE settings for STARS and WAVE themes (they have their own controls)
             const waveSettingsSection = document.getElementById('waveSettingsSection');
             if (waveSettingsSection) {
-                waveSettingsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'none' : 'block';
+                const hideWaveSettings = state.settings.theme === 'stars' || state.settings.theme === 'wave';
+                waveSettingsSection.style.display = !hasSelectedImage && !hideWaveSettings ? 'block' : 'none';
             }
 
             // Update theme description
@@ -3144,7 +3312,7 @@
             state.stars.starArray = [];
             state.stars.count = 0;
 
-            const maxOrbit = Math.round(Math.sqrt(w * w + h * h)) / 2;
+            const maxOrbit = Math.round(Math.sqrt(w * w + h * h)) / 2 * state.settings.starDiameter;
 
             class Star {
                 constructor() {
@@ -3167,6 +3335,12 @@
             for (let i = 0; i < state.settings.starCount; i++) {
                 new Star();
             }
+
+            // Initialize center position to screen center
+            state.stars.centerX = w / 2;
+            state.stars.centerY = h / 2;
+            state.stars.targetCenterX = w / 2;
+            state.stars.targetCenterY = h / 2;
 
             state.stars.initialized = true;
             console.log(`✨ Initialized ${state.settings.starCount} stars`);
@@ -3232,62 +3406,370 @@
             // Bass SLOWS DOWN orbit speed using user setting
             const speedBoost = 1.0 - (low * (state.settings.starAudioBoost / 10));
 
-            // Draw stars
+            // Smoothly transition center position to target (controlled by smoothing slider)
+            const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
+            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
+            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
+
+            // Draw based on mode
             ctx.globalCompositeOperation = 'lighter';
 
-            state.stars.starArray.forEach((star) => {
-                // Update Z position (move towards camera)
-                if (state.settings.starZSpeed > 0) {
-                    star.z += state.settings.starZSpeed * 0.001;
+            const mode = state.settings.starMode;
 
-                    // Reset star if it passes the camera
-                    if (star.z >= 1.0) {
-                        star.z = 0;
-                        star.timePassed = Math.random() * state.settings.starCount;
+            if (mode === 'planes') {
+                // PLANES MODE: Original gradient stars
+                state.stars.starArray.forEach((star) => {
+                    // Update Z position (move towards camera)
+                    if (state.settings.starZSpeed > 0) {
+                        star.z += state.settings.starZSpeed * 0.001;
+
+                        // Reset star if it passes the camera
+                        if (star.z >= 1.0) {
+                            star.z = 0;
+                            star.timePassed = Math.random() * state.settings.starCount;
+                        }
+                    }
+
+                    // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
+                    const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+
+                    // Scale orbit radius and star size by perspective
+                    const scaledOrbitRadius = star.orbitRadius * scale;
+                    star.radius = star.baseRadius * scale;
+
+                    // High frequencies shift the orbit center position (rate controlled by slider)
+                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+
+                    // Use smoothed center position (click-to-center feature)
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+
+                    // Twinkle effect using user setting
+                    const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
+                    if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
+                        star.alpha -= 0.05;
+                    } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
+                        star.alpha += 0.05;
+                    }
+
+                    // Mid frequencies add brightness boost
+                    const brightnessBoost = mid * 0.3;
+
+                    // Alpha also scales with distance (closer = brighter)
+                    const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
+
+                    ctx.globalAlpha = perspectiveAlpha;
+                    ctx.drawImage(
+                        state.stars.gradientCanvas,
+                        x - star.radius / 2,
+                        y - star.radius / 2,
+                        star.radius,
+                        star.radius
+                    );
+
+                    // Update orbit with audio-reactive speed
+                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                });
+
+            } else if (mode === 'grids') {
+                // GRIDS MODE: Draw layered grid patterns
+                const layers = state.settings.starLayers;
+                const hue = state.settings.starHue;
+                const sat = state.settings.starSaturation;
+
+                for (let layer = 0; layer < layers; layer++) {
+                    const layerDepth = layer / layers;
+                    const layerScale = 0.3 + layerDepth * 0.7;
+                    const cellSize = 40 + layer * 20;
+
+                    // Audio-reactive rotation per layer
+                    const rotation = time * 0.0001 * state.settings.starSpeed * speedBoost + layer * 0.3;
+
+                    ctx.save();
+                    ctx.translate(state.stars.centerX, state.stars.centerY);
+                    ctx.rotate(rotation + high * 0.5);
+                    ctx.scale(layerScale * state.settings.starDiameter, layerScale * state.settings.starDiameter);
+
+                    // Draw grid
+                    const gridSize = Math.max(w, h) / cellSize;
+                    ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${30 + layerDepth * 40}%, ${0.1 + mid * 0.3})`;
+                    ctx.lineWidth = 1 + layerDepth * 2;
+
+                    // Add shading with gradients
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, gridSize * cellSize / 2);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, 60%, ${0.3 + mid * 0.2})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, 40%, ${0.2 + mid * 0.1})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, 20%, ${0.05})`);
+                    ctx.strokeStyle = gradient;
+
+                    for (let i = -gridSize; i < gridSize; i++) {
+                        for (let j = -gridSize; j < gridSize; j++) {
+                            const x = i * cellSize;
+                            const y = j * cellSize;
+
+                            // Audio-reactive distortion
+                            const distortion = Math.sin(i * 0.5 + time * 0.001) * Math.cos(j * 0.5 + time * 0.001) * low * 10;
+
+                            ctx.strokeRect(x + distortion, y + distortion, cellSize, cellSize);
+                        }
+                    }
+
+                    ctx.restore();
+                }
+
+            } else if (mode === 'dots') {
+                // DOTS MODE: Simple layered dots
+                const layers = state.settings.starLayers;
+                const hue = state.settings.starHue;
+                const sat = state.settings.starSaturation;
+
+                state.stars.starArray.forEach((star) => {
+                    // Assign layer based on star index
+                    const layer = Math.floor(star.z * layers);
+                    const layerDepth = layer / layers;
+
+                    // Update Z position
+                    if (state.settings.starZSpeed > 0) {
+                        star.z += state.settings.starZSpeed * 0.001;
+                        if (star.z >= 1.0) {
+                            star.z = 0;
+                            star.timePassed = Math.random() * state.settings.starCount;
+                        }
+                    }
+
+                    const scale = 0.3 + layerDepth * 0.7;
+                    const scaledOrbitRadius = star.orbitRadius * scale;
+
+                    // High frequencies shift center
+                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+
+                    // Draw dot with shading
+                    const dotSize = (2 + layerDepth * 4) * state.settings.starBrightness;
+                    const brightness = 30 + layerDepth * 50 + mid * 30;
+
+                    // Radial gradient for shading
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${star.alpha + mid * 0.3})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, ${brightness * 0.3}%, 0)`);
+
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, dotSize * 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Update orbit
+                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                });
+            }
+        }
+
+        // =====================================================
+        // WAVE THEME RENDERING
+        // =====================================================
+
+        function initializeWave() {
+            const theme = config.themes.wave;
+            const w = state.boundingRect.width;
+            const h = state.boundingRect.height;
+
+            // Get grid density
+            const density = theme.gridDensity[state.settings.waveDensity] || theme.gridDensity.medium;
+            const cols = density.cols;
+            const rows = density.rows;
+
+            // Initialize grid nodes
+            state.wave.gridNodes = [];
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    state.wave.gridNodes.push({
+                        i,
+                        j,
+                        baseX: (i / (cols - 1)) * w,
+                        baseY: (j / (rows - 1)) * h
+                    });
+                }
+            }
+
+            // Initialize orbital dots
+            state.wave.orbitalDots = [];
+            for (let i = 0; i < state.settings.waveDotCount; i++) {
+                state.wave.orbitalDots.push({
+                    centerX: Math.random() * w,
+                    centerY: Math.random() * h,
+                    angle: Math.random() * Math.PI * 2,
+                    baseRadius: state.settings.waveOrbitSize,
+                    speed: (Math.random() * 0.5 + 0.5) * 0.02
+                });
+            }
+
+            state.wave.initialized = true;
+            console.log(`🌊 Initialized WAVE theme: ${cols}x${rows} grid, ${state.settings.waveDotCount} dots`);
+        }
+
+        function drawLinesWave() {
+            const theme = config.themes.wave;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime * 0.001; // Convert to seconds
+
+            // Initialize on first render
+            if (!state.wave.initialized) {
+                initializeWave();
+            }
+
+            // Get or create wave canvas
+            let waveCanvas = document.getElementById('wave-canvas');
+            if (!waveCanvas) {
+                waveCanvas = document.createElement('canvas');
+                waveCanvas.id = 'wave-canvas';
+                waveCanvas.style.position = 'fixed';
+                waveCanvas.style.top = '0';
+                waveCanvas.style.left = '0';
+                waveCanvas.style.width = '100%';
+                waveCanvas.style.height = '100%';
+                waveCanvas.style.pointerEvents = 'none';
+                waveCanvas.style.zIndex = '0';
+                document.body.insertBefore(waveCanvas, document.body.firstChild);
+            }
+
+            // Hide SVG paths
+            state.paths.forEach(path => path.setAttribute('d', ''));
+
+            const ctx = waveCanvas.getContext('2d');
+            const w = waveCanvas.width = state.boundingRect.width;
+            const h = waveCanvas.height = state.boundingRect.height;
+
+            // Clear with theme background
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Get color based on mode
+            let baseHue, baseSat;
+            const colorMode = theme.colorModes[state.settings.waveColorMode] || theme.colorModes.mono;
+
+            if (state.settings.waveColorMode === 'mono') {
+                baseHue = state.settings.waveHue;
+                baseSat = state.settings.waveSaturation;
+            } else {
+                baseHue = colorMode.baseHue;
+                baseSat = colorMode.saturation;
+            }
+
+            // Audio-reactive intensity (bass affects amplitude)
+            const intensity = state.settings.waveDistortion * (1.0 + low * 2.0);
+            const speedMultiplier = state.settings.waveSpeed;
+
+            // Get grid density
+            const density = theme.gridDensity[state.settings.waveDensity] || theme.gridDensity.medium;
+            const cols = density.cols;
+            const rows = density.rows;
+
+            // Helper function to calculate displaced position (shader-like)
+            function getDisplacedPos(i, j) {
+                const normX = i / (cols - 1);
+                const normY = j / (rows - 1);
+                const baseX = normX * w;
+                const baseY = normY * h;
+
+                // Vertex shader displacement: sine and cosine waves
+                const displaceY = Math.sin(baseX * 0.01 + time * speedMultiplier) * 15 * intensity;
+                const displaceX = Math.cos(baseY * 0.008 + time * speedMultiplier * 1.5) * 8 * intensity;
+
+                // Fragment shader noise pattern
+                const noise = Math.sin(normX * 20.0 + time * speedMultiplier) * Math.cos(normY * 15.0 + time * speedMultiplier * 0.8)
+                    + Math.sin(normX * 35.0 - time * speedMultiplier * 2.0) * Math.cos(normY * 25.0 + time * speedMultiplier * 1.2) * 0.5;
+
+                const x = baseX + displaceX + noise * 3;
+                const y = baseY + displaceY + noise * 3;
+
+                return { x, y, noise, normX, normY };
+            }
+
+            // Draw filled mesh quads with gradients (shader-like)
+            for (let i = 0; i < cols - 1; i++) {
+                for (let j = 0; j < rows - 1; j++) {
+                    const p1 = getDisplacedPos(i, j);
+                    const p2 = getDisplacedPos(i + 1, j);
+                    const p3 = getDisplacedPos(i + 1, j + 1);
+                    const p4 = getDisplacedPos(i, j + 1);
+
+                    // Color mixing based on noise and position (fragment shader style)
+                    const avgNoise = (p1.noise + p2.noise + p3.noise + p4.noise) / 4;
+                    const colorMix = avgNoise * 0.5 + 0.5; // Normalize to 0-1
+
+                    // Create gradient from dark to light based on noise
+                    const lightness1 = 10 + colorMix * 30; // Dark color
+                    const lightness2 = 40 + colorMix * 40; // Bright color
+
+                    // Audio-reactive brightness (mids affect brightness)
+                    const midBoost = mid * 20;
+
+                    // Create radial gradient for quad (glow effect)
+                    const centerX = (p1.x + p2.x + p3.x + p4.x) / 4;
+                    const centerY = (p1.y + p2.y + p3.y + p4.y) / 4;
+                    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 50);
+
+                    gradient.addColorStop(0, `hsla(${baseHue}, ${baseSat}%, ${lightness2 + midBoost}%, ${0.1 + state.settings.waveGlow * 0.2})`);
+                    gradient.addColorStop(1, `hsla(${baseHue}, ${baseSat}%, ${lightness1}%, ${0.05 + state.settings.waveGlow * 0.1})`);
+
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p3.x, p3.y);
+                    ctx.lineTo(p4.x, p4.y);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Draw subtle wireframe (optional, based on glow setting)
+                    if (state.settings.waveGlow > 0.3) {
+                        ctx.strokeStyle = `hsla(${baseHue}, ${baseSat}%, ${60 + high * 40}%, ${0.1 + state.settings.waveGlow * 0.2})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
                     }
                 }
+            }
 
-                // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
-                const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+            // Draw orbital dots over mesh (high-reactive)
+            const dotSpeedMultiplier = 1.0 + mid * 1.5;
 
-                // Scale orbit radius and star size by perspective
-                const scaledOrbitRadius = star.orbitRadius * scale;
-                star.radius = star.baseRadius * scale;
+            state.wave.orbitalDots.forEach(dot => {
+                // Audio-reactive orbit radius (bass expands)
+                const radius = dot.baseRadius * (1.0 + low * 0.3);
 
-                // High frequencies shift the orbit center position (rate controlled by slider)
-                const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                // Update angle with mid-reactive speed
+                dot.angle += dot.speed * dotSpeedMultiplier * speedMultiplier;
 
-                const x = Math.sin(star.timePassed) * scaledOrbitRadius + star.orbitX + centerOffsetX;
-                const y = Math.cos(star.timePassed) * scaledOrbitRadius + star.orbitY + centerOffsetY;
+                const x = dot.centerX + Math.cos(dot.angle) * radius;
+                const y = dot.centerY + Math.sin(dot.angle) * radius;
 
-                // Twinkle effect using user setting
-                const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
-                if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
-                    star.alpha -= 0.05;
-                } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
-                    star.alpha += 0.05;
-                }
+                // High-reactive glow
+                const dotGlow = state.settings.waveGlow * (0.6 + high * 0.4);
 
-                // Mid frequencies add brightness boost
-                const brightnessBoost = mid * 0.3;
+                // Draw dot with radial gradient glow
+                const dotGradient = ctx.createRadialGradient(x, y, 0, x, y, theme.dotSize * 4);
+                dotGradient.addColorStop(0, `hsla(${baseHue}, ${baseSat}%, 100%, ${dotGlow})`);
+                dotGradient.addColorStop(0.5, `hsla(${baseHue}, ${baseSat}%, 80%, ${dotGlow * 0.5})`);
+                dotGradient.addColorStop(1, `hsla(${baseHue}, ${baseSat}%, 60%, 0)`);
 
-                // Alpha also scales with distance (closer = brighter)
-                const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
+                ctx.fillStyle = dotGradient;
+                ctx.beginPath();
+                ctx.arc(x, y, theme.dotSize * 4, 0, Math.PI * 2);
+                ctx.fill();
 
-                ctx.globalAlpha = perspectiveAlpha;
-                ctx.drawImage(
-                    state.stars.gradientCanvas,
-                    x - star.radius / 2,
-                    y - star.radius / 2,
-                    star.radius,
-                    star.radius
-                );
-
-                // Update orbit with audio-reactive speed
-                // baseSpeed * user speed multiplier * audio boost
-                star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                // Core dot
+                ctx.fillStyle = `hsla(${baseHue}, ${baseSat}%, 100%, ${dotGlow * 1.2})`;
+                ctx.beginPath();
+                ctx.arc(x, y, theme.dotSize, 0, Math.PI * 2);
+                ctx.fill();
             });
+
+            ctx.globalAlpha = 1.0;
         }
 
         // Theme renderer dispatcher
@@ -3295,7 +3777,8 @@
             linear: drawLinesLinear,
             neon: drawLinesNeon,
             glitch: drawLinesGlitch,
-            stars: drawLinesStars
+            stars: drawLinesStars,
+            wave: drawLinesWave
         };
 
         function drawLines() {
@@ -3942,13 +4425,16 @@
                 const sidebarOpen = elements.sidebar.classList.contains('open');
                 const sidebarToggle = document.getElementById('sidebarToggle');
                 const fullscreenToggle = document.getElementById('fullscreenToggle');
+                const pairingToggle = document.getElementById('pairingToggle');
 
                 if (sidebarOpen) {
                     if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.add('sidebar-is-open');
+                    if (pairingToggle) pairingToggle.classList.add('sidebar-is-open');
                 } else {
                     if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.remove('sidebar-is-open');
+                    if (pairingToggle) pairingToggle.classList.remove('sidebar-is-open');
                 }
             });
 
@@ -3983,6 +4469,7 @@
                 if (e.key === 'h' || e.key === 'H') {
                     const statusBar = document.getElementById('statusBar');
                     const fullscreenBtn = document.getElementById('fullscreenToggle');
+                    const pairingBtn = document.getElementById('pairingToggle');
                     const addImageBtn = document.getElementById('addImageButton');
                     const sidebarToggle = document.getElementById('sidebarToggle');
 
@@ -3993,6 +4480,7 @@
                         // Show UI and cursor
                         if (statusBar) statusBar.classList.remove('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.remove('hidden-control');
+                        if (pairingBtn) pairingBtn.classList.remove('hidden-control');
                         if (addImageBtn) addImageBtn.classList.remove('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
                         document.body.classList.remove('hide-cursor');
@@ -4000,6 +4488,7 @@
                         // Hide UI and cursor
                         if (statusBar) statusBar.classList.add('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.add('hidden-control');
+                        if (pairingBtn) pairingBtn.classList.add('hidden-control');
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
                         document.body.classList.add('hide-cursor');
@@ -4435,6 +4924,144 @@
                 });
             }
 
+            // STARS DIAMETER slider
+            const starDiameterSlider = document.getElementById('starDiameterSlider');
+            const starDiameterValue = document.getElementById('starDiameterValue');
+            if (starDiameterSlider && starDiameterValue) {
+                starDiameterSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starDiameter = value;
+                    starDiameterValue.textContent = `${value.toFixed(1)}x`;
+                    // Reinitialize stars to apply new diameter
+                    state.stars.initialized = false;
+                });
+            }
+
+            // STARS MODE selector
+            const starModeSelect = document.getElementById('starModeSelect');
+            const starLayersControl = document.getElementById('starLayersControl');
+            if (starModeSelect && starLayersControl) {
+                // Initialize visibility based on current mode
+                if (state.settings.starMode === 'grids' || state.settings.starMode === 'dots') {
+                    starLayersControl.style.display = 'block';
+                } else {
+                    starLayersControl.style.display = 'none';
+                }
+
+                starModeSelect.addEventListener('change', (e) => {
+                    const mode = e.target.value;
+                    state.settings.starMode = mode;
+
+                    // Show/hide layers control based on mode
+                    if (mode === 'grids' || mode === 'dots') {
+                        starLayersControl.style.display = 'block';
+                    } else {
+                        starLayersControl.style.display = 'none';
+                    }
+
+                    // Reinitialize stars for new mode
+                    state.stars.initialized = false;
+                });
+            }
+
+            // STARS LAYERS slider
+            const starLayersSlider = document.getElementById('starLayersSlider');
+            const starLayersValue = document.getElementById('starLayersValue');
+            if (starLayersSlider && starLayersValue) {
+                starLayersSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.starLayers = value;
+                    starLayersValue.textContent = value.toString();
+                    // Reinitialize stars to apply new layer count
+                    state.stars.initialized = false;
+                });
+            }
+
+            // WAVE HUE slider
+            const waveHueSlider = document.getElementById('waveHueSlider');
+            const waveHueValue = document.getElementById('waveHueValue');
+            if (waveHueSlider && waveHueValue) {
+                waveHueSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.waveHue = value;
+                    waveHueValue.textContent = value + '°';
+                });
+            }
+
+            // WAVE SATURATION slider
+            const waveSaturationSlider = document.getElementById('waveSaturationSlider');
+            const waveSaturationValue = document.getElementById('waveSaturationValue');
+            if (waveSaturationSlider && waveSaturationValue) {
+                waveSaturationSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.waveSaturation = value;
+                    waveSaturationValue.textContent = value + '%';
+                });
+            }
+
+            // WAVE DISTORTION slider
+            const waveDistortionSlider = document.getElementById('waveDistortionSlider');
+            const waveDistortionValue = document.getElementById('waveDistortionValue');
+            if (waveDistortionSlider && waveDistortionValue) {
+                waveDistortionSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.waveDistortion = value;
+                    waveDistortionValue.textContent = value.toFixed(1);
+                });
+            }
+
+            // WAVE SPEED slider
+            const waveSpeedSlider = document.getElementById('waveSpeedSlider');
+            const waveSpeedValue = document.getElementById('waveSpeedValue');
+            if (waveSpeedSlider && waveSpeedValue) {
+                waveSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.waveSpeed = value;
+                    waveSpeedValue.textContent = value.toFixed(1);
+                });
+            }
+
+            // WAVE GLOW slider
+            const waveGlowSlider = document.getElementById('waveGlowSlider');
+            const waveGlowValue = document.getElementById('waveGlowValue');
+            if (waveGlowSlider && waveGlowValue) {
+                waveGlowSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.waveGlow = value;
+                    waveGlowValue.textContent = value.toFixed(1);
+                });
+            }
+
+            // WAVE DOT COUNT slider
+            const waveDotCountSlider = document.getElementById('waveDotCountSlider');
+            const waveDotCountValue = document.getElementById('waveDotCountValue');
+            if (waveDotCountSlider && waveDotCountValue) {
+                waveDotCountSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.waveDotCount = value;
+                    waveDotCountValue.textContent = value;
+                    // Dot count change requires reinitialization
+                    if (state.wave.initialized) {
+                        state.wave.initialized = false;
+                    }
+                });
+            }
+
+            // WAVE ORBIT SIZE slider
+            const waveOrbitSizeSlider = document.getElementById('waveOrbitSizeSlider');
+            const waveOrbitSizeValue = document.getElementById('waveOrbitSizeValue');
+            if (waveOrbitSizeSlider && waveOrbitSizeValue) {
+                waveOrbitSizeSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.waveOrbitSize = value;
+                    waveOrbitSizeValue.textContent = value;
+                    // Orbit size change requires reinitialization
+                    if (state.wave.initialized) {
+                        state.wave.initialized = false;
+                    }
+                });
+            }
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -4478,6 +5105,26 @@
                         state.settings.neonMode = option.dataset.neonMode;
                         console.log(`🎨 NEON mode changed to: ${state.settings.neonMode.toUpperCase()}`);
                     }
+
+                    // Handle WAVE density change
+                    if (option.dataset.waveDensity) {
+                        document.querySelectorAll('[data-wave-density]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.waveDensity = option.dataset.waveDensity;
+                        // Density change requires reinitialization
+                        if (state.wave.initialized) {
+                            state.wave.initialized = false;
+                        }
+                        console.log(`🌊 WAVE density changed to: ${state.settings.waveDensity.toUpperCase()}`);
+                    }
+
+                    // Handle WAVE color mode change
+                    if (option.dataset.waveColor) {
+                        document.querySelectorAll('[data-wave-color]').forEach(o => o.classList.remove('active'));
+                        option.classList.add('active');
+                        state.settings.waveColorMode = option.dataset.waveColor;
+                        console.log(`🌊 WAVE color mode changed to: ${state.settings.waveColorMode.toUpperCase()}`);
+                    }
                 });
             });
 
@@ -4486,6 +5133,15 @@
             if (resetBtn) {
                 resetBtn.addEventListener('click', resetToDefaults);
             }
+
+            // Click-to-center feature for STARS theme
+            document.addEventListener('click', (e) => {
+                // Only activate for STARS theme and when not clicking on controls
+                if (state.settings.theme === 'stars' && !elements.sidebar.contains(e.target)) {
+                    state.stars.targetCenterX = e.clientX;
+                    state.stars.targetCenterY = e.clientY;
+                }
+            });
 
             // Add image button and dropdown
             const addImageButton = document.getElementById('addImageButton');
@@ -4506,25 +5162,43 @@
                     }
                 });
 
+                // Unified media modal handlers
+                const mediaPopup = document.getElementById('mediaPopup');
+                const mediaPopupAdd = document.getElementById('mediaPopupAdd');
+                const mediaPopupCancel = document.getElementById('mediaPopupCancel');
+                const mediaUrlInput = document.getElementById('mediaUrlInput');
+                const mediaBrowseLink = document.getElementById('mediaBrowseLink');
+                const mediaFileInput = document.getElementById('mediaFileInput');
+
+                let currentMediaType = 'image'; // Track whether we're adding image or video
+
+                function openMediaModal(type) {
+                    currentMediaType = type;
+                    const mediaPopupTitle = document.getElementById('mediaPopupTitle');
+
+                    if (type === 'video') {
+                        mediaPopupTitle.textContent = 'ADD VIDEO';
+                        mediaUrlInput.placeholder = 'Enter video URL (direct .mp4, .webm file only)';
+                        mediaFileInput.accept = 'video/*';
+                    } else if (type === 'image') {
+                        mediaPopupTitle.textContent = 'ADD IMAGE';
+                        mediaUrlInput.placeholder = 'Enter image URL (direct .jpg, .png file only)';
+                        mediaFileInput.accept = 'image/*';
+                    } else if (type === 'background') {
+                        mediaPopupTitle.textContent = 'UPLOAD BACKGROUND IMAGE';
+                        mediaUrlInput.placeholder = 'Enter image URL (direct .jpg, .png file only)';
+                        mediaFileInput.accept = 'image/*';
+                    }
+
+                    mediaUrlInput.value = '';
+                    mediaPopup.style.display = 'flex';
+                    mediaUrlInput.focus();
+                }
+
                 // Handle "Add Image" menu item click
                 addImageMenuItem.addEventListener('click', () => {
                     addImageDropdown.classList.remove('show');
-
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.accept = 'image/*';
-                    fileInput.style.display = 'none';
-
-                    fileInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            loadImageFile(file);
-                        }
-                    });
-
-                    document.body.appendChild(fileInput);
-                    fileInput.click();
-                    document.body.removeChild(fileInput);
+                    openMediaModal('image');
                 });
 
                 // Handle "Add Video" menu item click
@@ -4532,49 +5206,72 @@
                 if (addVideoMenuItem) {
                     addVideoMenuItem.addEventListener('click', () => {
                         addImageDropdown.classList.remove('show');
-                        const videoPopup = document.getElementById('videoPopup');
-                        const videoUrlInput = document.getElementById('videoUrlInput');
-                        if (videoPopup && videoUrlInput) {
-                            videoUrlInput.value = '';
-                            videoPopup.style.display = 'flex';
-                            videoUrlInput.focus();
-                        }
+                        openMediaModal('video');
                     });
                 }
 
-                // Handle video popup buttons
-                const videoPopupAdd = document.getElementById('videoPopupAdd');
-                const videoPopupCancel = document.getElementById('videoPopupCancel');
-                const videoPopup = document.getElementById('videoPopup');
-                const videoUrlInput = document.getElementById('videoUrlInput');
-
-                if (videoPopupAdd && videoPopup && videoUrlInput) {
-                    videoPopupAdd.addEventListener('click', () => {
-                        const url = videoUrlInput.value.trim();
+                if (mediaPopupAdd && mediaPopup && mediaUrlInput) {
+                    mediaPopupAdd.addEventListener('click', () => {
+                        const url = mediaUrlInput.value.trim();
                         if (url) {
-                            loadVideoFromUrl(url);
-                            videoPopup.style.display = 'none';
+                            if (currentMediaType === 'video') {
+                                loadVideoFromUrl(url);
+                            } else {
+                                loadImageFromUrl(url);
+                            }
+                            mediaPopup.style.display = 'none';
                         }
                     });
                 }
 
-                if (videoPopupCancel && videoPopup) {
-                    videoPopupCancel.addEventListener('click', () => {
-                        videoPopup.style.display = 'none';
+                if (mediaPopupCancel && mediaPopup) {
+                    mediaPopupCancel.addEventListener('click', () => {
+                        mediaPopup.style.display = 'none';
                     });
                 }
 
-                // Close video popup on Escape key
-                if (videoPopup && videoUrlInput) {
-                    videoUrlInput.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') {
-                            videoPopup.style.display = 'none';
-                        } else if (e.key === 'Enter') {
-                            const url = videoUrlInput.value.trim();
-                            if (url) {
-                                loadVideoFromUrl(url);
-                                videoPopup.style.display = 'none';
+                if (mediaBrowseLink && mediaFileInput) {
+                    mediaBrowseLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        mediaFileInput.click();
+                    });
+
+                    mediaFileInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            if (file.type.startsWith('video/')) {
+                                loadVideoFile(file);
+                            } else if (file.type.startsWith('image/')) {
+                                loadImageFile(file);
                             }
+                            mediaPopup.style.display = 'none';
+                            mediaFileInput.value = ''; // Reset for next use
+                        }
+                    });
+                }
+
+                // Close media popup on Escape key and Enter key
+                if (mediaPopup && mediaUrlInput) {
+                    mediaUrlInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            mediaPopup.style.display = 'none';
+                        } else if (e.key === 'Enter') {
+                            const url = mediaUrlInput.value.trim();
+                            if (url) {
+                                if (currentMediaType === 'video') {
+                                    loadVideoFromUrl(url);
+                                } else {
+                                    loadImageFromUrl(url);
+                                }
+                                mediaPopup.style.display = 'none';
+                            }
+                        }
+                    });
+
+                    // Close popup when clicking outside
+                    mediaPopup.addEventListener('click', (e) => {
+                        if (e.target === mediaPopup) {
+                            mediaPopup.style.display = 'none';
                         }
                     });
                 }
@@ -4642,22 +5339,8 @@
             const uploadOverlay = document.getElementById('upload-overlay');
             if (uploadOverlay) {
                 uploadOverlay.addEventListener('click', () => {
-                    // Create hidden file input
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.accept = 'image/*';
-                    fileInput.style.display = 'none';
-
-                    fileInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            loadImageFile(file);
-                        }
-                    });
-
-                    document.body.appendChild(fileInput);
-                    fileInput.click();
-                    document.body.removeChild(fileInput);
+                    // Open unified media modal for background image upload
+                    openMediaModal('background');
                 });
             }
 
@@ -4780,6 +5463,176 @@
                 });
 
                 video.src = url;
+                video.load();
+            }
+
+            function loadImageFromUrl(url) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+
+                img.onload = () => {
+                    if (state.settings.theme === 'glitch') {
+                        // GLITCH theme: Load into glitchImage for background replacement
+                        state.glitchImage.img = img;
+                        state.glitchImage.loaded = true;
+
+                        // Fill canvas by scaling to cover
+                        const canvasAspect = state.boundingRect.width / state.boundingRect.height;
+                        const imgAspect = img.width / img.height;
+
+                        if (imgAspect > canvasAspect) {
+                            // Image is wider - fit to height
+                            state.glitchImage.height = state.boundingRect.height;
+                            state.glitchImage.width = state.glitchImage.height * imgAspect;
+                        } else {
+                            // Image is taller - fit to width
+                            state.glitchImage.width = state.boundingRect.width;
+                            state.glitchImage.height = state.glitchImage.width / imgAspect;
+                        }
+
+                        // Center the image
+                        state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+                        state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+
+                        console.log(`✅ GLITCH image loaded from URL: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
+                    } else {
+                        // LINEAR/NEON theme: Create image object overlay
+                        const canvas = document.createElement('canvas');
+                        canvas.style.position = 'absolute';
+                        canvas.style.cursor = 'move';
+                        canvas.style.pointerEvents = 'auto';
+                        canvas.className = 'image-object-canvas';
+                        document.getElementById('visualization-container').appendChild(canvas);
+
+                        // Scale to reasonable size
+                        const width = Math.min(img.width, 600);
+                        const height = (width / img.width) * img.height;
+                        const x = (state.boundingRect.width - width) / 2;
+                        const y = (state.boundingRect.height - height) / 2;
+
+                        // Create image object
+                        const imageObject = {
+                            img: img,
+                            x: x,
+                            y: y,
+                            width: width,
+                            height: height,
+                            theme: 'none',
+                            transparency: 1.0,
+                            rotation: 0,
+                            blur: 0,
+                            themeBlur: 0,
+                            themeOpacity: 1.0,
+                            flashFrequencyEnabled: false,
+                            flashFrequencyThreshold: 0.5,
+                            flashVolumeEnabled: false,
+                            flashVolumeThreshold: 0.5,
+                            canvas: canvas,
+                            isDragging: false,
+                            isResizing: false,
+                            dragStartX: 0,
+                            dragStartY: 0,
+                            dragStartWidth: 0,
+                            dragStartHeight: 0
+                        };
+
+                        state.imageObjects.push(imageObject);
+                        const imageIndex = state.imageObjects.length - 1;
+                        state.selectedImageIndex = imageIndex;
+
+                        // Add event listeners for selection and dragging
+                        setupImageInteraction(canvas, imageIndex);
+
+                        console.log(`✅ Image object created from URL: ${img.width}x${img.height} → ${width.toFixed(0)}x${height.toFixed(0)}`);
+
+                        // Update mode visibility
+                        updateModeVisibility();
+                    }
+                };
+
+                img.onerror = (e) => {
+                    console.error('❌ Failed to load image from URL:', url, e);
+                    alert('Failed to load image. Please check the URL and ensure CORS is enabled.');
+                };
+
+                img.src = url;
+            }
+
+            function loadVideoFile(file) {
+                const video = document.createElement('video');
+                video.muted = true;
+
+                const fileURL = URL.createObjectURL(file);
+
+                video.addEventListener('loadedmetadata', () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.style.position = 'absolute';
+                    canvas.style.cursor = 'move';
+                    canvas.style.pointerEvents = 'auto';
+                    canvas.className = 'image-object-canvas';
+                    document.getElementById('visualization-container').appendChild(canvas);
+
+                    // Scale to reasonable size
+                    const width = Math.min(video.videoWidth, 600);
+                    const height = (width / video.videoWidth) * video.videoHeight;
+                    const x = (state.boundingRect.width - width) / 2;
+                    const y = (state.boundingRect.height - height) / 2;
+
+                    // Create video object
+                    const videoObject = {
+                        video: video,
+                        isVideo: true,
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        theme: 'none',
+                        transparency: 1.0,
+                        rotation: 0,
+                        blur: 0,
+                        themeBlur: 0,
+                        themeOpacity: 1.0,
+                        flashFrequencyEnabled: false,
+                        flashFrequencyThreshold: 0.5,
+                        flashVolumeEnabled: false,
+                        flashVolumeThreshold: 0.5,
+                        loop: true,
+                        trimStart: 0,
+                        trimEnd: video.duration,
+                        duration: video.duration,
+                        canvas: canvas,
+                        isDragging: false,
+                        isResizing: false,
+                        dragStartX: 0,
+                        dragStartY: 0,
+                        dragStartWidth: 0,
+                        dragStartHeight: 0
+                    };
+
+                    state.imageObjects.push(videoObject);
+                    const videoIndex = state.imageObjects.length - 1;
+                    state.selectedImageIndex = videoIndex;
+
+                    // Add event listeners for selection and dragging
+                    setupImageInteraction(canvas, videoIndex);
+
+                    // Start playing the video
+                    video.loop = true;
+                    video.play().catch(e => console.warn('Video autoplay prevented:', e));
+
+                    console.log(`✅ Video file loaded: ${video.videoWidth}x${video.videoHeight} → ${width.toFixed(0)}x${height.toFixed(0)}, duration: ${video.duration.toFixed(2)}s`);
+
+                    // Update mode visibility
+                    updateModeVisibility();
+                });
+
+                video.addEventListener('error', (e) => {
+                    console.error('❌ Failed to load video file:', e);
+                    alert('Failed to load video file.');
+                    URL.revokeObjectURL(fileURL);
+                });
+
+                video.src = fileURL;
                 video.load();
             }
 
@@ -5040,8 +5893,8 @@
                 neonMode: 'bright',
                 colorTemp: 1.0,
                 image3DMotion: 0.0,
-                starHue: 217,
-                starSaturation: 61,
+                starHue: 44,
+                starSaturation: 12,
                 starSpeed: 1.0,
                 starCount: 1200,
                 starBrightness: 0.8,
@@ -5051,7 +5904,19 @@
                 starMaxOpacity: 1.0,
                 starZSpeed: 0,
                 starCenterRate: 1.0,
-                starSmoothing: 0.5
+                starSmoothing: 0.5,
+                starDiameter: 1.0,
+                starMode: 'planes',
+                starLayers: 3,
+                waveHue: 280,
+                waveSaturation: 70,
+                waveDistortion: 1.5,
+                waveSpeed: 1.0,
+                waveDensity: 'medium',
+                waveGlow: 1.0,
+                waveDotCount: 200,
+                waveOrbitSize: 100,
+                waveColorMode: 'mono'
             };
 
             // Update UI
@@ -5066,8 +5931,8 @@
             document.getElementById('glitchIntensitySlider').value = 1.0;
             document.getElementById('glitchContrastSlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
-            document.getElementById('starHueSlider').value = 217;
-            document.getElementById('starSaturationSlider').value = 61;
+            document.getElementById('starHueSlider').value = 44;
+            document.getElementById('starSaturationSlider').value = 12;
             document.getElementById('starSpeedSlider').value = 1.0;
             document.getElementById('starCountSlider').value = 1200;
             document.getElementById('starBrightnessSlider').value = 0.8;
@@ -5078,6 +5943,9 @@
             document.getElementById('starZSpeedSlider').value = 0;
             document.getElementById('starCenterRateSlider').value = 1.0;
             document.getElementById('starSmoothingSlider').value = 0.5;
+            document.getElementById('starDiameterSlider').value = 1.0;
+            document.getElementById('starModeSelect').value = 'planes';
+            document.getElementById('starLayersSlider').value = 3;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -5090,8 +5958,8 @@
             document.getElementById('glitchIntensityValue').textContent = '1.0';
             document.getElementById('glitchContrastValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
-            document.getElementById('starHueValue').textContent = '217°';
-            document.getElementById('starSaturationValue').textContent = '61%';
+            document.getElementById('starHueValue').textContent = '44°';
+            document.getElementById('starSaturationValue').textContent = '12%';
             document.getElementById('starSpeedValue').textContent = '1.0';
             document.getElementById('starCountValue').textContent = '1200';
             document.getElementById('starBrightnessValue').textContent = '0.80';
@@ -5102,6 +5970,22 @@
             document.getElementById('starZSpeedValue').textContent = '0.0';
             document.getElementById('starCenterRateValue').textContent = '1.0';
             document.getElementById('starSmoothingValue').textContent = '0.5';
+            document.getElementById('starDiameterValue').textContent = '1.0x';
+            document.getElementById('starLayersValue').textContent = '3';
+            document.getElementById('waveHueSlider').value = 280;
+            document.getElementById('waveSaturationSlider').value = 70;
+            document.getElementById('waveDistortionSlider').value = 1.5;
+            document.getElementById('waveSpeedSlider').value = 1.0;
+            document.getElementById('waveGlowSlider').value = 1.0;
+            document.getElementById('waveDotCountSlider').value = 200;
+            document.getElementById('waveOrbitSizeSlider').value = 100;
+            document.getElementById('waveHueValue').textContent = '280°';
+            document.getElementById('waveSaturationValue').textContent = '70%';
+            document.getElementById('waveDistortionValue').textContent = '1.5';
+            document.getElementById('waveSpeedValue').textContent = '1.0';
+            document.getElementById('waveGlowValue').textContent = '1.0';
+            document.getElementById('waveDotCountValue').textContent = '200';
+            document.getElementById('waveOrbitSizeValue').textContent = '100';
 
             // Update analyser if active
             if (state.analyser) {
@@ -5138,7 +6022,7 @@
         }
 
         // =====================================================
-        // MOBILE COMPANION PAIRING (WebSocket)
+        // COMPANION DEVICE PAIRING (WebSocket)
         // =====================================================
 
         let socket = null;
@@ -5148,15 +6032,16 @@
         // Connect to WebSocket server
         function initializePairing() {
             // Determine WebSocket server URL
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname;
-            const port = window.location.port || '3000';
+            let socketUrl;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                socketUrl = 'http://localhost:3000';
+            } else if (window.location.hostname.includes('onrender.com')) {
+                socketUrl = 'https://fikei-github-io.onrender.com';
+            } else {
+                socketUrl = `${window.location.protocol}//${window.location.host}`;
+            }
 
-            // Use same host as web page, or fallback to localhost for local dev
-            const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://localhost:3000`
-                : `${window.location.protocol}//${window.location.host}`;
-
+            console.log('🔌 Connecting to WebSocket server:', socketUrl);
             socket = io(socketUrl);
 
             socket.on('connect', () => {
@@ -5275,7 +6160,7 @@
                     if (pairingCodeEl) pairingCodeEl.textContent = pairingCode;
                     if (pairingUrlEl) {
                         const baseUrl = window.location.href.replace('/index.html', '').replace(/\/$/, '');
-                        pairingUrlEl.textContent = `${baseUrl}/mobile.html`;
+                        pairingUrlEl.textContent = `${baseUrl}/companion.html`;
                     }
                 });
             }
