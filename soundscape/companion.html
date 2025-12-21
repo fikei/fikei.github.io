@@ -454,6 +454,23 @@
                 </div>
                 <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.5">
             </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MODE</span>
+                </div>
+                <select class="theme-select" id="waveModeSelect">
+                    <option value="planes">PLANES</option>
+                    <option value="grids">GRIDS</option>
+                    <option value="dots">DOTS</option>
+                </select>
+            </div>
+            <div class="control-group" id="waveLayersControl" style="display: none;">
+                <div class="control-label">
+                    <span>LAYERS</span>
+                    <span class="control-value" id="waveLayersValue">3</span>
+                </div>
+                <input type="range" id="waveLayersSlider" min="1" max="10" step="1" value="3">
+            </div>
         </div>
 
         <div class="control-section" id="modeSection" style="display: none;">
@@ -696,6 +713,31 @@
                     }
                     updateControlVisibility(value);
                 }
+
+                // Update WAVE mode select
+                if (key === 'waveMode') {
+                    const waveModeSelect = document.getElementById('waveModeSelect');
+                    const waveLayersControl = document.getElementById('waveLayersControl');
+                    if (waveModeSelect && waveModeSelect.value !== value) {
+                        waveModeSelect.value = value;
+                    }
+                    // Show/hide layers control based on mode
+                    if (waveLayersControl) {
+                        if (value === 'grids' || value === 'dots') {
+                            waveLayersControl.style.display = 'block';
+                        } else {
+                            waveLayersControl.style.display = 'none';
+                        }
+                    }
+                }
+
+                // Update WAVE layers value
+                if (key === 'waveLayers') {
+                    const waveLayersValue = document.getElementById('waveLayersValue');
+                    if (waveLayersValue) {
+                        waveLayersValue.textContent = value.toString();
+                    }
+                }
             });
         }
 
@@ -713,8 +755,10 @@
                 case 'linear':
                     if (modeSection) modeSection.style.display = 'block';
                     break;
-                // WAVE, NEON, GLITCH, STARS don't have companion-specific controls
-                // (Wave settings are incomplete, so hiding for now)
+                case 'wave':
+                    if (waveSettingsSection) waveSettingsSection.style.display = 'block';
+                    break;
+                // NEON, GLITCH, STARS don't have companion-specific controls
             }
         }
 
@@ -993,6 +1037,34 @@
                 themeSelect.addEventListener('change', (e) => {
                     updateDesktop({ theme: e.target.value });
                     updateControlVisibility(e.target.value);
+                });
+            }
+
+            // WAVE MODE selector
+            const waveModeSelect = document.getElementById('waveModeSelect');
+            const waveLayersControl = document.getElementById('waveLayersControl');
+            if (waveModeSelect && waveLayersControl) {
+                waveModeSelect.addEventListener('change', (e) => {
+                    const mode = e.target.value;
+                    updateDesktop({ waveMode: mode });
+
+                    // Show/hide layers control based on mode
+                    if (mode === 'grids' || mode === 'dots') {
+                        waveLayersControl.style.display = 'block';
+                    } else {
+                        waveLayersControl.style.display = 'none';
+                    }
+                });
+            }
+
+            // WAVE LAYERS slider
+            const waveLayersSlider = document.getElementById('waveLayersSlider');
+            const waveLayersValue = document.getElementById('waveLayersValue');
+            if (waveLayersSlider && waveLayersValue) {
+                waveLayersSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    waveLayersValue.textContent = value.toString();
+                    updateDesktop({ waveLayers: value });
                 });
             }
         }
