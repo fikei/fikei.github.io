@@ -1083,16 +1083,16 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>HUE</span>
-                    <span class="control-value" id="starHueValue">217°</span>
+                    <span class="control-value" id="starHueValue">44°</span>
                 </div>
-                <input type="range" id="starHueSlider" min="0" max="360" step="1" value="217">
+                <input type="range" id="starHueSlider" min="0" max="360" step="1" value="44">
             </div>
             <div class="control-group">
                 <div class="control-label">
                     <span>SATURATION</span>
-                    <span class="control-value" id="starSaturationValue">61%</span>
+                    <span class="control-value" id="starSaturationValue">12%</span>
                 </div>
-                <input type="range" id="starSaturationSlider" min="0" max="100" step="1" value="61">
+                <input type="range" id="starSaturationSlider" min="0" max="100" step="1" value="12">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -1163,6 +1163,13 @@
                     <span class="control-value" id="starSmoothingValue">0.5</span>
                 </div>
                 <input type="range" id="starSmoothingSlider" min="0" max="1.0" step="0.1" value="0.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>DIAMETER</span>
+                    <span class="control-value" id="starDiameterValue">1.0x</span>
+                </div>
+                <input type="range" id="starDiameterSlider" min="0.5" max="2.0" step="0.1" value="1.0">
             </div>
         </section>
 
@@ -1488,8 +1495,8 @@
                 neonMode: 'bright',
                 colorTemp: 1.0,
                 image3DMotion: 0.0,  // 3D motion intensity for image objects (0 = off)
-                starHue: 217,  // Star base color hue (0-360)
-                starSaturation: 61,  // Star color saturation (0-100%)
+                starHue: 44,  // Star base color hue (0-360)
+                starSaturation: 12,  // Star color saturation (0-100%)
                 starSpeed: 1.0,  // Star base speed multiplier (0-5)
                 starCount: 1200,  // Number of stars (100-2000)
                 starBrightness: 0.8,  // Overall star brightness (0-1)
@@ -1500,6 +1507,7 @@
                 starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
                 starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
                 starSmoothing: 0.5,  // Audio smoothing for stars (0-1)
+                starDiameter: 1.0,  // Animation diameter multiplier (0.5-2.0)
 
                 // WAVE theme settings
                 waveHue: 280,  // Color hue (0-360)
@@ -3280,7 +3288,7 @@
             state.stars.starArray = [];
             state.stars.count = 0;
 
-            const maxOrbit = Math.round(Math.sqrt(w * w + h * h)) / 2;
+            const maxOrbit = Math.round(Math.sqrt(w * w + h * h)) / 2 * state.settings.starDiameter;
 
             class Star {
                 constructor() {
@@ -4787,6 +4795,19 @@
                 });
             }
 
+            // STARS DIAMETER slider
+            const starDiameterSlider = document.getElementById('starDiameterSlider');
+            const starDiameterValue = document.getElementById('starDiameterValue');
+            if (starDiameterSlider && starDiameterValue) {
+                starDiameterSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starDiameter = value;
+                    starDiameterValue.textContent = `${value.toFixed(1)}x`;
+                    // Reinitialize stars to apply new diameter
+                    state.stars.initialized = false;
+                });
+            }
+
             // WAVE HUE slider
             const waveHueSlider = document.getElementById('waveHueSlider');
             const waveHueValue = document.getElementById('waveHueValue');
@@ -5703,8 +5724,8 @@
                 neonMode: 'bright',
                 colorTemp: 1.0,
                 image3DMotion: 0.0,
-                starHue: 217,
-                starSaturation: 61,
+                starHue: 44,
+                starSaturation: 12,
                 starSpeed: 1.0,
                 starCount: 1200,
                 starBrightness: 0.8,
@@ -5715,6 +5736,7 @@
                 starZSpeed: 0,
                 starCenterRate: 1.0,
                 starSmoothing: 0.5,
+                starDiameter: 1.0,
                 waveHue: 280,
                 waveSaturation: 70,
                 waveDistortion: 1.5,
@@ -5738,8 +5760,8 @@
             document.getElementById('glitchIntensitySlider').value = 1.0;
             document.getElementById('glitchContrastSlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
-            document.getElementById('starHueSlider').value = 217;
-            document.getElementById('starSaturationSlider').value = 61;
+            document.getElementById('starHueSlider').value = 44;
+            document.getElementById('starSaturationSlider').value = 12;
             document.getElementById('starSpeedSlider').value = 1.0;
             document.getElementById('starCountSlider').value = 1200;
             document.getElementById('starBrightnessSlider').value = 0.8;
@@ -5750,6 +5772,7 @@
             document.getElementById('starZSpeedSlider').value = 0;
             document.getElementById('starCenterRateSlider').value = 1.0;
             document.getElementById('starSmoothingSlider').value = 0.5;
+            document.getElementById('starDiameterSlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -5762,8 +5785,8 @@
             document.getElementById('glitchIntensityValue').textContent = '1.0';
             document.getElementById('glitchContrastValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
-            document.getElementById('starHueValue').textContent = '217°';
-            document.getElementById('starSaturationValue').textContent = '61%';
+            document.getElementById('starHueValue').textContent = '44°';
+            document.getElementById('starSaturationValue').textContent = '12%';
             document.getElementById('starSpeedValue').textContent = '1.0';
             document.getElementById('starCountValue').textContent = '1200';
             document.getElementById('starBrightnessValue').textContent = '0.80';
@@ -5774,6 +5797,7 @@
             document.getElementById('starZSpeedValue').textContent = '0.0';
             document.getElementById('starCenterRateValue').textContent = '1.0';
             document.getElementById('starSmoothingValue').textContent = '0.5';
+            document.getElementById('starDiameterValue').textContent = '1.0x';
             document.getElementById('waveHueSlider').value = 280;
             document.getElementById('waveSaturationSlider').value = 70;
             document.getElementById('waveDistortionSlider').value = 1.5;
