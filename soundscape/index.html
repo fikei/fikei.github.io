@@ -214,38 +214,43 @@
             color: #000000;
         }
 
-        .pairing-toggle {
+        /* Pairing Code Display (Bottom Left) */
+        .pairing-code-display {
             position: fixed;
             bottom: 1rem;
-            right: calc(30px + 1rem + 0.5rem); /* To the left of fullscreen button */
+            left: 1rem;
             z-index: 101;
-            width: 30px;
-            height: 30px;
             background: #000000;
             border: 1px solid #ffffff;
-            border-radius: 0;
+            padding: 0.5rem 1rem;
+            font-family: monospace;
+            font-size: 10px;
             color: #ffffff;
-            font-size: 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
             opacity: 1;
-            transition: opacity 0.5s ease, background 0.15s ease, right 0.2s ease;
+            transition: opacity 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            align-items: flex-start;
         }
 
-        .pairing-toggle:hover {
-            background: #ffffff;
-            color: #000000;
-        }
-
-        .pairing-toggle.hidden-control {
+        .pairing-code-display.hidden-control {
             opacity: 0;
             pointer-events: none;
         }
 
-        .pairing-toggle.sidebar-is-open {
-            right: calc(200px + 30px + 1rem + 0.5rem); /* Float to left of sidebar with fullscreen button */
+        .pairing-code-label {
+            font-size: 8px;
+            color: #999999;
+        }
+
+        .pairing-code-value {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            color: #ffffff;
         }
 
         /* ===== SIDEBAR TOGGLE BUTTON ===== */
@@ -787,8 +792,11 @@
         </div>
     </div>
 
-    <!-- Pairing Toggle Button -->
-    <button class="pairing-toggle" id="pairingToggle" aria-label="Companion control">📱</button>
+    <!-- Pairing Code Display -->
+    <div class="pairing-code-display" id="pairingCodeDisplay">
+        <div class="pairing-code-label">Companion Code</div>
+        <div class="pairing-code-value" id="pairingCodeValue">------</div>
+    </div>
 
     <!-- Sidebar Toggle -->
     <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls"><span class="caret">›</span></button>
@@ -3928,9 +3936,9 @@
                     addImageBtn.classList.remove('hidden-control');
                 }
 
-                const pairingToggle = document.getElementById('pairingToggle');
-                if (pairingToggle) {
-                    pairingToggle.classList.remove('hidden-control');
+                const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+                if (pairingCodeDisplay) {
+                    pairingCodeDisplay.classList.remove('hidden-control');
                 }
             }
 
@@ -3962,9 +3970,9 @@
                 addImageBtn.classList.add('hidden-control');
             }
 
-            const pairingToggle = document.getElementById('pairingToggle');
-            if (pairingToggle) {
-                pairingToggle.classList.add('hidden-control');
+            const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+            if (pairingCodeDisplay) {
+                pairingCodeDisplay.classList.add('hidden-control');
             }
         }
 
@@ -4425,16 +4433,13 @@
                 const sidebarOpen = elements.sidebar.classList.contains('open');
                 const sidebarToggle = document.getElementById('sidebarToggle');
                 const fullscreenToggle = document.getElementById('fullscreenToggle');
-                const pairingToggle = document.getElementById('pairingToggle');
 
                 if (sidebarOpen) {
                     if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.add('sidebar-is-open');
-                    if (pairingToggle) pairingToggle.classList.add('sidebar-is-open');
                 } else {
                     if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
                     if (fullscreenToggle) fullscreenToggle.classList.remove('sidebar-is-open');
-                    if (pairingToggle) pairingToggle.classList.remove('sidebar-is-open');
                 }
             });
 
@@ -4469,7 +4474,7 @@
                 if (e.key === 'h' || e.key === 'H') {
                     const statusBar = document.getElementById('statusBar');
                     const fullscreenBtn = document.getElementById('fullscreenToggle');
-                    const pairingBtn = document.getElementById('pairingToggle');
+                    const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
                     const addImageBtn = document.getElementById('addImageButton');
                     const sidebarToggle = document.getElementById('sidebarToggle');
 
@@ -4480,7 +4485,7 @@
                         // Show UI and cursor
                         if (statusBar) statusBar.classList.remove('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.remove('hidden-control');
-                        if (pairingBtn) pairingBtn.classList.remove('hidden-control');
+                        if (pairingCodeDisplay) pairingCodeDisplay.classList.remove('hidden-control');
                         if (addImageBtn) addImageBtn.classList.remove('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
                         document.body.classList.remove('hide-cursor');
@@ -4488,7 +4493,7 @@
                         // Hide UI and cursor
                         if (statusBar) statusBar.classList.add('hidden-control');
                         if (fullscreenBtn) fullscreenBtn.classList.add('hidden-control');
-                        if (pairingBtn) pairingBtn.classList.add('hidden-control');
+                        if (pairingCodeDisplay) pairingCodeDisplay.classList.add('hidden-control');
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
                         document.body.classList.add('hide-cursor');
@@ -6047,10 +6052,10 @@
                         pairingCode = response.code;
                         console.log('📱 Pairing code generated:', pairingCode);
 
-                        // Update UI if pairing panel is already open
-                        const pairingCodeEl = document.getElementById('pairingCode');
-                        if (pairingCodeEl && pairingCodeEl.textContent === 'Connecting...') {
-                            pairingCodeEl.textContent = pairingCode;
+                        // Update the pairing code display
+                        const pairingCodeValue = document.getElementById('pairingCodeValue');
+                        if (pairingCodeValue) {
+                            pairingCodeValue.textContent = pairingCode;
                         }
                     } else {
                         console.error('❌ Failed to create session');
@@ -6085,10 +6090,10 @@
                 console.error('❌ WebSocket connection error:', error);
                 console.error('Make sure the WebSocket server is running at:', socketUrl);
 
-                // Update UI if pairing panel is open
-                const pairingCodeEl = document.getElementById('pairingCode');
-                if (pairingCodeEl && pairingCodeEl.textContent === 'Connecting...') {
-                    pairingCodeEl.textContent = 'Connection Failed';
+                // Update pairing code display
+                const pairingCodeValue = document.getElementById('pairingCodeValue');
+                if (pairingCodeValue) {
+                    pairingCodeValue.textContent = 'ERROR';
                 }
             });
         }
@@ -6154,47 +6159,8 @@
 
         // Setup pairing UI event handlers
         function setupPairingUI() {
-            const pairingToggle = document.getElementById('pairingToggle');
-            const pairingPanel = document.getElementById('pairingPanel');
-            const pairingClose = document.getElementById('pairingClose');
-            const pairingCodeEl = document.getElementById('pairingCode');
-            const pairingUrlEl = document.getElementById('pairingUrl');
-
-            if (pairingToggle && pairingPanel) {
-                pairingToggle.addEventListener('click', () => {
-                    pairingPanel.style.display = 'flex';
-                    // Update URL and code
-                    if (pairingCodeEl) {
-                        if (pairingCode) {
-                            pairingCodeEl.textContent = pairingCode;
-                        } else {
-                            pairingCodeEl.textContent = 'Connecting...';
-                            // Try to reconnect if not connected
-                            if (!socket || !socket.connected) {
-                                console.log('⚠️ WebSocket not connected, attempting to reconnect...');
-                                initializePairing();
-                            }
-                        }
-                    }
-                    if (pairingUrlEl) {
-                        const baseUrl = window.location.href.replace('/index.html', '').replace(/\/$/, '');
-                        pairingUrlEl.textContent = `${baseUrl}/companion.html`;
-                    }
-                });
-            }
-
-            if (pairingClose && pairingPanel) {
-                pairingClose.addEventListener('click', () => {
-                    pairingPanel.style.display = 'none';
-                });
-            }
-
-            // Close on Escape key
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && pairingPanel && pairingPanel.style.display !== 'none') {
-                    pairingPanel.style.display = 'none';
-                }
-            });
+            // Update the pairing code display when code is received
+            // The code is automatically updated by the WebSocket connection handler
         }
 
         // =====================================================
