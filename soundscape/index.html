@@ -1003,7 +1003,7 @@
                 <option value="glitch">GLITCH</option>
                 <option value="stars">STARS</option>
             </select>
-            <div id="themeDescription" style="margin-top: 0.5rem; font-size: 0.8rem; color: #999; line-height: 1.4;"></div>
+            <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
 
         <!-- Mode Selection (LINEAR theme only) -->
@@ -1146,6 +1146,13 @@
                     <span class="control-value" id="starZSpeedValue">0.0</span>
                 </div>
                 <input type="range" id="starZSpeedSlider" min="0" max="5.0" step="0.1" value="0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>CENTER SHIFT RATE</span>
+                    <span class="control-value" id="starCenterRateValue">1.0</span>
+                </div>
+                <input type="range" id="starCenterRateSlider" min="0" max="5.0" step="0.1" value="1.0">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -1384,6 +1391,7 @@
                 starMinOpacity: 0.2,  // Minimum star opacity (0-1)
                 starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
                 starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
+                starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
                 starSmoothing: 0.5  // Audio smoothing for stars (0-1)
             },
 
@@ -3246,9 +3254,9 @@
                 const scaledOrbitRadius = star.orbitRadius * scale;
                 star.radius = star.baseRadius * scale;
 
-                // High frequencies shift the orbit center position
-                const centerOffsetX = Math.sin(time * 0.001) * high * 100;
-                const centerOffsetY = Math.cos(time * 0.001) * high * 100;
+                // High frequencies shift the orbit center position (rate controlled by slider)
+                const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
 
                 const x = Math.sin(star.timePassed) * scaledOrbitRadius + star.orbitX + centerOffsetX;
                 const y = Math.cos(star.timePassed) * scaledOrbitRadius + star.orbitY + centerOffsetY;
@@ -4403,6 +4411,18 @@
                 });
             }
 
+            // STARS CENTER SHIFT RATE slider
+            const starCenterRateSlider = document.getElementById('starCenterRateSlider');
+            const starCenterRateValue = document.getElementById('starCenterRateValue');
+            if (starCenterRateSlider && starCenterRateValue) {
+                starCenterRateSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starCenterRate = value;
+                    starCenterRateValue.textContent = value.toFixed(1);
+                    // Center rate affects rendering in real-time, no reinit needed
+                });
+            }
+
             // STARS SMOOTHING slider
             const starSmoothingSlider = document.getElementById('starSmoothingSlider');
             const starSmoothingValue = document.getElementById('starSmoothingValue');
@@ -5030,6 +5050,7 @@
                 starMinOpacity: 0.2,
                 starMaxOpacity: 1.0,
                 starZSpeed: 0,
+                starCenterRate: 1.0,
                 starSmoothing: 0.5
             };
 
@@ -5055,6 +5076,8 @@
             document.getElementById('starMinOpacitySlider').value = 0.2;
             document.getElementById('starMaxOpacitySlider').value = 1.0;
             document.getElementById('starZSpeedSlider').value = 0;
+            document.getElementById('starCenterRateSlider').value = 1.0;
+            document.getElementById('starSmoothingSlider').value = 0.5;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -5077,6 +5100,8 @@
             document.getElementById('starMinOpacityValue').textContent = '0.20';
             document.getElementById('starMaxOpacityValue').textContent = '1.00';
             document.getElementById('starZSpeedValue').textContent = '0.0';
+            document.getElementById('starCenterRateValue').textContent = '1.0';
+            document.getElementById('starSmoothingValue').textContent = '0.5';
 
             // Update analyser if active
             if (state.analyser) {
