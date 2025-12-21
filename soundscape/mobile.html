@@ -6,6 +6,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <title>Soundscape Mobile Control</title>
+
+    <!-- Socket.io for WebSocket communication -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
     <style>
         * {
             margin: 0;
@@ -312,6 +316,7 @@
 
     <script>
         // Mobile control state
+        let socket = null;
         let sessionCode = null;
         let isConnected = false;
 
@@ -329,7 +334,7 @@
             if (code.length === 6 && /^\d{6}$/.test(code)) {
                 attemptConnection(code);
             } else {
-                showError();
+                showError('Please enter a 6-digit code');
             }
         });
 
@@ -341,31 +346,72 @@
         });
 
         function attemptConnection(code) {
-            const key = `soundscape_session_${code}`;
-            const data = localStorage.getItem(key);
+            // Determine WebSocket server URL
+            const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'http://localhost:3000'
+                : `${window.location.protocol}//${window.location.host}`;
 
-            if (data) {
-                try {
-                    JSON.parse(data);
-                    sessionCode = code;
-                    isConnected = true;
-                    showControls();
-                    startSyncingState();
-                } catch (e) {
-                    showError();
+            console.log('🔌 Connecting to:', socketUrl);
+
+            socket = io(socketUrl);
+
+            socket.on('connect', () => {
+                console.log('🔌 Connected to WebSocket server');
+
+                // Join session with pairing code
+                socket.emit('mobile:join-session', code, (response) => {
+                    if (response.success) {
+                        sessionCode = code;
+                        isConnected = true;
+                        showControls();
+
+                        // Apply initial state from desktop
+                        if (response.state && response.state.settings) {
+                            updateMobileUI(response.state.settings);
+                        }
+                    } else {
+                        showError(response.error || 'Invalid pairing code');
+                        socket.disconnect();
+                    }
+                });
+            });
+
+            socket.on('disconnect', () => {
+                console.log('🔌 Disconnected from WebSocket server');
+                isConnected = false;
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.classList.remove('connected');
+            });
+
+            socket.on('desktop:disconnected', () => {
+                console.log('🖥️  Desktop disconnected');
+                showError('Desktop disconnected');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            });
+
+            socket.on('state-update', (state) => {
+                console.log('📡 Received state update from desktop:', state);
+                if (state.settings) {
+                    updateMobileUI(state.settings);
                 }
-            } else {
-                showError();
-            }
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('❌ WebSocket connection error:', error);
+                showError('Connection failed. Is server running?');
+            });
         }
 
-        function showError() {
+        function showError(message = 'Invalid code. Please try again.') {
+            errorMessage.textContent = message;
             errorMessage.classList.add('show');
             codeInput.style.borderColor = '#ff0000';
             setTimeout(() => {
                 errorMessage.classList.remove('show');
                 codeInput.style.borderColor = '#ffffff';
-            }, 2000);
+            }, 3000);
         }
 
         function showControls() {
@@ -373,6 +419,28 @@
             controlsScreen.classList.add('active');
             connectionStatus.textContent = `Connected: ${sessionCode}`;
             connectionStatus.classList.add('connected');
+        }
+
+        function updateMobileUI(settings) {
+            // Update sliders and values
+            Object.entries(settings).forEach(([key, value]) => {
+                const slider = document.getElementById(`${key}Slider`) || document.getElementById(key);
+                const valueEl = document.getElementById(`${key}Value`);
+
+                if (slider && slider.value != value) {
+                    slider.value = value;
+                    if (valueEl && typeof value === 'number') {
+                        valueEl.textContent = value.toFixed(1);
+                    }
+                }
+
+                // Update mode buttons
+                if (key === 'mode') {
+                    document.querySelectorAll('.mode-button').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.mode === value);
+                    });
+                }
+            });
         }
 
         // Setup control bindings
@@ -405,44 +473,13 @@
         }
 
         function updateDesktop(settings) {
-            if (!isConnected || !sessionCode) return;
-
-            try {
-                const key = `soundscape_session_${sessionCode}`;
-                const data = JSON.parse(localStorage.getItem(key) || '{}');
-                data.mobileUpdate = { settings };
-                data.timestamp = Date.now();
-                localStorage.setItem(key, JSON.stringify(data));
-            } catch (e) {
-                console.error('Failed to update desktop:', e);
+            if (!socket || !isConnected) {
+                console.warn('Cannot update desktop: not connected');
+                return;
             }
-        }
 
-        function startSyncingState() {
-            // Poll for state updates from desktop every 100ms
-            setInterval(() => {
-                if (!isConnected || !sessionCode) return;
-
-                try {
-                    const key = `soundscape_session_${sessionCode}`;
-                    const data = JSON.parse(localStorage.getItem(key) || '{}');
-
-                    // Sync desktop state to mobile UI if needed
-                    if (data.state) {
-                        // Update UI to match desktop state
-                        Object.entries(data.state).forEach(([key, value]) => {
-                            const slider = document.getElementById(`${key}Slider`) || document.getElementById(key);
-                            const valueEl = document.getElementById(`${key}Value`);
-                            if (slider && slider.value != value) {
-                                slider.value = value;
-                                if (valueEl) valueEl.textContent = value.toFixed(1);
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.error('Sync error:', e);
-                }
-            }, 100);
+            console.log('📱 Sending control update to desktop:', settings);
+            socket.emit('mobile:control-update', { settings });
         }
 
         // Initialize controls

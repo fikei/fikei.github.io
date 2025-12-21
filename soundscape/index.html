@@ -12,6 +12,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
 
+    <!-- Socket.io for WebSocket communication -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
     <style>
         /* ===== RESET & BASE ===== */
         * {
@@ -792,8 +795,8 @@
     <div class="add-image-dropdown" id="addImageDropdown">
         <div class="add-image-dropdown-item" id="addImageMenuItem">Add Image</div>
         <div class="add-image-dropdown-item" id="addVideoMenuItem">Add Video</div>
-        <div class="add-image-dropdown-item" id="saveCanvasMenuItem">Save Canvas</div>
-        <div class="add-image-dropdown-item" id="loadCanvasMenuItem">Load Canvas</div>
+        <div class="add-image-dropdown-item" id="saveCanvasMenuItem" style="display: none;">Save Canvas</div>
+        <div class="add-image-dropdown-item" id="loadCanvasMenuItem" style="display: none;">Load Canvas</div>
     </div>
 
     <!-- Video URL Popup -->
@@ -998,7 +1001,9 @@
                 <option value="linear">LINEAR</option>
                 <option value="neon">NEON</option>
                 <option value="glitch">GLITCH</option>
+                <option value="stars">STARS</option>
             </select>
+            <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
 
         <!-- Mode Selection (LINEAR theme only) -->
@@ -1069,6 +1074,95 @@
             </div>
         </section>
 
+        <!-- STARS Theme Controls -->
+        <section class="control-section" id="starsControlsSection" style="display: none;">
+            <h3>STARS</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>HUE</span>
+                    <span class="control-value" id="starHueValue">217°</span>
+                </div>
+                <input type="range" id="starHueSlider" min="0" max="360" step="1" value="217">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SATURATION</span>
+                    <span class="control-value" id="starSaturationValue">61%</span>
+                </div>
+                <input type="range" id="starSaturationSlider" min="0" max="100" step="1" value="61">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BASE SPEED</span>
+                    <span class="control-value" id="starSpeedValue">1.0</span>
+                </div>
+                <input type="range" id="starSpeedSlider" min="0" max="5.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>STAR COUNT</span>
+                    <span class="control-value" id="starCountValue">1200</span>
+                </div>
+                <input type="range" id="starCountSlider" min="100" max="2000" step="100" value="1200">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BRIGHTNESS</span>
+                    <span class="control-value" id="starBrightnessValue">0.8</span>
+                </div>
+                <input type="range" id="starBrightnessSlider" min="0" max="1.0" step="0.05" value="0.8">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>AUDIO BOOST</span>
+                    <span class="control-value" id="starAudioBoostValue">3.0x</span>
+                </div>
+                <input type="range" id="starAudioBoostSlider" min="0" max="10.0" step="0.5" value="3.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>TWINKLE RATE</span>
+                    <span class="control-value" id="starTwinkleValue">20</span>
+                </div>
+                <input type="range" id="starTwinkleSlider" min="1" max="50" step="1" value="20">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MIN OPACITY</span>
+                    <span class="control-value" id="starMinOpacityValue">0.2</span>
+                </div>
+                <input type="range" id="starMinOpacitySlider" min="0" max="1.0" step="0.05" value="0.2">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MAX OPACITY</span>
+                    <span class="control-value" id="starMaxOpacityValue">1.0</span>
+                </div>
+                <input type="range" id="starMaxOpacitySlider" min="0" max="1.0" step="0.05" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Z-AXIS SPEED</span>
+                    <span class="control-value" id="starZSpeedValue">0.0</span>
+                </div>
+                <input type="range" id="starZSpeedSlider" min="0" max="5.0" step="0.1" value="0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>CENTER SHIFT RATE</span>
+                    <span class="control-value" id="starCenterRateValue">1.0</span>
+                </div>
+                <input type="range" id="starCenterRateSlider" min="0" max="5.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SMOOTHING</span>
+                    <span class="control-value" id="starSmoothingValue">0.5</span>
+                </div>
+                <input type="range" id="starSmoothingSlider" min="0" max="1.0" step="0.1" value="0.5">
+            </div>
+        </section>
+
         <!-- Frequency Emphasis -->
         <section class="control-section">
             <h3>FREQ</h3>
@@ -1096,7 +1190,7 @@
         </section>
 
         <!-- Wave Settings -->
-        <section class="control-section">
+        <section class="control-section" id="waveSettingsSection">
             <h3>WAVE</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -1249,6 +1343,18 @@
                     glitchIntensityMultiplier: 8, // Mids control random displacement
                     quantizationBase: 1,
                     quantizationMultiplier: 8 // Highs increase pixelation
+                },
+                stars: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    maxStars: 1200,
+                    hue: 217, // Base color hue (0-360)
+                    brightness: 0.8, // Overall star brightness (0-1)
+                    baseSpeed: 0.00002, // Base orbit speed
+                    speedMultiplier: 3.0, // Audio-reactive speed boost
+                    twinkleIntensity: 20, // How often stars twinkle (higher = less frequent)
+                    alphaMin: 0.2, // Minimum alpha for stars
+                    alphaMax: 1.0 // Maximum alpha for stars
                 }
             }
         };
@@ -1274,7 +1380,19 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                image3DMotion: 0.0  // 3D motion intensity for image objects (0 = off)
+                image3DMotion: 0.0,  // 3D motion intensity for image objects (0 = off)
+                starHue: 217,  // Star base color hue (0-360)
+                starSaturation: 61,  // Star color saturation (0-100%)
+                starSpeed: 1.0,  // Star base speed multiplier (0-5)
+                starCount: 1200,  // Number of stars (100-2000)
+                starBrightness: 0.8,  // Overall star brightness (0-1)
+                starAudioBoost: 3.0,  // Audio-reactive speed multiplier (0-10)
+                starTwinkle: 20,  // Twinkle rate (1-50, higher = less frequent)
+                starMinOpacity: 0.2,  // Minimum star opacity (0-1)
+                starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
+                starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
+                starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
+                starSmoothing: 0.5  // Audio smoothing for stars (0-1)
             },
 
             // Audio
@@ -1339,6 +1457,15 @@
                 dragStartHeight: 0
             },
 
+            // STARS theme state
+            stars: {
+                initialized: false,
+                starArray: [],
+                gradientCanvas: null,
+                gradientCtx: null,
+                count: 0
+            },
+
             // Image objects (for LINEAR/NEON overlay images)
             imageObjects: [],
             selectedImageIndex: -1
@@ -1359,6 +1486,9 @@
 
             // Setup all controls
             setupControls();
+
+            // Update theme description on load
+            updateThemeDescription();
 
             // Auto-start audio capture
             await startAudioCapture();
@@ -1483,11 +1613,26 @@
             updateColors();
         }
 
+        function updateThemeDescription() {
+            const themeDescription = document.getElementById('themeDescription');
+            if (!themeDescription) return;
+
+            const descriptions = {
+                linear: 'Audio affects: wave distortion, color intensity, path movement',
+                neon: 'Audio affects: gradient colors, mesh animation, brightness pulses',
+                glitch: 'Audio affects: rotation speed, glitch intensity, RGB separation',
+                stars: 'Audio affects: orbit speed (bass slows), brightness (mids), center position (highs)'
+            };
+
+            themeDescription.textContent = descriptions[state.settings.theme] || '';
+        }
+
         function updateModeVisibility() {
             const backgroundControlsSection = document.getElementById('backgroundControlsSection');
             const modeSection = document.getElementById('modeSection');
             const neonControlsSection = document.getElementById('neonControlsSection');
             const glitchControlsSection = document.getElementById('glitchControlsSection');
+            const starsControlsSection = document.getElementById('starsControlsSection');
             const imageControlsSection = document.getElementById('imageControlsSection');
             const imageThemeSelect = document.getElementById('imageThemeSelect');
             const uploadOverlay = document.getElementById('upload-overlay');
@@ -1511,6 +1656,19 @@
             if (glitchControlsSection) {
                 glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
             }
+
+            if (starsControlsSection) {
+                starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
+            }
+
+            // Hide WAVE settings for STARS theme
+            const waveSettingsSection = document.getElementById('waveSettingsSection');
+            if (waveSettingsSection) {
+                waveSettingsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'none' : 'block';
+            }
+
+            // Update theme description
+            updateThemeDescription();
 
             // Show image controls when an image is selected
             if (imageControlsSection) {
@@ -1608,6 +1766,12 @@
             // Update mode visibility based on theme
             updateModeVisibility();
 
+            // Handle stars canvas visibility
+            const starsCanvas = document.getElementById('stars-canvas');
+            if (starsCanvas) {
+                starsCanvas.style.display = state.settings.theme === 'stars' ? 'block' : 'none';
+            }
+
             // Update line colors based on theme
             if (state.settings.theme === 'linear') {
                 // Linear uses gradient colors
@@ -1630,6 +1794,11 @@
                 // Reset path attributes
                 state.paths.forEach((path) => {
                     path.setAttribute('opacity', theme.opacity);
+                });
+            } else if (state.settings.theme === 'stars') {
+                // Stars theme: hide SVG paths (stars are rendered on canvas)
+                state.paths.forEach((path) => {
+                    path.setAttribute('opacity', '0');
                 });
             }
         }
@@ -2950,11 +3119,183 @@
             });
         }
 
+        // =====================================================
+        // STARS THEME RENDERER
+        // =====================================================
+
+        function initializeStars() {
+            const theme = config.themes.stars;
+            const w = state.boundingRect.width;
+            const h = state.boundingRect.height;
+
+            // Create cached gradient texture for stars
+            const gradientCanvas = document.createElement('canvas');
+            const gradientCtx = gradientCanvas.getContext('2d');
+            gradientCanvas.width = 100;
+            gradientCanvas.height = 100;
+
+            state.stars.gradientCanvas = gradientCanvas;
+            state.stars.gradientCtx = gradientCtx;
+
+            // Update gradient with current hue
+            updateStarGradient();
+
+            // Initialize star array
+            state.stars.starArray = [];
+            state.stars.count = 0;
+
+            const maxOrbit = Math.round(Math.sqrt(w * w + h * h)) / 2;
+
+            class Star {
+                constructor() {
+                    this.orbitRadius = Math.floor(Math.random() * maxOrbit);
+                    this.baseRadius = Math.floor(Math.random() * (60 - this.orbitRadius / 12) + this.orbitRadius / 12);
+                    this.radius = this.baseRadius; // Will be scaled by z
+                    this.orbitX = w / 2;
+                    this.orbitY = h / 2;
+                    this.timePassed = Math.random() * state.settings.starCount;
+                    this.baseSpeed = (Math.random() * this.orbitRadius * theme.baseSpeed);
+                    // Use user settings for opacity range and brightness
+                    this.alpha = (Math.random() * (state.settings.starMaxOpacity - state.settings.starMinOpacity) + state.settings.starMinOpacity) * state.settings.starBrightness;
+                    // Z-axis depth (0 = far, 1 = close)
+                    this.z = Math.random();
+                    state.stars.starArray.push(this);
+                }
+            }
+
+            // Use user setting for star count
+            for (let i = 0; i < state.settings.starCount; i++) {
+                new Star();
+            }
+
+            state.stars.initialized = true;
+            console.log(`✨ Initialized ${state.settings.starCount} stars`);
+        }
+
+        function updateStarGradient() {
+            const canvas = state.stars.gradientCanvas;
+            const ctx = state.stars.gradientCtx;
+            const hue = state.settings.starHue;
+            const saturation = state.settings.starSaturation;
+            const half = canvas.width / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+            gradient.addColorStop(0.025, '#fff');
+            gradient.addColorStop(0.1, `hsl(${hue}, ${saturation}%, 33%)`);
+            gradient.addColorStop(0.25, `hsl(${hue}, ${Math.min(saturation + 3, 100)}%, 6%)`);
+            gradient.addColorStop(1, 'transparent');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(half, half, half, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawLinesStars() {
+            const theme = config.themes.stars;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            // Initialize stars on first render
+            if (!state.stars.initialized) {
+                initializeStars();
+            }
+
+            // Get or create stars canvas
+            let starsCanvas = document.getElementById('stars-canvas');
+            if (!starsCanvas) {
+                starsCanvas = document.createElement('canvas');
+                starsCanvas.id = 'stars-canvas';
+                starsCanvas.style.position = 'fixed';
+                starsCanvas.style.top = '0';
+                starsCanvas.style.left = '0';
+                starsCanvas.style.width = '100%';
+                starsCanvas.style.height = '100%';
+                starsCanvas.style.pointerEvents = 'none';
+                starsCanvas.style.zIndex = '0';
+                document.body.insertBefore(starsCanvas, document.body.firstChild);
+            }
+
+            const ctx = starsCanvas.getContext('2d');
+            const w = starsCanvas.width = state.boundingRect.width;
+            const h = starsCanvas.height = state.boundingRect.height;
+
+            // Clear with fade effect
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.8;
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Calculate audio-reactive speed multiplier
+            // Bass SLOWS DOWN orbit speed using user setting
+            const speedBoost = 1.0 - (low * (state.settings.starAudioBoost / 10));
+
+            // Draw stars
+            ctx.globalCompositeOperation = 'lighter';
+
+            state.stars.starArray.forEach((star) => {
+                // Update Z position (move towards camera)
+                if (state.settings.starZSpeed > 0) {
+                    star.z += state.settings.starZSpeed * 0.001;
+
+                    // Reset star if it passes the camera
+                    if (star.z >= 1.0) {
+                        star.z = 0;
+                        star.timePassed = Math.random() * state.settings.starCount;
+                    }
+                }
+
+                // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
+                const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+
+                // Scale orbit radius and star size by perspective
+                const scaledOrbitRadius = star.orbitRadius * scale;
+                star.radius = star.baseRadius * scale;
+
+                // High frequencies shift the orbit center position (rate controlled by slider)
+                const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+
+                const x = Math.sin(star.timePassed) * scaledOrbitRadius + star.orbitX + centerOffsetX;
+                const y = Math.cos(star.timePassed) * scaledOrbitRadius + star.orbitY + centerOffsetY;
+
+                // Twinkle effect using user setting
+                const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
+                if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
+                    star.alpha -= 0.05;
+                } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
+                    star.alpha += 0.05;
+                }
+
+                // Mid frequencies add brightness boost
+                const brightnessBoost = mid * 0.3;
+
+                // Alpha also scales with distance (closer = brighter)
+                const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
+
+                ctx.globalAlpha = perspectiveAlpha;
+                ctx.drawImage(
+                    state.stars.gradientCanvas,
+                    x - star.radius / 2,
+                    y - star.radius / 2,
+                    star.radius,
+                    star.radius
+                );
+
+                // Update orbit with audio-reactive speed
+                // baseSpeed * user speed multiplier * audio boost
+                star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+            });
+        }
+
         // Theme renderer dispatcher
         const themeRenderers = {
             linear: drawLinesLinear,
             neon: drawLinesNeon,
-            glitch: drawLinesGlitch
+            glitch: drawLinesGlitch,
+            stars: drawLinesStars
         };
 
         function drawLines() {
@@ -3103,6 +3444,11 @@
                 if (addImageBtn) {
                     addImageBtn.classList.remove('hidden-control');
                 }
+
+                const pairingToggle = document.getElementById('pairingToggle');
+                if (pairingToggle) {
+                    pairingToggle.classList.remove('hidden-control');
+                }
             }
 
             // Reset idle timeout
@@ -3131,6 +3477,11 @@
             const addImageBtn = document.getElementById('addImageButton');
             if (addImageBtn) {
                 addImageBtn.classList.add('hidden-control');
+            }
+
+            const pairingToggle = document.getElementById('pairingToggle');
+            if (pairingToggle) {
+                pairingToggle.classList.add('hidden-control');
             }
         }
 
@@ -3922,6 +4273,168 @@
                 state.settings.glitchContrast = value;
             });
 
+            // STARS hue slider
+            const starHueSlider = document.getElementById('starHueSlider');
+            const starHueValue = document.getElementById('starHueValue');
+            if (starHueSlider && starHueValue) {
+                starHueSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starHue = value;
+                    starHueValue.textContent = `${Math.round(value)}°`;
+                    // Update star gradient with new hue
+                    if (state.stars.initialized) {
+                        updateStarGradient();
+                    }
+                });
+            }
+
+            // STARS saturation slider
+            const starSaturationSlider = document.getElementById('starSaturationSlider');
+            const starSaturationValue = document.getElementById('starSaturationValue');
+            if (starSaturationSlider && starSaturationValue) {
+                starSaturationSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starSaturation = value;
+                    starSaturationValue.textContent = `${Math.round(value)}%`;
+                    // Update star gradient with new saturation
+                    if (state.stars.initialized) {
+                        updateStarGradient();
+                    }
+                });
+            }
+
+            // STARS speed slider
+            const starSpeedSlider = document.getElementById('starSpeedSlider');
+            const starSpeedValue = document.getElementById('starSpeedValue');
+            if (starSpeedSlider && starSpeedValue) {
+                starSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starSpeed = value;
+                    starSpeedValue.textContent = value.toFixed(1);
+                    // Speed affects orbit velocity, no need to reinitialize
+                });
+            }
+
+            // STARS count slider
+            const starCountSlider = document.getElementById('starCountSlider');
+            const starCountValue = document.getElementById('starCountValue');
+            if (starCountSlider && starCountValue) {
+                starCountSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.starCount = value;
+                    starCountValue.textContent = value;
+                    // Star count change requires reinitialization
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS brightness slider
+            const starBrightnessSlider = document.getElementById('starBrightnessSlider');
+            const starBrightnessValue = document.getElementById('starBrightnessValue');
+            if (starBrightnessSlider && starBrightnessValue) {
+                starBrightnessSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starBrightness = value;
+                    starBrightnessValue.textContent = value.toFixed(2);
+                    // Brightness change requires reinitialization to update star alphas
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS audio boost slider
+            const starAudioBoostSlider = document.getElementById('starAudioBoostSlider');
+            const starAudioBoostValue = document.getElementById('starAudioBoostValue');
+            if (starAudioBoostSlider && starAudioBoostValue) {
+                starAudioBoostSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starAudioBoost = value;
+                    starAudioBoostValue.textContent = `${value.toFixed(1)}x`;
+                    // Audio boost affects rendering, no reinit needed
+                });
+            }
+
+            // STARS twinkle slider
+            const starTwinkleSlider = document.getElementById('starTwinkleSlider');
+            const starTwinkleValue = document.getElementById('starTwinkleValue');
+            if (starTwinkleSlider && starTwinkleValue) {
+                starTwinkleSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.starTwinkle = value;
+                    starTwinkleValue.textContent = value;
+                    // Twinkle affects rendering, no reinit needed
+                });
+            }
+
+            // STARS min opacity slider
+            const starMinOpacitySlider = document.getElementById('starMinOpacitySlider');
+            const starMinOpacityValue = document.getElementById('starMinOpacityValue');
+            if (starMinOpacitySlider && starMinOpacityValue) {
+                starMinOpacitySlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starMinOpacity = value;
+                    starMinOpacityValue.textContent = value.toFixed(2);
+                    // Opacity change requires reinitialization to update star alphas
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS max opacity slider
+            const starMaxOpacitySlider = document.getElementById('starMaxOpacitySlider');
+            const starMaxOpacityValue = document.getElementById('starMaxOpacityValue');
+            if (starMaxOpacitySlider && starMaxOpacityValue) {
+                starMaxOpacitySlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starMaxOpacity = value;
+                    starMaxOpacityValue.textContent = value.toFixed(2);
+                    // Opacity change requires reinitialization to update star alphas
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS Z-axis speed slider
+            const starZSpeedSlider = document.getElementById('starZSpeedSlider');
+            const starZSpeedValue = document.getElementById('starZSpeedValue');
+            if (starZSpeedSlider && starZSpeedValue) {
+                starZSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starZSpeed = value;
+                    starZSpeedValue.textContent = value.toFixed(1);
+                    // Z-speed affects rendering in real-time, no reinit needed
+                });
+            }
+
+            // STARS CENTER SHIFT RATE slider
+            const starCenterRateSlider = document.getElementById('starCenterRateSlider');
+            const starCenterRateValue = document.getElementById('starCenterRateValue');
+            if (starCenterRateSlider && starCenterRateValue) {
+                starCenterRateSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starCenterRate = value;
+                    starCenterRateValue.textContent = value.toFixed(1);
+                    // Center rate affects rendering in real-time, no reinit needed
+                });
+            }
+
+            // STARS SMOOTHING slider
+            const starSmoothingSlider = document.getElementById('starSmoothingSlider');
+            const starSmoothingValue = document.getElementById('starSmoothingValue');
+            if (starSmoothingSlider && starSmoothingValue) {
+                starSmoothingSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starSmoothing = value;
+                    starSmoothingValue.textContent = value.toFixed(1);
+                    // Smoothing affects rendering in real-time, no reinit needed
+                });
+            }
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -4526,7 +5039,19 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                image3DMotion: 0.0
+                image3DMotion: 0.0,
+                starHue: 217,
+                starSaturation: 61,
+                starSpeed: 1.0,
+                starCount: 1200,
+                starBrightness: 0.8,
+                starAudioBoost: 3.0,
+                starTwinkle: 20,
+                starMinOpacity: 0.2,
+                starMaxOpacity: 1.0,
+                starZSpeed: 0,
+                starCenterRate: 1.0,
+                starSmoothing: 0.5
             };
 
             // Update UI
@@ -4541,6 +5066,18 @@
             document.getElementById('glitchIntensitySlider').value = 1.0;
             document.getElementById('glitchContrastSlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
+            document.getElementById('starHueSlider').value = 217;
+            document.getElementById('starSaturationSlider').value = 61;
+            document.getElementById('starSpeedSlider').value = 1.0;
+            document.getElementById('starCountSlider').value = 1200;
+            document.getElementById('starBrightnessSlider').value = 0.8;
+            document.getElementById('starAudioBoostSlider').value = 3.0;
+            document.getElementById('starTwinkleSlider').value = 20;
+            document.getElementById('starMinOpacitySlider').value = 0.2;
+            document.getElementById('starMaxOpacitySlider').value = 1.0;
+            document.getElementById('starZSpeedSlider').value = 0;
+            document.getElementById('starCenterRateSlider').value = 1.0;
+            document.getElementById('starSmoothingSlider').value = 0.5;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -4553,6 +5090,18 @@
             document.getElementById('glitchIntensityValue').textContent = '1.0';
             document.getElementById('glitchContrastValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
+            document.getElementById('starHueValue').textContent = '217°';
+            document.getElementById('starSaturationValue').textContent = '61%';
+            document.getElementById('starSpeedValue').textContent = '1.0';
+            document.getElementById('starCountValue').textContent = '1200';
+            document.getElementById('starBrightnessValue').textContent = '0.80';
+            document.getElementById('starAudioBoostValue').textContent = '3.0x';
+            document.getElementById('starTwinkleValue').textContent = '20';
+            document.getElementById('starMinOpacityValue').textContent = '0.20';
+            document.getElementById('starMaxOpacityValue').textContent = '1.00';
+            document.getElementById('starZSpeedValue').textContent = '0.0';
+            document.getElementById('starCenterRateValue').textContent = '1.0';
+            document.getElementById('starSmoothingValue').textContent = '0.5';
 
             // Update analyser if active
             if (state.analyser) {
@@ -4589,61 +5138,96 @@
         }
 
         // =====================================================
-        // MOBILE COMPANION PAIRING
+        // MOBILE COMPANION PAIRING (WebSocket)
         // =====================================================
 
-        // Generate 6-digit pairing code
-        function generatePairingCode() {
-            return Math.floor(100000 + Math.random() * 900000).toString();
-        }
+        let socket = null;
+        let pairingCode = null;
+        let mobileConnected = false;
 
-        // Session ID for this desktop instance
-        const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        const pairingCode = generatePairingCode();
-
-        // Store pairing info in localStorage
+        // Connect to WebSocket server
         function initializePairing() {
-            const pairingData = {
-                code: pairingCode,
-                sessionId: sessionId,
-                timestamp: Date.now(),
-                state: {}
-            };
-            localStorage.setItem(`soundscape_session_${pairingCode}`, JSON.stringify(pairingData));
-            console.log('📱 Pairing code generated:', pairingCode);
+            // Determine WebSocket server URL
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = window.location.port || '3000';
+
+            // Use same host as web page, or fallback to localhost for local dev
+            const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://localhost:3000`
+                : `${window.location.protocol}//${window.location.host}`;
+
+            socket = io(socketUrl);
+
+            socket.on('connect', () => {
+                console.log('🔌 Connected to WebSocket server');
+
+                // Request pairing code from server
+                socket.emit('desktop:create-session', (response) => {
+                    if (response.success) {
+                        pairingCode = response.code;
+                        console.log('📱 Pairing code generated:', pairingCode);
+                    } else {
+                        console.error('❌ Failed to create session');
+                    }
+                });
+            });
+
+            socket.on('disconnect', () => {
+                console.log('🔌 Disconnected from WebSocket server');
+                mobileConnected = false;
+            });
+
+            socket.on('mobile:connected', () => {
+                console.log('📱 Mobile device connected');
+                mobileConnected = true;
+
+                // Send initial state to mobile
+                sendStateToMobile();
+            });
+
+            socket.on('mobile:disconnected', () => {
+                console.log('📱 Mobile device disconnected');
+                mobileConnected = false;
+            });
+
+            socket.on('control-update', (update) => {
+                console.log('📱 Received control update from mobile:', update);
+                applyMobileUpdates(update);
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('❌ WebSocket connection error:', error);
+            });
         }
 
-        // Update shared state
+        // Send current state to mobile
+        function sendStateToMobile() {
+            if (!socket || !mobileConnected) return;
+
+            const stateSnapshot = {
+                settings: {
+                    intensity: state.settings.intensity,
+                    speed: state.settings.speed,
+                    smoothing: state.settings.smoothing,
+                    mode: state.settings.mode,
+                    freqEmphasis: state.settings.freqEmphasis
+                }
+            };
+
+            socket.emit('desktop:state-update', stateSnapshot);
+        }
+
+        // Update shared state (called when desktop controls change)
         function updateSharedState(updates) {
-            try {
-                const key = `soundscape_session_${pairingCode}`;
-                const data = JSON.parse(localStorage.getItem(key) || '{}');
-                data.state = { ...data.state, ...updates };
-                data.timestamp = Date.now();
-                localStorage.setItem(key, JSON.stringify(data));
-            } catch (e) {
-                console.warn('Failed to update shared state:', e);
-            }
+            if (!socket || !mobileConnected) return;
+            socket.emit('desktop:state-update', updates);
         }
 
         // Listen for state changes from mobile
         function startListeningForMobileUpdates() {
-            window.addEventListener('storage', (e) => {
-                if (e.key === `soundscape_session_${pairingCode}` && e.newValue) {
-                    try {
-                        const data = JSON.parse(e.newValue);
-                        if (data.mobileUpdate) {
-                            // Apply mobile updates to desktop
-                            applyMobileUpdates(data.mobileUpdate);
-                            // Clear the mobile update flag
-                            delete data.mobileUpdate;
-                            localStorage.setItem(e.key, JSON.stringify(data));
-                        }
-                    } catch (err) {
-                        console.warn('Failed to parse mobile update:', err);
-                    }
-                }
-            });
+            // WebSocket listeners are already set up in initializePairing()
+            // This function kept for compatibility
         }
 
         function applyMobileUpdates(updates) {
@@ -4655,13 +5239,22 @@
                 Object.entries(updates.settings).forEach(([key, value]) => {
                     const slider = document.getElementById(`${key}Slider`);
                     const valueEl = document.getElementById(`${key}Value`);
+
                     if (slider) slider.value = value;
+
                     if (valueEl) {
                         if (typeof value === 'number') {
                             valueEl.textContent = value.toFixed(1);
                         } else {
                             valueEl.textContent = value;
                         }
+                    }
+
+                    // Handle mode buttons
+                    if (key === 'mode') {
+                        document.querySelectorAll('.density-option').forEach(opt => {
+                            opt.classList.toggle('active', opt.dataset.mode === value);
+                        });
                     }
                 });
             }
