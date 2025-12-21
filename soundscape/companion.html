@@ -240,6 +240,17 @@
             color: #666666;
         }
 
+        .media-item-visibility {
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .media-item-visibility:hover {
+            transform: scale(1.2);
+        }
+
         .add-media-button {
             width: 100%;
             padding: 1rem;
@@ -699,13 +710,11 @@
 
             // Show relevant sections based on theme
             switch(theme) {
-                case 'wave':
-                    if (waveSettingsSection) waveSettingsSection.style.display = 'block';
-                    break;
                 case 'linear':
                     if (modeSection) modeSection.style.display = 'block';
                     break;
-                // NEON, GLITCH, STARS don't have companion-specific controls yet
+                // WAVE, NEON, GLITCH, STARS don't have companion-specific controls
+                // (Wave settings are incomplete, so hiding for now)
             }
         }
 
@@ -740,22 +749,63 @@
                 return;
             }
 
-            mediaList.innerHTML = mediaItems.map((item, index) => `
+            mediaList.innerHTML = mediaItems.map((item, index) => {
+                const isVisible = item.visible !== false; // Default to visible if not set
+                return `
                 <div class="media-item ${index === selectedMediaIndex ? 'selected' : ''}" data-index="${index}">
                     <div class="media-item-info">
                         <div class="media-item-name">${item.isVideo ? 'Video' : 'Image'} ${index + 1}</div>
                         <div class="media-item-type">${item.isVideo ? 'VIDEO' : 'IMAGE'}</div>
                     </div>
+                    <div class="media-item-visibility" data-index="${index}">
+                        ${isVisible ? '👁️' : '👁️‍🗨️'}
+                    </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
-            // Add click handlers
+            // Add click handlers for selecting media
             document.querySelectorAll('.media-item').forEach(item => {
-                item.addEventListener('click', () => {
+                item.addEventListener('click', (e) => {
+                    // Don't select if clicking on visibility icon
+                    if (e.target.classList.contains('media-item-visibility')) {
+                        return;
+                    }
                     const index = parseInt(item.dataset.index);
                     selectMedia(index);
                 });
             });
+
+            // Add click handlers for visibility toggle
+            document.querySelectorAll('.media-item-visibility').forEach(icon => {
+                icon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(icon.dataset.index);
+                    toggleMediaVisibility(index);
+                });
+            });
+        }
+
+        // Toggle media visibility
+        function toggleMediaVisibility(index) {
+            if (index < 0 || index >= mediaItems.length) return;
+
+            const item = mediaItems[index];
+            const newVisibility = item.visible === false ? true : false;
+
+            // Update local state
+            mediaItems[index].visible = newVisibility;
+
+            // Send to desktop
+            updateDesktop({
+                action: 'updateMedia',
+                mediaIndex: index,
+                property: 'visible',
+                value: newVisibility
+            });
+
+            // Re-render list
+            renderMediaList();
         }
 
         // Select media item

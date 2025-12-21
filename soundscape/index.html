@@ -3804,6 +3804,12 @@
                 const canvas = imageObj.canvas;
                 const ctx = canvas.getContext('2d');
 
+                // Check visibility - hide if explicitly set to false
+                if (imageObj.visible === false) {
+                    canvas.style.display = 'none';
+                    return; // Skip rendering this image
+                }
+
                 // Update canvas size and position
                 canvas.width = imageObj.width;
                 canvas.height = imageObj.height;
@@ -4559,23 +4565,41 @@
                     state.settings.theme = e.target.value;
                     console.log(`🎨 Theme changed to: ${state.settings.theme.toUpperCase()}`);
 
-                    // Clean up theme-specific elements
+                    // Clean up NEON theme elements
                     const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
                     if (gradientMeshGroup) {
                         gradientMeshGroup.innerHTML = '';
                     }
 
-                    // Clean up glitch paths
+                    // Clean up GLITCH theme paths
                     const allGlitchPaths = elements.svg.querySelectorAll('[id^="glitch-"]');
                     allGlitchPaths.forEach(path => path.remove());
 
-                    // Reset path attributes for theme change
+                    // Clean up STARS theme
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                        state.stars.starArray = [];
+                        state.stars.count = 0;
+                    }
+
+                    // Clean up WAVE theme
+                    if (state.wave.initialized) {
+                        state.wave.initialized = false;
+                        state.wave.gridNodes = [];
+                        state.wave.orbitalDots = [];
+                    }
+
+                    // Reset LINEAR theme path attributes
                     state.paths.forEach((path) => {
                         path.removeAttribute('filter');
                         path.removeAttribute('transform');
                         path.setAttribute('opacity', '0.6');
                         path.setAttribute('stroke', '#ffffff');
                     });
+
+                    // Clear the canvas to remove any residual graphics
+                    const ctx = elements.canvas.getContext('2d');
+                    ctx.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
 
                     // Update colors for new theme
                     updateColors();
@@ -6153,8 +6177,17 @@
                     speed: state.settings.speed,
                     smoothing: state.settings.smoothing,
                     mode: state.settings.mode,
+                    theme: state.settings.theme,
                     freqEmphasis: state.settings.freqEmphasis
-                }
+                },
+                imageObjects: state.imageObjects.map((obj, index) => ({
+                    isVideo: obj.isVideo || false,
+                    transparency: obj.transparency,
+                    rotation: obj.rotation,
+                    blur: obj.blur,
+                    theme: obj.theme,
+                    visible: obj.visible !== false // Default to true if not set
+                }))
             };
 
             socket.emit('desktop:state-update', stateSnapshot);
