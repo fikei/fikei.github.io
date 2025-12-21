@@ -368,16 +368,21 @@
         .add-image-dropdown {
             position: fixed;
             bottom: 3rem;
-            left: 1rem;
+            right: 1rem;
             z-index: 100;
             background: #000000;
             border: 1px solid #ffffff;
             display: none;
             min-width: 120px;
+            transition: right 0.2s ease;
         }
 
         .add-image-dropdown.show {
             display: block;
+        }
+
+        .add-image-dropdown.sidebar-is-open {
+            right: calc(200px + 1rem);
         }
 
         .add-image-dropdown-item {
@@ -4426,13 +4431,16 @@
                 const sidebarOpen = elements.sidebar.classList.contains('open');
                 const sidebarToggle = document.getElementById('sidebarToggle');
                 const addImageButton = document.getElementById('addImageButton');
+                const addImageDropdown = document.getElementById('addImageDropdown');
 
                 if (sidebarOpen) {
                     if (sidebarToggle) sidebarToggle.classList.add('sidebar-is-open');
                     if (addImageButton) addImageButton.classList.add('sidebar-is-open');
+                    if (addImageDropdown) addImageDropdown.classList.add('sidebar-is-open');
                 } else {
                     if (sidebarToggle) sidebarToggle.classList.remove('sidebar-is-open');
                     if (addImageButton) addImageButton.classList.remove('sidebar-is-open');
+                    if (addImageDropdown) addImageDropdown.classList.remove('sidebar-is-open');
                 }
             });
 

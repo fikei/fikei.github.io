@@ -359,6 +359,27 @@
         .mode-button:active {
             transform: scale(0.95);
         }
+
+        .theme-select {
+            width: 100%;
+            padding: 1rem;
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            font-size: 12px;
+            font-family: monospace;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        .theme-select:focus {
+            outline: none;
+            border-color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -390,13 +411,13 @@
         <div class="tab-content active" id="themesTab">
             <div class="control-section">
                 <h3>Background Theme</h3>
-                <div class="mode-buttons">
-                    <button class="mode-button" data-theme="linear">LINEAR</button>
-                    <button class="mode-button" data-theme="neon">NEON</button>
-                    <button class="mode-button" data-theme="glitch">GLITCH</button>
-                    <button class="mode-button" data-theme="stars">STARS</button>
-                    <button class="mode-button" data-theme="wave">WAVE</button>
-                </div>
+                <select class="theme-select" id="themeSelect">
+                    <option value="linear">LINEAR</option>
+                    <option value="neon">NEON</option>
+                    <option value="glitch">GLITCH</option>
+                    <option value="stars">STARS</option>
+                    <option value="wave">WAVE</option>
+                </select>
             </div>
 
             <div class="control-section">
@@ -655,11 +676,12 @@
                     });
                 }
 
-                // Update theme buttons
+                // Update theme select
                 if (key === 'theme') {
-                    document.querySelectorAll('.mode-button[data-theme]').forEach(btn => {
-                        btn.classList.toggle('active', btn.dataset.theme === value);
-                    });
+                    const themeSelect = document.getElementById('themeSelect');
+                    if (themeSelect && themeSelect.value !== value) {
+                        themeSelect.value = value;
+                    }
                 }
             });
         }
@@ -858,15 +880,13 @@
                 });
             });
 
-            // Theme buttons
-            const themeButtons = document.querySelectorAll('.mode-button[data-theme]');
-            themeButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    themeButtons.forEach(b => b.classList.remove('active'));
-                    button.classList.add('active');
-                    updateDesktop({ settings: { theme: button.dataset.theme } });
+            // Theme selector
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) {
+                themeSelect.addEventListener('change', (e) => {
+                    updateDesktop({ settings: { theme: e.target.value } });
                 });
-            });
+            }
         }
 
         function updateDesktop(settings) {
