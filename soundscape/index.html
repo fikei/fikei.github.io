@@ -3103,6 +3103,11 @@
                 if (addImageBtn) {
                     addImageBtn.classList.remove('hidden-control');
                 }
+
+                const pairingToggle = document.getElementById('pairingToggle');
+                if (pairingToggle) {
+                    pairingToggle.classList.remove('hidden-control');
+                }
             }
 
             // Reset idle timeout
@@ -3131,6 +3136,11 @@
             const addImageBtn = document.getElementById('addImageButton');
             if (addImageBtn) {
                 addImageBtn.classList.add('hidden-control');
+            }
+
+            const pairingToggle = document.getElementById('pairingToggle');
+            if (pairingToggle) {
+                pairingToggle.classList.add('hidden-control');
             }
         }
 
