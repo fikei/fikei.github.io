@@ -1182,28 +1182,28 @@
                 </div>
                 <input type="range" id="starDiameterSlider" min="0.5" max="2.0" step="0.1" value="1.0">
             </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>MODE</span>
-                </div>
-                <select id="starModeSelect" class="mode-select">
-                    <option value="planes">PLANES</option>
-                    <option value="grids">GRIDS</option>
-                    <option value="dots">DOTS</option>
-                </select>
-            </div>
-            <div class="control-group" id="starLayersControl">
-                <div class="control-label">
-                    <span>LAYERS</span>
-                    <span class="control-value" id="starLayersValue">3</span>
-                </div>
-                <input type="range" id="starLayersSlider" min="1" max="10" step="1" value="3">
-            </div>
         </section>
 
         <!-- WAVE Theme Controls -->
         <section class="control-section" id="waveControlsSection" style="display: none;">
             <h3>WAVE</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MODE</span>
+                </div>
+                <select id="waveModeSelect" class="mode-select">
+                    <option value="planes">PLANES</option>
+                    <option value="grids">GRIDS</option>
+                    <option value="dots">DOTS</option>
+                </select>
+            </div>
+            <div class="control-group" id="waveLayersControl" style="display: none;">
+                <div class="control-label">
+                    <span>LAYERS</span>
+                    <span class="control-value" id="waveLayersValue">3</span>
+                </div>
+                <input type="range" id="waveLayersSlider" min="1" max="10" step="1" value="3">
+            </div>
             <div class="control-group">
                 <div class="control-label">
                     <span>HUE</span>
@@ -1536,10 +1536,10 @@
                 starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
                 starSmoothing: 0.5,  // Audio smoothing for stars (0-1)
                 starDiameter: 1.0,  // Animation diameter multiplier (0.5-2.0)
-                starMode: 'planes',  // Visual mode: planes, grids, dots
-                starLayers: 3,  // Number of layers for grids/dots mode (1-10)
 
                 // WAVE theme settings
+                waveMode: 'planes',  // Visual mode: planes, grids, dots
+                waveLayers: 3,  // Number of layers for grids/dots mode (1-10)
                 waveHue: 280,  // Color hue (0-360)
                 waveSaturation: 70,  // Color saturation (0-100%)
                 waveDistortion: 1.5,  // Distortion intensity (0-5)
@@ -3417,13 +3417,10 @@
             state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
             state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
 
-            // Draw based on mode
+            // STARS theme always uses the original gradient planes mode
             ctx.globalCompositeOperation = 'lighter';
 
-            const mode = state.settings.starMode;
-
-            if (mode === 'planes') {
-                // PLANES MODE: Original gradient stars
+            // PLANES MODE: Original gradient stars
                 state.stars.starArray.forEach((star) => {
                     // Update Z position (move towards camera)
                     if (state.settings.starZSpeed > 0) {
@@ -6140,6 +6137,12 @@
             socket.on('mobile:connected', () => {
                 console.log('📱 Mobile device connected');
                 mobileConnected = true;
+
+                // Close pairing panel
+                const pairingPanel = document.getElementById('pairingPanel');
+                if (pairingPanel) {
+                    pairingPanel.style.display = 'none';
+                }
 
                 // Send initial state to mobile
                 sendStateToMobile();
