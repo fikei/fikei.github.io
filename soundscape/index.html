@@ -214,11 +214,11 @@
             color: #000000;
         }
 
-        /* Pairing Code Display (Bottom Left) */
+        /* Pairing Code Display (Bottom Right, next to fullscreen) */
         .pairing-code-display {
             position: fixed;
             bottom: 1rem;
-            left: 1rem;
+            right: calc(30px + 1rem + 0.5rem); /* To the left of fullscreen button */
             z-index: 101;
             height: 30px;
             background: #000000;
@@ -230,10 +230,14 @@
             color: #ffffff;
             letter-spacing: 0.2em;
             opacity: 1;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.5s ease, right 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        .pairing-code-display.sidebar-is-open {
+            right: calc(200px + 30px + 1rem + 0.5rem);
         }
 
         .pairing-code-display.hidden-control {
