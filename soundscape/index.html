@@ -773,7 +773,7 @@
         <section class="control-section" id="modeSection">
             <h3>MODE</h3>
             <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
-                <div class="density-option active" data-mode="default">DEFAULT</div>
+                <div class="density-option active" data-mode="default">FLOW</div>
                 <div class="density-option" data-mode="hole">HOLE</div>
                 <div class="density-option" data-mode="crunch">CRUNCH</div>
             </div>
@@ -883,9 +883,9 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>SMOOTHING</span>
-                    <span class="control-value" id="smoothingValue">0.3</span>
+                    <span class="control-value" id="smoothingValue">0.5</span>
                 </div>
-                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.3">
+                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.5">
             </div>
         </section>
 
@@ -964,7 +964,7 @@
         const config = {
             // Audio settings
             fftSize: 128, // Reduced from 256 for lower latency
-            smoothing: 0.3, // Reduced from 0.5 for faster response
+            smoothing: 0.5, // Default smoothing value
 
             // Grid settings
             densityPresets: {
@@ -1030,7 +1030,7 @@
                 highEmphasis: 1.0,
                 intensity: 2.5,
                 speed: 1.0,
-                smoothing: 0.3,
+                smoothing: 0.5,
                 density: 'medium',
                 gradient: 'default',
                 mode: 'default',
@@ -4045,7 +4045,7 @@
                 highEmphasis: 1.0,
                 intensity: 2.5,
                 speed: 1.0,
-                smoothing: 0.3,
+                smoothing: 0.5,
                 density: 'medium',
                 gradient: 'default',
                 mode: 'default',
@@ -4066,7 +4066,7 @@
             document.getElementById('highEmphasis').value = 1.0;
             document.getElementById('intensitySlider').value = 2.5;
             document.getElementById('speedSlider').value = 1.0;
-            document.getElementById('smoothingSlider').value = 0.3;
+            document.getElementById('smoothingSlider').value = 0.5;
             document.getElementById('colorTempSlider').value = 1.0;
             document.getElementById('rotationIntensitySlider').value = 1.0;
             document.getElementById('glitchIntensitySlider').value = 1.0;
@@ -4078,7 +4078,7 @@
             document.getElementById('highValue').textContent = '1.0';
             document.getElementById('intensityValue').textContent = '2.5';
             document.getElementById('speedValue').textContent = '1.0';
-            document.getElementById('smoothingValue').textContent = '0.3';
+            document.getElementById('smoothingValue').textContent = '0.5';
             document.getElementById('colorTempValue').textContent = '1.0';
             document.getElementById('rotationIntensityValue').textContent = '1.0';
             document.getElementById('glitchIntensityValue').textContent = '1.0';
