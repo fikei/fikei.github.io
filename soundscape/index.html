@@ -3484,7 +3484,7 @@
         function drawLinesWave() {
             const theme = config.themes.wave;
             const { low, mid, high } = state.audioLevels;
-            const time = state.currentTime;
+            const time = state.currentTime * 0.001; // Convert to seconds
 
             // Initialize on first render
             if (!state.wave.initialized) {
@@ -3529,94 +3529,113 @@
                 baseSat = colorMode.saturation;
             }
 
-            // Audio-reactive distortion (bass affects grid)
-            const distortionAmount = state.settings.waveDistortion * (1.0 + low * 2.0);
+            // Audio-reactive intensity (bass affects amplitude)
+            const intensity = state.settings.waveDistortion * (1.0 + low * 2.0);
+            const speedMultiplier = state.settings.waveSpeed;
 
             // Get grid density
             const density = theme.gridDensity[state.settings.waveDensity] || theme.gridDensity.medium;
             const cols = density.cols;
             const rows = density.rows;
 
-            // Draw mesh grid
-            ctx.strokeStyle = `hsl(${baseHue}, ${baseSat}%, 20%)`;
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.3 + (mid * 0.3);
+            // Helper function to calculate displaced position (shader-like)
+            function getDisplacedPos(i, j) {
+                const normX = i / (cols - 1);
+                const normY = j / (rows - 1);
+                const baseX = normX * w;
+                const baseY = normY * h;
 
-            state.wave.gridNodes.forEach(node => {
-                // Apply noise-based distortion
-                const noiseX = state.noise(node.i * theme.noiseScale + time * state.settings.waveSpeed * 0.001, node.j * theme.noiseScale);
-                const noiseY = state.noise(node.i * theme.noiseScale, node.j * theme.noiseScale + time * state.settings.waveSpeed * 0.001);
+                // Vertex shader displacement: sine and cosine waves
+                const displaceY = Math.sin(baseX * 0.01 + time * speedMultiplier) * 15 * intensity;
+                const displaceX = Math.cos(baseY * 0.008 + time * speedMultiplier * 1.5) * 8 * intensity;
 
-                const x = node.baseX + noiseX * distortionAmount * 50;
-                const y = node.baseY + noiseY * distortionAmount * 50;
+                // Fragment shader noise pattern
+                const noise = Math.sin(normX * 20.0 + time * speedMultiplier) * Math.cos(normY * 15.0 + time * speedMultiplier * 0.8)
+                    + Math.sin(normX * 35.0 - time * speedMultiplier * 2.0) * Math.cos(normY * 25.0 + time * speedMultiplier * 1.2) * 0.5;
 
-                // Draw connections to neighbors
-                const rightNeighbor = state.wave.gridNodes.find(n => n.i === node.i + 1 && n.j === node.j);
-                const bottomNeighbor = state.wave.gridNodes.find(n => n.i === node.i && n.j === node.j + 1);
+                const x = baseX + displaceX + noise * 3;
+                const y = baseY + displaceY + noise * 3;
 
-                if (rightNeighbor) {
-                    const rightNoiseX = state.noise(rightNeighbor.i * theme.noiseScale + time * state.settings.waveSpeed * 0.001, rightNeighbor.j * theme.noiseScale);
-                    const rightNoiseY = state.noise(rightNeighbor.i * theme.noiseScale, rightNeighbor.j * theme.noiseScale + time * state.settings.waveSpeed * 0.001);
-                    const rightX = rightNeighbor.baseX + rightNoiseX * distortionAmount * 50;
-                    const rightY = rightNeighbor.baseY + rightNoiseY * distortionAmount * 50;
+                return { x, y, noise, normX, normY };
+            }
 
+            // Draw filled mesh quads with gradients (shader-like)
+            for (let i = 0; i < cols - 1; i++) {
+                for (let j = 0; j < rows - 1; j++) {
+                    const p1 = getDisplacedPos(i, j);
+                    const p2 = getDisplacedPos(i + 1, j);
+                    const p3 = getDisplacedPos(i + 1, j + 1);
+                    const p4 = getDisplacedPos(i, j + 1);
+
+                    // Color mixing based on noise and position (fragment shader style)
+                    const avgNoise = (p1.noise + p2.noise + p3.noise + p4.noise) / 4;
+                    const colorMix = avgNoise * 0.5 + 0.5; // Normalize to 0-1
+
+                    // Create gradient from dark to light based on noise
+                    const lightness1 = 10 + colorMix * 30; // Dark color
+                    const lightness2 = 40 + colorMix * 40; // Bright color
+
+                    // Audio-reactive brightness (mids affect brightness)
+                    const midBoost = mid * 20;
+
+                    // Create radial gradient for quad (glow effect)
+                    const centerX = (p1.x + p2.x + p3.x + p4.x) / 4;
+                    const centerY = (p1.y + p2.y + p3.y + p4.y) / 4;
+                    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 50);
+
+                    gradient.addColorStop(0, `hsla(${baseHue}, ${baseSat}%, ${lightness2 + midBoost}%, ${0.1 + state.settings.waveGlow * 0.2})`);
+                    gradient.addColorStop(1, `hsla(${baseHue}, ${baseSat}%, ${lightness1}%, ${0.05 + state.settings.waveGlow * 0.1})`);
+
+                    ctx.fillStyle = gradient;
                     ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(rightX, rightY);
-                    ctx.stroke();
-                }
-
-                if (bottomNeighbor) {
-                    const bottomNoiseX = state.noise(bottomNeighbor.i * theme.noiseScale + time * state.settings.waveSpeed * 0.001, bottomNeighbor.j * theme.noiseScale);
-                    const bottomNoiseY = state.noise(bottomNeighbor.i * theme.noiseScale, bottomNeighbor.j * theme.noiseScale + time * state.settings.waveSpeed * 0.001);
-                    const bottomX = bottomNeighbor.baseX + bottomNoiseX * distortionAmount * 50;
-                    const bottomY = bottomNeighbor.baseY + bottomNoiseY * distortionAmount * 50;
-
-                    ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(bottomX, bottomY);
-                    ctx.stroke();
-                }
-
-                // Draw glowing node (high-reactive)
-                const glowAmount = state.settings.waveGlow * (0.5 + high * 0.5);
-                if (glowAmount > 0) {
-                    ctx.globalAlpha = glowAmount * 0.8;
-                    ctx.fillStyle = `hsl(${baseHue}, ${baseSat}%, 80%)`;
-                    ctx.beginPath();
-                    ctx.arc(x, y, theme.nodeSize, 0, Math.PI * 2);
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p3.x, p3.y);
+                    ctx.lineTo(p4.x, p4.y);
+                    ctx.closePath();
                     ctx.fill();
-                }
-            });
 
-            // Draw orbital dots (mid-reactive speed)
-            ctx.globalAlpha = 0.8;
-            const speedMultiplier = 1.0 + mid * 1.5;
+                    // Draw subtle wireframe (optional, based on glow setting)
+                    if (state.settings.waveGlow > 0.3) {
+                        ctx.strokeStyle = `hsla(${baseHue}, ${baseSat}%, ${60 + high * 40}%, ${0.1 + state.settings.waveGlow * 0.2})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // Draw orbital dots over mesh (high-reactive)
+            const dotSpeedMultiplier = 1.0 + mid * 1.5;
 
             state.wave.orbitalDots.forEach(dot => {
                 // Audio-reactive orbit radius (bass expands)
                 const radius = dot.baseRadius * (1.0 + low * 0.3);
 
                 // Update angle with mid-reactive speed
-                dot.angle += dot.speed * speedMultiplier * state.settings.waveSpeed;
+                dot.angle += dot.speed * dotSpeedMultiplier * speedMultiplier;
 
                 const x = dot.centerX + Math.cos(dot.angle) * radius;
                 const y = dot.centerY + Math.sin(dot.angle) * radius;
 
-                // Draw dot with glow
-                ctx.globalAlpha = 0.6 + (high * 0.4);
-                ctx.fillStyle = `hsl(${baseHue}, ${baseSat}%, 90%)`;
+                // High-reactive glow
+                const dotGlow = state.settings.waveGlow * (0.6 + high * 0.4);
+
+                // Draw dot with radial gradient glow
+                const dotGradient = ctx.createRadialGradient(x, y, 0, x, y, theme.dotSize * 4);
+                dotGradient.addColorStop(0, `hsla(${baseHue}, ${baseSat}%, 100%, ${dotGlow})`);
+                dotGradient.addColorStop(0.5, `hsla(${baseHue}, ${baseSat}%, 80%, ${dotGlow * 0.5})`);
+                dotGradient.addColorStop(1, `hsla(${baseHue}, ${baseSat}%, 60%, 0)`);
+
+                ctx.fillStyle = dotGradient;
+                ctx.beginPath();
+                ctx.arc(x, y, theme.dotSize * 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Core dot
+                ctx.fillStyle = `hsla(${baseHue}, ${baseSat}%, 100%, ${dotGlow * 1.2})`;
                 ctx.beginPath();
                 ctx.arc(x, y, theme.dotSize, 0, Math.PI * 2);
                 ctx.fill();
-
-                // Add glow effect
-                if (state.settings.waveGlow > 0.5) {
-                    ctx.globalAlpha = 0.3 * state.settings.waveGlow;
-                    ctx.beginPath();
-                    ctx.arc(x, y, theme.dotSize * 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
             });
 
             ctx.globalAlpha = 1.0;
