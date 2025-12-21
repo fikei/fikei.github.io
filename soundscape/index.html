@@ -12,6 +12,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
 
+    <!-- Socket.io for WebSocket communication -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
     <style>
         /* ===== RESET & BASE ===== */
         * {
@@ -792,8 +795,8 @@
     <div class="add-image-dropdown" id="addImageDropdown">
         <div class="add-image-dropdown-item" id="addImageMenuItem">Add Image</div>
         <div class="add-image-dropdown-item" id="addVideoMenuItem">Add Video</div>
-        <div class="add-image-dropdown-item" id="saveCanvasMenuItem">Save Canvas</div>
-        <div class="add-image-dropdown-item" id="loadCanvasMenuItem">Load Canvas</div>
+        <div class="add-image-dropdown-item" id="saveCanvasMenuItem" style="display: none;">Save Canvas</div>
+        <div class="add-image-dropdown-item" id="loadCanvasMenuItem" style="display: none;">Load Canvas</div>
     </div>
 
     <!-- Video URL Popup -->
@@ -4599,61 +4602,96 @@
         }
 
         // =====================================================
-        // MOBILE COMPANION PAIRING
+        // MOBILE COMPANION PAIRING (WebSocket)
         // =====================================================
 
-        // Generate 6-digit pairing code
-        function generatePairingCode() {
-            return Math.floor(100000 + Math.random() * 900000).toString();
-        }
+        let socket = null;
+        let pairingCode = null;
+        let mobileConnected = false;
 
-        // Session ID for this desktop instance
-        const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        const pairingCode = generatePairingCode();
-
-        // Store pairing info in localStorage
+        // Connect to WebSocket server
         function initializePairing() {
-            const pairingData = {
-                code: pairingCode,
-                sessionId: sessionId,
-                timestamp: Date.now(),
-                state: {}
-            };
-            localStorage.setItem(`soundscape_session_${pairingCode}`, JSON.stringify(pairingData));
-            console.log('📱 Pairing code generated:', pairingCode);
+            // Determine WebSocket server URL
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = window.location.port || '3000';
+
+            // Use same host as web page, or fallback to localhost for local dev
+            const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://localhost:3000`
+                : `${window.location.protocol}//${window.location.host}`;
+
+            socket = io(socketUrl);
+
+            socket.on('connect', () => {
+                console.log('🔌 Connected to WebSocket server');
+
+                // Request pairing code from server
+                socket.emit('desktop:create-session', (response) => {
+                    if (response.success) {
+                        pairingCode = response.code;
+                        console.log('📱 Pairing code generated:', pairingCode);
+                    } else {
+                        console.error('❌ Failed to create session');
+                    }
+                });
+            });
+
+            socket.on('disconnect', () => {
+                console.log('🔌 Disconnected from WebSocket server');
+                mobileConnected = false;
+            });
+
+            socket.on('mobile:connected', () => {
+                console.log('📱 Mobile device connected');
+                mobileConnected = true;
+
+                // Send initial state to mobile
+                sendStateToMobile();
+            });
+
+            socket.on('mobile:disconnected', () => {
+                console.log('📱 Mobile device disconnected');
+                mobileConnected = false;
+            });
+
+            socket.on('control-update', (update) => {
+                console.log('📱 Received control update from mobile:', update);
+                applyMobileUpdates(update);
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('❌ WebSocket connection error:', error);
+            });
         }
 
-        // Update shared state
+        // Send current state to mobile
+        function sendStateToMobile() {
+            if (!socket || !mobileConnected) return;
+
+            const stateSnapshot = {
+                settings: {
+                    intensity: state.settings.intensity,
+                    speed: state.settings.speed,
+                    smoothing: state.settings.smoothing,
+                    mode: state.settings.mode,
+                    freqEmphasis: state.settings.freqEmphasis
+                }
+            };
+
+            socket.emit('desktop:state-update', stateSnapshot);
+        }
+
+        // Update shared state (called when desktop controls change)
         function updateSharedState(updates) {
-            try {
-                const key = `soundscape_session_${pairingCode}`;
-                const data = JSON.parse(localStorage.getItem(key) || '{}');
-                data.state = { ...data.state, ...updates };
-                data.timestamp = Date.now();
-                localStorage.setItem(key, JSON.stringify(data));
-            } catch (e) {
-                console.warn('Failed to update shared state:', e);
-            }
+            if (!socket || !mobileConnected) return;
+            socket.emit('desktop:state-update', updates);
         }
 
         // Listen for state changes from mobile
         function startListeningForMobileUpdates() {
-            window.addEventListener('storage', (e) => {
-                if (e.key === `soundscape_session_${pairingCode}` && e.newValue) {
-                    try {
-                        const data = JSON.parse(e.newValue);
-                        if (data.mobileUpdate) {
-                            // Apply mobile updates to desktop
-                            applyMobileUpdates(data.mobileUpdate);
-                            // Clear the mobile update flag
-                            delete data.mobileUpdate;
-                            localStorage.setItem(e.key, JSON.stringify(data));
-                        }
-                    } catch (err) {
-                        console.warn('Failed to parse mobile update:', err);
-                    }
-                }
-            });
+            // WebSocket listeners are already set up in initializePairing()
+            // This function kept for compatibility
         }
 
         function applyMobileUpdates(updates) {
@@ -4665,13 +4703,22 @@
                 Object.entries(updates.settings).forEach(([key, value]) => {
                     const slider = document.getElementById(`${key}Slider`);
                     const valueEl = document.getElementById(`${key}Value`);
+
                     if (slider) slider.value = value;
+
                     if (valueEl) {
                         if (typeof value === 'number') {
                             valueEl.textContent = value.toFixed(1);
                         } else {
                             valueEl.textContent = value;
                         }
+                    }
+
+                    // Handle mode buttons
+                    if (key === 'mode') {
+                        document.querySelectorAll('.density-option').forEach(opt => {
+                            opt.classList.toggle('active', opt.dataset.mode === value);
+                        });
                     }
                 });
             }
