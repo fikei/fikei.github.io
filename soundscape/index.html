@@ -735,13 +735,6 @@
                 </div>
                 <input type="range" id="colorTempSlider" min="0" max="2.0" step="0.1" value="1.0">
             </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>SAT RANGE</span>
-                    <span class="control-value" id="satRangeValue">1.0</span>
-                </div>
-                <input type="range" id="satRangeSlider" min="0" max="2.0" step="0.1" value="1.0">
-            </div>
         </section>
 
         <!-- GLITCH Theme Controls -->
@@ -977,7 +970,6 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                satRange: 1.0,
                 image3DMotion: 0.0  // 3D motion intensity for image objects (0 = off)
             },
 
@@ -1666,15 +1658,14 @@
             // Get color mode settings
             const colorMode = state.settings.neonMode;
             const colorTempIntensity = state.settings.colorTemp;
-            const satRangeIntensity = state.settings.satRange;
 
             // Calculate audio-reactive parameters
             const hueShift = (mid * 360 + time * 0.05) % 360;
 
             // Saturation mapping: high frequencies = less saturated, low frequencies = more saturated
             const baseSaturation = theme.saturationBase + high * theme.saturationMultiplier;
-            const saturationFromLow = low * 30 * satRangeIntensity; // Bass increases saturation
-            const saturationFromHigh = -high * 20 * satRangeIntensity; // Highs decrease saturation
+            const saturationFromLow = low * 30; // Bass increases saturation
+            const saturationFromHigh = -high * 20; // Highs decrease saturation
             const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
 
             // Lightness: Low frequencies darken, high frequencies brighten
@@ -1916,15 +1907,14 @@
             // Get color mode settings
             const colorMode = state.settings.neonMode;
             const colorTempIntensity = state.settings.colorTemp;
-            const satRangeIntensity = state.settings.satRange;
 
             // Calculate audio-reactive parameters
             const hueShift = (mid * 360 + time * 0.05) % 360;
 
             // Saturation mapping
             const baseSaturation = theme.saturationBase + high * theme.saturationMultiplier;
-            const saturationFromLow = low * 30 * satRangeIntensity;
-            const saturationFromHigh = -high * 20 * satRangeIntensity;
+            const saturationFromLow = low * 30;
+            const saturationFromHigh = -high * 20;
             const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
 
             // Lightness
@@ -3407,10 +3397,6 @@
                 state.settings.colorTemp = value;
             });
 
-            // NEON saturation range slider
-            setupSlider('satRangeSlider', 'satRangeValue', (value) => {
-                state.settings.satRange = value;
-            });
 
             // GLITCH rotation intensity slider
             setupSlider('rotationIntensitySlider', 'rotationIntensityValue', (value) => {
@@ -3886,7 +3872,6 @@
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
-                satRange: 1.0,
                 image3DMotion: 0.0
             };
 
@@ -3898,7 +3883,6 @@
             document.getElementById('speedSlider').value = 1.0;
             document.getElementById('smoothingSlider').value = 0.3;
             document.getElementById('colorTempSlider').value = 1.0;
-            document.getElementById('satRangeSlider').value = 1.0;
             document.getElementById('rotationIntensitySlider').value = 1.0;
             document.getElementById('glitchIntensitySlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
@@ -3910,7 +3894,6 @@
             document.getElementById('speedValue').textContent = '1.0';
             document.getElementById('smoothingValue').textContent = '0.3';
             document.getElementById('colorTempValue').textContent = '1.0';
-            document.getElementById('satRangeValue').textContent = '1.0';
             document.getElementById('rotationIntensityValue').textContent = '1.0';
             document.getElementById('glitchIntensityValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
