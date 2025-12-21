@@ -1097,6 +1097,48 @@
                 </div>
                 <input type="range" id="starSpeedSlider" min="0" max="5.0" step="0.1" value="1.0">
             </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>STAR COUNT</span>
+                    <span class="control-value" id="starCountValue">1200</span>
+                </div>
+                <input type="range" id="starCountSlider" min="100" max="2000" step="100" value="1200">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>BRIGHTNESS</span>
+                    <span class="control-value" id="starBrightnessValue">0.8</span>
+                </div>
+                <input type="range" id="starBrightnessSlider" min="0" max="1.0" step="0.05" value="0.8">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>AUDIO BOOST</span>
+                    <span class="control-value" id="starAudioBoostValue">3.0x</span>
+                </div>
+                <input type="range" id="starAudioBoostSlider" min="0" max="10.0" step="0.5" value="3.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>TWINKLE RATE</span>
+                    <span class="control-value" id="starTwinkleValue">20</span>
+                </div>
+                <input type="range" id="starTwinkleSlider" min="1" max="50" step="1" value="20">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MIN OPACITY</span>
+                    <span class="control-value" id="starMinOpacityValue">0.2</span>
+                </div>
+                <input type="range" id="starMinOpacitySlider" min="0" max="1.0" step="0.05" value="0.2">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MAX OPACITY</span>
+                    <span class="control-value" id="starMaxOpacityValue">1.0</span>
+                </div>
+                <input type="range" id="starMaxOpacitySlider" min="0" max="1.0" step="0.05" value="1.0">
+            </div>
         </section>
 
         <!-- Frequency Emphasis -->
@@ -1319,7 +1361,13 @@
                 image3DMotion: 0.0,  // 3D motion intensity for image objects (0 = off)
                 starHue: 217,  // Star base color hue (0-360)
                 starSaturation: 61,  // Star color saturation (0-100%)
-                starSpeed: 1.0  // Star base speed multiplier (0-5)
+                starSpeed: 1.0,  // Star base speed multiplier (0-5)
+                starCount: 1200,  // Number of stars (100-2000)
+                starBrightness: 0.8,  // Overall star brightness (0-1)
+                starAudioBoost: 3.0,  // Audio-reactive speed multiplier (0-10)
+                starTwinkle: 20,  // Twinkle rate (1-50, higher = less frequent)
+                starMinOpacity: 0.2,  // Minimum star opacity (0-1)
+                starMaxOpacity: 1.0  // Maximum star opacity (0-1)
             },
 
             // Audio
@@ -3053,19 +3101,21 @@
                     this.radius = Math.floor(Math.random() * (60 - this.orbitRadius / 12) + this.orbitRadius / 12);
                     this.orbitX = w / 2;
                     this.orbitY = h / 2;
-                    this.timePassed = Math.random() * theme.maxStars;
+                    this.timePassed = Math.random() * state.settings.starCount;
                     this.baseSpeed = (Math.random() * this.orbitRadius * theme.baseSpeed);
-                    this.alpha = (Math.random() * (theme.alphaMax - theme.alphaMin) + theme.alphaMin) * theme.brightness;
+                    // Use user settings for opacity range and brightness
+                    this.alpha = (Math.random() * (state.settings.starMaxOpacity - state.settings.starMinOpacity) + state.settings.starMinOpacity) * state.settings.starBrightness;
                     state.stars.starArray.push(this);
                 }
             }
 
-            for (let i = 0; i < theme.maxStars; i++) {
+            // Use user setting for star count
+            for (let i = 0; i < state.settings.starCount; i++) {
                 new Star();
             }
 
             state.stars.initialized = true;
-            console.log(`✨ Initialized ${theme.maxStars} stars`);
+            console.log(`✨ Initialized ${state.settings.starCount} stars`);
         }
 
         function updateStarGradient() {
@@ -3124,8 +3174,8 @@
             ctx.fillRect(0, 0, w, h);
 
             // Calculate audio-reactive speed multiplier
-            // Bass increases orbit speed
-            const speedBoost = 1.0 + (low * theme.speedMultiplier);
+            // Bass increases orbit speed using user setting
+            const speedBoost = 1.0 + (low * state.settings.starAudioBoost);
 
             // Draw stars
             ctx.globalCompositeOperation = 'lighter';
@@ -3134,11 +3184,11 @@
                 const x = Math.sin(star.timePassed) * star.orbitRadius + star.orbitX;
                 const y = Math.cos(star.timePassed) * star.orbitRadius + star.orbitY;
 
-                // Twinkle effect
-                const twinkle = Math.floor(Math.random() * theme.twinkleIntensity);
-                if (twinkle === 1 && star.alpha > theme.alphaMin) {
+                // Twinkle effect using user setting
+                const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
+                if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
                     star.alpha -= 0.05;
-                } else if (twinkle === 2 && star.alpha < theme.alphaMax * theme.brightness) {
+                } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
                     star.alpha += 0.05;
                 }
 
@@ -4185,6 +4235,90 @@
                 });
             }
 
+            // STARS count slider
+            const starCountSlider = document.getElementById('starCountSlider');
+            const starCountValue = document.getElementById('starCountValue');
+            if (starCountSlider && starCountValue) {
+                starCountSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.starCount = value;
+                    starCountValue.textContent = value;
+                    // Star count change requires reinitialization
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS brightness slider
+            const starBrightnessSlider = document.getElementById('starBrightnessSlider');
+            const starBrightnessValue = document.getElementById('starBrightnessValue');
+            if (starBrightnessSlider && starBrightnessValue) {
+                starBrightnessSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starBrightness = value;
+                    starBrightnessValue.textContent = value.toFixed(2);
+                    // Brightness change requires reinitialization to update star alphas
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS audio boost slider
+            const starAudioBoostSlider = document.getElementById('starAudioBoostSlider');
+            const starAudioBoostValue = document.getElementById('starAudioBoostValue');
+            if (starAudioBoostSlider && starAudioBoostValue) {
+                starAudioBoostSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starAudioBoost = value;
+                    starAudioBoostValue.textContent = `${value.toFixed(1)}x`;
+                    // Audio boost affects rendering, no reinit needed
+                });
+            }
+
+            // STARS twinkle slider
+            const starTwinkleSlider = document.getElementById('starTwinkleSlider');
+            const starTwinkleValue = document.getElementById('starTwinkleValue');
+            if (starTwinkleSlider && starTwinkleValue) {
+                starTwinkleSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.starTwinkle = value;
+                    starTwinkleValue.textContent = value;
+                    // Twinkle affects rendering, no reinit needed
+                });
+            }
+
+            // STARS min opacity slider
+            const starMinOpacitySlider = document.getElementById('starMinOpacitySlider');
+            const starMinOpacityValue = document.getElementById('starMinOpacityValue');
+            if (starMinOpacitySlider && starMinOpacityValue) {
+                starMinOpacitySlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starMinOpacity = value;
+                    starMinOpacityValue.textContent = value.toFixed(2);
+                    // Opacity change requires reinitialization to update star alphas
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
+            // STARS max opacity slider
+            const starMaxOpacitySlider = document.getElementById('starMaxOpacitySlider');
+            const starMaxOpacityValue = document.getElementById('starMaxOpacityValue');
+            if (starMaxOpacitySlider && starMaxOpacityValue) {
+                starMaxOpacitySlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    state.settings.starMaxOpacity = value;
+                    starMaxOpacityValue.textContent = value.toFixed(2);
+                    // Opacity change requires reinitialization to update star alphas
+                    if (state.stars.initialized) {
+                        state.stars.initialized = false;
+                    }
+                });
+            }
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -4792,7 +4926,13 @@
                 image3DMotion: 0.0,
                 starHue: 217,
                 starSaturation: 61,
-                starSpeed: 1.0
+                starSpeed: 1.0,
+                starCount: 1200,
+                starBrightness: 0.8,
+                starAudioBoost: 3.0,
+                starTwinkle: 20,
+                starMinOpacity: 0.2,
+                starMaxOpacity: 1.0
             };
 
             // Update UI
@@ -4810,6 +4950,12 @@
             document.getElementById('starHueSlider').value = 217;
             document.getElementById('starSaturationSlider').value = 61;
             document.getElementById('starSpeedSlider').value = 1.0;
+            document.getElementById('starCountSlider').value = 1200;
+            document.getElementById('starBrightnessSlider').value = 0.8;
+            document.getElementById('starAudioBoostSlider').value = 3.0;
+            document.getElementById('starTwinkleSlider').value = 20;
+            document.getElementById('starMinOpacitySlider').value = 0.2;
+            document.getElementById('starMaxOpacitySlider').value = 1.0;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -4825,6 +4971,12 @@
             document.getElementById('starHueValue').textContent = '217°';
             document.getElementById('starSaturationValue').textContent = '61%';
             document.getElementById('starSpeedValue').textContent = '1.0';
+            document.getElementById('starCountValue').textContent = '1200';
+            document.getElementById('starBrightnessValue').textContent = '0.80';
+            document.getElementById('starAudioBoostValue').textContent = '3.0x';
+            document.getElementById('starTwinkleValue').textContent = '20';
+            document.getElementById('starMinOpacityValue').textContent = '0.20';
+            document.getElementById('starMaxOpacityValue').textContent = '1.00';
 
             // Update analyser if active
             if (state.analyser) {
