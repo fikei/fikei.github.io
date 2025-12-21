@@ -795,11 +795,10 @@
     <!-- Fullscreen Toggle -->
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
 
-    <!-- Add Image Button & Dropdown -->
-    <button class="add-image-button" id="addImageButton" aria-label="Add image">+</button>
+    <!-- Add Media Button & Dropdown -->
+    <button class="add-image-button" id="addImageButton" aria-label="Add media">+</button>
     <div class="add-image-dropdown" id="addImageDropdown">
-        <div class="add-image-dropdown-item" id="addImageMenuItem">Add Image</div>
-        <div class="add-image-dropdown-item" id="addVideoMenuItem">Add Video</div>
+        <div class="add-image-dropdown-item" id="addMediaMenuItem">Add Media</div>
         <div class="add-image-dropdown-item" id="saveCanvasMenuItem" style="display: none;">Save Canvas</div>
         <div class="add-image-dropdown-item" id="loadCanvasMenuItem" style="display: none;">Load Canvas</div>
     </div>
@@ -808,7 +807,7 @@
     <div class="video-popup" id="mediaPopup" style="display: none;">
         <div class="video-popup-content">
             <h3 id="mediaPopupTitle">ADD MEDIA</h3>
-            <input type="text" id="mediaUrlInput" placeholder="Enter URL (direct video/image file only)" />
+            <input type="text" id="mediaUrlInput" placeholder="Enter media URL (direct image or video file)" />
             <p style="text-align: center; margin: 0.5rem 0; font-size: 8px; color: #999; text-transform: uppercase;">Or <a href="#" id="mediaBrowseLink" style="color: #fff; text-decoration: underline; cursor: pointer;">browse</a> from desktop</p>
             <div class="video-popup-buttons">
                 <button id="mediaPopupAdd">ADD</button>
@@ -5143,12 +5142,12 @@
                 }
             });
 
-            // Add image button and dropdown
+            // Add media button and dropdown
             const addImageButton = document.getElementById('addImageButton');
             const addImageDropdown = document.getElementById('addImageDropdown');
-            const addImageMenuItem = document.getElementById('addImageMenuItem');
+            const addMediaMenuItem = document.getElementById('addMediaMenuItem');
 
-            if (addImageButton && addImageDropdown && addImageMenuItem) {
+            if (addImageButton && addImageDropdown && addMediaMenuItem) {
                 // Toggle dropdown on button click
                 addImageButton.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -5170,24 +5169,18 @@
                 const mediaBrowseLink = document.getElementById('mediaBrowseLink');
                 const mediaFileInput = document.getElementById('mediaFileInput');
 
-                let currentMediaType = 'image'; // Track whether we're adding image or video
-
                 function openMediaModal(type) {
-                    currentMediaType = type;
                     const mediaPopupTitle = document.getElementById('mediaPopupTitle');
 
-                    if (type === 'video') {
-                        mediaPopupTitle.textContent = 'ADD VIDEO';
-                        mediaUrlInput.placeholder = 'Enter video URL (direct .mp4, .webm file only)';
-                        mediaFileInput.accept = 'video/*';
-                    } else if (type === 'image') {
-                        mediaPopupTitle.textContent = 'ADD IMAGE';
-                        mediaUrlInput.placeholder = 'Enter image URL (direct .jpg, .png file only)';
-                        mediaFileInput.accept = 'image/*';
-                    } else if (type === 'background') {
+                    if (type === 'background') {
                         mediaPopupTitle.textContent = 'UPLOAD BACKGROUND IMAGE';
                         mediaUrlInput.placeholder = 'Enter image URL (direct .jpg, .png file only)';
                         mediaFileInput.accept = 'image/*';
+                    } else {
+                        // Default: combined media (both image and video)
+                        mediaPopupTitle.textContent = 'ADD MEDIA';
+                        mediaUrlInput.placeholder = 'Enter media URL (direct image or video file)';
+                        mediaFileInput.accept = 'image/*,video/*';
                     }
 
                     mediaUrlInput.value = '';
@@ -5195,26 +5188,21 @@
                     mediaUrlInput.focus();
                 }
 
-                // Handle "Add Image" menu item click
-                addImageMenuItem.addEventListener('click', () => {
+                // Handle "Add Media" menu item click
+                addMediaMenuItem.addEventListener('click', () => {
                     addImageDropdown.classList.remove('show');
-                    openMediaModal('image');
+                    openMediaModal('media');
                 });
-
-                // Handle "Add Video" menu item click
-                const addVideoMenuItem = document.getElementById('addVideoMenuItem');
-                if (addVideoMenuItem) {
-                    addVideoMenuItem.addEventListener('click', () => {
-                        addImageDropdown.classList.remove('show');
-                        openMediaModal('video');
-                    });
-                }
 
                 if (mediaPopupAdd && mediaPopup && mediaUrlInput) {
                     mediaPopupAdd.addEventListener('click', () => {
                         const url = mediaUrlInput.value.trim();
                         if (url) {
-                            if (currentMediaType === 'video') {
+                            // Auto-detect media type from URL extension
+                            const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
+                            const isVideo = videoExtensions.some(ext => url.toLowerCase().includes(ext));
+
+                            if (isVideo) {
                                 loadVideoFromUrl(url);
                             } else {
                                 loadImageFromUrl(url);
@@ -5258,7 +5246,11 @@
                         } else if (e.key === 'Enter') {
                             const url = mediaUrlInput.value.trim();
                             if (url) {
-                                if (currentMediaType === 'video') {
+                                // Auto-detect media type from URL extension
+                                const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
+                                const isVideo = videoExtensions.some(ext => url.toLowerCase().includes(ext));
+
+                                if (isVideo) {
                                     loadVideoFromUrl(url);
                                 } else {
                                     loadImageFromUrl(url);
