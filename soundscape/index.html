@@ -282,6 +282,75 @@
             color: #000000;
         }
 
+        /* ===== VIDEO POPUP ===== */
+        .video-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-popup-content {
+            background: #000000;
+            border: 1px solid #ffffff;
+            padding: 2rem;
+            min-width: 300px;
+            max-width: 500px;
+        }
+
+        .video-popup-content h3 {
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            margin-bottom: 1.5rem;
+        }
+
+        .video-popup-content input[type="text"] {
+            width: 100%;
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            padding: 0.75rem;
+            font-size: 10px;
+            font-family: monospace;
+            margin-bottom: 1.5rem;
+            outline: none;
+        }
+
+        .video-popup-content input[type="text"]:focus {
+            border-color: #999999;
+        }
+
+        .video-popup-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        .video-popup-buttons button {
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            padding: 0.5rem 1.5rem;
+            font-size: 10px;
+            font-family: monospace;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.15s ease;
+        }
+
+        .video-popup-buttons button:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
         /* ===== CONTROLS SIDEBAR ===== */
         .sidebar {
             position: fixed;
@@ -602,8 +671,21 @@
     <button class="add-image-button" id="addImageButton" aria-label="Add image">+</button>
     <div class="add-image-dropdown" id="addImageDropdown">
         <div class="add-image-dropdown-item" id="addImageMenuItem">Add Image</div>
+        <div class="add-image-dropdown-item" id="addVideoMenuItem">Add Video</div>
         <div class="add-image-dropdown-item" id="saveCanvasMenuItem">Save Canvas</div>
         <div class="add-image-dropdown-item" id="loadCanvasMenuItem">Load Canvas</div>
+    </div>
+
+    <!-- Video URL Popup -->
+    <div class="video-popup" id="videoPopup" style="display: none;">
+        <div class="video-popup-content">
+            <h3>ADD VIDEO BY URL</h3>
+            <input type="text" id="videoUrlInput" placeholder="Enter video URL" />
+            <div class="video-popup-buttons">
+                <button id="videoPopupAdd">ADD</button>
+                <button id="videoPopupCancel">CANCEL</button>
+            </div>
+        </div>
     </div>
 
     <!-- Hidden file inputs for canvas load -->
@@ -689,6 +771,36 @@
                     <span class="control-value" id="flashVolumeValue">0.5</span>
                 </div>
                 <input type="range" id="flashVolumeSlider" min="0" max="1" step="0.05" value="0.5">
+            </div>
+
+            <!-- Video Controls (visible only for videos) -->
+            <div id="videoControlsSection" style="display: none;">
+                <h3 style="margin-top: 2rem;">VIDEO</h3>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>LOOP</span>
+                    </div>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="videoLoopCheck">
+                        <span>Enable</span>
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>TRIM START</span>
+                        <span class="control-value" id="videoTrimStartValue">0.0s</span>
+                    </div>
+                    <input type="range" id="videoTrimStartSlider" min="0" max="100" step="0.1" value="0">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>TRIM END</span>
+                        <span class="control-value" id="videoTrimEndValue">0.0s</span>
+                    </div>
+                    <input type="range" id="videoTrimEndSlider" min="0" max="100" step="0.1" value="100">
+                </div>
             </div>
 
             <div id="imageEffectSettings">
@@ -1319,6 +1431,39 @@
 
                     updateSlider('flashFrequencySlider', 'flashFrequencyValue', imageObj.flashFrequencyThreshold || 0.5, 2);
                     updateSlider('flashVolumeSlider', 'flashVolumeValue', imageObj.flashVolumeThreshold || 0.5, 2);
+
+                    // Update video controls if this is a video object
+                    const videoControlsSection = document.getElementById('videoControlsSection');
+                    if (videoControlsSection) {
+                        if (imageObj.isVideo) {
+                            videoControlsSection.style.display = 'block';
+
+                            // Update loop checkbox
+                            const videoLoopCheck = document.getElementById('videoLoopCheck');
+                            if (videoLoopCheck) videoLoopCheck.checked = imageObj.loop || false;
+
+                            // Update trim sliders
+                            const trimStartSlider = document.getElementById('videoTrimStartSlider');
+                            const trimEndSlider = document.getElementById('videoTrimEndSlider');
+                            const trimStartValue = document.getElementById('videoTrimStartValue');
+                            const trimEndValue = document.getElementById('videoTrimEndValue');
+
+                            if (imageObj.duration) {
+                                if (trimStartSlider) {
+                                    trimStartSlider.max = imageObj.duration;
+                                    trimStartSlider.value = imageObj.trimStart || 0;
+                                }
+                                if (trimEndSlider) {
+                                    trimEndSlider.max = imageObj.duration;
+                                    trimEndSlider.value = imageObj.trimEnd || imageObj.duration;
+                                }
+                                if (trimStartValue) trimStartValue.textContent = `${(imageObj.trimStart || 0).toFixed(1)}s`;
+                                if (trimEndValue) trimEndValue.textContent = `${(imageObj.trimEnd || imageObj.duration).toFixed(1)}s`;
+                            }
+                        } else {
+                            videoControlsSection.style.display = 'none';
+                        }
+                    }
                 }
             }
 
@@ -2774,22 +2919,41 @@
                     canvas.style.boxShadow = 'none';
                 }
 
+                // Handle video trimming and looping
+                if (imageObj.isVideo && imageObj.video) {
+                    const video = imageObj.video;
+                    video.loop = imageObj.loop || false;
+
+                    // Apply trimming
+                    if (video.currentTime < imageObj.trimStart || video.currentTime > imageObj.trimEnd) {
+                        video.currentTime = imageObj.trimStart;
+                    }
+
+                    // If we reach the trim end, loop back to trim start
+                    if (imageObj.loop && video.currentTime >= imageObj.trimEnd) {
+                        video.currentTime = imageObj.trimStart;
+                    }
+                }
+
+                // Get the source (video or image)
+                const source = imageObj.isVideo ? imageObj.video : imageObj.img;
+
                 // Render based on image's assigned theme
                 if (imageObj.theme === 'none') {
-                    // No effect - just draw the plain image
+                    // No effect - just draw the plain image/video
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(imageObj.img, 0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
                 } else if (imageObj.theme === 'neon') {
-                    renderNeonImage(canvas, config.themes.neon, low, mid, high, time, imageObj.width, imageObj.height, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity);
+                    renderNeonImage(canvas, config.themes.neon, low, mid, high, time, imageObj.width, imageObj.height, source, imageObj.themeBlur, imageObj.themeOpacity);
                 } else if (imageObj.theme === 'glitch') {
-                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, imageObj.img, imageObj.themeBlur, imageObj.themeOpacity, imageObj.rotation);
+                    renderGlitchImage(canvas, config.themes.glitch, low, mid, high, time, source, imageObj.themeBlur, imageObj.themeOpacity, imageObj.rotation);
                 } else if (imageObj.theme === 'linear') {
-                    // For LINEAR theme on image, just draw the image with some audio-reactive effects
+                    // For LINEAR theme on image/video, just draw with some audio-reactive effects
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                     // Apply audio-reactive opacity combined with theme opacity
                     ctx.globalAlpha = (0.8 + (mid * 0.2)) * imageObj.themeOpacity;
-                    ctx.drawImage(imageObj.img, 0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
                     ctx.globalAlpha = 1.0;
                 }
             });
@@ -3528,6 +3692,51 @@
                 }
             });
 
+            // Video controls
+            const videoLoopCheck = document.getElementById('videoLoopCheck');
+            if (videoLoopCheck) {
+                videoLoopCheck.addEventListener('change', (e) => {
+                    if (state.selectedImageIndex === -1) return;
+                    const videoObj = state.imageObjects[state.selectedImageIndex];
+                    if (videoObj && videoObj.isVideo) {
+                        videoObj.loop = e.target.checked;
+                    }
+                });
+            }
+
+            // Video trim sliders with scrubbing
+            const videoTrimStartSlider = document.getElementById('videoTrimStartSlider');
+            const videoTrimStartValue = document.getElementById('videoTrimStartValue');
+            if (videoTrimStartSlider && videoTrimStartValue) {
+                videoTrimStartSlider.addEventListener('input', (e) => {
+                    if (state.selectedImageIndex === -1) return;
+                    const videoObj = state.imageObjects[state.selectedImageIndex];
+                    if (videoObj && videoObj.isVideo && videoObj.video) {
+                        const value = parseFloat(e.target.value);
+                        videoObj.trimStart = value;
+                        videoTrimStartValue.textContent = `${value.toFixed(1)}s`;
+                        // Scrub to this position
+                        videoObj.video.currentTime = value;
+                    }
+                });
+            }
+
+            const videoTrimEndSlider = document.getElementById('videoTrimEndSlider');
+            const videoTrimEndValue = document.getElementById('videoTrimEndValue');
+            if (videoTrimEndSlider && videoTrimEndValue) {
+                videoTrimEndSlider.addEventListener('input', (e) => {
+                    if (state.selectedImageIndex === -1) return;
+                    const videoObj = state.imageObjects[state.selectedImageIndex];
+                    if (videoObj && videoObj.isVideo && videoObj.video) {
+                        const value = parseFloat(e.target.value);
+                        videoObj.trimEnd = value;
+                        videoTrimEndValue.textContent = `${value.toFixed(1)}s`;
+                        // Scrub to this position
+                        videoObj.video.currentTime = value;
+                    }
+                });
+            }
+
             // Theme opacity slider
             setupSlider('themeOpacitySlider', 'themeOpacityValue', (value) => {
                 if (state.selectedImageIndex === -1) return;
@@ -3680,6 +3889,58 @@
                     document.body.removeChild(fileInput);
                 });
 
+                // Handle "Add Video" menu item click
+                const addVideoMenuItem = document.getElementById('addVideoMenuItem');
+                if (addVideoMenuItem) {
+                    addVideoMenuItem.addEventListener('click', () => {
+                        addImageDropdown.classList.remove('show');
+                        const videoPopup = document.getElementById('videoPopup');
+                        const videoUrlInput = document.getElementById('videoUrlInput');
+                        if (videoPopup && videoUrlInput) {
+                            videoUrlInput.value = '';
+                            videoPopup.style.display = 'flex';
+                            videoUrlInput.focus();
+                        }
+                    });
+                }
+
+                // Handle video popup buttons
+                const videoPopupAdd = document.getElementById('videoPopupAdd');
+                const videoPopupCancel = document.getElementById('videoPopupCancel');
+                const videoPopup = document.getElementById('videoPopup');
+                const videoUrlInput = document.getElementById('videoUrlInput');
+
+                if (videoPopupAdd && videoPopup && videoUrlInput) {
+                    videoPopupAdd.addEventListener('click', () => {
+                        const url = videoUrlInput.value.trim();
+                        if (url) {
+                            loadVideoFromUrl(url);
+                            videoPopup.style.display = 'none';
+                        }
+                    });
+                }
+
+                if (videoPopupCancel && videoPopup) {
+                    videoPopupCancel.addEventListener('click', () => {
+                        videoPopup.style.display = 'none';
+                    });
+                }
+
+                // Close video popup on Escape key
+                if (videoPopup && videoUrlInput) {
+                    videoUrlInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            videoPopup.style.display = 'none';
+                        } else if (e.key === 'Enter') {
+                            const url = videoUrlInput.value.trim();
+                            if (url) {
+                                loadVideoFromUrl(url);
+                                videoPopup.style.display = 'none';
+                            }
+                        }
+                    });
+                }
+
                 // Handle "Save Canvas" menu item click
                 const saveCanvasMenuItem = document.getElementById('saveCanvasMenuItem');
                 if (saveCanvasMenuItem) {
@@ -3808,6 +4069,82 @@
             }
 
             // Helper function to load image file
+            function loadVideoFromUrl(url) {
+                const video = document.createElement('video');
+                video.crossOrigin = 'anonymous';
+                video.muted = true; // Muted by default for autoplay compatibility
+
+                video.addEventListener('loadedmetadata', () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.style.position = 'absolute';
+                    canvas.style.cursor = 'move';
+                    canvas.style.pointerEvents = 'auto';
+                    canvas.className = 'image-object-canvas';
+                    document.getElementById('visualization-container').appendChild(canvas);
+
+                    // Scale to reasonable size
+                    const width = Math.min(video.videoWidth, 600);
+                    const height = (width / video.videoWidth) * video.videoHeight;
+                    const x = (state.boundingRect.width - width) / 2;
+                    const y = (state.boundingRect.height - height) / 2;
+
+                    // Create video object (similar to image object but with video element)
+                    const videoObject = {
+                        video: video,
+                        isVideo: true,
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        theme: 'none',
+                        transparency: 1.0,
+                        rotation: 0,
+                        blur: 0,
+                        themeBlur: 0,
+                        themeOpacity: 1.0,
+                        flashFrequencyEnabled: false,
+                        flashFrequencyThreshold: 0.5,
+                        flashVolumeEnabled: false,
+                        flashVolumeThreshold: 0.5,
+                        loop: true,
+                        trimStart: 0,
+                        trimEnd: video.duration,
+                        duration: video.duration,
+                        canvas: canvas,
+                        isDragging: false,
+                        isResizing: false,
+                        dragStartX: 0,
+                        dragStartY: 0,
+                        dragStartWidth: 0,
+                        dragStartHeight: 0
+                    };
+
+                    state.imageObjects.push(videoObject);
+                    const videoIndex = state.imageObjects.length - 1;
+                    state.selectedImageIndex = videoIndex;
+
+                    // Add event listeners for selection and dragging
+                    setupImageInteraction(canvas, videoIndex);
+
+                    // Start playing the video
+                    video.loop = true;
+                    video.play().catch(e => console.warn('Video autoplay prevented:', e));
+
+                    console.log(`✅ Video object created: ${video.videoWidth}x${video.videoHeight} → ${width.toFixed(0)}x${height.toFixed(0)}, duration: ${video.duration.toFixed(2)}s`);
+
+                    // Update mode visibility
+                    updateModeVisibility();
+                });
+
+                video.addEventListener('error', (e) => {
+                    console.error('❌ Failed to load video:', url, e);
+                    alert('Failed to load video. Please check the URL and ensure CORS is enabled.');
+                });
+
+                video.src = url;
+                video.load();
+            }
+
             function loadImageFile(file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -3916,7 +4253,14 @@
                     const newHeight = Math.max(100, imageObj.dragStartHeight + deltaY);
 
                     // Maintain aspect ratio
-                    const aspectRatio = imageObj.img.width / imageObj.img.height;
+                    let aspectRatio;
+                    if (imageObj.isVideo && imageObj.video) {
+                        aspectRatio = imageObj.video.videoWidth / imageObj.video.videoHeight;
+                    } else if (imageObj.img) {
+                        aspectRatio = imageObj.img.width / imageObj.img.height;
+                    } else {
+                        aspectRatio = 1;
+                    }
                     imageObj.width = newWidth;
                     imageObj.height = newWidth / aspectRatio;
                 }
