@@ -1940,10 +1940,15 @@
             // Update mode visibility based on theme
             updateModeVisibility();
 
-            // Handle stars canvas visibility
+            // Handle canvas visibility
             const starsCanvas = document.getElementById('stars-canvas');
             if (starsCanvas) {
                 starsCanvas.style.display = state.settings.theme === 'stars' ? 'block' : 'none';
+            }
+
+            const waveCanvas = document.getElementById('wave-canvas');
+            if (waveCanvas) {
+                waveCanvas.style.display = state.settings.theme === 'wave' ? 'block' : 'none';
             }
 
             // Update line colors based on theme
@@ -1971,6 +1976,11 @@
                 });
             } else if (state.settings.theme === 'stars') {
                 // Stars theme: hide SVG paths (stars are rendered on canvas)
+                state.paths.forEach((path) => {
+                    path.setAttribute('opacity', '0');
+                });
+            } else if (state.settings.theme === 'wave') {
+                // Wave theme: hide SVG paths (wave is rendered on canvas)
                 state.paths.forEach((path) => {
                     path.setAttribute('opacity', '0');
                 });
@@ -4516,6 +4526,8 @@
                         path.removeAttribute('transform');
                         path.setAttribute('opacity', '0.6');
                         path.setAttribute('stroke', '#ffffff');
+                        // Clear path data to remove any lingering visuals
+                        path.setAttribute('d', '');
                     });
 
                     // Clear the canvas to remove any residual graphics
