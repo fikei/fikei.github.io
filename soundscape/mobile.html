@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>Soundscape Mobile Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: monospace;
+            background: #000000;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            padding: 1.5rem 1rem;
+            border-bottom: 1px solid #ffffff;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 0.2em;
+            margin-bottom: 0.5rem;
+        }
+
+        .connection-status {
+            font-size: 10px;
+            color: #999999;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .connection-status.connected {
+            color: #00ff00;
+        }
+
+        /* ===== PAIRING SCREEN ===== */
+        .pairing-screen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .pairing-content {
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .pairing-content h2 {
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+        }
+
+        .code-input {
+            width: 100%;
+            background: #000000;
+            border: 2px solid #ffffff;
+            color: #ffffff;
+            padding: 1.5rem;
+            font-size: 32px;
+            font-family: monospace;
+            text-align: center;
+            letter-spacing: 0.3em;
+            margin-bottom: 1.5rem;
+            outline: none;
+        }
+
+        .code-input::placeholder {
+            color: #333333;
+        }
+
+        .connect-button {
+            width: 100%;
+            background: #ffffff;
+            border: 2px solid #ffffff;
+            color: #000000;
+            padding: 1rem;
+            font-size: 12px;
+            font-family: monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .connect-button:active {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .error-message {
+            color: #ff0000;
+            font-size: 10px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* ===== CONTROLS SCREEN ===== */
+        .controls-screen {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .controls-screen.active {
+            display: block;
+        }
+
+        .control-section {
+            margin-bottom: 2rem;
+        }
+
+        .control-section h3 {
+            font-size: 10px;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            color: #999999;
+            text-transform: uppercase;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 10px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .control-value {
+            color: #999999;
+        }
+
+        /* Touch-optimized sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 50px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-track {
+            width: 100%;
+            height: 2px;
+            background: #ffffff;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 50px;
+            height: 50px;
+            background: #ffffff;
+            border: 2px solid #000000;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: 2px;
+            background: #ffffff;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 50px;
+            height: 50px;
+            background: #ffffff;
+            border: 2px solid #000000;
+            cursor: pointer;
+        }
+
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .mode-button {
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            padding: 1rem;
+            font-size: 10px;
+            font-family: monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-button.active {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .mode-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>SOUNDSCAPE MOBILE</h1>
+        <div class="connection-status" id="connectionStatus">Not Connected</div>
+    </div>
+
+    <!-- Pairing Screen -->
+    <div class="pairing-screen" id="pairingScreen">
+        <div class="pairing-content">
+            <h2>Enter Pairing Code</h2>
+            <input type="tel" class="code-input" id="codeInput" placeholder="000000" maxlength="6" pattern="[0-9]*" inputmode="numeric">
+            <button class="connect-button" id="connectButton">CONNECT</button>
+            <div class="error-message" id="errorMessage">Invalid code. Please try again.</div>
+        </div>
+    </div>
+
+    <!-- Controls Screen -->
+    <div class="controls-screen" id="controlsScreen">
+        <div class="control-section">
+            <h3>Wave Settings</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>INTENSITY</span>
+                    <span class="control-value" id="intensityValue">2.5</span>
+                </div>
+                <input type="range" id="intensitySlider" min="0" max="5" step="0.1" value="2.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SPEED</span>
+                    <span class="control-value" id="speedValue">1.0</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.1" max="2" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SMOOTHING</span>
+                    <span class="control-value" id="smoothingValue">0.5</span>
+                </div>
+                <input type="range" id="smoothingSlider" min="0" max="1" step="0.1" value="0.5">
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Mode</h3>
+            <div class="mode-buttons">
+                <button class="mode-button active" data-mode="default">FLOW</button>
+                <button class="mode-button" data-mode="hole">HOLE</button>
+                <button class="mode-button" data-mode="crunch">CRUNCH</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Frequency Emphasis</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>LOW</span>
+                    <span class="control-value" id="lowValue">1.0</span>
+                </div>
+                <input type="range" id="lowEmphasis" min="0" max="3" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MID</span>
+                    <span class="control-value" id="midValue">1.0</span>
+                </div>
+                <input type="range" id="midEmphasis" min="0" max="3" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>HIGH</span>
+                    <span class="control-value" id="highValue">1.0</span>
+                </div>
+                <input type="range" id="highEmphasis" min="0" max="3" step="0.1" value="1.0">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mobile control state
+        let sessionCode = null;
+        let isConnected = false;
+
+        // DOM elements
+        const pairingScreen = document.getElementById('pairingScreen');
+        const controlsScreen = document.getElementById('controlsScreen');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const codeInput = document.getElementById('codeInput');
+        const connectButton = document.getElementById('connectButton');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Connect to desktop
+        connectButton.addEventListener('click', () => {
+            const code = codeInput.value.trim();
+            if (code.length === 6 && /^\d{6}$/.test(code)) {
+                attemptConnection(code);
+            } else {
+                showError();
+            }
+        });
+
+        // Enter key to connect
+        codeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                connectButton.click();
+            }
+        });
+
+        function attemptConnection(code) {
+            const key = `soundscape_session_${code}`;
+            const data = localStorage.getItem(key);
+
+            if (data) {
+                try {
+                    JSON.parse(data);
+                    sessionCode = code;
+                    isConnected = true;
+                    showControls();
+                    startSyncingState();
+                } catch (e) {
+                    showError();
+                }
+            } else {
+                showError();
+            }
+        }
+
+        function showError() {
+            errorMessage.classList.add('show');
+            codeInput.style.borderColor = '#ff0000';
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+                codeInput.style.borderColor = '#ffffff';
+            }, 2000);
+        }
+
+        function showControls() {
+            pairingScreen.style.display = 'none';
+            controlsScreen.classList.add('active');
+            connectionStatus.textContent = `Connected: ${sessionCode}`;
+            connectionStatus.classList.add('connected');
+        }
+
+        // Setup control bindings
+        function setupControls() {
+            // Sliders
+            const sliders = ['intensity', 'speed', 'smoothing', 'lowEmphasis', 'midEmphasis', 'highEmphasis'];
+
+            sliders.forEach(name => {
+                const slider = document.getElementById(`${name}Slider`) || document.getElementById(name);
+                const valueEl = document.getElementById(`${name}Value`);
+
+                if (slider && valueEl) {
+                    slider.addEventListener('input', (e) => {
+                        const value = parseFloat(e.target.value);
+                        valueEl.textContent = value.toFixed(1);
+                        updateDesktop({ [name]: value });
+                    });
+                }
+            });
+
+            // Mode buttons
+            const modeButtons = document.querySelectorAll('.mode-button');
+            modeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    modeButtons.forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    updateDesktop({ mode: button.dataset.mode });
+                });
+            });
+        }
+
+        function updateDesktop(settings) {
+            if (!isConnected || !sessionCode) return;
+
+            try {
+                const key = `soundscape_session_${sessionCode}`;
+                const data = JSON.parse(localStorage.getItem(key) || '{}');
+                data.mobileUpdate = { settings };
+                data.timestamp = Date.now();
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.error('Failed to update desktop:', e);
+            }
+        }
+
+        function startSyncingState() {
+            // Poll for state updates from desktop every 100ms
+            setInterval(() => {
+                if (!isConnected || !sessionCode) return;
+
+                try {
+                    const key = `soundscape_session_${sessionCode}`;
+                    const data = JSON.parse(localStorage.getItem(key) || '{}');
+
+                    // Sync desktop state to mobile UI if needed
+                    if (data.state) {
+                        // Update UI to match desktop state
+                        Object.entries(data.state).forEach(([key, value]) => {
+                            const slider = document.getElementById(`${key}Slider`) || document.getElementById(key);
+                            const valueEl = document.getElementById(`${key}Value`);
+                            if (slider && slider.value != value) {
+                                slider.value = value;
+                                if (valueEl) valueEl.textContent = value.toFixed(1);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Sync error:', e);
+                }
+            }, 100);
+        }
+
+        // Initialize controls
+        setupControls();
+    </script>
+</body>
+</html>

@@ -134,6 +134,111 @@
             50% { opacity: 0; }
         }
 
+        /* ===== PAIRING PANEL ===== */
+        .pairing-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pairing-content {
+            background: #000000;
+            border: 1px solid #ffffff;
+            padding: 3rem 2rem;
+            text-align: center;
+            min-width: 350px;
+        }
+
+        .pairing-content h3 {
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
+        }
+
+        .pairing-instruction {
+            font-size: 10px;
+            color: #999999;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .pairing-url {
+            font-family: monospace;
+            font-size: 12px;
+            color: #ffffff;
+            margin-bottom: 2rem;
+            padding: 0.75rem;
+            background: #111111;
+            border: 1px solid #333333;
+        }
+
+        .pairing-code {
+            font-family: monospace;
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            color: #ffffff;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 2px solid #ffffff;
+        }
+
+        .pairing-close {
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            padding: 0.75rem 2rem;
+            font-size: 10px;
+            font-family: monospace;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.15s ease;
+        }
+
+        .pairing-close:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .pairing-toggle {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            z-index: 20;
+            width: 40px;
+            height: 40px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: all 0.15s ease;
+        }
+
+        .pairing-toggle:hover {
+            background: #ffffff;
+            transform: scale(1.05);
+        }
+
+        .pairing-toggle.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         /* ===== SIDEBAR TOGGLE BUTTON ===== */
         .sidebar-toggle {
             position: fixed;
@@ -660,6 +765,21 @@
         <div class="status-indicator"></div>
         <span>activ</span>
     </div>
+
+    <!-- Pairing Code Display -->
+    <div class="pairing-panel" id="pairingPanel" style="display: none;">
+        <div class="pairing-content">
+            <h3>MOBILE CONTROL</h3>
+            <p class="pairing-instruction">Open on mobile:</p>
+            <p class="pairing-url" id="pairingUrl">Loading...</p>
+            <p class="pairing-instruction">Enter code:</p>
+            <div class="pairing-code" id="pairingCode">------</div>
+            <button class="pairing-close" id="pairingClose">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- Pairing Toggle Button -->
+    <button class="pairing-toggle" id="pairingToggle" aria-label="Mobile control">📱</button>
 
     <!-- Sidebar Toggle -->
     <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls"><span class="caret">›</span></button>
@@ -1242,6 +1362,11 @@
 
             // Auto-start audio capture
             await startAudioCapture();
+
+            // Initialize mobile companion pairing
+            initializePairing();
+            setupPairingUI();
+            startListeningForMobileUpdates();
         }
 
         // =====================================================
@@ -4461,6 +4586,119 @@
             updateColors();
 
             console.log('🔄 Reset to defaults');
+        }
+
+        // =====================================================
+        // MOBILE COMPANION PAIRING
+        // =====================================================
+
+        // Generate 6-digit pairing code
+        function generatePairingCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        // Session ID for this desktop instance
+        const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        const pairingCode = generatePairingCode();
+
+        // Store pairing info in localStorage
+        function initializePairing() {
+            const pairingData = {
+                code: pairingCode,
+                sessionId: sessionId,
+                timestamp: Date.now(),
+                state: {}
+            };
+            localStorage.setItem(`soundscape_session_${pairingCode}`, JSON.stringify(pairingData));
+            console.log('📱 Pairing code generated:', pairingCode);
+        }
+
+        // Update shared state
+        function updateSharedState(updates) {
+            try {
+                const key = `soundscape_session_${pairingCode}`;
+                const data = JSON.parse(localStorage.getItem(key) || '{}');
+                data.state = { ...data.state, ...updates };
+                data.timestamp = Date.now();
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.warn('Failed to update shared state:', e);
+            }
+        }
+
+        // Listen for state changes from mobile
+        function startListeningForMobileUpdates() {
+            window.addEventListener('storage', (e) => {
+                if (e.key === `soundscape_session_${pairingCode}` && e.newValue) {
+                    try {
+                        const data = JSON.parse(e.newValue);
+                        if (data.mobileUpdate) {
+                            // Apply mobile updates to desktop
+                            applyMobileUpdates(data.mobileUpdate);
+                            // Clear the mobile update flag
+                            delete data.mobileUpdate;
+                            localStorage.setItem(e.key, JSON.stringify(data));
+                        }
+                    } catch (err) {
+                        console.warn('Failed to parse mobile update:', err);
+                    }
+                }
+            });
+        }
+
+        function applyMobileUpdates(updates) {
+            // Apply settings updates from mobile
+            if (updates.settings) {
+                Object.assign(state.settings, updates.settings);
+
+                // Update UI elements to reflect changes
+                Object.entries(updates.settings).forEach(([key, value]) => {
+                    const slider = document.getElementById(`${key}Slider`);
+                    const valueEl = document.getElementById(`${key}Value`);
+                    if (slider) slider.value = value;
+                    if (valueEl) {
+                        if (typeof value === 'number') {
+                            valueEl.textContent = value.toFixed(1);
+                        } else {
+                            valueEl.textContent = value;
+                        }
+                    }
+                });
+            }
+        }
+
+        // Setup pairing UI event handlers
+        function setupPairingUI() {
+            const pairingToggle = document.getElementById('pairingToggle');
+            const pairingPanel = document.getElementById('pairingPanel');
+            const pairingClose = document.getElementById('pairingClose');
+            const pairingCodeEl = document.getElementById('pairingCode');
+            const pairingUrlEl = document.getElementById('pairingUrl');
+
+            if (pairingToggle && pairingPanel) {
+                pairingToggle.addEventListener('click', () => {
+                    pairingPanel.style.display = 'flex';
+                    // Update URL and code
+                    if (pairingCodeEl) pairingCodeEl.textContent = pairingCode;
+                    if (pairingUrlEl) {
+                        const baseUrl = window.location.href.replace('/index.html', '').replace(/\/$/, '');
+                        pairingUrlEl.textContent = `${baseUrl}/mobile.html`;
+                    }
+                });
+            }
+
+            if (pairingClose && pairingPanel) {
+                pairingClose.addEventListener('click', () => {
+                    pairingPanel.style.display = 'none';
+                });
+            }
+
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && pairingPanel && pairingPanel.style.display !== 'none') {
+                    pairingPanel.style.display = 'none';
+                }
+            });
         }
 
         // =====================================================
