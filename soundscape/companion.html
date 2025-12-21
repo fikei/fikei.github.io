@@ -488,6 +488,7 @@
                     <div class="empty-state">No media added yet</div>
                 </div>
                 <button class="add-media-button" id="addMediaButton">+ Add Media</button>
+                <input type="file" id="mediaFileInput" accept="image/*,video/*" style="display: none;">
             </div>
 
             <!-- Media Controls (shown when item selected) -->
@@ -769,10 +770,44 @@
         function setupMediaControls() {
             // Add media button
             const addMediaButton = document.getElementById('addMediaButton');
-            if (addMediaButton) {
+            const mediaFileInput = document.getElementById('mediaFileInput');
+
+            if (addMediaButton && mediaFileInput) {
                 addMediaButton.addEventListener('click', () => {
-                    // Send request to desktop to add media
-                    updateDesktop({ action: 'addMedia' });
+                    // Trigger file input
+                    mediaFileInput.click();
+                });
+
+                // Handle file selection
+                mediaFileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    // Check if it's an image or video
+                    const isVideo = file.type.startsWith('video/');
+                    const isImage = file.type.startsWith('image/');
+
+                    if (!isImage && !isVideo) {
+                        alert('Please select an image or video file');
+                        return;
+                    }
+
+                    // Convert to data URL
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const dataUrl = event.target.result;
+
+                        // Send to desktop
+                        updateDesktop({
+                            action: 'addMediaFromCompanion',
+                            mediaUrl: dataUrl,
+                            isVideo: isVideo
+                        });
+
+                        // Clear the input for next use
+                        mediaFileInput.value = '';
+                    };
+                    reader.readAsDataURL(file);
                 });
             }
 

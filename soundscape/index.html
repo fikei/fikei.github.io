@@ -4546,6 +4546,9 @@
                     updateModeVisibility();
 
                     console.log(`🗑️ Image removed at index ${imageIndex}`);
+
+                    // Send updated state to companion
+                    sendStateToMobile();
                 }
             });
 
@@ -5471,6 +5474,9 @@
 
                     // Update mode visibility
                     updateModeVisibility();
+
+                    // Send updated state to companion
+                    sendStateToMobile();
                 });
 
                 video.addEventListener('error', (e) => {
@@ -5563,6 +5569,9 @@
 
                         // Update mode visibility
                         updateModeVisibility();
+
+                        // Send updated state to companion
+                        sendStateToMobile();
                     }
                 };
 
@@ -5640,6 +5649,9 @@
 
                     // Update mode visibility
                     updateModeVisibility();
+
+                    // Send updated state to companion
+                    sendStateToMobile();
                 });
 
                 video.addEventListener('error', (e) => {
@@ -5730,6 +5742,9 @@
                             setupImageInteraction(canvas, imageIndex);
 
                             console.log(`✅ Image object created: ${img.width}x${img.height} → ${width.toFixed(0)}x${height.toFixed(0)}, theme: ${imageObject.theme}`);
+
+                            // Send updated state to companion
+                            sendStateToMobile();
                         }
 
                         // Hide upload overlay
@@ -6158,6 +6173,67 @@
         }
 
         function applyMobileUpdates(updates) {
+            // Handle actions
+            if (updates.action) {
+                switch (updates.action) {
+                    case 'addMediaFromCompanion':
+                        // Add media from companion device
+                        if (updates.mediaUrl) {
+                            const imageObject = {
+                                element: updates.isVideo ? document.createElement('video') : new Image(),
+                                x: window.innerWidth / 2,
+                                y: window.innerHeight / 2,
+                                width: 300,
+                                height: 300,
+                                rotation: 0,
+                                transparency: 1.0,
+                                theme: 'none',
+                                isVideo: updates.isVideo || false,
+                                blur: 0
+                            };
+
+                            imageObject.element.src = updates.mediaUrl;
+
+                            if (updates.isVideo) {
+                                imageObject.element.loop = true;
+                                imageObject.element.muted = true;
+                                imageObject.element.play();
+                            }
+
+                            state.imageObjects.push(imageObject);
+                            console.log('📱 Media added from companion');
+
+                            // Send updated state back to mobile
+                            sendStateToMobile();
+                        }
+                        break;
+
+                    case 'deleteMedia':
+                        // Delete media item
+                        if (typeof updates.mediaIndex === 'number' && updates.mediaIndex >= 0) {
+                            state.imageObjects.splice(updates.mediaIndex, 1);
+                            state.selectedImageIndex = -1;
+                            console.log('📱 Media deleted from companion');
+
+                            // Send updated state back to mobile
+                            sendStateToMobile();
+                        }
+                        break;
+
+                    case 'updateMedia':
+                        // Update media property
+                        if (typeof updates.mediaIndex === 'number' && updates.mediaIndex >= 0) {
+                            const imageObj = state.imageObjects[updates.mediaIndex];
+                            if (imageObj && updates.property) {
+                                imageObj[updates.property] = updates.value;
+                                console.log(`📱 Media ${updates.property} updated to ${updates.value}`);
+                            }
+                        }
+                        break;
+                }
+                return;
+            }
+
             // Apply settings updates from mobile
             if (updates.settings) {
                 Object.assign(state.settings, updates.settings);
