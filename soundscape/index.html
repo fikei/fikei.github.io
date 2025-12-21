@@ -1171,6 +1171,23 @@
                 </div>
                 <input type="range" id="starDiameterSlider" min="0.5" max="2.0" step="0.1" value="1.0">
             </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>MODE</span>
+                </div>
+                <select id="starModeSelect" class="mode-select">
+                    <option value="planes">PLANES</option>
+                    <option value="grids">GRIDS</option>
+                    <option value="dots">DOTS</option>
+                </select>
+            </div>
+            <div class="control-group" id="starLayersControl">
+                <div class="control-label">
+                    <span>LAYERS</span>
+                    <span class="control-value" id="starLayersValue">3</span>
+                </div>
+                <input type="range" id="starLayersSlider" min="1" max="10" step="1" value="3">
+            </div>
         </section>
 
         <!-- WAVE Theme Controls -->
@@ -1508,6 +1525,8 @@
                 starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
                 starSmoothing: 0.5,  // Audio smoothing for stars (0-1)
                 starDiameter: 1.0,  // Animation diameter multiplier (0.5-2.0)
+                starMode: 'planes',  // Visual mode: planes, grids, dots
+                starLayers: 3,  // Number of layers for grids/dots mode (1-10)
 
                 // WAVE theme settings
                 waveHue: 280,  // Color hue (0-360)
@@ -3387,63 +3406,162 @@
             state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
             state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
 
-            // Draw stars
+            // Draw based on mode
             ctx.globalCompositeOperation = 'lighter';
 
-            state.stars.starArray.forEach((star) => {
-                // Update Z position (move towards camera)
-                if (state.settings.starZSpeed > 0) {
-                    star.z += state.settings.starZSpeed * 0.001;
+            const mode = state.settings.starMode;
 
-                    // Reset star if it passes the camera
-                    if (star.z >= 1.0) {
-                        star.z = 0;
-                        star.timePassed = Math.random() * state.settings.starCount;
+            if (mode === 'planes') {
+                // PLANES MODE: Original gradient stars
+                state.stars.starArray.forEach((star) => {
+                    // Update Z position (move towards camera)
+                    if (state.settings.starZSpeed > 0) {
+                        star.z += state.settings.starZSpeed * 0.001;
+
+                        // Reset star if it passes the camera
+                        if (star.z >= 1.0) {
+                            star.z = 0;
+                            star.timePassed = Math.random() * state.settings.starCount;
+                        }
                     }
+
+                    // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
+                    const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+
+                    // Scale orbit radius and star size by perspective
+                    const scaledOrbitRadius = star.orbitRadius * scale;
+                    star.radius = star.baseRadius * scale;
+
+                    // High frequencies shift the orbit center position (rate controlled by slider)
+                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+
+                    // Use smoothed center position (click-to-center feature)
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+
+                    // Twinkle effect using user setting
+                    const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
+                    if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
+                        star.alpha -= 0.05;
+                    } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
+                        star.alpha += 0.05;
+                    }
+
+                    // Mid frequencies add brightness boost
+                    const brightnessBoost = mid * 0.3;
+
+                    // Alpha also scales with distance (closer = brighter)
+                    const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
+
+                    ctx.globalAlpha = perspectiveAlpha;
+                    ctx.drawImage(
+                        state.stars.gradientCanvas,
+                        x - star.radius / 2,
+                        y - star.radius / 2,
+                        star.radius,
+                        star.radius
+                    );
+
+                    // Update orbit with audio-reactive speed
+                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                });
+
+            } else if (mode === 'grids') {
+                // GRIDS MODE: Draw layered grid patterns
+                const layers = state.settings.starLayers;
+                const hue = state.settings.starHue;
+                const sat = state.settings.starSaturation;
+
+                for (let layer = 0; layer < layers; layer++) {
+                    const layerDepth = layer / layers;
+                    const layerScale = 0.3 + layerDepth * 0.7;
+                    const cellSize = 40 + layer * 20;
+
+                    // Audio-reactive rotation per layer
+                    const rotation = time * 0.0001 * state.settings.starSpeed * speedBoost + layer * 0.3;
+
+                    ctx.save();
+                    ctx.translate(state.stars.centerX, state.stars.centerY);
+                    ctx.rotate(rotation + high * 0.5);
+                    ctx.scale(layerScale * state.settings.starDiameter, layerScale * state.settings.starDiameter);
+
+                    // Draw grid
+                    const gridSize = Math.max(w, h) / cellSize;
+                    ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${30 + layerDepth * 40}%, ${0.1 + mid * 0.3})`;
+                    ctx.lineWidth = 1 + layerDepth * 2;
+
+                    // Add shading with gradients
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, gridSize * cellSize / 2);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, 60%, ${0.3 + mid * 0.2})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, 40%, ${0.2 + mid * 0.1})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, 20%, ${0.05})`);
+                    ctx.strokeStyle = gradient;
+
+                    for (let i = -gridSize; i < gridSize; i++) {
+                        for (let j = -gridSize; j < gridSize; j++) {
+                            const x = i * cellSize;
+                            const y = j * cellSize;
+
+                            // Audio-reactive distortion
+                            const distortion = Math.sin(i * 0.5 + time * 0.001) * Math.cos(j * 0.5 + time * 0.001) * low * 10;
+
+                            ctx.strokeRect(x + distortion, y + distortion, cellSize, cellSize);
+                        }
+                    }
+
+                    ctx.restore();
                 }
 
-                // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
-                const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+            } else if (mode === 'dots') {
+                // DOTS MODE: Simple layered dots
+                const layers = state.settings.starLayers;
+                const hue = state.settings.starHue;
+                const sat = state.settings.starSaturation;
 
-                // Scale orbit radius and star size by perspective
-                const scaledOrbitRadius = star.orbitRadius * scale;
-                star.radius = star.baseRadius * scale;
+                state.stars.starArray.forEach((star) => {
+                    // Assign layer based on star index
+                    const layer = Math.floor(star.z * layers);
+                    const layerDepth = layer / layers;
 
-                // High frequencies shift the orbit center position (rate controlled by slider)
-                const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    // Update Z position
+                    if (state.settings.starZSpeed > 0) {
+                        star.z += state.settings.starZSpeed * 0.001;
+                        if (star.z >= 1.0) {
+                            star.z = 0;
+                            star.timePassed = Math.random() * state.settings.starCount;
+                        }
+                    }
 
-                // Use smoothed center position (click-to-center feature)
-                const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
-                const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+                    const scale = 0.3 + layerDepth * 0.7;
+                    const scaledOrbitRadius = star.orbitRadius * scale;
 
-                // Twinkle effect using user setting
-                const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
-                if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
-                    star.alpha -= 0.05;
-                } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
-                    star.alpha += 0.05;
-                }
+                    // High frequencies shift center
+                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
 
-                // Mid frequencies add brightness boost
-                const brightnessBoost = mid * 0.3;
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
 
-                // Alpha also scales with distance (closer = brighter)
-                const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
+                    // Draw dot with shading
+                    const dotSize = (2 + layerDepth * 4) * state.settings.starBrightness;
+                    const brightness = 30 + layerDepth * 50 + mid * 30;
 
-                ctx.globalAlpha = perspectiveAlpha;
-                ctx.drawImage(
-                    state.stars.gradientCanvas,
-                    x - star.radius / 2,
-                    y - star.radius / 2,
-                    star.radius,
-                    star.radius
-                );
+                    // Radial gradient for shading
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${star.alpha + mid * 0.3})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, ${brightness * 0.3}%, 0)`);
 
-                // Update orbit with audio-reactive speed
-                // baseSpeed * user speed multiplier * audio boost
-                star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
-            });
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, dotSize * 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Update orbit
+                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                });
+            }
         }
 
         // =====================================================
@@ -4808,6 +4926,46 @@
                 });
             }
 
+            // STARS MODE selector
+            const starModeSelect = document.getElementById('starModeSelect');
+            const starLayersControl = document.getElementById('starLayersControl');
+            if (starModeSelect && starLayersControl) {
+                // Initialize visibility based on current mode
+                if (state.settings.starMode === 'grids' || state.settings.starMode === 'dots') {
+                    starLayersControl.style.display = 'block';
+                } else {
+                    starLayersControl.style.display = 'none';
+                }
+
+                starModeSelect.addEventListener('change', (e) => {
+                    const mode = e.target.value;
+                    state.settings.starMode = mode;
+
+                    // Show/hide layers control based on mode
+                    if (mode === 'grids' || mode === 'dots') {
+                        starLayersControl.style.display = 'block';
+                    } else {
+                        starLayersControl.style.display = 'none';
+                    }
+
+                    // Reinitialize stars for new mode
+                    state.stars.initialized = false;
+                });
+            }
+
+            // STARS LAYERS slider
+            const starLayersSlider = document.getElementById('starLayersSlider');
+            const starLayersValue = document.getElementById('starLayersValue');
+            if (starLayersSlider && starLayersValue) {
+                starLayersSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.starLayers = value;
+                    starLayersValue.textContent = value.toString();
+                    // Reinitialize stars to apply new layer count
+                    state.stars.initialized = false;
+                });
+            }
+
             // WAVE HUE slider
             const waveHueSlider = document.getElementById('waveHueSlider');
             const waveHueValue = document.getElementById('waveHueValue');
@@ -5737,6 +5895,8 @@
                 starCenterRate: 1.0,
                 starSmoothing: 0.5,
                 starDiameter: 1.0,
+                starMode: 'planes',
+                starLayers: 3,
                 waveHue: 280,
                 waveSaturation: 70,
                 waveDistortion: 1.5,
@@ -5773,6 +5933,8 @@
             document.getElementById('starCenterRateSlider').value = 1.0;
             document.getElementById('starSmoothingSlider').value = 0.5;
             document.getElementById('starDiameterSlider').value = 1.0;
+            document.getElementById('starModeSelect').value = 'planes';
+            document.getElementById('starLayersSlider').value = 3;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -5798,6 +5960,7 @@
             document.getElementById('starCenterRateValue').textContent = '1.0';
             document.getElementById('starSmoothingValue').textContent = '0.5';
             document.getElementById('starDiameterValue').textContent = '1.0x';
+            document.getElementById('starLayersValue').textContent = '3';
             document.getElementById('waveHueSlider').value = 280;
             document.getElementById('waveSaturationSlider').value = 70;
             document.getElementById('waveDistortionSlider').value = 1.5;
