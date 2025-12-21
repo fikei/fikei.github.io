@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>Soundscape Mobile Control</title>
+    <title>Soundscape Companion Control</title>
 
     <!-- Socket.io for WebSocket communication -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
@@ -238,7 +238,7 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <h1>SOUNDSCAPE MOBILE</h1>
+        <h1>SOUNDSCAPE COMPANION</h1>
         <div class="connection-status" id="connectionStatus">Not Connected</div>
     </div>
 
@@ -315,7 +315,7 @@
     </div>
 
     <script>
-        // Mobile control state
+        // Companion control state
         let socket = null;
         let sessionCode = null;
         let isConnected = false;
@@ -347,9 +347,14 @@
 
         function attemptConnection(code) {
             // Determine WebSocket server URL
-            const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? 'http://localhost:3000'
-                : `${window.location.protocol}//${window.location.host}`;
+            let socketUrl;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                socketUrl = 'http://localhost:3000';
+            } else if (window.location.hostname.includes('onrender.com')) {
+                socketUrl = 'https://fikei-github-io.onrender.com';
+            } else {
+                socketUrl = `${window.location.protocol}//${window.location.host}`;
+            }
 
             console.log('🔌 Connecting to:', socketUrl);
 

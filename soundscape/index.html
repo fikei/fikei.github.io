@@ -772,8 +772,8 @@
     <!-- Pairing Code Display -->
     <div class="pairing-panel" id="pairingPanel" style="display: none;">
         <div class="pairing-content">
-            <h3>MOBILE CONTROL</h3>
-            <p class="pairing-instruction">Open on mobile:</p>
+            <h3>COMPANION CONTROL</h3>
+            <p class="pairing-instruction">Open on companion device:</p>
             <p class="pairing-url" id="pairingUrl">Loading...</p>
             <p class="pairing-instruction">Enter code:</p>
             <div class="pairing-code" id="pairingCode">------</div>
@@ -782,7 +782,7 @@
     </div>
 
     <!-- Pairing Toggle Button -->
-    <button class="pairing-toggle" id="pairingToggle" aria-label="Mobile control">📱</button>
+    <button class="pairing-toggle" id="pairingToggle" aria-label="Companion control">📱</button>
 
     <!-- Sidebar Toggle -->
     <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle controls"><span class="caret">›</span></button>
@@ -6011,7 +6011,7 @@
         }
 
         // =====================================================
-        // MOBILE COMPANION PAIRING (WebSocket)
+        // COMPANION DEVICE PAIRING (WebSocket)
         // =====================================================
 
         let socket = null;
@@ -6021,15 +6021,16 @@
         // Connect to WebSocket server
         function initializePairing() {
             // Determine WebSocket server URL
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname;
-            const port = window.location.port || '3000';
+            let socketUrl;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                socketUrl = 'http://localhost:3000';
+            } else if (window.location.hostname.includes('onrender.com')) {
+                socketUrl = 'https://fikei-github-io.onrender.com';
+            } else {
+                socketUrl = `${window.location.protocol}//${window.location.host}`;
+            }
 
-            // Use same host as web page, or fallback to localhost for local dev
-            const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://localhost:3000`
-                : `${window.location.protocol}//${window.location.host}`;
-
+            console.log('🔌 Connecting to WebSocket server:', socketUrl);
             socket = io(socketUrl);
 
             socket.on('connect', () => {
@@ -6148,7 +6149,7 @@
                     if (pairingCodeEl) pairingCodeEl.textContent = pairingCode;
                     if (pairingUrlEl) {
                         const baseUrl = window.location.href.replace('/index.html', '').replace(/\/$/, '');
-                        pairingUrlEl.textContent = `${baseUrl}/mobile.html`;
+                        pairingUrlEl.textContent = `${baseUrl}/companion.html`;
                     }
                 });
             }
