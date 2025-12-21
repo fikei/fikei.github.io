@@ -1002,6 +1002,7 @@
                 <option value="neon">NEON</option>
                 <option value="glitch">GLITCH</option>
                 <option value="stars">STARS</option>
+                <option value="wave">WAVE</option>
             </select>
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
@@ -1160,6 +1161,80 @@
                     <span class="control-value" id="starSmoothingValue">0.5</span>
                 </div>
                 <input type="range" id="starSmoothingSlider" min="0" max="1.0" step="0.1" value="0.5">
+            </div>
+        </section>
+
+        <!-- WAVE Theme Controls -->
+        <section class="control-section" id="waveControlsSection" style="display: none;">
+            <h3>WAVE</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>HUE</span>
+                    <span class="control-value" id="waveHueValue">280°</span>
+                </div>
+                <input type="range" id="waveHueSlider" min="0" max="360" step="1" value="280">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SATURATION</span>
+                    <span class="control-value" id="waveSaturationValue">70%</span>
+                </div>
+                <input type="range" id="waveSaturationSlider" min="0" max="100" step="1" value="70">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>DISTORTION</span>
+                    <span class="control-value" id="waveDistortionValue">1.5</span>
+                </div>
+                <input type="range" id="waveDistortionSlider" min="0" max="5.0" step="0.1" value="1.5">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SPEED</span>
+                    <span class="control-value" id="waveSpeedValue">1.0</span>
+                </div>
+                <input type="range" id="waveSpeedSlider" min="0" max="3.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>GRID DENSITY</span>
+                </div>
+                <div class="density-options">
+                    <div class="density-option" data-wave-density="low">L</div>
+                    <div class="density-option active" data-wave-density="medium">M</div>
+                    <div class="density-option" data-wave-density="high">H</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>GLOW</span>
+                    <span class="control-value" id="waveGlowValue">1.0</span>
+                </div>
+                <input type="range" id="waveGlowSlider" min="0" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>DOT COUNT</span>
+                    <span class="control-value" id="waveDotCountValue">200</span>
+                </div>
+                <input type="range" id="waveDotCountSlider" min="50" max="500" step="10" value="200">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>ORBIT SIZE</span>
+                    <span class="control-value" id="waveOrbitSizeValue">100</span>
+                </div>
+                <input type="range" id="waveOrbitSizeSlider" min="50" max="300" step="10" value="100">
+            </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>COLOR MODE</span>
+                </div>
+                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="density-option active" data-wave-color="mono">MONO</div>
+                    <div class="density-option" data-wave-color="warm">WARM</div>
+                    <div class="density-option" data-wave-color="cool">COOL</div>
+                </div>
             </div>
         </section>
 
@@ -1355,6 +1430,36 @@
                     twinkleIntensity: 20, // How often stars twinkle (higher = less frequent)
                     alphaMin: 0.2, // Minimum alpha for stars
                     alphaMax: 1.0 // Maximum alpha for stars
+                },
+                wave: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    hue: 280, // Purple hue
+                    saturation: 70, // Color saturation
+
+                    // Mesh grid properties
+                    gridDensity: {
+                        low: { cols: 15, rows: 10 },
+                        medium: { cols: 20, rows: 12 },
+                        high: { cols: 30, rows: 18 }
+                    },
+                    nodeSize: 3,
+                    noiseScale: 0.05,
+                    distortionIntensity: 1.5,
+                    speed: 1.0,
+                    glow: 1.0,
+
+                    // Orbital dots
+                    dotCount: 200,
+                    orbitRadius: 100,
+                    dotSize: 2,
+
+                    // Color modes
+                    colorModes: {
+                        mono: { baseHue: 0, saturation: 0 },
+                        warm: { baseHue: 30, saturation: 60 },
+                        cool: { baseHue: 200, saturation: 60 }
+                    }
                 }
             }
         };
@@ -1392,7 +1497,18 @@
                 starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
                 starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
                 starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
-                starSmoothing: 0.5  // Audio smoothing for stars (0-1)
+                starSmoothing: 0.5,  // Audio smoothing for stars (0-1)
+
+                // WAVE theme settings
+                waveHue: 280,  // Color hue (0-360)
+                waveSaturation: 70,  // Color saturation (0-100%)
+                waveDistortion: 1.5,  // Distortion intensity (0-5)
+                waveSpeed: 1.0,  // Animation speed (0-3)
+                waveDensity: 'medium',  // Grid density (low/medium/high)
+                waveGlow: 1.0,  // Glow intensity (0-2)
+                waveDotCount: 200,  // Number of orbital dots (50-500)
+                waveOrbitSize: 100,  // Orbit radius in pixels (50-300)
+                waveColorMode: 'mono'  // Color mode (mono/warm/cool)
             },
 
             // Audio
@@ -1463,7 +1579,18 @@
                 starArray: [],
                 gradientCanvas: null,
                 gradientCtx: null,
-                count: 0
+                count: 0,
+                centerX: null,  // Current center X (smoothed)
+                centerY: null,  // Current center Y (smoothed)
+                targetCenterX: null,  // Target center X (click position)
+                targetCenterY: null   // Target center Y (click position)
+            },
+
+            wave: {
+                initialized: false,
+                gridNodes: [],
+                orbitalDots: [],
+                noiseOffset: 0
             },
 
             // Image objects (for LINEAR/NEON overlay images)
@@ -1621,7 +1748,8 @@
                 linear: 'Audio affects: wave distortion, color intensity, path movement',
                 neon: 'Audio affects: gradient colors, mesh animation, brightness pulses',
                 glitch: 'Audio affects: rotation speed, glitch intensity, RGB separation',
-                stars: 'Audio affects: orbit speed (bass slows), brightness (mids), center position (highs)'
+                stars: 'Audio affects: orbit speed (bass slows), brightness (mids), center position (highs)',
+                wave: 'Audio affects: grid distortion (bass), orbit speed (mids), glow intensity (highs)'
             };
 
             themeDescription.textContent = descriptions[state.settings.theme] || '';
@@ -1661,10 +1789,16 @@
                 starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
             }
 
-            // Hide WAVE settings for STARS theme
+            const waveControlsSection = document.getElementById('waveControlsSection');
+            if (waveControlsSection) {
+                waveControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'wave' ? 'block' : 'none';
+            }
+
+            // Hide global WAVE settings for STARS and WAVE themes (they have their own controls)
             const waveSettingsSection = document.getElementById('waveSettingsSection');
             if (waveSettingsSection) {
-                waveSettingsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'none' : 'block';
+                const hideWaveSettings = state.settings.theme === 'stars' || state.settings.theme === 'wave';
+                waveSettingsSection.style.display = !hasSelectedImage && !hideWaveSettings ? 'block' : 'none';
             }
 
             // Update theme description
@@ -3168,6 +3302,12 @@
                 new Star();
             }
 
+            // Initialize center position to screen center
+            state.stars.centerX = w / 2;
+            state.stars.centerY = h / 2;
+            state.stars.targetCenterX = w / 2;
+            state.stars.targetCenterY = h / 2;
+
             state.stars.initialized = true;
             console.log(`✨ Initialized ${state.settings.starCount} stars`);
         }
@@ -3232,6 +3372,11 @@
             // Bass SLOWS DOWN orbit speed using user setting
             const speedBoost = 1.0 - (low * (state.settings.starAudioBoost / 10));
 
+            // Smoothly transition center position to target (controlled by smoothing slider)
+            const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
+            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
+            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
+
             // Draw stars
             ctx.globalCompositeOperation = 'lighter';
 
@@ -3258,8 +3403,9 @@
                 const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
                 const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
 
-                const x = Math.sin(star.timePassed) * scaledOrbitRadius + star.orbitX + centerOffsetX;
-                const y = Math.cos(star.timePassed) * scaledOrbitRadius + star.orbitY + centerOffsetY;
+                // Use smoothed center position (click-to-center feature)
+                const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
 
                 // Twinkle effect using user setting
                 const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
@@ -4486,6 +4632,15 @@
             if (resetBtn) {
                 resetBtn.addEventListener('click', resetToDefaults);
             }
+
+            // Click-to-center feature for STARS theme
+            document.addEventListener('click', (e) => {
+                // Only activate for STARS theme and when not clicking on controls
+                if (state.settings.theme === 'stars' && !elements.sidebar.contains(e.target)) {
+                    state.stars.targetCenterX = e.clientX;
+                    state.stars.targetCenterY = e.clientY;
+                }
+            });
 
             // Add image button and dropdown
             const addImageButton = document.getElementById('addImageButton');
