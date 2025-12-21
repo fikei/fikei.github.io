@@ -376,6 +376,34 @@
             cursor: pointer;
         }
 
+        /* Checkboxes */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-size: 10px;
+            color: #999999;
+        }
+
+        input[type="checkbox"] {
+            width: 12px;
+            height: 12px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            border: 1px solid #ffffff;
+            background: #000000;
+        }
+
+        input[type="checkbox"]:checked {
+            background: #ffffff;
+        }
+
+        input[type="checkbox"]:hover {
+            border-color: #999999;
+        }
+
         /* Gradient Presets Grid */
         .gradient-grid {
             display: none;
@@ -626,6 +654,41 @@
                     <span class="control-value" id="image3DMotionValue">0.0</span>
                 </div>
                 <input type="range" id="image3DMotionSlider" min="0" max="2" step="0.1" value="0">
+            </div>
+
+            <h3 style="margin-top: 2rem;">FLASH EFFECT</h3>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>FREQUENCY FLASH</span>
+                </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="flashFrequencyCheck">
+                    <span>Enable</span>
+                </label>
+            </div>
+            <div class="control-group" id="flashFrequencySliderGroup" style="display: none;">
+                <div class="control-label">
+                    <span>FREQ THRESHOLD</span>
+                    <span class="control-value" id="flashFrequencyValue">0.5</span>
+                </div>
+                <input type="range" id="flashFrequencySlider" min="0" max="1" step="0.05" value="0.5">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>VOLUME FLASH</span>
+                </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="flashVolumeCheck">
+                    <span>Enable</span>
+                </label>
+            </div>
+            <div class="control-group" id="flashVolumeSliderGroup" style="display: none;">
+                <div class="control-label">
+                    <span>VOL THRESHOLD</span>
+                    <span class="control-value" id="flashVolumeValue">0.5</span>
+                </div>
+                <input type="range" id="flashVolumeSlider" min="0" max="1" step="0.05" value="0.5">
             </div>
 
             <div id="imageEffectSettings">
@@ -1241,6 +1304,20 @@
                     updateSlider('imageRotationSlider', 'imageRotationValue', imageObj.rotation, 0);
                     updateSlider('imageBlurSlider', 'imageBlurValue', imageObj.blur, 1);
                     updateSlider('themeOpacitySlider', 'themeOpacityValue', imageObj.themeOpacity, 2);
+
+                    // Update flash effect controls
+                    const flashFreqCheck = document.getElementById('flashFrequencyCheck');
+                    const flashVolCheck = document.getElementById('flashVolumeCheck');
+                    const flashFreqGroup = document.getElementById('flashFrequencySliderGroup');
+                    const flashVolGroup = document.getElementById('flashVolumeSliderGroup');
+
+                    if (flashFreqCheck) flashFreqCheck.checked = imageObj.flashFrequencyEnabled || false;
+                    if (flashVolCheck) flashVolCheck.checked = imageObj.flashVolumeEnabled || false;
+                    if (flashFreqGroup) flashFreqGroup.style.display = imageObj.flashFrequencyEnabled ? 'block' : 'none';
+                    if (flashVolGroup) flashVolGroup.style.display = imageObj.flashVolumeEnabled ? 'block' : 'none';
+
+                    updateSlider('flashFrequencySlider', 'flashFrequencyValue', imageObj.flashFrequencyThreshold || 0.5, 2);
+                    updateSlider('flashVolumeSlider', 'flashVolumeValue', imageObj.flashVolumeThreshold || 0.5, 2);
                 }
             }
 
@@ -2630,6 +2707,30 @@
                 canvas.style.top = `${imageObj.y}px`;
                 canvas.style.display = 'block';
 
+                // Flash effect logic
+                let shouldHideFlash = false;
+
+                if (imageObj.flashFrequencyEnabled) {
+                    // Calculate average frequency level (0-1 range)
+                    const avgFrequency = (low + mid + high) / 3;
+                    if (avgFrequency > imageObj.flashFrequencyThreshold) {
+                        shouldHideFlash = true;
+                    }
+                }
+
+                if (imageObj.flashVolumeEnabled && !shouldHideFlash) {
+                    // Use high frequency as volume proxy (0-1 range)
+                    const volume = Math.max(low, mid, high);
+                    if (volume > imageObj.flashVolumeThreshold) {
+                        shouldHideFlash = true;
+                    }
+                }
+
+                // Apply flash visibility
+                if (shouldHideFlash) {
+                    canvas.style.display = 'none';
+                }
+
                 // Apply transparency
                 canvas.style.opacity = imageObj.transparency;
 
@@ -2853,6 +2954,10 @@
                         blur: imageObj.blur,
                         themeBlur: imageObj.themeBlur,
                         themeOpacity: imageObj.themeOpacity,
+                        flashFrequencyEnabled: imageObj.flashFrequencyEnabled,
+                        flashFrequencyThreshold: imageObj.flashFrequencyThreshold,
+                        flashVolumeEnabled: imageObj.flashVolumeEnabled,
+                        flashVolumeThreshold: imageObj.flashVolumeThreshold,
                         imageData: imageData
                     });
                 }
@@ -2976,6 +3081,10 @@
                             blur: imageObjData.blur,
                             themeBlur: imageObjData.themeBlur,
                             themeOpacity: imageObjData.themeOpacity,
+                            flashFrequencyEnabled: imageObjData.flashFrequencyEnabled || false,
+                            flashFrequencyThreshold: imageObjData.flashFrequencyThreshold || 0.5,
+                            flashVolumeEnabled: imageObjData.flashVolumeEnabled || false,
+                            flashVolumeThreshold: imageObjData.flashVolumeThreshold || 0.5,
                             canvas: canvas,
                             isDragging: false,
                             isResizing: false,
@@ -3044,6 +3153,10 @@
                     blur: imageObjData.blur,
                     themeBlur: imageObjData.themeBlur,
                     themeOpacity: imageObjData.themeOpacity,
+                    flashFrequencyEnabled: imageObjData.flashFrequencyEnabled || false,
+                    flashFrequencyThreshold: imageObjData.flashFrequencyThreshold || 0.5,
+                    flashVolumeEnabled: imageObjData.flashVolumeEnabled || false,
+                    flashVolumeThreshold: imageObjData.flashVolumeThreshold || 0.5,
                     canvas: canvas,
                     isDragging: false,
                     isResizing: false,
@@ -3369,6 +3482,46 @@
             // 3D Motion slider (global setting for all images)
             setupSlider('image3DMotionSlider', 'image3DMotionValue', (value) => {
                 state.settings.image3DMotion = value;
+            });
+
+            // Flash effect controls
+            const flashFrequencyCheck = document.getElementById('flashFrequencyCheck');
+            const flashFrequencySliderGroup = document.getElementById('flashFrequencySliderGroup');
+            const flashVolumeCheck = document.getElementById('flashVolumeCheck');
+            const flashVolumeSliderGroup = document.getElementById('flashVolumeSliderGroup');
+
+            flashFrequencyCheck.addEventListener('change', (e) => {
+                if (state.selectedImageIndex === -1) return;
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.flashFrequencyEnabled = e.target.checked;
+                    flashFrequencySliderGroup.style.display = e.target.checked ? 'block' : 'none';
+                }
+            });
+
+            flashVolumeCheck.addEventListener('change', (e) => {
+                if (state.selectedImageIndex === -1) return;
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.flashVolumeEnabled = e.target.checked;
+                    flashVolumeSliderGroup.style.display = e.target.checked ? 'block' : 'none';
+                }
+            });
+
+            setupSlider('flashFrequencySlider', 'flashFrequencyValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.flashFrequencyThreshold = value;
+                }
+            });
+
+            setupSlider('flashVolumeSlider', 'flashVolumeValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.flashVolumeThreshold = value;
+                }
             });
 
             // Theme opacity slider
@@ -3708,6 +3861,10 @@
                                 blur: 0, // Blur amount in pixels
                                 themeBlur: 0, // Blur on theme effect
                                 themeOpacity: 1.0, // Opacity of theme effect
+                                flashFrequencyEnabled: false,
+                                flashFrequencyThreshold: 0.5,
+                                flashVolumeEnabled: false,
+                                flashVolumeThreshold: 0.5,
                                 canvas: canvas,
                                 isDragging: false,
                                 isResizing: false,
