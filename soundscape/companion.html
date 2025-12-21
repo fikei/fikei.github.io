@@ -420,7 +420,7 @@
                 </select>
             </div>
 
-            <div class="control-section">
+            <div class="control-section" id="waveSettingsSection" style="display: none;">
                 <h3>Wave Settings</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -445,7 +445,7 @@
             </div>
         </div>
 
-        <div class="control-section">
+        <div class="control-section" id="modeSection" style="display: none;">
             <h3>Mode</h3>
             <div class="mode-buttons">
                 <button class="mode-button active" data-mode="default">FLOW</button>
@@ -683,8 +683,30 @@
                     if (themeSelect && themeSelect.value !== value) {
                         themeSelect.value = value;
                     }
+                    updateControlVisibility(value);
                 }
             });
+        }
+
+        // Update control visibility based on theme
+        function updateControlVisibility(theme) {
+            const waveSettingsSection = document.getElementById('waveSettingsSection');
+            const modeSection = document.getElementById('modeSection');
+
+            // Hide all theme-specific sections
+            if (waveSettingsSection) waveSettingsSection.style.display = 'none';
+            if (modeSection) modeSection.style.display = 'none';
+
+            // Show relevant sections based on theme
+            switch(theme) {
+                case 'wave':
+                    if (waveSettingsSection) waveSettingsSection.style.display = 'block';
+                    break;
+                case 'linear':
+                    if (modeSection) modeSection.style.display = 'block';
+                    break;
+                // NEON, GLITCH, STARS don't have companion-specific controls yet
+            }
         }
 
         // Tab switching
@@ -911,7 +933,7 @@
                 button.addEventListener('click', () => {
                     modeButtons.forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
-                    updateDesktop({ settings: { mode: button.dataset.mode } });
+                    updateDesktop({ mode: button.dataset.mode });
                 });
             });
 
@@ -919,19 +941,27 @@
             const themeSelect = document.getElementById('themeSelect');
             if (themeSelect) {
                 themeSelect.addEventListener('change', (e) => {
-                    updateDesktop({ settings: { theme: e.target.value } });
+                    updateDesktop({ theme: e.target.value });
+                    updateControlVisibility(e.target.value);
                 });
             }
         }
 
-        function updateDesktop(settings) {
+        function updateDesktop(data) {
             if (!socket || !isConnected) {
                 console.warn('Cannot update desktop: not connected');
                 return;
             }
 
-            console.log('📱 Sending control update to desktop:', settings);
-            socket.emit('mobile:control-update', { settings });
+            console.log('📱 Sending control update to desktop:', data);
+
+            // If it's an action (media operations), send as-is
+            // Otherwise, wrap in settings object
+            if (data.action) {
+                socket.emit('mobile:control-update', data);
+            } else {
+                socket.emit('mobile:control-update', { settings: data });
+            }
         }
 
         // Initialize controls
