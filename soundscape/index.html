@@ -773,9 +773,9 @@
         <section class="control-section" id="modeSection">
             <h3>MODE</h3>
             <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
-                <div class="density-option active" data-mode="hole">HOLE</div>
+                <div class="density-option active" data-mode="default">DEFAULT</div>
+                <div class="density-option" data-mode="hole">HOLE</div>
                 <div class="density-option" data-mode="crunch">CRUNCH</div>
-                <div class="density-option" data-mode="static">STATIC</div>
             </div>
         </section>
 
@@ -1033,7 +1033,7 @@
                 smoothing: 0.3,
                 density: 'medium',
                 gradient: 'default',
-                mode: 'hole',
+                mode: 'default',
                 theme: 'linear',
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
@@ -1538,8 +1538,8 @@
             // MODE-DEPENDENT BEHAVIOR
             let midCursorX, midCursorY, highCursorX, highCursorY;
 
-            if (state.settings.mode === 'hole' || state.settings.mode === 'static') {
-                // HOLE/STATIC MODE: Follow cursor if on screen, random if not
+            if (state.settings.mode === 'hole' || state.settings.mode === 'default') {
+                // HOLE/DEFAULT MODE: Follow cursor if on screen, random if not
                 if (state.mouse.onScreen) {
                     midCursorX = state.mouse.sx;
                     midCursorY = state.mouse.sy;
@@ -1606,8 +1606,8 @@
                             highForceX = Math.cos(angle) * highStrength * 150 * state.settings.intensity;
                             highForceY = Math.sin(angle) * highStrength * 150 * state.settings.intensity;
                         }
-                    } else if (state.settings.mode === 'static') {
-                        // STATIC MODE: No audio-reactive burst/hole effect
+                    } else if (state.settings.mode === 'default') {
+                        // DEFAULT MODE: No audio-reactive burst/hole effect
                         // Forces remain 0
                     } else {
                         // CRUNCH MODE: Directional wave sweep across screen - MORE DRAMATIC
@@ -4048,7 +4048,7 @@
                 smoothing: 0.3,
                 density: 'medium',
                 gradient: 'default',
-                mode: 'hole',
+                mode: 'default',
                 theme: 'linear',
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
