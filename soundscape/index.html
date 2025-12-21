@@ -764,6 +764,13 @@
                 </div>
                 <input type="range" id="glitchIntensitySlider" min="0" max="5.0" step="0.1" value="1.0">
             </div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>CONTRAST</span>
+                    <span class="control-value" id="glitchContrastValue">1.0</span>
+                </div>
+                <input type="range" id="glitchContrastSlider" min="0" max="3.0" step="0.1" value="1.0">
+            </div>
         </section>
 
         <!-- Frequency Emphasis -->
@@ -967,6 +974,7 @@
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
                 glitchEffectIntensity: 1.0,
+                glitchContrast: 1.0,
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
@@ -2204,10 +2212,15 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.globalCompositeOperation = 'lighter';
 
+            // Apply contrast filter
+            const contrast = state.settings.glitchContrast;
+            ctx.filter = `contrast(${contrast})`;
+
             ctx.drawImage(redCanvas, -channelSeparation, 0);
             ctx.drawImage(greenCanvas, 0, 0);
             ctx.drawImage(blueCanvas, channelSeparation, 0);
 
+            ctx.filter = 'none';
             ctx.globalCompositeOperation = 'source-over';
         }
 
@@ -2444,6 +2457,10 @@
             const randomOffsetX = (Math.random() - 0.5) * channelSeparation * 0.5;
             const randomOffsetY = (Math.random() - 0.5) * channelSeparation * 0.5;
 
+            // Apply contrast filter
+            const contrast = state.settings.glitchContrast;
+            ctx.filter = `contrast(${contrast})`;
+
             if (glitchMode === 'gray') {
                 // GRAY mode: Single render to avoid overexposure
                 // Apply subtle offset variations for glitch effect
@@ -2487,6 +2504,7 @@
                 }
             }
 
+            ctx.filter = 'none';
             ctx.globalCompositeOperation = 'source-over';
         }
 
@@ -3408,6 +3426,11 @@
                 state.settings.glitchEffectIntensity = value;
             });
 
+            // GLITCH contrast slider
+            setupSlider('glitchContrastSlider', 'glitchContrastValue', (value) => {
+                state.settings.glitchContrast = value;
+            });
+
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -3869,6 +3892,7 @@
                 burstSize: 1.0,
                 rotationIntensity: 1.0,
                 glitchEffectIntensity: 1.0,
+                glitchContrast: 1.0,
                 glitchMode: 'rgb',
                 neonMode: 'bright',
                 colorTemp: 1.0,
@@ -3885,6 +3909,7 @@
             document.getElementById('colorTempSlider').value = 1.0;
             document.getElementById('rotationIntensitySlider').value = 1.0;
             document.getElementById('glitchIntensitySlider').value = 1.0;
+            document.getElementById('glitchContrastSlider').value = 1.0;
             document.getElementById('image3DMotionSlider').value = 0.0;
 
             document.getElementById('lowValue').textContent = '1.0';
@@ -3896,6 +3921,7 @@
             document.getElementById('colorTempValue').textContent = '1.0';
             document.getElementById('rotationIntensityValue').textContent = '1.0';
             document.getElementById('glitchIntensityValue').textContent = '1.0';
+            document.getElementById('glitchContrastValue').textContent = '1.0';
             document.getElementById('image3DMotionValue').textContent = '0.0';
 
             // Update analyser if active
