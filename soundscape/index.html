@@ -220,37 +220,25 @@
             bottom: 1rem;
             left: 1rem;
             z-index: 101;
+            height: 30px;
             background: #000000;
             border: 1px solid #ffffff;
-            padding: 0.5rem 1rem;
+            border-radius: 0;
+            padding: 0 1rem;
             font-family: monospace;
             font-size: 10px;
             color: #ffffff;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.2em;
             opacity: 1;
             transition: opacity 0.5s ease;
             display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            align-items: flex-start;
+            align-items: center;
+            justify-content: center;
         }
 
         .pairing-code-display.hidden-control {
             opacity: 0;
             pointer-events: none;
-        }
-
-        .pairing-code-label {
-            font-size: 8px;
-            color: #999999;
-        }
-
-        .pairing-code-value {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: 0.3em;
-            color: #ffffff;
         }
 
         /* ===== SIDEBAR TOGGLE BUTTON ===== */
@@ -794,8 +782,7 @@
 
     <!-- Pairing Code Display -->
     <div class="pairing-code-display" id="pairingCodeDisplay">
-        <div class="pairing-code-label">Companion Code</div>
-        <div class="pairing-code-value" id="pairingCodeValue">------</div>
+        <span id="pairingCodeValue">------</span>
     </div>
 
     <!-- Sidebar Toggle -->
