@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <title>Soundscape Companion Control</title>
+    <link rel="icon" href="data:,">
 
     <!-- Socket.io for WebSocket communication -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
@@ -349,14 +351,15 @@
             // Determine WebSocket server URL
             let socketUrl;
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Local development
                 socketUrl = 'http://localhost:3000';
-            } else if (window.location.hostname.includes('onrender.com')) {
-                socketUrl = 'https://fikei-github-io.onrender.com';
             } else {
-                socketUrl = `${window.location.protocol}//${window.location.host}`;
+                // Production: Always use Render deployment for WebSocket server
+                // GitHub Pages can't run WebSocket servers, so we use Render
+                socketUrl = 'https://fikei-github-io.onrender.com';
             }
 
-            console.log('🔌 Connecting to:', socketUrl);
+            console.log('🔌 Connecting to WebSocket server:', socketUrl);
 
             socket = io(socketUrl);
 
