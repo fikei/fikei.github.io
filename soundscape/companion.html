@@ -795,8 +795,10 @@
 
             mediaList.innerHTML = mediaItems.map((item, index) => {
                 const isVisible = item.visible !== false; // Default to visible if not set
+                const thumbnail = item.src ? `<img src="${item.src}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-right: 10px;">` : '';
                 return `
                 <div class="media-item ${index === selectedMediaIndex ? 'selected' : ''}" data-index="${index}">
+                    ${thumbnail}
                     <div class="media-item-info">
                         <div class="media-item-name">${item.isVideo ? 'Video' : 'Image'} ${index + 1}</div>
                         <div class="media-item-type">${item.isVideo ? 'VIDEO' : 'IMAGE'}</div>

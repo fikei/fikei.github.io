@@ -6199,6 +6199,7 @@
                 },
                 imageObjects: state.imageObjects.map((obj, index) => ({
                     isVideo: obj.isVideo || false,
+                    src: obj.element ? obj.element.src : '',  // Include media URL for companion
                     transparency: obj.transparency,
                     rotation: obj.rotation,
                     blur: obj.blur,
