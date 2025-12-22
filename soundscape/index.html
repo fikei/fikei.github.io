@@ -4536,9 +4536,12 @@
                         path.setAttribute('d', '');
                     });
 
-                    // Clear the canvas to remove any residual graphics
-                    const ctx = elements.canvas.getContext('2d');
-                    ctx.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
+                    // Clear theme canvas (used by GLITCH theme)
+                    const themeCanvas = document.getElementById('theme-canvas');
+                    if (themeCanvas) {
+                        const ctx = themeCanvas.getContext('2d');
+                        ctx.clearRect(0, 0, themeCanvas.width, themeCanvas.height);
+                    }
 
                     // Clear STARS canvas
                     const starsCanvas = document.getElementById('stars-canvas');
