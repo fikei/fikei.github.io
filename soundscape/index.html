@@ -1218,61 +1218,6 @@
                 </div>
                 <input type="range" id="waveSaturationSlider" min="0" max="100" step="1" value="70">
             </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>DISTORTION</span>
-                    <span class="control-value" id="waveDistortionValue">1.5</span>
-                </div>
-                <input type="range" id="waveDistortionSlider" min="0" max="5.0" step="0.1" value="1.5">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>SPEED</span>
-                    <span class="control-value" id="waveSpeedValue">1.0</span>
-                </div>
-                <input type="range" id="waveSpeedSlider" min="0" max="3.0" step="0.1" value="1.0">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>GRID DENSITY</span>
-                </div>
-                <div class="density-options">
-                    <div class="density-option" data-wave-density="low">L</div>
-                    <div class="density-option active" data-wave-density="medium">M</div>
-                    <div class="density-option" data-wave-density="high">H</div>
-                </div>
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>GLOW</span>
-                    <span class="control-value" id="waveGlowValue">1.0</span>
-                </div>
-                <input type="range" id="waveGlowSlider" min="0" max="2.0" step="0.1" value="1.0">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>DOT COUNT</span>
-                    <span class="control-value" id="waveDotCountValue">200</span>
-                </div>
-                <input type="range" id="waveDotCountSlider" min="50" max="500" step="10" value="200">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>ORBIT SIZE</span>
-                    <span class="control-value" id="waveOrbitSizeValue">100</span>
-                </div>
-                <input type="range" id="waveOrbitSizeSlider" min="50" max="300" step="10" value="100">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>COLOR MODE</span>
-                </div>
-                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
-                    <div class="density-option active" data-wave-color="mono">MONO</div>
-                    <div class="density-option" data-wave-color="warm">WARM</div>
-                    <div class="density-option" data-wave-color="cool">COOL</div>
-                </div>
-            </div>
         </section>
 
         <!-- Frequency Emphasis -->
@@ -1541,14 +1486,7 @@
                 waveMode: 'planes',  // Visual mode: planes, grids, dots
                 waveLayers: 3,  // Number of layers for grids/dots mode (1-10)
                 waveHue: 280,  // Color hue (0-360)
-                waveSaturation: 70,  // Color saturation (0-100%)
-                waveDistortion: 1.5,  // Distortion intensity (0-5)
-                waveSpeed: 1.0,  // Animation speed (0-3)
-                waveDensity: 'medium',  // Grid density (low/medium/high)
-                waveGlow: 1.0,  // Glow intensity (0-2)
-                waveDotCount: 200,  // Number of orbital dots (50-500)
-                waveOrbitSize: 100,  // Orbit radius in pixels (50-300)
-                waveColorMode: 'mono'  // Color mode (mono/warm/cool)
+                waveSaturation: 70  // Color saturation (0-100%)
             },
 
             // Audio
@@ -5040,69 +4978,6 @@
                 });
             }
 
-            // WAVE DISTORTION slider
-            const waveDistortionSlider = document.getElementById('waveDistortionSlider');
-            const waveDistortionValue = document.getElementById('waveDistortionValue');
-            if (waveDistortionSlider && waveDistortionValue) {
-                waveDistortionSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.waveDistortion = value;
-                    waveDistortionValue.textContent = value.toFixed(1);
-                });
-            }
-
-            // WAVE SPEED slider
-            const waveSpeedSlider = document.getElementById('waveSpeedSlider');
-            const waveSpeedValue = document.getElementById('waveSpeedValue');
-            if (waveSpeedSlider && waveSpeedValue) {
-                waveSpeedSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.waveSpeed = value;
-                    waveSpeedValue.textContent = value.toFixed(1);
-                });
-            }
-
-            // WAVE GLOW slider
-            const waveGlowSlider = document.getElementById('waveGlowSlider');
-            const waveGlowValue = document.getElementById('waveGlowValue');
-            if (waveGlowSlider && waveGlowValue) {
-                waveGlowSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.waveGlow = value;
-                    waveGlowValue.textContent = value.toFixed(1);
-                });
-            }
-
-            // WAVE DOT COUNT slider
-            const waveDotCountSlider = document.getElementById('waveDotCountSlider');
-            const waveDotCountValue = document.getElementById('waveDotCountValue');
-            if (waveDotCountSlider && waveDotCountValue) {
-                waveDotCountSlider.addEventListener('input', (e) => {
-                    const value = parseInt(e.target.value);
-                    state.settings.waveDotCount = value;
-                    waveDotCountValue.textContent = value;
-                    // Dot count change requires reinitialization
-                    if (state.wave.initialized) {
-                        state.wave.initialized = false;
-                    }
-                });
-            }
-
-            // WAVE ORBIT SIZE slider
-            const waveOrbitSizeSlider = document.getElementById('waveOrbitSizeSlider');
-            const waveOrbitSizeValue = document.getElementById('waveOrbitSizeValue');
-            if (waveOrbitSizeSlider && waveOrbitSizeValue) {
-                waveOrbitSizeSlider.addEventListener('input', (e) => {
-                    const value = parseInt(e.target.value);
-                    state.settings.waveOrbitSize = value;
-                    waveOrbitSizeValue.textContent = value;
-                    // Orbit size change requires reinitialization
-                    if (state.wave.initialized) {
-                        state.wave.initialized = false;
-                    }
-                });
-            }
-
             // Density and mode options
             document.querySelectorAll('.density-option').forEach(option => {
                 option.addEventListener('click', () => {
@@ -5145,26 +5020,6 @@
                         option.classList.add('active');
                         state.settings.neonMode = option.dataset.neonMode;
                         console.log(`🎨 NEON mode changed to: ${state.settings.neonMode.toUpperCase()}`);
-                    }
-
-                    // Handle WAVE density change
-                    if (option.dataset.waveDensity) {
-                        document.querySelectorAll('[data-wave-density]').forEach(o => o.classList.remove('active'));
-                        option.classList.add('active');
-                        state.settings.waveDensity = option.dataset.waveDensity;
-                        // Density change requires reinitialization
-                        if (state.wave.initialized) {
-                            state.wave.initialized = false;
-                        }
-                        console.log(`🌊 WAVE density changed to: ${state.settings.waveDensity.toUpperCase()}`);
-                    }
-
-                    // Handle WAVE color mode change
-                    if (option.dataset.waveColor) {
-                        document.querySelectorAll('[data-wave-color]').forEach(o => o.classList.remove('active'));
-                        option.classList.add('active');
-                        state.settings.waveColorMode = option.dataset.waveColor;
-                        console.log(`🌊 WAVE color mode changed to: ${state.settings.waveColorMode.toUpperCase()}`);
                     }
                 });
             });
@@ -5957,14 +5812,7 @@
                 waveMode: 'planes',
                 waveLayers: 3,
                 waveHue: 280,
-                waveSaturation: 70,
-                waveDistortion: 1.5,
-                waveSpeed: 1.0,
-                waveDensity: 'medium',
-                waveGlow: 1.0,
-                waveDotCount: 200,
-                waveOrbitSize: 100,
-                waveColorMode: 'mono'
+                waveSaturation: 70
             };
 
             // Update UI
@@ -6025,18 +5873,8 @@
             document.getElementById('waveLayersValue').textContent = '3';
             document.getElementById('waveHueSlider').value = 280;
             document.getElementById('waveSaturationSlider').value = 70;
-            document.getElementById('waveDistortionSlider').value = 1.5;
-            document.getElementById('waveSpeedSlider').value = 1.0;
-            document.getElementById('waveGlowSlider').value = 1.0;
-            document.getElementById('waveDotCountSlider').value = 200;
-            document.getElementById('waveOrbitSizeSlider').value = 100;
             document.getElementById('waveHueValue').textContent = '280°';
             document.getElementById('waveSaturationValue').textContent = '70%';
-            document.getElementById('waveDistortionValue').textContent = '1.5';
-            document.getElementById('waveSpeedValue').textContent = '1.0';
-            document.getElementById('waveGlowValue').textContent = '1.0';
-            document.getElementById('waveDotCountValue').textContent = '200';
-            document.getElementById('waveOrbitSizeValue').textContent = '100';
 
             // Update analyser if active
             if (state.analyser) {
