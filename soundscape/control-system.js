@@ -1080,6 +1080,26 @@ class ControlSystemUI {
       return null;
     }
 
+    // Initialize audio reactivity state from theme config
+    if (!window.state.audioReactivity) {
+      window.state.audioReactivity = {};
+    }
+    if (!window.state.audioReactivity[themeName] && themeConfig.audioReactivity) {
+      window.state.audioReactivity[themeName] = JSON.parse(JSON.stringify(themeConfig.audioReactivity));
+    }
+
+    // Initialize settings state from theme config defaults
+    if (!window.state.settings[themeName]) {
+      window.state.settings[themeName] = {};
+      // Set default values for all controls
+      for (const [controlId, controlConfig] of Object.entries(themeConfig.controls)) {
+        const controlDef = { ...CONTROL_REGISTRY[controlId], ...controlConfig };
+        if (controlDef.default !== undefined) {
+          window.state.settings[themeName][controlId] = controlDef.default;
+        }
+      }
+    }
+
     const section = document.createElement('section');
     section.className = 'control-section';
     section.id = `${themeName}ControlsSection`;
