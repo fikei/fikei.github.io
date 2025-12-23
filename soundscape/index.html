@@ -836,6 +836,36 @@
             background: #ffffff;
         }
 
+        /* ===== TOAST NOTIFICATIONS ===== */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 100, 100, 0.95);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            max-width: 80%;
+            text-align: center;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: rgba(100, 255, 100, 0.95);
+        }
+
         /* ===== RESPONSIVE DESIGN ===== */
         @media (max-width: 768px) {
             .sidebar {
@@ -987,6 +1017,14 @@
                 <input type="range" id="image3DMotionSlider" min="0" max="2" step="0.1" value="0">
             </div>
 
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SCALE</span>
+                    <span class="control-value" id="imageScaleValue">1.0x</span>
+                </div>
+                <input type="range" id="imageScaleSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+            </div>
+
             <h3 style="margin-top: 2rem;">FLASH EFFECT</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -1050,6 +1088,56 @@
                     </div>
                     <input type="range" id="videoTrimEndSlider" min="0" max="100" step="0.1" value="100">
                 </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>PLAYBACK SPEED</span>
+                        <span class="control-value" id="videoSpeedValue">1.0x</span>
+                    </div>
+                    <input type="range" id="videoSpeedSlider" min="0.25" max="4.0" step="0.25" value="1.0">
+                </div>
+            </div>
+
+            <!-- GLITCH Background Image Controls (visible only when GLITCH theme active and image loaded as background) -->
+            <div id="glitchBackgroundControls" style="display: none;">
+                <h3 style="margin-top: 2rem;">GLITCH BACKGROUND</h3>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>FIT MODE</span>
+                    </div>
+                    <select class="theme-select" id="glitchFitModeSelect">
+                        <option value="cover">COVER (Fill, May Crop)</option>
+                        <option value="contain">CONTAIN (Fit All, Letterbox)</option>
+                        <option value="fill">FILL (Stretch to Fit)</option>
+                        <option value="manual">MANUAL (Custom)</option>
+                    </select>
+                </div>
+
+                <div class="control-group" id="glitchScaleGroup">
+                    <div class="control-label">
+                        <span>SCALE</span>
+                        <span class="control-value" id="glitchScaleValue">1.0x</span>
+                    </div>
+                    <input type="range" id="glitchScaleSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+                </div>
+
+                <div class="control-group" id="glitchXGroup">
+                    <div class="control-label">
+                        <span>X POSITION</span>
+                        <span class="control-value" id="glitchXValue">0</span>
+                    </div>
+                    <input type="range" id="glitchXSlider" min="-1000" max="1000" step="10" value="0">
+                </div>
+
+                <div class="control-group" id="glitchYGroup">
+                    <div class="control-label">
+                        <span>Y POSITION</span>
+                        <span class="control-value" id="glitchYValue">0</span>
+                    </div>
+                    <input type="range" id="glitchYSlider" min="-1000" max="1000" step="10" value="0">
+                </div>
+
+                <button class="btn" id="glitchResetBtn" style="margin-top: 1rem; width: 100%;">RESET TO CENTER</button>
             </div>
 
             <div id="imageEffectSettings">
@@ -1790,8 +1878,12 @@
                 loaded: false,
                 width: 400,
                 height: 300,
+                originalWidth: 0,
+                originalHeight: 0,
                 x: 0,
                 y: 0,
+                scale: 1.0,
+                fitMode: 'cover',
                 rotation3D: { x: 0, y: 0, z: 0 },
                 isDragging: false,
                 dragStartX: 0,
@@ -5370,6 +5462,26 @@
                 });
             }
 
+            // Image scale slider
+            setupSlider('imageScaleSlider', 'imageScaleValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.scale = value;
+                    imageObj.width = imageObj.originalWidth * value;
+                    imageObj.height = imageObj.originalHeight * value;
+                }
+            }, 'x');
+
+            // Video playback speed slider
+            setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+                const videoObj = state.imageObjects[state.selectedImageIndex];
+                if (videoObj && videoObj.isVideo && videoObj.video) {
+                    videoObj.video.playbackRate = value;
+                }
+            }, 'x');
+
             // Theme opacity slider
             setupSlider('themeOpacitySlider', 'themeOpacityValue', (value) => {
                 if (state.selectedImageIndex === -1) return;
@@ -5379,6 +5491,76 @@
                     imageObj.themeOpacity = value;
                 }
             });
+
+            // GLITCH background image controls
+            const glitchFitModeSelect = document.getElementById('glitchFitModeSelect');
+            const glitchScaleGroup = document.getElementById('glitchScaleGroup');
+            const glitchXGroup = document.getElementById('glitchXGroup');
+            const glitchYGroup = document.getElementById('glitchYGroup');
+            const glitchResetBtn = document.getElementById('glitchResetBtn');
+
+            if (glitchFitModeSelect) {
+                glitchFitModeSelect.addEventListener('change', (e) => {
+                    state.glitchImage.fitMode = e.target.value;
+
+                    // Show/hide scale and position controls based on fit mode
+                    const isManual = e.target.value === 'manual';
+                    if (glitchScaleGroup) glitchScaleGroup.style.display = isManual ? 'block' : 'none';
+                    if (glitchXGroup) glitchXGroup.style.display = isManual ? 'block' : 'none';
+                    if (glitchYGroup) glitchYGroup.style.display = isManual ? 'block' : 'none';
+
+                    // Reapply fit mode
+                    if (state.glitchImage.loaded && state.glitchImage.img) {
+                        applyGlitchImageFitMode();
+                    }
+                });
+            }
+
+            setupSlider('glitchScaleSlider', 'glitchScaleValue', (value) => {
+                if (!state.glitchImage.loaded) return;
+                state.glitchImage.scale = value;
+                state.glitchImage.width = state.glitchImage.originalWidth * value;
+                state.glitchImage.height = state.glitchImage.originalHeight * value;
+            }, 'x');
+
+            setupSlider('glitchXSlider', 'glitchXValue', (value) => {
+                if (!state.glitchImage.loaded) return;
+                state.glitchImage.x = value;
+            });
+
+            setupSlider('glitchYSlider', 'glitchYValue', (value) => {
+                if (!state.glitchImage.loaded) return;
+                state.glitchImage.y = value;
+            });
+
+            if (glitchResetBtn) {
+                glitchResetBtn.addEventListener('click', () => {
+                    if (!state.glitchImage.loaded || !state.glitchImage.img) return;
+
+                    // Reset to center and default scale
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.x = 0;
+                    state.glitchImage.y = 0;
+
+                    // Update sliders
+                    const scaleSlider = document.getElementById('glitchScaleSlider');
+                    const scaleValue = document.getElementById('glitchScaleValue');
+                    const xSlider = document.getElementById('glitchXSlider');
+                    const xValue = document.getElementById('glitchXValue');
+                    const ySlider = document.getElementById('glitchYSlider');
+                    const yValue = document.getElementById('glitchYValue');
+
+                    if (scaleSlider) scaleSlider.value = 1.0;
+                    if (scaleValue) scaleValue.textContent = '1.0x';
+                    if (xSlider) xSlider.value = 0;
+                    if (xValue) xValue.textContent = '0';
+                    if (ySlider) ySlider.value = 0;
+                    if (yValue) yValue.textContent = '0';
+
+                    // Reapply fit mode
+                    applyGlitchImageFitMode();
+                });
+            }
 
             // Frequency emphasis sliders
             setupSlider('lowEmphasis', 'lowValue', (value) => {
@@ -6030,6 +6212,9 @@
                         y: y,
                         width: width,
                         height: height,
+                        originalWidth: width,
+                        originalHeight: height,
+                        scale: 1.0,
                         theme: 'none',
                         transparency: 1.0,
                         rotation: 0,
@@ -6092,23 +6277,11 @@
                         state.glitchImage.img = img;
                         state.glitchImage.loaded = true;
 
-                        // Fill canvas by scaling to cover
-                        const canvasAspect = state.boundingRect.width / state.boundingRect.height;
-                        const imgAspect = img.width / img.height;
+                        // Apply fit mode (cover by default)
+                        applyGlitchImageFitMode();
 
-                        if (imgAspect > canvasAspect) {
-                            // Image is wider - fit to height
-                            state.glitchImage.height = state.boundingRect.height;
-                            state.glitchImage.width = state.glitchImage.height * imgAspect;
-                        } else {
-                            // Image is taller - fit to width
-                            state.glitchImage.width = state.boundingRect.width;
-                            state.glitchImage.height = state.glitchImage.width / imgAspect;
-                        }
-
-                        // Center the image
-                        state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                        state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                        // Show GLITCH controls
+                        updateModeVisibility();
 
                         console.log(`✅ GLITCH image loaded from URL: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                     } else {
@@ -6133,6 +6306,9 @@
                             y: y,
                             width: width,
                             height: height,
+                            originalWidth: width,
+                            originalHeight: height,
+                            scale: 1.0,
                             theme: 'none',
                             transparency: 1.0,
                             rotation: 0,
@@ -6484,6 +6660,84 @@
                     console.log(`🖼️ GLITCH image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                 }
             });
+        }
+
+        /**
+         * Apply fit mode to GLITCH background image
+         */
+        function applyGlitchImageFitMode() {
+            if (!state.glitchImage.loaded || !state.glitchImage.img) return;
+
+            const img = state.glitchImage.img;
+            const canvasWidth = state.boundingRect.width;
+            const canvasHeight = state.boundingRect.height;
+            const canvasAspect = canvasWidth / canvasHeight;
+            const imgAspect = img.width / img.height;
+
+            const fitMode = state.glitchImage.fitMode || 'cover';
+
+            switch (fitMode) {
+                case 'cover':
+                    // Fill canvas completely (may crop)
+                    if (imgAspect > canvasAspect) {
+                        // Image is wider - fit to height
+                        state.glitchImage.originalHeight = canvasHeight;
+                        state.glitchImage.originalWidth = canvasHeight * imgAspect;
+                    } else {
+                        // Image is taller - fit to width
+                        state.glitchImage.originalWidth = canvasWidth;
+                        state.glitchImage.originalHeight = canvasWidth / imgAspect;
+                    }
+                    // Center the image
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.width = state.glitchImage.originalWidth;
+                    state.glitchImage.height = state.glitchImage.originalHeight;
+                    state.glitchImage.x = (canvasWidth - state.glitchImage.width) / 2;
+                    state.glitchImage.y = (canvasHeight - state.glitchImage.height) / 2;
+                    break;
+
+                case 'contain':
+                    // Fit entirely within canvas (may letterbox)
+                    if (imgAspect > canvasAspect) {
+                        // Image is wider - fit to width
+                        state.glitchImage.originalWidth = canvasWidth;
+                        state.glitchImage.originalHeight = canvasWidth / imgAspect;
+                    } else {
+                        // Image is taller - fit to height
+                        state.glitchImage.originalHeight = canvasHeight;
+                        state.glitchImage.originalWidth = canvasHeight * imgAspect;
+                    }
+                    // Center the image
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.width = state.glitchImage.originalWidth;
+                    state.glitchImage.height = state.glitchImage.originalHeight;
+                    state.glitchImage.x = (canvasWidth - state.glitchImage.width) / 2;
+                    state.glitchImage.y = (canvasHeight - state.glitchImage.height) / 2;
+                    break;
+
+                case 'fill':
+                    // Stretch to exactly fill canvas
+                    state.glitchImage.originalWidth = canvasWidth;
+                    state.glitchImage.originalHeight = canvasHeight;
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.width = canvasWidth;
+                    state.glitchImage.height = canvasHeight;
+                    state.glitchImage.x = 0;
+                    state.glitchImage.y = 0;
+                    break;
+
+                case 'manual':
+                    // User-controlled scale and position
+                    // Keep existing originalWidth/Height or set from image
+                    if (state.glitchImage.originalWidth === 0) {
+                        state.glitchImage.originalWidth = img.width;
+                        state.glitchImage.originalHeight = img.height;
+                    }
+                    state.glitchImage.width = state.glitchImage.originalWidth * state.glitchImage.scale;
+                    state.glitchImage.height = state.glitchImage.originalHeight * state.glitchImage.scale;
+                    // Keep existing x/y positions
+                    break;
+            }
         }
 
         function setupSlider(sliderId, valueId, callback) {
