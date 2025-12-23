@@ -2221,29 +2221,81 @@
                 });
             }
 
-            // Get audio frequency data
-            let lowSum = 0, midSum = 0, highSum = 0;
+            // Get audio frequency data with expanded analysis
+            let subBassSum = 0, bassSum = 0, lowMidsSum = 0, midsSum = 0,
+                highMidsSum = 0, highsSum = 0, brillianceSum = 0;
+            let peakValue = 0, sumSquares = 0;
 
             if (state.analyser) {
                 state.analyser.getByteFrequencyData(state.dataArray);
 
+                // Split frequency spectrum into 7 bands
+                // Assuming 44.1kHz sample rate, typical FFT size 2048
+                // Frequency per bin ≈ 44100 / 2048 ≈ 21.5 Hz
                 for (let i = 0; i < state.bufferLength; i++) {
                     const value = state.dataArray[i];
-                    if (i < state.bufferLength * 0.3) lowSum += value;
-                    else if (i < state.bufferLength * 0.7) midSum += value;
-                    else highSum += value;
+                    const binPercentage = i / state.bufferLength;
+
+                    // Track peak and RMS
+                    peakValue = Math.max(peakValue, value);
+                    sumSquares += value * value;
+
+                    // Frequency band distribution (approximate Hz ranges)
+                    // 0-5%: Sub-Bass (20-60 Hz)
+                    // 5-15%: Bass (60-250 Hz)
+                    // 15-25%: Low-Mids (250-500 Hz)
+                    // 25-50%: Mids (500-2000 Hz)
+                    // 50-70%: High-Mids (2000-4000 Hz)
+                    // 70-90%: Highs (4000-8000 Hz)
+                    // 90-100%: Brilliance (8000-20000 Hz)
+                    if (binPercentage < 0.05) subBassSum += value;
+                    else if (binPercentage < 0.15) bassSum += value;
+                    else if (binPercentage < 0.25) lowMidsSum += value;
+                    else if (binPercentage < 0.50) midsSum += value;
+                    else if (binPercentage < 0.70) highMidsSum += value;
+                    else if (binPercentage < 0.90) highsSum += value;
+                    else brillianceSum += value;
                 }
             }
 
-            // Calculate frequency levels with emphasis
-            const lowLevel = (lowSum / (state.bufferLength * 0.3) / 255) * state.settings.lowEmphasis;
-            const midLevel = (midSum / (state.bufferLength * 0.4) / 255) * state.settings.midEmphasis;
-            const highLevel = (highSum / (state.bufferLength * 0.3) / 255) * state.settings.highEmphasis;
+            // Calculate normalized frequency levels (0-1)
+            const subBassLevel = (subBassSum / (state.bufferLength * 0.05) / 255) * state.settings.lowEmphasis;
+            const bassLevel = (bassSum / (state.bufferLength * 0.10) / 255) * state.settings.lowEmphasis;
+            const lowMidsLevel = (lowMidsSum / (state.bufferLength * 0.10) / 255) * state.settings.midEmphasis;
+            const midsLevel = (midsSum / (state.bufferLength * 0.25) / 255) * state.settings.midEmphasis;
+            const highMidsLevel = (highMidsSum / (state.bufferLength * 0.20) / 255) * state.settings.highEmphasis;
+            const highsLevel = (highsSum / (state.bufferLength * 0.20) / 255) * state.settings.highEmphasis;
+            const brillianceLevel = (brillianceSum / (state.bufferLength * 0.10) / 255) * state.settings.highEmphasis;
 
-            // Store audio levels for theme renderers
-            state.audioLevels.low = lowLevel;
-            state.audioLevels.mid = midLevel;
-            state.audioLevels.high = highLevel;
+            // Calculate amplitude features
+            const peakLevel = peakValue / 255;
+            const rmsLevel = Math.sqrt(sumSquares / state.bufferLength) / 255;
+            const dbLevel = rmsLevel > 0 ? Math.max(0, Math.min(1, (20 * Math.log10(rmsLevel) + 60) / 60)) : 0; // Normalize -60dB to 0dB as 0-1
+
+            // Store all audio levels for theme renderers and control system
+            state.audioLevels = {
+                // Original 3-band (for backward compatibility)
+                low: bassLevel,
+                mid: midsLevel,
+                high: highsLevel,
+
+                // Expanded 7-band frequency analysis
+                subBass: subBassLevel,
+                bass: bassLevel,
+                lowMids: lowMidsLevel,
+                mids: midsLevel,
+                highMids: highMidsLevel,
+                highs: highsLevel,
+                brilliance: brillianceLevel,
+
+                // Amplitude features
+                peak: peakLevel,
+                rms: rmsLevel,
+                decibels: dbLevel,
+
+                // Combined
+                allLevels: (bassLevel + midsLevel + highsLevel) / 3
+            };
 
             // Apply audio modulation to controls
             if (audioEngine && state.settings.theme) {

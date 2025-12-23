@@ -1724,17 +1724,40 @@ class AudioModulationEngine {
 
     // Handle different source types
     switch (mappedId) {
+      // Basic
       case 'none':
         return 0;
       case 'allLevels':
-        return (audioLevels.low + audioLevels.mid + audioLevels.high) / 3;
+        return audioLevels.allLevels || (audioLevels.low + audioLevels.mid + audioLevels.high) / 3;
+
+      // Frequency Bands (7-band analysis)
+      case 'subBass':
+        return audioLevels.subBass || audioLevels.low;
       case 'bass':
-        return audioLevels.low;
+        return audioLevels.bass || audioLevels.low;
+      case 'lowMids':
+        return audioLevels.lowMids || audioLevels.mid;
       case 'mids':
-        return audioLevels.mid;
+        return audioLevels.mids || audioLevels.mid;
+      case 'highMids':
+        return audioLevels.highMids || audioLevels.high;
       case 'highs':
-        return audioLevels.high;
-      // TODO: Implement other audio sources (spectral, rhythm, etc.)
+        return audioLevels.highs || audioLevels.high;
+      case 'brilliance':
+        return audioLevels.brilliance || audioLevels.high;
+
+      // Amplitude Features
+      case 'peak':
+        return audioLevels.peak || audioLevels.high;
+      case 'rms':
+        return audioLevels.rms || (audioLevels.low + audioLevels.mid + audioLevels.high) / 3;
+      case 'decibels':
+        return audioLevels.decibels || (audioLevels.low + audioLevels.mid + audioLevels.high) / 3;
+
+      // TODO: Implement rhythm sources (beat, onset, bpm)
+      // TODO: Implement dynamics sources (attack, transients, envelope)
+      // TODO: Implement spectral sources (centroid, flux, rolloff, zcr)
+      // TODO: Implement musical sources (pitch, harmonic)
       default:
         console.warn(`Audio source not yet implemented: ${mappedId}`);
         return audioLevels.mid; // Fallback to mid
