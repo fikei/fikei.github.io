@@ -805,13 +805,16 @@ const THEME_CONFIGS = {
       opacity: { default: 0.6 }
     },
     audioReactivity: {
-      points: { enabled: false, frequency: 'bass', intensity: 0.4 },
-      spread: { enabled: false, frequency: 'mids', intensity: 0.5 },
-      amplitude: { enabled: true, frequency: 'allLevels', intensity: 0.7 },
-      lineWidth: { enabled: false, frequency: 'highs', intensity: 0.3 },
-      hue: { enabled: false, frequency: 'mids', intensity: 0.6 },
-      saturation: { enabled: false, frequency: 'bass', intensity: 0.3 },
-      opacity: { enabled: false, frequency: 'allLevels', intensity: 0.4 }
+      // Original: Amplitude responds to overall audio (physics-based)
+      amplitude: { enabled: true, frequency: 'allLevels', intensity: 0.7, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      points: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      spread: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      opacity: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' }
     }
   },
 
@@ -865,15 +868,18 @@ const THEME_CONFIGS = {
       blur: { default: 0 }
     },
     audioReactivity: {
-      warmCool: { enabled: false, frequency: 'mids', intensity: 0.4 },
-      hue: { enabled: false, frequency: 'mids', intensity: 0.6 },
-      saturation: { enabled: false, frequency: 'bass', intensity: 0.3 },
-      lightness: { enabled: false, frequency: 'highs', intensity: 0.4 },
-      burstSize: { enabled: true, frequency: 'bass', intensity: 0.7 },
-      meshDensity: { enabled: false, frequency: 'mids', intensity: 0.3 },
-      movement: { enabled: true, frequency: 'bass', intensity: 0.8 },
-      glow: { enabled: true, frequency: 'allLevels', intensity: 0.6 },
-      blur: { enabled: false, frequency: 'bass', intensity: 0.3 }
+      // Original: Burst size, movement, and glow respond to audio
+      burstSize: { enabled: true, frequency: 'bass', intensity: 0.7, mode: 'modulate' },
+      movement: { enabled: true, frequency: 'bass', intensity: 0.8, mode: 'modulate' },
+      glow: { enabled: true, frequency: 'allLevels', intensity: 0.6, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      warmCool: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      lightness: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      meshDensity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      blur: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
     }
   },
 
@@ -911,14 +917,17 @@ const THEME_CONFIGS = {
       pixelation: { default: 1 }
     },
     audioReactivity: {
-      rotation: { enabled: true, frequency: 'mids', intensity: 0.6 },
-      glitchIntensity: { enabled: true, frequency: 'highs', intensity: 0.6 },
-      contrast: { enabled: false, frequency: 'bass', intensity: 0.3 },
-      channelOffset: { enabled: true, frequency: 'highs', intensity: 0.7 },
-      displacement: { enabled: true, frequency: 'allLevels', intensity: 0.5 },
-      scanlines: { enabled: false, frequency: 'mids', intensity: 0.3 },
-      noise: { enabled: false, frequency: 'highs', intensity: 0.4 },
-      pixelation: { enabled: false, frequency: 'beat', intensity: 0.7 }
+      // Original: Rotation (mids), glitch intensity (highs), channel offset (highs), displacement (all)
+      rotation: { enabled: true, frequency: 'mids', intensity: 0.6, mode: 'modulate' },
+      glitchIntensity: { enabled: true, frequency: 'highs', intensity: 0.6, mode: 'modulate' },
+      channelOffset: { enabled: true, frequency: 'highs', intensity: 0.7, mode: 'modulate' },
+      displacement: { enabled: true, frequency: 'allLevels', intensity: 0.5, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      contrast: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      scanlines: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      noise: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      pixelation: { enabled: false, frequency: 'none', intensity: 0.7, mode: 'modulate' }
     }
   },
 
@@ -958,20 +967,23 @@ const THEME_CONFIGS = {
       audioBoost: { default: 3.0 }
     },
     audioReactivity: {
-      hue: { enabled: false, frequency: 'mids', intensity: 0.6 },
-      saturation: { enabled: false, frequency: 'bass', intensity: 0.3 },
-      speed: { enabled: true, frequency: 'bass', intensity: 0.7 },
-      zSpeed: { enabled: false, frequency: 'highs', intensity: 0.4 },
-      centerShiftRate: { enabled: false, frequency: 'highs', intensity: 0.4 },
-      brightness: { enabled: true, frequency: 'mids', intensity: 0.3 },
-      minOpacity: { enabled: false, frequency: 'bass', intensity: 0.3 },
-      maxOpacity: { enabled: false, frequency: 'mids', intensity: 0.3 },
-      diameter: { enabled: false, frequency: 'bass', intensity: 0.4 },
-      twinkleRate: { enabled: false, frequency: 'mids', intensity: 0.4 },
-      trailLength: { enabled: false, frequency: 'allLevels', intensity: 0.5 },
-      bloom: { enabled: false, frequency: 'bass', intensity: 0.6 },
-      count: { enabled: false, frequency: 'mids', intensity: 0.4 },
-      perspective: { enabled: false, frequency: 'bass', intensity: 0.3 }
+      // Original: Speed (bass) and brightness (mids)
+      speed: { enabled: true, frequency: 'bass', intensity: 0.7, mode: 'modulate' },
+      brightness: { enabled: true, frequency: 'mids', intensity: 0.3, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      zSpeed: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      centerShiftRate: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      minOpacity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      maxOpacity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      diameter: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      twinkleRate: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      trailLength: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      bloom: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      count: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      perspective: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
     }
   },
 
@@ -1025,20 +1037,23 @@ const THEME_CONFIGS = {
       phaseShift: { default: 0 }
     },
     audioReactivity: {
-      layers: { enabled: false, frequency: 'mids', intensity: 0.3 },
-      hue: { enabled: false, frequency: 'mids', intensity: 0.6 },
-      saturation: { enabled: false, frequency: 'highs', intensity: 0.3 },
-      amplitude: { enabled: true, frequency: 'bass', intensity: 0.7 },
-      wavelength: { enabled: false, frequency: 'mids', intensity: 0.5 },
-      lineWidth: { enabled: false, frequency: 'highs', intensity: 0.3 },
-      rotationX: { enabled: true, frequency: 'bass', intensity: 0.6 },
-      rotationY: { enabled: true, frequency: 'mids', intensity: 0.6 },
-      speed: { enabled: false, frequency: 'allLevels', intensity: 0.4 },
-      glow: { enabled: false, frequency: 'bass', intensity: 0.5 },
-      perspective: { enabled: false, frequency: 'mids', intensity: 0.3 },
-      depth: { enabled: false, frequency: 'bass', intensity: 0.4 },
-      turbulence: { enabled: false, frequency: 'highs', intensity: 0.5 },
-      phaseShift: { enabled: false, frequency: 'mids', intensity: 0.3 }
+      // Original: Amplitude, rotationX, and rotationY respond to audio
+      amplitude: { enabled: true, frequency: 'bass', intensity: 0.7, mode: 'modulate' },
+      rotationX: { enabled: true, frequency: 'bass', intensity: 0.6, mode: 'modulate' },
+      rotationY: { enabled: true, frequency: 'mids', intensity: 0.6, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      layers: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      wavelength: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      speed: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      glow: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      perspective: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      depth: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      turbulence: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      phaseShift: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
     }
   }
 };
