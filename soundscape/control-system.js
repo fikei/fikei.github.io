@@ -859,6 +859,20 @@ const THEME_CONFIGS = {
         category: 'style',
         audioReactive: false
       },
+      colorChangeMode: {
+        type: 'buttonGroup',
+        label: 'COLOR CHANGE',
+        options: [
+          { value: 'static', label: 'STATIC' },
+          { value: 'cycle', label: 'CYCLE' },
+          { value: 'pulse', label: 'PULSE' },
+          { value: 'reactive', label: 'REACTIVE' }
+        ],
+        default: 'static',
+        category: 'style',
+        audioReactive: false,
+        description: 'How colors change over time'
+      },
       density: {
         type: 'buttonGroup',
         label: 'DENSITY',
@@ -874,6 +888,22 @@ const THEME_CONFIGS = {
       },
 
       // Color
+      cycleSpeed: {
+        type: 'slider',
+        label: 'CYCLE SPEED',
+        min: 0.01,
+        max: 0.5,
+        step: 0.01,
+        default: 0.1,
+        unit: 'x',
+        category: 'color',
+        audioReactive: false,
+        visibleWhen: (state) => {
+          const mode = state.settings?.neon?.colorChangeMode || 'static';
+          return mode === 'cycle' || mode === 'pulse';
+        },
+        description: 'Speed of color cycling/pulsing'
+      },
       warmCool: {
         default: 1.0,
         category: 'color'

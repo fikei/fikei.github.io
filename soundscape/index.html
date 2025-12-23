@@ -2688,6 +2688,8 @@
 
             // Get values from control system (with fallbacks)
             const colorMode = audioEngine ? (audioEngine.getValue('neon', 'colorMode') || state.settings.neonMode) : state.settings.neonMode;
+            const colorChangeMode = audioEngine ? (audioEngine.getValue('neon', 'colorChangeMode') || 'static') : 'static';
+            const cycleSpeed = audioEngine ? (audioEngine.getValue('neon', 'cycleSpeed') || 0.1) : 0.1;
             const warmCool = audioEngine ? (audioEngine.getValue('neon', 'warmCool') || state.settings.colorTemp) : state.settings.colorTemp;
             const burstSize = audioEngine ? (audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
             const movement = audioEngine ? (audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
@@ -2719,8 +2721,52 @@
             // Color settings are now from control system
             const colorTempIntensity = warmCool;
 
-            // Calculate audio-reactive parameters (using base hue from controls)
-            const hueShift = (baseHue + mid * 60 + time * 0.05) % 360;
+            // Initialize NEON state if needed (for REACTIVE mode)
+            if (!state.neon) {
+                state.neon = {
+                    reactiveHue: baseHue,
+                    lastBeatTime: 0,
+                    targetHue: baseHue,
+                    currentHue: baseHue
+                };
+            }
+
+            // Calculate hue based on color change mode
+            let hueShift;
+            switch (colorChangeMode) {
+                case 'static':
+                    // No color change - use base hue directly
+                    hueShift = baseHue;
+                    break;
+
+                case 'cycle':
+                    // Continuous rotation through color wheel
+                    hueShift = (baseHue + time * cycleSpeed * 100) % 360;
+                    break;
+
+                case 'pulse':
+                    // Oscillate between complementary colors
+                    const pulseOffset = Math.sin(time * cycleSpeed * 2) * 60;
+                    hueShift = (baseHue + pulseOffset) % 360;
+                    break;
+
+                case 'reactive':
+                    // Jump to random hue on beat detection
+                    const beatDetected = state.audioLevels.beat > 0.5;
+                    if (beatDetected && (time - state.neon.lastBeatTime) > 300) {
+                        // Generate new random hue on beat
+                        state.neon.targetHue = Math.random() * 360;
+                        state.neon.lastBeatTime = time;
+                    }
+                    // Smoothly interpolate to target hue
+                    const lerpSpeed = 0.1;
+                    state.neon.currentHue = state.neon.currentHue + (state.neon.targetHue - state.neon.currentHue) * lerpSpeed;
+                    hueShift = state.neon.currentHue % 360;
+                    break;
+
+                default:
+                    hueShift = baseHue;
+            }
 
             // Saturation mapping: use control value as base, modulate with audio
             const saturationFromLow = low * 30; // Bass increases saturation
