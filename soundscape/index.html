@@ -1693,6 +1693,9 @@
             selectedImageIndex: -1
         };
 
+        // Expose state globally for control system
+        window.state = state;
+
         // =====================================================
         // UNIFIED CONTROL SYSTEM INITIALIZATION
         // =====================================================
@@ -1912,34 +1915,35 @@
                 backgroundControlsSection.style.display = hasSelectedImage ? 'none' : 'block';
             }
 
+            // DISABLED: Old theme-specific controls replaced by unified control system
             // Show/hide theme-specific background controls
-            if (modeSection) {
-                modeSection.style.display = !hasSelectedImage && state.settings.theme === 'linear' ? 'block' : 'none';
-            }
+            // if (modeSection) {
+            //     modeSection.style.display = !hasSelectedImage && state.settings.theme === 'linear' ? 'block' : 'none';
+            // }
 
-            if (neonControlsSection) {
-                neonControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'neon' ? 'block' : 'none';
-            }
+            // if (neonControlsSection) {
+            //     neonControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'neon' ? 'block' : 'none';
+            // }
 
-            if (glitchControlsSection) {
-                glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
-            }
+            // if (glitchControlsSection) {
+            //     glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
+            // }
 
-            if (starsControlsSection) {
-                starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
-            }
+            // if (starsControlsSection) {
+            //     starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
+            // }
 
-            const waveControlsSection = document.getElementById('waveControlsSection');
-            if (waveControlsSection) {
-                waveControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'wave' ? 'block' : 'none';
-            }
+            // const waveControlsSection = document.getElementById('waveControlsSection');
+            // if (waveControlsSection) {
+            //     waveControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'wave' ? 'block' : 'none';
+            // }
 
-            // Hide global WAVE settings for STARS and WAVE themes (they have their own controls)
-            const waveSettingsSection = document.getElementById('waveSettingsSection');
-            if (waveSettingsSection) {
-                const hideWaveSettings = state.settings.theme === 'stars' || state.settings.theme === 'wave';
-                waveSettingsSection.style.display = !hasSelectedImage && !hideWaveSettings ? 'block' : 'none';
-            }
+            // // Hide global WAVE settings for STARS and WAVE themes (they have their own controls)
+            // const waveSettingsSection = document.getElementById('waveSettingsSection');
+            // if (waveSettingsSection) {
+            //     const hideWaveSettings = state.settings.theme === 'stars' || state.settings.theme === 'wave';
+            //     waveSettingsSection.style.display = !hasSelectedImage && !hideWaveSettings ? 'block' : 'none';
+            // }
 
             // Update theme description
             updateThemeDescription();
