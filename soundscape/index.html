@@ -2434,6 +2434,7 @@
             const hue = audioEngine ? (audioEngine.getValue('linear', 'hue') || theme.hue) : theme.hue;
             const saturation = audioEngine ? (audioEngine.getValue('linear', 'saturation') || theme.saturation) : theme.saturation;
             const opacity = audioEngine ? (audioEngine.getValue('linear', 'opacity') || theme.opacity) : theme.opacity;
+            const lineWidth = audioEngine ? (audioEngine.getValue('linear', 'lineWidth') || 3) : 3;
 
             // Hide NEON gradient mesh if it exists
             const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
@@ -2470,6 +2471,7 @@
                 path.removeAttribute('filter');
                 path.removeAttribute('transform');
                 path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
+                path.setAttribute('stroke-width', lineWidth);
 
                 // Update stroke color from control system
                 path.setAttribute('stroke', `hsl(${hue}, ${saturation}%, 50%)`);
@@ -2487,6 +2489,10 @@
             const burstSize = audioEngine ? (audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
             const movement = audioEngine ? (audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
             const glow = audioEngine ? (audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
+            const baseHue = audioEngine ? (audioEngine.getValue('neon', 'hue') || 280) : 280;
+            const baseSaturationControl = audioEngine ? (audioEngine.getValue('neon', 'saturation') || 70) : 70;
+            const baseLightnessControl = audioEngine ? (audioEngine.getValue('neon', 'lightness') || 50) : 50;
+            const blur = audioEngine ? (audioEngine.getValue('neon', 'blur') || 0) : 0;
 
             // Hide all line paths for NEON theme
             state.paths.forEach(path => {
@@ -2510,20 +2516,18 @@
             // Color settings are now from control system
             const colorTempIntensity = warmCool;
 
-            // Calculate audio-reactive parameters
-            const hueShift = (mid * 360 + time * 0.05) % 360;
+            // Calculate audio-reactive parameters (using base hue from controls)
+            const hueShift = (baseHue + mid * 60 + time * 0.05) % 360;
 
-            // Saturation mapping: high frequencies = less saturated, low frequencies = more saturated
-            const baseSaturation = theme.saturationBase + high * theme.saturationMultiplier;
+            // Saturation mapping: use control value as base, modulate with audio
             const saturationFromLow = low * 30; // Bass increases saturation
             const saturationFromHigh = -high * 20; // Highs decrease saturation
-            const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
+            const saturation = Math.max(0, Math.min(100, baseSaturationControl + saturationFromLow + saturationFromHigh));
 
-            // Lightness: Low frequencies darken, high frequencies brighten
-            // Range from 20% (dark) to 90% (bright)
-            const lightnessFromLow = -low * theme.lightnessRange * 0.5; // Darken with bass
-            const lightnessFromHigh = high * theme.lightnessRange * 0.7; // Brighten with highs
-            const lightness = theme.lightnessBase + lightnessFromLow + lightnessFromHigh;
+            // Lightness: use control value as base, modulate with audio
+            const lightnessFromLow = -low * 20; // Darken with bass
+            const lightnessFromHigh = high * 30; // Brighten with highs
+            const lightness = Math.max(20, Math.min(90, baseLightnessControl + lightnessFromLow + lightnessFromHigh));
 
             // Movement: More dramatic with bass - uses movement control value
             const movementAmplitude = (theme.movementBase + low * theme.movementMultiplier) * movement;
@@ -2719,8 +2723,8 @@
                 gradientMeshGroup.appendChild(circle);
             }
 
-            // Update glow filter based on bass
-            const blurRadius = theme.blurBase + low * theme.blurMultiplier;
+            // Update glow filter based on bass and blur control
+            const blurRadius = (theme.blurBase + low * theme.blurMultiplier + blur * 2) * glow;
             const filter = elements.svg.querySelector('#neon-glow');
             if (filter) {
                 const blur1 = filter.querySelector('feGaussianBlur[result="blur1"]');
