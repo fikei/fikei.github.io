@@ -1,6 +1,6 @@
 # Soundscape Visualization - Project Tracker
 
-**Last Updated**: 2024-12-23 (Session 3)
+**Last Updated**: 2024-12-23 (Session 4)
 **Branch**: `claude/soundscape-visualization-CklQm`
 **Status**: ✅ **CORE SYSTEM FEATURE-COMPLETE** (100% Controls, 100% Audio Sources)
 
@@ -15,7 +15,7 @@ Complete unified control system for soundscape visualization with 5 themes, 59 c
 - **Audio Sources**: 25 (18 custom + 7 Meyda) - ✅ **100% COMPLETE**
 - **Themes**: 5 (LINEAR, NEON, GLITCH, STARS, WAVE) - ✅ **ALL COMPLETE**
 - **Implementation Progress**: **Visual Controls 100% | Audio Sources 100%**
-- **Media Controls**: 14/23 (61%) - Optional enhancements
+- **Media Controls**: 18/23 (78%) - Optional enhancements
 
 ---
 
@@ -306,6 +306,85 @@ Complete unified control system for soundscape visualization with 5 themes, 59 c
 
 ---
 
+### Phase 6: Media Controls Part 2 (Current Session)
+**Status**: ✅ Complete
+**Date**: 2024-12-23
+**Branch**: `claude/soundscape-visualization-CklQm`
+
+#### Implementation Summary
+
+Completed 4 high-priority stories from Media Improvements epic (Stories 6.1, 6.2, 6.3, 6.7).
+
+**Story 6.1: Image Scale Control** ✅
+- Added scale slider (0.1x-5.0x) to image controls
+- UI: lines 990-996
+- Event handler: lines 5432-5440
+- Added originalWidth, originalHeight, scale properties to all image/video objects
+- Maintains aspect ratio automatically
+- Works seamlessly with rotation and other transforms
+
+**Story 6.2: GLITCH Background Image Controls** ✅
+- Added GLITCH-specific controls section (lines 1072-1111)
+- Fit mode selector: COVER, CONTAIN, FILL, MANUAL
+- Scale slider (visible in MANUAL mode)
+- X/Y position sliders (visible in MANUAL mode)
+- Reset button to return to defaults
+- Event handlers: lines 5465-5533
+- Fit mode calculation function: lines 6697-6720 (applyGlitchImageFitMode)
+- Conditional UI visibility: lines 2299-2332
+
+**Story 6.3: Video Playback Speed** ✅
+- Added playback speed slider (0.25x-4.0x) to video controls
+- UI: lines 1062-1068
+- Event handler: lines 5443-5449
+- Uses HTML5 video.playbackRate property
+- Speed persists across play/pause operations
+
+**Story 6.7: Error Handling & Validation** ✅
+- **Toast Notification System**:
+  - CSS: lines 839-867
+  - Function: lines 6671-6692
+  - Supports error (red) and success (green) types
+  - Auto-dismisses after 4 seconds
+  - Smooth fade in/out animations
+
+- **File Validation**:
+  - Image files: Type checking (must start with 'image/')
+  - Video files: Type checking (must start with 'video/')
+  - Size limit: 50MB for both images and videos
+  - Empty URL validation
+
+- **Error Detection**:
+  - Image URL errors: lines 6383-6393 (CORS, mixed content)
+  - Image file errors: lines 6543-6551, 6605-6607
+  - Video file errors: lines 6490-6511 (codec-specific messages)
+  - Network errors, decode errors, format errors
+
+- **User Feedback**:
+  - "Mixed content blocked. Use HTTPS URL"
+  - "Invalid image URL or CORS error"
+  - "File too large. Maximum size is 50MB"
+  - "Invalid file type. Please select an image/video file"
+  - "Video codec not supported"
+  - "Failed to load image file. File may be corrupted"
+
+**Additional Implementation Details**:
+- Updated all 8 imageObjects.push() locations with scale properties
+- Added scale slider value updates in updateModeVisibility()
+- Updated save/load state functions to persist scale properties
+- Added scale properties to placeholder creation
+- Added scale properties to companion app media
+
+**Phase 6 Results**:
+- 4 stories completed (6.1, 6.2, 6.3, 6.7)
+- 7 new controls added
+- Toast notification system implemented
+- Comprehensive error handling added
+- Media controls progress: 14/23 (61%) → 18/23 (78%)
+- Ready to commit and push
+
+---
+
 ## 🎯 NEXT PRIORITIES
 
 All visual controls are now complete! The next major priority is Meyda audio analysis integration.
@@ -319,36 +398,42 @@ All visual controls are now complete! The next major priority is Meyda audio ana
 **Status**: Not Started
 **Documentation**: See `MEDIA_ANALYSIS.md` for detailed analysis
 
-**Current Status**: 61% Complete (14/23 features)
+**Current Status**: 78% Complete (18/23 features)
 - Upload functionality: 100% (4/4)
-- Basic controls: 70% (7/10)
-- Video controls: 75% (3/4)
-- Advanced features: 0% (0/5)
+- Basic controls: 80% (8/10)
+- Video controls: 100% (4/4)
+- Advanced features: 20% (1/5)
 
 **Total Estimated Effort**: 11-14 hours
 
 ---
 
 #### Story 6.1: Scale Control (HIGH PRIORITY)
-**Status**: Not Started
+**Status**: ✅ Complete
 **Priority**: High
 **Estimate**: 1-2 hours
+**Commit**: Part 2 (pending)
 
 **Background**: Users can only resize images by dragging corners (imprecise). No scale slider for fine-tuned control.
 
 **Tasks**:
-- [ ] Add scale slider (0.1-5.0x) to image controls section
-- [ ] Add scale value display (e.g., "1.0x")
-- [ ] Implement scale event handler
-- [ ] Apply scale to image width/height
-- [ ] Maintain aspect ratio
-- [ ] Test with various scales (0.1x - 5.0x)
-- [ ] Ensure scale works with rotation and other transforms
+- [x] Add scale slider (0.1-5.0x) to image controls section
+- [x] Add scale value display (e.g., "1.0x")
+- [x] Implement scale event handler
+- [x] Apply scale to image width/height
+- [x] Maintain aspect ratio
+- [x] Test with various scales (0.1x - 5.0x)
+- [x] Ensure scale works with rotation and other transforms
 
 **Acceptance Criteria**:
-- Scale slider appears when image is selected
-- Slider adjusts image size smoothly
-- Scale combines correctly with rotation/position
+- ✅ Scale slider appears when image is selected
+- ✅ Slider adjusts image size smoothly
+- ✅ Scale combines correctly with rotation/position
+
+**Implementation Location**:
+- UI: lines 990-996
+- Event handler: lines 5432-5440
+- State properties: originalWidth, originalHeight, scale
 
 **Implementation Notes**:
 ```javascript
@@ -373,9 +458,10 @@ setupSlider('imageScaleSlider', 'imageScaleValue', (value) => {
 ---
 
 #### Story 6.2: GLITCH Theme Image Controls (HIGH PRIORITY)
-**Status**: Not Started
+**Status**: ✅ Complete
 **Priority**: High
 **Estimate**: 3-4 hours
+**Commit**: Part 2 (pending)
 
 **Background**: GLITCH theme loads images as background but provides NO user controls for position/scale. Image is hardcoded to fill-to-cover with centered position.
 
@@ -394,51 +480,62 @@ state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2
 ```
 
 **Tasks**:
-- [ ] Add GLITCH-specific controls section (conditional visibility)
-- [ ] Add scale slider (0.1-5.0x)
-- [ ] Add X position slider (-1000 to 1000)
-- [ ] Add Y position slider (-1000 to 1000)
-- [ ] Add fit mode selector (FILL, CONTAIN, COVER, STRETCH)
-- [ ] Add "Reset to Default" button
-- [ ] Implement scale event handler for GLITCH background
-- [ ] Implement X/Y position handlers
-- [ ] Implement fit mode logic
-- [ ] Test with different aspect ratios
+- [x] Add GLITCH-specific controls section (conditional visibility)
+- [x] Add scale slider (0.1-5.0x)
+- [x] Add X position slider (-1000 to 1000)
+- [x] Add Y position slider (-1000 to 1000)
+- [x] Add fit mode selector (COVER, CONTAIN, FILL, MANUAL)
+- [x] Add "Reset to Center" button
+- [x] Implement scale event handler for GLITCH background
+- [x] Implement X/Y position handlers
+- [x] Implement fit mode logic
+- [x] Test with different aspect ratios
 
 **Acceptance Criteria**:
-- GLITCH controls appear when GLITCH theme active and image loaded
-- Scale adjusts image size
-- X/Y sliders reposition image
-- Fit modes work correctly (fill, contain, cover, stretch)
-- Reset button returns to default centering
+- ✅ GLITCH controls appear when GLITCH theme active and image loaded
+- ✅ Scale adjusts image size
+- ✅ X/Y sliders reposition image
+- ✅ Fit modes work correctly (cover, contain, fill, manual)
+- ✅ Reset button returns to default centering
+
+**Implementation Location**:
+- UI: lines 1072-1111
+- Event handlers: lines 5465-5533
+- Fit mode function: lines 6697-6720 (applyGlitchImageFitMode)
+- UI visibility: lines 2299-2332
 
 **Fit Mode Definitions**:
-- **FILL**: Stretch to exactly fill canvas (may distort)
-- **CONTAIN**: Fit entirely within canvas (letterbox/pillarbox)
 - **COVER**: Fill canvas completely (may crop edges) - DEFAULT
-- **STRETCH**: Custom user scale/position
+- **CONTAIN**: Fit entirely within canvas (letterbox/pillarbox)
+- **FILL**: Stretch to exactly fill canvas (may distort)
+- **MANUAL**: Custom user scale/position
 
 ---
 
 #### Story 6.3: Video Playback Speed (HIGH PRIORITY)
-**Status**: Not Started
+**Status**: ✅ Complete
 **Priority**: High
 **Estimate**: 1 hour
+**Commit**: Part 2 (pending)
 
 **Background**: Videos always play at 1x speed. No slow-motion or time-lapse options.
 
 **Tasks**:
-- [ ] Add playback speed slider (0.25x - 4.0x) to video controls
-- [ ] Add speed value display (e.g., "1.0x")
-- [ ] Implement speed event handler
-- [ ] Apply to video.playbackRate property
-- [ ] Test with different speeds
-- [ ] Ensure speed persists across play/pause
+- [x] Add playback speed slider (0.25x - 4.0x) to video controls
+- [x] Add speed value display (e.g., "1.0x")
+- [x] Implement speed event handler
+- [x] Apply to video.playbackRate property
+- [x] Test with different speeds
+- [x] Ensure speed persists across play/pause
 
 **Acceptance Criteria**:
-- Speed slider appears in video controls section
-- Speed adjusts playback rate smoothly
-- Speed ranges from 0.25x (slow) to 4.0x (fast)
+- ✅ Speed slider appears in video controls section
+- ✅ Speed adjusts playback rate smoothly
+- ✅ Speed ranges from 0.25x (slow) to 4.0x (fast)
+
+**Implementation Location**:
+- UI: lines 1062-1068
+- Event handler: lines 5443-5449
 
 **Implementation Notes**:
 ```javascript
@@ -534,27 +631,35 @@ setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
 ---
 
 #### Story 6.7: Error Handling & Validation
-**Status**: Not Started
+**Status**: ✅ Complete
 **Priority**: Medium
 **Estimate**: 2 hours
+**Commit**: Part 2 (pending)
 
 **Background**: No error handling for failed loads, invalid URLs, CORS errors, or file size limits.
 
 **Tasks**:
-- [ ] Add error toast/message system
-- [ ] Add img.onerror handler with user feedback
-- [ ] Add video.onerror handler
-- [ ] Add file size validation (50MB limit)
-- [ ] Add URL validation
-- [ ] Add CORS error detection and messaging
-- [ ] Add file type validation
-- [ ] Test with various error scenarios
+- [x] Add error toast/message system
+- [x] Add img.onerror handler with user feedback
+- [x] Add video.onerror handler
+- [x] Add file size validation (50MB limit)
+- [x] Add URL validation
+- [x] Add CORS error detection and messaging
+- [x] Add file type validation
+- [x] Test with various error scenarios
 
 **Acceptance Criteria**:
-- Failed image loads show error message
-- Invalid URLs are rejected with feedback
-- Oversized files are rejected before upload
-- CORS errors show helpful message
+- ✅ Failed image loads show error message
+- ✅ Invalid URLs are rejected with feedback
+- ✅ Oversized files are rejected before upload
+- ✅ CORS errors show helpful message
+
+**Implementation Location**:
+- Toast system: lines 839-867 (CSS), 6671-6692 (function)
+- Image URL errors: lines 6383-6393
+- Image file errors: lines 6543-6551, 6605-6607
+- Video file errors: lines 6490-6511
+- File validation: lines 6422-6427 (image), 6371-6383 (video)
 
 ---
 
@@ -637,13 +742,13 @@ setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
 3. ✅ Image loading (URL + files)
 4. ✅ Video loading (URL + files)
 
-**Basic Transformations** (7/10 - 70%):
+**Basic Transformations** (8/10 - 80%):
 5. ✅ Effect selection (NONE, LINEAR, NEON, GLITCH)
 6. ✅ Transparency (0-1)
 7. ✅ Rotation (0-360°)
 8. ✅ Blur (0-20px)
 9. ✅ 3D Motion (0-2)
-10. ❌ **Scale** (0.1-5.0x) - MISSING (Story 6.1)
+10. ✅ **Scale** (0.1-5.0x) - ✅ COMPLETE (Story 6.1)
 11. ❌ **X Position** (-1000 to 1000) - MISSING (Story 6.4)
 12. ❌ **Y Position** (-1000 to 1000) - MISSING (Story 6.4)
 
@@ -651,20 +756,21 @@ setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
 13. ✅ Frequency Flash (toggle + threshold)
 14. ✅ Volume Flash (toggle + threshold)
 
-**Video Controls** (3/4 - 75%):
+**Video Controls** (4/4 - 100%):
 15. ✅ Loop (toggle)
 16. ✅ Trim Start (0 to duration)
 17. ✅ Trim End (0 to duration)
-18. ❌ **Playback Speed** (0.25x-4.0x) - MISSING (Story 6.3)
+18. ✅ **Playback Speed** (0.25x-4.0x) - ✅ COMPLETE (Story 6.3)
 
-**GLITCH Theme Controls** (0/1 - 0%):
-19. ❌ **GLITCH Image Scale** - MISSING (Story 6.2)
-20. ❌ **GLITCH Image X/Y** - MISSING (Story 6.2)
+**GLITCH Theme Controls** (1/1 - 100%):
+19. ✅ **GLITCH Image Scale** - ✅ COMPLETE (Story 6.2)
+20. ✅ **GLITCH Image X/Y** - ✅ COMPLETE (Story 6.2)
 
-**Advanced Features** (0/3 - 0%):
-21. ❌ **Flip/Mirror** - MISSING (Story 6.5)
-22. ❌ **Layer Ordering** - MISSING (Story 6.6)
-23. ❌ **Keyboard Shortcuts** - MISSING (Story 6.8)
+**Advanced Features** (1/4 - 25%):
+21. ✅ **Error Handling** - ✅ COMPLETE (Story 6.7)
+22. ❌ **Flip/Mirror** - MISSING (Story 6.5)
+23. ❌ **Layer Ordering** - MISSING (Story 6.6)
+24. ❌ **Keyboard Shortcuts** - MISSING (Story 6.8)
 
 #### Expected Future Additions
 - Filters/effects (brightness, contrast, saturation)
@@ -993,7 +1099,16 @@ setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
 
 ## 📈 Progress Summary
 
-### Completed This Session (Session 3)
+### Completed This Session (Session 4)
+- ✅ **Phase 6: Media Controls Part 2** - 4 stories completed (6.1, 6.2, 6.3, 6.7)
+- ✅ **Image scale control** - Fine-tuned scaling with 0.1x-5.0x slider
+- ✅ **GLITCH background controls** - Scale + position + fit modes
+- ✅ **Video playback speed** - 0.25x-4.0x speed control
+- ✅ **Error handling & validation** - Toast system + comprehensive validation
+- ✅ **Media controls: 14/23 (61%) → 18/23 (78%)**
+- ✅ **Ready to commit**
+
+**Previous Session (Session 3)**:
 - ✅ **Media Improvements Epic** added to backlog (10 stories, 27-35 hours estimated)
 - ✅ **Hide theme controls when image selected** (UI improvement)
 - ✅ **Phase 5: Meyda integration** - All 7 spectral features implemented
@@ -1016,8 +1131,8 @@ setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
   - GLITCH: 9/9 controls (100%)
   - STARS: 14/14 controls (100%)
   - WAVE: 16/16 controls (100%)
-- **Media Controls**: 14/23 implemented (61%)
-- **Remaining**: Media enhancements (optional, 27-35 hours)
+- **Media Controls**: 18/23 implemented (78%)
+- **Remaining**: Media enhancements (optional, 5 stories, ~15 hours)
 
 ### Key Achievements
 - ✅ All 59 visual controls implemented and functional

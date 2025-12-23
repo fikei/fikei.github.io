@@ -2246,6 +2246,12 @@
                     updateSlider('imageRotationSlider', 'imageRotationValue', imageObj.rotation, 0);
                     updateSlider('imageBlurSlider', 'imageBlurValue', imageObj.blur, 1);
                     updateSlider('themeOpacitySlider', 'themeOpacityValue', imageObj.themeOpacity, 2);
+                    updateSlider('imageScaleSlider', 'imageScaleValue', imageObj.scale || 1.0, 1);
+
+                    // Update video speed slider if this is a video
+                    if (imageObj.isVideo) {
+                        updateSlider('videoSpeedSlider', 'videoSpeedValue', imageObj.video?.playbackRate || 1.0, 1);
+                    }
 
                     // Update flash effect controls
                     const flashFreqCheck = document.getElementById('flashFrequencyCheck');
@@ -2293,6 +2299,41 @@
                             videoControlsSection.style.display = 'none';
                         }
                     }
+                }
+            }
+
+            // Show/hide GLITCH background controls
+            const glitchBackgroundControls = document.getElementById('glitchBackgroundControls');
+            if (glitchBackgroundControls) {
+                const shouldShowGlitchControls = state.settings.theme === 'glitch' && state.glitchImage.loaded;
+                glitchBackgroundControls.style.display = shouldShowGlitchControls ? 'block' : 'none';
+
+                // Update GLITCH control values when shown
+                if (shouldShowGlitchControls) {
+                    const fitModeSelect = document.getElementById('glitchFitModeSelect');
+                    const scaleSlider = document.getElementById('glitchScaleSlider');
+                    const scaleValue = document.getElementById('glitchScaleValue');
+                    const xSlider = document.getElementById('glitchXSlider');
+                    const xValue = document.getElementById('glitchXValue');
+                    const ySlider = document.getElementById('glitchYSlider');
+                    const yValue = document.getElementById('glitchYValue');
+
+                    if (fitModeSelect) fitModeSelect.value = state.glitchImage.fitMode || 'cover';
+                    if (scaleSlider) scaleSlider.value = state.glitchImage.scale || 1.0;
+                    if (scaleValue) scaleValue.textContent = `${(state.glitchImage.scale || 1.0).toFixed(1)}x`;
+                    if (xSlider) xSlider.value = state.glitchImage.x || 0;
+                    if (xValue) xValue.textContent = (state.glitchImage.x || 0).toString();
+                    if (ySlider) ySlider.value = state.glitchImage.y || 0;
+                    if (yValue) yValue.textContent = (state.glitchImage.y || 0).toString();
+
+                    // Show/hide manual controls based on fit mode
+                    const isManual = (state.glitchImage.fitMode || 'cover') === 'manual';
+                    const scaleGroup = document.getElementById('glitchScaleGroup');
+                    const xGroup = document.getElementById('glitchXGroup');
+                    const yGroup = document.getElementById('glitchYGroup');
+                    if (scaleGroup) scaleGroup.style.display = isManual ? 'block' : 'none';
+                    if (xGroup) xGroup.style.display = isManual ? 'block' : 'none';
+                    if (yGroup) yGroup.style.display = isManual ? 'block' : 'none';
                 }
             }
 
@@ -4778,6 +4819,9 @@
                         y: imageObj.y,
                         width: imageObj.width,
                         height: imageObj.height,
+                        originalWidth: imageObj.originalWidth || imageObj.width,
+                        originalHeight: imageObj.originalHeight || imageObj.height,
+                        scale: imageObj.scale || 1.0,
                         theme: imageObj.theme,
                         transparency: imageObj.transparency,
                         rotation: imageObj.rotation,
@@ -4905,6 +4949,9 @@
                             y: imageObjData.y,
                             width: imageObjData.width,
                             height: imageObjData.height,
+                            originalWidth: imageObjData.originalWidth || imageObjData.width,
+                            originalHeight: imageObjData.originalHeight || imageObjData.height,
+                            scale: imageObjData.scale || 1.0,
                             theme: imageObjData.theme,
                             transparency: imageObjData.transparency,
                             rotation: imageObjData.rotation,
@@ -4977,6 +5024,9 @@
                     y: imageObjData.y,
                     width: imageObjData.width,
                     height: imageObjData.height,
+                    originalWidth: imageObjData.originalWidth || imageObjData.width,
+                    originalHeight: imageObjData.originalHeight || imageObjData.height,
+                    scale: imageObjData.scale || 1.0,
                     theme: imageObjData.theme,
                     transparency: imageObjData.transparency,
                     rotation: imageObjData.rotation,
@@ -6347,13 +6397,41 @@
 
                 img.onerror = (e) => {
                     console.error('❌ Failed to load image from URL:', url, e);
-                    alert('Failed to load image. Please check the URL and ensure CORS is enabled.');
+
+                    // Detect error type
+                    let errorMsg = 'Failed to load image';
+                    if (url.startsWith('http://') && window.location.protocol === 'https:') {
+                        errorMsg = 'Mixed content blocked. Use HTTPS URL';
+                    } else if (e.type === 'error') {
+                        errorMsg = 'Invalid image URL or CORS error';
+                    }
+
+                    showToast(errorMsg, 'error');
                 };
+
+                // Validate URL before loading
+                if (!url || url.trim() === '') {
+                    showToast('Please enter a valid image URL', 'error');
+                    return;
+                }
 
                 img.src = url;
             }
 
             function loadVideoFile(file) {
+                // Validate file type
+                if (!file.type.startsWith('video/')) {
+                    showToast('Invalid file type. Please select a video file', 'error');
+                    return;
+                }
+
+                // Validate file size (50MB limit)
+                const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+                if (file.size > maxSize) {
+                    showToast('File too large. Maximum size is 50MB', 'error');
+                    return;
+                }
+
                 const video = document.createElement('video');
                 video.muted = true;
 
@@ -6381,6 +6459,9 @@
                         y: y,
                         width: width,
                         height: height,
+                        originalWidth: width,
+                        originalHeight: height,
+                        scale: 1.0,
                         theme: 'none',
                         transparency: 1.0,
                         rotation: 0,
@@ -6426,7 +6507,24 @@
 
                 video.addEventListener('error', (e) => {
                     console.error('❌ Failed to load video file:', e);
-                    alert('Failed to load video file.');
+                    let errorMsg = 'Failed to load video file';
+                    if (e.target.error) {
+                        switch (e.target.error.code) {
+                            case e.target.error.MEDIA_ERR_ABORTED:
+                                errorMsg = 'Video loading aborted';
+                                break;
+                            case e.target.error.MEDIA_ERR_NETWORK:
+                                errorMsg = 'Network error loading video';
+                                break;
+                            case e.target.error.MEDIA_ERR_DECODE:
+                                errorMsg = 'Video codec not supported';
+                                break;
+                            case e.target.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                                errorMsg = 'Video format not supported';
+                                break;
+                        }
+                    }
+                    showToast(errorMsg, 'error');
                     URL.revokeObjectURL(fileURL);
                 });
 
@@ -6435,6 +6533,19 @@
             }
 
             function loadImageFile(file) {
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    showToast('Invalid file type. Please select an image file', 'error');
+                    return;
+                }
+
+                // Validate file size (50MB limit)
+                const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+                if (file.size > maxSize) {
+                    showToast('File too large. Maximum size is 50MB', 'error');
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const img = new Image();
@@ -6444,23 +6555,11 @@
                             state.glitchImage.img = img;
                             state.glitchImage.loaded = true;
 
-                            // Fill canvas by scaling to cover
-                            const canvasAspect = state.boundingRect.width / state.boundingRect.height;
-                            const imgAspect = img.width / img.height;
+                            // Apply fit mode (cover by default)
+                            applyGlitchImageFitMode();
 
-                            if (imgAspect > canvasAspect) {
-                                // Image is wider - fit to height
-                                state.glitchImage.height = state.boundingRect.height;
-                                state.glitchImage.width = state.glitchImage.height * imgAspect;
-                            } else {
-                                // Image is taller - fit to width
-                                state.glitchImage.width = state.boundingRect.width;
-                                state.glitchImage.height = state.glitchImage.width / imgAspect;
-                            }
-
-                            // Center the image
-                            state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                            state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                            // Show GLITCH controls
+                            updateModeVisibility();
 
                             console.log(`✅ GLITCH image loaded: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                         } else {
@@ -6485,6 +6584,9 @@
                                 y: y,
                                 width: width,
                                 height: height,
+                                originalWidth: width,
+                                originalHeight: height,
+                                scale: 1.0,
                                 theme: 'none', // Default to no effect
                                 transparency: 1.0, // Default to fully opaque
                                 rotation: 0, // Rotation in degrees
@@ -6520,8 +6622,20 @@
                         // Hide upload overlay
                         updateModeVisibility();
                     };
+
+                    img.onerror = () => {
+                        console.error('❌ Failed to load image from file:', file.name);
+                        showToast('Failed to load image file. File may be corrupted', 'error');
+                    };
+
                     img.src = event.target.result;
                 };
+
+                reader.onerror = () => {
+                    console.error('❌ Failed to read file:', file.name);
+                    showToast('Failed to read file. Please try again', 'error');
+                };
+
                 reader.readAsDataURL(file);
             }
 
@@ -6660,6 +6774,35 @@
                     console.log(`🖼️ GLITCH image resized to ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                 }
             });
+        }
+
+        /**
+         * Show toast notification
+         * @param {string} message - Message to display
+         * @param {string} type - 'error' or 'success' (default: 'error')
+         * @param {number} duration - How long to show (ms, default: 4000)
+         */
+        function showToast(message, type = 'error', duration = 4000) {
+            const toast = document.createElement('div');
+            toast.className = `toast${type === 'success' ? ' success' : ''}`;
+            toast.textContent = message;
+
+            const container = document.getElementById('toastContainer');
+            container.appendChild(toast);
+
+            // Trigger reflow to enable transition
+            toast.offsetHeight;
+
+            // Show toast
+            toast.classList.add('show');
+
+            // Auto-hide after duration
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(toast);
+                }, 300); // Match CSS transition duration
+            }, duration);
         }
 
         /**
@@ -7055,6 +7198,9 @@
                                 y: window.innerHeight / 2,
                                 width: 300,
                                 height: 300,
+                                originalWidth: 300,
+                                originalHeight: 300,
+                                scale: 1.0,
                                 rotation: 0,
                                 transparency: 1.0,
                                 theme: 'none',
@@ -7163,5 +7309,8 @@
 
     <!-- Unified Control System -->
     <script src="control-system.js"></script>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer"></div>
 </body>
 </html>
