@@ -2700,6 +2700,7 @@
             const blur = audioEngine ? (audioEngine.getValue('neon', 'blur') || 0) : 0;
             const responsiveness = audioEngine ? (audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
             const smoothing = audioEngine ? (audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
+            const meshDensity = audioEngine ? (audioEngine.getValue('neon', 'meshDensity') || 8) : 8;
 
             // Initialize NEON state if needed (for smoothing and reactive mode)
             if (!state.neon) {
@@ -2814,7 +2815,8 @@
             }
 
             // Create multiple gradient centers for organic look
-            const numBaseCenters = theme.baseHues.length;
+            // Use meshDensity control to determine number of gradient centers
+            const numBaseCenters = Math.floor(meshDensity);
             const numUserCenters = state.userGradientCenters.length;
 
             // Get or create gradient definitions in defs
@@ -2872,16 +2874,16 @@
                     const frequencyBalance = (high - low) * colorTempIntensity; // -1 to 1 range
                     // Map: -1 (low/cool) = 210 (cyan-blue), +1 (high/warm) = 30 (orange-red)
                     const frequencyHue = 120 - frequencyBalance * 90; // 210 to 30
-                    const baseHue = theme.baseHues[i];
-                    hue = ((frequencyHue + baseHue * 0.3 + hueShift * 0.5) % 360);
+                    const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+                    hue = ((frequencyHue + baseHueOffset * 0.3 + hueShift * 0.5) % 360);
 
                     // Pastel colors: higher saturation but softer
                     finalSaturation = Math.max(40, Math.min(70, saturation * 0.7));
                     finalLightness = Math.max(60, Math.min(85, lightness + 10)); // Lighter for pastel
                 } else {
                     // Bright mode (default): Original vibrant colors
-                    const baseHue = theme.baseHues[i];
-                    hue = (baseHue + hueShift) % 360;
+                    const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+                    hue = (baseHueOffset + hueShift) % 360;
                     finalSaturation = saturation;
                     finalLightness = lightness;
                 }
