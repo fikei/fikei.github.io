@@ -313,18 +313,372 @@ All visual controls are now complete! The next major priority is Meyda audio ana
 
 ## 📋 BACKLOG
 
-### Epic: Media Upload Enhancements
-**Priority**: Low
+### Epic: Media Upload & Controls Enhancement
+**Priority**: Medium (Deferred until after Meyda)
 **Status**: Not Started
+**Documentation**: See `MEDIA_ANALYSIS.md` for detailed analysis
 
-Current implementation is functional but could be enhanced:
-- [ ] Add drag-and-drop support for images/videos
-- [ ] Add image scale/position controls for GLITCH theme
-- [ ] Add video playback speed control
-- [ ] Add media library/gallery
-- [ ] Add media filters/effects
+**Current Status**: 61% Complete (14/23 features)
+- Upload functionality: 100% (4/4)
+- Basic controls: 70% (7/10)
+- Video controls: 75% (3/4)
+- Advanced features: 0% (0/5)
 
-**Notes**: Current media upload works via modal. No critical missing functionality.
+**Total Estimated Effort**: 11-14 hours
+
+---
+
+#### Story 6.1: Scale Control (HIGH PRIORITY)
+**Status**: Not Started
+**Priority**: High
+**Estimate**: 1-2 hours
+
+**Background**: Users can only resize images by dragging corners (imprecise). No scale slider for fine-tuned control.
+
+**Tasks**:
+- [ ] Add scale slider (0.1-5.0x) to image controls section
+- [ ] Add scale value display (e.g., "1.0x")
+- [ ] Implement scale event handler
+- [ ] Apply scale to image width/height
+- [ ] Maintain aspect ratio
+- [ ] Test with various scales (0.1x - 5.0x)
+- [ ] Ensure scale works with rotation and other transforms
+
+**Acceptance Criteria**:
+- Scale slider appears when image is selected
+- Slider adjusts image size smoothly
+- Scale combines correctly with rotation/position
+
+**Implementation Notes**:
+```javascript
+<div class="control-group">
+    <div class="control-label">
+        <span>SCALE</span>
+        <span class="control-value" id="imageScaleValue">1.0x</span>
+    </div>
+    <input type="range" id="imageScaleSlider"
+           min="0.1" max="5.0" step="0.1" value="1.0">
+</div>
+
+// Event handler
+setupSlider('imageScaleSlider', 'imageScaleValue', (value) => {
+    if (state.selectedImageIndex === -1) return;
+    const obj = state.imageObjects[state.selectedImageIndex];
+    obj.width = obj.originalWidth * value;
+    obj.height = obj.originalHeight * value;
+});
+```
+
+---
+
+#### Story 6.2: GLITCH Theme Image Controls (HIGH PRIORITY)
+**Status**: Not Started
+**Priority**: High
+**Estimate**: 3-4 hours
+
+**Background**: GLITCH theme loads images as background but provides NO user controls for position/scale. Image is hardcoded to fill-to-cover with centered position.
+
+**Current Implementation**:
+```javascript
+// HARDCODED - NO USER CONTROL (lines 5961-5984)
+if (imgAspect > canvasAspect) {
+    state.glitchImage.height = state.boundingRect.height;
+    state.glitchImage.width = state.glitchImage.height * imgAspect;
+} else {
+    state.glitchImage.width = state.boundingRect.width;
+    state.glitchImage.height = state.glitchImage.width / imgAspect;
+}
+state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
+state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+```
+
+**Tasks**:
+- [ ] Add GLITCH-specific controls section (conditional visibility)
+- [ ] Add scale slider (0.1-5.0x)
+- [ ] Add X position slider (-1000 to 1000)
+- [ ] Add Y position slider (-1000 to 1000)
+- [ ] Add fit mode selector (FILL, CONTAIN, COVER, STRETCH)
+- [ ] Add "Reset to Default" button
+- [ ] Implement scale event handler for GLITCH background
+- [ ] Implement X/Y position handlers
+- [ ] Implement fit mode logic
+- [ ] Test with different aspect ratios
+
+**Acceptance Criteria**:
+- GLITCH controls appear when GLITCH theme active and image loaded
+- Scale adjusts image size
+- X/Y sliders reposition image
+- Fit modes work correctly (fill, contain, cover, stretch)
+- Reset button returns to default centering
+
+**Fit Mode Definitions**:
+- **FILL**: Stretch to exactly fill canvas (may distort)
+- **CONTAIN**: Fit entirely within canvas (letterbox/pillarbox)
+- **COVER**: Fill canvas completely (may crop edges) - DEFAULT
+- **STRETCH**: Custom user scale/position
+
+---
+
+#### Story 6.3: Video Playback Speed (HIGH PRIORITY)
+**Status**: Not Started
+**Priority**: High
+**Estimate**: 1 hour
+
+**Background**: Videos always play at 1x speed. No slow-motion or time-lapse options.
+
+**Tasks**:
+- [ ] Add playback speed slider (0.25x - 4.0x) to video controls
+- [ ] Add speed value display (e.g., "1.0x")
+- [ ] Implement speed event handler
+- [ ] Apply to video.playbackRate property
+- [ ] Test with different speeds
+- [ ] Ensure speed persists across play/pause
+
+**Acceptance Criteria**:
+- Speed slider appears in video controls section
+- Speed adjusts playback rate smoothly
+- Speed ranges from 0.25x (slow) to 4.0x (fast)
+
+**Implementation Notes**:
+```javascript
+<div class="control-group">
+    <div class="control-label">
+        <span>PLAYBACK SPEED</span>
+        <span class="control-value" id="videoSpeedValue">1.0x</span>
+    </div>
+    <input type="range" id="videoSpeedSlider"
+           min="0.25" max="4.0" step="0.25" value="1.0">
+</div>
+
+setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
+    if (state.selectedImageIndex === -1) return;
+    const videoObj = state.imageObjects[state.selectedImageIndex];
+    if (videoObj && videoObj.isVideo && videoObj.video) {
+        videoObj.video.playbackRate = value;
+    }
+});
+```
+
+---
+
+#### Story 6.4: Position Controls (X/Y Sliders)
+**Status**: Not Started
+**Priority**: Medium
+**Estimate**: 2-3 hours
+
+**Background**: Users can only position images by dragging (imprecise). No numeric position controls.
+
+**Tasks**:
+- [ ] Add X position slider (-1000 to 1000)
+- [ ] Add Y position slider (-1000 to 1000)
+- [ ] Add position value displays
+- [ ] Implement X/Y event handlers
+- [ ] Add "Center Image" button
+- [ ] Add snap-to-grid option (optional)
+- [ ] Test precision positioning
+- [ ] Ensure compatibility with drag-to-move
+
+**Acceptance Criteria**:
+- X/Y sliders appear when image is selected
+- Sliders position image precisely
+- Center button centers image on canvas
+- Sliders sync with drag-to-move
+
+---
+
+#### Story 6.5: Flip/Mirror Controls
+**Status**: Not Started
+**Priority**: Low
+**Estimate**: 1 hour
+
+**Background**: No horizontal/vertical flip options.
+
+**Tasks**:
+- [ ] Add "FLIP H" button (horizontal flip)
+- [ ] Add "FLIP V" button (vertical flip)
+- [ ] Implement flip transform using ctx.scale(-1, 1)
+- [ ] Track flip state in image object
+- [ ] Test with rotated images
+- [ ] Ensure flips combine correctly with other transforms
+
+**Acceptance Criteria**:
+- Flip buttons appear in image controls
+- Horizontal flip mirrors image left-right
+- Vertical flip mirrors image top-bottom
+- Flips work with rotation and scale
+
+---
+
+#### Story 6.6: Layer Ordering
+**Status**: Not Started
+**Priority**: Low
+**Estimate**: 2 hours
+
+**Background**: Multiple overlapping images have no Z-order control. Render order is fixed by upload order.
+
+**Tasks**:
+- [ ] Add "⬆ BRING TO FRONT" button
+- [ ] Add "⬇ SEND TO BACK" button
+- [ ] Implement array reordering logic
+- [ ] Update render loop to respect order
+- [ ] Add visual indication of layer order (optional)
+- [ ] Test with 3+ overlapping images
+
+**Acceptance Criteria**:
+- Buttons appear when image is selected
+- Bring to front moves image to top render layer
+- Send to back moves image to bottom render layer
+- Multiple clicks work correctly
+
+---
+
+#### Story 6.7: Error Handling & Validation
+**Status**: Not Started
+**Priority**: Medium
+**Estimate**: 2 hours
+
+**Background**: No error handling for failed loads, invalid URLs, CORS errors, or file size limits.
+
+**Tasks**:
+- [ ] Add error toast/message system
+- [ ] Add img.onerror handler with user feedback
+- [ ] Add video.onerror handler
+- [ ] Add file size validation (50MB limit)
+- [ ] Add URL validation
+- [ ] Add CORS error detection and messaging
+- [ ] Add file type validation
+- [ ] Test with various error scenarios
+
+**Acceptance Criteria**:
+- Failed image loads show error message
+- Invalid URLs are rejected with feedback
+- Oversized files are rejected before upload
+- CORS errors show helpful message
+
+---
+
+#### Story 6.8: Keyboard Shortcuts
+**Status**: Not Started
+**Priority**: Medium
+**Estimate**: 4 hours
+
+**Background**: No keyboard shortcuts for media operations.
+
+**Tasks**:
+- [ ] Add `Delete` key handler (remove selected)
+- [ ] Add arrow keys (nudge position 1px, 10px with Shift)
+- [ ] Add `Ctrl+D` (duplicate selected)
+- [ ] Add `Ctrl+Z` (undo last action - requires undo system)
+- [ ] Add `[` / `]` (rotate 90° CCW/CW)
+- [ ] Add `+` / `-` (scale up/down 0.1x)
+- [ ] Add keyboard shortcut help modal (optional)
+- [ ] Test all shortcuts
+
+**Acceptance Criteria**:
+- All keyboard shortcuts work when image selected
+- Shortcuts don't interfere with text input
+- Arrow nudge respects selection
+
+---
+
+#### Story 6.9: Media Library/Gallery (FUTURE)
+**Status**: Not Started
+**Priority**: Low
+**Estimate**: 6-8 hours
+
+**Background**: No way to browse/manage previously uploaded media.
+
+**Tasks**:
+- [ ] Design sidebar gallery UI
+- [ ] Add thumbnail generation
+- [ ] Implement IndexedDB storage for media
+- [ ] Add "Save to Library" option
+- [ ] Add gallery panel with thumbnails
+- [ ] Add click-to-load from gallery
+- [ ] Add delete from library option
+- [ ] Test storage limits
+
+**Acceptance Criteria**:
+- Gallery panel shows thumbnails
+- Click thumbnail loads media
+- Library persists across sessions
+
+---
+
+#### Story 6.10: Multi-Select Support (FUTURE)
+**Status**: Not Started
+**Priority**: Low
+**Estimate**: 6-8 hours
+
+**Background**: Can only select one image at a time.
+
+**Tasks**:
+- [ ] Implement Ctrl+Click multi-select
+- [ ] Add selection rectangle visual
+- [ ] Implement group transforms
+- [ ] Add delete multiple option
+- [ ] Test with 3+ selected images
+
+**Acceptance Criteria**:
+- Ctrl+Click selects multiple images
+- Transforms apply to all selected
+- Delete removes all selected
+
+---
+
+### Image Controls Reference
+
+#### ✅ Existing Image/Video Controls (14/23 implemented)
+
+**Upload Functionality** (4/4 - 100%):
+1. ✅ Unified media modal (URL + file browser)
+2. ✅ Drag & drop support
+3. ✅ Image loading (URL + files)
+4. ✅ Video loading (URL + files)
+
+**Basic Transformations** (7/10 - 70%):
+5. ✅ Effect selection (NONE, LINEAR, NEON, GLITCH)
+6. ✅ Transparency (0-1)
+7. ✅ Rotation (0-360°)
+8. ✅ Blur (0-20px)
+9. ✅ 3D Motion (0-2)
+10. ❌ **Scale** (0.1-5.0x) - MISSING (Story 6.1)
+11. ❌ **X Position** (-1000 to 1000) - MISSING (Story 6.4)
+12. ❌ **Y Position** (-1000 to 1000) - MISSING (Story 6.4)
+
+**Flash Effects** (2/2 - 100%):
+13. ✅ Frequency Flash (toggle + threshold)
+14. ✅ Volume Flash (toggle + threshold)
+
+**Video Controls** (3/4 - 75%):
+15. ✅ Loop (toggle)
+16. ✅ Trim Start (0 to duration)
+17. ✅ Trim End (0 to duration)
+18. ❌ **Playback Speed** (0.25x-4.0x) - MISSING (Story 6.3)
+
+**GLITCH Theme Controls** (0/1 - 0%):
+19. ❌ **GLITCH Image Scale** - MISSING (Story 6.2)
+20. ❌ **GLITCH Image X/Y** - MISSING (Story 6.2)
+
+**Advanced Features** (0/3 - 0%):
+21. ❌ **Flip/Mirror** - MISSING (Story 6.5)
+22. ❌ **Layer Ordering** - MISSING (Story 6.6)
+23. ❌ **Keyboard Shortcuts** - MISSING (Story 6.8)
+
+#### Expected Future Additions
+- Filters/effects (brightness, contrast, saturation)
+- Media library/gallery
+- Multi-select support
+- Error handling improvements
+
+---
+
+**Media Epic Summary**:
+- **Immediate Priority** (3 stories): Scale, GLITCH controls, Video speed (4-7 hours)
+- **Short-term** (2 stories): Position controls, Error handling (4-5 hours)
+- **Medium-term** (2 stories): Flip/mirror, Layer ordering, Keyboard shortcuts (7 hours)
+- **Future** (2 stories): Media library, Multi-select (12-16 hours)
+- **Total Estimated**: 27-35 hours for full completion
 
 ---
 

@@ -2088,8 +2088,33 @@
             updateThemeDescription();
 
             // Show image controls when an image is selected
+            // Hide theme controls when image is selected
             if (imageControlsSection) {
                 imageControlsSection.style.display = hasSelectedImage ? 'block' : 'none';
+
+                // Hide/show theme controls based on image selection
+                const dynamicControls = document.getElementById('dynamicControlsContainer');
+                const themeControlSections = [
+                    'modeSection',
+                    'neonControlsSection',
+                    'glitchControlsSection',
+                    'starsControlsSection',
+                    'waveControlsSection',
+                    'waveSettingsSection'
+                ];
+
+                if (hasSelectedImage) {
+                    // Hide theme controls when image is selected
+                    if (dynamicControls) dynamicControls.style.display = 'none';
+                    themeControlSections.forEach(id => {
+                        const section = document.getElementById(id);
+                        if (section) section.style.display = 'none';
+                    });
+                } else {
+                    // Show theme controls when no image is selected
+                    if (dynamicControls) dynamicControls.style.display = 'block';
+                    // Theme-specific sections will be shown/hidden by updateThemeUI()
+                }
 
                 // Update image controls to match selected image's properties
                 if (hasSelectedImage) {
