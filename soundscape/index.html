@@ -3075,6 +3075,30 @@
 
             ctx.filter = 'none';
             ctx.globalCompositeOperation = 'source-over';
+
+            // Apply scanlines effect (CRT-style horizontal lines)
+            if (scanlinesControl > 0) {
+                ctx.globalAlpha = scanlinesControl * 0.3;
+                ctx.fillStyle = '#000000';
+                for (let y = 0; y < canvas.height; y += 4) {
+                    ctx.fillRect(0, y, canvas.width, 2);
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Apply noise overlay (static grain)
+            if (noiseControl > 0) {
+                const noiseData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = noiseData.data;
+                const noiseAmount = noiseControl * 50;
+                for (let i = 0; i < pixels.length; i += 4) {
+                    const noise = (Math.random() - 0.5) * noiseAmount;
+                    pixels[i] += noise;     // R
+                    pixels[i + 1] += noise; // G
+                    pixels[i + 2] += noise; // B
+                }
+                ctx.putImageData(noiseData, 0, 0);
+            }
         }
 
         function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0, baseRotation = 0) {
