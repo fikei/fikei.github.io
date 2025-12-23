@@ -3862,6 +3862,10 @@
             const twinkleRate = audioEngine ? (audioEngine.getValue('stars', 'twinkleRate') || state.settings.starTwinkle) : state.settings.starTwinkle;
             const audioBoost = audioEngine ? (audioEngine.getValue('stars', 'audioBoost') || state.settings.starAudioBoost) : state.settings.starAudioBoost;
             const count = audioEngine ? (audioEngine.getValue('stars', 'count') || state.settings.starCount) : state.settings.starCount;
+            const trailLength = audioEngine ? (audioEngine.getValue('stars', 'trailLength') || 0) : 0;
+            const bloom = audioEngine ? (audioEngine.getValue('stars', 'bloom') || 0) : 0;
+            const perspective = audioEngine ? (audioEngine.getValue('stars', 'perspective') || 1.0) : 1.0;
+            const smoothing = audioEngine ? (audioEngine.getValue('stars', 'smoothing') || 0.5) : 0.5;
 
             // Hide SVG paths for STARS theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -3893,9 +3897,10 @@
             // Update star gradient with current colors from control system
             updateStarGradient(hue, saturation);
 
-            // Clear with fade effect
+            // Clear with fade effect (controlled by trailLength)
+            // trailLength: 0 = no trails (alpha 1.0), 1 = long trails (alpha 0.3)
             ctx.globalCompositeOperation = 'source-over';
-            ctx.globalAlpha = 0.8;
+            ctx.globalAlpha = 1.0 - (trailLength * 0.7);
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, w, h);
 
@@ -3904,9 +3909,8 @@
             const speedBoost = 1.0 - (low * (audioBoost / 10));
 
             // Smoothly transition center position to target (controlled by smoothing slider)
-            const smoothingFactor = 0.5; // Default smoothing if not using control
-            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
-            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
+            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothing) * 0.1;
+            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothing) * 0.1;
 
             // STARS theme always uses the original gradient planes mode
             ctx.globalCompositeOperation = 'lighter';
@@ -3925,7 +3929,10 @@
                     }
 
                     // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
-                    const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+                    // Perspective control adjusts depth effect intensity
+                    const baseScale = 0.2;
+                    const depthRange = 0.8 * perspective; // perspective multiplier (0-2)
+                    const scale = baseScale + star.z * depthRange;
 
                     // Scale orbit radius and star size by perspective
                     const scaledOrbitRadius = star.orbitRadius * scale;
@@ -3954,6 +3961,15 @@
                     const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
 
                     ctx.globalAlpha = perspectiveAlpha;
+
+                    // Apply bloom/glow effect if enabled
+                    if (bloom > 0) {
+                        const blurAmount = bloom * 10; // 0-20px blur range
+                        ctx.filter = `blur(${blurAmount}px)`;
+                    } else {
+                        ctx.filter = 'none';
+                    }
+
                     ctx.drawImage(
                         state.stars.gradientCanvas,
                         x - star.radius / 2,
