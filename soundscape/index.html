@@ -1788,8 +1788,11 @@
             elements.svg.style.height = `${height}px`;
             elements.svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-            // Get density settings
-            const density = config.densityPresets[state.settings.density];
+            // Get density settings from control system (LINEAR theme)
+            const densityValue = (audioEngine && state.settings.theme === 'linear')
+                ? (audioEngine.getValue('linear', 'density') || state.settings.density)
+                : state.settings.density;
+            const density = config.densityPresets[densityValue];
             const { xGap, yGap } = density;
 
             // Calculate grid dimensions - oversized to hide edges
@@ -2253,6 +2256,11 @@
                 ? (audioEngine.getValue(state.settings.theme, 'amplitude') || state.settings.intensity)
                 : state.settings.intensity;
 
+            // Get visualMode from control system (for LINEAR theme)
+            const visualMode = (audioEngine && state.settings.theme === 'linear')
+                ? (audioEngine.getValue('linear', 'visualMode') || state.settings.mode)
+                : state.settings.mode;
+
             // Debug logging (every 60 frames ~= 1 second)
             if (Math.random() < 0.016) {
                 console.log('🎵 Audio Levels:', {
@@ -2260,6 +2268,7 @@
                     mid: midLevel.toFixed(3),
                     high: highLevel.toFixed(3),
                     amplitude: amplitude?.toFixed(3),
+                    mode: visualMode,
                     lowSum,
                     midSum,
                     highSum
@@ -2277,7 +2286,7 @@
             // MODE-DEPENDENT BEHAVIOR
             let midCursorX, midCursorY, highCursorX, highCursorY;
 
-            if (state.settings.mode === 'hole' || state.settings.mode === 'default') {
+            if (visualMode === 'hole' || visualMode === 'default') {
                 // HOLE/DEFAULT MODE: Follow cursor if on screen, random if not
                 if (state.mouse.onScreen) {
                     midCursorX = state.mouse.sx;
@@ -2318,7 +2327,7 @@
                     let highForceX = 0;
                     let highForceY = 0;
 
-                    if (state.settings.mode === 'hole') {
+                    if (visualMode === 'hole') {
                         // HOLE MODE: Radial ripples from cursor position
                         // 2. Mids create ripple effect - MORE DRAMATIC
                         const midDx = p.x - midCursorX;
@@ -2345,7 +2354,7 @@
                             highForceX = Math.cos(angle) * highStrength * 150 * amplitude;
                             highForceY = Math.sin(angle) * highStrength * 150 * amplitude;
                         }
-                    } else if (state.settings.mode === 'default') {
+                    } else if (visualMode === 'default') {
                         // DEFAULT MODE: No audio-reactive burst/hole effect
                         // Forces remain 0
                     } else {
