@@ -1402,6 +1402,9 @@ class ControlSystemUI {
     }
     window.state.settings[context][controlId] = value;
 
+    // Log the change for debugging
+    console.log(`🎛️  Control changed: ${context}.${controlId} = ${typeof value === 'number' ? value.toFixed(2) : value}`);
+
     // Update value display for sliders
     if (controlDef.type === 'slider') {
       const valueDisplay = document.querySelector(`#${context}_${controlId}`)
@@ -1465,7 +1468,26 @@ class ControlSystemUI {
   handleIntensityChange(controlId, context, intensity) {
     if (!window.state.audioReactivity?.[context]?.[controlId]) return;
     window.state.audioReactivity[context][controlId].intensity = intensity;
-    console.log(`🎵 Intensity changed: ${context}.${controlId} -> ${Math.round(intensity * 100)}%`);
+
+    // Get current audio level and show what the modulation would be
+    const audioConfig = window.state.audioReactivity[context][controlId];
+    const audioLevel = this.getAudioLevel(audioConfig.frequency, window.state.audioLevels);
+    const baseValue = window.state.settings[context]?.[controlId];
+    const controlDef = CONTROL_REGISTRY[controlId] || THEME_CONFIGS[context]?.controls[controlId];
+
+    if (controlDef?.type === 'slider' && audioLevel !== undefined && baseValue !== undefined) {
+      const range = controlDef.max - controlDef.min;
+      const modulation = (audioLevel - 0.5) * range * intensity;
+      const modulatedValue = Math.max(controlDef.min, Math.min(controlDef.max, baseValue + modulation));
+      console.log(`🎵 Intensity changed: ${context}.${controlId}
+   Intensity: ${Math.round(intensity * 100)}%
+   Audio Level: ${(audioLevel * 100).toFixed(1)}% (${audioConfig.frequency})
+   Base Value: ${baseValue.toFixed(2)}
+   Modulation: ${modulation >= 0 ? '+' : ''}${modulation.toFixed(2)}
+   Result: ${modulatedValue.toFixed(2)} (range: ${controlDef.min}-${controlDef.max})`);
+    } else {
+      console.log(`🎵 Intensity changed: ${context}.${controlId} -> ${Math.round(intensity * 100)}%`);
+    }
   }
 
   /**
