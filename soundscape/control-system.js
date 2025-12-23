@@ -1754,7 +1754,14 @@ class AudioModulationEngine {
       case 'decibels':
         return audioLevels.decibels || (audioLevels.low + audioLevels.mid + audioLevels.high) / 3;
 
-      // TODO: Implement rhythm sources (beat, onset, bpm)
+      // Rhythm Features
+      case 'beat':
+        return audioLevels.beat || 0;
+      case 'onset':
+        return audioLevels.onset || 0;
+      case 'bpm':
+        return audioLevels.bpm || 0.5; // Default to 120 BPM (0.5 normalized)
+
       // TODO: Implement dynamics sources (attack, transients, envelope)
       // TODO: Implement spectral sources (centroid, flux, rolloff, zcr)
       // TODO: Implement musical sources (pitch, harmonic)

@@ -1410,6 +1410,122 @@
         // SOUNDSCAPE: Audio-Reactive Wave Visualization
         // =====================================================
 
+        // ===== BEAT DETECTION SYSTEM =====
+        class BeatDetector {
+            constructor() {
+                this.energyHistory = [];
+                this.historySize = 43; // ~1 second at 43 FPS
+                this.threshold = 1.3; // Beat detected if energy > avg * threshold
+                this.minTimeBetweenBeats = 300; // ms (prevents double-triggering)
+                this.lastBeatTime = 0;
+                this.beatStrength = 0;
+                this.decayRate = 0.95; // How fast beat strength decays
+            }
+
+            detectBeat(currentEnergy, timestamp) {
+                // Add to history
+                this.energyHistory.push(currentEnergy);
+                if (this.energyHistory.length > this.historySize) {
+                    this.energyHistory.shift();
+                }
+
+                // Calculate average energy
+                const avgEnergy = this.energyHistory.reduce((sum, e) => sum + e, 0) / this.energyHistory.length;
+
+                // Detect beat if current energy significantly exceeds average
+                const timeSinceLastBeat = timestamp - this.lastBeatTime;
+                const isBeat = currentEnergy > avgEnergy * this.threshold &&
+                              timeSinceLastBeat > this.minTimeBetweenBeats;
+
+                if (isBeat) {
+                    this.beatStrength = Math.min(1.0, (currentEnergy / avgEnergy - 1) / (this.threshold - 1));
+                    this.lastBeatTime = timestamp;
+                } else {
+                    // Decay beat strength over time
+                    this.beatStrength *= this.decayRate;
+                }
+
+                return {
+                    isBeat,
+                    strength: this.beatStrength,
+                    energy: currentEnergy,
+                    avgEnergy
+                };
+            }
+
+            reset() {
+                this.energyHistory = [];
+                this.beatStrength = 0;
+                this.lastBeatTime = 0;
+            }
+        }
+
+        // ===== BPM DETECTION SYSTEM =====
+        class BPMDetector {
+            constructor() {
+                this.beatTimes = [];
+                this.maxBeats = 32; // Track last 32 beats
+                this.lastBPM = 120; // Default BPM
+                this.confidence = 0;
+            }
+
+            addBeat(timestamp) {
+                this.beatTimes.push(timestamp);
+                if (this.beatTimes.length > this.maxBeats) {
+                    this.beatTimes.shift();
+                }
+
+                // Recalculate BPM
+                if (this.beatTimes.length >= 4) {
+                    this.calculateBPM();
+                }
+            }
+
+            calculateBPM() {
+                if (this.beatTimes.length < 4) {
+                    this.confidence = 0;
+                    return this.lastBPM;
+                }
+
+                // Calculate intervals between beats
+                const intervals = [];
+                for (let i = 1; i < this.beatTimes.length; i++) {
+                    intervals.push(this.beatTimes[i] - this.beatTimes[i - 1]);
+                }
+
+                // Use median interval (more robust than average)
+                intervals.sort((a, b) => a - b);
+                const medianInterval = intervals[Math.floor(intervals.length / 2)];
+
+                // Convert to BPM
+                const bpm = 60000 / medianInterval;
+
+                // Clamp to realistic range
+                if (bpm >= 60 && bpm <= 200) {
+                    this.lastBPM = bpm;
+
+                    // Calculate confidence based on interval consistency
+                    const stdDev = Math.sqrt(intervals.reduce((sum, i) => sum + Math.pow(i - medianInterval, 2), 0) / intervals.length);
+                    this.confidence = Math.max(0, 1 - (stdDev / medianInterval));
+                }
+
+                return this.lastBPM;
+            }
+
+            getBPM() {
+                return this.lastBPM;
+            }
+
+            getConfidence() {
+                return this.confidence;
+            }
+
+            reset() {
+                this.beatTimes = [];
+                this.confidence = 0;
+            }
+        }
+
         // Simple 2D noise function (Perlin-like)
         function createNoise2D() {
             const permutation = [];
@@ -1648,6 +1764,10 @@
                 high: 0
             },
             currentTime: 0,
+
+            // Beat and BPM detection
+            beatDetector: new BeatDetector(),
+            bpmDetector: new BPMDetector(),
 
             // User-created gradient centers (for NEON theme)
             userGradientCenters: [],
@@ -2272,6 +2392,27 @@
             const rmsLevel = Math.sqrt(sumSquares / state.bufferLength) / 255;
             const dbLevel = rmsLevel > 0 ? Math.max(0, Math.min(1, (20 * Math.log10(rmsLevel) + 60) / 60)) : 0; // Normalize -60dB to 0dB as 0-1
 
+            // Beat and BPM detection
+            const timestamp = performance.now();
+
+            // Detect bass-focused beats (kick drums)
+            const bassEnergy = subBassLevel + bassLevel;
+            const beatResult = state.beatDetector.detectBeat(bassEnergy, timestamp);
+
+            // Detect onset (any sudden sound start - more sensitive)
+            const onsetEnergy = midsLevel + highsLevel;
+            const onsetThreshold = 0.6;
+            const isOnset = onsetEnergy > onsetThreshold;
+
+            // Update BPM when beat detected
+            if (beatResult.isBeat) {
+                state.bpmDetector.addBeat(timestamp);
+            }
+
+            // Get current BPM (normalized 0-1, where 120 BPM = 0.5)
+            const bpmValue = (state.bpmDetector.getBPM() - 60) / 140; // 60-200 BPM -> 0-1
+            const bpmConfidence = state.bpmDetector.getConfidence();
+
             // Store all audio levels for theme renderers and control system
             state.audioLevels = {
                 // Original 3-band (for backward compatibility)
@@ -2293,8 +2434,18 @@
                 rms: rmsLevel,
                 decibels: dbLevel,
 
+                // Rhythm features
+                beat: beatResult.strength, // 0-1, decays over time
+                onset: isOnset ? 1.0 : 0.0, // 0 or 1 (trigger)
+                bpm: bpmValue, // 0-1 (60-200 BPM)
+
                 // Combined
-                allLevels: (bassLevel + midsLevel + highsLevel) / 3
+                allLevels: (bassLevel + midsLevel + highsLevel) / 3,
+
+                // Metadata (for debugging)
+                _bpmActual: state.bpmDetector.getBPM(),
+                _bpmConfidence: bpmConfidence,
+                _beatDetected: beatResult.isBeat
             };
 
             // Apply audio modulation to controls
