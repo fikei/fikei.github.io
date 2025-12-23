@@ -794,15 +794,36 @@ const THEME_CONFIGS = {
       },
 
       // Geometry
-      points: { default: 8 },
-      spread: { default: 100 },
-      amplitude: { default: 1.0 },
-      lineWidth: { default: 3 },
+      points: {
+        default: 8,
+        category: 'geometry'
+      },
+      spread: {
+        default: 100,
+        category: 'geometry'
+      },
+      amplitude: {
+        default: 1.0,
+        category: 'geometry'
+      },
+      lineWidth: {
+        default: 3,
+        category: 'geometry'
+      },
 
       // Color
-      hue: { default: 280 },
-      saturation: { default: 70 },
-      opacity: { default: 0.6 }
+      hue: {
+        default: 280,
+        category: 'color'
+      },
+      saturation: {
+        default: 70,
+        category: 'color'
+      },
+      opacity: {
+        default: 0.6,
+        category: 'color'
+      }
     },
     audioReactivity: {
       // Original: Amplitude responds to overall audio (physics-based)
@@ -853,19 +874,46 @@ const THEME_CONFIGS = {
       },
 
       // Color
-      warmCool: { default: 1.0 },
-      hue: { default: 280 },
-      saturation: { default: 70 },
-      lightness: { default: 50 },
+      warmCool: {
+        default: 1.0,
+        category: 'color'
+      },
+      hue: {
+        default: 280,
+        category: 'color'
+      },
+      saturation: {
+        default: 70,
+        category: 'color'
+      },
+      lightness: {
+        default: 50,
+        category: 'color'
+      },
 
       // Geometry
-      burstSize: { default: 1.0 },
-      meshDensity: { default: 8 },
-      movement: { default: 1.0 },
+      burstSize: {
+        default: 1.0,
+        category: 'geometry'
+      },
+      meshDensity: {
+        default: 8,
+        category: 'geometry'
+      },
+      movement: {
+        default: 1.0,
+        category: 'motion'
+      },
 
       // Effects
-      glow: { default: 1.5 },
-      blur: { default: 0 }
+      glow: {
+        default: 1.5,
+        category: 'effects'
+      },
+      blur: {
+        default: 0,
+        category: 'effects'
+      }
     },
     audioReactivity: {
       // Original: Burst size, movement, and glow respond to audio
@@ -904,17 +952,41 @@ const THEME_CONFIGS = {
         audioReactive: false
       },
 
-      // Motion
-      rotation: { default: 1.0 },
+      // Motion - 3D rotation effects
+      rotation: {
+        default: 1.0,
+        category: 'motion'
+      },
 
-      // Effects
-      glitchIntensity: { default: 1.0 },
-      contrast: { default: 1.0 },
-      channelOffset: { default: 5 },
-      displacement: { default: 10 },
-      scanlines: { default: 0 },
-      noise: { default: 0 },
-      pixelation: { default: 1 }
+      // Effects - Media manipulation
+      glitchIntensity: {
+        default: 1.0,
+        category: 'effects'
+      },
+      channelOffset: {
+        default: 5,
+        category: 'effects'
+      },
+      displacement: {
+        default: 10,
+        category: 'effects'
+      },
+      contrast: {
+        default: 1.0,
+        category: 'effects'
+      },
+      scanlines: {
+        default: 0,
+        category: 'effects'
+      },
+      noise: {
+        default: 0,
+        category: 'effects'
+      },
+      pixelation: {
+        default: 1,
+        category: 'effects'
+      }
     },
     audioReactivity: {
       // Original: Rotation (mids), glitch intensity (highs), channel offset (highs), displacement (all)
@@ -939,32 +1011,80 @@ const THEME_CONFIGS = {
     description: 'Orbital stars with perspective and depth',
     controls: {
       // Color
-      hue: { default: 44 },
-      saturation: { default: 12 },
+      hue: {
+        default: 44,
+        category: 'color'
+      },
+      saturation: {
+        default: 12,
+        category: 'color'
+      },
 
       // Motion
-      speed: { default: 1.0 },
-      zSpeed: { default: 0 },
-      centerShiftRate: { default: 1.0 },
-      smoothing: { default: 0.5 },
+      speed: {
+        default: 1.0,
+        category: 'motion'
+      },
+      zSpeed: {
+        default: 0,
+        category: 'motion'
+      },
+      centerShiftRate: {
+        default: 1.0,
+        category: 'motion'
+      },
+      smoothing: {
+        default: 0.5,
+        category: 'motion'
+      },
 
       // Appearance
-      brightness: { default: 0.8 },
-      minOpacity: { default: 0.2 },
-      maxOpacity: { default: 1.0 },
-      diameter: { default: 1.0 },
+      brightness: {
+        default: 0.8,
+        category: 'color'
+      },
+      minOpacity: {
+        default: 0.2,
+        category: 'color'
+      },
+      maxOpacity: {
+        default: 1.0,
+        category: 'color'
+      },
+      diameter: {
+        default: 1.0,
+        category: 'geometry'
+      },
 
       // Effects
-      twinkleRate: { default: 20 },
-      trailLength: { default: 0 },
-      bloom: { default: 0 },
+      twinkleRate: {
+        default: 20,
+        category: 'effects'
+      },
+      trailLength: {
+        default: 0,
+        category: 'effects'
+      },
+      bloom: {
+        default: 0,
+        category: 'effects'
+      },
 
       // Geometry
-      count: { default: 1200 },
-      perspective: { default: 1.0 },
+      count: {
+        default: 1200,
+        category: 'geometry'
+      },
+      perspective: {
+        default: 1.0,
+        category: 'geometry'
+      },
 
       // Audio
-      audioBoost: { default: 3.0 }
+      audioBoost: {
+        default: 3.0,
+        category: 'audio'
+      }
     },
     audioReactivity: {
       // Original: Speed (bass) and brightness (mids)
@@ -1009,6 +1129,7 @@ const THEME_CONFIGS = {
       },
       layers: {
         default: 3,
+        category: 'geometry',
         visibleWhen: (state) => {
           const mode = state.settings?.wave?.visualMode || 'planes';
           return ['grids', 'dots'].includes(mode);
@@ -1016,25 +1137,64 @@ const THEME_CONFIGS = {
       },
 
       // Color
-      hue: { default: 280 },
-      saturation: { default: 70 },
+      hue: {
+        default: 280,
+        category: 'color'
+      },
+      saturation: {
+        default: 70,
+        category: 'color'
+      },
 
       // Geometry
-      amplitude: { default: 1.2 },
-      wavelength: { default: 50 },
-      lineWidth: { default: 3 },
+      amplitude: {
+        default: 1.2,
+        category: 'geometry'
+      },
+      wavelength: {
+        default: 50,
+        category: 'geometry'
+      },
+      lineWidth: {
+        default: 3,
+        category: 'geometry'
+      },
 
       // Motion
-      rotationX: { default: 0.3 },
-      rotationY: { default: 0.3 },
-      speed: { default: 1.0 },
+      rotationX: {
+        default: 0.3,
+        category: 'motion'
+      },
+      rotationY: {
+        default: 0.3,
+        category: 'motion'
+      },
+      speed: {
+        default: 1.0,
+        category: 'motion'
+      },
 
       // Effects
-      glow: { default: 0 },
-      perspective: { default: 1.0 },
-      depth: { default: 1.0 },
-      turbulence: { default: 0 },
-      phaseShift: { default: 0 }
+      glow: {
+        default: 0,
+        category: 'effects'
+      },
+      perspective: {
+        default: 1.0,
+        category: 'effects'
+      },
+      depth: {
+        default: 1.0,
+        category: 'effects'
+      },
+      turbulence: {
+        default: 0,
+        category: 'effects'
+      },
+      phaseShift: {
+        default: 0,
+        category: 'effects'
+      }
     },
     audioReactivity: {
       // Original: Amplitude, rotationX, and rotationY respond to audio
