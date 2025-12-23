@@ -2698,6 +2698,30 @@
             const baseSaturationControl = audioEngine ? (audioEngine.getValue('neon', 'saturation') || 70) : 70;
             const baseLightnessControl = audioEngine ? (audioEngine.getValue('neon', 'lightness') || 50) : 50;
             const blur = audioEngine ? (audioEngine.getValue('neon', 'blur') || 0) : 0;
+            const responsiveness = audioEngine ? (audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
+            const smoothing = audioEngine ? (audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
+
+            // Initialize NEON state if needed (for smoothing and reactive mode)
+            if (!state.neon) {
+                state.neon = {
+                    smoothedAudio: { low: 0, mid: 0, high: 0 },
+                    reactiveHue: baseHue,
+                    lastBeatTime: 0,
+                    targetHue: baseHue,
+                    currentHue: baseHue
+                };
+            }
+
+            // Apply exponential smoothing to audio levels
+            const alpha = 1 - smoothing; // Smoothing factor (0 = full smooth, 1 = no smooth)
+            state.neon.smoothedAudio.low = state.neon.smoothedAudio.low + (low - state.neon.smoothedAudio.low) * alpha;
+            state.neon.smoothedAudio.mid = state.neon.smoothedAudio.mid + (mid - state.neon.smoothedAudio.mid) * alpha;
+            state.neon.smoothedAudio.high = state.neon.smoothedAudio.high + (high - state.neon.smoothedAudio.high) * alpha;
+
+            // Apply responsiveness multiplier to smoothed audio (amplifies/dampens audio response)
+            const lowSmooth = state.neon.smoothedAudio.low * responsiveness;
+            const midSmooth = state.neon.smoothedAudio.mid * responsiveness;
+            const highSmooth = state.neon.smoothedAudio.high * responsiveness;
 
             // Hide all line paths for NEON theme
             state.paths.forEach(path => {
@@ -2720,16 +2744,6 @@
 
             // Color settings are now from control system
             const colorTempIntensity = warmCool;
-
-            // Initialize NEON state if needed (for REACTIVE mode)
-            if (!state.neon) {
-                state.neon = {
-                    reactiveHue: baseHue,
-                    lastBeatTime: 0,
-                    targetHue: baseHue,
-                    currentHue: baseHue
-                };
-            }
 
             // Calculate hue based on color change mode
             let hueShift;
@@ -2768,27 +2782,29 @@
                     hueShift = baseHue;
             }
 
-            // Saturation mapping: use control value as base, modulate with audio
-            const saturationFromLow = low * 30; // Bass increases saturation
-            const saturationFromHigh = -high * 20; // Highs decrease saturation
+            // Saturation mapping: use control value as base, modulate with smoothed audio
+            const saturationFromLow = lowSmooth * 30; // Bass increases saturation
+            const saturationFromHigh = -highSmooth * 20; // Highs decrease saturation
             const saturation = Math.max(0, Math.min(100, baseSaturationControl + saturationFromLow + saturationFromHigh));
 
-            // Lightness: use control value as base, modulate with audio
-            const lightnessFromLow = -low * 20; // Darken with bass
-            const lightnessFromHigh = high * 30; // Brighten with highs
+            // Lightness: use control value as base, modulate with smoothed audio
+            const lightnessFromLow = -lowSmooth * 20; // Darken with bass
+            const lightnessFromHigh = highSmooth * 30; // Brighten with highs
             const lightness = Math.max(20, Math.min(90, baseLightnessControl + lightnessFromLow + lightnessFromHigh));
 
-            // Movement: More dramatic with bass - uses movement control value
-            const movementAmplitude = (theme.movementBase + low * theme.movementMultiplier) * movement;
+            // Movement: More dramatic with bass - uses movement control value and smoothed audio
+            const movementAmplitude = (theme.movementBase + lowSmooth * theme.movementMultiplier) * movement;
 
-            // Size: Dramatic pulsing with all frequencies combined - uses burstSize control value
-            const combinedEnergy = (low * 0.5 + mid * 0.3 + high * 0.2);
+            // Size: Dramatic pulsing with all frequencies combined - uses burstSize control value and smoothed audio
+            const combinedEnergy = (lowSmooth * 0.5 + midSmooth * 0.3 + highSmooth * 0.2);
             const sizeMultiplier = theme.sizeMultiplierBase + combinedEnergy * theme.sizeMultiplierRange;
 
             // Debug logging for NEON renderer (every ~1 second)
             if (Math.random() < 0.016) {
                 console.log('🎨 NEON Render:', {
                     audioLevels: { low, mid, high },
+                    smoothedLevels: { lowSmooth: lowSmooth.toFixed(2), midSmooth: midSmooth.toFixed(2), highSmooth: highSmooth.toFixed(2) },
+                    controls: { responsiveness, smoothing: smoothing.toFixed(2), colorChangeMode },
                     hueShift: hueShift.toFixed(1),
                     saturation: saturation.toFixed(1),
                     lightness: lightness.toFixed(1),

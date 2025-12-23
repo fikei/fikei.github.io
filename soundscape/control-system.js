@@ -930,9 +930,35 @@ const THEME_CONFIGS = {
         default: 8,
         category: 'geometry'
       },
+
+      // Motion
       movement: {
         default: 1.0,
         category: 'motion'
+      },
+      responsiveness: {
+        type: 'slider',
+        label: 'RESPONSIVENESS',
+        min: 0.1,
+        max: 2.0,
+        step: 0.1,
+        default: 1.0,
+        unit: 'x',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Speed of audio response'
+      },
+      smoothing: {
+        type: 'slider',
+        label: 'SMOOTHING',
+        min: 0,
+        max: 0.95,
+        step: 0.05,
+        default: 0.7,
+        unit: '',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Movement smoothing amount'
       },
 
       // Effects
