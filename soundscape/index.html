@@ -3066,8 +3066,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.globalCompositeOperation = 'lighter';
 
-            // Apply contrast filter
-            const contrast = state.settings.glitchContrast;
+            // Apply contrast filter (using control system value)
             ctx.filter = `contrast(${contrast})`;
 
             ctx.drawImage(redCanvas, -channelSeparation, 0);
