@@ -3707,6 +3707,19 @@
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
 
+            // Get values from control system (with fallbacks)
+            const visualMode = audioEngine ? (audioEngine.getValue('wave', 'visualMode') || state.settings.waveMode) : state.settings.waveMode;
+            const layers = audioEngine ? (audioEngine.getValue('wave', 'layers') || state.settings.waveLayers) : state.settings.waveLayers;
+            const hue = audioEngine ? (audioEngine.getValue('wave', 'hue') || state.settings.waveHue) : state.settings.waveHue;
+            const saturation = audioEngine ? (audioEngine.getValue('wave', 'saturation') || state.settings.waveSaturation) : state.settings.waveSaturation;
+            const amplitude = audioEngine ? (audioEngine.getValue('wave', 'amplitude') || 1.0) : 1.0;
+            const wavelength = audioEngine ? (audioEngine.getValue('wave', 'wavelength') || 1.0) : 1.0;
+            const lineWidth = audioEngine ? (audioEngine.getValue('wave', 'lineWidth') || 2) : 2;
+            const speed = audioEngine ? (audioEngine.getValue('wave', 'speed') || state.settings.starSpeed || 1.0) : (state.settings.starSpeed || 1.0);
+            const rotationX = audioEngine ? (audioEngine.getValue('wave', 'rotationX') || 0) : 0;
+            const rotationY = audioEngine ? (audioEngine.getValue('wave', 'rotationY') || 0) : 0;
+            const glow = audioEngine ? (audioEngine.getValue('wave', 'glow') || 0) : 0;
+
             // Hide SVG paths for WAVE theme
             state.paths.forEach(path => path.setAttribute('d', ''));
 
@@ -3748,50 +3761,42 @@
             // Draw based on mode
             ctx.globalCompositeOperation = 'lighter';
 
-            const mode = state.settings.waveMode;
+            const mode = visualMode;
 
             if (mode === 'planes') {
-                // PLANES MODE: Original gradient stars
+                // PLANES MODE: Original gradient stars - simplified for WAVE theme
+                // Note: WAVE theme doesn't support Z-axis movement in control system yet
+                const speedBoost = 1.0 + high * amplitude;
+
                 state.stars.starArray.forEach((star) => {
-                    // Update Z position (move towards camera)
-                    if (state.settings.starZSpeed > 0) {
-                        star.z += state.settings.starZSpeed * 0.001;
-                        if (star.z >= 1.0) {
-                            star.z = 0;
-                            star.timePassed = Math.random() * state.settings.starCount;
-                        }
-                    }
-
                     const scale = 0.2 + star.z * 0.8;
-                    const speedBoost = 1.0 + high * state.settings.starAudioBoost;
-                    const scaledOrbitRadius = star.orbitRadius * scale * state.settings.starDiameter;
+                    const scaledOrbitRadius = star.orbitRadius * scale * wavelength;
 
-                    // High frequencies shift center position
-                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    // High frequencies shift center position with rotationY control
+                    const centerOffsetX = Math.sin(time * 0.001 + rotationX * 0.1) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 + rotationY * 0.1) * high * 100;
 
                     const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
                     const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
 
-                    // Get pre-rendered gradient from cache
+                    // Get pre-rendered gradient from cache (with glow effect)
+                    const size = 25 * star.size * amplitude * (1 + glow);
                     ctx.drawImage(
                         state.stars.gradientCanvas,
                         0, 0, 50, 50,
-                        x - 25 * star.size * state.settings.starBrightness,
-                        y - 25 * star.size * state.settings.starBrightness,
-                        50 * star.size * state.settings.starBrightness,
-                        50 * star.size * state.settings.starBrightness
+                        x - size,
+                        y - size,
+                        size * 2,
+                        size * 2
                     );
 
                     // Update orbit
-                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                    star.timePassed += star.baseSpeed * speed * speedBoost;
                 });
 
             } else if (mode === 'grids') {
                 // GRIDS MODE: Draw layered grid patterns
-                const layers = state.settings.waveLayers;
-                const hue = state.settings.waveHue;
-                const sat = state.settings.waveSaturation;
+                const sat = saturation;
 
                 for (let layer = 0; layer < layers; layer++) {
                     const layerDepth = layer / layers;
@@ -3799,12 +3804,12 @@
                     const cellSize = 40 + layer * 20;
 
                     // Audio-reactive rotation per layer
-                    const rotation = time * 0.0001 * state.settings.starSpeed + layer * 0.3;
+                    const rotation = time * 0.0001 * speed + layer * 0.3;
 
                     ctx.save();
                     ctx.translate(state.stars.centerX, state.stars.centerY);
-                    ctx.rotate(rotation + high * 0.5);
-                    ctx.scale(layerScale * state.settings.starDiameter, layerScale * state.settings.starDiameter);
+                    ctx.rotate(rotation + high * 0.5 + rotationY * 0.01);
+                    ctx.scale(layerScale * amplitude, layerScale * amplitude);
 
                     // Draw grid with radial gradient shading
                     const gridSize = Math.max(w, h) / cellSize;
@@ -3831,10 +3836,8 @@
 
             } else if (mode === 'dots') {
                 // DOTS MODE: Simple layered dots
-                const layers = state.settings.waveLayers;
-                const hue = state.settings.waveHue;
-                const sat = state.settings.waveSaturation;
-                const speedBoost = 1.0 + high * state.settings.starAudioBoost;
+                const sat = saturation;
+                const speedBoost = 1.0 + high * amplitude;
 
                 state.stars.starArray.forEach((star) => {
                     // Assign layer based on star index
@@ -3861,11 +3864,11 @@
                     const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
 
                     // Draw dot with shading
-                    const dotSize = (2 + layerDepth * 4) * state.settings.starBrightness;
+                    const dotSize = (2 + layerDepth * 4) * amplitude;
                     const brightness = 30 + layerDepth * 50 + mid * 30;
 
-                    // Radial gradient for shading
-                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2);
+                    // Radial gradient for shading (with glow effect)
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2 * (1 + glow));
                     gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${star.alpha + mid * 0.3})`);
                     gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5})`);
                     gradient.addColorStop(1, `hsla(${hue}, ${sat}%, ${brightness * 0.3}%, 0)`);
@@ -3876,7 +3879,7 @@
                     ctx.fill();
 
                     // Update orbit
-                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                    star.timePassed += star.baseSpeed * speed * speedBoost;
                 });
             }
 
