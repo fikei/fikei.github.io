@@ -2880,14 +2880,24 @@
 
             if (!img) return;
 
+            // Get values from control system (with fallbacks)
+            const rotation = audioEngine ? (audioEngine.getValue('glitch', 'rotation') || state.settings.rotationIntensity) : state.settings.rotationIntensity;
+            const glitchIntensityControl = audioEngine ? (audioEngine.getValue('glitch', 'glitchIntensity') || state.settings.glitchEffectIntensity) : state.settings.glitchEffectIntensity;
+            const contrast = audioEngine ? (audioEngine.getValue('glitch', 'contrast') || 1.0) : 1.0;
+            const channelOffsetControl = audioEngine ? (audioEngine.getValue('glitch', 'channelOffset') || 5) : 5;
+            const displacementControl = audioEngine ? (audioEngine.getValue('glitch', 'displacement') || 10) : 10;
+            const scanlinesControl = audioEngine ? (audioEngine.getValue('glitch', 'scanlines') || 0) : 0;
+            const noiseControl = audioEngine ? (audioEngine.getValue('glitch', 'noise') || 0) : 0;
+            const pixelationControl = audioEngine ? (audioEngine.getValue('glitch', 'pixelation') || 1) : 1;
+
             // Calculate glitch parameters with user intensity multipliers
-            const glitchEffectIntensity = state.settings.glitchEffectIntensity;
-            const channelSeparation = (theme.channelSeparationBase + low * theme.channelSeparationMultiplier) * glitchEffectIntensity;
-            const glitchIntensity = mid * theme.glitchIntensityMultiplier * glitchEffectIntensity;
-            const quantization = Math.max(1, (theme.quantizationBase + high * theme.quantizationMultiplier) * glitchEffectIntensity);
+            const glitchEffectIntensity = glitchIntensityControl;
+            const channelSeparation = channelOffsetControl;
+            const glitchIntensity = displacementControl;
+            const quantization = Math.max(1, pixelationControl);
 
             // Calculate 3D rotation based on audio with user intensity multiplier
-            const rotationIntensity = state.settings.rotationIntensity;
+            const rotationIntensity = rotation;
             const rotationX = mid * 45 * rotationIntensity;
             const rotationY = high * 45 * rotationIntensity;
             const rotationZ = low * 15 * rotationIntensity;
@@ -2981,8 +2991,9 @@
             // Put modified image data back
             tempCtx.putImageData(imageData, 0, 0);
 
-            // RGB Channel Separation
-            const glitchMode = state.settings.glitchMode || 'rgb';
+            // RGB Channel Separation - use visualMode from control system
+            const visualMode = audioEngine ? (audioEngine.getValue('glitch', 'visualMode') || state.settings.glitchMode) : state.settings.glitchMode;
+            const glitchMode = visualMode || 'rgb';
             const redCanvas = document.createElement('canvas');
             const greenCanvas = document.createElement('canvas');
             const blueCanvas = document.createElement('canvas');
