@@ -2247,12 +2247,19 @@
                 audioEngine.applyModulation(state.audioLevels, state.settings.theme);
             }
 
+            // Get modulated amplitude (for LINEAR theme physics)
+            // Falls back to old intensity control if not available
+            const amplitude = (audioEngine && state.settings.theme)
+                ? (audioEngine.getValue(state.settings.theme, 'amplitude') || state.settings.intensity)
+                : state.settings.intensity;
+
             // Debug logging (every 60 frames ~= 1 second)
             if (Math.random() < 0.016) {
                 console.log('🎵 Audio Levels:', {
                     low: lowLevel.toFixed(3),
                     mid: midLevel.toFixed(3),
                     high: highLevel.toFixed(3),
+                    amplitude: amplitude?.toFixed(3),
                     lowSum,
                     midSum,
                     highSum
@@ -2260,8 +2267,8 @@
             }
 
             // Bass creates global background shift - more dramatic
-            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 60 * state.settings.intensity;
-            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 50 * state.settings.intensity;
+            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 60 * amplitude;
+            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 50 * amplitude;
 
             // Get canvas dimensions
             const canvasWidth = state.boundingRect.width;
@@ -2322,8 +2329,8 @@
                         if (midDist < midRadius && midDist > 0) {
                             const midStrength = (1 - midDist / midRadius) * midLevel;
                             const angle = Math.atan2(midDy, midDx);
-                            midForceX = Math.cos(angle) * midStrength * 120 * state.settings.intensity;
-                            midForceY = Math.sin(angle) * midStrength * 120 * state.settings.intensity;
+                            midForceX = Math.cos(angle) * midStrength * 120 * amplitude;
+                            midForceY = Math.sin(angle) * midStrength * 120 * amplitude;
                         }
 
                         // 3. Highs create sharper ripple effect - MORE DRAMATIC
@@ -2335,8 +2342,8 @@
                         if (highDist < highRadius && highDist > 0) {
                             const highStrength = (1 - highDist / highRadius) * highLevel;
                             const angle = Math.atan2(highDy, highDx);
-                            highForceX = Math.cos(angle) * highStrength * 150 * state.settings.intensity;
-                            highForceY = Math.sin(angle) * highStrength * 150 * state.settings.intensity;
+                            highForceX = Math.cos(angle) * highStrength * 150 * amplitude;
+                            highForceY = Math.sin(angle) * highStrength * 150 * amplitude;
                         }
                     } else if (state.settings.mode === 'default') {
                         // DEFAULT MODE: No audio-reactive burst/hole effect
@@ -2353,8 +2360,8 @@
                             const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midLevel;
                             const perpAngle = crunchMidAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.01, p.y * 0.01 + time * 0.001) > 0 ? 1 : -1;
-                            midForceX = Math.cos(perpAngle) * midStrength * 180 * state.settings.intensity * waveDir;
-                            midForceY = Math.sin(perpAngle) * midStrength * 180 * state.settings.intensity * waveDir;
+                            midForceX = Math.cos(perpAngle) * midStrength * 180 * amplitude * waveDir;
+                            midForceY = Math.sin(perpAngle) * midStrength * 180 * amplitude * waveDir;
                         }
 
                         // Calculate distance from wave front for highs
@@ -2367,8 +2374,8 @@
                             const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highLevel;
                             const perpAngle = crunchHighAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.015, p.y * 0.015 + time * 0.0015) > 0 ? 1 : -1;
-                            highForceX = Math.cos(perpAngle) * highStrength * 220 * state.settings.intensity * waveDir;
-                            highForceY = Math.sin(perpAngle) * highStrength * 220 * state.settings.intensity * waveDir;
+                            highForceX = Math.cos(perpAngle) * highStrength * 220 * amplitude * waveDir;
+                            highForceY = Math.sin(perpAngle) * highStrength * 220 * amplitude * waveDir;
                         }
                     }
 
@@ -2414,6 +2421,11 @@
             const theme = config.themes.linear;
             const { low, mid, high } = state.audioLevels;
 
+            // Get values from control system (with fallbacks to old config)
+            const hue = audioEngine ? (audioEngine.getValue('linear', 'hue') || theme.hue) : theme.hue;
+            const saturation = audioEngine ? (audioEngine.getValue('linear', 'saturation') || theme.saturation) : theme.saturation;
+            const opacity = audioEngine ? (audioEngine.getValue('linear', 'opacity') || theme.opacity) : theme.opacity;
+
             // Hide NEON gradient mesh if it exists
             const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
             if (gradientMeshGroup) {
@@ -2422,7 +2434,7 @@
 
             // Calculate overall audio energy for dramatic effect
             const totalEnergy = (low + mid + high) / 3;
-            const dynamicOpacity = theme.opacity + totalEnergy * theme.opacityMultiplier;
+            const dynamicOpacity = opacity + totalEnergy * theme.opacityMultiplier;
 
             state.lines.forEach((points, lineIndex) => {
                 if (points.length < 2 || !state.paths[lineIndex]) return;
@@ -2443,12 +2455,15 @@
                     pathData += ` L ${x} ${y}`;
                 }
 
-                // Update path with dynamic opacity
+                // Update path with color values from control system
                 const path = state.paths[lineIndex];
                 path.setAttribute('d', pathData);
                 path.removeAttribute('filter');
                 path.removeAttribute('transform');
                 path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
+
+                // Update stroke color from control system
+                path.setAttribute('stroke', `hsl(${hue}, ${saturation}%, 50%)`);
             });
         }
 
