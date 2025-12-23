@@ -3512,19 +3512,20 @@
             console.log(`✨ Initialized ${state.settings.starCount} stars`);
         }
 
-        function updateStarGradient() {
+        function updateStarGradient(hue, saturation) {
             const canvas = state.stars.gradientCanvas;
             const ctx = state.stars.gradientCtx;
-            const hue = state.settings.starHue;
-            const saturation = state.settings.starSaturation;
+            // Use parameters if provided, otherwise fallback to state
+            const finalHue = hue !== undefined ? hue : (state.settings.starHue || 44);
+            const finalSaturation = saturation !== undefined ? saturation : (state.settings.starSaturation || 12);
             const half = canvas.width / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
             gradient.addColorStop(0.025, '#fff');
-            gradient.addColorStop(0.1, `hsl(${hue}, ${saturation}%, 33%)`);
-            gradient.addColorStop(0.25, `hsl(${hue}, ${Math.min(saturation + 3, 100)}%, 6%)`);
+            gradient.addColorStop(0.1, `hsl(${finalHue}, ${finalSaturation}%, 33%)`);
+            gradient.addColorStop(0.25, `hsl(${finalHue}, ${Math.min(finalSaturation + 3, 100)}%, 6%)`);
             gradient.addColorStop(1, 'transparent');
 
             ctx.fillStyle = gradient;
@@ -3537,6 +3538,20 @@
             const theme = config.themes.stars;
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
+
+            // Get values from control system (with fallbacks to old state)
+            const hue = audioEngine ? (audioEngine.getValue('stars', 'hue') || state.settings.starHue) : state.settings.starHue;
+            const saturation = audioEngine ? (audioEngine.getValue('stars', 'saturation') || state.settings.starSaturation) : state.settings.starSaturation;
+            const speed = audioEngine ? (audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
+            const brightness = audioEngine ? (audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
+            const zSpeed = audioEngine ? (audioEngine.getValue('stars', 'zSpeed') || state.settings.starZSpeed) : state.settings.starZSpeed;
+            const centerShiftRate = audioEngine ? (audioEngine.getValue('stars', 'centerShiftRate') || state.settings.starCenterRate) : state.settings.starCenterRate;
+            const minOpacity = audioEngine ? (audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
+            const maxOpacity = audioEngine ? (audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
+            const diameter = audioEngine ? (audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
+            const twinkleRate = audioEngine ? (audioEngine.getValue('stars', 'twinkleRate') || state.settings.starTwinkle) : state.settings.starTwinkle;
+            const audioBoost = audioEngine ? (audioEngine.getValue('stars', 'audioBoost') || state.settings.starAudioBoost) : state.settings.starAudioBoost;
+            const count = audioEngine ? (audioEngine.getValue('stars', 'count') || state.settings.starCount) : state.settings.starCount;
 
             // Hide SVG paths for STARS theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -3565,6 +3580,9 @@
             const w = starsCanvas.width = state.boundingRect.width;
             const h = starsCanvas.height = state.boundingRect.height;
 
+            // Update star gradient with current colors from control system
+            updateStarGradient(hue, saturation);
+
             // Clear with fade effect
             ctx.globalCompositeOperation = 'source-over';
             ctx.globalAlpha = 0.8;
@@ -3573,10 +3591,10 @@
 
             // Calculate audio-reactive speed multiplier
             // Bass SLOWS DOWN orbit speed using user setting
-            const speedBoost = 1.0 - (low * (state.settings.starAudioBoost / 10));
+            const speedBoost = 1.0 - (low * (audioBoost / 10));
 
             // Smoothly transition center position to target (controlled by smoothing slider)
-            const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
+            const smoothingFactor = 0.5; // Default smoothing if not using control
             state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
             state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
 
@@ -3586,13 +3604,13 @@
             // PLANES MODE: Original gradient stars
                 state.stars.starArray.forEach((star) => {
                     // Update Z position (move towards camera)
-                    if (state.settings.starZSpeed > 0) {
-                        star.z += state.settings.starZSpeed * 0.001;
+                    if (zSpeed > 0) {
+                        star.z += zSpeed * 0.001;
 
                         // Reset star if it passes the camera
                         if (star.z >= 1.0) {
                             star.z = 0;
-                            star.timePassed = Math.random() * state.settings.starCount;
+                            star.timePassed = Math.random() * count;
                         }
                     }
 
@@ -3601,21 +3619,21 @@
 
                     // Scale orbit radius and star size by perspective
                     const scaledOrbitRadius = star.orbitRadius * scale;
-                    star.radius = star.baseRadius * scale;
+                    star.radius = star.baseRadius * scale * diameter;
 
                     // High frequencies shift the orbit center position (rate controlled by slider)
-                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    const centerOffsetX = Math.sin(time * 0.001 * centerShiftRate) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 * centerShiftRate) * high * 100;
 
                     // Use smoothed center position (click-to-center feature)
                     const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
                     const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
 
                     // Twinkle effect using user setting
-                    const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
-                    if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
+                    const twinkle = Math.floor(Math.random() * twinkleRate);
+                    if (twinkle === 1 && star.alpha > minOpacity) {
                         star.alpha -= 0.05;
-                    } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
+                    } else if (twinkle === 2 && star.alpha < maxOpacity * brightness) {
                         star.alpha += 0.05;
                     }
 
@@ -3635,7 +3653,7 @@
                     );
 
                     // Update orbit with audio-reactive speed
-                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                    star.timePassed += star.baseSpeed * speed * speedBoost;
                 });
 
             ctx.globalAlpha = 1.0;
