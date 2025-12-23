@@ -109,7 +109,7 @@ const AUDIO_SOURCES = {
     description: 'Overall volume contour over time'
   },
 
-  // Spectral
+  // Spectral (Meyda)
   centroid: {
     label: 'Spectral Centroid (Brightness)',
     category: 'spectral',
@@ -125,13 +125,33 @@ const AUDIO_SOURCES = {
     category: 'spectral',
     description: 'Frequency below which 85% of energy is'
   },
+  flatness: {
+    label: 'Spectral Flatness',
+    category: 'spectral',
+    description: 'Tonality vs noisiness (0=tonal, 1=noise)'
+  },
+  spread: {
+    label: 'Spectral Spread (Variance)',
+    category: 'spectral',
+    description: 'Frequency distribution variance'
+  },
+  loudness: {
+    label: 'Loudness (Perceptual)',
+    category: 'amplitude',
+    description: 'Perceived loudness (psychoacoustic)'
+  },
   zcr: {
     label: 'Zero Crossing Rate',
     category: 'spectral',
     description: 'Noisiness/percussiveness measure'
   },
 
-  // Musical
+  // Musical (Meyda)
+  chroma: {
+    label: 'Chroma (Pitch Classes)',
+    category: 'musical',
+    description: 'Average pitch class energy'
+  },
   pitch: {
     label: 'Pitch Detection',
     category: 'musical',
@@ -1818,9 +1838,26 @@ class AudioModulationEngine {
       case 'bpm':
         return audioLevels.bpm || 0.5; // Default to 120 BPM (0.5 normalized)
 
+      // Spectral Features (Meyda)
+      case 'centroid':
+        return audioLevels.centroid || audioLevels.mid;
+      case 'flatness':
+        return audioLevels.flatness || 0.5;
+      case 'rolloff':
+        return audioLevels.rolloff || audioLevels.high;
+      case 'flux':
+        return audioLevels.flux || 0;
+      case 'spread':
+        return audioLevels.spread || 0.5;
+
+      // Perceptual Features (Meyda)
+      case 'loudness':
+        return audioLevels.loudness || audioLevels.rms;
+      case 'chroma':
+        return audioLevels.chroma || 0.5;
+
       // TODO: Implement dynamics sources (attack, transients, envelope)
-      // TODO: Implement spectral sources (centroid, flux, rolloff, zcr)
-      // TODO: Implement musical sources (pitch, harmonic)
+      // TODO: Implement musical pitch detection
       default:
         console.warn(`Audio source not yet implemented: ${mappedId}`);
         return audioLevels.mid; // Fallback to mid

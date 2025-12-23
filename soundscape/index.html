@@ -16,6 +16,9 @@
     <!-- Socket.io for WebSocket communication -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 
+    <!-- Meyda Audio Analysis Library -->
+    <script src="https://unpkg.com/meyda@5.6.0/dist/web/meyda.min.js"></script>
+
     <style>
         /* ===== RESET & BASE ===== */
         * {
@@ -1397,6 +1400,11 @@
 
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
+
+        <!-- Attribution -->
+        <div style="padding: 1rem; text-align: center; font-size: 8px; color: #666; margin-top: auto;">
+            Advanced audio analysis powered by <a href="https://meyda.js.org" target="_blank" style="color: #888; text-decoration: underline;">Meyda</a>
+        </div>
     </aside>
 
     <!-- Error Screen -->
@@ -1729,6 +1737,10 @@
             dataArray: null,
             bufferLength: 0,
             isActive: false,
+
+            // Meyda audio analysis
+            meydaAnalyzer: null,
+            meydaFeatures: null,
 
             // Wave grid
             paths: [],
@@ -2285,6 +2297,38 @@
                 // Connect audio graph
                 state.microphone.connect(state.analyser);
 
+                // Initialize Meyda for advanced audio analysis
+                if (typeof Meyda !== 'undefined') {
+                    try {
+                        state.meydaAnalyzer = Meyda.createMeydaAnalyzer({
+                            audioContext: state.audioContext,
+                            source: state.microphone,
+                            bufferSize: 512,
+                            featureExtractors: [
+                                'spectralCentroid',
+                                'spectralFlatness',
+                                'spectralRolloff',
+                                'spectralFlux',
+                                'spectralSpread',
+                                'loudness',
+                                'chroma'
+                            ],
+                            callback: features => {
+                                state.meydaFeatures = features;
+                            }
+                        });
+
+                        state.meydaAnalyzer.start();
+                        console.log('✨ Meyda analyzer initialized with 7 features');
+                    } catch (err) {
+                        console.warn('⚠️ Meyda initialization failed:', err);
+                        state.meydaAnalyzer = null;
+                    }
+                } else {
+                    console.warn('⚠️ Meyda library not loaded, advanced features disabled');
+                    state.meydaAnalyzer = null;
+                }
+
                 // Update UI
                 state.isActive = true;
                 elements.loading.classList.add('hidden');
@@ -2356,6 +2400,51 @@
 
             // Calculate angle
             m.a = Math.atan2(dy, dx);
+        }
+
+        /**
+         * Normalize Meyda features to 0-1 range
+         * @param {Object} features - Raw Meyda features
+         * @returns {Object} Normalized features (0-1)
+         */
+        function normalizeMeydaFeatures(features) {
+            if (!features) return {};
+
+            return {
+                // Spectral Centroid: typically 0-10000 Hz
+                spectralCentroid: features.spectralCentroid
+                    ? Math.min(1, features.spectralCentroid / 10000)
+                    : 0,
+
+                // Spectral Flatness: already 0-1
+                spectralFlatness: features.spectralFlatness || 0,
+
+                // Spectral Rolloff: typically 0-20000 Hz
+                spectralRolloff: features.spectralRolloff
+                    ? Math.min(1, features.spectralRolloff / 20000)
+                    : 0,
+
+                // Spectral Flux: typically 0-100, varies widely
+                spectralFlux: features.spectralFlux
+                    ? Math.min(1, features.spectralFlux / 100)
+                    : 0,
+
+                // Spectral Spread: typically 0-5000
+                spectralSpread: features.spectralSpread
+                    ? Math.min(1, features.spectralSpread / 5000)
+                    : 0,
+
+                // Loudness: object with total, specific, relative
+                // Use total loudness, typically -60 to 0 dB
+                loudness: features.loudness?.total
+                    ? Math.min(1, Math.max(0, (features.loudness.total + 60) / 60))
+                    : 0,
+
+                // Chroma: 12 values, already normalized but average them
+                chroma: features.chroma
+                    ? features.chroma.reduce((sum, val) => sum + val, 0) / 12
+                    : 0
+            };
         }
 
         function movePoints(time) {
@@ -2454,6 +2543,9 @@
             const bpmValue = (state.bpmDetector.getBPM() - 60) / 140; // 60-200 BPM -> 0-1
             const bpmConfidence = state.bpmDetector.getConfidence();
 
+            // Normalize Meyda features if available
+            const meydaNormalized = normalizeMeydaFeatures(state.meydaFeatures);
+
             // Store all audio levels for theme renderers and control system
             state.audioLevels = {
                 // Original 3-band (for backward compatibility)
@@ -2480,13 +2572,25 @@
                 onset: isOnset ? 1.0 : 0.0, // 0 or 1 (trigger)
                 bpm: bpmValue, // 0-1 (60-200 BPM)
 
+                // Meyda: Spectral features
+                centroid: meydaNormalized.spectralCentroid || 0,
+                flatness: meydaNormalized.spectralFlatness || 0,
+                rolloff: meydaNormalized.spectralRolloff || 0,
+                flux: meydaNormalized.spectralFlux || 0,
+                spread: meydaNormalized.spectralSpread || 0,
+
+                // Meyda: Perceptual features
+                loudness: meydaNormalized.loudness || 0,
+                chroma: meydaNormalized.chroma || 0,
+
                 // Combined
                 allLevels: (bassLevel + midsLevel + highsLevel) / 3,
 
                 // Metadata (for debugging)
                 _bpmActual: state.bpmDetector.getBPM(),
                 _bpmConfidence: bpmConfidence,
-                _beatDetected: beatResult.isBeat
+                _beatDetected: beatResult.isBeat,
+                _meydaActive: !!state.meydaAnalyzer
             };
 
             // Apply audio modulation to controls
