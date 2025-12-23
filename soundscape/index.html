@@ -2481,6 +2481,13 @@
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
 
+            // Get values from control system (with fallbacks)
+            const colorMode = audioEngine ? (audioEngine.getValue('neon', 'colorMode') || state.settings.neonMode) : state.settings.neonMode;
+            const warmCool = audioEngine ? (audioEngine.getValue('neon', 'warmCool') || state.settings.colorTemp) : state.settings.colorTemp;
+            const burstSize = audioEngine ? (audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
+            const movement = audioEngine ? (audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
+            const glow = audioEngine ? (audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
+
             // Hide all line paths for NEON theme
             state.paths.forEach(path => {
                 path.setAttribute('d', '');
@@ -2500,9 +2507,8 @@
                 elements.svg.appendChild(gradientMeshGroup);
             }
 
-            // Get color mode settings
-            const colorMode = state.settings.neonMode;
-            const colorTempIntensity = state.settings.colorTemp;
+            // Color settings are now from control system
+            const colorTempIntensity = warmCool;
 
             // Calculate audio-reactive parameters
             const hueShift = (mid * 360 + time * 0.05) % 360;
@@ -2519,10 +2525,10 @@
             const lightnessFromHigh = high * theme.lightnessRange * 0.7; // Brighten with highs
             const lightness = theme.lightnessBase + lightnessFromLow + lightnessFromHigh;
 
-            // Movement: More dramatic with bass
-            const movementAmplitude = theme.movementBase + low * theme.movementMultiplier;
+            // Movement: More dramatic with bass - uses movement control value
+            const movementAmplitude = (theme.movementBase + low * theme.movementMultiplier) * movement;
 
-            // Size: Dramatic pulsing with all frequencies combined
+            // Size: Dramatic pulsing with all frequencies combined - uses burstSize control value
             const combinedEnergy = (low * 0.5 + mid * 0.3 + high * 0.2);
             const sizeMultiplier = theme.sizeMultiplierBase + combinedEnergy * theme.sizeMultiplierRange;
 
@@ -2567,7 +2573,7 @@
 
                 // Calculate size based on audio and position
                 const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.6;
-                const radius = baseRadius * sizeMultiplier * state.settings.burstSize;
+                const radius = baseRadius * sizeMultiplier * burstSize;
 
                 // Create radial gradient for this center
                 const gradientId = `neon-radial-${i}`;
