@@ -648,6 +648,116 @@
             border-color: #ffffff;
         }
 
+        /* ===== UNIFIED CONTROL SYSTEM ===== */
+
+        /* Category Sections */
+        .control-category {
+            margin-bottom: 1.5rem;
+        }
+
+        .category-header {
+            font-size: 9px;
+            font-weight: 700;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid #222222;
+        }
+
+        .category-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* Audio Controls */
+        .audio-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding-left: 0.5rem;
+            border-left: 1px solid #222222;
+        }
+
+        .audio-source-dropdown {
+            width: 100%;
+            padding: 0.4rem;
+            background: #000000;
+            border: 1px solid #333333;
+            color: #999999;
+            font-size: 9px;
+            font-family: 'Space Grotesk', monospace;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+        }
+
+        .audio-source-dropdown:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+        }
+
+        .audio-source-dropdown:focus {
+            outline: none;
+            border-color: #ffffff;
+            color: #ffffff;
+        }
+
+        .audio-source-dropdown option:disabled {
+            color: #666666;
+            font-weight: 700;
+            background: #000000;
+        }
+
+        /* Intensity Controls */
+        .intensity-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 9px;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .intensity-slider {
+            flex: 1;
+            height: 1px;
+            background: #222222;
+        }
+
+        .intensity-value {
+            min-width: 3rem;
+            text-align: right;
+            color: #ffffff;
+            font-size: 9px;
+        }
+
+        /* Mode Select (buttonGroup alternative to dropdown) */
+        .mode-select {
+            width: 100%;
+            padding: 0.5rem;
+            background: #000000;
+            border: 1px solid #333333;
+            color: #ffffff;
+            font-size: 10px;
+            font-family: 'Space Grotesk', monospace;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+        }
+
+        .mode-select:hover {
+            border-color: #ffffff;
+        }
+
+        .mode-select:focus {
+            outline: none;
+            border-color: #ffffff;
+        }
+
         /* Buttons */
         .btn {
             width: 100%;
@@ -6182,5 +6292,8 @@
 
         console.log('🌊 Soundscape loaded');
     </script>
+
+    <!-- Unified Control System -->
+    <script src="control-system.js"></script>
 </body>
 </html>
