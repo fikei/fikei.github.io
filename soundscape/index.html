@@ -3354,11 +3354,18 @@
             const { low, mid, high } = state.audioLevels;
 
             // Get values from control system (with fallbacks to old config)
-            const hue = audioEngine ? (audioEngine.getValue('linear', 'hue') || theme.hue) : theme.hue;
-            const saturation = audioEngine ? (audioEngine.getValue('linear', 'saturation') || theme.saturation) : theme.saturation;
-            const opacity = audioEngine ? (audioEngine.getValue('linear', 'opacity') || theme.opacity) : theme.opacity;
-            const lineWidth = audioEngine ? (audioEngine.getValue('linear', 'lineWidth') || 3) : 3;
-            const backgroundShift = audioEngine ? (audioEngine.getValue('linear', 'backgroundShift') || 1.0) : 1.0;
+            // Use ?? or explicit checks to handle 0 as valid value (not falsy)
+            const hueValue = audioEngine ? audioEngine.getValue('linear', 'hue') : null;
+            const saturationValue = audioEngine ? audioEngine.getValue('linear', 'saturation') : null;
+            const opacityValue = audioEngine ? audioEngine.getValue('linear', 'opacity') : null;
+            const lineWidthValue = audioEngine ? audioEngine.getValue('linear', 'lineWidth') : null;
+            const backgroundShiftValue = audioEngine ? audioEngine.getValue('linear', 'backgroundShift') : null;
+
+            const hue = hueValue !== null && hueValue !== undefined ? hueValue : (theme.hue !== undefined ? theme.hue : 280);
+            const saturation = saturationValue !== null && saturationValue !== undefined ? saturationValue : (theme.saturation !== undefined ? theme.saturation : 0);
+            const opacity = opacityValue !== null && opacityValue !== undefined ? opacityValue : theme.opacity;
+            const lineWidth = lineWidthValue !== null && lineWidthValue !== undefined ? lineWidthValue : 3;
+            const backgroundShift = backgroundShiftValue !== null && backgroundShiftValue !== undefined ? backgroundShiftValue : 1.0;
 
             // Calculate background shift transform
             const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
