@@ -3397,11 +3397,11 @@
 
             // Get values from control system (with fallbacks to old config)
             // Use ?? or explicit checks to handle 0 as valid value (not falsy)
-            const hueValue = audioEngine ? audioEngine.getValue('linear', 'hue') : null;
-            const saturationValue = audioEngine ? audioEngine.getValue('linear', 'saturation') : null;
-            const opacityValue = audioEngine ? audioEngine.getValue('linear', 'opacity') : null;
-            const lineWidthValue = audioEngine ? audioEngine.getValue('linear', 'lineWidth') : null;
-            const backgroundShiftValue = audioEngine ? audioEngine.getValue('linear', 'backgroundShift') : null;
+            const hueValue = window.audioEngine ? window.audioEngine.getValue('linear', 'hue') : null;
+            const saturationValue = window.audioEngine ? window.audioEngine.getValue('linear', 'saturation') : null;
+            const opacityValue = window.audioEngine ? window.audioEngine.getValue('linear', 'opacity') : null;
+            const lineWidthValue = window.audioEngine ? window.audioEngine.getValue('linear', 'lineWidth') : null;
+            const backgroundShiftValue = window.audioEngine ? window.audioEngine.getValue('linear', 'backgroundShift') : null;
 
             const hue = hueValue !== null && hueValue !== undefined ? hueValue : (theme.hue !== undefined ? theme.hue : 280);
             const saturation = saturationValue !== null && saturationValue !== undefined ? saturationValue : (theme.saturation !== undefined ? theme.saturation : 0);
@@ -3469,21 +3469,21 @@
             const time = state.currentTime;
 
             // Get values from control system (with fallbacks)
-            const colorMode = audioEngine ? (audioEngine.getValue('neon', 'colorMode') || state.settings.neonMode) : state.settings.neonMode;
-            const colorChangeMode = audioEngine ? (audioEngine.getValue('neon', 'colorChangeMode') || 'static') : 'static';
-            const cycleSpeed = audioEngine ? (audioEngine.getValue('neon', 'cycleSpeed') || 0.1) : 0.1;
-            const warmCool = audioEngine ? (audioEngine.getValue('neon', 'warmCool') || state.settings.colorTemp) : state.settings.colorTemp;
-            const burstSize = audioEngine ? (audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
-            const movement = audioEngine ? (audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
-            const glow = audioEngine ? (audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
-            const baseHue = audioEngine ? (audioEngine.getValue('neon', 'hue') || 280) : 280;
-            const baseSaturationControl = audioEngine ? (audioEngine.getValue('neon', 'saturation') || 70) : 70;
-            const baseLightnessControl = audioEngine ? (audioEngine.getValue('neon', 'lightness') || 50) : 50;
-            const blur = audioEngine ? (audioEngine.getValue('neon', 'blur') || 0) : 0;
-            const responsiveness = audioEngine ? (audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
-            const smoothing = audioEngine ? (audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
-            const meshDensity = audioEngine ? (audioEngine.getValue('neon', 'meshDensity') || 8) : 8;
-            const backgroundShift = audioEngine ? (audioEngine.getValue('neon', 'backgroundShift') || 1.0) : 1.0;
+            const colorMode = window.audioEngine ? (window.audioEngine.getValue('neon', 'colorMode') || state.settings.neonMode) : state.settings.neonMode;
+            const colorChangeMode = window.audioEngine ? (window.audioEngine.getValue('neon', 'colorChangeMode') || 'static') : 'static';
+            const cycleSpeed = window.audioEngine ? (window.audioEngine.getValue('neon', 'cycleSpeed') || 0.1) : 0.1;
+            const warmCool = window.audioEngine ? (window.audioEngine.getValue('neon', 'warmCool') || state.settings.colorTemp) : state.settings.colorTemp;
+            const burstSize = window.audioEngine ? (window.audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
+            const movement = window.audioEngine ? (window.audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
+            const glow = window.audioEngine ? (window.audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
+            const baseHue = window.audioEngine ? (window.audioEngine.getValue('neon', 'hue') || 280) : 280;
+            const baseSaturationControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'saturation') || 70) : 70;
+            const baseLightnessControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'lightness') || 50) : 50;
+            const blur = window.audioEngine ? (window.audioEngine.getValue('neon', 'blur') || 0) : 0;
+            const responsiveness = window.audioEngine ? (window.audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
+            const smoothing = window.audioEngine ? (window.audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
+            const meshDensity = window.audioEngine ? (window.audioEngine.getValue('neon', 'meshDensity') || 8) : 8;
+            const backgroundShift = window.audioEngine ? (window.audioEngine.getValue('neon', 'backgroundShift') || 1.0) : 1.0;
 
             // Initialize NEON state if needed (for smoothing and reactive mode)
             if (!state.neon) {
@@ -3944,15 +3944,15 @@
             if (!img) return;
 
             // Get values from control system (with fallbacks)
-            const rotation = audioEngine ? (audioEngine.getValue('glitch', 'rotation') || state.settings.rotationIntensity) : state.settings.rotationIntensity;
-            const glitchIntensityControl = audioEngine ? (audioEngine.getValue('glitch', 'glitchIntensity') || state.settings.glitchEffectIntensity) : state.settings.glitchEffectIntensity;
-            const contrast = audioEngine ? (audioEngine.getValue('glitch', 'contrast') || 1.0) : 1.0;
-            const channelOffsetControl = audioEngine ? (audioEngine.getValue('glitch', 'channelOffset') || 5) : 5;
-            const displacementControl = audioEngine ? (audioEngine.getValue('glitch', 'displacement') || 10) : 10;
-            const scanlinesControl = audioEngine ? (audioEngine.getValue('glitch', 'scanlines') || 0) : 0;
-            const noiseControl = audioEngine ? (audioEngine.getValue('glitch', 'noise') || 0) : 0;
-            const pixelationControl = audioEngine ? (audioEngine.getValue('glitch', 'pixelation') || 1) : 1;
-            const backgroundShift = audioEngine ? (audioEngine.getValue('glitch', 'backgroundShift') || 1.0) : 1.0;
+            const rotation = window.audioEngine ? (window.audioEngine.getValue('glitch', 'rotation') || state.settings.rotationIntensity) : state.settings.rotationIntensity;
+            const glitchIntensityControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'glitchIntensity') || state.settings.glitchEffectIntensity) : state.settings.glitchEffectIntensity;
+            const contrast = window.audioEngine ? (window.audioEngine.getValue('glitch', 'contrast') || 1.0) : 1.0;
+            const channelOffsetControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'channelOffset') || 5) : 5;
+            const displacementControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'displacement') || 10) : 10;
+            const scanlinesControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'scanlines') || 0) : 0;
+            const noiseControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'noise') || 0) : 0;
+            const pixelationControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'pixelation') || 1) : 1;
+            const backgroundShift = window.audioEngine ? (window.audioEngine.getValue('glitch', 'backgroundShift') || 1.0) : 1.0;
 
             // Calculate glitch parameters with user intensity multipliers
             const glitchEffectIntensity = glitchIntensityControl;
@@ -4062,7 +4062,7 @@
             tempCtx.putImageData(imageData, 0, 0);
 
             // RGB Channel Separation - use visualMode from control system
-            const visualMode = audioEngine ? (audioEngine.getValue('glitch', 'visualMode') || state.settings.glitchMode) : state.settings.glitchMode;
+            const visualMode = window.audioEngine ? (window.audioEngine.getValue('glitch', 'visualMode') || state.settings.glitchMode) : state.settings.glitchMode;
             const glitchMode = visualMode || 'rgb';
             const redCanvas = document.createElement('canvas');
             const greenCanvas = document.createElement('canvas');
@@ -4636,22 +4636,22 @@
             const time = state.currentTime;
 
             // Get values from control system (with fallbacks to old state)
-            const hue = audioEngine ? (audioEngine.getValue('stars', 'hue') || state.settings.starHue) : state.settings.starHue;
-            const saturation = audioEngine ? (audioEngine.getValue('stars', 'saturation') || state.settings.starSaturation) : state.settings.starSaturation;
-            const speed = audioEngine ? (audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
-            const brightness = audioEngine ? (audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
-            const zSpeed = audioEngine ? (audioEngine.getValue('stars', 'zSpeed') || state.settings.starZSpeed) : state.settings.starZSpeed;
-            const backgroundShift = audioEngine ? (audioEngine.getValue('stars', 'backgroundShift') || 1.0) : 1.0;
-            const minOpacity = audioEngine ? (audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
-            const maxOpacity = audioEngine ? (audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
-            const diameter = audioEngine ? (audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
-            const twinkleRate = audioEngine ? (audioEngine.getValue('stars', 'twinkleRate') || state.settings.starTwinkle) : state.settings.starTwinkle;
-            const audioBoost = audioEngine ? (audioEngine.getValue('stars', 'audioBoost') || state.settings.starAudioBoost) : state.settings.starAudioBoost;
-            const count = audioEngine ? (audioEngine.getValue('stars', 'count') || state.settings.starCount) : state.settings.starCount;
-            const trailLength = audioEngine ? (audioEngine.getValue('stars', 'trailLength') || 0) : 0;
-            const bloom = audioEngine ? (audioEngine.getValue('stars', 'bloom') || 0) : 0;
-            const perspective = audioEngine ? (audioEngine.getValue('stars', 'perspective') || 1.0) : 1.0;
-            const smoothing = audioEngine ? (audioEngine.getValue('stars', 'smoothing') || 0.5) : 0.5;
+            const hue = window.audioEngine ? (window.audioEngine.getValue('stars', 'hue') || state.settings.starHue) : state.settings.starHue;
+            const saturation = window.audioEngine ? (window.audioEngine.getValue('stars', 'saturation') || state.settings.starSaturation) : state.settings.starSaturation;
+            const speed = window.audioEngine ? (window.audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
+            const brightness = window.audioEngine ? (window.audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
+            const zSpeed = window.audioEngine ? (window.audioEngine.getValue('stars', 'zSpeed') || state.settings.starZSpeed) : state.settings.starZSpeed;
+            const backgroundShift = window.audioEngine ? (window.audioEngine.getValue('stars', 'backgroundShift') || 1.0) : 1.0;
+            const minOpacity = window.audioEngine ? (window.audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
+            const maxOpacity = window.audioEngine ? (window.audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
+            const diameter = window.audioEngine ? (window.audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
+            const twinkleRate = window.audioEngine ? (window.audioEngine.getValue('stars', 'twinkleRate') || state.settings.starTwinkle) : state.settings.starTwinkle;
+            const audioBoost = window.audioEngine ? (window.audioEngine.getValue('stars', 'audioBoost') || state.settings.starAudioBoost) : state.settings.starAudioBoost;
+            const count = window.audioEngine ? (window.audioEngine.getValue('stars', 'count') || state.settings.starCount) : state.settings.starCount;
+            const trailLength = window.audioEngine ? (window.audioEngine.getValue('stars', 'trailLength') || 0) : 0;
+            const bloom = window.audioEngine ? (window.audioEngine.getValue('stars', 'bloom') || 0) : 0;
+            const perspective = window.audioEngine ? (window.audioEngine.getValue('stars', 'perspective') || 1.0) : 1.0;
+            const smoothing = window.audioEngine ? (window.audioEngine.getValue('stars', 'smoothing') || 0.5) : 0.5;
 
             // Hide SVG paths for STARS theme
             state.paths.forEach(path => path.setAttribute('d', ''));
