@@ -334,11 +334,19 @@ class BeatPad {
 
     // Clear all button
     const clearAllBtn = document.getElementById('beat-pad-clear-all');
-    clearAllBtn.addEventListener('click', () => {
-      if (confirm('Clear all scenes? This cannot be undone.')) {
-        this.clearAllScenes();
-      }
-    });
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => {
+        console.log('🗑️ Clear All button clicked');
+        if (confirm('Clear all scenes? This cannot be undone.')) {
+          this.clearAllScenes();
+          console.log('✅ All scenes cleared');
+        } else {
+          console.log('❌ Clear cancelled');
+        }
+      });
+    } else {
+      console.error('⚠️ Clear All button not found!');
+    }
 
     // Export button
     const exportBtn = document.getElementById('beat-pad-export');
@@ -746,6 +754,7 @@ class BeatPad {
    */
   updateGridUI() {
     const pads = this.gridContainer.querySelectorAll('.beat-pad');
+    console.log(`🔄 Updating grid UI: ${pads.length} pads, ${this.scenes.filter(s => s !== null).length} scenes loaded`);
 
     pads.forEach((pad, index) => {
       const scene = this.scenes[index];
@@ -852,10 +861,12 @@ class BeatPad {
    * Clear all scenes
    */
   clearAllScenes() {
+    console.log('🗑️ Clearing all scenes...');
     this.scenes = new Array(9).fill(null);
     this.activePadIndex = null;
     this.saveScenestoStorage();
     this.updateGridUI();
+    console.log('✅ All scenes cleared, UI updated');
   }
 
   /**
@@ -869,6 +880,7 @@ class BeatPad {
         timestamp: Date.now()
       };
       localStorage.setItem('beatPadScenes', JSON.stringify(data));
+      console.log('💾 Saved to localStorage:', { sceneCount: this.scenes.filter(s => s !== null).length, total: this.scenes.length });
     } catch (e) {
       console.error('Failed to save scenes to localStorage:', e);
     }
