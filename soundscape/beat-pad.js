@@ -347,16 +347,8 @@ class BeatPad {
 
     if (clearAllBtn) {
       clearAllBtn.addEventListener('click', () => {
-        console.log('🗑️ Clear All button clicked - showing confirmation dialog...');
-        const userConfirmed = confirm('⚠️ DELETE ALL SCENES?\n\nThis will permanently delete all 9 saved scenes from storage.\n\nClick OK to delete, or Cancel to keep them.');
-        console.log('User confirmation result:', userConfirmed ? 'OK (proceed with delete)' : 'CANCEL (keep scenes)');
-
-        if (userConfirmed) {
-          this.clearAllScenes();
-          console.log('✅ All scenes cleared');
-        } else {
-          console.log('❌ Clear cancelled by user');
-        }
+        console.log('🗑️ Clear All button clicked - showing custom confirmation...');
+        this.showClearAllConfirmation();
       });
       console.log('✅ Clear All button event listener attached');
     } else {
@@ -879,6 +871,97 @@ class BeatPad {
 
     this.saveScenestoStorage();
     this.updateGridUI();
+  }
+
+  /**
+   * Show custom confirmation dialog for Clear All
+   */
+  showClearAllConfirmation() {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: #000;
+      border: 2px solid #fff;
+      padding: 2rem;
+      max-width: 400px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: #fff;
+      text-align: center;
+    `;
+
+    dialog.innerHTML = `
+      <div style="font-size: 24px; margin-bottom: 1rem;">⚠️</div>
+      <div style="font-size: 16px; font-weight: bold; margin-bottom: 1rem;">DELETE ALL SCENES?</div>
+      <div style="font-size: 12px; margin-bottom: 2rem; line-height: 1.5;">
+        This will permanently delete all 9 saved scenes from storage.<br><br>
+        This action cannot be undone.
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: center;">
+        <button id="confirmClearAll" style="
+          background: #fff;
+          color: #000;
+          border: none;
+          padding: 0.5rem 1.5rem;
+          font-family: 'IBM Plex Mono', monospace;
+          font-weight: bold;
+          cursor: pointer;
+          font-size: 12px;
+        ">DELETE</button>
+        <button id="cancelClearAll" style="
+          background: #000;
+          color: #fff;
+          border: 1px solid #fff;
+          padding: 0.5rem 1.5rem;
+          font-family: 'IBM Plex Mono', monospace;
+          font-weight: bold;
+          cursor: pointer;
+          font-size: 12px;
+        ">CANCEL</button>
+      </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Handle confirm
+    document.getElementById('confirmClearAll').addEventListener('click', () => {
+      console.log('✅ User confirmed: DELETE all scenes');
+      document.body.removeChild(overlay);
+      this.clearAllScenes();
+    });
+
+    // Handle cancel
+    document.getElementById('cancelClearAll').addEventListener('click', () => {
+      console.log('❌ User cancelled: Keep scenes');
+      document.body.removeChild(overlay);
+    });
+
+    // ESC to cancel
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        console.log('❌ User cancelled with ESC: Keep scenes');
+        document.body.removeChild(overlay);
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    console.log('📋 Custom confirmation dialog shown');
   }
 
   /**
