@@ -903,7 +903,7 @@ const THEME_CONFIGS = {
         category: 'color'
       },
       saturation: {
-        default: 70,
+        default: 0,
         category: 'color'
       },
       opacity: {
