@@ -27,8 +27,12 @@ class BeatPad {
   init() {
     this.loadScenesFromStorage();
     this.createGridUI();
+    this.setupToggleButton();
     this.attachEventListeners();
     this.setupKeyboardShortcuts();
+
+    // Initially hide the beatpad
+    this.gridContainer.classList.add('hidden');
   }
 
   /**
@@ -127,18 +131,57 @@ class BeatPad {
   }
 
   /**
+   * Setup toggle button for showing/hiding beat pad
+   */
+  setupToggleButton() {
+    const toggleBtn = document.getElementById('beatpadToggle');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        this.toggle();
+      });
+    }
+  }
+
+  /**
+   * Toggle beat pad visibility
+   */
+  toggle() {
+    const toggleBtn = document.getElementById('beatpadToggle');
+    const isHidden = this.gridContainer.classList.contains('hidden');
+
+    if (isHidden) {
+      this.gridContainer.classList.remove('hidden');
+      if (toggleBtn) toggleBtn.classList.add('active');
+      console.log('✅ Beat Pad opened');
+    } else {
+      this.gridContainer.classList.add('hidden');
+      if (toggleBtn) toggleBtn.classList.remove('active');
+      console.log('❌ Beat Pad closed');
+    }
+  }
+
+  /**
    * Attach event listeners to UI elements
    */
   attachEventListeners() {
     const grid = this.gridContainer.querySelector('.beat-pad-grid');
 
-    // Pad clicks - load scene
+    // Pad clicks - save if empty, load if filled
     grid.addEventListener('click', (e) => {
       const pad = e.target.closest('.beat-pad');
       if (!pad) return;
 
       const index = parseInt(pad.dataset.index);
-      this.loadScene(index);
+      const scene = this.scenes[index];
+
+      // If pad is empty, save current scene
+      if (!scene) {
+        this.saveCurrentScene(index);
+        this.activePadIndex = index;
+      } else {
+        // If pad has a scene, load it
+        this.loadScene(index);
+      }
     });
 
     // Pad right-click - context menu
@@ -238,6 +281,14 @@ class BeatPad {
       }
 
       const key = e.key.toLowerCase();
+
+      // Shift+B = Toggle Beat Pad
+      if (e.shiftKey && key === 'b') {
+        e.preventDefault();
+        this.toggle();
+        return;
+      }
+
       const padIndex = keyMap[key];
 
       if (padIndex !== undefined) {
@@ -255,7 +306,7 @@ class BeatPad {
       }
     });
 
-    console.log('⌨️ Keyboard shortcuts enabled (1-4, QWER, ASDF, ZXCV to load, Shift+key to save)');
+    console.log('⌨️ Keyboard shortcuts enabled (Shift+B to toggle, 1-4/QWER/ASDF/ZXCV to load, Shift+key to save)');
   }
 
   /**

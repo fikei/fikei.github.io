@@ -325,6 +325,44 @@
             pointer-events: none;
         }
 
+        /* Beat Pad Toggle */
+        .beatpad-toggle {
+            position: fixed;
+            bottom: 1rem;
+            left: 3rem;
+            z-index: 101;
+            width: 30px;
+            height: 30px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            border-radius: 0;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.5s ease, background 0.15s ease;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .beatpad-toggle:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .beatpad-toggle.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .beatpad-toggle.active {
+            background: #ffffff;
+            color: #000000;
+        }
+
         /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
         .add-image-button {
             position: fixed;
@@ -627,6 +665,13 @@
             border-radius: 4px;
             z-index: 1000;
             min-width: 280px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .beat-pad-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-20px);
         }
 
         .beat-pad-header {
@@ -1329,6 +1374,9 @@
 
     <!-- Fullscreen Toggle -->
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
+
+    <!-- Beat Pad Toggle -->
+    <button class="beatpad-toggle" id="beatpadToggle" aria-label="Toggle Beat Pad" title="Beat Pad (Shift+B)">⚏</button>
 
     <!-- Add Media Button & Dropdown -->
     <button class="add-image-button" id="addImageButton" aria-label="Add media">+</button>
@@ -5114,6 +5162,11 @@
                 if (pairingCodeDisplay) {
                     pairingCodeDisplay.classList.remove('hidden-control');
                 }
+
+                const beatpadToggle = document.getElementById('beatpadToggle');
+                if (beatpadToggle) {
+                    beatpadToggle.classList.remove('hidden-control');
+                }
             }
 
             // Reset idle timeout
@@ -5147,6 +5200,11 @@
             const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
             if (pairingCodeDisplay) {
                 pairingCodeDisplay.classList.add('hidden-control');
+            }
+
+            const beatpadToggle = document.getElementById('beatpadToggle');
+            if (beatpadToggle) {
+                beatpadToggle.classList.add('hidden-control');
             }
         }
 
@@ -5680,6 +5738,7 @@
                     const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
                     const addImageBtn = document.getElementById('addImageButton');
                     const sidebarToggle = document.getElementById('sidebarToggle');
+                    const beatpadToggle = document.getElementById('beatpadToggle');
 
                     // Check if UI is currently hidden
                     const isHidden = statusBar && statusBar.classList.contains('hidden-control');
@@ -5691,6 +5750,7 @@
                         if (pairingCodeDisplay) pairingCodeDisplay.classList.remove('hidden-control');
                         if (addImageBtn) addImageBtn.classList.remove('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
+                        if (beatpadToggle) beatpadToggle.classList.remove('hidden-control');
                         document.body.classList.remove('hide-cursor');
                     } else {
                         // Hide UI and cursor
@@ -5699,6 +5759,7 @@
                         if (pairingCodeDisplay) pairingCodeDisplay.classList.add('hidden-control');
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
+                        if (beatpadToggle) beatpadToggle.classList.add('hidden-control');
                         document.body.classList.add('hide-cursor');
                     }
                 }
