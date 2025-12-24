@@ -774,337 +774,55 @@ const CONTROL_REGISTRY = {
 };
 
 // =====================================================
-// 2.5 VALUE FORMATTERS - Explicit value display
+// 2.5 VALUE FORMATTERS - Simple value display (no descriptions)
 // =====================================================
 
 const VALUE_FORMATTERS = {
-  backgroundShift: (val) => {
-    if (val === 0) return 'Disabled (No movement)';
-    const px = Math.round(val * 20); // Base is 20px at 1.0x
-    if (val < 0.5) return `Subtle (±${px}px)`;
-    if (val < 1.5) return `Moderate (±${px}px)`;
-    if (val < 3) return `Strong (±${px}px)`;
-    return `Very Intense (±${px}px)`;
-  },
-
-  twinkleRate: (val) => {
-    const pct = ((1 / val) * 100).toFixed(1);
-    if (val > 300) return `Rare (${pct}% per frame)`;
-    if (val > 150) return `Subtle (${pct}% per frame)`;
-    if (val > 50) return `Moderate (${pct}% per frame)`;
-    return `Active (${pct}% per frame)`;
-  },
-
-  opacity: (val) => {
-    const pct = Math.round(val * 100);
-    if (pct === 0) return 'Invisible (0%)';
-    if (pct === 100) return 'Solid (100%)';
-    if (pct < 50) return `Transparent (${pct}%)`;
-    return `${pct}%`;
-  },
-
-  minOpacity: (val) => {
-    const pct = Math.round(val * 100);
-    return `${pct}% minimum`;
-  },
-
-  maxOpacity: (val) => {
-    const pct = Math.round(val * 100);
-    return `${pct}% maximum`;
-  },
-
-  speed: (val) => {
-    if (val === 0) return 'Paused';
-    if (val < 0.5) return `${val}× (Slow)`;
-    if (val === 1) return '1× (Normal)';
-    if (val < 2) return `${val}× (Fast)`;
-    return `${val}× (Very Fast)`;
-  },
-
-  zSpeed: (val) => {
-    if (val === 0) return 'Disabled (No depth)';
-    if (val < 1) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 3) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  hue: (val) => {
-    const deg = Math.round(val);
-    let color;
-    if (deg < 30 || deg >= 330) color = 'Red';
-    else if (deg < 90) color = 'Yellow';
-    else if (deg < 150) color = 'Green';
-    else if (deg < 210) color = 'Cyan';
-    else if (deg < 270) color = 'Blue';
-    else color = 'Purple';
-    return `${deg}° (${color})`;
-  },
-
-  saturation: (val) => {
-    const pct = Math.round(val);
-    if (pct < 20) return `${pct}% (Desaturated)`;
-    if (pct < 50) return `${pct}% (Muted)`;
-    if (pct < 80) return `${pct}%`;
-    return `${pct}% (Vibrant)`;
-  },
-
-  brightness: (val) => {
-    const pct = Math.round(val * 100);
-    if (pct < 30) return `${pct}% (Dim)`;
-    if (pct < 70) return `${pct}%`;
-    return `${pct}% (Bright)`;
-  },
-
-  lightness: (val) => {
-    const pct = Math.round(val);
-    if (pct < 30) return `${pct}% (Dark)`;
-    if (pct < 70) return `${pct}%`;
-    return `${pct}% (Light)`;
-  },
-
-  rotation: (val) => {
-    const deg = Math.round(val);
-    if (deg === 0) return '0° (None)';
-    if (deg < 45) return `${deg}° (Slight)`;
-    if (deg === 90) return '90° (Quarter turn)';
-    if (deg < 180) return `${deg}°`;
-    if (deg === 180) return '180° (Half turn)';
-    if (deg < 360) return `${deg}°`;
-    return '360° (Full rotation)';
-  },
-
-  rotationX: (val) => {
-    if (val === 0) return '0 (No tilt)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  rotationY: (val) => {
-    if (val === 0) return '0 (No rotation)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  amplitude: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)} (Weak)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 1.5) return `${val.toFixed(1)} (Strong)`;
-    return `${val.toFixed(1)} (Very Strong)`;
-  },
-
-  wavelength: (val) => {
-    const px = Math.round(val);
-    if (px < 30) return `${px}px (Tight)`;
-    if (px < 70) return `${px}px`;
-    return `${px}px (Wide)`;
-  },
-
-  spread: (val) => {
-    const px = Math.round(val);
-    if (px < 10) return `${px}px (Dense)`;
-    if (px < 15) return `${px}px (Medium)`;
-    return `${px}px (Sparse)`;
-  },
-
-  lineWidth: (val) => {
-    const px = Math.round(val);
-    if (px < 2) return `${px}px (Thin)`;
-    if (px < 5) return `${px}px`;
-    return `${px}px (Thick)`;
-  },
-
-  burstSize: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)} (Small)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 2) return `${val.toFixed(1)} (Large)`;
-    return `${val.toFixed(1)} (Very Large)`;
-  },
-
-  movement: (val) => {
-    if (val === 0) return '0 (Frozen)';
-    if (val < 0.5) return `${val.toFixed(1)} (Slow)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 2) return `${val.toFixed(1)} (Fast)`;
-    return `${val.toFixed(1)} (Very Fast)`;
-  },
-
-  glow: (val) => {
-    if (val === 0) return '0 (No glow)';
-    if (val < 1) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 2) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  blur: (val) => {
-    const px = Math.round(val);
-    if (px === 0) return '0px (None)';
-    if (px < 5) return `${px}px (Slight)`;
-    if (px < 10) return `${px}px (Moderate)`;
-    return `${px}px (Strong)`;
-  },
-
-  meshDensity: (val) => {
-    const num = Math.round(val);
-    if (num < 5) return `${num} (Sparse)`;
-    if (num < 10) return `${num} (Medium)`;
-    return `${num} (Dense)`;
-  },
-
-  responsiveness: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)}× (Sluggish)`;
-    if (val === 1.0) return '1.0× (Normal)';
-    if (val < 1.5) return `${val.toFixed(1)}× (Responsive)`;
-    return `${val.toFixed(1)}× (Very Responsive)`;
-  },
-
-  smoothing: (val) => {
-    const pct = Math.round(val * 100);
-    if (pct === 0) return '0% (Instant)';
-    if (pct < 50) return `${pct}% (Responsive)`;
-    if (pct < 80) return `${pct}% (Smooth)`;
-    return `${pct}% (Very Smooth)`;
-  },
-
-  warmCool: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)} (Cool)`;
-    if (val === 1.0) return '1.0 (Neutral)';
-    if (val < 1.5) return `${val.toFixed(1)} (Warm)`;
-    return `${val.toFixed(1)} (Very Warm)`;
-  },
-
-  cycleSpeed: (val) => {
-    if (val < 0.05) return `${val.toFixed(2)}× (Very Slow)`;
-    if (val < 0.15) return `${val.toFixed(2)}× (Slow)`;
-    if (val < 0.3) return `${val.toFixed(2)}× (Moderate)`;
-    return `${val.toFixed(2)}× (Fast)`;
-  },
-
-  glitchIntensity: (val) => {
-    if (val === 0) return '0 (None)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 2) return `${val.toFixed(1)} (Strong)`;
-    return `${val.toFixed(1)} (Extreme)`;
-  },
-
-  channelOffset: (val) => {
-    const px = Math.round(val);
-    if (px === 0) return '0px (None)';
-    if (px < 5) return `${px}px (Subtle)`;
-    if (px < 10) return `${px}px (Moderate)`;
-    return `${px}px (Strong)`;
-  },
-
-  displacement: (val) => {
-    const px = Math.round(val);
-    if (px === 0) return '0px (None)';
-    if (px < 10) return `${px}px (Subtle)`;
-    if (px < 20) return `${px}px (Moderate)`;
-    return `${px}px (Strong)`;
-  },
-
-  contrast: (val) => {
-    if (val < 0.8) return `${val.toFixed(1)} (Low)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 1.5) return `${val.toFixed(1)} (High)`;
-    return `${val.toFixed(1)} (Very High)`;
-  },
-
-  scanlines: (val) => {
-    if (val === 0) return '0 (None)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  noise: (val) => {
-    if (val === 0) return '0 (None)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  pixelation: (val) => {
-    const px = Math.round(val);
-    if (px === 1) return '1 (None)';
-    if (px < 5) return `${px}px (Slight)`;
-    if (px < 10) return `${px}px (Moderate)`;
-    return `${px}px (Strong)`;
-  },
-
-  diameter: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)}× (Small)`;
-    if (val === 1.0) return '1.0× (Normal)';
-    if (val < 2) return `${val.toFixed(1)}× (Large)`;
-    return `${val.toFixed(1)}× (Very Large)`;
-  },
-
-  count: (val) => {
-    const num = Math.round(val);
-    if (num < 500) return `${num} (Few)`;
-    if (num < 1500) return `${num}`;
-    return `${num} (Many)`;
-  },
-
-  perspective: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)} (Flat)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 2) return `${val.toFixed(1)} (Deep)`;
-    return `${val.toFixed(1)} (Very Deep)`;
-  },
-
-  trailLength: (val) => {
-    if (val === 0) return '0 (No trails)';
-    if (val < 0.5) return `${val.toFixed(1)} (Short)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Long)`;
-  },
-
-  bloom: (val) => {
-    if (val === 0) return '0 (No bloom)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  audioBoost: (val) => {
-    if (val === 0) return '0 (No effect)';
-    if (val < 2) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 5) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  layers: (val) => {
-    const num = Math.round(val);
-    if (num === 1) return '1 layer';
-    return `${num} layers`;
-  },
-
-  depth: (val) => {
-    if (val < 0.5) return `${val.toFixed(1)} (Shallow)`;
-    if (val === 1.0) return '1.0 (Normal)';
-    if (val < 2) return `${val.toFixed(1)} (Deep)`;
-    return `${val.toFixed(1)} (Very Deep)`;
-  },
-
-  turbulence: (val) => {
-    if (val === 0) return '0 (None)';
-    if (val < 0.5) return `${val.toFixed(1)} (Subtle)`;
-    if (val < 1) return `${val.toFixed(1)} (Moderate)`;
-    return `${val.toFixed(1)} (Strong)`;
-  },
-
-  phaseShift: (val) => {
-    if (val === 0) return '0 (Synchronized)';
-    if (val < Math.PI) return `${val.toFixed(2)} (Slight offset)`;
-    return `${val.toFixed(2)} (Offset)`;
-  },
-
-  points: (val) => {
-    return `${Math.round(val)} points`;
-  },
+  backgroundShift: (val) => `±${Math.round(val * 20)}px`,
+  twinkleRate: (val) => `${((1 / val) * 100).toFixed(1)}% per frame`,
+  opacity: (val) => `${Math.round(val * 100)}%`,
+  minOpacity: (val) => `${Math.round(val * 100)}%`,
+  maxOpacity: (val) => `${Math.round(val * 100)}%`,
+  speed: (val) => val === 0 ? '0' : `${val}×`,
+  zSpeed: (val) => val.toFixed(1),
+  hue: (val) => `${Math.round(val)}°`,
+  saturation: (val) => `${Math.round(val)}%`,
+  brightness: (val) => `${Math.round(val * 100)}%`,
+  lightness: (val) => `${Math.round(val)}%`,
+  rotation: (val) => `${Math.round(val)}°`,
+  rotationX: (val) => val.toFixed(1),
+  rotationY: (val) => val.toFixed(1),
+  amplitude: (val) => val.toFixed(1),
+  wavelength: (val) => `${Math.round(val)}px`,
+  spread: (val) => `${Math.round(val)}px`,
+  lineWidth: (val) => `${Math.round(val)}px`,
+  burstSize: (val) => val.toFixed(1),
+  movement: (val) => val.toFixed(1),
+  glow: (val) => val.toFixed(1),
+  blur: (val) => `${Math.round(val)}px`,
+  meshDensity: (val) => Math.round(val).toString(),
+  responsiveness: (val) => `${val.toFixed(1)}×`,
+  smoothing: (val) => `${Math.round(val * 100)}%`,
+  warmCool: (val) => val.toFixed(1),
+  cycleSpeed: (val) => `${val.toFixed(2)}×`,
+  glitchIntensity: (val) => val.toFixed(1),
+  channelOffset: (val) => `${Math.round(val)}px`,
+  displacement: (val) => `${Math.round(val)}px`,
+  contrast: (val) => val.toFixed(1),
+  scanlines: (val) => val.toFixed(1),
+  noise: (val) => val.toFixed(1),
+  pixelation: (val) => `${Math.round(val)}px`,
+  diameter: (val) => `${val.toFixed(1)}×`,
+  count: (val) => Math.round(val).toString(),
+  perspective: (val) => val.toFixed(1),
+  trailLength: (val) => val.toFixed(1),
+  bloom: (val) => val.toFixed(1),
+  audioBoost: (val) => val.toFixed(1),
+  layers: (val) => Math.round(val).toString(),
+  depth: (val) => val.toFixed(1),
+  turbulence: (val) => val.toFixed(1),
+  phaseShift: (val) => val.toFixed(2),
+  points: (val) => Math.round(val).toString(),
 
   // Default formatter for any control without a specific formatter
   default: (val) => {
@@ -1930,14 +1648,8 @@ class ControlSystemUI {
    * Get display label for audio source
    */
   getAudioSourceLabel(sourceId) {
-    if (sourceId === 'none') return 'STATIC';
-    if (sourceId === 'bass') return 'BASS';
-    if (sourceId === 'mids') return 'MIDS';
-    if (sourceId === 'highs') return 'HIGHS';
-    if (sourceId === 'allLevels') return 'ALL LEVELS';
-    // Fallback for other sources
     const source = AUDIO_SOURCES[sourceId];
-    return source ? source.label.toUpperCase() : sourceId.toUpperCase();
+    return source ? source.label : sourceId.toUpperCase();
   }
 
   /**
@@ -1947,14 +1659,7 @@ class ControlSystemUI {
     // Check if dropdown already exists
     let dropdown = document.querySelector('.audio-dropdown.active');
 
-    // Close existing dropdown if clicking a different button
-    if (dropdown && dropdown.parentElement !== button.parentElement) {
-      dropdown.remove();
-    }
-
-    // Toggle dropdown for this button
-    dropdown = button.parentElement.querySelector('.audio-dropdown');
-
+    // Close existing dropdown
     if (dropdown) {
       dropdown.remove();
       return;
@@ -1964,51 +1669,66 @@ class ControlSystemUI {
     dropdown = document.createElement('div');
     dropdown.className = 'audio-dropdown active';
 
-    // Add main options
-    const options = [
-      { value: 'none', label: 'STATIC' },
-      { value: 'bass', label: 'BASS' },
-      { value: 'mids', label: 'MIDS' },
-      { value: 'highs', label: 'HIGHS' },
-      { value: 'allLevels', label: 'ALL LEVELS' }
-    ];
-
-    options.forEach(option => {
-      const item = document.createElement('div');
-      item.className = 'audio-dropdown-item';
-      item.textContent = option.label;
-      item.dataset.value = option.value;
-
-      // Mark current selection
-      if (option.value === button.dataset.audioSource) {
-        item.classList.add('selected');
+    // Build options from AUDIO_SOURCES, grouped by category
+    const categories = {};
+    for (const [sourceId, source] of Object.entries(AUDIO_SOURCES)) {
+      if (!categories[source.category]) {
+        categories[source.category] = [];
       }
+      categories[source.category].push({ sourceId, source });
+    }
 
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.handleAudioSourceChange(controlId, context, option.value);
+    // Category order
+    const categoryOrder = ['basic', 'frequency', 'amplitude', 'rhythm', 'dynamics', 'spectral', 'musical'];
 
-        // Update button
-        button.textContent = option.label;
-        button.dataset.audioSource = option.value;
+    categoryOrder.forEach(categoryId => {
+      if (!categories[categoryId]) return;
 
-        // Update styling
-        button.classList.toggle('static', option.value === 'none');
+      // Add category header
+      const categoryHeader = document.createElement('div');
+      categoryHeader.className = 'audio-dropdown-category';
+      categoryHeader.textContent = categoryId.toUpperCase();
+      dropdown.appendChild(categoryHeader);
 
-        // Show/hide intensity control
-        const intensityContainer = document.getElementById(`${context}_${controlId}_intensityContainer`);
-        if (intensityContainer) {
-          intensityContainer.style.display = option.value === 'none' ? 'none' : 'flex';
+      // Add items in category
+      categories[categoryId].forEach(({ sourceId, source }) => {
+        const item = document.createElement('div');
+        item.className = 'audio-dropdown-item';
+        item.textContent = source.label;
+        item.dataset.value = sourceId;
+
+        // Mark current selection
+        if (sourceId === button.dataset.audioSource) {
+          item.classList.add('selected');
         }
 
-        dropdown.remove();
-      });
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.handleAudioSourceChange(controlId, context, sourceId);
 
-      dropdown.appendChild(item);
+          // Update button
+          button.textContent = source.label;
+          button.dataset.audioSource = sourceId;
+
+          // Update styling (static only for 'none')
+          button.classList.toggle('static', sourceId === 'none');
+
+          // Show/hide intensity control
+          const intensityContainer = document.getElementById(`${context}_${controlId}_intensityContainer`);
+          if (intensityContainer) {
+            intensityContainer.style.display = sourceId === 'none' ? 'none' : 'flex';
+          }
+
+          dropdown.remove();
+        });
+
+        dropdown.appendChild(item);
+      });
     });
 
-    // Position dropdown
-    button.parentElement.appendChild(dropdown);
+    // Position dropdown relative to button
+    button.style.position = 'relative';
+    button.appendChild(dropdown);
 
     // Close dropdown when clicking outside
     const closeDropdown = (e) => {
