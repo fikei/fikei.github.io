@@ -23,6 +23,7 @@ class BeatPad {
     this.loadScenesFromStorage();
     this.createGridUI();
     this.attachEventListeners();
+    this.setupKeyboardShortcuts();
   }
 
   /**
@@ -41,19 +42,36 @@ class BeatPad {
       <h3>BEAT PAD</h3>
       <div class="beat-pad-actions">
         <button class="beat-pad-btn" id="beat-pad-save-current" title="Save current state to selected pad">SAVE</button>
+        <button class="beat-pad-btn" id="beat-pad-export" title="Export all scenes as JSON">EXPORT</button>
+        <button class="beat-pad-btn" id="beat-pad-import" title="Import scenes from JSON">IMPORT</button>
         <button class="beat-pad-btn" id="beat-pad-clear-all" title="Clear all scenes">CLEAR ALL</button>
       </div>
     `;
     this.gridContainer.appendChild(header);
 
+    // Add hidden file input for import
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    fileInput.id = 'beat-pad-file-input';
+    this.gridContainer.appendChild(fileInput);
+
     // Create grid (4×4 = 16 pads)
     const grid = document.createElement('div');
     grid.className = 'beat-pad-grid';
+
+    // Keyboard hints for each pad
+    const keyHints = ['1', '2', '3', '4', 'Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
 
     for (let i = 0; i < 16; i++) {
       const pad = document.createElement('div');
       pad.className = 'beat-pad';
       pad.dataset.index = i;
+
+      const padKeyHint = document.createElement('div');
+      padKeyHint.className = 'beat-pad-key';
+      padKeyHint.textContent = keyHints[i];
 
       const padNumber = document.createElement('div');
       padNumber.className = 'beat-pad-number';
@@ -63,6 +81,7 @@ class BeatPad {
       padLabel.className = 'beat-pad-label';
       padLabel.textContent = 'EMPTY';
 
+      pad.appendChild(padKeyHint);
       pad.appendChild(padNumber);
       pad.appendChild(padLabel);
       grid.appendChild(pad);
@@ -130,6 +149,71 @@ class BeatPad {
         this.clearAllScenes();
       }
     });
+
+    // Export button
+    const exportBtn = document.getElementById('beat-pad-export');
+    exportBtn.addEventListener('click', () => {
+      this.exportScenes();
+    });
+
+    // Import button
+    const importBtn = document.getElementById('beat-pad-import');
+    const fileInput = document.getElementById('beat-pad-file-input');
+
+    importBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        this.importScenes(file);
+        fileInput.value = ''; // Reset input
+      }
+    });
+  }
+
+  /**
+   * Setup keyboard shortcuts for pad triggering
+   */
+  setupKeyboardShortcuts() {
+    // Keyboard layout mapping (4×4 grid):
+    // Row 1: 1, 2, 3, 4 -> pads 0-3
+    // Row 2: Q, W, E, R -> pads 4-7
+    // Row 3: A, S, D, F -> pads 8-11
+    // Row 4: Z, X, C, V -> pads 12-15
+    const keyMap = {
+      '1': 0, '2': 1, '3': 2, '4': 3,
+      'q': 4, 'w': 5, 'e': 6, 'r': 7,
+      'a': 8, 's': 9, 'd': 10, 'f': 11,
+      'z': 12, 'x': 13, 'c': 14, 'v': 15
+    };
+
+    document.addEventListener('keydown', (e) => {
+      // Ignore if typing in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      const padIndex = keyMap[key];
+
+      if (padIndex !== undefined) {
+        e.preventDefault();
+
+        // Shift + key = save to pad
+        if (e.shiftKey) {
+          this.saveCurrentScene(padIndex);
+          this.activePadIndex = padIndex;
+        }
+        // Just key = load scene
+        else {
+          this.loadScene(padIndex);
+        }
+      }
+    });
+
+    console.log('⌨️ Keyboard shortcuts enabled (1-4, QWER, ASDF, ZXCV to load, Shift+key to save)');
   }
 
   /**

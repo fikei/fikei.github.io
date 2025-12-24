@@ -714,6 +714,26 @@
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
         }
 
+        .beat-pad-key {
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            font-size: 8px;
+            font-weight: 600;
+            color: #444444;
+            opacity: 0.6;
+        }
+
+        .beat-pad:hover .beat-pad-key {
+            opacity: 1;
+            color: #888888;
+        }
+
+        .beat-pad.active .beat-pad-key {
+            color: #ffffff;
+            opacity: 0.8;
+        }
+
         .beat-pad-number {
             font-size: 10px;
             font-weight: 700;
