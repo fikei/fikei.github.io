@@ -491,7 +491,7 @@ class BeatPad {
    * Save current state to a pad
    */
   saveCurrentScene(index) {
-    if (index < 0 || index >= 16) return;
+    if (index < 0 || index >= 9) return;
 
     const scene = this.getCurrentScene();
     this.scenes[index] = scene;
@@ -507,7 +507,7 @@ class BeatPad {
    * Load a scene from a pad
    */
   loadScene(index) {
-    if (index < 0 || index >= 16) return;
+    if (index < 0 || index >= 9) return;
     if (this.isTransitioning) {
       console.log('⏸️ Transition in progress, please wait');
       return;
@@ -837,7 +837,7 @@ class BeatPad {
    * Clear a specific scene
    */
   clearScene(index) {
-    if (index < 0 || index >= 16) return;
+    if (index < 0 || index >= 9) return;
 
     this.scenes[index] = null;
     if (this.activePadIndex === index) {
@@ -852,7 +852,7 @@ class BeatPad {
    * Clear all scenes
    */
   clearAllScenes() {
-    this.scenes = new Array(16).fill(null);
+    this.scenes = new Array(9).fill(null);
     this.activePadIndex = null;
     this.saveScenestoStorage();
     this.updateGridUI();
@@ -882,12 +882,12 @@ class BeatPad {
       const stored = localStorage.getItem('beatPadScenes');
       if (stored) {
         const data = JSON.parse(stored);
-        this.scenes = data.scenes || new Array(16).fill(null);
+        this.scenes = data.scenes || new Array(9).fill(null);
         this.activePadIndex = data.activePadIndex || null;
       }
     } catch (e) {
       console.error('Failed to load scenes from localStorage:', e);
-      this.scenes = new Array(16).fill(null);
+      this.scenes = new Array(9).fill(null);
     }
   }
 
