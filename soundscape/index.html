@@ -2868,7 +2868,6 @@
                                 'spectralCentroid',
                                 'spectralFlatness',
                                 'spectralRolloff',
-                                'spectralFlux',
                                 'spectralSpread',
                                 'loudness',
                                 'chroma'
@@ -2876,19 +2875,18 @@
                             callback: features => {
                                 try {
                                     // Validate features before storing
-                                    // spectralFlux may error on first few frames
                                     if (features && typeof features === 'object') {
                                         state.meydaFeatures = features;
                                     }
                                 } catch (err) {
-                                    // Silently ignore Meyda calculation errors (e.g., spectralFlux on first frames)
+                                    // Silently ignore Meyda calculation errors
                                     // Features will use previous valid values or defaults
                                 }
                             }
                         });
 
                         state.meydaAnalyzer.start();
-                        console.log('✨ Meyda analyzer initialized with 7 features');
+                        console.log('✨ Meyda analyzer initialized with 6 features');
                     } catch (err) {
                         console.warn('⚠️ Meyda initialization failed:', err);
                         state.meydaAnalyzer = null;
@@ -2994,9 +2992,7 @@
                     : 0,
 
                 // Spectral Flux: typically 0-100, varies widely
-                spectralFlux: features.spectralFlux
-                    ? Math.min(1, features.spectralFlux / 100)
-                    : 0,
+                spectralFlux: 0, // Disabled due to errors in Meyda library
 
                 // Spectral Spread: typically 0-5000
                 spectralSpread: features.spectralSpread

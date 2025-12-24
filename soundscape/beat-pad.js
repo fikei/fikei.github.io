@@ -149,6 +149,8 @@ class BeatPad {
     const toggleBtn = document.getElementById('beatpadToggle');
     const isHidden = this.gridContainer.classList.contains('hidden');
 
+    console.log('🔧 Toggle called. Current state:', { isHidden, gridContainer: this.gridContainer, toggleBtn });
+
     if (isHidden) {
       this.gridContainer.classList.remove('hidden');
       if (toggleBtn) toggleBtn.classList.add('active');
@@ -464,7 +466,7 @@ class BeatPad {
   applySceneCrossfade(scene, index) {
     this.isTransitioning = true;
 
-    const container = document.getElementById('container');
+    const container = document.getElementById('visualization-container');
     const startTime = Date.now();
     const duration = this.transitionDuration;
 
@@ -573,7 +575,7 @@ class BeatPad {
   applySceneWipe(scene, index) {
     this.isTransitioning = true;
 
-    const container = document.getElementById('container');
+    const container = document.getElementById('visualization-container');
     const startTime = Date.now();
     const duration = this.transitionDuration;
 
