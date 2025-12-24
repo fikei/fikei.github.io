@@ -391,6 +391,165 @@
             outline: none;
             border-color: #ffffff;
         }
+
+        /* ===== BEAT PAD PANEL ===== */
+        .beatpad-panel {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 100%;
+            height: 100vh;
+            background: #000000;
+            z-index: 1000;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            padding: 1rem;
+            border-left: 1px solid #ffffff;
+        }
+
+        .beatpad-panel.open {
+            right: 0;
+        }
+
+        .beatpad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333333;
+        }
+
+        .beatpad-header h3 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #ffffff;
+        }
+
+        .beatpad-close {
+            background: none;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            font-size: 10px;
+            font-family: monospace;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .beatpad-close:active {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .beatpad-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .beatpad-cell {
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            border: 2px solid #333333;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .beatpad-cell:active {
+            background: #252525;
+        }
+
+        .beatpad-cell.empty {
+            border-style: dashed;
+            opacity: 0.5;
+        }
+
+        .beatpad-cell.loaded {
+            border-color: #666666;
+            opacity: 1;
+        }
+
+        .beatpad-cell.active {
+            border-color: #ffffff;
+            background: #2a2a2a;
+        }
+
+        .beatpad-key {
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            font-size: 8px;
+            color: #666666;
+        }
+
+        .beatpad-number {
+            font-size: 10px;
+            color: #999999;
+            margin-bottom: 0.25rem;
+        }
+
+        .beatpad-label {
+            font-size: 7px;
+            color: #666666;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .beatpad-controls {
+            margin-bottom: 1.5rem;
+        }
+
+        .beatpad-control-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .beatpad-control-label {
+            flex: 0 0 80px;
+            font-size: 9px;
+            color: #999999;
+            text-transform: uppercase;
+        }
+
+        .beatpad-select {
+            flex: 1;
+            background: #000000;
+            border: 1px solid #333333;
+            color: #ffffff;
+            padding: 0.5rem;
+            font-size: 10px;
+            font-family: monospace;
+        }
+
+        .swipe-hint {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            font-size: 9px;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            opacity: 0.7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
     </style>
 </head>
 <body>
@@ -565,6 +724,33 @@
             </div>
         </div>
     </div>
+
+    <!-- Beat Pad Panel (swipe left to open) -->
+    <div class="beatpad-panel" id="beatpadPanel">
+        <div class="beatpad-header">
+            <h3>BEAT PAD</h3>
+            <button class="beatpad-close" id="beatpadClose">CLOSE</button>
+        </div>
+
+        <div class="beatpad-controls">
+            <div class="beatpad-control-row">
+                <span class="beatpad-control-label">TRANSITION</span>
+                <select class="beatpad-select" id="beatpadTransitionType">
+                    <option value="CUT">CUT</option>
+                    <option value="CROSSFADE">CROSSFADE</option>
+                    <option value="MORPH">MORPH</option>
+                    <option value="WIPE">WIPE</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="beatpad-grid" id="beatpadGrid">
+            <!-- Grid will be populated dynamically -->
+        </div>
+    </div>
+
+    <!-- Swipe Hint -->
+    <div class="swipe-hint" id="swipeHint">← SWIPE LEFT FOR BEAT PAD</div>
 
     <script>
         // Companion control state
@@ -1088,8 +1274,153 @@
             }
         }
 
+        // =====================================================
+        // BEAT PAD
+        // =====================================================
+
+        // Beat Pad state
+        let beatpadScenes = new Array(16).fill(null);
+        let activePadIndex = null;
+        const keyHints = ['1', '2', '3', '4', 'Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
+
+        // Create Beat Pad grid
+        function createBeatpadGrid() {
+            const grid = document.getElementById('beatpadGrid');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'beatpad-cell empty';
+                cell.dataset.index = i;
+
+                const keyHint = document.createElement('div');
+                keyHint.className = 'beatpad-key';
+                keyHint.textContent = keyHints[i];
+
+                const number = document.createElement('div');
+                number.className = 'beatpad-number';
+                number.textContent = i + 1;
+
+                const label = document.createElement('div');
+                label.className = 'beatpad-label';
+                label.textContent = 'EMPTY';
+
+                cell.appendChild(keyHint);
+                cell.appendChild(number);
+                cell.appendChild(label);
+
+                // Tap to trigger scene
+                cell.addEventListener('click', () => {
+                    const scene = beatpadScenes[i];
+                    if (scene) {
+                        // Load scene
+                        sendToHost({ action: 'beatpad:load-scene', index: i });
+                    } else {
+                        // Save current scene
+                        sendToHost({ action: 'beatpad:save-scene', index: i });
+                    }
+                });
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // Update Beat Pad grid UI
+        function updateBeatpadGrid(scenes, activeIndex) {
+            beatpadScenes = scenes || beatpadScenes;
+            activePadIndex = activeIndex !== undefined ? activeIndex : activePadIndex;
+
+            const cells = document.querySelectorAll('.beatpad-cell');
+            cells.forEach((cell, index) => {
+                const scene = beatpadScenes[index];
+                const label = cell.querySelector('.beatpad-label');
+
+                if (scene) {
+                    cell.classList.remove('empty');
+                    cell.classList.add('loaded');
+                    label.textContent = scene.name || `Scene ${index + 1}`;
+                } else {
+                    cell.classList.add('empty');
+                    cell.classList.remove('loaded');
+                    label.textContent = 'EMPTY';
+                }
+
+                if (index === activePadIndex) {
+                    cell.classList.add('active');
+                } else {
+                    cell.classList.remove('active');
+                }
+            });
+        }
+
+        // Swipe detection
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        function handleSwipe() {
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            const absDeltaX = Math.abs(deltaX);
+            const absDeltaY = Math.abs(deltaY);
+
+            // Only trigger if horizontal swipe is dominant
+            if (absDeltaX > absDeltaY && absDeltaX > 50) {
+                const panel = document.getElementById('beatpadPanel');
+                const hint = document.getElementById('swipeHint');
+
+                if (deltaX < 0) {
+                    // Swipe left - open panel
+                    panel.classList.add('open');
+                    hint.style.display = 'none';
+                } else if (deltaX > 0 && panel.classList.contains('open')) {
+                    // Swipe right - close panel
+                    panel.classList.remove('open');
+                    hint.style.display = 'block';
+                }
+            }
+        }
+
+        // Setup Beat Pad
+        function setupBeatpad() {
+            createBeatpadGrid();
+
+            // Close button
+            document.getElementById('beatpadClose').addEventListener('click', () => {
+                document.getElementById('beatpadPanel').classList.remove('open');
+                document.getElementById('swipeHint').style.display = 'block';
+            });
+
+            // Transition type
+            document.getElementById('beatpadTransitionType').addEventListener('change', (e) => {
+                sendToHost({ action: 'beatpad:set-transition', value: e.target.value });
+            });
+
+            // Swipe detection on controls screen
+            const controlsScreen = document.getElementById('controlsScreen');
+            controlsScreen.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            });
+
+            controlsScreen.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleSwipe();
+            });
+
+            // Listen for Beat Pad state updates from host
+            if (socket) {
+                socket.on('host:beatpad-state', (data) => {
+                    if (data.scenes) updateBeatpadGrid(data.scenes, data.activeIndex);
+                });
+            }
+        }
+
         // Initialize controls
         setupControls();
+        setupBeatpad();
     </script>
 </body>
 </html>
