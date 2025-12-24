@@ -295,12 +295,21 @@ class BeatPad {
       const index = parseInt(pad.dataset.index);
       const scene = this.scenes[index];
 
+      console.log(`🎯 Pad ${index + 1} clicked:`, {
+        hasScene: !!scene,
+        sceneName: scene?.name,
+        totalScenes: this.scenes.length,
+        sceneData: scene ? 'Scene exists' : 'Empty pad'
+      });
+
       // If pad is empty, save current scene
       if (!scene) {
+        console.log(`💾 Pad ${index + 1} is empty, saving current scene`);
         this.saveCurrentScene(index);
         this.activePadIndex = index;
       } else {
         // If pad has a scene, load it
+        console.log(`▶️ Pad ${index + 1} has scene "${scene.name}", loading it`);
         this.loadScene(index);
       }
     });
@@ -502,13 +511,19 @@ class BeatPad {
     if (index < 0 || index >= 9) return;
 
     const scene = this.getCurrentScene();
+    console.log(`💾 saveCurrentScene(${index}):`, {
+      theme: scene.theme,
+      settingsCount: Object.keys(scene.settings).length,
+      name: scene.name
+    });
+
     this.scenes[index] = scene;
     this.activePadIndex = index;
 
     this.saveScenestoStorage();
     this.updateGridUI();
 
-    console.log(`Scene saved to pad ${index + 1}:`, scene);
+    console.log(`✅ Scene saved to pad ${index + 1}:`, scene.name);
   }
 
   /**
@@ -523,11 +538,14 @@ class BeatPad {
 
     const scene = this.scenes[index];
     if (!scene) {
-      console.log(`Pad ${index + 1} is empty`);
+      console.log(`⚠️ Pad ${index + 1} is empty, cannot load`);
       return;
     }
 
-    console.log(`Loading scene from pad ${index + 1} with ${this.transitionType} transition (${this.transitionDuration}ms)`);
+    console.log(`▶️ loadScene(${index}): "${scene.name}" with ${this.transitionType} transition (${this.transitionDuration}ms)`, {
+      theme: scene.theme,
+      settingsCount: Object.keys(scene.settings).length
+    });
 
     // Apply scene with selected transition type
     switch (this.transitionType) {
