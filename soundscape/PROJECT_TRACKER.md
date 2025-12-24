@@ -393,8 +393,724 @@ All visual controls are now complete! The next major priority is Meyda audio ana
 
 ## 📋 BACKLOG
 
+### Epic: Beat Pad Scene System (4×4 Grid)
+**Priority**: High
+**Status**: Not Started
+**Total Estimated Effort**: 24-32 hours
+**MIDI Integration**: Future phase
+
+#### Overview
+
+Design and implement a comprehensive scene management system with a 4×4 grid of "beat pads" (16 total). Each pad stores a complete snapshot of the visualization state - including theme selection, all control values, and audio reactivity configuration. Users can save their current creative state to a pad, then instantly recall it with a single click or smoothly transition between scenes with configurable effects.
+
+This system enables live performance workflows where users can build a library of visual "presets" and switch between them dynamically. The architecture is designed with MIDI controller integration in mind, allowing future hardware control for tactile, real-time manipulation during live shows or DJ sets.
+
+**Key Features**:
+- 16 independent scene slots (4×4 grid layout)
+- Complete state capture (theme + 59 controls + audio reactivity)
+- Multiple transition types (CUT, CROSSFADE, MORPH, WIPE)
+- Persistent storage (localStorage + JSON export/import)
+- Context menus for scene management (save, rename, clear, copy)
+- Visual feedback (empty/loaded/active states)
+- Future MIDI integration for live performance
+
+**Use Cases**:
+- **Live Performance**: VJ at club switches between scenes synced to music
+- **Creative Exploration**: Save variations while experimenting, quickly compare
+- **Show Programming**: Build sequence of scenes for pre-programmed visuals
+- **Preset Library**: Organize favorite configurations for quick access
+- **Collaboration**: Export/import scene banks to share with others
+
+---
+
+#### Implementation Strategy
+
+**Phase 1: Core System** (High Priority - 10-12 hours)
+- Data structure and persistence (localStorage)
+- Instant scene loading (CUT transition)
+- Basic pad grid UI with click-to-load
+
+**Phase 2: Scene Management** (High Priority - 7-9 hours)
+- Context menus (right-click/long-press)
+- Save, rename, clear, copy operations
+- Global import/export
+
+**Phase 3: Transitions** (Medium Priority - 10-14 hours)
+- Crossfade with duration and easing
+- Morph with parameter interpolation
+- Wipe with directional animation
+- Transition settings panel
+
+**Phase 4: Polish** (Low Priority - 4-10 hours)
+- Scene thumbnails/previews
+- Keyboard shortcuts
+- Enhanced visual feedback
+
+**Phase 5: MIDI Integration** (Future - 8-12 hours)
+- Web MIDI API integration
+- Note-to-pad mapping (C1-D#2)
+- Velocity-sensitive transitions
+- CC control mapping
+
+---
+
+#### Discussion Questions
+
+**Q1: Scene Naming - Auto-generate or require input?**
+
+**Options**:
+- **A**: Auto-generate names (Scene 1, Scene 2, etc.)
+  - Pros: Faster save workflow, no modal dialogs
+  - Cons: Names not descriptive, user must rename later
+
+- **B**: Prompt for name on save
+  - Pros: Meaningful names from start
+  - Cons: Extra step, interrupts flow
+
+- **C**: Auto-generate with quick inline rename option
+  - Pros: Best of both - fast save + easy rename
+  - Cons: Slightly more UI complexity
+
+**Recommendation**: Option C - Auto-generate with inline rename affordance
+
+---
+
+**Q2: Transition Behavior - When should transitions apply?**
+
+**Options**:
+- **A**: Always use selected transition type
+  - Pros: Consistent, predictable
+  - Cons: May be too slow for rapid scene changes
+
+- **B**: CUT on click, transitions on keyboard/MIDI
+  - Pros: Fast default, artistic control when needed
+  - Cons: Inconsistent behavior
+
+- **C**: Modifier key (Shift+Click) for transition
+  - Pros: User chooses per-action
+  - Cons: Requires learning, not touch-friendly
+
+- **D**: Setting toggle: "Always Transition" vs "Manual"
+  - Pros: Clear mode, user preference respected
+  - Cons: Extra UI, mode switching overhead
+
+**Recommendation**: Option A (always transition) with keyboard shortcut (number keys 1-16) for instant CUT
+
+---
+
+**Q3: Cross-Theme Transitions - How to handle?**
+
+**Challenge**: Transitioning from LINEAR to GLITCH requires switching rendering engines (SVG to Canvas). Can't smoothly interpolate control values between incompatible themes.
+
+**Options**:
+- **A**: Force CROSSFADE for cross-theme (visual blend only)
+  - Pros: Always works, smooth visual
+  - Cons: Can't use MORPH across themes
+
+- **B**: Instant CUT for cross-theme transitions
+  - Pros: Simple, no complexity
+  - Cons: Jarring visual, no transition
+
+- **C**: WIPE for cross-theme, MORPH for same-theme
+  - Pros: Best of both worlds
+  - Cons: Users need to understand limitation
+
+**Recommendation**: Option A - Force CROSSFADE for cross-theme, allow all transition types within same theme
+
+---
+
+**Q4: Scene Thumbnails - Worth the complexity?**
+
+**Considerations**:
+- Thumbnails require canvas snapshots (200x200px)
+- Storage: ~50KB per thumbnail × 16 pads = ~800KB localStorage
+- Benefits: Visual recognition, professional look
+- Costs: Implementation time (4-6 hours), storage overhead
+
+**Options**:
+- **A**: Implement thumbnails in Phase 1
+  - Pros: Better UX from start
+  - Cons: Delays core functionality
+
+- **B**: Defer thumbnails to Phase 4 (polish)
+  - Pros: Focus on core features first
+  - Cons: Less visual appeal early on
+
+- **C**: Skip thumbnails entirely
+  - Pros: Simpler implementation
+  - Cons: Pads less recognizable
+
+**Recommendation**: Option B - Defer to Phase 4 (polish). Use theme icons + scene names as MVP.
+
+---
+
+**Q5: Undo/Redo - Should scene loading be undoable?**
+
+**Challenge**: Scene changes are destructive (overwrite current state). No way to go back if user clicks wrong pad.
+
+**Options**:
+- **A**: Implement full undo/redo stack
+  - Pros: Safety net, professional feature
+  - Cons: Complex (6-8 hours), memory overhead
+
+- **B**: "Previous Scene" button (single-level undo)
+  - Pros: Simple (1-2 hours), solves main use case
+  - Cons: Only one step back
+
+- **C**: Warning dialog before overwriting unsaved state
+  - Pros: Prevents accidents
+  - Cons: Interrupts flow, annoying
+
+- **D**: No undo - user must be careful
+  - Pros: Simple, no overhead
+  - Cons: Easy to lose work
+
+**Recommendation**: Option B - Single-level "Previous Scene" button. Good safety net without full undo complexity.
+
+---
+
+**Q6: MIDI Integration - Include in MVP or defer?**
+
+**Considerations**:
+- MIDI is powerful for live performance
+- Web MIDI API is well-supported (Chrome, Edge)
+- Adds significant complexity (8-12 hours)
+- Not all users have MIDI controllers
+
+**Options**:
+- **A**: Include MIDI in Phase 1
+  - Pros: Full feature from launch, attracts performers
+  - Cons: Delays MVP, adds complexity
+
+- **B**: Phase 5 (separate release)
+  - Pros: MVP ships faster, MIDI comes when ready
+  - Cons: Users can't perform live until Phase 5
+
+- **C**: Basic MIDI first (note triggers only), advanced later
+  - Pros: Balanced approach
+  - Cons: Still adds time to MVP
+
+**Recommendation**: Option B - Defer MIDI to Phase 5. Focus on core features, add MIDI as enhancement.
+
+---
+
+**Q7: Scene Storage - localStorage limits?**
+
+**Considerations**:
+- localStorage typically limited to 5-10MB per domain
+- Each scene: ~5-10KB (controls + metadata)
+- 16 scenes: ~80-160KB base
+- With thumbnails: ~880-960KB total
+- Safe within limits, but worth monitoring
+
+**Options**:
+- **A**: localStorage only (simple)
+  - Pros: No server required, instant
+  - Cons: Limited to one browser/device
+
+- **B**: localStorage + optional cloud sync
+  - Pros: Access from anywhere
+  - Cons: Requires backend, auth, complexity
+
+- **C**: localStorage + export/import for sharing
+  - Pros: Simple sharing via JSON files
+  - Cons: Manual process
+
+**Recommendation**: Option C - localStorage + export/import. Cloud sync can be future enhancement.
+
+---
+
+**Q8: Pad Grid Layout - Fixed 4×4 or configurable?**
+
+**Options**:
+- **A**: Fixed 4×4 (16 pads)
+  - Pros: Matches standard MIDI controllers
+  - Cons: No flexibility
+
+- **B**: Configurable (2×2, 4×4, 8×8)
+  - Pros: User choice, power users get more
+  - Cons: Complex UI, MIDI mapping issues
+
+- **C**: Multiple banks (16 pads per bank, switchable)
+  - Pros: Unlimited scenes via banking
+  - Cons: Bank switching overhead
+
+**Recommendation**: Option A for MVP (4×4), Option C for future (bank support via MIDI program change)
+
+---
+
+#### User Stories
+
+---
+
+#### Story BP-1.1: Scene Data Structure & Persistence
+**Priority**: High
+**Estimate**: 3-4 hours
+**Dependencies**: None
+
+**User Story**:
+As a user, I want my scene configurations to be saved and restored across sessions so that I don't lose my creative work.
+
+**Tasks**:
+- [ ] Design Scene data structure with all required fields
+  - `id`, `name`, `theme`, `controls`, `audioReactivity`, `metadata`
+- [ ] Implement `saveSceneToPad(padIndex, currentState)` function
+- [ ] Implement `loadSceneFromPad(padIndex)` function
+- [ ] Create localStorage persistence layer
+  - Key: `soundscape_beatPads_bank1`
+  - Structure: Array of 16 scene objects
+- [ ] Add metadata tracking (created, modified timestamps)
+- [ ] Implement JSON export for individual scenes
+- [ ] Implement JSON import for scenes
+- [ ] Add scene validation (check theme exists, validate control ranges)
+- [ ] Test save/load with all 5 themes
+- [ ] Test persistence across page reload
+
+**Acceptance Criteria**:
+- Scene saves all control values correctly
+- Scene saves all audio reactivity settings
+- Scenes persist in localStorage across sessions
+- Invalid scenes are rejected with error message
+- Export produces valid JSON file
+- Import validates and loads JSON correctly
+
+**Technical Notes**:
+```javascript
+Scene = {
+  id: string,              // UUID
+  name: string,            // User-defined label
+  theme: string,           // 'linear', 'neon', etc.
+  controls: {
+    [controlId]: value     // All control values
+  },
+  audioReactivity: {
+    [controlId]: {
+      enabled: boolean,
+      frequency: string,
+      intensity: number
+    }
+  },
+  metadata: {
+    created: timestamp,
+    modified: timestamp,
+    color: string          // Pad visual identifier
+  }
+}
+```
+
+---
+
+#### Story BP-1.2: Apply Scene (Instant Load)
+**Priority**: High
+**Estimate**: 2-3 hours
+**Dependencies**: BP-1.1
+
+**User Story**:
+As a user, I want to instantly switch to a saved scene by clicking a pad so that I can quickly change the visualization.
+
+**Tasks**:
+- [ ] Implement `applyScene(scene)` function
+- [ ] Switch theme if different from current
+- [ ] Apply all control values from scene
+- [ ] Apply all audio reactivity settings
+- [ ] Update UI to reflect new values (sliders, buttons, dropdowns)
+- [ ] Handle theme switching edge cases
+- [ ] Clear any active transitions before applying
+- [ ] Test with all 5 themes
+- [ ] Test rapid scene switching (no memory leaks)
+- [ ] Add error handling for corrupted scenes
+
+**Acceptance Criteria**:
+- Scene loads instantly (< 100ms)
+- All controls update to scene values
+- Theme switches correctly if needed
+- UI sliders/buttons update to match scene
+- Audio reactivity toggles correctly
+- No visual glitches during switch
+- Console shows no errors
+
+---
+
+#### Story BP-2.1: Beat Pad Grid UI
+**Priority**: High
+**Estimate**: 4-5 hours
+**Dependencies**: BP-1.1, BP-1.2
+
+**User Story**:
+As a user, I want a 4×4 grid of pads to visually manage my scenes so that I can easily access and organize them.
+
+**Tasks**:
+- [ ] Design pad grid layout (4×4 responsive grid)
+- [ ] Add CSS for pad states (empty, loaded, active)
+- [ ] Create pad component with visual feedback
+  - Empty state: Gray background, "+" icon
+  - Loaded state: Theme color, scene name
+  - Active state: Bright border, pulsing animation
+- [ ] Implement click handler for pad loading
+- [ ] Add active pad highlighting
+- [ ] Show scene name on pad (editable)
+- [ ] Add theme icon/indicator on each pad
+- [ ] Display control count badge
+- [ ] Add hover preview (tooltip with details)
+- [ ] Test grid responsiveness
+- [ ] Add keyboard navigation (arrow keys)
+
+**Acceptance Criteria**:
+- 4×4 grid displays correctly on all screen sizes
+- Empty pads show clear "add scene" affordance
+- Loaded pads show scene name and theme
+- Active pad is clearly highlighted
+- Click loads scene immediately
+- Hover shows scene details
+- Grid is visually consistent with app design
+
+**UI Wireframe**:
+```
+┌─────┬─────┬─────┬─────┐
+│  1  │  2  │  3  │  4  │
+│INTRO│DROP │     │     │
+├─────┼─────┼─────┼─────┤
+│  5  │  6  │  7  │  8  │
+│     │     │     │     │
+├─────┼─────┼─────┼─────┤
+│  9  │ 10  │ 11  │ 12  │
+│     │     │     │     │
+├─────┼─────┼─────┼─────┤
+│ 13  │ 14  │ 15  │ 16  │
+│     │     │     │     │
+└─────┴─────┴─────┴─────┘
+```
+
+---
+
+#### Story BP-2.2: Pad Context Menu (Save, Rename, Clear)
+**Priority**: High
+**Estimate**: 3-4 hours
+**Dependencies**: BP-2.1
+
+**User Story**:
+As a user, I want to right-click or long-press a pad to access options like save, rename, and clear so that I can manage my scenes.
+
+**Tasks**:
+- [ ] Implement long-press detection (500ms threshold)
+- [ ] Create context menu component
+- [ ] Add "Save Current State" option
+- [ ] Add "Rename Scene" option with inline editing
+- [ ] Add "Clear Pad" option with confirmation
+- [ ] Add "Copy Scene" option
+- [ ] Add "Set Pad Color" option (color picker)
+- [ ] Add "Export Scene" option (download JSON)
+- [ ] Position menu near clicked pad
+- [ ] Close menu on outside click
+- [ ] Add keyboard shortcuts (Delete key for clear)
+- [ ] Test on touch devices
+
+**Acceptance Criteria**:
+- Long-press (500ms) opens context menu
+- Right-click opens context menu
+- Save captures current state correctly
+- Rename allows inline editing
+- Clear shows confirmation dialog
+- Copy creates duplicate in memory
+- Menu closes on outside click
+- Touch gestures work on mobile
+
+---
+
+#### Story BP-3.1: CUT Transition (Instant)
+**Priority**: High
+**Estimate**: 1 hour
+**Dependencies**: BP-1.2
+
+**User Story**:
+As a user, I want an instant cut transition so that I can sync scene changes with beat drops.
+
+**Tasks**:
+- [ ] Implement CUT transition type
+- [ ] Add transition settings UI
+- [ ] Add "Transition Type" selector (CUT, FADE, MORPH, WIPE)
+- [ ] Set CUT as default
+- [ ] Test instant switching
+- [ ] Ensure no frame drops
+
+**Acceptance Criteria**:
+- CUT switches scenes instantly (0ms delay)
+- No visual artifacts
+- Works with all theme combinations
+- Setting persists across sessions
+
+---
+
+#### Story BP-3.2: CROSSFADE Transition
+**Priority**: High
+**Estimate**: 4-5 hours
+**Dependencies**: BP-3.1
+
+**User Story**:
+As a user, I want smooth crossfade transitions between scenes so that changes are visually pleasing rather than jarring.
+
+**Tasks**:
+- [ ] Implement CROSSFADE transition type
+- [ ] Add duration slider (100ms - 5000ms)
+- [ ] Render both scenes simultaneously during transition
+- [ ] Implement opacity interpolation
+- [ ] Handle theme switching (render both canvases)
+- [ ] Add easing function support (linear, ease-in, ease-out, ease-in-out)
+- [ ] Clean up old scene after transition completes
+- [ ] Test with different durations
+- [ ] Test same-theme transitions
+- [ ] Test cross-theme transitions
+- [ ] Optimize for 60 FPS
+
+**Acceptance Criteria**:
+- Crossfade smoothly blends scenes
+- Duration slider adjusts fade time
+- Works across different themes
+- Maintains 60 FPS during transition
+- Old scene cleans up properly after fade
+- Easing options work correctly
+
+**Technical Notes**:
+```javascript
+function transitionCrossfade(fromScene, toScene, duration, easing) {
+  const startTime = performance.now();
+
+  function animate(currentTime) {
+    const elapsed = currentTime - startTime;
+    const rawProgress = Math.min(elapsed / duration, 1);
+    const progress = applyEasing(rawProgress, easing);
+
+    renderScene(fromScene, 1 - progress);
+    renderScene(toScene, progress);
+
+    if (progress < 1) requestAnimationFrame(animate);
+    else applyScene(toScene);
+  }
+
+  requestAnimationFrame(animate);
+}
+```
+
+---
+
+#### Story BP-3.3: MORPH Transition (Parameter Interpolation)
+**Priority**: Medium
+**Estimate**: 5-6 hours
+**Dependencies**: BP-3.2
+
+**User Story**:
+As a user, I want control values to smoothly interpolate between scenes so that transitions feel organic and continuous.
+
+**Tasks**:
+- [ ] Implement MORPH transition type
+- [ ] Add duration slider for morph
+- [ ] Implement parameter interpolation for all control types
+- [ ] Handle sliders (lerp numeric values)
+- [ ] Handle button groups (instant switch at midpoint)
+- [ ] Handle audio reactivity (interpolate intensity)
+- [ ] Implement easing functions
+- [ ] Only works within same theme (disable for cross-theme)
+- [ ] Test with various control combinations
+- [ ] Optimize interpolation performance
+- [ ] Add option to morph audio reactivity separately
+
+**Acceptance Criteria**:
+- All numeric controls interpolate smoothly
+- Button group controls switch cleanly
+- Audio reactivity transitions feel natural
+- Morph disabled for cross-theme transitions (shows warning)
+- Easing affects interpolation curve
+- 60 FPS maintained during morph
+
+---
+
+#### Story BP-3.4: WIPE Transition (Directional)
+**Priority**: Low
+**Estimate**: 3-4 hours
+**Dependencies**: BP-3.2
+
+**User Story**:
+As a user, I want directional wipe transitions so that I can create dynamic visual effects when switching scenes.
+
+**Tasks**:
+- [ ] Implement WIPE transition type
+- [ ] Add direction selector (Left, Right, Up, Down)
+- [ ] Add duration slider for wipe
+- [ ] Implement clip-path animation for wipe effect
+- [ ] Support cross-theme wipes
+- [ ] Add easing support
+- [ ] Test all 4 directions
+- [ ] Optimize rendering performance
+
+**Acceptance Criteria**:
+- Wipe animates in selected direction
+- Works across themes
+- Duration slider adjusts speed
+- Clean edge during wipe (no tearing)
+- 60 FPS maintained
+
+---
+
+#### Story BP-4.1: Transition Settings Panel
+**Priority**: Medium
+**Estimate**: 2-3 hours
+**Dependencies**: BP-3.1, BP-3.2
+
+**User Story**:
+As a user, I want a settings panel to configure transition behavior so that I can customize how scenes change.
+
+**Tasks**:
+- [ ] Design transition settings UI panel
+- [ ] Add transition type selector (buttons)
+- [ ] Add duration slider with ms value display
+- [ ] Add easing dropdown (linear, ease-in, ease-out, ease-in-out)
+- [ ] Add direction selector (for WIPE only, conditional visibility)
+- [ ] Save settings to localStorage
+- [ ] Add "Test Transition" button (preview current settings)
+- [ ] Show disabled states for incompatible options
+- [ ] Add tooltips explaining each option
+
+**Acceptance Criteria**:
+- Settings panel is easily accessible
+- All transition parameters are editable
+- Settings persist across sessions
+- Incompatible options are disabled/hidden
+- Test button previews transition
+- UI is intuitive and well-labeled
+
+---
+
+#### Story BP-5.1: Global Scene Management
+**Priority**: Medium
+**Estimate**: 2-3 hours
+**Dependencies**: BP-2.2
+
+**User Story**:
+As a user, I want global controls to manage all scenes so that I can quickly import/export or reset my entire pad bank.
+
+**Tasks**:
+- [ ] Add "Import Bank" button (load 16 scenes from JSON)
+- [ ] Add "Export Bank" button (save all 16 scenes to JSON)
+- [ ] Add "Clear All Pads" button with confirmation
+- [ ] Implement bank export/import logic
+- [ ] Add file picker for import
+- [ ] Validate imported bank structure
+- [ ] Add error messages for invalid imports
+- [ ] Test with partial banks (< 16 scenes)
+- [ ] Test with corrupted JSON
+
+**Acceptance Criteria**:
+- Export downloads JSON file with all scenes
+- Import loads valid JSON and populates pads
+- Clear all shows confirmation and empties all pads
+- Invalid imports show clear error message
+- Partial banks import successfully
+
+---
+
+#### Story BP-6.1: Scene Preview/Thumbnail (Future)
+**Priority**: Low
+**Estimate**: 4-6 hours
+**Dependencies**: BP-2.1
+
+**User Story**:
+As a user, I want visual thumbnails of my scenes on each pad so that I can identify them at a glance.
+
+**Tasks**:
+- [ ] Implement canvas snapshot capture
+- [ ] Generate thumbnail on scene save (200x200px)
+- [ ] Store thumbnail as base64 data URL
+- [ ] Display thumbnail as pad background
+- [ ] Add fallback for missing thumbnails
+- [ ] Optimize thumbnail file size
+- [ ] Test with all themes
+- [ ] Handle theme-specific rendering for thumbnails
+
+**Acceptance Criteria**:
+- Thumbnails accurately represent scenes
+- File size < 50KB per thumbnail
+- Thumbnails load quickly
+- Fallback shows theme icon if thumbnail missing
+
+---
+
+#### Story BP-7.1: MIDI Controller Integration (Future)
+**Priority**: Low (Future Phase)
+**Estimate**: 8-12 hours
+**Dependencies**: All core beat pad features
+
+**User Story**:
+As a performer, I want to trigger scenes with a MIDI controller so that I can perform live with tactile hardware controls.
+
+**Tasks**:
+- [ ] Implement Web MIDI API integration
+- [ ] Add MIDI device detection and listing
+- [ ] Map MIDI notes to pads (C1-D#2 = pads 1-16)
+- [ ] Implement velocity-sensitive transitions
+  - Low velocity (1-63): Slow transition
+  - High velocity (64-127): Fast transition
+- [ ] Add CC control mapping for transition parameters
+  - CC 1: Crossfade duration
+  - CC 2: Easing curve
+- [ ] Add MIDI learn mode for custom mappings
+- [ ] Add MIDI indicator lights (show active note)
+- [ ] Save MIDI mappings to localStorage
+- [ ] Test with hardware controllers (Akai APC, Novation Launchpad)
+- [ ] Add MIDI settings panel
+
+**Acceptance Criteria**:
+- MIDI devices are auto-detected
+- Pads trigger on MIDI note on
+- Velocity affects transition speed
+- CC controls adjust parameters in real-time
+- MIDI learn works for custom mapping
+- Settings persist across sessions
+
+**MIDI Mapping Reference**:
+```
+Pad Layout → MIDI Notes
+┌────┬────┬────┬────┐
+│ C1 │ C#1│ D1 │ D#1│  (36-39)
+├────┼────┼────┼────┤
+│ E1 │ F1 │ F#1│ G1 │  (40-43)
+├────┼────┼────┼────┤
+│ G#1│ A1 │ A#1│ B1 │  (44-47)
+├────┼────┼────┼────┤
+│ C2 │ C#2│ D2 │ D#2│  (48-51)
+└────┴────┴────┴────┘
+```
+
+---
+
+#### Story BP-8.1: Scene Chaining (Future)
+**Priority**: Low
+**Estimate**: 3-4 hours
+**Dependencies**: BP-3.1
+
+**User Story**:
+As a user, I want to automatically advance through a sequence of scenes so that I can create pre-programmed shows.
+
+**Tasks**:
+- [ ] Add "Chain" mode toggle
+- [ ] Add scene sequence editor (drag to reorder)
+- [ ] Add duration per scene (auto-advance timer)
+- [ ] Implement auto-advance logic
+- [ ] Add loop option for chain
+- [ ] Add play/pause/stop controls for chain
+- [ ] Show progress indicator (current scene in chain)
+- [ ] Save chain sequences to localStorage
+
+**Acceptance Criteria**:
+- Chain mode auto-advances through scenes
+- Duration per scene is configurable
+- Sequence is reorderable
+- Chain loops if enabled
+- Play controls work correctly
+
+---
+
 ### Epic: Media Upload & Controls Enhancement
-**Priority**: Medium (Deferred until after Meyda)
+**Priority**: Medium (Deferred until after Beat Pad)
 **Status**: Not Started
 **Documentation**: See `MEDIA_ANALYSIS.md` for detailed analysis
 
