@@ -880,18 +880,42 @@ class BeatPad {
    */
   clearAllScenes() {
     console.log('🗑️ Clearing all scenes and purging localStorage...');
+
+    // Log before state
+    console.log('Before clear:', {
+      scenesInMemory: this.scenes.filter(s => s !== null).length,
+      totalSlots: this.scenes.length,
+      activeIndex: this.activePadIndex
+    });
+
     this.scenes = new Array(9).fill(null);
     this.activePadIndex = null;
 
     // Completely remove from localStorage
     try {
+      const beforeRemove = localStorage.getItem('beatPadScenes');
       localStorage.removeItem('beatPadScenes');
-      console.log('💾 localStorage purged: beatPadScenes removed');
+      const afterRemove = localStorage.getItem('beatPadScenes');
+
+      console.log('💾 localStorage operations:', {
+        hadData: !!beforeRemove,
+        dataSize: beforeRemove ? beforeRemove.length : 0,
+        removedSuccessfully: afterRemove === null,
+        afterValue: afterRemove
+      });
     } catch (e) {
-      console.error('Failed to remove from localStorage:', e);
+      console.error('❌ Failed to remove from localStorage:', e);
     }
 
     this.updateGridUI();
+
+    // Log after state
+    console.log('After clear:', {
+      scenesInMemory: this.scenes.filter(s => s !== null).length,
+      totalSlots: this.scenes.length,
+      activeIndex: this.activePadIndex
+    });
+
     console.log('✅ All scenes cleared, localStorage purged, UI updated');
   }
 
@@ -918,13 +942,24 @@ class BeatPad {
   loadScenesFromStorage() {
     try {
       const stored = localStorage.getItem('beatPadScenes');
+      console.log('📂 Loading scenes from localStorage:', {
+        hasData: !!stored,
+        dataLength: stored ? stored.length : 0
+      });
+
       if (stored) {
         const data = JSON.parse(stored);
         this.scenes = data.scenes || new Array(9).fill(null);
         this.activePadIndex = data.activePadIndex || null;
+
+        const loadedScenes = this.scenes.filter(s => s !== null).length;
+        console.log(`📂 Loaded ${loadedScenes} scenes from localStorage`);
+      } else {
+        console.log('📂 No saved scenes found, starting with empty grid');
+        this.scenes = new Array(9).fill(null);
       }
     } catch (e) {
-      console.error('Failed to load scenes from localStorage:', e);
+      console.error('❌ Failed to load scenes from localStorage:', e);
       this.scenes = new Array(9).fill(null);
     }
   }
