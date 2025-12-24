@@ -7647,6 +7647,9 @@
 
                 // Send initial state to mobile
                 sendStateToMobile();
+
+                // Send initial Beat Pad state to mobile
+                sendBeatPadStateToMobile();
             });
 
             socket.on('mobile:disconnected', () => {
@@ -7702,6 +7705,19 @@
             };
 
             socket.emit('desktop:state-update', stateSnapshot);
+        }
+
+        // Send Beat Pad state to mobile companion
+        function sendBeatPadStateToMobile() {
+            if (!socket || !mobileConnected || !window.beatPad) return;
+
+            const beatpadState = {
+                scenes: window.beatPad.scenes,
+                activeIndex: window.beatPad.activePadIndex
+            };
+
+            socket.emit('host:beatpad-state', beatpadState);
+            console.log('📱 Sent Beat Pad state to companion:', beatpadState);
         }
 
         // Update shared state (called when desktop controls change)
@@ -7775,6 +7791,34 @@
                                 imageObj[updates.property] = updates.value;
                                 console.log(`📱 Media ${updates.property} updated to ${updates.value}`);
                             }
+                        }
+                        break;
+
+                    case 'beatpad:save-scene':
+                        // Save current scene to Beat Pad from companion
+                        if (window.beatPad && typeof updates.index === 'number') {
+                            console.log(`📱 Saving scene to pad ${updates.index + 1} from companion`);
+                            window.beatPad.saveCurrentScene(updates.index);
+                            // Send updated Beat Pad state back to companion
+                            sendBeatPadStateToMobile();
+                        }
+                        break;
+
+                    case 'beatpad:load-scene':
+                        // Load scene from Beat Pad via companion
+                        if (window.beatPad && typeof updates.index === 'number') {
+                            console.log(`📱 Loading scene from pad ${updates.index + 1} via companion`);
+                            window.beatPad.loadScene(updates.index);
+                            // Send updated Beat Pad state back to companion
+                            sendBeatPadStateToMobile();
+                        }
+                        break;
+
+                    case 'beatpad:set-transition':
+                        // Set Beat Pad transition type from companion
+                        if (window.beatPad && updates.value) {
+                            console.log(`📱 Setting Beat Pad transition to ${updates.value} from companion`);
+                            window.beatPad.transitionType = updates.value;
                         }
                         break;
                 }

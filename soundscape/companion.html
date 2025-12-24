@@ -848,6 +848,13 @@
                 }
             });
 
+            socket.on('host:beatpad-state', (data) => {
+                console.log('📡 Received Beat Pad state from host:', data);
+                if (data.scenes) {
+                    updateBeatpadGrid(data.scenes, data.activeIndex);
+                }
+            });
+
             socket.on('connect_error', (error) => {
                 console.error('❌ WebSocket connection error:', error);
                 showError('Connection failed. Is server running?');
@@ -1409,13 +1416,6 @@
                 touchEndY = e.changedTouches[0].screenY;
                 handleSwipe();
             });
-
-            // Listen for Beat Pad state updates from host
-            if (socket) {
-                socket.on('host:beatpad-state', (data) => {
-                    if (data.scenes) updateBeatpadGrid(data.scenes, data.activeIndex);
-                });
-            }
         }
 
         // Initialize controls
