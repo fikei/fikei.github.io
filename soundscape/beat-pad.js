@@ -346,11 +346,11 @@ class BeatPad {
     if (clearAllBtn) {
       clearAllBtn.addEventListener('click', () => {
         console.log('🗑️ Clear All button clicked');
-        if (confirm('Clear all scenes? This cannot be undone.')) {
+        if (confirm('⚠️ DELETE ALL SCENES?\n\nThis will permanently delete all 9 saved scenes from storage.\n\nClick OK to delete, or Cancel to keep them.')) {
           this.clearAllScenes();
           console.log('✅ All scenes cleared');
         } else {
-          console.log('❌ Clear cancelled');
+          console.log('❌ Clear cancelled by user');
         }
       });
     } else {
