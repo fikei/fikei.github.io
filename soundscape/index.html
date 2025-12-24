@@ -2447,7 +2447,16 @@
                                 'chroma'
                             ],
                             callback: features => {
-                                state.meydaFeatures = features;
+                                try {
+                                    // Validate features before storing
+                                    // spectralFlux may error on first few frames
+                                    if (features && typeof features === 'object') {
+                                        state.meydaFeatures = features;
+                                    }
+                                } catch (err) {
+                                    // Silently ignore Meyda calculation errors (e.g., spectralFlux on first frames)
+                                    // Features will use previous valid values or defaults
+                                }
                             }
                         });
 
@@ -2745,9 +2754,9 @@
             // Debug logging (every 60 frames ~= 1 second)
             if (Math.random() < 0.016) {
                 console.log('🎵 Audio Levels:', {
-                    low: lowLevel.toFixed(3),
-                    mid: midLevel.toFixed(3),
-                    high: highLevel.toFixed(3),
+                    low: bassLevel.toFixed(3),
+                    mid: midsLevel.toFixed(3),
+                    high: highsLevel.toFixed(3),
                     amplitude: amplitude?.toFixed(3),
                     mode: visualMode,
                     lowSum,
@@ -2757,8 +2766,8 @@
             }
 
             // Bass creates global background shift - more dramatic
-            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 60 * amplitude;
-            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 50 * amplitude;
+            const bassShiftX = Math.sin(time * 0.001) * bassLevel * 60 * amplitude;
+            const bassShiftY = Math.cos(time * 0.0015) * bassLevel * 50 * amplitude;
 
             // Get canvas dimensions
             const canvasWidth = state.boundingRect.width;
@@ -2776,11 +2785,11 @@
                     highCursorY = state.mouse.sy;
                 } else {
                     // Random virtual cursor positions
-                    midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
-                    midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+                    midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midsLevel * 200;
+                    midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midsLevel * 150;
 
-                    highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
-                    highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
+                    highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highsLevel * 250;
+                    highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highsLevel * 200;
                 }
             }
 
@@ -2814,10 +2823,10 @@
                         const midDx = p.x - midCursorX;
                         const midDy = p.y - midCursorY;
                         const midDist = Math.hypot(midDx, midDy);
-                        const midRadius = 400 * midLevel;
+                        const midRadius = 400 * midsLevel;
 
                         if (midDist < midRadius && midDist > 0) {
-                            const midStrength = (1 - midDist / midRadius) * midLevel;
+                            const midStrength = (1 - midDist / midRadius) * midsLevel;
                             const angle = Math.atan2(midDy, midDx);
                             midForceX = Math.cos(angle) * midStrength * 120 * amplitude;
                             midForceY = Math.sin(angle) * midStrength * 120 * amplitude;
@@ -2827,10 +2836,10 @@
                         const highDx = p.x - highCursorX;
                         const highDy = p.y - highCursorY;
                         const highDist = Math.hypot(highDx, highDy);
-                        const highRadius = 250 * highLevel;
+                        const highRadius = 250 * highsLevel;
 
                         if (highDist < highRadius && highDist > 0) {
-                            const highStrength = (1 - highDist / highRadius) * highLevel;
+                            const highStrength = (1 - highDist / highRadius) * highsLevel;
                             const angle = Math.atan2(highDy, highDx);
                             highForceX = Math.cos(angle) * highStrength * 150 * amplitude;
                             highForceY = Math.sin(angle) * highStrength * 150 * amplitude;
@@ -2847,7 +2856,7 @@
                         const midWaveWidth = 500;
 
                         if (Math.abs(midDistFromFront) < midWaveWidth) {
-                            const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midLevel;
+                            const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midsLevel;
                             const perpAngle = crunchMidAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.01, p.y * 0.01 + time * 0.001) > 0 ? 1 : -1;
                             midForceX = Math.cos(perpAngle) * midStrength * 180 * amplitude * waveDir;
@@ -2861,7 +2870,7 @@
                         const highWaveWidth = 400;
 
                         if (Math.abs(highDistFromFront) < highWaveWidth) {
-                            const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highLevel;
+                            const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highsLevel;
                             const perpAngle = crunchHighAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.015, p.y * 0.015 + time * 0.0015) > 0 ? 1 : -1;
                             highForceX = Math.cos(perpAngle) * highStrength * 220 * amplitude * waveDir;
