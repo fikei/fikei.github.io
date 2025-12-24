@@ -446,7 +446,7 @@
 
         .beatpad-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 0.5rem;
             margin-bottom: 1.5rem;
         }
@@ -736,7 +736,95 @@
                         <span class="expand-icon">▼</span>
                     </button>
                     <div class="theme-group-content" id="linearControls">
-                        <!-- Will be populated with LINEAR controls -->
+                        <!-- Style -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MODE</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button" data-control="visualMode" data-value="default">FLOW</button>
+                                <button class="mode-button active" data-control="visualMode" data-value="hole">HOLE</button>
+                                <button class="mode-button" data-control="visualMode" data-value="crunch">CRUNCH</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>DENSITY</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button" data-control="density" data-value="low">L</button>
+                                <button class="mode-button active" data-control="density" data-value="medium">M</button>
+                                <button class="mode-button" data-control="density" data-value="high">H</button>
+                            </div>
+                        </div>
+
+                        <!-- Geometry -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>POINTS</span>
+                                <span class="control-value" id="linearPointsValue">8</span>
+                            </div>
+                            <input type="range" id="linearPointsSlider" data-control="points" min="3" max="20" step="1" value="8">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SPREAD</span>
+                                <span class="control-value" id="linearSpreadValue">12</span>
+                            </div>
+                            <input type="range" id="linearSpreadSlider" data-control="spread" min="20" max="300" step="10" value="12">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>AMPLITUDE</span>
+                                <span class="control-value" id="linearAmplitudeValue">1.0x</span>
+                            </div>
+                            <input type="range" id="linearAmplitudeSlider" data-control="amplitude" min="0" max="3" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>LINE WIDTH</span>
+                                <span class="control-value" id="linearLineWidthValue">3px</span>
+                            </div>
+                            <input type="range" id="linearLineWidthSlider" data-control="lineWidth" min="0.5" max="10" step="0.5" value="3">
+                        </div>
+
+                        <!-- Color -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>HUE</span>
+                                <span class="control-value" id="linearHueValue">280°</span>
+                            </div>
+                            <input type="range" id="linearHueSlider" data-control="hue" min="0" max="360" step="1" value="280">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SATURATION</span>
+                                <span class="control-value" id="linearSaturationValue">0%</span>
+                            </div>
+                            <input type="range" id="linearSaturationSlider" data-control="saturation" min="0" max="100" step="1" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>OPACITY</span>
+                                <span class="control-value" id="linearOpacityValue">0.6</span>
+                            </div>
+                            <input type="range" id="linearOpacitySlider" data-control="opacity" min="0" max="1" step="0.05" value="0.6">
+                        </div>
+
+                        <!-- Motion -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BACKGROUND SHIFT</span>
+                                <span class="control-value" id="linearBackgroundShiftValue">1.0x</span>
+                            </div>
+                            <input type="range" id="linearBackgroundShiftSlider" data-control="backgroundShift" min="0" max="5" step="0.1" value="1.0">
+                        </div>
                     </div>
                 </div>
 
@@ -1404,17 +1492,17 @@
         // BEAT PAD
         // =====================================================
 
-        // Beat Pad state
-        let beatpadScenes = new Array(16).fill(null);
+        // Beat Pad state (3x3 grid = 9 cells)
+        let beatpadScenes = new Array(9).fill(null);
         let activePadIndex = null;
-        const keyHints = ['1', '2', '3', '4', 'Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
+        const keyHints = ['1', '2', '3', 'Q', 'W', 'E', 'A', 'S', 'D'];
 
-        // Create Beat Pad grid
+        // Create Beat Pad grid (3x3 for mobile optimization)
         function createBeatpadGrid() {
             const grid = document.getElementById('beatpadGrid');
             grid.innerHTML = '';
 
-            for (let i = 0; i < 16; i++) {
+            for (let i = 0; i < 9; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'beatpad-cell empty';
                 cell.dataset.index = i;
@@ -1576,112 +1664,36 @@
             const container = document.getElementById('linearControls');
             if (!container) return;
 
-            container.innerHTML = `
-                <!-- Density Button Group -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>DENSITY</span>
-                    </div>
-                    <div class="mode-buttons">
-                        <button class="mode-button" data-linear-density="low">L</button>
-                        <button class="mode-button active" data-linear-density="medium">M</button>
-                        <button class="mode-button" data-linear-density="high">H</button>
-                    </div>
-                </div>
-
-                <!-- Points Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>POINTS</span>
-                        <span class="control-value" id="linearPointsValue">8</span>
-                    </div>
-                    <input type="range" id="linearPointsSlider" min="3" max="20" step="1" value="8">
-                </div>
-
-                <!-- Spread Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>SPREAD</span>
-                        <span class="control-value" id="linearSpreadValue">12</span>
-                    </div>
-                    <input type="range" id="linearSpreadSlider" min="20" max="300" step="10" value="12">
-                </div>
-
-                <!-- Amplitude Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>AMPLITUDE</span>
-                        <span class="control-value" id="linearAmplitudeValue">1.0</span>
-                    </div>
-                    <input type="range" id="linearAmplitudeSlider" min="0" max="3" step="0.1" value="1.0">
-                </div>
-
-                <!-- Line Width Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>LINE WIDTH</span>
-                        <span class="control-value" id="linearLineWidthValue">3</span>
-                    </div>
-                    <input type="range" id="linearLineWidthSlider" min="0.5" max="10" step="0.5" value="3">
-                </div>
-
-                <!-- Hue Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>HUE</span>
-                        <span class="control-value" id="linearHueValue">280°</span>
-                    </div>
-                    <input type="range" id="linearHueSlider" min="0" max="360" step="1" value="280">
-                </div>
-
-                <!-- Saturation Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>SATURATION</span>
-                        <span class="control-value" id="linearSaturationValue">0%</span>
-                    </div>
-                    <input type="range" id="linearSaturationSlider" min="0" max="100" step="1" value="0">
-                </div>
-
-                <!-- Opacity Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>OPACITY</span>
-                        <span class="control-value" id="linearOpacityValue">0.6</span>
-                    </div>
-                    <input type="range" id="linearOpacitySlider" min="0" max="1" step="0.05" value="0.6">
-                </div>
-
-                <!-- Background Shift Slider -->
-                <div class="control-group">
-                    <div class="control-label">
-                        <span>BACKGROUND SHIFT</span>
-                        <span class="control-value" id="linearBackgroundShiftValue">1.0</span>
-                    </div>
-                    <input type="range" id="linearBackgroundShiftSlider" min="0" max="5" step="0.1" value="1.0">
-                </div>
-            `;
+            // Bind visualMode button group
+            const visualModeButtons = container.querySelectorAll('[data-control="visualMode"]');
+            visualModeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    visualModeButtons.forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    sendControlUpdate('visualMode', button.dataset.value);
+                });
+            });
 
             // Bind density button group
-            const densityButtons = container.querySelectorAll('[data-linear-density]');
+            const densityButtons = container.querySelectorAll('[data-control="density"]');
             densityButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     densityButtons.forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
-                    sendControlUpdate('density', button.dataset.linearDensity);
+                    sendControlUpdate('density', button.dataset.value);
                 });
             });
 
-            // Bind sliders
+            // Bind sliders with real-time updates (no apply button needed)
             const sliderBindings = [
                 { id: 'linearPoints', controlId: 'points', format: (v) => Math.round(v).toString() },
                 { id: 'linearSpread', controlId: 'spread', format: (v) => Math.round(v).toString() },
-                { id: 'linearAmplitude', controlId: 'amplitude', format: (v) => v.toFixed(1) },
-                { id: 'linearLineWidth', controlId: 'lineWidth', format: (v) => v.toFixed(1) },
+                { id: 'linearAmplitude', controlId: 'amplitude', format: (v) => v.toFixed(1) + 'x' },
+                { id: 'linearLineWidth', controlId: 'lineWidth', format: (v) => v.toFixed(1) + 'px' },
                 { id: 'linearHue', controlId: 'hue', format: (v) => Math.round(v) + '°' },
                 { id: 'linearSaturation', controlId: 'saturation', format: (v) => Math.round(v) + '%' },
                 { id: 'linearOpacity', controlId: 'opacity', format: (v) => v.toFixed(2) },
-                { id: 'linearBackgroundShift', controlId: 'backgroundShift', format: (v) => v.toFixed(1) }
+                { id: 'linearBackgroundShift', controlId: 'backgroundShift', format: (v) => v.toFixed(1) + 'x' }
             ];
 
             sliderBindings.forEach(binding => {
@@ -1692,12 +1704,15 @@
                     slider.addEventListener('input', (e) => {
                         const value = parseFloat(e.target.value);
                         valueEl.textContent = binding.format(value);
+                        // Real-time update - no apply button needed
                         sendControlUpdate(binding.controlId, value);
                     });
+                } else {
+                    console.warn(`⚠️ LINEAR control not found: ${binding.id}`);
                 }
             });
 
-            console.log('✅ LINEAR theme controls initialized');
+            console.log('✅ LINEAR theme controls initialized with real-time sync');
         }
 
         // Initialize controls

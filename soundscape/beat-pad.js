@@ -1,7 +1,7 @@
 /**
  * Beat Pad Scene System
  *
- * Manages a 4×4 grid of scene slots for saving/loading complete visualization states.
+ * Manages a 3×3 grid of scene slots for saving/loading complete visualization states.
  * Each pad stores a snapshot of theme, controls, and audio reactivity settings.
  */
 
@@ -9,7 +9,7 @@ class BeatPad {
   constructor(soundscape, controlSystem) {
     this.soundscape = soundscape;
     this.controlSystem = controlSystem;
-    this.scenes = new Array(16).fill(null); // 16 pads (4×4 grid)
+    this.scenes = new Array(9).fill(null); // 9 pads (3×3 grid)
     this.activePadIndex = null;
     this.gridContainer = null;
 
@@ -44,7 +44,7 @@ class BeatPad {
   }
 
   /**
-   * Create the 4×4 grid UI
+   * Create the 3×3 grid UI
    */
   createGridUI() {
     // Create container
@@ -95,14 +95,14 @@ class BeatPad {
     fileInput.id = 'beat-pad-file-input';
     this.gridContainer.appendChild(fileInput);
 
-    // Create grid (4×4 = 16 pads)
+    // Create grid (3×3 = 9 pads)
     const grid = document.createElement('div');
     grid.className = 'beat-pad-grid';
 
     // Keyboard hints for each pad
-    const keyHints = ['1', '2', '3', '4', 'Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
+    const keyHints = ['1', '2', '3', 'Q', 'W', 'E', 'A', 'S', 'D'];
 
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 9; i++) {
       const pad = document.createElement('div');
       pad.className = 'beat-pad';
       pad.dataset.index = i;
