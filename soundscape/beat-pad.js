@@ -879,12 +879,20 @@ class BeatPad {
    * Clear all scenes
    */
   clearAllScenes() {
-    console.log('🗑️ Clearing all scenes...');
+    console.log('🗑️ Clearing all scenes and purging localStorage...');
     this.scenes = new Array(9).fill(null);
     this.activePadIndex = null;
-    this.saveScenestoStorage();
+
+    // Completely remove from localStorage
+    try {
+      localStorage.removeItem('beatPadScenes');
+      console.log('💾 localStorage purged: beatPadScenes removed');
+    } catch (e) {
+      console.error('Failed to remove from localStorage:', e);
+    }
+
     this.updateGridUI();
-    console.log('✅ All scenes cleared, UI updated');
+    console.log('✅ All scenes cleared, localStorage purged, UI updated');
   }
 
   /**
