@@ -352,13 +352,17 @@
             background: #ffffff;
         }
 
-        .beatpad-toggle:hover .grid-icon {
-            border-color: #000000;
-        }
-
-        .beatpad-toggle:hover .grid-icon::before,
-        .beatpad-toggle:hover .grid-icon::after {
+        .beatpad-toggle:hover .grid-icon::before {
             background: #000000;
+            box-shadow:
+                6px 0 0 #000000,
+                12px 0 0 #000000,
+                0 6px 0 #000000,
+                6px 6px 0 #000000,
+                12px 6px 0 #000000,
+                0 12px 0 #000000,
+                6px 12px 0 #000000,
+                12px 12px 0 #000000;
         }
 
         .beatpad-toggle.hidden-control {
@@ -370,13 +374,17 @@
             background: #ffffff;
         }
 
-        .beatpad-toggle.active .grid-icon {
-            border-color: #000000;
-        }
-
-        .beatpad-toggle.active .grid-icon::before,
-        .beatpad-toggle.active .grid-icon::after {
+        .beatpad-toggle.active .grid-icon::before {
             background: #000000;
+            box-shadow:
+                6px 0 0 #000000,
+                12px 0 0 #000000,
+                0 6px 0 #000000,
+                6px 6px 0 #000000,
+                12px 6px 0 #000000,
+                0 12px 0 #000000,
+                6px 12px 0 #000000,
+                12px 12px 0 #000000;
         }
 
         /* 3x3 Grid Icon */
