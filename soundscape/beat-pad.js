@@ -18,6 +18,10 @@ class BeatPad {
     this.transitionDuration = 1000; // milliseconds
     this.isTransitioning = false;
 
+    // Drag state
+    this.isDragging = false;
+    this.dragOffset = { x: 0, y: 0 };
+
     this.init();
   }
 
@@ -28,8 +32,12 @@ class BeatPad {
     this.loadScenesFromStorage();
     this.createGridUI();
     this.setupToggleButton();
+    this.setupDragging();
     this.attachEventListeners();
     this.setupKeyboardShortcuts();
+
+    // Restore position from localStorage
+    this.restorePosition();
 
     // Initially hide the beatpad
     this.gridContainer.classList.add('hidden');
@@ -159,6 +167,101 @@ class BeatPad {
       this.gridContainer.classList.add('hidden');
       if (toggleBtn) toggleBtn.classList.remove('active');
       console.log('❌ Beat Pad closed');
+    }
+  }
+
+  /**
+   * Setup dragging functionality
+   */
+  setupDragging() {
+    const header = this.gridContainer.querySelector('.beat-pad-header h3');
+    if (!header) return;
+
+    header.style.cursor = 'grab';
+
+    const startDrag = (e) => {
+      // Only drag if clicking on the header, not buttons
+      if (e.target.tagName === 'BUTTON') return;
+
+      this.isDragging = true;
+      header.style.cursor = 'grabbing';
+
+      const rect = this.gridContainer.getBoundingClientRect();
+      const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+
+      this.dragOffset.x = clientX - rect.left;
+      this.dragOffset.y = clientY - rect.top;
+
+      e.preventDefault();
+    };
+
+    const drag = (e) => {
+      if (!this.isDragging) return;
+
+      const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+
+      const newLeft = clientX - this.dragOffset.x;
+      const newTop = clientY - this.dragOffset.y;
+
+      // Keep within viewport bounds
+      const maxLeft = window.innerWidth - this.gridContainer.offsetWidth;
+      const maxTop = window.innerHeight - this.gridContainer.offsetHeight;
+
+      const boundedLeft = Math.max(0, Math.min(newLeft, maxLeft));
+      const boundedTop = Math.max(0, Math.min(newTop, maxTop));
+
+      this.gridContainer.style.left = `${boundedLeft}px`;
+      this.gridContainer.style.top = `${boundedTop}px`;
+      this.gridContainer.style.right = 'auto';
+
+      e.preventDefault();
+    };
+
+    const endDrag = () => {
+      if (this.isDragging) {
+        this.isDragging = false;
+        header.style.cursor = 'grab';
+        this.savePosition();
+      }
+    };
+
+    header.addEventListener('mousedown', startDrag);
+    header.addEventListener('touchstart', startDrag);
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('touchmove', drag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+  }
+
+  /**
+   * Save position to localStorage
+   */
+  savePosition() {
+    const position = {
+      left: this.gridContainer.style.left,
+      top: this.gridContainer.style.top
+    };
+    localStorage.setItem('beatpad-position', JSON.stringify(position));
+  }
+
+  /**
+   * Restore position from localStorage
+   */
+  restorePosition() {
+    const saved = localStorage.getItem('beatpad-position');
+    if (saved) {
+      try {
+        const position = JSON.parse(saved);
+        if (position.left && position.top) {
+          this.gridContainer.style.left = position.left;
+          this.gridContainer.style.top = position.top;
+          this.gridContainer.style.right = 'auto';
+        }
+      } catch (err) {
+        console.warn('Failed to restore Beat Pad position:', err);
+      }
     }
   }
 
