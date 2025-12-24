@@ -11,7 +11,7 @@
 const AUDIO_SOURCES = {
   // Basic
   none: {
-    label: 'None (Static)',
+    label: 'Static',
     category: 'basic',
     description: 'No audio modulation'
   },
@@ -1645,11 +1645,11 @@ class ControlSystemUI {
   }
 
   /**
-   * Get display label for audio source
+   * Get display label for audio source (always uppercase for buttons)
    */
   getAudioSourceLabel(sourceId) {
     const source = AUDIO_SOURCES[sourceId];
-    return source ? source.label : sourceId.toUpperCase();
+    return source ? source.label.toUpperCase() : sourceId.toUpperCase();
   }
 
   /**
@@ -1706,8 +1706,8 @@ class ControlSystemUI {
           e.stopPropagation();
           this.handleAudioSourceChange(controlId, context, sourceId);
 
-          // Update button
-          button.textContent = source.label;
+          // Update button (always uppercase)
+          button.textContent = source.label.toUpperCase();
           button.dataset.audioSource = sourceId;
 
           // Update styling (static only for 'none')
