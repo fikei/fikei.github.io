@@ -819,7 +819,7 @@ const THEME_CONFIGS = {
         category: 'geometry'
       },
       spread: {
-        default: 100,
+        default: 12,
         category: 'geometry'
       },
       amplitude: {
