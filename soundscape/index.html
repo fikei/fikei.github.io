@@ -2365,6 +2365,8 @@
 
                 // Initialize Audio Modulation Engine
                 audioEngine = new AudioModulationEngine();
+                window.audioEngine = audioEngine; // Make globally accessible for Beat Pad
+                console.log('✅ AudioEngine initialized and set as window.audioEngine');
 
                 // Show controls for current theme
                 const currentTheme = state.settings.theme || 'linear';

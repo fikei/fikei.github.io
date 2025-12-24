@@ -455,9 +455,22 @@ class BeatPad {
     }
 
     // Also capture all control values from audioEngine directly for the current theme
+    console.log('📸 Checking window.audioEngine:', {
+      exists: !!window.audioEngine,
+      hasThemes: !!(window.audioEngine && window.audioEngine.themes),
+      currentTheme: this.soundscape.currentTheme
+    });
+
     if (window.audioEngine && window.audioEngine.themes) {
       const currentTheme = this.soundscape.currentTheme;
       const themeConfig = window.audioEngine.themes[currentTheme];
+
+      console.log('📸 Theme config:', {
+        theme: currentTheme,
+        configExists: !!themeConfig,
+        hasControls: !!(themeConfig && themeConfig.controls),
+        controlKeys: themeConfig && themeConfig.controls ? Object.keys(themeConfig.controls) : []
+      });
 
       if (themeConfig && themeConfig.controls) {
         console.log(`📸 Capturing ${currentTheme} theme controls from audioEngine:`, Object.keys(themeConfig.controls));
@@ -469,7 +482,11 @@ class BeatPad {
             console.log(`  ${controlId}: ${value}`);
           }
         }
+      } else {
+        console.warn('⚠️ No theme config or controls found for', currentTheme);
       }
+    } else {
+      console.warn('⚠️ window.audioEngine or audioEngine.themes not available');
     }
 
     // Capture audio reactivity settings
