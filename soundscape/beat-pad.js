@@ -174,17 +174,25 @@ class BeatPad {
    * Setup dragging functionality
    */
   setupDragging() {
-    const header = this.gridContainer.querySelector('.beat-pad-header h3');
-    if (!header) return;
+    const header = this.gridContainer.querySelector('.beat-pad-header');
+    if (!header) {
+      console.warn('⚠️ Beat Pad header not found for dragging');
+      return;
+    }
 
+    // Make the header (but not buttons) draggable
     header.style.cursor = 'grab';
+    header.style.userSelect = 'none';
 
     const startDrag = (e) => {
-      // Only drag if clicking on the header, not buttons
-      if (e.target.tagName === 'BUTTON') return;
+      // Don't drag if clicking on buttons or inputs
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') {
+        return;
+      }
 
       this.isDragging = true;
       header.style.cursor = 'grabbing';
+      document.body.style.cursor = 'grabbing';
 
       const rect = this.gridContainer.getBoundingClientRect();
       const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
@@ -193,7 +201,10 @@ class BeatPad {
       this.dragOffset.x = clientX - rect.left;
       this.dragOffset.y = clientY - rect.top;
 
+      console.log('🎯 Drag started', { x: clientX, y: clientY, offset: this.dragOffset });
+
       e.preventDefault();
+      e.stopPropagation();
     };
 
     const drag = (e) => {
@@ -223,16 +234,21 @@ class BeatPad {
       if (this.isDragging) {
         this.isDragging = false;
         header.style.cursor = 'grab';
+        document.body.style.cursor = '';
         this.savePosition();
+        console.log('🎯 Drag ended', { left: this.gridContainer.style.left, top: this.gridContainer.style.top });
       }
     };
 
+    // Attach to header, not just h3
     header.addEventListener('mousedown', startDrag);
-    header.addEventListener('touchstart', startDrag);
+    header.addEventListener('touchstart', startDrag, { passive: false });
     document.addEventListener('mousemove', drag);
-    document.addEventListener('touchmove', drag);
+    document.addEventListener('touchmove', drag, { passive: false });
     document.addEventListener('mouseup', endDrag);
     document.addEventListener('touchend', endDrag);
+
+    console.log('✅ Beat Pad drag handlers attached to header');
   }
 
   /**
