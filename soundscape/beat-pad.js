@@ -343,16 +343,22 @@ class BeatPad {
 
     // Clear all button
     const clearAllBtn = document.getElementById('beat-pad-clear-all');
+    console.log('🔍 Clear All button element:', clearAllBtn ? 'FOUND' : 'NOT FOUND');
+
     if (clearAllBtn) {
       clearAllBtn.addEventListener('click', () => {
-        console.log('🗑️ Clear All button clicked');
-        if (confirm('⚠️ DELETE ALL SCENES?\n\nThis will permanently delete all 9 saved scenes from storage.\n\nClick OK to delete, or Cancel to keep them.')) {
+        console.log('🗑️ Clear All button clicked - showing confirmation dialog...');
+        const userConfirmed = confirm('⚠️ DELETE ALL SCENES?\n\nThis will permanently delete all 9 saved scenes from storage.\n\nClick OK to delete, or Cancel to keep them.');
+        console.log('User confirmation result:', userConfirmed ? 'OK (proceed with delete)' : 'CANCEL (keep scenes)');
+
+        if (userConfirmed) {
           this.clearAllScenes();
           console.log('✅ All scenes cleared');
         } else {
           console.log('❌ Clear cancelled by user');
         }
       });
+      console.log('✅ Clear All button event listener attached');
     } else {
       console.error('⚠️ Clear All button not found!');
     }
