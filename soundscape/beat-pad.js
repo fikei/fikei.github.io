@@ -434,86 +434,57 @@ class BeatPad {
    * Capture current visualization state as a scene
    */
   getCurrentScene() {
+    const currentTheme = this.soundscape.currentTheme;
+
     const scene = {
       version: '1.0',
       timestamp: Date.now(),
       name: `Scene ${new Date().toLocaleTimeString()}`,
-      theme: this.soundscape.currentTheme,
+      theme: currentTheme,
       settings: {}
     };
 
-    // Capture all control values from control system
-    const registry = window.CONTROL_REGISTRY || {};
-    console.log('📸 Capturing scene from CONTROL_REGISTRY:', Object.keys(registry));
+    console.log(`📸 Capturing scene for theme: ${currentTheme}`);
 
-    for (const [controlId, config] of Object.entries(registry)) {
-      // Get current value from soundscape
-      const currentValue = this.getCurrentControlValue(controlId, config);
-      if (currentValue !== undefined) {
-        scene.settings[controlId] = currentValue;
-      }
-    }
-
-    // Also capture all control values from audioEngine directly for the current theme
-    console.log('📸 Checking window.audioEngine:', {
-      exists: !!window.audioEngine,
-      hasThemes: !!(window.audioEngine && window.audioEngine.themes),
-      currentTheme: this.soundscape.currentTheme
-    });
-
+    // Capture ALL control values from audioEngine (authoritative source)
     if (window.audioEngine && window.audioEngine.themes) {
-      const currentTheme = this.soundscape.currentTheme;
       const themeConfig = window.audioEngine.themes[currentTheme];
 
-      console.log('📸 Theme config:', {
-        theme: currentTheme,
-        configExists: !!themeConfig,
-        hasControls: !!(themeConfig && themeConfig.controls),
-        controlKeys: themeConfig && themeConfig.controls ? Object.keys(themeConfig.controls) : []
-      });
-
       if (themeConfig && themeConfig.controls) {
-        console.log(`📸 Capturing ${currentTheme} theme controls from audioEngine:`, Object.keys(themeConfig.controls));
+        const controlIds = Object.keys(themeConfig.controls);
+        console.log(`📸 Capturing ${controlIds.length} controls from audioEngine:`, controlIds);
 
-        for (const controlId of Object.keys(themeConfig.controls)) {
+        for (const controlId of controlIds) {
           const value = window.audioEngine.getValue(currentTheme, controlId);
           if (value !== undefined && value !== null) {
             scene.settings[controlId] = value;
-            console.log(`  ${controlId}: ${value}`);
+            console.log(`  ✓ ${controlId}: ${value}`);
+          } else {
+            console.warn(`  ⚠️ ${controlId}: undefined/null value`);
           }
         }
+
+        console.log(`📸 Successfully captured ${Object.keys(scene.settings).length} control values`);
       } else {
-        console.warn('⚠️ No theme config or controls found for', currentTheme);
+        console.error(`⚠️ No theme config or controls found for ${currentTheme}`);
       }
     } else {
-      console.warn('⚠️ window.audioEngine or audioEngine.themes not available');
+      console.error('⚠️ window.audioEngine or audioEngine.themes not available');
     }
 
     // Capture audio reactivity settings
     if (this.controlSystem && this.controlSystem.audioReactivity) {
       scene.audioReactivity = { ...this.controlSystem.audioReactivity };
+      console.log(`📸 Captured audio reactivity for ${Object.keys(scene.audioReactivity).length} controls`);
     }
 
-    console.log('📸 Scene captured:', scene);
+    console.log('📸 Scene capture complete:', {
+      theme: scene.theme,
+      settingsCount: Object.keys(scene.settings).length,
+      hasAudioReactivity: !!scene.audioReactivity
+    });
+
     return scene;
-  }
-
-  /**
-   * Get current value for a control
-   */
-  getCurrentControlValue(controlId, config) {
-    // Try to get from theme config first
-    if (this.soundscape.themeConfig && this.soundscape.themeConfig[controlId] !== undefined) {
-      return this.soundscape.themeConfig[controlId];
-    }
-
-    // Try to get from soundscape properties
-    if (this.soundscape[controlId] !== undefined) {
-      return this.soundscape[controlId];
-    }
-
-    // Use default from config
-    return config.default;
   }
 
   /**
