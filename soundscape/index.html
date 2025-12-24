@@ -329,7 +329,7 @@
         .beatpad-toggle {
             position: fixed;
             bottom: 1rem;
-            left: 3rem;
+            left: 2.5rem;
             z-index: 101;
             width: 30px;
             height: 30px;
@@ -350,7 +350,15 @@
 
         .beatpad-toggle:hover {
             background: #ffffff;
-            color: #000000;
+        }
+
+        .beatpad-toggle:hover .grid-icon {
+            border-color: #000000;
+        }
+
+        .beatpad-toggle:hover .grid-icon::before,
+        .beatpad-toggle:hover .grid-icon::after {
+            background: #000000;
         }
 
         .beatpad-toggle.hidden-control {
@@ -360,7 +368,43 @@
 
         .beatpad-toggle.active {
             background: #ffffff;
-            color: #000000;
+        }
+
+        .beatpad-toggle.active .grid-icon {
+            border-color: #000000;
+        }
+
+        .beatpad-toggle.active .grid-icon::before,
+        .beatpad-toggle.active .grid-icon::after {
+            background: #000000;
+        }
+
+        /* 3x3 Grid Icon */
+        .grid-icon {
+            width: 15px;
+            height: 15px;
+            display: grid;
+            grid-template-columns: repeat(3, 3px);
+            grid-template-rows: repeat(3, 3px);
+            gap: 3px;
+            position: relative;
+        }
+
+        .grid-icon::before {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: white;
+            box-shadow:
+                6px 0 0 white,
+                12px 0 0 white,
+                0 6px 0 white,
+                6px 6px 0 white,
+                12px 6px 0 white,
+                0 12px 0 white,
+                6px 12px 0 white,
+                12px 12px 0 white;
         }
 
         /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
@@ -1376,7 +1420,9 @@
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
 
     <!-- Beat Pad Toggle -->
-    <button class="beatpad-toggle" id="beatpadToggle" aria-label="Toggle Beat Pad" title="Beat Pad (Shift+B)">⚏</button>
+    <button class="beatpad-toggle" id="beatpadToggle" aria-label="Toggle Beat Pad" title="Beat Pad (Shift+B)">
+        <span class="grid-icon"></span>
+    </button>
 
     <!-- Add Media Button & Dropdown -->
     <button class="add-image-button" id="addImageButton" aria-label="Add media">+</button>
