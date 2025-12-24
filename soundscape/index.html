@@ -821,17 +821,19 @@
             font-size: 9px;
             font-weight: 500;
             padding: 0.25rem 0.5rem;
-            background: #1a1a1a;
+            background: #000000;
             color: #ffffff;
             border: 1px solid #333333;
             border-radius: 2px;
             cursor: pointer;
             flex: 1;
+            text-align: left;
         }
 
         .beat-pad-select:focus {
             outline: none;
             border-color: #666666;
+            background: #000000;
         }
 
         .beat-pad-slider {
@@ -1014,15 +1016,18 @@
             text-transform: uppercase;
             cursor: pointer;
             transition: border-color 0.15s ease;
+            text-align: left;
         }
 
         .theme-select:hover {
             border-color: #ffffff;
+            background: #000000;
         }
 
         .theme-select:focus {
             outline: none;
             border-color: #ffffff;
+            background: #000000;
         }
 
         /* ===== UNIFIED CONTROL SYSTEM ===== */
@@ -1069,17 +1074,20 @@
             font-family: 'Space Grotesk', monospace;
             cursor: pointer;
             transition: border-color 0.15s ease;
+            text-align: left;
         }
 
         .audio-source-dropdown:hover {
             border-color: #ffffff;
             color: #ffffff;
+            background: #000000;
         }
 
         .audio-source-dropdown:focus {
             outline: none;
             border-color: #ffffff;
             color: #ffffff;
+            background: #000000;
         }
 
         .audio-source-dropdown option:disabled {
@@ -1124,15 +1132,18 @@
             text-transform: uppercase;
             cursor: pointer;
             transition: border-color 0.15s ease;
+            text-align: left;
         }
 
         .mode-select:hover {
             border-color: #ffffff;
+            background: #000000;
         }
 
         .mode-select:focus {
             outline: none;
             border-color: #ffffff;
+            background: #000000;
         }
 
         /* Buttons */
@@ -3351,7 +3362,7 @@
                 path.setAttribute('stroke-width', lineWidth);
 
                 // Update stroke color from control system
-                path.setAttribute('stroke', `hsl(${hue}, ${saturation}%, 50%)`);
+                path.setAttribute('stroke', `hsl(${hue}, ${saturation}%, 100%)`);
             });
         }
 
