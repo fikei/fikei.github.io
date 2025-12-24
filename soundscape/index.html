@@ -2765,6 +2765,12 @@
             const bassShiftX = Math.sin(time * 0.001) * bassLevel * 20 * amplitude;
             const bassShiftY = Math.cos(time * 0.0015) * bassLevel * 15 * amplitude;
 
+            // Store background shift for theme renderers
+            state.backgroundShift = {
+                x: bassShiftX,
+                y: bassShiftY
+            };
+
             // Get canvas dimensions
             const canvasWidth = state.boundingRect.width;
             const canvasHeight = state.boundingRect.height;
@@ -2921,6 +2927,12 @@
             const saturation = audioEngine ? (audioEngine.getValue('linear', 'saturation') || theme.saturation) : theme.saturation;
             const opacity = audioEngine ? (audioEngine.getValue('linear', 'opacity') || theme.opacity) : theme.opacity;
             const lineWidth = audioEngine ? (audioEngine.getValue('linear', 'lineWidth') || 3) : 3;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('linear', 'backgroundShift') || 1.0) : 1.0;
+
+            // Calculate background shift transform
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            const transformString = shiftX !== 0 || shiftY !== 0 ? `translate(${shiftX}, ${shiftY})` : '';
 
             // Hide NEON gradient mesh if it exists
             const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
@@ -2955,7 +2967,14 @@
                 const path = state.paths[lineIndex];
                 path.setAttribute('d', pathData);
                 path.removeAttribute('filter');
-                path.removeAttribute('transform');
+
+                // Apply background shift transform
+                if (transformString) {
+                    path.setAttribute('transform', transformString);
+                } else {
+                    path.removeAttribute('transform');
+                }
+
                 path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
                 path.setAttribute('stroke-width', lineWidth);
 
@@ -2984,6 +3003,7 @@
             const responsiveness = audioEngine ? (audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
             const smoothing = audioEngine ? (audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
             const meshDensity = audioEngine ? (audioEngine.getValue('neon', 'meshDensity') || 8) : 8;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('neon', 'backgroundShift') || 1.0) : 1.0;
 
             // Initialize NEON state if needed (for smoothing and reactive mode)
             if (!state.neon) {
@@ -3024,6 +3044,15 @@
                 gradientMeshGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 gradientMeshGroup.setAttribute('id', 'neon-gradient-mesh');
                 elements.svg.appendChild(gradientMeshGroup);
+            }
+
+            // Apply background shift transform
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            if (shiftX !== 0 || shiftY !== 0) {
+                gradientMeshGroup.setAttribute('transform', `translate(${shiftX}, ${shiftY})`);
+            } else {
+                gradientMeshGroup.removeAttribute('transform');
             }
 
             // Color settings are now from control system
@@ -3443,6 +3472,7 @@
             const scanlinesControl = audioEngine ? (audioEngine.getValue('glitch', 'scanlines') || 0) : 0;
             const noiseControl = audioEngine ? (audioEngine.getValue('glitch', 'noise') || 0) : 0;
             const pixelationControl = audioEngine ? (audioEngine.getValue('glitch', 'pixelation') || 1) : 1;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('glitch', 'backgroundShift') || 1.0) : 1.0;
 
             // Calculate glitch parameters with user intensity multipliers
             const glitchEffectIntensity = glitchIntensityControl;
@@ -3463,6 +3493,12 @@
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply background shift
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            ctx.save();
+            ctx.translate(shiftX, shiftY);
 
             // Apply quantization/pixelation by scaling down and up
             const pixelSize = Math.max(1, Math.floor(quantization));
@@ -3653,6 +3689,9 @@
                 }
                 ctx.putImageData(noiseData, 0, 0);
             }
+
+            // Restore canvas state
+            ctx.restore();
         }
 
         function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0, baseRotation = 0) {
@@ -4122,7 +4161,7 @@
             const speed = audioEngine ? (audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
             const brightness = audioEngine ? (audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
             const zSpeed = audioEngine ? (audioEngine.getValue('stars', 'zSpeed') || state.settings.starZSpeed) : state.settings.starZSpeed;
-            const centerShiftRate = audioEngine ? (audioEngine.getValue('stars', 'centerShiftRate') || state.settings.starCenterRate) : state.settings.starCenterRate;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('stars', 'backgroundShift') || 1.0) : 1.0;
             const minOpacity = audioEngine ? (audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
             const maxOpacity = audioEngine ? (audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
             const diameter = audioEngine ? (audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
@@ -4170,6 +4209,12 @@
             ctx.globalAlpha = 1.0 - (trailLength * 0.7);
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, w, h);
+
+            // Apply background shift
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            ctx.save();
+            ctx.translate(shiftX, shiftY);
 
             // Calculate audio-reactive speed multiplier
             // Bass SLOWS DOWN orbit speed using user setting
@@ -4250,6 +4295,9 @@
                 });
 
             ctx.globalAlpha = 1.0;
+
+            // Restore canvas state
+            ctx.restore();
         }
 
         // =====================================================
@@ -4316,6 +4364,7 @@
             const depth = audioEngine ? (audioEngine.getValue('wave', 'depth') || 1.0) : 1.0;
             const turbulence = audioEngine ? (audioEngine.getValue('wave', 'turbulence') || 0) : 0;
             const phaseShift = audioEngine ? (audioEngine.getValue('wave', 'phaseShift') || 0) : 0;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('wave', 'backgroundShift') || 1.0) : 1.0;
 
             // Hide SVG paths for WAVE theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -4349,6 +4398,12 @@
 
             // Clear canvas
             ctx.clearRect(0, 0, w, h);
+
+            // Apply background shift
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            ctx.save();
+            ctx.translate(shiftX, shiftY);
 
             // Audio smoothing and speed boost
             const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
@@ -4513,6 +4568,9 @@
             }
 
             ctx.globalAlpha = 1.0;
+
+            // Restore canvas state
+            ctx.restore();
         }
 
         // Theme renderer dispatcher

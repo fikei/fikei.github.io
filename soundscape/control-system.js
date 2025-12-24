@@ -354,17 +354,17 @@ const CONTROL_REGISTRY = {
     description: 'Depth movement speed'
   },
 
-  centerShiftRate: {
+  backgroundShift: {
     type: 'slider',
-    label: 'CENTER SHIFT',
+    label: 'BACKGROUND SHIFT',
     min: 0,
     max: 5,
     step: 0.1,
     default: 1.0,
-    unit: '',
+    unit: 'x',
     category: 'motion',
     audioReactive: true,
-    description: 'Center position shift rate'
+    description: 'Global camera shift intensity (bass-reactive)'
   },
 
   smoothing: {
@@ -843,6 +843,12 @@ const THEME_CONFIGS = {
       opacity: {
         default: 0.6,
         category: 'color'
+      },
+
+      // Motion
+      backgroundShift: {
+        default: 1.0,
+        category: 'motion'
       }
     },
     audioReactivity: {
@@ -855,7 +861,8 @@ const THEME_CONFIGS = {
       lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
-      opacity: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' }
+      opacity: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
     }
   },
 
@@ -956,6 +963,10 @@ const THEME_CONFIGS = {
         default: 1.0,
         category: 'motion'
       },
+      backgroundShift: {
+        default: 1.0,
+        category: 'motion'
+      },
       responsiveness: {
         type: 'slider',
         label: 'RESPONSIVENESS',
@@ -1003,7 +1014,8 @@ const THEME_CONFIGS = {
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       lightness: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       meshDensity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
-      blur: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+      blur: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
     }
   },
 
@@ -1030,6 +1042,10 @@ const THEME_CONFIGS = {
 
       // Motion - 3D rotation effects
       rotation: {
+        default: 1.0,
+        category: 'motion'
+      },
+      backgroundShift: {
         default: 1.0,
         category: 'motion'
       },
@@ -1075,7 +1091,8 @@ const THEME_CONFIGS = {
       contrast: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       scanlines: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       noise: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
-      pixelation: { enabled: false, frequency: 'none', intensity: 0.7, mode: 'modulate' }
+      pixelation: { enabled: false, frequency: 'none', intensity: 0.7, mode: 'modulate' },
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
     }
   },
 
@@ -1105,7 +1122,7 @@ const THEME_CONFIGS = {
         default: 0,
         category: 'motion'
       },
-      centerShiftRate: {
+      backgroundShift: {
         default: 1.0,
         category: 'motion'
       },
@@ -1171,7 +1188,7 @@ const THEME_CONFIGS = {
       hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       zSpeed: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
-      centerShiftRate: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' },
       minOpacity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       maxOpacity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       diameter: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
@@ -1249,6 +1266,10 @@ const THEME_CONFIGS = {
         default: 1.0,
         category: 'motion'
       },
+      backgroundShift: {
+        default: 1.0,
+        category: 'motion'
+      },
 
       // Effects
       glow: {
@@ -1289,7 +1310,8 @@ const THEME_CONFIGS = {
       perspective: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       depth: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       turbulence: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
-      phaseShift: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+      phaseShift: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
     }
   }
 };
