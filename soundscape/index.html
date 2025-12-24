@@ -2018,28 +2018,24 @@
                 : state.settings.density;
             const density = config.densityPresets[densityValue];
 
-            // Get points and spread controls (override density if control system is active)
-            const pointsControl = (audioEngine && state.settings.theme === 'linear')
-                ? (audioEngine.getValue('linear', 'points') || 30)
-                : 30;
+            // Get spread control (represents both xGap and yGap for uniform grid spacing)
+            // Default to 12px (original medium density)
             const spreadControl = (audioEngine && state.settings.theme === 'linear')
-                ? (audioEngine.getValue('linear', 'spread') || 100)
-                : 100;
+                ? (audioEngine.getValue('linear', 'spread') || 12)
+                : 12;
 
-            // Use spread control to determine xGap, points control to determine number of vertical points
+            // Use spread control for both x and y gap (uniform grid spacing)
             const xGap = spreadControl;
+            const yGap = spreadControl;
 
             // Calculate grid dimensions - oversized to hide edges
             const padding = 400; // Increased padding to ensure edges are never visible
             const oWidth = width + padding;
             const oHeight = height + padding;
+
+            // Calculate total lines and points based on gap spacing (original behavior)
             const totalLines = Math.ceil(oWidth / xGap);
-
-            // Use points control to directly set number of points per line
-            const totalPoints = Math.floor(pointsControl);
-
-            // Calculate yGap to distribute points evenly across height
-            const yGap = oHeight / totalPoints;
+            const totalPoints = Math.ceil(oHeight / yGap);
 
             const xStart = (width - xGap * totalLines) / 2;
             const yStart = (height - yGap * totalPoints) / 2;
