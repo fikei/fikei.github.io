@@ -2020,8 +2020,8 @@
 
             // Get points and spread controls (override density if control system is active)
             const pointsControl = (audioEngine && state.settings.theme === 'linear')
-                ? (audioEngine.getValue('linear', 'points') || 8)
-                : 8;
+                ? (audioEngine.getValue('linear', 'points') || 30)
+                : 30;
             const spreadControl = (audioEngine && state.settings.theme === 'linear')
                 ? (audioEngine.getValue('linear', 'spread') || 100)
                 : 100;
