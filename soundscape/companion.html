@@ -835,7 +835,148 @@
                         <span class="expand-icon">▼</span>
                     </button>
                     <div class="theme-group-content" id="neonControls">
-                        <!-- Will be populated with NEON controls -->
+                        <!-- Style -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>COLOR MODE</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button active" data-control="colorMode" data-value="bright">BRIGHT</button>
+                                <button class="mode-button" data-control="colorMode" data-value="gray">GRAY</button>
+                                <button class="mode-button" data-control="colorMode" data-value="pastel">PASTEL</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>COLOR CHANGE</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button active" data-control="colorChangeMode" data-value="static">STATIC</button>
+                                <button class="mode-button" data-control="colorChangeMode" data-value="cycle">CYCLE</button>
+                                <button class="mode-button" data-control="colorChangeMode" data-value="pulse">PULSE</button>
+                                <button class="mode-button" data-control="colorChangeMode" data-value="reactive">REACTIVE</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>DENSITY</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button" data-control="density" data-value="low">L</button>
+                                <button class="mode-button active" data-control="density" data-value="medium">M</button>
+                                <button class="mode-button" data-control="density" data-value="high">H</button>
+                            </div>
+                        </div>
+
+                        <!-- Color -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>CYCLE SPEED</span>
+                                <span class="control-value" id="neonCycleSpeedValue">0.10×</span>
+                            </div>
+                            <input type="range" id="neonCycleSpeedSlider" data-control="cycleSpeed" min="0.01" max="0.5" step="0.01" value="0.1">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>WARM/COOL</span>
+                                <span class="control-value" id="neonWarmCoolValue">1.0</span>
+                            </div>
+                            <input type="range" id="neonWarmCoolSlider" data-control="warmCool" min="0" max="2" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>HUE</span>
+                                <span class="control-value" id="neonHueValue">280°</span>
+                            </div>
+                            <input type="range" id="neonHueSlider" data-control="hue" min="0" max="360" step="1" value="280">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SATURATION</span>
+                                <span class="control-value" id="neonSaturationValue">70%</span>
+                            </div>
+                            <input type="range" id="neonSaturationSlider" data-control="saturation" min="0" max="100" step="1" value="70">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>LIGHTNESS</span>
+                                <span class="control-value" id="neonLightnessValue">50%</span>
+                            </div>
+                            <input type="range" id="neonLightnessSlider" data-control="lightness" min="0" max="100" step="1" value="50">
+                        </div>
+
+                        <!-- Geometry -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BURST SIZE</span>
+                                <span class="control-value" id="neonBurstSizeValue">1.0</span>
+                            </div>
+                            <input type="range" id="neonBurstSizeSlider" data-control="burstSize" min="0.5" max="3" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MESH DENSITY</span>
+                                <span class="control-value" id="neonMeshDensityValue">8</span>
+                            </div>
+                            <input type="range" id="neonMeshDensitySlider" data-control="meshDensity" min="4" max="16" step="1" value="8">
+                        </div>
+
+                        <!-- Motion -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MOVEMENT</span>
+                                <span class="control-value" id="neonMovementValue">1.0</span>
+                            </div>
+                            <input type="range" id="neonMovementSlider" data-control="movement" min="0" max="3" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BACKGROUND SHIFT</span>
+                                <span class="control-value" id="neonBackgroundShiftValue">1.0×</span>
+                            </div>
+                            <input type="range" id="neonBackgroundShiftSlider" data-control="backgroundShift" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>RESPONSIVENESS</span>
+                                <span class="control-value" id="neonResponsivenessValue">1.0×</span>
+                            </div>
+                            <input type="range" id="neonResponsivenessSlider" data-control="responsiveness" min="0.1" max="2.0" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SMOOTHING</span>
+                                <span class="control-value" id="neonSmoothingValue">70%</span>
+                            </div>
+                            <input type="range" id="neonSmoothingSlider" data-control="smoothing" min="0" max="0.95" step="0.05" value="0.7">
+                        </div>
+
+                        <!-- Effects -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>GLOW</span>
+                                <span class="control-value" id="neonGlowValue">1.5</span>
+                            </div>
+                            <input type="range" id="neonGlowSlider" data-control="glow" min="0" max="3" step="0.1" value="1.5">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BLUR</span>
+                                <span class="control-value" id="neonBlurValue">0px</span>
+                            </div>
+                            <input type="range" id="neonBlurSlider" data-control="blur" min="0" max="20" step="1" value="0">
+                        </div>
                     </div>
                 </div>
 
@@ -846,7 +987,91 @@
                         <span class="expand-icon">▼</span>
                     </button>
                     <div class="theme-group-content" id="glitchControls">
-                        <!-- Will be populated with GLITCH controls -->
+                        <!-- Style -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MODE</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button active" data-control="visualMode" data-value="rgb">RGB</button>
+                                <button class="mode-button" data-control="visualMode" data-value="br">B&R</button>
+                                <button class="mode-button" data-control="visualMode" data-value="gray">GRAY</button>
+                            </div>
+                        </div>
+
+                        <!-- Motion -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>ROTATION</span>
+                                <span class="control-value" id="glitchRotationValue">1.0</span>
+                            </div>
+                            <input type="range" id="glitchRotationSlider" data-control="rotation" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BACKGROUND SHIFT</span>
+                                <span class="control-value" id="glitchBackgroundShiftValue">1.0×</span>
+                            </div>
+                            <input type="range" id="glitchBackgroundShiftSlider" data-control="backgroundShift" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <!-- Effects -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>GLITCH</span>
+                                <span class="control-value" id="glitchGlitchIntensityValue">1.0</span>
+                            </div>
+                            <input type="range" id="glitchGlitchIntensitySlider" data-control="glitchIntensity" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>RGB OFFSET</span>
+                                <span class="control-value" id="glitchChannelOffsetValue">5px</span>
+                            </div>
+                            <input type="range" id="glitchChannelOffsetSlider" data-control="channelOffset" min="0" max="30" step="1" value="5">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>DISPLACEMENT</span>
+                                <span class="control-value" id="glitchDisplacementValue">10px</span>
+                            </div>
+                            <input type="range" id="glitchDisplacementSlider" data-control="displacement" min="0" max="50" step="1" value="10">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>CONTRAST</span>
+                                <span class="control-value" id="glitchContrastValue">1.0</span>
+                            </div>
+                            <input type="range" id="glitchContrastSlider" data-control="contrast" min="0" max="3" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SCANLINES</span>
+                                <span class="control-value" id="glitchScanlinesValue">0</span>
+                            </div>
+                            <input type="range" id="glitchScanlinesSlider" data-control="scanlines" min="0" max="1" step="0.05" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>NOISE</span>
+                                <span class="control-value" id="glitchNoiseValue">0</span>
+                            </div>
+                            <input type="range" id="glitchNoiseSlider" data-control="noise" min="0" max="1" step="0.05" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>PIXELATION</span>
+                                <span class="control-value" id="glitchPixelationValue">1px</span>
+                            </div>
+                            <input type="range" id="glitchPixelationSlider" data-control="pixelation" min="1" max="50" step="1" value="1">
+                        </div>
                     </div>
                 </div>
 
@@ -857,7 +1082,139 @@
                         <span class="expand-icon">▼</span>
                     </button>
                     <div class="theme-group-content" id="starsControls">
-                        <!-- Will be populated with STARS controls -->
+                        <!-- Color -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>HUE</span>
+                                <span class="control-value" id="starsHueValue">44°</span>
+                            </div>
+                            <input type="range" id="starsHueSlider" data-control="hue" min="0" max="360" step="1" value="44">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SATURATION</span>
+                                <span class="control-value" id="starsSaturationValue">12%</span>
+                            </div>
+                            <input type="range" id="starsSaturationSlider" data-control="saturation" min="0" max="100" step="1" value="12">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BRIGHTNESS</span>
+                                <span class="control-value" id="starsBrightnessValue">80%</span>
+                            </div>
+                            <input type="range" id="starsBrightnessSlider" data-control="brightness" min="0" max="1" step="0.05" value="0.8">
+                        </div>
+
+                        <!-- Motion -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SPEED</span>
+                                <span class="control-value" id="starsSpeedValue">1.0×</span>
+                            </div>
+                            <input type="range" id="starsSpeedSlider" data-control="speed" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Z-AXIS SPEED</span>
+                                <span class="control-value" id="starsZSpeedValue">0</span>
+                            </div>
+                            <input type="range" id="starsZSpeedSlider" data-control="zSpeed" min="0" max="5" step="0.1" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BACKGROUND SHIFT</span>
+                                <span class="control-value" id="starsBackgroundShiftValue">1.0×</span>
+                            </div>
+                            <input type="range" id="starsBackgroundShiftSlider" data-control="backgroundShift" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SMOOTHING</span>
+                                <span class="control-value" id="starsSmoothingValue">50%</span>
+                            </div>
+                            <input type="range" id="starsSmoothingSlider" data-control="smoothing" min="0" max="1" step="0.1" value="0.5">
+                        </div>
+
+                        <!-- Opacity -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MIN OPACITY</span>
+                                <span class="control-value" id="starsMinOpacityValue">20%</span>
+                            </div>
+                            <input type="range" id="starsMinOpacitySlider" data-control="minOpacity" min="0" max="1" step="0.05" value="0.2">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MAX OPACITY</span>
+                                <span class="control-value" id="starsMaxOpacityValue">100%</span>
+                            </div>
+                            <input type="range" id="starsMaxOpacitySlider" data-control="maxOpacity" min="0" max="1" step="0.05" value="1.0">
+                        </div>
+
+                        <!-- Geometry -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>DIAMETER</span>
+                                <span class="control-value" id="starsDiameterValue">1.0×</span>
+                            </div>
+                            <input type="range" id="starsDiameterSlider" data-control="diameter" min="0.5" max="2" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>COUNT</span>
+                                <span class="control-value" id="starsCountValue">1200</span>
+                            </div>
+                            <input type="range" id="starsCountSlider" data-control="count" min="100" max="2000" step="100" value="1200">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>PERSPECTIVE</span>
+                                <span class="control-value" id="starsPerspectiveValue">1.0</span>
+                            </div>
+                            <input type="range" id="starsPerspectiveSlider" data-control="perspective" min="0" max="2" step="0.1" value="1.0">
+                        </div>
+
+                        <!-- Effects -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>TWINKLE RATE</span>
+                                <span class="control-value" id="starsTwinkleRateValue">200</span>
+                            </div>
+                            <input type="range" id="starsTwinkleRateSlider" data-control="twinkleRate" min="10" max="500" step="10" value="200">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>TRAIL LENGTH</span>
+                                <span class="control-value" id="starsTrailLengthValue">0</span>
+                            </div>
+                            <input type="range" id="starsTrailLengthSlider" data-control="trailLength" min="0" max="1" step="0.05" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BLOOM</span>
+                                <span class="control-value" id="starsBloomValue">0</span>
+                            </div>
+                            <input type="range" id="starsBloomSlider" data-control="bloom" min="0" max="2" step="0.1" value="0">
+                        </div>
+
+                        <!-- Audio -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>AUDIO BOOST</span>
+                                <span class="control-value" id="starsAudioBoostValue">3.0</span>
+                            </div>
+                            <input type="range" id="starsAudioBoostSlider" data-control="audioBoost" min="0" max="10" step="0.5" value="3.0">
+                        </div>
                     </div>
                 </div>
 
@@ -868,7 +1225,141 @@
                         <span class="expand-icon">▼</span>
                     </button>
                     <div class="theme-group-content" id="waveControls">
-                        <!-- Will be populated with WAVE controls -->
+                        <!-- Style -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>MODE</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="mode-button active" data-control="visualMode" data-value="planes">PLANES</button>
+                                <button class="mode-button" data-control="visualMode" data-value="grids">GRIDS</button>
+                                <button class="mode-button" data-control="visualMode" data-value="dots">DOTS</button>
+                            </div>
+                        </div>
+
+                        <!-- Geometry -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>LAYERS</span>
+                                <span class="control-value" id="waveLayersValue">3</span>
+                            </div>
+                            <input type="range" id="waveLayersSlider" data-control="layers" min="1" max="10" step="1" value="3">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>AMPLITUDE</span>
+                                <span class="control-value" id="waveAmplitudeValue">1.2</span>
+                            </div>
+                            <input type="range" id="waveAmplitudeSlider" data-control="amplitude" min="0" max="3" step="0.1" value="1.2">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>WAVELENGTH</span>
+                                <span class="control-value" id="waveWavelengthValue">50px</span>
+                            </div>
+                            <input type="range" id="waveWavelengthSlider" data-control="wavelength" min="10" max="200" step="5" value="50">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>LINE WIDTH</span>
+                                <span class="control-value" id="waveLineWidthValue">3px</span>
+                            </div>
+                            <input type="range" id="waveLineWidthSlider" data-control="lineWidth" min="0.5" max="10" step="0.5" value="3">
+                        </div>
+
+                        <!-- Color -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>HUE</span>
+                                <span class="control-value" id="waveHueValue">280°</span>
+                            </div>
+                            <input type="range" id="waveHueSlider" data-control="hue" min="0" max="360" step="1" value="280">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SATURATION</span>
+                                <span class="control-value" id="waveSaturationValue">70%</span>
+                            </div>
+                            <input type="range" id="waveSaturationSlider" data-control="saturation" min="0" max="100" step="1" value="70">
+                        </div>
+
+                        <!-- Motion -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>ROTATION X</span>
+                                <span class="control-value" id="waveRotationXValue">0.3</span>
+                            </div>
+                            <input type="range" id="waveRotationXSlider" data-control="rotationX" min="0" max="5" step="0.1" value="0.3">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>ROTATION Y</span>
+                                <span class="control-value" id="waveRotationYValue">0.3</span>
+                            </div>
+                            <input type="range" id="waveRotationYSlider" data-control="rotationY" min="0" max="5" step="0.1" value="0.3">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SPEED</span>
+                                <span class="control-value" id="waveSpeedValue">1.0×</span>
+                            </div>
+                            <input type="range" id="waveSpeedSlider" data-control="speed" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>BACKGROUND SHIFT</span>
+                                <span class="control-value" id="waveBackgroundShiftValue">1.0×</span>
+                            </div>
+                            <input type="range" id="waveBackgroundShiftSlider" data-control="backgroundShift" min="0" max="5" step="0.1" value="1.0">
+                        </div>
+
+                        <!-- Effects -->
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>GLOW</span>
+                                <span class="control-value" id="waveGlowValue">0</span>
+                            </div>
+                            <input type="range" id="waveGlowSlider" data-control="glow" min="0" max="3" step="0.1" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>PERSPECTIVE</span>
+                                <span class="control-value" id="wavePerspectiveValue">1.0</span>
+                            </div>
+                            <input type="range" id="wavePerspectiveSlider" data-control="perspective" min="0" max="2" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>DEPTH</span>
+                                <span class="control-value" id="waveDepthValue">1.0</span>
+                            </div>
+                            <input type="range" id="waveDepthSlider" data-control="depth" min="0" max="2" step="0.1" value="1.0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>TURBULENCE</span>
+                                <span class="control-value" id="waveTurbulenceValue">0</span>
+                            </div>
+                            <input type="range" id="waveTurbulenceSlider" data-control="turbulence" min="0" max="2" step="0.1" value="0">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>PHASE SHIFT</span>
+                                <span class="control-value" id="wavePhaseShiftValue">0</span>
+                            </div>
+                            <input type="range" id="wavePhaseShiftSlider" data-control="phaseShift" min="0" max="6.28" step="0.1" value="0">
+                        </div>
                     </div>
                 </div>
             </div>
