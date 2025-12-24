@@ -1084,7 +1084,7 @@ const VALUE_FORMATTERS = {
 
   depth: (val) => {
     if (val < 0.5) return `${val.toFixed(1)} (Shallow)`;
-    if (val === 1.0) return '1.0 (Normal)`;
+    if (val === 1.0) return '1.0 (Normal)';
     if (val < 2) return `${val.toFixed(1)} (Deep)`;
     return `${val.toFixed(1)} (Very Deep)`;
   },
