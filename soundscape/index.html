@@ -790,6 +790,85 @@
             background: #f0f0f0;
         }
 
+        .beat-pad-transition-controls {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #333333;
+            margin-bottom: 0.75rem;
+        }
+
+        .beat-pad-control-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .beat-pad-control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .beat-pad-control-label {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #999999;
+            min-width: 60px;
+        }
+
+        .beat-pad-select {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            background: #1a1a1a;
+            color: #ffffff;
+            border: 1px solid #333333;
+            border-radius: 2px;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .beat-pad-select:focus {
+            outline: none;
+            border-color: #666666;
+        }
+
+        .beat-pad-slider {
+            flex: 1;
+            height: 2px;
+            background: #333333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .beat-pad-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .beat-pad-slider::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .beat-pad-value {
+            font-size: 9px;
+            font-weight: 500;
+            color: #ffffff;
+            min-width: 35px;
+            text-align: right;
+        }
+
         /* Intensity Control */
         .intensity-control {
             display: flex;

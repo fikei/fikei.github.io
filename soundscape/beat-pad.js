@@ -13,6 +13,11 @@ class BeatPad {
     this.activePadIndex = null;
     this.gridContainer = null;
 
+    // Transition settings
+    this.transitionType = 'CUT'; // CUT, CROSSFADE, MORPH, WIPE
+    this.transitionDuration = 1000; // milliseconds
+    this.isTransitioning = false;
+
     this.init();
   }
 
@@ -48,6 +53,27 @@ class BeatPad {
       </div>
     `;
     this.gridContainer.appendChild(header);
+
+    // Create transition controls
+    const transitionControls = document.createElement('div');
+    transitionControls.className = 'beat-pad-transition-controls';
+    transitionControls.innerHTML = `
+      <div class="beat-pad-control-row">
+        <label class="beat-pad-control-label">TRANSITION</label>
+        <select id="beat-pad-transition-type" class="beat-pad-select">
+          <option value="CUT">CUT</option>
+          <option value="CROSSFADE">CROSSFADE</option>
+          <option value="MORPH">MORPH</option>
+          <option value="WIPE">WIPE</option>
+        </select>
+      </div>
+      <div class="beat-pad-control-row">
+        <label class="beat-pad-control-label">DURATION</label>
+        <input type="range" id="beat-pad-transition-duration" class="beat-pad-slider" min="100" max="5000" step="100" value="1000">
+        <span id="beat-pad-duration-value" class="beat-pad-value">1.0s</span>
+      </div>
+    `;
+    this.gridContainer.appendChild(transitionControls);
 
     // Add hidden file input for import
     const fileInput = document.createElement('input');
@@ -171,6 +197,22 @@ class BeatPad {
         fileInput.value = ''; // Reset input
       }
     });
+
+    // Transition type selector
+    const transitionTypeSelect = document.getElementById('beat-pad-transition-type');
+    transitionTypeSelect.addEventListener('change', (e) => {
+      this.transitionType = e.target.value;
+      console.log(`Transition type: ${this.transitionType}`);
+    });
+
+    // Transition duration slider
+    const durationSlider = document.getElementById('beat-pad-transition-duration');
+    const durationValue = document.getElementById('beat-pad-duration-value');
+
+    durationSlider.addEventListener('input', (e) => {
+      this.transitionDuration = parseInt(e.target.value);
+      durationValue.textContent = `${(this.transitionDuration / 1000).toFixed(1)}s`;
+    });
   }
 
   /**
@@ -283,8 +325,12 @@ class BeatPad {
   /**
    * Load a scene from a pad
    */
-  loadScene(index, transitionType = 'CUT') {
+  loadScene(index) {
     if (index < 0 || index >= 16) return;
+    if (this.isTransitioning) {
+      console.log('⏸️ Transition in progress, please wait');
+      return;
+    }
 
     const scene = this.scenes[index];
     if (!scene) {
@@ -292,14 +338,33 @@ class BeatPad {
       return;
     }
 
-    console.log(`Loading scene from pad ${index + 1}:`, scene);
+    console.log(`Loading scene from pad ${index + 1} with ${this.transitionType} transition (${this.transitionDuration}ms)`);
 
-    // For now, use instant transition (CUT)
-    // TODO: Implement CROSSFADE, MORPH, WIPE transitions in Phase 3
-    this.applySceneInstant(scene);
+    // Apply scene with selected transition type
+    switch (this.transitionType) {
+      case 'CUT':
+        this.applySceneInstant(scene);
+        this.activePadIndex = index;
+        this.updateGridUI();
+        break;
 
-    this.activePadIndex = index;
-    this.updateGridUI();
+      case 'CROSSFADE':
+        this.applySceneCrossfade(scene, index);
+        break;
+
+      case 'MORPH':
+        this.applySceneMorph(scene, index);
+        break;
+
+      case 'WIPE':
+        this.applySceneWipe(scene, index);
+        break;
+
+      default:
+        this.applySceneInstant(scene);
+        this.activePadIndex = index;
+        this.updateGridUI();
+    }
   }
 
   /**
@@ -340,6 +405,155 @@ class BeatPad {
     if (this.soundscape.hasOwnProperty(controlId)) {
       this.soundscape[controlId] = value;
     }
+  }
+
+  /**
+   * Apply scene with CROSSFADE transition (opacity blend)
+   */
+  applySceneCrossfade(scene, index) {
+    this.isTransitioning = true;
+
+    const container = document.getElementById('container');
+    const startTime = Date.now();
+    const duration = this.transitionDuration;
+
+    // Apply scene immediately (instant switch)
+    this.applySceneInstant(scene);
+
+    // Animate opacity fade
+    let lastOpacity = 0;
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease-in-out
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      // Apply opacity to container
+      const opacity = 0.3 + (eased * 0.7); // Fade from 30% to 100%
+      if (opacity !== lastOpacity) {
+        container.style.opacity = opacity;
+        lastOpacity = opacity;
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        container.style.opacity = 1;
+        this.isTransitioning = false;
+        this.activePadIndex = index;
+        this.updateGridUI();
+      }
+    };
+
+    animate();
+  }
+
+  /**
+   * Apply scene with MORPH transition (parameter interpolation)
+   */
+  applySceneMorph(scene, index) {
+    this.isTransitioning = true;
+
+    // Capture starting values
+    const startValues = {};
+    for (const controlId in scene.settings) {
+      startValues[controlId] = this.soundscape.themeConfig?.[controlId]
+        || this.soundscape[controlId];
+    }
+
+    // Switch theme if different (instant for now)
+    if (scene.theme !== this.soundscape.currentTheme) {
+      this.soundscape.switchTheme(scene.theme);
+    }
+
+    const startTime = Date.now();
+    const duration = this.transitionDuration;
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease-in-out
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      // Interpolate all control values
+      for (const [controlId, endValue] of Object.entries(scene.settings)) {
+        const startValue = startValues[controlId];
+        if (typeof startValue === 'number' && typeof endValue === 'number') {
+          const currentValue = startValue + (endValue - startValue) * eased;
+          this.applyControlValue(controlId, currentValue);
+        }
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Apply final values
+        for (const [controlId, value] of Object.entries(scene.settings)) {
+          this.applyControlValue(controlId, value);
+        }
+
+        // Apply audio reactivity
+        if (scene.audioReactivity && this.controlSystem) {
+          this.controlSystem.audioReactivity = { ...scene.audioReactivity };
+        }
+
+        if (this.controlSystem) {
+          this.controlSystem.refreshAllControls();
+        }
+
+        this.isTransitioning = false;
+        this.activePadIndex = index;
+        this.updateGridUI();
+      }
+    };
+
+    animate();
+  }
+
+  /**
+   * Apply scene with WIPE transition (directional reveal)
+   */
+  applySceneWipe(scene, index) {
+    this.isTransitioning = true;
+
+    const container = document.getElementById('container');
+    const startTime = Date.now();
+    const duration = this.transitionDuration;
+
+    // Apply scene immediately
+    this.applySceneInstant(scene);
+
+    // Animate clip-path wipe from left to right
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease-in-out
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      // Wipe from left (0%) to right (100%)
+      const wipePercent = eased * 100;
+      container.style.clipPath = `inset(0 ${100 - wipePercent}% 0 0)`;
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        container.style.clipPath = '';
+        this.isTransitioning = false;
+        this.activePadIndex = index;
+        this.updateGridUI();
+      }
+    };
+
+    animate();
   }
 
   /**
