@@ -16,6 +16,9 @@
     <!-- Socket.io for WebSocket communication -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 
+    <!-- Meyda Audio Analysis Library -->
+    <script src="https://unpkg.com/meyda@5.6.0/dist/web/meyda.min.js"></script>
+
     <style>
         /* ===== RESET & BASE ===== */
         * {
@@ -322,6 +325,44 @@
             pointer-events: none;
         }
 
+        /* Beat Pad Toggle */
+        .beatpad-toggle {
+            position: fixed;
+            bottom: 1rem;
+            left: 3rem;
+            z-index: 101;
+            width: 30px;
+            height: 30px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            border-radius: 0;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.5s ease, background 0.15s ease;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .beatpad-toggle:hover {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .beatpad-toggle.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .beatpad-toggle.active {
+            background: #ffffff;
+            color: #000000;
+        }
+
         /* ===== ADD IMAGE BUTTON & DROPDOWN ===== */
         .add-image-button {
             position: fixed;
@@ -518,16 +559,399 @@
             margin-bottom: 1.5rem;
         }
 
-        .control-label {
+        /* Control Header (Label + Audio Selector) */
+        .control-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 0.5rem;
-            font-size: 10px;
-            color: #999999;
         }
 
+        .control-label {
+            font-size: 10px;
+            color: #999999;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Audio Selector Button */
+        .audio-selector {
+            padding: 0.25rem 0.75rem;
+            font-size: 9px;
+            font-weight: 700;
+            font-family: 'Space Grotesk', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid #333;
+            cursor: pointer;
+            min-width: 80px;
+            text-align: center;
+            transition: all 0.15s ease;
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .audio-selector.static {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .audio-selector:hover {
+            border-color: #ffffff;
+        }
+
+        /* Audio Dropdown (Inline) */
+        .audio-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid #333;
+            min-width: 200px;
+            max-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            margin-top: 2px;
+        }
+
+        .audio-dropdown-category {
+            padding: 0.5rem 0.75rem;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #666666;
+            background: #f5f5f5;
+            border-top: 1px solid #ddd;
+        }
+
+        .audio-dropdown-category:first-child {
+            border-top: none;
+        }
+
+        .audio-dropdown-item {
+            padding: 0.5rem 0.75rem 0.5rem 1.5rem;
+            cursor: pointer;
+            font-size: 9px;
+            font-weight: 400;
+            color: #000000;
+            transition: background 0.1s ease;
+        }
+
+        .audio-dropdown-item:hover {
+            background: #f0f0f0;
+        }
+
+        .audio-dropdown-item.selected {
+            background: #e0e0e0;
+            font-weight: 700;
+        }
+
+        .audio-dropdown-item.selected::before {
+            content: '✓ ';
+            margin-left: -1em;
+        }
+
+        /* Beat Pad Scene System */
+        .beat-pad-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #333333;
+            padding: 1rem;
+            border-radius: 4px;
+            z-index: 1000;
+            min-width: 280px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .beat-pad-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-20px);
+        }
+
+        .beat-pad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333333;
+        }
+
+        .beat-pad-header h3 {
+            margin: 0;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #ffffff;
+        }
+
+        .beat-pad-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .beat-pad-btn {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 8px;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #333333;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.15s ease;
+        }
+
+        .beat-pad-btn:hover {
+            background: #000000;
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+
+        .beat-pad-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        .beat-pad {
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            border: 2px solid #333333;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .beat-pad:hover {
+            border-color: #666666;
+            background: #252525;
+        }
+
+        .beat-pad.empty {
+            border-style: dashed;
+            opacity: 0.5;
+        }
+
+        .beat-pad.loaded {
+            border-color: #666666;
+            opacity: 1;
+        }
+
+        .beat-pad.active {
+            border-color: #ffffff;
+            background: #2a2a2a;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .beat-pad-key {
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            font-size: 8px;
+            font-weight: 600;
+            color: #444444;
+            opacity: 0.6;
+        }
+
+        .beat-pad:hover .beat-pad-key {
+            opacity: 1;
+            color: #888888;
+        }
+
+        .beat-pad.active .beat-pad-key {
+            color: #ffffff;
+            opacity: 0.8;
+        }
+
+        .beat-pad-number {
+            font-size: 10px;
+            font-weight: 700;
+            color: #666666;
+            margin-bottom: 0.25rem;
+        }
+
+        .beat-pad.active .beat-pad-number {
+            color: #ffffff;
+        }
+
+        .beat-pad-label {
+            font-size: 7px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #999999;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .beat-pad.loaded .beat-pad-label {
+            color: #cccccc;
+        }
+
+        .beat-pad.active .beat-pad-label {
+            color: #ffffff;
+        }
+
+        .beat-pad-context-menu {
+            position: fixed;
+            background: #ffffff;
+            border: 1px solid #333333;
+            border-radius: 4px;
+            padding: 0.25rem 0;
+            min-width: 120px;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .beat-pad-context-item {
+            padding: 0.5rem 0.75rem;
+            font-size: 9px;
+            font-weight: 400;
+            color: #000000;
+            cursor: pointer;
+            transition: background 0.1s ease;
+        }
+
+        .beat-pad-context-item:hover {
+            background: #f0f0f0;
+        }
+
+        .beat-pad-transition-controls {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #333333;
+            margin-bottom: 0.75rem;
+        }
+
+        .beat-pad-control-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .beat-pad-control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .beat-pad-control-label {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #999999;
+            min-width: 60px;
+        }
+
+        .beat-pad-select {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            background: #000000;
+            color: #ffffff;
+            border: 1px solid #333333;
+            border-radius: 2px;
+            cursor: pointer;
+            flex: 1;
+            text-align: left;
+        }
+
+        .beat-pad-select:focus {
+            outline: none;
+            border-color: #666666;
+            background: #000000;
+        }
+
+        .beat-pad-slider {
+            flex: 1;
+            height: 2px;
+            background: #333333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .beat-pad-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .beat-pad-slider::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .beat-pad-value {
+            font-size: 9px;
+            font-weight: 500;
+            color: #ffffff;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        /* Intensity Control */
+        .intensity-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .intensity-label {
+            font-size: 9px;
+            color: #999999;
+            text-transform: uppercase;
+            min-width: 60px;
+        }
+
+        .intensity-slider {
+            flex: 1;
+            height: 1px;
+            background: #333333;
+        }
+
+        .intensity-value {
+            font-size: 9px;
+            color: #ffffff;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        /* Slider Container */
+        .slider-container {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Value Display (Below Slider) */
         .control-value {
+            font-size: 9px;
             color: #ffffff;
             font-weight: 400;
         }
@@ -637,15 +1061,134 @@
             text-transform: uppercase;
             cursor: pointer;
             transition: border-color 0.15s ease;
+            text-align: left;
         }
 
         .theme-select:hover {
             border-color: #ffffff;
+            background: #000000;
         }
 
         .theme-select:focus {
             outline: none;
             border-color: #ffffff;
+            background: #000000;
+        }
+
+        /* ===== UNIFIED CONTROL SYSTEM ===== */
+
+        /* Category Sections */
+        .control-category {
+            margin-bottom: 1.5rem;
+        }
+
+        .category-header {
+            font-size: 9px;
+            font-weight: 700;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid #222222;
+        }
+
+        .category-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* Audio Controls */
+        .audio-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding-left: 0.5rem;
+            border-left: 1px solid #222222;
+        }
+
+        .audio-source-dropdown {
+            width: 100%;
+            padding: 0.4rem;
+            background: #000000;
+            border: 1px solid #333333;
+            color: #999999;
+            font-size: 9px;
+            font-family: 'Space Grotesk', monospace;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+            text-align: left;
+        }
+
+        .audio-source-dropdown:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+            background: #000000;
+        }
+
+        .audio-source-dropdown:focus {
+            outline: none;
+            border-color: #ffffff;
+            color: #ffffff;
+            background: #000000;
+        }
+
+        .audio-source-dropdown option:disabled {
+            color: #666666;
+            font-weight: 700;
+            background: #000000;
+        }
+
+        /* Intensity Controls */
+        .intensity-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 9px;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .intensity-slider {
+            flex: 1;
+            height: 1px;
+            background: #222222;
+        }
+
+        .intensity-value {
+            min-width: 3rem;
+            text-align: right;
+            color: #ffffff;
+            font-size: 9px;
+        }
+
+        /* Mode Select (buttonGroup alternative to dropdown) */
+        .mode-select {
+            width: 100%;
+            padding: 0.5rem;
+            background: #000000;
+            border: 1px solid #333333;
+            color: #ffffff;
+            font-size: 10px;
+            font-family: 'Space Grotesk', monospace;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+            text-align: left;
+        }
+
+        .mode-select:hover {
+            border-color: #ffffff;
+            background: #000000;
+        }
+
+        .mode-select:focus {
+            outline: none;
+            border-color: #ffffff;
+            background: #000000;
         }
 
         /* Buttons */
@@ -721,6 +1264,36 @@
 
         .sidebar::-webkit-scrollbar-thumb:hover {
             background: #ffffff;
+        }
+
+        /* ===== TOAST NOTIFICATIONS ===== */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 100, 100, 0.95);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            max-width: 80%;
+            text-align: center;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: rgba(100, 255, 100, 0.95);
         }
 
         /* ===== RESPONSIVE DESIGN ===== */
@@ -802,6 +1375,9 @@
     <!-- Fullscreen Toggle -->
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
 
+    <!-- Beat Pad Toggle -->
+    <button class="beatpad-toggle" id="beatpadToggle" aria-label="Toggle Beat Pad" title="Beat Pad (Shift+B)">⚏</button>
+
     <!-- Add Media Button & Dropdown -->
     <button class="add-image-button" id="addImageButton" aria-label="Add media">+</button>
     <div class="add-image-dropdown" id="addImageDropdown">
@@ -874,6 +1450,14 @@
                 <input type="range" id="image3DMotionSlider" min="0" max="2" step="0.1" value="0">
             </div>
 
+            <div class="control-group">
+                <div class="control-label">
+                    <span>SCALE</span>
+                    <span class="control-value" id="imageScaleValue">1.0x</span>
+                </div>
+                <input type="range" id="imageScaleSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+            </div>
+
             <h3 style="margin-top: 2rem;">FLASH EFFECT</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -937,6 +1521,56 @@
                     </div>
                     <input type="range" id="videoTrimEndSlider" min="0" max="100" step="0.1" value="100">
                 </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>PLAYBACK SPEED</span>
+                        <span class="control-value" id="videoSpeedValue">1.0x</span>
+                    </div>
+                    <input type="range" id="videoSpeedSlider" min="0.25" max="4.0" step="0.25" value="1.0">
+                </div>
+            </div>
+
+            <!-- GLITCH Background Image Controls (visible only when GLITCH theme active and image loaded as background) -->
+            <div id="glitchBackgroundControls" style="display: none;">
+                <h3 style="margin-top: 2rem;">GLITCH BACKGROUND</h3>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>FIT MODE</span>
+                    </div>
+                    <select class="theme-select" id="glitchFitModeSelect">
+                        <option value="cover">COVER (Fill, May Crop)</option>
+                        <option value="contain">CONTAIN (Fit All, Letterbox)</option>
+                        <option value="fill">FILL (Stretch to Fit)</option>
+                        <option value="manual">MANUAL (Custom)</option>
+                    </select>
+                </div>
+
+                <div class="control-group" id="glitchScaleGroup">
+                    <div class="control-label">
+                        <span>SCALE</span>
+                        <span class="control-value" id="glitchScaleValue">1.0x</span>
+                    </div>
+                    <input type="range" id="glitchScaleSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+                </div>
+
+                <div class="control-group" id="glitchXGroup">
+                    <div class="control-label">
+                        <span>X POSITION</span>
+                        <span class="control-value" id="glitchXValue">0</span>
+                    </div>
+                    <input type="range" id="glitchXSlider" min="-1000" max="1000" step="10" value="0">
+                </div>
+
+                <div class="control-group" id="glitchYGroup">
+                    <div class="control-label">
+                        <span>Y POSITION</span>
+                        <span class="control-value" id="glitchYValue">0</span>
+                    </div>
+                    <input type="range" id="glitchYSlider" min="-1000" max="1000" step="10" value="0">
+                </div>
+
+                <button class="btn" id="glitchResetBtn" style="margin-top: 1rem; width: 100%;">RESET TO CENTER</button>
             </div>
 
             <div id="imageEffectSettings">
@@ -1020,8 +1654,11 @@
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
 
-        <!-- Mode Selection (LINEAR theme only) -->
-        <section class="control-section" id="modeSection">
+        <!-- Dynamic Theme Controls (Generated by Control System) -->
+        <div id="dynamicControlsContainer"></div>
+
+        <!-- Mode Selection (LINEAR theme only) - REPLACED BY UNIFIED CONTROL SYSTEM -->
+        <section class="control-section" id="modeSection" style="display: none;">
             <h3>MODE</h3>
             <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="density-option active" data-mode="default">FLOW</div>
@@ -1136,9 +1773,9 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>TWINKLE RATE</span>
-                    <span class="control-value" id="starTwinkleValue">20</span>
+                    <span class="control-value" id="starTwinkleValue">200</span>
                 </div>
-                <input type="range" id="starTwinkleSlider" min="1" max="50" step="1" value="20">
+                <input type="range" id="starTwinkleSlider" min="1" max="500" step="1" value="200">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -1160,13 +1797,6 @@
                     <span class="control-value" id="starZSpeedValue">0.0</span>
                 </div>
                 <input type="range" id="starZSpeedSlider" min="0" max="5.0" step="0.1" value="0">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>CENTER SHIFT RATE</span>
-                    <span class="control-value" id="starCenterRateValue">1.0</span>
-                </div>
-                <input type="range" id="starCenterRateSlider" min="0" max="5.0" step="0.1" value="1.0">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -1218,65 +1848,10 @@
                 </div>
                 <input type="range" id="waveSaturationSlider" min="0" max="100" step="1" value="70">
             </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>DISTORTION</span>
-                    <span class="control-value" id="waveDistortionValue">1.5</span>
-                </div>
-                <input type="range" id="waveDistortionSlider" min="0" max="5.0" step="0.1" value="1.5">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>SPEED</span>
-                    <span class="control-value" id="waveSpeedValue">1.0</span>
-                </div>
-                <input type="range" id="waveSpeedSlider" min="0" max="3.0" step="0.1" value="1.0">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>GRID DENSITY</span>
-                </div>
-                <div class="density-options">
-                    <div class="density-option" data-wave-density="low">L</div>
-                    <div class="density-option active" data-wave-density="medium">M</div>
-                    <div class="density-option" data-wave-density="high">H</div>
-                </div>
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>GLOW</span>
-                    <span class="control-value" id="waveGlowValue">1.0</span>
-                </div>
-                <input type="range" id="waveGlowSlider" min="0" max="2.0" step="0.1" value="1.0">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>DOT COUNT</span>
-                    <span class="control-value" id="waveDotCountValue">200</span>
-                </div>
-                <input type="range" id="waveDotCountSlider" min="50" max="500" step="10" value="200">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>ORBIT SIZE</span>
-                    <span class="control-value" id="waveOrbitSizeValue">100</span>
-                </div>
-                <input type="range" id="waveOrbitSizeSlider" min="50" max="300" step="10" value="100">
-            </div>
-            <div class="control-group">
-                <div class="control-label">
-                    <span>COLOR MODE</span>
-                </div>
-                <div class="density-options" style="grid-template-columns: repeat(3, 1fr);">
-                    <div class="density-option active" data-wave-color="mono">MONO</div>
-                    <div class="density-option" data-wave-color="warm">WARM</div>
-                    <div class="density-option" data-wave-color="cool">COOL</div>
-                </div>
-            </div>
         </section>
 
-        <!-- Frequency Emphasis -->
-        <section class="control-section">
+        <!-- Frequency Emphasis - REPLACED BY UNIFIED CONTROL SYSTEM -->
+        <section class="control-section" style="display: none;">
             <h3>FREQ</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -1301,8 +1876,8 @@
             </div>
         </section>
 
-        <!-- Wave Settings -->
-        <section class="control-section" id="waveSettingsSection">
+        <!-- Wave Settings - REPLACED BY UNIFIED CONTROL SYSTEM -->
+        <section class="control-section" id="waveSettingsSection" style="display: none;">
             <h3>WAVE</h3>
             <div class="control-group">
                 <div class="control-label">
@@ -1327,8 +1902,8 @@
             </div>
         </section>
 
-        <!-- Grid Density -->
-        <section class="control-section">
+        <!-- Grid Density - REPLACED BY UNIFIED CONTROL SYSTEM -->
+        <section class="control-section" style="display: none;">
             <h3>DENSITY</h3>
             <div class="density-options">
                 <div class="density-option" data-density="low">L</div>
@@ -1339,6 +1914,11 @@
 
         <!-- Reset Button -->
         <button class="btn btn-reset" id="resetBtn">RESET</button>
+
+        <!-- Attribution -->
+        <div style="padding: 1rem; text-align: center; font-size: 8px; color: #666; margin-top: auto;">
+            Advanced audio analysis powered by <a href="https://meyda.js.org" target="_blank" style="color: #888; text-decoration: underline;">Meyda</a>
+        </div>
     </aside>
 
     <!-- Error Screen -->
@@ -1351,6 +1931,122 @@
         // =====================================================
         // SOUNDSCAPE: Audio-Reactive Wave Visualization
         // =====================================================
+
+        // ===== BEAT DETECTION SYSTEM =====
+        class BeatDetector {
+            constructor() {
+                this.energyHistory = [];
+                this.historySize = 43; // ~1 second at 43 FPS
+                this.threshold = 1.3; // Beat detected if energy > avg * threshold
+                this.minTimeBetweenBeats = 300; // ms (prevents double-triggering)
+                this.lastBeatTime = 0;
+                this.beatStrength = 0;
+                this.decayRate = 0.95; // How fast beat strength decays
+            }
+
+            detectBeat(currentEnergy, timestamp) {
+                // Add to history
+                this.energyHistory.push(currentEnergy);
+                if (this.energyHistory.length > this.historySize) {
+                    this.energyHistory.shift();
+                }
+
+                // Calculate average energy
+                const avgEnergy = this.energyHistory.reduce((sum, e) => sum + e, 0) / this.energyHistory.length;
+
+                // Detect beat if current energy significantly exceeds average
+                const timeSinceLastBeat = timestamp - this.lastBeatTime;
+                const isBeat = currentEnergy > avgEnergy * this.threshold &&
+                              timeSinceLastBeat > this.minTimeBetweenBeats;
+
+                if (isBeat) {
+                    this.beatStrength = Math.min(1.0, (currentEnergy / avgEnergy - 1) / (this.threshold - 1));
+                    this.lastBeatTime = timestamp;
+                } else {
+                    // Decay beat strength over time
+                    this.beatStrength *= this.decayRate;
+                }
+
+                return {
+                    isBeat,
+                    strength: this.beatStrength,
+                    energy: currentEnergy,
+                    avgEnergy
+                };
+            }
+
+            reset() {
+                this.energyHistory = [];
+                this.beatStrength = 0;
+                this.lastBeatTime = 0;
+            }
+        }
+
+        // ===== BPM DETECTION SYSTEM =====
+        class BPMDetector {
+            constructor() {
+                this.beatTimes = [];
+                this.maxBeats = 32; // Track last 32 beats
+                this.lastBPM = 120; // Default BPM
+                this.confidence = 0;
+            }
+
+            addBeat(timestamp) {
+                this.beatTimes.push(timestamp);
+                if (this.beatTimes.length > this.maxBeats) {
+                    this.beatTimes.shift();
+                }
+
+                // Recalculate BPM
+                if (this.beatTimes.length >= 4) {
+                    this.calculateBPM();
+                }
+            }
+
+            calculateBPM() {
+                if (this.beatTimes.length < 4) {
+                    this.confidence = 0;
+                    return this.lastBPM;
+                }
+
+                // Calculate intervals between beats
+                const intervals = [];
+                for (let i = 1; i < this.beatTimes.length; i++) {
+                    intervals.push(this.beatTimes[i] - this.beatTimes[i - 1]);
+                }
+
+                // Use median interval (more robust than average)
+                intervals.sort((a, b) => a - b);
+                const medianInterval = intervals[Math.floor(intervals.length / 2)];
+
+                // Convert to BPM
+                const bpm = 60000 / medianInterval;
+
+                // Clamp to realistic range
+                if (bpm >= 60 && bpm <= 200) {
+                    this.lastBPM = bpm;
+
+                    // Calculate confidence based on interval consistency
+                    const stdDev = Math.sqrt(intervals.reduce((sum, i) => sum + Math.pow(i - medianInterval, 2), 0) / intervals.length);
+                    this.confidence = Math.max(0, 1 - (stdDev / medianInterval));
+                }
+
+                return this.lastBPM;
+            }
+
+            getBPM() {
+                return this.lastBPM;
+            }
+
+            getConfidence() {
+                return this.confidence;
+            }
+
+            reset() {
+                this.beatTimes = [];
+                this.confidence = 0;
+            }
+        }
 
         // Simple 2D noise function (Perlin-like)
         function createNoise2D() {
@@ -1501,6 +2197,10 @@
             }
         };
 
+        // ===== UNIFIED CONTROL SYSTEM =====
+        let controlSystemUI = null;
+        let audioEngine = null;
+
         // ===== STATE =====
         const state = {
             // User settings
@@ -1529,11 +2229,10 @@
                 starCount: 1200,  // Number of stars (100-2000)
                 starBrightness: 0.8,  // Overall star brightness (0-1)
                 starAudioBoost: 3.0,  // Audio-reactive speed multiplier (0-10)
-                starTwinkle: 20,  // Twinkle rate (1-50, higher = less frequent)
+                starTwinkle: 200,  // Twinkle rate (higher = less frequent, 200 = subtle)
                 starMinOpacity: 0.2,  // Minimum star opacity (0-1)
                 starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
                 starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
-                starCenterRate: 1.0,  // Center position shift rate (0-5, multiplied by highs)
                 starSmoothing: 0.5,  // Audio smoothing for stars (0-1)
                 starDiameter: 1.0,  // Animation diameter multiplier (0.5-2.0)
 
@@ -1541,14 +2240,7 @@
                 waveMode: 'planes',  // Visual mode: planes, grids, dots
                 waveLayers: 3,  // Number of layers for grids/dots mode (1-10)
                 waveHue: 280,  // Color hue (0-360)
-                waveSaturation: 70,  // Color saturation (0-100%)
-                waveDistortion: 1.5,  // Distortion intensity (0-5)
-                waveSpeed: 1.0,  // Animation speed (0-3)
-                waveDensity: 'medium',  // Grid density (low/medium/high)
-                waveGlow: 1.0,  // Glow intensity (0-2)
-                waveDotCount: 200,  // Number of orbital dots (50-500)
-                waveOrbitSize: 100,  // Orbit radius in pixels (50-300)
-                waveColorMode: 'mono'  // Color mode (mono/warm/cool)
+                waveSaturation: 70  // Color saturation (0-100%)
             },
 
             // Audio
@@ -1558,6 +2250,10 @@
             dataArray: null,
             bufferLength: 0,
             isActive: false,
+
+            // Meyda audio analysis
+            meydaAnalyzer: null,
+            meydaFeatures: null,
 
             // Wave grid
             paths: [],
@@ -1594,6 +2290,10 @@
             },
             currentTime: 0,
 
+            // Beat and BPM detection
+            beatDetector: new BeatDetector(),
+            bpmDetector: new BPMDetector(),
+
             // User-created gradient centers (for NEON theme)
             userGradientCenters: [],
 
@@ -1603,8 +2303,12 @@
                 loaded: false,
                 width: 400,
                 height: 300,
+                originalWidth: 0,
+                originalHeight: 0,
                 x: 0,
                 y: 0,
+                scale: 1.0,
+                fitMode: 'cover',
                 rotation3D: { x: 0, y: 0, z: 0 },
                 isDragging: false,
                 dragStartX: 0,
@@ -1638,6 +2342,51 @@
             selectedImageIndex: -1
         };
 
+        // Expose state globally for control system
+        window.state = state;
+
+        // =====================================================
+        // UNIFIED CONTROL SYSTEM INITIALIZATION
+        // =====================================================
+
+        function initializeControlSystem() {
+            console.log('🎛️ Initializing Unified Control System...');
+
+            try {
+                // Initialize Control System UI
+                const container = document.getElementById('dynamicControlsContainer');
+                if (!container) {
+                    console.error('❌ Dynamic controls container not found');
+                    return;
+                }
+
+                controlSystemUI = new ControlSystemUI(container);
+                controlSystemUI.initializeAll();
+
+                // Initialize Audio Modulation Engine
+                audioEngine = new AudioModulationEngine();
+
+                // Show controls for current theme
+                const currentTheme = state.settings.theme || 'linear';
+                controlSystemUI.showTheme(currentTheme);
+
+                // Hook into theme switching
+                const themeSelect = document.getElementById('themeSelect');
+                if (themeSelect) {
+                    themeSelect.addEventListener('change', (e) => {
+                        const newTheme = e.target.value;
+                        if (controlSystemUI) {
+                            controlSystemUI.showTheme(newTheme);
+                        }
+                    });
+                }
+
+                console.log('✅ Unified Control System initialized');
+            } catch (error) {
+                console.error('❌ Failed to initialize Control System:', error);
+            }
+        }
+
         // =====================================================
         // INITIALIZATION
         // =====================================================
@@ -1656,6 +2405,55 @@
 
             // Update theme description on load
             updateThemeDescription();
+
+            // Initialize unified control system
+            initializeControlSystem();
+
+            // Create global soundscape API for Beat Pad
+            window.soundscape = {
+                get currentTheme() {
+                    return state.settings.theme || 'linear';
+                },
+                switchTheme(theme) {
+                    if (controlSystemUI) {
+                        controlSystemUI.showTheme(theme);
+                    }
+                },
+                get themeConfig() {
+                    if (!audioEngine) return {};
+                    const theme = this.currentTheme;
+                    const config = {};
+                    if (audioEngine.themes && audioEngine.themes[theme]) {
+                        const themeControls = audioEngine.themes[theme].controls || {};
+                        for (const controlId in themeControls) {
+                            config[controlId] = audioEngine.getValue(theme, controlId);
+                        }
+                    }
+                    return config;
+                },
+                setControlValue(controlId, value) {
+                    if (audioEngine && controlSystemUI) {
+                        const theme = this.currentTheme;
+                        audioEngine.setValue(theme, controlId, value);
+                        // Refresh the UI to reflect the change
+                        if (controlSystemUI.updateControlValue) {
+                            controlSystemUI.updateControlValue(controlId, value);
+                        }
+                    }
+                }
+            };
+
+            // Initialize Beat Pad Scene System
+            if (typeof BeatPad !== 'undefined' && window.soundscape && controlSystemUI) {
+                window.beatPad = new BeatPad(window.soundscape, controlSystemUI);
+                console.log('✅ Beat Pad Scene System initialized');
+            } else {
+                console.warn('⚠️ Beat Pad not initialized:', {
+                    beatPadExists: typeof BeatPad !== 'undefined',
+                    soundscapeExists: !!window.soundscape,
+                    controlSystemUIExists: !!controlSystemUI
+                });
+            }
 
             // Auto-start audio capture
             await startAudioCapture();
@@ -1685,16 +2483,31 @@
             elements.svg.style.height = `${height}px`;
             elements.svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-            // Get density settings
-            const density = config.densityPresets[state.settings.density];
-            const { xGap, yGap } = density;
+            // Get density settings from control system (LINEAR theme)
+            const densityValue = (audioEngine && state.settings.theme === 'linear')
+                ? (audioEngine.getValue('linear', 'density') || state.settings.density)
+                : state.settings.density;
+            const density = config.densityPresets[densityValue];
+
+            // Get spread control (represents both xGap and yGap for uniform grid spacing)
+            // Default to 12px (original medium density)
+            const spreadControl = (audioEngine && state.settings.theme === 'linear')
+                ? (audioEngine.getValue('linear', 'spread') || 12)
+                : 12;
+
+            // Use spread control for both x and y gap (uniform grid spacing)
+            const xGap = spreadControl;
+            const yGap = spreadControl;
 
             // Calculate grid dimensions - oversized to hide edges
             const padding = 400; // Increased padding to ensure edges are never visible
             const oWidth = width + padding;
             const oHeight = height + padding;
+
+            // Calculate total lines and points based on gap spacing (original behavior)
             const totalLines = Math.ceil(oWidth / xGap);
             const totalPoints = Math.ceil(oHeight / yGap);
+
             const xStart = (width - xGap * totalLines) / 2;
             const yStart = (height - yGap * totalPoints) / 2;
 
@@ -1812,41 +2625,67 @@
                 backgroundControlsSection.style.display = hasSelectedImage ? 'none' : 'block';
             }
 
+            // DISABLED: Old theme-specific controls replaced by unified control system
             // Show/hide theme-specific background controls
-            if (modeSection) {
-                modeSection.style.display = !hasSelectedImage && state.settings.theme === 'linear' ? 'block' : 'none';
-            }
+            // if (modeSection) {
+            //     modeSection.style.display = !hasSelectedImage && state.settings.theme === 'linear' ? 'block' : 'none';
+            // }
 
-            if (neonControlsSection) {
-                neonControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'neon' ? 'block' : 'none';
-            }
+            // if (neonControlsSection) {
+            //     neonControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'neon' ? 'block' : 'none';
+            // }
 
-            if (glitchControlsSection) {
-                glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
-            }
+            // if (glitchControlsSection) {
+            //     glitchControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'glitch' ? 'block' : 'none';
+            // }
 
-            if (starsControlsSection) {
-                starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
-            }
+            // if (starsControlsSection) {
+            //     starsControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'stars' ? 'block' : 'none';
+            // }
 
-            const waveControlsSection = document.getElementById('waveControlsSection');
-            if (waveControlsSection) {
-                waveControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'wave' ? 'block' : 'none';
-            }
+            // const waveControlsSection = document.getElementById('waveControlsSection');
+            // if (waveControlsSection) {
+            //     waveControlsSection.style.display = !hasSelectedImage && state.settings.theme === 'wave' ? 'block' : 'none';
+            // }
 
-            // Hide global WAVE settings for STARS and WAVE themes (they have their own controls)
-            const waveSettingsSection = document.getElementById('waveSettingsSection');
-            if (waveSettingsSection) {
-                const hideWaveSettings = state.settings.theme === 'stars' || state.settings.theme === 'wave';
-                waveSettingsSection.style.display = !hasSelectedImage && !hideWaveSettings ? 'block' : 'none';
-            }
+            // // Hide global WAVE settings for STARS and WAVE themes (they have their own controls)
+            // const waveSettingsSection = document.getElementById('waveSettingsSection');
+            // if (waveSettingsSection) {
+            //     const hideWaveSettings = state.settings.theme === 'stars' || state.settings.theme === 'wave';
+            //     waveSettingsSection.style.display = !hasSelectedImage && !hideWaveSettings ? 'block' : 'none';
+            // }
 
             // Update theme description
             updateThemeDescription();
 
             // Show image controls when an image is selected
+            // Hide theme controls when image is selected
             if (imageControlsSection) {
                 imageControlsSection.style.display = hasSelectedImage ? 'block' : 'none';
+
+                // Hide/show theme controls based on image selection
+                const dynamicControls = document.getElementById('dynamicControlsContainer');
+                const themeControlSections = [
+                    'modeSection',
+                    'neonControlsSection',
+                    'glitchControlsSection',
+                    'starsControlsSection',
+                    'waveControlsSection',
+                    'waveSettingsSection'
+                ];
+
+                if (hasSelectedImage) {
+                    // Hide theme controls when image is selected
+                    if (dynamicControls) dynamicControls.style.display = 'none';
+                    themeControlSections.forEach(id => {
+                        const section = document.getElementById(id);
+                        if (section) section.style.display = 'none';
+                    });
+                } else {
+                    // Show theme controls when no image is selected
+                    if (dynamicControls) dynamicControls.style.display = 'block';
+                    // Theme-specific sections will be shown/hidden by updateThemeUI()
+                }
 
                 // Update image controls to match selected image's properties
                 if (hasSelectedImage) {
@@ -1874,6 +2713,12 @@
                     updateSlider('imageRotationSlider', 'imageRotationValue', imageObj.rotation, 0);
                     updateSlider('imageBlurSlider', 'imageBlurValue', imageObj.blur, 1);
                     updateSlider('themeOpacitySlider', 'themeOpacityValue', imageObj.themeOpacity, 2);
+                    updateSlider('imageScaleSlider', 'imageScaleValue', imageObj.scale || 1.0, 1);
+
+                    // Update video speed slider if this is a video
+                    if (imageObj.isVideo) {
+                        updateSlider('videoSpeedSlider', 'videoSpeedValue', imageObj.video?.playbackRate || 1.0, 1);
+                    }
 
                     // Update flash effect controls
                     const flashFreqCheck = document.getElementById('flashFrequencyCheck');
@@ -1924,6 +2769,41 @@
                 }
             }
 
+            // Show/hide GLITCH background controls
+            const glitchBackgroundControls = document.getElementById('glitchBackgroundControls');
+            if (glitchBackgroundControls) {
+                const shouldShowGlitchControls = state.settings.theme === 'glitch' && state.glitchImage.loaded;
+                glitchBackgroundControls.style.display = shouldShowGlitchControls ? 'block' : 'none';
+
+                // Update GLITCH control values when shown
+                if (shouldShowGlitchControls) {
+                    const fitModeSelect = document.getElementById('glitchFitModeSelect');
+                    const scaleSlider = document.getElementById('glitchScaleSlider');
+                    const scaleValue = document.getElementById('glitchScaleValue');
+                    const xSlider = document.getElementById('glitchXSlider');
+                    const xValue = document.getElementById('glitchXValue');
+                    const ySlider = document.getElementById('glitchYSlider');
+                    const yValue = document.getElementById('glitchYValue');
+
+                    if (fitModeSelect) fitModeSelect.value = state.glitchImage.fitMode || 'cover';
+                    if (scaleSlider) scaleSlider.value = state.glitchImage.scale || 1.0;
+                    if (scaleValue) scaleValue.textContent = `${(state.glitchImage.scale || 1.0).toFixed(1)}x`;
+                    if (xSlider) xSlider.value = state.glitchImage.x || 0;
+                    if (xValue) xValue.textContent = (state.glitchImage.x || 0).toString();
+                    if (ySlider) ySlider.value = state.glitchImage.y || 0;
+                    if (yValue) yValue.textContent = (state.glitchImage.y || 0).toString();
+
+                    // Show/hide manual controls based on fit mode
+                    const isManual = (state.glitchImage.fitMode || 'cover') === 'manual';
+                    const scaleGroup = document.getElementById('glitchScaleGroup');
+                    const xGroup = document.getElementById('glitchXGroup');
+                    const yGroup = document.getElementById('glitchYGroup');
+                    if (scaleGroup) scaleGroup.style.display = isManual ? 'block' : 'none';
+                    if (xGroup) xGroup.style.display = isManual ? 'block' : 'none';
+                    if (yGroup) yGroup.style.display = isManual ? 'block' : 'none';
+                }
+            }
+
             if (uploadOverlay) {
                 // Show upload overlay for GLITCH theme only when no image is loaded
                 const shouldShowOverlay = state.settings.theme === 'glitch' && !state.glitchImage.loaded;
@@ -1940,10 +2820,15 @@
             // Update mode visibility based on theme
             updateModeVisibility();
 
-            // Handle stars canvas visibility
+            // Handle canvas visibility
             const starsCanvas = document.getElementById('stars-canvas');
             if (starsCanvas) {
                 starsCanvas.style.display = state.settings.theme === 'stars' ? 'block' : 'none';
+            }
+
+            const waveCanvas = document.getElementById('wave-canvas');
+            if (waveCanvas) {
+                waveCanvas.style.display = state.settings.theme === 'wave' ? 'block' : 'none';
             }
 
             // Update line colors based on theme
@@ -1971,6 +2856,11 @@
                 });
             } else if (state.settings.theme === 'stars') {
                 // Stars theme: hide SVG paths (stars are rendered on canvas)
+                state.paths.forEach((path) => {
+                    path.setAttribute('opacity', '0');
+                });
+            } else if (state.settings.theme === 'wave') {
+                // Wave theme: hide SVG paths (wave is rendered on canvas)
                 state.paths.forEach((path) => {
                     path.setAttribute('opacity', '0');
                 });
@@ -2006,6 +2896,45 @@
 
                 // Connect audio graph
                 state.microphone.connect(state.analyser);
+
+                // Initialize Meyda for advanced audio analysis
+                if (typeof Meyda !== 'undefined') {
+                    try {
+                        state.meydaAnalyzer = Meyda.createMeydaAnalyzer({
+                            audioContext: state.audioContext,
+                            source: state.microphone,
+                            bufferSize: 512,
+                            featureExtractors: [
+                                'spectralCentroid',
+                                'spectralFlatness',
+                                'spectralRolloff',
+                                'spectralSpread',
+                                'loudness',
+                                'chroma'
+                            ],
+                            callback: features => {
+                                try {
+                                    // Validate features before storing
+                                    if (features && typeof features === 'object') {
+                                        state.meydaFeatures = features;
+                                    }
+                                } catch (err) {
+                                    // Silently ignore Meyda calculation errors
+                                    // Features will use previous valid values or defaults
+                                }
+                            }
+                        });
+
+                        state.meydaAnalyzer.start();
+                        console.log('✨ Meyda analyzer initialized with 6 features');
+                    } catch (err) {
+                        console.warn('⚠️ Meyda initialization failed:', err);
+                        state.meydaAnalyzer = null;
+                    }
+                } else {
+                    console.warn('⚠️ Meyda library not loaded, advanced features disabled');
+                    state.meydaAnalyzer = null;
+                }
 
                 // Update UI
                 state.isActive = true;
@@ -2080,6 +3009,49 @@
             m.a = Math.atan2(dy, dx);
         }
 
+        /**
+         * Normalize Meyda features to 0-1 range
+         * @param {Object} features - Raw Meyda features
+         * @returns {Object} Normalized features (0-1)
+         */
+        function normalizeMeydaFeatures(features) {
+            if (!features) return {};
+
+            return {
+                // Spectral Centroid: typically 0-10000 Hz
+                spectralCentroid: features.spectralCentroid
+                    ? Math.min(1, features.spectralCentroid / 10000)
+                    : 0,
+
+                // Spectral Flatness: already 0-1
+                spectralFlatness: features.spectralFlatness || 0,
+
+                // Spectral Rolloff: typically 0-20000 Hz
+                spectralRolloff: features.spectralRolloff
+                    ? Math.min(1, features.spectralRolloff / 20000)
+                    : 0,
+
+                // Spectral Flux: typically 0-100, varies widely
+                spectralFlux: 0, // Disabled due to errors in Meyda library
+
+                // Spectral Spread: typically 0-5000
+                spectralSpread: features.spectralSpread
+                    ? Math.min(1, features.spectralSpread / 5000)
+                    : 0,
+
+                // Loudness: object with total, specific, relative
+                // Use total loudness, typically -60 to 0 dB
+                loudness: features.loudness?.total
+                    ? Math.min(1, Math.max(0, (features.loudness.total + 60) / 60))
+                    : 0,
+
+                // Chroma: 12 values, already normalized but average them
+                chroma: features.chroma
+                    ? features.chroma.reduce((sum, val) => sum + val, 0) / 12
+                    : 0
+            };
+        }
+
         function movePoints(time) {
             // Store time for theme renderers
             state.currentTime = time;
@@ -2104,45 +3076,167 @@
                 });
             }
 
-            // Get audio frequency data
-            let lowSum = 0, midSum = 0, highSum = 0;
+            // Get audio frequency data with expanded analysis
+            let subBassSum = 0, bassSum = 0, lowMidsSum = 0, midsSum = 0,
+                highMidsSum = 0, highsSum = 0, brillianceSum = 0;
+            let peakValue = 0, sumSquares = 0;
 
             if (state.analyser) {
                 state.analyser.getByteFrequencyData(state.dataArray);
 
+                // Split frequency spectrum into 7 bands
+                // Assuming 44.1kHz sample rate, typical FFT size 2048
+                // Frequency per bin ≈ 44100 / 2048 ≈ 21.5 Hz
                 for (let i = 0; i < state.bufferLength; i++) {
                     const value = state.dataArray[i];
-                    if (i < state.bufferLength * 0.3) lowSum += value;
-                    else if (i < state.bufferLength * 0.7) midSum += value;
-                    else highSum += value;
+                    const binPercentage = i / state.bufferLength;
+
+                    // Track peak and RMS
+                    peakValue = Math.max(peakValue, value);
+                    sumSquares += value * value;
+
+                    // Frequency band distribution (approximate Hz ranges)
+                    // 0-5%: Sub-Bass (20-60 Hz)
+                    // 5-15%: Bass (60-250 Hz)
+                    // 15-25%: Low-Mids (250-500 Hz)
+                    // 25-50%: Mids (500-2000 Hz)
+                    // 50-70%: High-Mids (2000-4000 Hz)
+                    // 70-90%: Highs (4000-8000 Hz)
+                    // 90-100%: Brilliance (8000-20000 Hz)
+                    if (binPercentage < 0.05) subBassSum += value;
+                    else if (binPercentage < 0.15) bassSum += value;
+                    else if (binPercentage < 0.25) lowMidsSum += value;
+                    else if (binPercentage < 0.50) midsSum += value;
+                    else if (binPercentage < 0.70) highMidsSum += value;
+                    else if (binPercentage < 0.90) highsSum += value;
+                    else brillianceSum += value;
                 }
             }
 
-            // Calculate frequency levels with emphasis
-            const lowLevel = (lowSum / (state.bufferLength * 0.3) / 255) * state.settings.lowEmphasis;
-            const midLevel = (midSum / (state.bufferLength * 0.4) / 255) * state.settings.midEmphasis;
-            const highLevel = (highSum / (state.bufferLength * 0.3) / 255) * state.settings.highEmphasis;
+            // Calculate normalized frequency levels (0-1)
+            const subBassLevel = (subBassSum / (state.bufferLength * 0.05) / 255) * state.settings.lowEmphasis;
+            const bassLevel = (bassSum / (state.bufferLength * 0.10) / 255) * state.settings.lowEmphasis;
+            const lowMidsLevel = (lowMidsSum / (state.bufferLength * 0.10) / 255) * state.settings.midEmphasis;
+            const midsLevel = (midsSum / (state.bufferLength * 0.25) / 255) * state.settings.midEmphasis;
+            const highMidsLevel = (highMidsSum / (state.bufferLength * 0.20) / 255) * state.settings.highEmphasis;
+            const highsLevel = (highsSum / (state.bufferLength * 0.20) / 255) * state.settings.highEmphasis;
+            const brillianceLevel = (brillianceSum / (state.bufferLength * 0.10) / 255) * state.settings.highEmphasis;
 
-            // Store audio levels for theme renderers
-            state.audioLevels.low = lowLevel;
-            state.audioLevels.mid = midLevel;
-            state.audioLevels.high = highLevel;
+            // Calculate amplitude features
+            const peakLevel = peakValue / 255;
+            const rmsLevel = Math.sqrt(sumSquares / state.bufferLength) / 255;
+            const dbLevel = rmsLevel > 0 ? Math.max(0, Math.min(1, (20 * Math.log10(rmsLevel) + 60) / 60)) : 0; // Normalize -60dB to 0dB as 0-1
+
+            // Beat and BPM detection
+            const timestamp = performance.now();
+
+            // Detect bass-focused beats (kick drums)
+            const bassEnergy = subBassLevel + bassLevel;
+            const beatResult = state.beatDetector.detectBeat(bassEnergy, timestamp);
+
+            // Detect onset (any sudden sound start - more sensitive)
+            const onsetEnergy = midsLevel + highsLevel;
+            const onsetThreshold = 0.6;
+            const isOnset = onsetEnergy > onsetThreshold;
+
+            // Update BPM when beat detected
+            if (beatResult.isBeat) {
+                state.bpmDetector.addBeat(timestamp);
+            }
+
+            // Get current BPM (normalized 0-1, where 120 BPM = 0.5)
+            const bpmValue = (state.bpmDetector.getBPM() - 60) / 140; // 60-200 BPM -> 0-1
+            const bpmConfidence = state.bpmDetector.getConfidence();
+
+            // Normalize Meyda features if available
+            const meydaNormalized = normalizeMeydaFeatures(state.meydaFeatures);
+
+            // Store all audio levels for theme renderers and control system
+            state.audioLevels = {
+                // Original 3-band (for backward compatibility)
+                low: bassLevel,
+                mid: midsLevel,
+                high: highsLevel,
+
+                // Expanded 7-band frequency analysis
+                subBass: subBassLevel,
+                bass: bassLevel,
+                lowMids: lowMidsLevel,
+                mids: midsLevel,
+                highMids: highMidsLevel,
+                highs: highsLevel,
+                brilliance: brillianceLevel,
+
+                // Amplitude features
+                peak: peakLevel,
+                rms: rmsLevel,
+                decibels: dbLevel,
+
+                // Rhythm features
+                beat: beatResult.strength, // 0-1, decays over time
+                onset: isOnset ? 1.0 : 0.0, // 0 or 1 (trigger)
+                bpm: bpmValue, // 0-1 (60-200 BPM)
+
+                // Meyda: Spectral features
+                centroid: meydaNormalized.spectralCentroid || 0,
+                flatness: meydaNormalized.spectralFlatness || 0,
+                rolloff: meydaNormalized.spectralRolloff || 0,
+                flux: meydaNormalized.spectralFlux || 0,
+                spread: meydaNormalized.spectralSpread || 0,
+
+                // Meyda: Perceptual features
+                loudness: meydaNormalized.loudness || 0,
+                chroma: meydaNormalized.chroma || 0,
+
+                // Combined
+                allLevels: (bassLevel + midsLevel + highsLevel) / 3,
+
+                // Metadata (for debugging)
+                _bpmActual: state.bpmDetector.getBPM(),
+                _bpmConfidence: bpmConfidence,
+                _beatDetected: beatResult.isBeat,
+                _meydaActive: !!state.meydaAnalyzer
+            };
+
+            // Apply audio modulation to controls
+            if (audioEngine && state.settings.theme) {
+                audioEngine.applyModulation(state.audioLevels, state.settings.theme);
+            }
+
+            // Get modulated amplitude (for LINEAR theme physics)
+            // Falls back to old intensity control if not available
+            const amplitude = (audioEngine && state.settings.theme)
+                ? (audioEngine.getValue(state.settings.theme, 'amplitude') || state.settings.intensity)
+                : state.settings.intensity;
+
+            // Get visualMode from control system (for LINEAR theme)
+            const visualMode = (audioEngine && state.settings.theme === 'linear')
+                ? (audioEngine.getValue('linear', 'visualMode') || state.settings.mode)
+                : state.settings.mode;
 
             // Debug logging (every 60 frames ~= 1 second)
             if (Math.random() < 0.016) {
                 console.log('🎵 Audio Levels:', {
-                    low: lowLevel.toFixed(3),
-                    mid: midLevel.toFixed(3),
-                    high: highLevel.toFixed(3),
-                    lowSum,
-                    midSum,
-                    highSum
+                    low: bassLevel.toFixed(3),
+                    mid: midsLevel.toFixed(3),
+                    high: highsLevel.toFixed(3),
+                    amplitude: amplitude?.toFixed(3),
+                    mode: visualMode,
+                    bassSum,
+                    midsSum,
+                    highsSum
                 });
             }
 
             // Bass creates global background shift - more dramatic
-            const bassShiftX = Math.sin(time * 0.001) * lowLevel * 60 * state.settings.intensity;
-            const bassShiftY = Math.cos(time * 0.0015) * lowLevel * 50 * state.settings.intensity;
+            const bassShiftX = Math.sin(time * 0.001) * bassLevel * 20 * amplitude;
+            const bassShiftY = Math.cos(time * 0.0015) * bassLevel * 15 * amplitude;
+
+            // Store background shift for theme renderers
+            state.backgroundShift = {
+                x: bassShiftX,
+                y: bassShiftY
+            };
 
             // Get canvas dimensions
             const canvasWidth = state.boundingRect.width;
@@ -2151,7 +3245,7 @@
             // MODE-DEPENDENT BEHAVIOR
             let midCursorX, midCursorY, highCursorX, highCursorY;
 
-            if (state.settings.mode === 'hole' || state.settings.mode === 'default') {
+            if (visualMode === 'hole' || visualMode === 'default') {
                 // HOLE/DEFAULT MODE: Follow cursor if on screen, random if not
                 if (state.mouse.onScreen) {
                     midCursorX = state.mouse.sx;
@@ -2160,11 +3254,11 @@
                     highCursorY = state.mouse.sy;
                 } else {
                     // Random virtual cursor positions
-                    midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midLevel * 200;
-                    midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midLevel * 150;
+                    midCursorX = canvasWidth * 0.3 + Math.sin(time * 0.002) * midsLevel * 200;
+                    midCursorY = canvasHeight * 0.5 + Math.cos(time * 0.003) * midsLevel * 150;
 
-                    highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highLevel * 250;
-                    highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highLevel * 200;
+                    highCursorX = canvasWidth * 0.7 + Math.sin(time * 0.0025) * highsLevel * 250;
+                    highCursorY = canvasHeight * 0.5 + Math.cos(time * 0.002) * highsLevel * 200;
                 }
             }
 
@@ -2192,34 +3286,34 @@
                     let highForceX = 0;
                     let highForceY = 0;
 
-                    if (state.settings.mode === 'hole') {
+                    if (visualMode === 'hole') {
                         // HOLE MODE: Radial ripples from cursor position
                         // 2. Mids create ripple effect - MORE DRAMATIC
                         const midDx = p.x - midCursorX;
                         const midDy = p.y - midCursorY;
                         const midDist = Math.hypot(midDx, midDy);
-                        const midRadius = 400 * midLevel;
+                        const midRadius = 400 * midsLevel;
 
                         if (midDist < midRadius && midDist > 0) {
-                            const midStrength = (1 - midDist / midRadius) * midLevel;
+                            const midStrength = (1 - midDist / midRadius) * midsLevel;
                             const angle = Math.atan2(midDy, midDx);
-                            midForceX = Math.cos(angle) * midStrength * 120 * state.settings.intensity;
-                            midForceY = Math.sin(angle) * midStrength * 120 * state.settings.intensity;
+                            midForceX = Math.cos(angle) * midStrength * 120 * amplitude;
+                            midForceY = Math.sin(angle) * midStrength * 120 * amplitude;
                         }
 
                         // 3. Highs create sharper ripple effect - MORE DRAMATIC
                         const highDx = p.x - highCursorX;
                         const highDy = p.y - highCursorY;
                         const highDist = Math.hypot(highDx, highDy);
-                        const highRadius = 250 * highLevel;
+                        const highRadius = 250 * highsLevel;
 
                         if (highDist < highRadius && highDist > 0) {
-                            const highStrength = (1 - highDist / highRadius) * highLevel;
+                            const highStrength = (1 - highDist / highRadius) * highsLevel;
                             const angle = Math.atan2(highDy, highDx);
-                            highForceX = Math.cos(angle) * highStrength * 150 * state.settings.intensity;
-                            highForceY = Math.sin(angle) * highStrength * 150 * state.settings.intensity;
+                            highForceX = Math.cos(angle) * highStrength * 150 * amplitude;
+                            highForceY = Math.sin(angle) * highStrength * 150 * amplitude;
                         }
-                    } else if (state.settings.mode === 'default') {
+                    } else if (visualMode === 'default') {
                         // DEFAULT MODE: No audio-reactive burst/hole effect
                         // Forces remain 0
                     } else {
@@ -2231,11 +3325,11 @@
                         const midWaveWidth = 500;
 
                         if (Math.abs(midDistFromFront) < midWaveWidth) {
-                            const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midLevel;
+                            const midStrength = (1 - Math.abs(midDistFromFront) / midWaveWidth) * midsLevel;
                             const perpAngle = crunchMidAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.01, p.y * 0.01 + time * 0.001) > 0 ? 1 : -1;
-                            midForceX = Math.cos(perpAngle) * midStrength * 180 * state.settings.intensity * waveDir;
-                            midForceY = Math.sin(perpAngle) * midStrength * 180 * state.settings.intensity * waveDir;
+                            midForceX = Math.cos(perpAngle) * midStrength * 180 * amplitude * waveDir;
+                            midForceY = Math.sin(perpAngle) * midStrength * 180 * amplitude * waveDir;
                         }
 
                         // Calculate distance from wave front for highs
@@ -2245,11 +3339,11 @@
                         const highWaveWidth = 400;
 
                         if (Math.abs(highDistFromFront) < highWaveWidth) {
-                            const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highLevel;
+                            const highStrength = (1 - Math.abs(highDistFromFront) / highWaveWidth) * highsLevel;
                             const perpAngle = crunchHighAngle + Math.PI * 0.5;
                             const waveDir = state.noise(p.x * 0.015, p.y * 0.015 + time * 0.0015) > 0 ? 1 : -1;
-                            highForceX = Math.cos(perpAngle) * highStrength * 220 * state.settings.intensity * waveDir;
-                            highForceY = Math.sin(perpAngle) * highStrength * 220 * state.settings.intensity * waveDir;
+                            highForceX = Math.cos(perpAngle) * highStrength * 220 * amplitude * waveDir;
+                            highForceY = Math.sin(perpAngle) * highStrength * 220 * amplitude * waveDir;
                         }
                     }
 
@@ -2295,6 +3389,25 @@
             const theme = config.themes.linear;
             const { low, mid, high } = state.audioLevels;
 
+            // Get values from control system (with fallbacks to old config)
+            // Use ?? or explicit checks to handle 0 as valid value (not falsy)
+            const hueValue = audioEngine ? audioEngine.getValue('linear', 'hue') : null;
+            const saturationValue = audioEngine ? audioEngine.getValue('linear', 'saturation') : null;
+            const opacityValue = audioEngine ? audioEngine.getValue('linear', 'opacity') : null;
+            const lineWidthValue = audioEngine ? audioEngine.getValue('linear', 'lineWidth') : null;
+            const backgroundShiftValue = audioEngine ? audioEngine.getValue('linear', 'backgroundShift') : null;
+
+            const hue = hueValue !== null && hueValue !== undefined ? hueValue : (theme.hue !== undefined ? theme.hue : 280);
+            const saturation = saturationValue !== null && saturationValue !== undefined ? saturationValue : (theme.saturation !== undefined ? theme.saturation : 0);
+            const opacity = opacityValue !== null && opacityValue !== undefined ? opacityValue : theme.opacity;
+            const lineWidth = lineWidthValue !== null && lineWidthValue !== undefined ? lineWidthValue : 3;
+            const backgroundShift = backgroundShiftValue !== null && backgroundShiftValue !== undefined ? backgroundShiftValue : 1.0;
+
+            // Calculate background shift transform
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            const transformString = shiftX !== 0 || shiftY !== 0 ? `translate(${shiftX}, ${shiftY})` : '';
+
             // Hide NEON gradient mesh if it exists
             const gradientMeshGroup = elements.svg.querySelector('#neon-gradient-mesh');
             if (gradientMeshGroup) {
@@ -2303,7 +3416,7 @@
 
             // Calculate overall audio energy for dramatic effect
             const totalEnergy = (low + mid + high) / 3;
-            const dynamicOpacity = theme.opacity + totalEnergy * theme.opacityMultiplier;
+            const dynamicOpacity = opacity + totalEnergy * theme.opacityMultiplier;
 
             state.lines.forEach((points, lineIndex) => {
                 if (points.length < 2 || !state.paths[lineIndex]) return;
@@ -2324,12 +3437,23 @@
                     pathData += ` L ${x} ${y}`;
                 }
 
-                // Update path with dynamic opacity
+                // Update path with color values from control system
                 const path = state.paths[lineIndex];
                 path.setAttribute('d', pathData);
                 path.removeAttribute('filter');
-                path.removeAttribute('transform');
+
+                // Apply background shift transform
+                if (transformString) {
+                    path.setAttribute('transform', transformString);
+                } else {
+                    path.removeAttribute('transform');
+                }
+
                 path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
+                path.setAttribute('stroke-width', lineWidth);
+
+                // Update stroke color from control system
+                path.setAttribute('stroke', `hsl(${hue}, ${saturation}%, 100%)`);
             });
         }
 
@@ -2337,6 +3461,45 @@
             const theme = config.themes.neon;
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
+
+            // Get values from control system (with fallbacks)
+            const colorMode = audioEngine ? (audioEngine.getValue('neon', 'colorMode') || state.settings.neonMode) : state.settings.neonMode;
+            const colorChangeMode = audioEngine ? (audioEngine.getValue('neon', 'colorChangeMode') || 'static') : 'static';
+            const cycleSpeed = audioEngine ? (audioEngine.getValue('neon', 'cycleSpeed') || 0.1) : 0.1;
+            const warmCool = audioEngine ? (audioEngine.getValue('neon', 'warmCool') || state.settings.colorTemp) : state.settings.colorTemp;
+            const burstSize = audioEngine ? (audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
+            const movement = audioEngine ? (audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
+            const glow = audioEngine ? (audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
+            const baseHue = audioEngine ? (audioEngine.getValue('neon', 'hue') || 280) : 280;
+            const baseSaturationControl = audioEngine ? (audioEngine.getValue('neon', 'saturation') || 70) : 70;
+            const baseLightnessControl = audioEngine ? (audioEngine.getValue('neon', 'lightness') || 50) : 50;
+            const blur = audioEngine ? (audioEngine.getValue('neon', 'blur') || 0) : 0;
+            const responsiveness = audioEngine ? (audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
+            const smoothing = audioEngine ? (audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
+            const meshDensity = audioEngine ? (audioEngine.getValue('neon', 'meshDensity') || 8) : 8;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('neon', 'backgroundShift') || 1.0) : 1.0;
+
+            // Initialize NEON state if needed (for smoothing and reactive mode)
+            if (!state.neon) {
+                state.neon = {
+                    smoothedAudio: { low: 0, mid: 0, high: 0 },
+                    reactiveHue: baseHue,
+                    lastBeatTime: 0,
+                    targetHue: baseHue,
+                    currentHue: baseHue
+                };
+            }
+
+            // Apply exponential smoothing to audio levels
+            const alpha = 1 - smoothing; // Smoothing factor (0 = full smooth, 1 = no smooth)
+            state.neon.smoothedAudio.low = state.neon.smoothedAudio.low + (low - state.neon.smoothedAudio.low) * alpha;
+            state.neon.smoothedAudio.mid = state.neon.smoothedAudio.mid + (mid - state.neon.smoothedAudio.mid) * alpha;
+            state.neon.smoothedAudio.high = state.neon.smoothedAudio.high + (high - state.neon.smoothedAudio.high) * alpha;
+
+            // Apply responsiveness multiplier to smoothed audio (amplifies/dampens audio response)
+            const lowSmooth = state.neon.smoothedAudio.low * responsiveness;
+            const midSmooth = state.neon.smoothedAudio.mid * responsiveness;
+            const highSmooth = state.neon.smoothedAudio.high * responsiveness;
 
             // Hide all line paths for NEON theme
             state.paths.forEach(path => {
@@ -2357,36 +3520,78 @@
                 elements.svg.appendChild(gradientMeshGroup);
             }
 
-            // Get color mode settings
-            const colorMode = state.settings.neonMode;
-            const colorTempIntensity = state.settings.colorTemp;
+            // Apply background shift transform
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            if (shiftX !== 0 || shiftY !== 0) {
+                gradientMeshGroup.setAttribute('transform', `translate(${shiftX}, ${shiftY})`);
+            } else {
+                gradientMeshGroup.removeAttribute('transform');
+            }
 
-            // Calculate audio-reactive parameters
-            const hueShift = (mid * 360 + time * 0.05) % 360;
+            // Color settings are now from control system
+            const colorTempIntensity = warmCool;
 
-            // Saturation mapping: high frequencies = less saturated, low frequencies = more saturated
-            const baseSaturation = theme.saturationBase + high * theme.saturationMultiplier;
-            const saturationFromLow = low * 30; // Bass increases saturation
-            const saturationFromHigh = -high * 20; // Highs decrease saturation
-            const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
+            // Calculate hue based on color change mode
+            let hueShift;
+            switch (colorChangeMode) {
+                case 'static':
+                    // No color change - use base hue directly
+                    hueShift = baseHue;
+                    break;
 
-            // Lightness: Low frequencies darken, high frequencies brighten
-            // Range from 20% (dark) to 90% (bright)
-            const lightnessFromLow = -low * theme.lightnessRange * 0.5; // Darken with bass
-            const lightnessFromHigh = high * theme.lightnessRange * 0.7; // Brighten with highs
-            const lightness = theme.lightnessBase + lightnessFromLow + lightnessFromHigh;
+                case 'cycle':
+                    // Continuous rotation through color wheel
+                    hueShift = (baseHue + time * cycleSpeed * 100) % 360;
+                    break;
 
-            // Movement: More dramatic with bass
-            const movementAmplitude = theme.movementBase + low * theme.movementMultiplier;
+                case 'pulse':
+                    // Oscillate between complementary colors
+                    const pulseOffset = Math.sin(time * cycleSpeed * 2) * 60;
+                    hueShift = (baseHue + pulseOffset) % 360;
+                    break;
 
-            // Size: Dramatic pulsing with all frequencies combined
-            const combinedEnergy = (low * 0.5 + mid * 0.3 + high * 0.2);
+                case 'reactive':
+                    // Jump to random hue on beat detection
+                    const beatDetected = state.audioLevels.beat > 0.5;
+                    if (beatDetected && (time - state.neon.lastBeatTime) > 300) {
+                        // Generate new random hue on beat
+                        state.neon.targetHue = Math.random() * 360;
+                        state.neon.lastBeatTime = time;
+                    }
+                    // Smoothly interpolate to target hue
+                    const lerpSpeed = 0.1;
+                    state.neon.currentHue = state.neon.currentHue + (state.neon.targetHue - state.neon.currentHue) * lerpSpeed;
+                    hueShift = state.neon.currentHue % 360;
+                    break;
+
+                default:
+                    hueShift = baseHue;
+            }
+
+            // Saturation mapping: use control value as base, modulate with smoothed audio
+            const saturationFromLow = lowSmooth * 30; // Bass increases saturation
+            const saturationFromHigh = -highSmooth * 20; // Highs decrease saturation
+            const saturation = Math.max(0, Math.min(100, baseSaturationControl + saturationFromLow + saturationFromHigh));
+
+            // Lightness: use control value as base, modulate with smoothed audio
+            const lightnessFromLow = -lowSmooth * 20; // Darken with bass
+            const lightnessFromHigh = highSmooth * 30; // Brighten with highs
+            const lightness = Math.max(20, Math.min(90, baseLightnessControl + lightnessFromLow + lightnessFromHigh));
+
+            // Movement: More dramatic with bass - uses movement control value and smoothed audio
+            const movementAmplitude = (theme.movementBase + lowSmooth * theme.movementMultiplier) * movement;
+
+            // Size: Dramatic pulsing with all frequencies combined - uses burstSize control value and smoothed audio
+            const combinedEnergy = (lowSmooth * 0.5 + midSmooth * 0.3 + highSmooth * 0.2);
             const sizeMultiplier = theme.sizeMultiplierBase + combinedEnergy * theme.sizeMultiplierRange;
 
             // Debug logging for NEON renderer (every ~1 second)
             if (Math.random() < 0.016) {
                 console.log('🎨 NEON Render:', {
                     audioLevels: { low, mid, high },
+                    smoothedLevels: { lowSmooth: lowSmooth.toFixed(2), midSmooth: midSmooth.toFixed(2), highSmooth: highSmooth.toFixed(2) },
+                    controls: { responsiveness, smoothing: smoothing.toFixed(2), colorChangeMode },
                     hueShift: hueShift.toFixed(1),
                     saturation: saturation.toFixed(1),
                     lightness: lightness.toFixed(1),
@@ -2396,7 +3601,8 @@
             }
 
             // Create multiple gradient centers for organic look
-            const numBaseCenters = theme.baseHues.length;
+            // Use meshDensity control to determine number of gradient centers
+            const numBaseCenters = Math.floor(meshDensity);
             const numUserCenters = state.userGradientCenters.length;
 
             // Get or create gradient definitions in defs
@@ -2424,7 +3630,7 @@
 
                 // Calculate size based on audio and position
                 const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.6;
-                const radius = baseRadius * sizeMultiplier * state.settings.burstSize;
+                const radius = baseRadius * sizeMultiplier * burstSize;
 
                 // Create radial gradient for this center
                 const gradientId = `neon-radial-${i}`;
@@ -2454,16 +3660,16 @@
                     const frequencyBalance = (high - low) * colorTempIntensity; // -1 to 1 range
                     // Map: -1 (low/cool) = 210 (cyan-blue), +1 (high/warm) = 30 (orange-red)
                     const frequencyHue = 120 - frequencyBalance * 90; // 210 to 30
-                    const baseHue = theme.baseHues[i];
-                    hue = ((frequencyHue + baseHue * 0.3 + hueShift * 0.5) % 360);
+                    const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+                    hue = ((frequencyHue + baseHueOffset * 0.3 + hueShift * 0.5) % 360);
 
                     // Pastel colors: higher saturation but softer
                     finalSaturation = Math.max(40, Math.min(70, saturation * 0.7));
                     finalLightness = Math.max(60, Math.min(85, lightness + 10)); // Lighter for pastel
                 } else {
                     // Bright mode (default): Original vibrant colors
-                    const baseHue = theme.baseHues[i];
-                    hue = (baseHue + hueShift) % 360;
+                    const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+                    hue = (baseHueOffset + hueShift) % 360;
                     finalSaturation = saturation;
                     finalLightness = lightness;
                 }
@@ -2570,8 +3776,8 @@
                 gradientMeshGroup.appendChild(circle);
             }
 
-            // Update glow filter based on bass
-            const blurRadius = theme.blurBase + low * theme.blurMultiplier;
+            // Update glow filter based on bass and blur control
+            const blurRadius = (theme.blurBase + low * theme.blurMultiplier + blur * 2) * glow;
             const filter = elements.svg.querySelector('#neon-glow');
             if (filter) {
                 const blur1 = filter.querySelector('feGaussianBlur[result="blur1"]');
@@ -2731,14 +3937,25 @@
 
             if (!img) return;
 
+            // Get values from control system (with fallbacks)
+            const rotation = audioEngine ? (audioEngine.getValue('glitch', 'rotation') || state.settings.rotationIntensity) : state.settings.rotationIntensity;
+            const glitchIntensityControl = audioEngine ? (audioEngine.getValue('glitch', 'glitchIntensity') || state.settings.glitchEffectIntensity) : state.settings.glitchEffectIntensity;
+            const contrast = audioEngine ? (audioEngine.getValue('glitch', 'contrast') || 1.0) : 1.0;
+            const channelOffsetControl = audioEngine ? (audioEngine.getValue('glitch', 'channelOffset') || 5) : 5;
+            const displacementControl = audioEngine ? (audioEngine.getValue('glitch', 'displacement') || 10) : 10;
+            const scanlinesControl = audioEngine ? (audioEngine.getValue('glitch', 'scanlines') || 0) : 0;
+            const noiseControl = audioEngine ? (audioEngine.getValue('glitch', 'noise') || 0) : 0;
+            const pixelationControl = audioEngine ? (audioEngine.getValue('glitch', 'pixelation') || 1) : 1;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('glitch', 'backgroundShift') || 1.0) : 1.0;
+
             // Calculate glitch parameters with user intensity multipliers
-            const glitchEffectIntensity = state.settings.glitchEffectIntensity;
-            const channelSeparation = (theme.channelSeparationBase + low * theme.channelSeparationMultiplier) * glitchEffectIntensity;
-            const glitchIntensity = mid * theme.glitchIntensityMultiplier * glitchEffectIntensity;
-            const quantization = Math.max(1, (theme.quantizationBase + high * theme.quantizationMultiplier) * glitchEffectIntensity);
+            const glitchEffectIntensity = glitchIntensityControl;
+            const channelSeparation = channelOffsetControl;
+            const glitchIntensity = displacementControl;
+            const quantization = Math.max(1, pixelationControl);
 
             // Calculate 3D rotation based on audio with user intensity multiplier
-            const rotationIntensity = state.settings.rotationIntensity;
+            const rotationIntensity = rotation;
             const rotationX = mid * 45 * rotationIntensity;
             const rotationY = high * 45 * rotationIntensity;
             const rotationZ = low * 15 * rotationIntensity;
@@ -2750,6 +3967,12 @@
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply background shift
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            ctx.save();
+            ctx.translate(shiftX, shiftY);
 
             // Apply quantization/pixelation by scaling down and up
             const pixelSize = Math.max(1, Math.floor(quantization));
@@ -2832,8 +4055,9 @@
             // Put modified image data back
             tempCtx.putImageData(imageData, 0, 0);
 
-            // RGB Channel Separation
-            const glitchMode = state.settings.glitchMode || 'rgb';
+            // RGB Channel Separation - use visualMode from control system
+            const visualMode = audioEngine ? (audioEngine.getValue('glitch', 'visualMode') || state.settings.glitchMode) : state.settings.glitchMode;
+            const glitchMode = visualMode || 'rgb';
             const redCanvas = document.createElement('canvas');
             const greenCanvas = document.createElement('canvas');
             const blueCanvas = document.createElement('canvas');
@@ -2906,8 +4130,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.globalCompositeOperation = 'lighter';
 
-            // Apply contrast filter
-            const contrast = state.settings.glitchContrast;
+            // Apply contrast filter (using control system value)
             ctx.filter = `contrast(${contrast})`;
 
             ctx.drawImage(redCanvas, -channelSeparation, 0);
@@ -2916,6 +4139,33 @@
 
             ctx.filter = 'none';
             ctx.globalCompositeOperation = 'source-over';
+
+            // Apply scanlines effect (CRT-style horizontal lines)
+            if (scanlinesControl > 0) {
+                ctx.globalAlpha = scanlinesControl * 0.3;
+                ctx.fillStyle = '#000000';
+                for (let y = 0; y < canvas.height; y += 4) {
+                    ctx.fillRect(0, y, canvas.width, 2);
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Apply noise overlay (static grain)
+            if (noiseControl > 0) {
+                const noiseData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = noiseData.data;
+                const noiseAmount = noiseControl * 50;
+                for (let i = 0; i < pixels.length; i += 4) {
+                    const noise = (Math.random() - 0.5) * noiseAmount;
+                    pixels[i] += noise;     // R
+                    pixels[i + 1] += noise; // G
+                    pixels[i + 2] += noise; // B
+                }
+                ctx.putImageData(noiseData, 0, 0);
+            }
+
+            // Restore canvas state
+            ctx.restore();
         }
 
         function renderGlitchImage(canvas, theme, low, mid, high, time, img, themeBlur = 0, themeOpacity = 1.0, baseRotation = 0) {
@@ -3352,19 +4602,20 @@
             console.log(`✨ Initialized ${state.settings.starCount} stars`);
         }
 
-        function updateStarGradient() {
+        function updateStarGradient(hue, saturation) {
             const canvas = state.stars.gradientCanvas;
             const ctx = state.stars.gradientCtx;
-            const hue = state.settings.starHue;
-            const saturation = state.settings.starSaturation;
+            // Use parameters if provided, otherwise fallback to state
+            const finalHue = hue !== undefined ? hue : (state.settings.starHue || 44);
+            const finalSaturation = saturation !== undefined ? saturation : (state.settings.starSaturation || 12);
             const half = canvas.width / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
             gradient.addColorStop(0.025, '#fff');
-            gradient.addColorStop(0.1, `hsl(${hue}, ${saturation}%, 33%)`);
-            gradient.addColorStop(0.25, `hsl(${hue}, ${Math.min(saturation + 3, 100)}%, 6%)`);
+            gradient.addColorStop(0.1, `hsl(${finalHue}, ${finalSaturation}%, 33%)`);
+            gradient.addColorStop(0.25, `hsl(${finalHue}, ${Math.min(finalSaturation + 3, 100)}%, 6%)`);
             gradient.addColorStop(1, 'transparent');
 
             ctx.fillStyle = gradient;
@@ -3377,6 +4628,27 @@
             const theme = config.themes.stars;
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
+
+            // Get values from control system (with fallbacks to old state)
+            const hue = audioEngine ? (audioEngine.getValue('stars', 'hue') || state.settings.starHue) : state.settings.starHue;
+            const saturation = audioEngine ? (audioEngine.getValue('stars', 'saturation') || state.settings.starSaturation) : state.settings.starSaturation;
+            const speed = audioEngine ? (audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
+            const brightness = audioEngine ? (audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
+            const zSpeed = audioEngine ? (audioEngine.getValue('stars', 'zSpeed') || state.settings.starZSpeed) : state.settings.starZSpeed;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('stars', 'backgroundShift') || 1.0) : 1.0;
+            const minOpacity = audioEngine ? (audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
+            const maxOpacity = audioEngine ? (audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
+            const diameter = audioEngine ? (audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
+            const twinkleRate = audioEngine ? (audioEngine.getValue('stars', 'twinkleRate') || state.settings.starTwinkle) : state.settings.starTwinkle;
+            const audioBoost = audioEngine ? (audioEngine.getValue('stars', 'audioBoost') || state.settings.starAudioBoost) : state.settings.starAudioBoost;
+            const count = audioEngine ? (audioEngine.getValue('stars', 'count') || state.settings.starCount) : state.settings.starCount;
+            const trailLength = audioEngine ? (audioEngine.getValue('stars', 'trailLength') || 0) : 0;
+            const bloom = audioEngine ? (audioEngine.getValue('stars', 'bloom') || 0) : 0;
+            const perspective = audioEngine ? (audioEngine.getValue('stars', 'perspective') || 1.0) : 1.0;
+            const smoothing = audioEngine ? (audioEngine.getValue('stars', 'smoothing') || 0.5) : 0.5;
+
+            // Hide SVG paths for STARS theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
 
             // Initialize stars on first render
             if (!state.stars.initialized) {
@@ -3402,20 +4674,29 @@
             const w = starsCanvas.width = state.boundingRect.width;
             const h = starsCanvas.height = state.boundingRect.height;
 
-            // Clear with fade effect
+            // Update star gradient with current colors from control system
+            updateStarGradient(hue, saturation);
+
+            // Clear with fade effect (controlled by trailLength)
+            // trailLength: 0 = no trails (alpha 1.0), 1 = long trails (alpha 0.3)
             ctx.globalCompositeOperation = 'source-over';
-            ctx.globalAlpha = 0.8;
+            ctx.globalAlpha = 1.0 - (trailLength * 0.7);
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, w, h);
 
+            // Apply background shift
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            ctx.save();
+            ctx.translate(shiftX, shiftY);
+
             // Calculate audio-reactive speed multiplier
             // Bass SLOWS DOWN orbit speed using user setting
-            const speedBoost = 1.0 - (low * (state.settings.starAudioBoost / 10));
+            const speedBoost = 1.0 - (low * (audioBoost / 10));
 
             // Smoothly transition center position to target (controlled by smoothing slider)
-            const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
-            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
-            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothingFactor) * 0.1;
+            state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothing) * 0.1;
+            state.stars.centerY += (state.stars.targetCenterY - state.stars.centerY) * (1 - smoothing) * 0.1;
 
             // STARS theme always uses the original gradient planes mode
             ctx.globalCompositeOperation = 'lighter';
@@ -3423,36 +4704,35 @@
             // PLANES MODE: Original gradient stars
                 state.stars.starArray.forEach((star) => {
                     // Update Z position (move towards camera)
-                    if (state.settings.starZSpeed > 0) {
-                        star.z += state.settings.starZSpeed * 0.001;
+                    if (zSpeed > 0) {
+                        star.z += zSpeed * 0.001;
 
                         // Reset star if it passes the camera
                         if (star.z >= 1.0) {
                             star.z = 0;
-                            star.timePassed = Math.random() * state.settings.starCount;
+                            star.timePassed = Math.random() * count;
                         }
                     }
 
                     // Calculate perspective scale based on Z (0 = far/small, 1 = close/big)
-                    const scale = 0.2 + star.z * 0.8; // Range from 0.2 to 1.0
+                    // Perspective control adjusts depth effect intensity
+                    const baseScale = 0.2;
+                    const depthRange = 0.8 * perspective; // perspective multiplier (0-2)
+                    const scale = baseScale + star.z * depthRange;
 
                     // Scale orbit radius and star size by perspective
                     const scaledOrbitRadius = star.orbitRadius * scale;
-                    star.radius = star.baseRadius * scale;
-
-                    // High frequencies shift the orbit center position (rate controlled by slider)
-                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    star.radius = star.baseRadius * scale * diameter;
 
                     // Use smoothed center position (click-to-center feature)
-                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
-                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX;
+                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY;
 
                     // Twinkle effect using user setting
-                    const twinkle = Math.floor(Math.random() * state.settings.starTwinkle);
-                    if (twinkle === 1 && star.alpha > state.settings.starMinOpacity) {
+                    const twinkle = Math.floor(Math.random() * twinkleRate);
+                    if (twinkle === 1 && star.alpha > minOpacity) {
                         star.alpha -= 0.05;
-                    } else if (twinkle === 2 && star.alpha < state.settings.starMaxOpacity * state.settings.starBrightness) {
+                    } else if (twinkle === 2 && star.alpha < maxOpacity * brightness) {
                         star.alpha += 0.05;
                     }
 
@@ -3463,6 +4743,15 @@
                     const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
 
                     ctx.globalAlpha = perspectiveAlpha;
+
+                    // Apply bloom/glow effect if enabled
+                    if (bloom > 0) {
+                        const blurAmount = bloom * 10; // 0-20px blur range
+                        ctx.filter = `blur(${blurAmount}px)`;
+                    } else {
+                        ctx.filter = 'none';
+                    }
+
                     ctx.drawImage(
                         state.stars.gradientCanvas,
                         x - star.radius / 2,
@@ -3472,10 +4761,13 @@
                     );
 
                     // Update orbit with audio-reactive speed
-                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                    star.timePassed += star.baseSpeed * speed * speedBoost;
                 });
 
             ctx.globalAlpha = 1.0;
+
+            // Restore canvas state
+            ctx.restore();
         }
 
         // =====================================================
@@ -3526,6 +4818,27 @@
             const { low, mid, high } = state.audioLevels;
             const time = state.currentTime;
 
+            // Get values from control system (with fallbacks)
+            const visualMode = audioEngine ? (audioEngine.getValue('wave', 'visualMode') || state.settings.waveMode) : state.settings.waveMode;
+            const layers = audioEngine ? (audioEngine.getValue('wave', 'layers') || state.settings.waveLayers) : state.settings.waveLayers;
+            const hue = audioEngine ? (audioEngine.getValue('wave', 'hue') || state.settings.waveHue) : state.settings.waveHue;
+            const saturation = audioEngine ? (audioEngine.getValue('wave', 'saturation') || state.settings.waveSaturation) : state.settings.waveSaturation;
+            const amplitude = audioEngine ? (audioEngine.getValue('wave', 'amplitude') || 1.0) : 1.0;
+            const wavelength = audioEngine ? (audioEngine.getValue('wave', 'wavelength') || 1.0) : 1.0;
+            const lineWidth = audioEngine ? (audioEngine.getValue('wave', 'lineWidth') || 2) : 2;
+            const speed = audioEngine ? (audioEngine.getValue('wave', 'speed') || state.settings.starSpeed || 1.0) : (state.settings.starSpeed || 1.0);
+            const rotationX = audioEngine ? (audioEngine.getValue('wave', 'rotationX') || 0) : 0;
+            const rotationY = audioEngine ? (audioEngine.getValue('wave', 'rotationY') || 0) : 0;
+            const glow = audioEngine ? (audioEngine.getValue('wave', 'glow') || 0) : 0;
+            const perspective = audioEngine ? (audioEngine.getValue('wave', 'perspective') || 1.0) : 1.0;
+            const depth = audioEngine ? (audioEngine.getValue('wave', 'depth') || 1.0) : 1.0;
+            const turbulence = audioEngine ? (audioEngine.getValue('wave', 'turbulence') || 0) : 0;
+            const phaseShift = audioEngine ? (audioEngine.getValue('wave', 'phaseShift') || 0) : 0;
+            const backgroundShift = audioEngine ? (audioEngine.getValue('wave', 'backgroundShift') || 1.0) : 1.0;
+
+            // Hide SVG paths for WAVE theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
+
             // Initialize stars on first render (we reuse stars array for wave theme)
             if (!state.stars.initialized) {
                 initializeStars();
@@ -3556,6 +4869,12 @@
             // Clear canvas
             ctx.clearRect(0, 0, w, h);
 
+            // Apply background shift
+            const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
+            const shiftY = state.backgroundShift ? state.backgroundShift.y * backgroundShift : 0;
+            ctx.save();
+            ctx.translate(shiftX, shiftY);
+
             // Audio smoothing and speed boost
             const smoothingFactor = state.settings.starSmoothing; // 0-1, higher = smoother/slower
             state.stars.centerX += (state.stars.targetCenterX - state.stars.centerX) * (1 - smoothingFactor) * 0.1;
@@ -3564,63 +4883,69 @@
             // Draw based on mode
             ctx.globalCompositeOperation = 'lighter';
 
-            const mode = state.settings.waveMode;
+            const mode = visualMode;
 
             if (mode === 'planes') {
-                // PLANES MODE: Original gradient stars
+                // PLANES MODE: Original gradient stars - simplified for WAVE theme
+                const speedBoost = 1.0 + high * amplitude;
+
                 state.stars.starArray.forEach((star) => {
-                    // Update Z position (move towards camera)
-                    if (state.settings.starZSpeed > 0) {
-                        star.z += state.settings.starZSpeed * 0.001;
-                        if (star.z >= 1.0) {
-                            star.z = 0;
-                            star.timePassed = Math.random() * state.settings.starCount;
-                        }
+                    // Apply perspective control to depth scaling
+                    const baseScale = 0.2;
+                    const depthRange = 0.8 * perspective * depth; // perspective and depth multipliers
+                    const scale = baseScale + star.z * depthRange;
+                    const scaledOrbitRadius = star.orbitRadius * scale * wavelength;
+
+                    // High frequencies shift center position with rotationY control
+                    const centerOffsetX = Math.sin(time * 0.001 + rotationX * 0.1) * high * 100;
+                    const centerOffsetY = Math.cos(time * 0.001 + rotationY * 0.1) * high * 100;
+
+                    // Calculate base position with phaseShift
+                    const phaseAngle = star.timePassed + phaseShift;
+                    let x = Math.sin(phaseAngle) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
+                    let y = Math.cos(phaseAngle) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+
+                    // Apply turbulence (noise-based displacement)
+                    if (turbulence > 0) {
+                        const turbulenceX = (state.noise(x * 0.01, y * 0.01 + time * 0.001) - 0.5) * turbulence * 100;
+                        const turbulenceY = (state.noise(x * 0.01 + 100, y * 0.01 + time * 0.001) - 0.5) * turbulence * 100;
+                        x += turbulenceX;
+                        y += turbulenceY;
                     }
 
-                    const scale = 0.2 + star.z * 0.8;
-                    const speedBoost = 1.0 + high * state.settings.starAudioBoost;
-                    const scaledOrbitRadius = star.orbitRadius * scale * state.settings.starDiameter;
-
-                    // High frequencies shift center position
-                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
-
-                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
-                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
-
-                    // Get pre-rendered gradient from cache
+                    // Get pre-rendered gradient from cache (with glow effect)
+                    const size = 25 * star.size * amplitude * (1 + glow);
                     ctx.drawImage(
                         state.stars.gradientCanvas,
                         0, 0, 50, 50,
-                        x - 25 * star.size * state.settings.starBrightness,
-                        y - 25 * star.size * state.settings.starBrightness,
-                        50 * star.size * state.settings.starBrightness,
-                        50 * star.size * state.settings.starBrightness
+                        x - size,
+                        y - size,
+                        size * 2,
+                        size * 2
                     );
 
                     // Update orbit
-                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                    star.timePassed += star.baseSpeed * speed * speedBoost;
                 });
 
             } else if (mode === 'grids') {
                 // GRIDS MODE: Draw layered grid patterns
-                const layers = state.settings.waveLayers;
-                const hue = state.settings.waveHue;
-                const sat = state.settings.waveSaturation;
+                const sat = saturation;
 
                 for (let layer = 0; layer < layers; layer++) {
                     const layerDepth = layer / layers;
-                    const layerScale = 0.3 + layerDepth * 0.7;
+                    // Apply depth control to layer scaling
+                    const layerScale = 0.3 + layerDepth * 0.7 * depth;
                     const cellSize = 40 + layer * 20;
 
-                    // Audio-reactive rotation per layer
-                    const rotation = time * 0.0001 * state.settings.starSpeed + layer * 0.3;
+                    // Audio-reactive rotation per layer with phaseShift
+                    const rotation = time * 0.0001 * speed + layer * 0.3 + phaseShift * 0.1;
 
                     ctx.save();
                     ctx.translate(state.stars.centerX, state.stars.centerY);
-                    ctx.rotate(rotation + high * 0.5);
-                    ctx.scale(layerScale * state.settings.starDiameter, layerScale * state.settings.starDiameter);
+                    ctx.rotate(rotation + high * 0.5 + rotationY * 0.01);
+                    // Apply perspective scaling
+                    ctx.scale(layerScale * amplitude * perspective, layerScale * amplitude * perspective);
 
                     // Draw grid with radial gradient shading
                     const gridSize = Math.max(w, h) / cellSize;
@@ -3635,10 +4960,17 @@
                             const x = i * cellSize;
                             const y = j * cellSize;
 
-                            // Audio-reactive distortion
-                            const distortion = Math.sin(i * 0.5 + time * 0.001) * Math.cos(j * 0.5 + time * 0.001) * low * 10;
+                            // Audio-reactive distortion with turbulence
+                            let distortion = Math.sin(i * 0.5 + time * 0.001) * Math.cos(j * 0.5 + time * 0.001) * low * 10;
 
-                            ctx.strokeRect(x + distortion, y + distortion, cellSize, cellSize);
+                            // Add turbulence displacement
+                            if (turbulence > 0) {
+                                const turbX = (state.noise(i * 0.1, j * 0.1 + time * 0.001) - 0.5) * turbulence * 50;
+                                const turbY = (state.noise(i * 0.1 + 100, j * 0.1 + time * 0.001) - 0.5) * turbulence * 50;
+                                ctx.strokeRect(x + distortion + turbX, y + distortion + turbY, cellSize, cellSize);
+                            } else {
+                                ctx.strokeRect(x + distortion, y + distortion, cellSize, cellSize);
+                            }
                         }
                     }
 
@@ -3647,10 +4979,8 @@
 
             } else if (mode === 'dots') {
                 // DOTS MODE: Simple layered dots
-                const layers = state.settings.waveLayers;
-                const hue = state.settings.waveHue;
-                const sat = state.settings.waveSaturation;
-                const speedBoost = 1.0 + high * state.settings.starAudioBoost;
+                const sat = saturation;
+                const speedBoost = 1.0 + high * amplitude;
 
                 state.stars.starArray.forEach((star) => {
                     // Assign layer based on star index
@@ -3666,22 +4996,29 @@
                         }
                     }
 
-                    const scale = 0.3 + layerDepth * 0.7;
+                    // Apply depth and perspective to layer scaling
+                    const scale = 0.3 + layerDepth * 0.7 * depth * perspective;
                     const scaledOrbitRadius = star.orbitRadius * scale;
 
-                    // High frequencies shift center
-                    const centerOffsetX = Math.sin(time * 0.001 * state.settings.starCenterRate) * high * 100;
-                    const centerOffsetY = Math.cos(time * 0.001 * state.settings.starCenterRate) * high * 100;
+                    // Calculate position with phaseShift
+                    const phaseAngle = star.timePassed + phaseShift;
+                    let x = Math.sin(phaseAngle) * scaledOrbitRadius + state.stars.centerX;
+                    let y = Math.cos(phaseAngle) * scaledOrbitRadius + state.stars.centerY;
 
-                    const x = Math.sin(star.timePassed) * scaledOrbitRadius + state.stars.centerX + centerOffsetX;
-                    const y = Math.cos(star.timePassed) * scaledOrbitRadius + state.stars.centerY + centerOffsetY;
+                    // Apply turbulence displacement
+                    if (turbulence > 0) {
+                        const turbX = (state.noise(x * 0.01, y * 0.01 + time * 0.001) - 0.5) * turbulence * 100;
+                        const turbY = (state.noise(x * 0.01 + 100, y * 0.01 + time * 0.001) - 0.5) * turbulence * 100;
+                        x += turbX;
+                        y += turbY;
+                    }
 
                     // Draw dot with shading
-                    const dotSize = (2 + layerDepth * 4) * state.settings.starBrightness;
+                    const dotSize = (2 + layerDepth * 4) * amplitude;
                     const brightness = 30 + layerDepth * 50 + mid * 30;
 
-                    // Radial gradient for shading
-                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2);
+                    // Radial gradient for shading (with glow effect)
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2 * (1 + glow));
                     gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${star.alpha + mid * 0.3})`);
                     gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5})`);
                     gradient.addColorStop(1, `hsla(${hue}, ${sat}%, ${brightness * 0.3}%, 0)`);
@@ -3692,11 +5029,14 @@
                     ctx.fill();
 
                     // Update orbit
-                    star.timePassed += star.baseSpeed * state.settings.starSpeed * speedBoost;
+                    star.timePassed += star.baseSpeed * speed * speedBoost;
                 });
             }
 
             ctx.globalAlpha = 1.0;
+
+            // Restore canvas state
+            ctx.restore();
         }
 
         // Theme renderer dispatcher
@@ -3865,6 +5205,11 @@
                 if (pairingCodeDisplay) {
                     pairingCodeDisplay.classList.remove('hidden-control');
                 }
+
+                const beatpadToggle = document.getElementById('beatpadToggle');
+                if (beatpadToggle) {
+                    beatpadToggle.classList.remove('hidden-control');
+                }
             }
 
             // Reset idle timeout
@@ -3898,6 +5243,11 @@
             const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
             if (pairingCodeDisplay) {
                 pairingCodeDisplay.classList.add('hidden-control');
+            }
+
+            const beatpadToggle = document.getElementById('beatpadToggle');
+            if (beatpadToggle) {
+                beatpadToggle.classList.add('hidden-control');
             }
         }
 
@@ -4008,6 +5358,9 @@
                         y: imageObj.y,
                         width: imageObj.width,
                         height: imageObj.height,
+                        originalWidth: imageObj.originalWidth || imageObj.width,
+                        originalHeight: imageObj.originalHeight || imageObj.height,
+                        scale: imageObj.scale || 1.0,
                         theme: imageObj.theme,
                         transparency: imageObj.transparency,
                         rotation: imageObj.rotation,
@@ -4135,6 +5488,9 @@
                             y: imageObjData.y,
                             width: imageObjData.width,
                             height: imageObjData.height,
+                            originalWidth: imageObjData.originalWidth || imageObjData.width,
+                            originalHeight: imageObjData.originalHeight || imageObjData.height,
+                            scale: imageObjData.scale || 1.0,
                             theme: imageObjData.theme,
                             transparency: imageObjData.transparency,
                             rotation: imageObjData.rotation,
@@ -4207,6 +5563,9 @@
                     y: imageObjData.y,
                     width: imageObjData.width,
                     height: imageObjData.height,
+                    originalWidth: imageObjData.originalWidth || imageObjData.width,
+                    originalHeight: imageObjData.originalHeight || imageObjData.height,
+                    scale: imageObjData.scale || 1.0,
                     theme: imageObjData.theme,
                     transparency: imageObjData.transparency,
                     rotation: imageObjData.rotation,
@@ -4422,6 +5781,7 @@
                     const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
                     const addImageBtn = document.getElementById('addImageButton');
                     const sidebarToggle = document.getElementById('sidebarToggle');
+                    const beatpadToggle = document.getElementById('beatpadToggle');
 
                     // Check if UI is currently hidden
                     const isHidden = statusBar && statusBar.classList.contains('hidden-control');
@@ -4433,6 +5793,7 @@
                         if (pairingCodeDisplay) pairingCodeDisplay.classList.remove('hidden-control');
                         if (addImageBtn) addImageBtn.classList.remove('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.remove('hidden-control');
+                        if (beatpadToggle) beatpadToggle.classList.remove('hidden-control');
                         document.body.classList.remove('hide-cursor');
                     } else {
                         // Hide UI and cursor
@@ -4441,6 +5802,7 @@
                         if (pairingCodeDisplay) pairingCodeDisplay.classList.add('hidden-control');
                         if (addImageBtn) addImageBtn.classList.add('hidden-control');
                         if (sidebarToggle) sidebarToggle.classList.add('hidden-control');
+                        if (beatpadToggle) beatpadToggle.classList.add('hidden-control');
                         document.body.classList.add('hide-cursor');
                     }
                 }
@@ -4516,11 +5878,30 @@
                         path.removeAttribute('transform');
                         path.setAttribute('opacity', '0.6');
                         path.setAttribute('stroke', '#ffffff');
+                        // Clear path data to remove any lingering visuals
+                        path.setAttribute('d', '');
                     });
 
-                    // Clear the canvas to remove any residual graphics
-                    const ctx = elements.canvas.getContext('2d');
-                    ctx.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
+                    // Clear theme canvas (used by GLITCH theme)
+                    const themeCanvas = document.getElementById('theme-canvas');
+                    if (themeCanvas) {
+                        const ctx = themeCanvas.getContext('2d');
+                        ctx.clearRect(0, 0, themeCanvas.width, themeCanvas.height);
+                    }
+
+                    // Clear STARS canvas
+                    const starsCanvas = document.getElementById('stars-canvas');
+                    if (starsCanvas) {
+                        const starsCtx = starsCanvas.getContext('2d');
+                        starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+                    }
+
+                    // Clear WAVE canvas
+                    const waveCanvas = document.getElementById('wave-canvas');
+                    if (waveCanvas) {
+                        const waveCtx = waveCanvas.getContext('2d');
+                        waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+                    }
 
                     // Update colors for new theme
                     updateColors();
@@ -4673,6 +6054,26 @@
                 });
             }
 
+            // Image scale slider
+            setupSlider('imageScaleSlider', 'imageScaleValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+                const imageObj = state.imageObjects[state.selectedImageIndex];
+                if (imageObj) {
+                    imageObj.scale = value;
+                    imageObj.width = imageObj.originalWidth * value;
+                    imageObj.height = imageObj.originalHeight * value;
+                }
+            }, 'x');
+
+            // Video playback speed slider
+            setupSlider('videoSpeedSlider', 'videoSpeedValue', (value) => {
+                if (state.selectedImageIndex === -1) return;
+                const videoObj = state.imageObjects[state.selectedImageIndex];
+                if (videoObj && videoObj.isVideo && videoObj.video) {
+                    videoObj.video.playbackRate = value;
+                }
+            }, 'x');
+
             // Theme opacity slider
             setupSlider('themeOpacitySlider', 'themeOpacityValue', (value) => {
                 if (state.selectedImageIndex === -1) return;
@@ -4682,6 +6083,76 @@
                     imageObj.themeOpacity = value;
                 }
             });
+
+            // GLITCH background image controls
+            const glitchFitModeSelect = document.getElementById('glitchFitModeSelect');
+            const glitchScaleGroup = document.getElementById('glitchScaleGroup');
+            const glitchXGroup = document.getElementById('glitchXGroup');
+            const glitchYGroup = document.getElementById('glitchYGroup');
+            const glitchResetBtn = document.getElementById('glitchResetBtn');
+
+            if (glitchFitModeSelect) {
+                glitchFitModeSelect.addEventListener('change', (e) => {
+                    state.glitchImage.fitMode = e.target.value;
+
+                    // Show/hide scale and position controls based on fit mode
+                    const isManual = e.target.value === 'manual';
+                    if (glitchScaleGroup) glitchScaleGroup.style.display = isManual ? 'block' : 'none';
+                    if (glitchXGroup) glitchXGroup.style.display = isManual ? 'block' : 'none';
+                    if (glitchYGroup) glitchYGroup.style.display = isManual ? 'block' : 'none';
+
+                    // Reapply fit mode
+                    if (state.glitchImage.loaded && state.glitchImage.img) {
+                        applyGlitchImageFitMode();
+                    }
+                });
+            }
+
+            setupSlider('glitchScaleSlider', 'glitchScaleValue', (value) => {
+                if (!state.glitchImage.loaded) return;
+                state.glitchImage.scale = value;
+                state.glitchImage.width = state.glitchImage.originalWidth * value;
+                state.glitchImage.height = state.glitchImage.originalHeight * value;
+            }, 'x');
+
+            setupSlider('glitchXSlider', 'glitchXValue', (value) => {
+                if (!state.glitchImage.loaded) return;
+                state.glitchImage.x = value;
+            });
+
+            setupSlider('glitchYSlider', 'glitchYValue', (value) => {
+                if (!state.glitchImage.loaded) return;
+                state.glitchImage.y = value;
+            });
+
+            if (glitchResetBtn) {
+                glitchResetBtn.addEventListener('click', () => {
+                    if (!state.glitchImage.loaded || !state.glitchImage.img) return;
+
+                    // Reset to center and default scale
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.x = 0;
+                    state.glitchImage.y = 0;
+
+                    // Update sliders
+                    const scaleSlider = document.getElementById('glitchScaleSlider');
+                    const scaleValue = document.getElementById('glitchScaleValue');
+                    const xSlider = document.getElementById('glitchXSlider');
+                    const xValue = document.getElementById('glitchXValue');
+                    const ySlider = document.getElementById('glitchYSlider');
+                    const yValue = document.getElementById('glitchYValue');
+
+                    if (scaleSlider) scaleSlider.value = 1.0;
+                    if (scaleValue) scaleValue.textContent = '1.0x';
+                    if (xSlider) xSlider.value = 0;
+                    if (xValue) xValue.textContent = '0';
+                    if (ySlider) ySlider.value = 0;
+                    if (yValue) yValue.textContent = '0';
+
+                    // Reapply fit mode
+                    applyGlitchImageFitMode();
+                });
+            }
 
             // Frequency emphasis sliders
             setupSlider('lowEmphasis', 'lowValue', (value) => {
@@ -4871,18 +6342,6 @@
                 });
             }
 
-            // STARS CENTER SHIFT RATE slider
-            const starCenterRateSlider = document.getElementById('starCenterRateSlider');
-            const starCenterRateValue = document.getElementById('starCenterRateValue');
-            if (starCenterRateSlider && starCenterRateValue) {
-                starCenterRateSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.starCenterRate = value;
-                    starCenterRateValue.textContent = value.toFixed(1);
-                    // Center rate affects rendering in real-time, no reinit needed
-                });
-            }
-
             // STARS SMOOTHING slider
             const starSmoothingSlider = document.getElementById('starSmoothingSlider');
             const starSmoothingValue = document.getElementById('starSmoothingValue');
@@ -4948,6 +6407,41 @@
                 });
             }
 
+            // WAVE MODE selector
+            const waveModeSelect = document.getElementById('waveModeSelect');
+            const waveLayersControl = document.getElementById('waveLayersControl');
+            if (waveModeSelect && waveLayersControl) {
+                // Initialize visibility based on current mode
+                if (state.settings.waveMode === 'grids' || state.settings.waveMode === 'dots') {
+                    waveLayersControl.style.display = 'block';
+                } else {
+                    waveLayersControl.style.display = 'none';
+                }
+
+                waveModeSelect.addEventListener('change', (e) => {
+                    const mode = e.target.value;
+                    state.settings.waveMode = mode;
+
+                    // Show/hide layers control based on mode
+                    if (mode === 'grids' || mode === 'dots') {
+                        waveLayersControl.style.display = 'block';
+                    } else {
+                        waveLayersControl.style.display = 'none';
+                    }
+                });
+            }
+
+            // WAVE LAYERS slider
+            const waveLayersSlider = document.getElementById('waveLayersSlider');
+            const waveLayersValue = document.getElementById('waveLayersValue');
+            if (waveLayersSlider && waveLayersValue) {
+                waveLayersSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    state.settings.waveLayers = value;
+                    waveLayersValue.textContent = value.toString();
+                });
+            }
+
             // WAVE HUE slider
             const waveHueSlider = document.getElementById('waveHueSlider');
             const waveHueValue = document.getElementById('waveHueValue');
@@ -4967,69 +6461,6 @@
                     const value = parseInt(e.target.value);
                     state.settings.waveSaturation = value;
                     waveSaturationValue.textContent = value + '%';
-                });
-            }
-
-            // WAVE DISTORTION slider
-            const waveDistortionSlider = document.getElementById('waveDistortionSlider');
-            const waveDistortionValue = document.getElementById('waveDistortionValue');
-            if (waveDistortionSlider && waveDistortionValue) {
-                waveDistortionSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.waveDistortion = value;
-                    waveDistortionValue.textContent = value.toFixed(1);
-                });
-            }
-
-            // WAVE SPEED slider
-            const waveSpeedSlider = document.getElementById('waveSpeedSlider');
-            const waveSpeedValue = document.getElementById('waveSpeedValue');
-            if (waveSpeedSlider && waveSpeedValue) {
-                waveSpeedSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.waveSpeed = value;
-                    waveSpeedValue.textContent = value.toFixed(1);
-                });
-            }
-
-            // WAVE GLOW slider
-            const waveGlowSlider = document.getElementById('waveGlowSlider');
-            const waveGlowValue = document.getElementById('waveGlowValue');
-            if (waveGlowSlider && waveGlowValue) {
-                waveGlowSlider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    state.settings.waveGlow = value;
-                    waveGlowValue.textContent = value.toFixed(1);
-                });
-            }
-
-            // WAVE DOT COUNT slider
-            const waveDotCountSlider = document.getElementById('waveDotCountSlider');
-            const waveDotCountValue = document.getElementById('waveDotCountValue');
-            if (waveDotCountSlider && waveDotCountValue) {
-                waveDotCountSlider.addEventListener('input', (e) => {
-                    const value = parseInt(e.target.value);
-                    state.settings.waveDotCount = value;
-                    waveDotCountValue.textContent = value;
-                    // Dot count change requires reinitialization
-                    if (state.wave.initialized) {
-                        state.wave.initialized = false;
-                    }
-                });
-            }
-
-            // WAVE ORBIT SIZE slider
-            const waveOrbitSizeSlider = document.getElementById('waveOrbitSizeSlider');
-            const waveOrbitSizeValue = document.getElementById('waveOrbitSizeValue');
-            if (waveOrbitSizeSlider && waveOrbitSizeValue) {
-                waveOrbitSizeSlider.addEventListener('input', (e) => {
-                    const value = parseInt(e.target.value);
-                    state.settings.waveOrbitSize = value;
-                    waveOrbitSizeValue.textContent = value;
-                    // Orbit size change requires reinitialization
-                    if (state.wave.initialized) {
-                        state.wave.initialized = false;
-                    }
                 });
             }
 
@@ -5075,26 +6506,6 @@
                         option.classList.add('active');
                         state.settings.neonMode = option.dataset.neonMode;
                         console.log(`🎨 NEON mode changed to: ${state.settings.neonMode.toUpperCase()}`);
-                    }
-
-                    // Handle WAVE density change
-                    if (option.dataset.waveDensity) {
-                        document.querySelectorAll('[data-wave-density]').forEach(o => o.classList.remove('active'));
-                        option.classList.add('active');
-                        state.settings.waveDensity = option.dataset.waveDensity;
-                        // Density change requires reinitialization
-                        if (state.wave.initialized) {
-                            state.wave.initialized = false;
-                        }
-                        console.log(`🌊 WAVE density changed to: ${state.settings.waveDensity.toUpperCase()}`);
-                    }
-
-                    // Handle WAVE color mode change
-                    if (option.dataset.waveColor) {
-                        document.querySelectorAll('[data-wave-color]').forEach(o => o.classList.remove('active'));
-                        option.classList.add('active');
-                        state.settings.waveColorMode = option.dataset.waveColor;
-                        console.log(`🌊 WAVE color mode changed to: ${state.settings.waveColorMode.toUpperCase()}`);
                     }
                 });
             });
@@ -5381,6 +6792,9 @@
                         y: y,
                         width: width,
                         height: height,
+                        originalWidth: width,
+                        originalHeight: height,
+                        scale: 1.0,
                         theme: 'none',
                         transparency: 1.0,
                         rotation: 0,
@@ -5443,23 +6857,11 @@
                         state.glitchImage.img = img;
                         state.glitchImage.loaded = true;
 
-                        // Fill canvas by scaling to cover
-                        const canvasAspect = state.boundingRect.width / state.boundingRect.height;
-                        const imgAspect = img.width / img.height;
+                        // Apply fit mode (cover by default)
+                        applyGlitchImageFitMode();
 
-                        if (imgAspect > canvasAspect) {
-                            // Image is wider - fit to height
-                            state.glitchImage.height = state.boundingRect.height;
-                            state.glitchImage.width = state.glitchImage.height * imgAspect;
-                        } else {
-                            // Image is taller - fit to width
-                            state.glitchImage.width = state.boundingRect.width;
-                            state.glitchImage.height = state.glitchImage.width / imgAspect;
-                        }
-
-                        // Center the image
-                        state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                        state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                        // Show GLITCH controls
+                        updateModeVisibility();
 
                         console.log(`✅ GLITCH image loaded from URL: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                     } else {
@@ -5484,6 +6886,9 @@
                             y: y,
                             width: width,
                             height: height,
+                            originalWidth: width,
+                            originalHeight: height,
+                            scale: 1.0,
                             theme: 'none',
                             transparency: 1.0,
                             rotation: 0,
@@ -5522,13 +6927,41 @@
 
                 img.onerror = (e) => {
                     console.error('❌ Failed to load image from URL:', url, e);
-                    alert('Failed to load image. Please check the URL and ensure CORS is enabled.');
+
+                    // Detect error type
+                    let errorMsg = 'Failed to load image';
+                    if (url.startsWith('http://') && window.location.protocol === 'https:') {
+                        errorMsg = 'Mixed content blocked. Use HTTPS URL';
+                    } else if (e.type === 'error') {
+                        errorMsg = 'Invalid image URL or CORS error';
+                    }
+
+                    showToast(errorMsg, 'error');
                 };
+
+                // Validate URL before loading
+                if (!url || url.trim() === '') {
+                    showToast('Please enter a valid image URL', 'error');
+                    return;
+                }
 
                 img.src = url;
             }
 
             function loadVideoFile(file) {
+                // Validate file type
+                if (!file.type.startsWith('video/')) {
+                    showToast('Invalid file type. Please select a video file', 'error');
+                    return;
+                }
+
+                // Validate file size (50MB limit)
+                const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+                if (file.size > maxSize) {
+                    showToast('File too large. Maximum size is 50MB', 'error');
+                    return;
+                }
+
                 const video = document.createElement('video');
                 video.muted = true;
 
@@ -5556,6 +6989,9 @@
                         y: y,
                         width: width,
                         height: height,
+                        originalWidth: width,
+                        originalHeight: height,
+                        scale: 1.0,
                         theme: 'none',
                         transparency: 1.0,
                         rotation: 0,
@@ -5601,7 +7037,24 @@
 
                 video.addEventListener('error', (e) => {
                     console.error('❌ Failed to load video file:', e);
-                    alert('Failed to load video file.');
+                    let errorMsg = 'Failed to load video file';
+                    if (e.target.error) {
+                        switch (e.target.error.code) {
+                            case e.target.error.MEDIA_ERR_ABORTED:
+                                errorMsg = 'Video loading aborted';
+                                break;
+                            case e.target.error.MEDIA_ERR_NETWORK:
+                                errorMsg = 'Network error loading video';
+                                break;
+                            case e.target.error.MEDIA_ERR_DECODE:
+                                errorMsg = 'Video codec not supported';
+                                break;
+                            case e.target.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                                errorMsg = 'Video format not supported';
+                                break;
+                        }
+                    }
+                    showToast(errorMsg, 'error');
                     URL.revokeObjectURL(fileURL);
                 });
 
@@ -5610,6 +7063,19 @@
             }
 
             function loadImageFile(file) {
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    showToast('Invalid file type. Please select an image file', 'error');
+                    return;
+                }
+
+                // Validate file size (50MB limit)
+                const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+                if (file.size > maxSize) {
+                    showToast('File too large. Maximum size is 50MB', 'error');
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const img = new Image();
@@ -5619,23 +7085,11 @@
                             state.glitchImage.img = img;
                             state.glitchImage.loaded = true;
 
-                            // Fill canvas by scaling to cover
-                            const canvasAspect = state.boundingRect.width / state.boundingRect.height;
-                            const imgAspect = img.width / img.height;
+                            // Apply fit mode (cover by default)
+                            applyGlitchImageFitMode();
 
-                            if (imgAspect > canvasAspect) {
-                                // Image is wider - fit to height
-                                state.glitchImage.height = state.boundingRect.height;
-                                state.glitchImage.width = state.glitchImage.height * imgAspect;
-                            } else {
-                                // Image is taller - fit to width
-                                state.glitchImage.width = state.boundingRect.width;
-                                state.glitchImage.height = state.glitchImage.width / imgAspect;
-                            }
-
-                            // Center the image
-                            state.glitchImage.x = (state.boundingRect.width - state.glitchImage.width) / 2;
-                            state.glitchImage.y = (state.boundingRect.height - state.glitchImage.height) / 2;
+                            // Show GLITCH controls
+                            updateModeVisibility();
 
                             console.log(`✅ GLITCH image loaded: ${img.width}x${img.height} → ${state.glitchImage.width.toFixed(0)}x${state.glitchImage.height.toFixed(0)}`);
                         } else {
@@ -5660,6 +7114,9 @@
                                 y: y,
                                 width: width,
                                 height: height,
+                                originalWidth: width,
+                                originalHeight: height,
+                                scale: 1.0,
                                 theme: 'none', // Default to no effect
                                 transparency: 1.0, // Default to fully opaque
                                 rotation: 0, // Rotation in degrees
@@ -5695,8 +7152,20 @@
                         // Hide upload overlay
                         updateModeVisibility();
                     };
+
+                    img.onerror = () => {
+                        console.error('❌ Failed to load image from file:', file.name);
+                        showToast('Failed to load image file. File may be corrupted', 'error');
+                    };
+
                     img.src = event.target.result;
                 };
+
+                reader.onerror = () => {
+                    console.error('❌ Failed to read file:', file.name);
+                    showToast('Failed to read file. Please try again', 'error');
+                };
+
                 reader.readAsDataURL(file);
             }
 
@@ -5837,6 +7306,113 @@
             });
         }
 
+        /**
+         * Show toast notification
+         * @param {string} message - Message to display
+         * @param {string} type - 'error' or 'success' (default: 'error')
+         * @param {number} duration - How long to show (ms, default: 4000)
+         */
+        function showToast(message, type = 'error', duration = 4000) {
+            const toast = document.createElement('div');
+            toast.className = `toast${type === 'success' ? ' success' : ''}`;
+            toast.textContent = message;
+
+            const container = document.getElementById('toastContainer');
+            container.appendChild(toast);
+
+            // Trigger reflow to enable transition
+            toast.offsetHeight;
+
+            // Show toast
+            toast.classList.add('show');
+
+            // Auto-hide after duration
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(toast);
+                }, 300); // Match CSS transition duration
+            }, duration);
+        }
+
+        /**
+         * Apply fit mode to GLITCH background image
+         */
+        function applyGlitchImageFitMode() {
+            if (!state.glitchImage.loaded || !state.glitchImage.img) return;
+
+            const img = state.glitchImage.img;
+            const canvasWidth = state.boundingRect.width;
+            const canvasHeight = state.boundingRect.height;
+            const canvasAspect = canvasWidth / canvasHeight;
+            const imgAspect = img.width / img.height;
+
+            const fitMode = state.glitchImage.fitMode || 'cover';
+
+            switch (fitMode) {
+                case 'cover':
+                    // Fill canvas completely (may crop)
+                    if (imgAspect > canvasAspect) {
+                        // Image is wider - fit to height
+                        state.glitchImage.originalHeight = canvasHeight;
+                        state.glitchImage.originalWidth = canvasHeight * imgAspect;
+                    } else {
+                        // Image is taller - fit to width
+                        state.glitchImage.originalWidth = canvasWidth;
+                        state.glitchImage.originalHeight = canvasWidth / imgAspect;
+                    }
+                    // Center the image
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.width = state.glitchImage.originalWidth;
+                    state.glitchImage.height = state.glitchImage.originalHeight;
+                    state.glitchImage.x = (canvasWidth - state.glitchImage.width) / 2;
+                    state.glitchImage.y = (canvasHeight - state.glitchImage.height) / 2;
+                    break;
+
+                case 'contain':
+                    // Fit entirely within canvas (may letterbox)
+                    if (imgAspect > canvasAspect) {
+                        // Image is wider - fit to width
+                        state.glitchImage.originalWidth = canvasWidth;
+                        state.glitchImage.originalHeight = canvasWidth / imgAspect;
+                    } else {
+                        // Image is taller - fit to height
+                        state.glitchImage.originalHeight = canvasHeight;
+                        state.glitchImage.originalWidth = canvasHeight * imgAspect;
+                    }
+                    // Center the image
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.width = state.glitchImage.originalWidth;
+                    state.glitchImage.height = state.glitchImage.originalHeight;
+                    state.glitchImage.x = (canvasWidth - state.glitchImage.width) / 2;
+                    state.glitchImage.y = (canvasHeight - state.glitchImage.height) / 2;
+                    break;
+
+                case 'fill':
+                    // Stretch to exactly fill canvas
+                    state.glitchImage.originalWidth = canvasWidth;
+                    state.glitchImage.originalHeight = canvasHeight;
+                    state.glitchImage.scale = 1.0;
+                    state.glitchImage.width = canvasWidth;
+                    state.glitchImage.height = canvasHeight;
+                    state.glitchImage.x = 0;
+                    state.glitchImage.y = 0;
+                    break;
+
+                case 'manual':
+                    // User-controlled scale and position
+                    // Keep existing originalWidth/Height or set from image
+                    if (state.glitchImage.originalWidth === 0) {
+                        state.glitchImage.originalWidth = img.width;
+                        state.glitchImage.originalHeight = img.height;
+                    }
+                    state.glitchImage.width = state.glitchImage.originalWidth * state.glitchImage.scale;
+                    state.glitchImage.height = state.glitchImage.originalHeight * state.glitchImage.scale;
+                    // Keep existing x/y positions
+                    break;
+            }
+        }
+
         function setupSlider(sliderId, valueId, callback) {
             const slider = document.getElementById(sliderId);
             const valueDisplay = document.getElementById(valueId);
@@ -5879,20 +7455,14 @@
                 starMinOpacity: 0.2,
                 starMaxOpacity: 1.0,
                 starZSpeed: 0,
-                starCenterRate: 1.0,
                 starSmoothing: 0.5,
                 starDiameter: 1.0,
                 starMode: 'planes',
                 starLayers: 3,
+                waveMode: 'planes',
+                waveLayers: 3,
                 waveHue: 280,
-                waveSaturation: 70,
-                waveDistortion: 1.5,
-                waveSpeed: 1.0,
-                waveDensity: 'medium',
-                waveGlow: 1.0,
-                waveDotCount: 200,
-                waveOrbitSize: 100,
-                waveColorMode: 'mono'
+                waveSaturation: 70
             };
 
             // Update UI
@@ -5913,15 +7483,16 @@
             document.getElementById('starCountSlider').value = 1200;
             document.getElementById('starBrightnessSlider').value = 0.8;
             document.getElementById('starAudioBoostSlider').value = 3.0;
-            document.getElementById('starTwinkleSlider').value = 20;
+            document.getElementById('starTwinkleSlider').value = 200;
             document.getElementById('starMinOpacitySlider').value = 0.2;
             document.getElementById('starMaxOpacitySlider').value = 1.0;
             document.getElementById('starZSpeedSlider').value = 0;
-            document.getElementById('starCenterRateSlider').value = 1.0;
             document.getElementById('starSmoothingSlider').value = 0.5;
             document.getElementById('starDiameterSlider').value = 1.0;
             document.getElementById('starModeSelect').value = 'planes';
             document.getElementById('starLayersSlider').value = 3;
+            document.getElementById('waveModeSelect').value = 'planes';
+            document.getElementById('waveLayersSlider').value = 3;
 
             document.getElementById('lowValue').textContent = '1.0';
             document.getElementById('midValue').textContent = '1.0';
@@ -5940,28 +7511,18 @@
             document.getElementById('starCountValue').textContent = '1200';
             document.getElementById('starBrightnessValue').textContent = '0.80';
             document.getElementById('starAudioBoostValue').textContent = '3.0x';
-            document.getElementById('starTwinkleValue').textContent = '20';
+            document.getElementById('starTwinkleValue').textContent = '200';
             document.getElementById('starMinOpacityValue').textContent = '0.20';
             document.getElementById('starMaxOpacityValue').textContent = '1.00';
             document.getElementById('starZSpeedValue').textContent = '0.0';
-            document.getElementById('starCenterRateValue').textContent = '1.0';
             document.getElementById('starSmoothingValue').textContent = '0.5';
             document.getElementById('starDiameterValue').textContent = '1.0x';
             document.getElementById('starLayersValue').textContent = '3';
+            document.getElementById('waveLayersValue').textContent = '3';
             document.getElementById('waveHueSlider').value = 280;
             document.getElementById('waveSaturationSlider').value = 70;
-            document.getElementById('waveDistortionSlider').value = 1.5;
-            document.getElementById('waveSpeedSlider').value = 1.0;
-            document.getElementById('waveGlowSlider').value = 1.0;
-            document.getElementById('waveDotCountSlider').value = 200;
-            document.getElementById('waveOrbitSizeSlider').value = 100;
             document.getElementById('waveHueValue').textContent = '280°';
             document.getElementById('waveSaturationValue').textContent = '70%';
-            document.getElementById('waveDistortionValue').textContent = '1.5';
-            document.getElementById('waveSpeedValue').textContent = '1.0';
-            document.getElementById('waveGlowValue').textContent = '1.0';
-            document.getElementById('waveDotCountValue').textContent = '200';
-            document.getElementById('waveOrbitSizeValue').textContent = '100';
 
             // Update analyser if active
             if (state.analyser) {
@@ -6127,6 +7688,7 @@
                 },
                 imageObjects: state.imageObjects.map((obj, index) => ({
                     isVideo: obj.isVideo || false,
+                    src: obj.element ? obj.element.src : '',  // Include media URL for companion
                     transparency: obj.transparency,
                     rotation: obj.rotation,
                     blur: obj.blur,
@@ -6163,6 +7725,9 @@
                                 y: window.innerHeight / 2,
                                 width: 300,
                                 height: 300,
+                                originalWidth: 300,
+                                originalHeight: 300,
+                                scale: 1.0,
                                 rotation: 0,
                                 transparency: 1.0,
                                 theme: 'none',
@@ -6268,5 +7833,14 @@
 
         console.log('🌊 Soundscape loaded');
     </script>
+
+    <!-- Unified Control System -->
+    <script src="control-system.js"></script>
+
+    <!-- Beat Pad Scene System -->
+    <script src="beat-pad.js"></script>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer"></div>
 </body>
 </html>
