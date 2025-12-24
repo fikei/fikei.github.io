@@ -578,6 +578,15 @@ class BeatPad {
   applySceneInstant(scene) {
     console.log('🎬 Applying scene:', scene);
 
+    // Check if scene has control settings
+    const settingsCount = Object.keys(scene.settings || {}).length;
+    console.log(`📊 Scene has ${settingsCount} control settings to apply`);
+
+    if (settingsCount === 0) {
+      console.warn('⚠️ WARNING: Scene has NO control settings! This scene was saved before the fix.');
+      console.warn('⚠️ To fix: Re-save this scene by adjusting controls and clicking the pad again.');
+    }
+
     // Switch theme if different
     if (scene.theme !== this.soundscape.currentTheme) {
       console.log(`🎨 Switching theme from ${this.soundscape.currentTheme} to ${scene.theme}`);
@@ -586,6 +595,7 @@ class BeatPad {
 
     // Apply all control values
     console.log('🎛️ Applying control values:', scene.settings);
+    console.log('🎛️ Control values detail:', Object.entries(scene.settings || {}).map(([k, v]) => `${k}=${v}`).join(', '));
     for (const [controlId, value] of Object.entries(scene.settings)) {
       console.log(`  Setting ${controlId} = ${value}`);
       this.applyControlValue(controlId, value);
