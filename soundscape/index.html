@@ -616,6 +616,160 @@
             margin-left: -1em;
         }
 
+        /* Beat Pad Scene System */
+        .beat-pad-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #333333;
+            padding: 1rem;
+            border-radius: 4px;
+            z-index: 1000;
+            min-width: 280px;
+        }
+
+        .beat-pad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333333;
+        }
+
+        .beat-pad-header h3 {
+            margin: 0;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #ffffff;
+        }
+
+        .beat-pad-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .beat-pad-btn {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 8px;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #333333;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.15s ease;
+        }
+
+        .beat-pad-btn:hover {
+            background: #000000;
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+
+        .beat-pad-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        .beat-pad {
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            border: 2px solid #333333;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .beat-pad:hover {
+            border-color: #666666;
+            background: #252525;
+        }
+
+        .beat-pad.empty {
+            border-style: dashed;
+            opacity: 0.5;
+        }
+
+        .beat-pad.loaded {
+            border-color: #666666;
+            opacity: 1;
+        }
+
+        .beat-pad.active {
+            border-color: #ffffff;
+            background: #2a2a2a;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .beat-pad-number {
+            font-size: 10px;
+            font-weight: 700;
+            color: #666666;
+            margin-bottom: 0.25rem;
+        }
+
+        .beat-pad.active .beat-pad-number {
+            color: #ffffff;
+        }
+
+        .beat-pad-label {
+            font-size: 7px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #999999;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .beat-pad.loaded .beat-pad-label {
+            color: #cccccc;
+        }
+
+        .beat-pad.active .beat-pad-label {
+            color: #ffffff;
+        }
+
+        .beat-pad-context-menu {
+            position: fixed;
+            background: #ffffff;
+            border: 1px solid #333333;
+            border-radius: 4px;
+            padding: 0.25rem 0;
+            min-width: 120px;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .beat-pad-context-item {
+            padding: 0.5rem 0.75rem;
+            font-size: 9px;
+            font-weight: 400;
+            color: #000000;
+            cursor: pointer;
+            transition: background 0.1s ease;
+        }
+
+        .beat-pad-context-item:hover {
+            background: #f0f0f0;
+        }
+
         /* Intensity Control */
         .intensity-control {
             display: flex;
@@ -2096,6 +2250,12 @@
 
             // Initialize unified control system
             initializeControlSystem();
+
+            // Initialize Beat Pad Scene System
+            if (typeof BeatPad !== 'undefined' && window.soundscape && controlSystemUI) {
+                window.beatPad = new BeatPad(window.soundscape, controlSystemUI);
+                console.log('✅ Beat Pad Scene System initialized');
+            }
 
             // Auto-start audio capture
             await startAudioCapture();
@@ -7462,6 +7622,9 @@
 
     <!-- Unified Control System -->
     <script src="control-system.js"></script>
+
+    <!-- Beat Pad Scene System -->
+    <script src="beat-pad.js"></script>
 
     <!-- Toast Notification Container -->
     <div id="toastContainer"></div>

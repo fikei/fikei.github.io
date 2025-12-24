@@ -2068,6 +2068,66 @@ class ControlSystemUI {
     });
     console.log('🎛️ Control System UI initialized');
   }
+
+  /**
+   * Refresh all control UI elements to reflect current values
+   * Used when loading scenes from Beat Pad
+   */
+  refreshAllControls() {
+    if (!window.soundscape) return;
+
+    const currentTheme = window.soundscape.currentTheme;
+    if (!currentTheme) return;
+
+    // Update all sliders
+    this.controlElements.forEach((element, controlId) => {
+      if (element.type === 'range') {
+        // Get current value from soundscape
+        let currentValue = window.soundscape.themeConfig?.[controlId];
+        if (currentValue === undefined && window.soundscape[controlId] !== undefined) {
+          currentValue = window.soundscape[controlId];
+        }
+
+        if (currentValue !== undefined) {
+          element.value = currentValue;
+
+          // Update value display
+          const valueDisplay = element.parentElement?.querySelector('.slider-value');
+          if (valueDisplay) {
+            const controlConfig = CONTROL_REGISTRY[controlId];
+            const formatter = VALUE_FORMATTERS[controlId];
+            valueDisplay.textContent = formatter ? formatter(currentValue) : currentValue;
+          }
+        }
+      }
+    });
+
+    // Update audio selector buttons
+    this.audioToggles.forEach((button, controlId) => {
+      if (this.audioReactivity?.[controlId]) {
+        const sourceId = this.audioReactivity[controlId].source || 'none';
+        const source = AUDIO_SOURCES[sourceId];
+        if (source) {
+          const shortLabel = source.label.replace(/\s*\([^)]*\)/g, '').trim();
+          button.textContent = shortLabel.toUpperCase();
+        }
+
+        // Update intensity slider if exists
+        const intensitySlider = button.parentElement?.querySelector('.intensity-slider');
+        if (intensitySlider && this.audioReactivity[controlId].intensity !== undefined) {
+          intensitySlider.value = this.audioReactivity[controlId].intensity;
+
+          // Update intensity value display
+          const intensityValue = button.parentElement?.querySelector('.intensity-value');
+          if (intensityValue) {
+            intensityValue.textContent = `${Math.round(this.audioReactivity[controlId].intensity * 100)}%`;
+          }
+        }
+      }
+    });
+
+    console.log('🔄 Refreshed all control UI elements');
+  }
 }
 
 // =====================================================
