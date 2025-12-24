@@ -1134,7 +1134,7 @@ const THEME_CONFIGS = {
 
       // Effects
       twinkleRate: {
-        default: 20,
+        default: 200,
         category: 'effects'
       },
       trailLength: {

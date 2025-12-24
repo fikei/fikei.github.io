@@ -1340,9 +1340,9 @@
             <div class="control-group">
                 <div class="control-label">
                     <span>TWINKLE RATE</span>
-                    <span class="control-value" id="starTwinkleValue">20</span>
+                    <span class="control-value" id="starTwinkleValue">200</span>
                 </div>
-                <input type="range" id="starTwinkleSlider" min="1" max="50" step="1" value="20">
+                <input type="range" id="starTwinkleSlider" min="1" max="500" step="1" value="200">
             </div>
             <div class="control-group">
                 <div class="control-label">
@@ -1803,7 +1803,7 @@
                 starCount: 1200,  // Number of stars (100-2000)
                 starBrightness: 0.8,  // Overall star brightness (0-1)
                 starAudioBoost: 3.0,  // Audio-reactive speed multiplier (0-10)
-                starTwinkle: 20,  // Twinkle rate (1-50, higher = less frequent)
+                starTwinkle: 200,  // Twinkle rate (higher = less frequent, 200 = subtle)
                 starMinOpacity: 0.2,  // Minimum star opacity (0-1)
                 starMaxOpacity: 1.0,  // Maximum star opacity (0-1)
                 starZSpeed: 0,  // Z-axis movement speed (0-5, creates depth effect)
@@ -6959,7 +6959,7 @@
             document.getElementById('starCountSlider').value = 1200;
             document.getElementById('starBrightnessSlider').value = 0.8;
             document.getElementById('starAudioBoostSlider').value = 3.0;
-            document.getElementById('starTwinkleSlider').value = 20;
+            document.getElementById('starTwinkleSlider').value = 200;
             document.getElementById('starMinOpacitySlider').value = 0.2;
             document.getElementById('starMaxOpacitySlider').value = 1.0;
             document.getElementById('starZSpeedSlider').value = 0;
@@ -6988,7 +6988,7 @@
             document.getElementById('starCountValue').textContent = '1200';
             document.getElementById('starBrightnessValue').textContent = '0.80';
             document.getElementById('starAudioBoostValue').textContent = '3.0x';
-            document.getElementById('starTwinkleValue').textContent = '20';
+            document.getElementById('starTwinkleValue').textContent = '200';
             document.getElementById('starMinOpacityValue').textContent = '0.20';
             document.getElementById('starMaxOpacityValue').textContent = '1.00';
             document.getElementById('starZSpeedValue').textContent = '0.0';
