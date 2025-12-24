@@ -461,30 +461,43 @@ class BeatPad {
 
     console.log(`📸 Capturing scene for theme: ${currentTheme}`);
 
-    // Capture ALL control values from audioEngine (authoritative source)
-    if (window.audioEngine && window.audioEngine.themes) {
-      const themeConfig = window.audioEngine.themes[currentTheme];
+    // Debug: Check what's available
+    console.log('🔍 Debug audioEngine:', {
+      hasWindow: typeof window !== 'undefined',
+      hasAudioEngine: !!window.audioEngine,
+      audioEngineKeys: window.audioEngine ? Object.keys(window.audioEngine) : [],
+      hasThemeConfigs: typeof window.THEME_CONFIGS !== 'undefined',
+      hasControlSystem: !!this.controlSystem
+    });
 
-      if (themeConfig && themeConfig.controls) {
-        const controlIds = Object.keys(themeConfig.controls);
-        console.log(`📸 Capturing ${controlIds.length} controls from audioEngine:`, controlIds);
+    // Try to get controls from THEME_CONFIGS and control system
+    if (typeof window.THEME_CONFIGS !== 'undefined' && window.THEME_CONFIGS[currentTheme]) {
+      const themeConfig = window.THEME_CONFIGS[currentTheme];
+      console.log(`📸 Using THEME_CONFIGS for ${currentTheme}:`, Object.keys(themeConfig.controls || {}));
 
-        for (const controlId of controlIds) {
-          const value = window.audioEngine.getValue(currentTheme, controlId);
-          if (value !== undefined && value !== null) {
+      if (themeConfig.controls) {
+        for (const controlId of Object.keys(themeConfig.controls)) {
+          // Try to get value from control system first
+          let value = null;
+
+          if (this.controlSystem && this.controlSystem.getControlValue) {
+            value = this.controlSystem.getControlValue(controlId);
+          } else if (window.audioEngine && window.audioEngine.getValue) {
+            value = window.audioEngine.getValue(currentTheme, controlId);
+          } else if (this.soundscape && this.soundscape[controlId] !== undefined) {
+            value = this.soundscape[controlId];
+          }
+
+          if (value !== null && value !== undefined) {
             scene.settings[controlId] = value;
             console.log(`  ✓ ${controlId}: ${value}`);
           } else {
-            console.warn(`  ⚠️ ${controlId}: undefined/null value`);
+            console.warn(`  ⚠️ ${controlId}: no value found`);
           }
         }
-
-        console.log(`📸 Successfully captured ${Object.keys(scene.settings).length} control values`);
-      } else {
-        console.error(`⚠️ No theme config or controls found for ${currentTheme}`);
       }
     } else {
-      console.error('⚠️ window.audioEngine or audioEngine.themes not available');
+      console.error('⚠️ THEME_CONFIGS not available or theme not found:', currentTheme);
     }
 
     // Capture audio reactivity settings
