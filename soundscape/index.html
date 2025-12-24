@@ -7796,6 +7796,14 @@
                         }
                         break;
 
+                    case 'updateControl':
+                        // Update theme-specific control from companion
+                        if (window.soundscape && updates.controlId && updates.value !== undefined) {
+                            console.log(`📱 Control update from companion: ${updates.controlId} = ${updates.value}`);
+                            window.soundscape.setControlValue(updates.controlId, updates.value);
+                        }
+                        break;
+
                     case 'beatpad:save-scene':
                         // Save current scene to Beat Pad from companion
                         if (window.beatPad && typeof updates.index === 'number') {

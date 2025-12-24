@@ -550,6 +550,61 @@
             0%, 100% { opacity: 0.4; }
             50% { opacity: 0.7; }
         }
+
+        /* ===== THEME GROUP COLLAPSIBLE ===== */
+        .theme-group {
+            margin-bottom: 1rem;
+            border: 1px solid #333333;
+            background: #0a0a0a;
+        }
+
+        .theme-group-header {
+            width: 100%;
+            padding: 1rem;
+            background: #1a1a1a;
+            border: none;
+            color: #ffffff;
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .theme-group-header:active {
+            background: #252525;
+        }
+
+        .theme-group-header.active {
+            background: #2a2a2a;
+            border-bottom: 1px solid #333333;
+        }
+
+        .expand-icon {
+            transition: transform 0.2s ease;
+            font-size: 10px;
+        }
+
+        .theme-group-header.active .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .theme-group-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 1rem;
+        }
+
+        .theme-group-content.active {
+            max-height: 2000px;
+            padding: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -574,6 +629,7 @@
         <!-- Tabs -->
         <div class="tabs">
             <button class="tab-button active" data-tab="themes">Themes</button>
+            <button class="tab-button" data-tab="controls">Controls</button>
             <button class="tab-button" data-tab="media">Media</button>
         </div>
 
@@ -665,6 +721,69 @@
                 <input type="range" id="highEmphasis" min="0" max="3" step="0.1" value="1.0">
             </div>
         </div>
+        </div>
+
+        <!-- Controls Tab -->
+        <div class="tab-content" id="controlsTab">
+            <div class="control-section">
+                <h3>Theme-Specific Controls</h3>
+                <p style="font-size: 9px; color: #666; margin-bottom: 1rem;">Fine-tune parameters for each theme</p>
+
+                <!-- LINEAR Theme Controls -->
+                <div class="theme-group">
+                    <button class="theme-group-header" data-theme="linear">
+                        <span>LINEAR THEME</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div class="theme-group-content" id="linearControls">
+                        <!-- Will be populated with LINEAR controls -->
+                    </div>
+                </div>
+
+                <!-- NEON Theme Controls -->
+                <div class="theme-group">
+                    <button class="theme-group-header" data-theme="neon">
+                        <span>NEON THEME</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div class="theme-group-content" id="neonControls">
+                        <!-- Will be populated with NEON controls -->
+                    </div>
+                </div>
+
+                <!-- GLITCH Theme Controls -->
+                <div class="theme-group">
+                    <button class="theme-group-header" data-theme="glitch">
+                        <span>GLITCH THEME</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div class="theme-group-content" id="glitchControls">
+                        <!-- Will be populated with GLITCH controls -->
+                    </div>
+                </div>
+
+                <!-- STARS Theme Controls -->
+                <div class="theme-group">
+                    <button class="theme-group-header" data-theme="stars">
+                        <span>STARS THEME</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div class="theme-group-content" id="starsControls">
+                        <!-- Will be populated with STARS controls -->
+                    </div>
+                </div>
+
+                <!-- WAVE Theme Controls -->
+                <div class="theme-group">
+                    <button class="theme-group-header" data-theme="wave">
+                        <span>WAVE THEME</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div class="theme-group-content" id="waveControls">
+                        <!-- Will be populated with WAVE controls -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Media Tab -->
@@ -1418,9 +1537,174 @@
             });
         }
 
+        // =====================================================
+        // THEME-SPECIFIC CONTROLS
+        // =====================================================
+
+        // Helper function to send control update to host
+        function sendControlUpdate(controlId, value) {
+            if (!socket || !isConnected) {
+                console.warn('Cannot send control update: not connected');
+                return;
+            }
+
+            console.log(`📱 Sending control update: ${controlId} = ${value}`);
+            socket.emit('mobile:control-update', {
+                action: 'updateControl',
+                controlId: controlId,
+                value: value
+            });
+        }
+
+        // Setup theme group collapsible headers
+        function setupThemeGroups() {
+            const headers = document.querySelectorAll('.theme-group-header');
+            headers.forEach(header => {
+                header.addEventListener('click', () => {
+                    const content = header.nextElementSibling;
+                    const isActive = header.classList.contains('active');
+
+                    // Toggle active state
+                    header.classList.toggle('active');
+                    content.classList.toggle('active');
+                });
+            });
+        }
+
+        // Setup LINEAR theme controls
+        function setupLinearControls() {
+            const container = document.getElementById('linearControls');
+            if (!container) return;
+
+            container.innerHTML = `
+                <!-- Density Button Group -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>DENSITY</span>
+                    </div>
+                    <div class="mode-buttons">
+                        <button class="mode-button" data-linear-density="low">L</button>
+                        <button class="mode-button active" data-linear-density="medium">M</button>
+                        <button class="mode-button" data-linear-density="high">H</button>
+                    </div>
+                </div>
+
+                <!-- Points Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>POINTS</span>
+                        <span class="control-value" id="linearPointsValue">8</span>
+                    </div>
+                    <input type="range" id="linearPointsSlider" min="3" max="20" step="1" value="8">
+                </div>
+
+                <!-- Spread Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>SPREAD</span>
+                        <span class="control-value" id="linearSpreadValue">12</span>
+                    </div>
+                    <input type="range" id="linearSpreadSlider" min="20" max="300" step="10" value="12">
+                </div>
+
+                <!-- Amplitude Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>AMPLITUDE</span>
+                        <span class="control-value" id="linearAmplitudeValue">1.0</span>
+                    </div>
+                    <input type="range" id="linearAmplitudeSlider" min="0" max="3" step="0.1" value="1.0">
+                </div>
+
+                <!-- Line Width Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>LINE WIDTH</span>
+                        <span class="control-value" id="linearLineWidthValue">3</span>
+                    </div>
+                    <input type="range" id="linearLineWidthSlider" min="0.5" max="10" step="0.5" value="3">
+                </div>
+
+                <!-- Hue Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>HUE</span>
+                        <span class="control-value" id="linearHueValue">280°</span>
+                    </div>
+                    <input type="range" id="linearHueSlider" min="0" max="360" step="1" value="280">
+                </div>
+
+                <!-- Saturation Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>SATURATION</span>
+                        <span class="control-value" id="linearSaturationValue">0%</span>
+                    </div>
+                    <input type="range" id="linearSaturationSlider" min="0" max="100" step="1" value="0">
+                </div>
+
+                <!-- Opacity Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>OPACITY</span>
+                        <span class="control-value" id="linearOpacityValue">0.6</span>
+                    </div>
+                    <input type="range" id="linearOpacitySlider" min="0" max="1" step="0.05" value="0.6">
+                </div>
+
+                <!-- Background Shift Slider -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>BACKGROUND SHIFT</span>
+                        <span class="control-value" id="linearBackgroundShiftValue">1.0</span>
+                    </div>
+                    <input type="range" id="linearBackgroundShiftSlider" min="0" max="5" step="0.1" value="1.0">
+                </div>
+            `;
+
+            // Bind density button group
+            const densityButtons = container.querySelectorAll('[data-linear-density]');
+            densityButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    densityButtons.forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    sendControlUpdate('density', button.dataset.linearDensity);
+                });
+            });
+
+            // Bind sliders
+            const sliderBindings = [
+                { id: 'linearPoints', controlId: 'points', format: (v) => Math.round(v).toString() },
+                { id: 'linearSpread', controlId: 'spread', format: (v) => Math.round(v).toString() },
+                { id: 'linearAmplitude', controlId: 'amplitude', format: (v) => v.toFixed(1) },
+                { id: 'linearLineWidth', controlId: 'lineWidth', format: (v) => v.toFixed(1) },
+                { id: 'linearHue', controlId: 'hue', format: (v) => Math.round(v) + '°' },
+                { id: 'linearSaturation', controlId: 'saturation', format: (v) => Math.round(v) + '%' },
+                { id: 'linearOpacity', controlId: 'opacity', format: (v) => v.toFixed(2) },
+                { id: 'linearBackgroundShift', controlId: 'backgroundShift', format: (v) => v.toFixed(1) }
+            ];
+
+            sliderBindings.forEach(binding => {
+                const slider = document.getElementById(`${binding.id}Slider`);
+                const valueEl = document.getElementById(`${binding.id}Value`);
+
+                if (slider && valueEl) {
+                    slider.addEventListener('input', (e) => {
+                        const value = parseFloat(e.target.value);
+                        valueEl.textContent = binding.format(value);
+                        sendControlUpdate(binding.controlId, value);
+                    });
+                }
+            });
+
+            console.log('✅ LINEAR theme controls initialized');
+        }
+
         // Initialize controls
         setupControls();
         setupBeatpad();
+        setupThemeGroups();
+        setupLinearControls();
     </script>
 </body>
 </html>
