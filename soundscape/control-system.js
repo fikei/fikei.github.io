@@ -1646,10 +1646,15 @@ class ControlSystemUI {
 
   /**
    * Get display label for audio source (always uppercase for buttons)
+   * Removes parentheses and content inside them for shorter button labels
    */
   getAudioSourceLabel(sourceId) {
     const source = AUDIO_SOURCES[sourceId];
-    return source ? source.label.toUpperCase() : sourceId.toUpperCase();
+    if (!source) return sourceId.toUpperCase();
+
+    // Remove parentheses and content inside them for button display
+    const shortLabel = source.label.replace(/\s*\([^)]*\)/g, '').trim();
+    return shortLabel.toUpperCase();
   }
 
   /**
@@ -1706,8 +1711,9 @@ class ControlSystemUI {
           e.stopPropagation();
           this.handleAudioSourceChange(controlId, context, sourceId);
 
-          // Update button (always uppercase)
-          button.textContent = source.label.toUpperCase();
+          // Update button with short label (remove parentheses, always uppercase)
+          const shortLabel = source.label.replace(/\s*\([^)]*\)/g, '').trim();
+          button.textContent = shortLabel.toUpperCase();
           button.dataset.audioSource = sourceId;
 
           // Update styling (static only for 'none')
