@@ -449,14 +449,9 @@ class BeatPad {
    * Apply a single control value
    */
   applyControlValue(controlId, value) {
-    // Set on theme config
-    if (this.soundscape.themeConfig) {
-      this.soundscape.themeConfig[controlId] = value;
-    }
-
-    // Set on soundscape if property exists
-    if (this.soundscape.hasOwnProperty(controlId)) {
-      this.soundscape[controlId] = value;
+    // Use the soundscape API to set control value
+    if (this.soundscape.setControlValue) {
+      this.soundscape.setControlValue(controlId, value);
     }
   }
 

@@ -2409,10 +2409,50 @@
             // Initialize unified control system
             initializeControlSystem();
 
+            // Create global soundscape API for Beat Pad
+            window.soundscape = {
+                get currentTheme() {
+                    return state.settings.theme || 'linear';
+                },
+                switchTheme(theme) {
+                    if (controlSystemUI) {
+                        controlSystemUI.showTheme(theme);
+                    }
+                },
+                get themeConfig() {
+                    if (!audioEngine) return {};
+                    const theme = this.currentTheme;
+                    const config = {};
+                    if (audioEngine.themes && audioEngine.themes[theme]) {
+                        const themeControls = audioEngine.themes[theme].controls || {};
+                        for (const controlId in themeControls) {
+                            config[controlId] = audioEngine.getValue(theme, controlId);
+                        }
+                    }
+                    return config;
+                },
+                setControlValue(controlId, value) {
+                    if (audioEngine && controlSystemUI) {
+                        const theme = this.currentTheme;
+                        audioEngine.setValue(theme, controlId, value);
+                        // Refresh the UI to reflect the change
+                        if (controlSystemUI.updateControlValue) {
+                            controlSystemUI.updateControlValue(controlId, value);
+                        }
+                    }
+                }
+            };
+
             // Initialize Beat Pad Scene System
             if (typeof BeatPad !== 'undefined' && window.soundscape && controlSystemUI) {
                 window.beatPad = new BeatPad(window.soundscape, controlSystemUI);
                 console.log('✅ Beat Pad Scene System initialized');
+            } else {
+                console.warn('⚠️ Beat Pad not initialized:', {
+                    beatPadExists: typeof BeatPad !== 'undefined',
+                    soundscapeExists: !!window.soundscape,
+                    controlSystemUIExists: !!controlSystemUI
+                });
             }
 
             // Auto-start audio capture
