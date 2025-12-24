@@ -2434,11 +2434,15 @@
                 setControlValue(controlId, value) {
                     if (audioEngine && controlSystemUI) {
                         const theme = this.currentTheme;
+                        console.log(`      → audioEngine.setValue("${theme}", "${controlId}", ${value})`);
                         audioEngine.setValue(theme, controlId, value);
                         // Refresh the UI to reflect the change
                         if (controlSystemUI.updateControlValue) {
+                            console.log(`      → controlSystemUI.updateControlValue("${controlId}", ${value})`);
                             controlSystemUI.updateControlValue(controlId, value);
                         }
+                    } else {
+                        console.warn(`      ⚠️ audioEngine or controlSystemUI not available`);
                     }
                 }
             };

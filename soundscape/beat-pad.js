@@ -444,6 +444,8 @@ class BeatPad {
 
     // Capture all control values from control system
     const registry = window.CONTROL_REGISTRY || {};
+    console.log('📸 Capturing scene from CONTROL_REGISTRY:', Object.keys(registry));
+
     for (const [controlId, config] of Object.entries(registry)) {
       // Get current value from soundscape
       const currentValue = this.getCurrentControlValue(controlId, config);
@@ -452,11 +454,30 @@ class BeatPad {
       }
     }
 
+    // Also capture all control values from audioEngine directly for the current theme
+    if (window.audioEngine && window.audioEngine.themes) {
+      const currentTheme = this.soundscape.currentTheme;
+      const themeConfig = window.audioEngine.themes[currentTheme];
+
+      if (themeConfig && themeConfig.controls) {
+        console.log(`📸 Capturing ${currentTheme} theme controls from audioEngine:`, Object.keys(themeConfig.controls));
+
+        for (const controlId of Object.keys(themeConfig.controls)) {
+          const value = window.audioEngine.getValue(currentTheme, controlId);
+          if (value !== undefined && value !== null) {
+            scene.settings[controlId] = value;
+            console.log(`  ${controlId}: ${value}`);
+          }
+        }
+      }
+    }
+
     // Capture audio reactivity settings
     if (this.controlSystem && this.controlSystem.audioReactivity) {
       scene.audioReactivity = { ...this.controlSystem.audioReactivity };
     }
 
+    console.log('📸 Scene captured:', scene);
     return scene;
   }
 
@@ -543,13 +564,18 @@ class BeatPad {
    * Apply scene with instant transition (CUT)
    */
   applySceneInstant(scene) {
+    console.log('🎬 Applying scene:', scene);
+
     // Switch theme if different
     if (scene.theme !== this.soundscape.currentTheme) {
+      console.log(`🎨 Switching theme from ${this.soundscape.currentTheme} to ${scene.theme}`);
       this.soundscape.switchTheme(scene.theme);
     }
 
     // Apply all control values
+    console.log('🎛️ Applying control values:', scene.settings);
     for (const [controlId, value] of Object.entries(scene.settings)) {
+      console.log(`  Setting ${controlId} = ${value}`);
       this.applyControlValue(controlId, value);
     }
 
@@ -560,6 +586,7 @@ class BeatPad {
 
     // Update all UI controls to reflect new values
     if (this.controlSystem) {
+      console.log('🔄 Refreshing all controls UI');
       this.controlSystem.refreshAllControls();
     }
   }
@@ -570,7 +597,10 @@ class BeatPad {
   applyControlValue(controlId, value) {
     // Use the soundscape API to set control value
     if (this.soundscape.setControlValue) {
+      console.log(`    → Calling soundscape.setControlValue("${controlId}", ${value})`);
       this.soundscape.setControlValue(controlId, value);
+    } else {
+      console.warn(`    ⚠️ soundscape.setControlValue not available for ${controlId}`);
     }
   }
 
