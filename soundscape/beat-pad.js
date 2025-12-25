@@ -456,60 +456,34 @@ class BeatPad {
       timestamp: Date.now(),
       name: `Scene ${new Date().toLocaleTimeString()}`,
       theme: currentTheme,
-      settings: {}
+      settings: {},
+      audioReactivity: {}
     };
 
     console.log(`📸 Capturing scene for theme: ${currentTheme}`);
 
-    // Debug: Check what's available
-    console.log('🔍 Debug audioEngine:', {
-      hasWindow: typeof window !== 'undefined',
-      hasAudioEngine: !!window.audioEngine,
-      audioEngineKeys: window.audioEngine ? Object.keys(window.audioEngine) : [],
-      hasThemeConfigs: typeof window.THEME_CONFIGS !== 'undefined',
-      hasControlSystem: !!this.controlSystem
-    });
-
-    // Try to get controls from THEME_CONFIGS and control system
-    if (typeof window.THEME_CONFIGS !== 'undefined' && window.THEME_CONFIGS[currentTheme]) {
-      const themeConfig = window.THEME_CONFIGS[currentTheme];
-      console.log(`📸 Using THEME_CONFIGS for ${currentTheme}:`, Object.keys(themeConfig.controls || {}));
-
-      if (themeConfig.controls) {
-        for (const controlId of Object.keys(themeConfig.controls)) {
-          // Try to get value from control system first
-          let value = null;
-
-          if (this.controlSystem && this.controlSystem.getControlValue) {
-            value = this.controlSystem.getControlValue(controlId);
-          } else if (window.audioEngine && window.audioEngine.getValue) {
-            value = window.audioEngine.getValue(currentTheme, controlId);
-          } else if (this.soundscape && this.soundscape[controlId] !== undefined) {
-            value = this.soundscape[controlId];
-          }
-
-          if (value !== null && value !== undefined) {
-            scene.settings[controlId] = value;
-            console.log(`  ✓ ${controlId}: ${value}`);
-          } else {
-            console.warn(`  ⚠️ ${controlId}: no value found`);
-          }
-        }
-      }
+    // Capture control settings from window.state.settings
+    if (window.state && window.state.settings && window.state.settings[currentTheme]) {
+      // Deep copy all theme-specific settings
+      scene.settings = JSON.parse(JSON.stringify(window.state.settings[currentTheme]));
+      console.log(`📸 Captured ${Object.keys(scene.settings).length} control settings from window.state.settings.${currentTheme}`);
     } else {
-      console.error('⚠️ THEME_CONFIGS not available or theme not found:', currentTheme);
+      console.warn(`⚠️ No settings found in window.state.settings.${currentTheme}`);
     }
 
-    // Capture audio reactivity settings
-    if (this.controlSystem && this.controlSystem.audioReactivity) {
-      scene.audioReactivity = { ...this.controlSystem.audioReactivity };
+    // Capture audio reactivity settings from window.state.audioReactivity
+    if (window.state && window.state.audioReactivity && window.state.audioReactivity[currentTheme]) {
+      // Deep copy all audio reactivity settings
+      scene.audioReactivity = JSON.parse(JSON.stringify(window.state.audioReactivity[currentTheme]));
       console.log(`📸 Captured audio reactivity for ${Object.keys(scene.audioReactivity).length} controls`);
+    } else {
+      console.warn(`⚠️ No audio reactivity found in window.state.audioReactivity.${currentTheme}`);
     }
 
     console.log('📸 Scene capture complete:', {
       theme: scene.theme,
       settingsCount: Object.keys(scene.settings).length,
-      hasAudioReactivity: !!scene.audioReactivity
+      audioReactivityCount: Object.keys(scene.audioReactivity).length
     });
 
     return scene;
@@ -614,9 +588,13 @@ class BeatPad {
       this.applyControlValue(controlId, value);
     }
 
-    // Apply audio reactivity settings
-    if (scene.audioReactivity && this.controlSystem) {
-      this.controlSystem.audioReactivity = { ...scene.audioReactivity };
+    // Apply audio reactivity settings to window.state
+    if (scene.audioReactivity) {
+      if (!window.state.audioReactivity) {
+        window.state.audioReactivity = {};
+      }
+      window.state.audioReactivity[scene.theme] = JSON.parse(JSON.stringify(scene.audioReactivity));
+      console.log(`🎵 Restored audio reactivity for ${Object.keys(scene.audioReactivity).length} controls`);
     }
 
     // Update all UI controls to reflect new values

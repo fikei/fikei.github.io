@@ -2079,54 +2079,124 @@ class ControlSystemUI {
     const currentTheme = window.soundscape.currentTheme;
     if (!currentTheme) return;
 
-    // Update all sliders
-    this.controlElements.forEach((element, controlId) => {
+    console.log(`🔄 Refreshing controls for theme: ${currentTheme}`);
+
+    // Update all sliders and button groups
+    this.controlElements.forEach((element, elementKey) => {
+      // Extract controlId from elementKey (format: "themeName_controlId")
+      const parts = elementKey.split('_');
+      const theme = parts[0];
+      const controlId = parts.slice(1).join('_');
+
+      if (theme !== currentTheme) return;
+
+      // Get current value from window.state.settings
+      const currentValue = window.state.settings[currentTheme]?.[controlId];
+      if (currentValue === undefined) return;
+
       if (element.type === 'range') {
-        // Get current value from soundscape
-        let currentValue = window.soundscape.themeConfig?.[controlId];
-        if (currentValue === undefined && window.soundscape[controlId] !== undefined) {
-          currentValue = window.soundscape[controlId];
+        element.value = currentValue;
+
+        // Update value display
+        const valueDisplay = document.getElementById(`${currentTheme}_${controlId}_value`);
+        if (valueDisplay) {
+          valueDisplay.textContent = getFormattedValue(controlId, currentValue);
         }
 
-        if (currentValue !== undefined) {
-          element.value = currentValue;
-
-          // Update value display
-          const valueDisplay = element.parentElement?.querySelector('.slider-value');
-          if (valueDisplay) {
-            const controlConfig = CONTROL_REGISTRY[controlId];
-            const formatter = VALUE_FORMATTERS[controlId];
-            valueDisplay.textContent = formatter ? formatter(currentValue) : currentValue;
+        console.log(`  ✓ Updated slider ${controlId} = ${currentValue}`);
+      } else if (element.classList.contains('density-options')) {
+        // Update button group
+        element.querySelectorAll('.density-option').forEach(btn => {
+          btn.classList.remove('active');
+          if (btn.dataset.value === currentValue) {
+            btn.classList.add('active');
           }
-        }
+        });
+
+        console.log(`  ✓ Updated button group ${controlId} = ${currentValue}`);
       }
     });
 
-    // Update audio selector buttons
-    this.audioToggles.forEach((button, controlId) => {
-      if (this.audioReactivity?.[controlId]) {
-        const sourceId = this.audioReactivity[controlId].source || 'none';
+    // Update audio selector buttons and intensity sliders
+    if (window.state.audioReactivity && window.state.audioReactivity[currentTheme]) {
+      for (const [controlId, audioConfig] of Object.entries(window.state.audioReactivity[currentTheme])) {
+        const button = document.getElementById(`${currentTheme}_${controlId}_audioSelector`);
+        if (!button) continue;
+
+        const sourceId = audioConfig.frequency || 'none';
         const source = AUDIO_SOURCES[sourceId];
         if (source) {
           const shortLabel = source.label.replace(/\s*\([^)]*\)/g, '').trim();
           button.textContent = shortLabel.toUpperCase();
+          button.dataset.audioSource = sourceId;
+          button.classList.toggle('static', sourceId === 'none');
         }
 
-        // Update intensity slider if exists
-        const intensitySlider = button.parentElement?.querySelector('.intensity-slider');
-        if (intensitySlider && this.audioReactivity[controlId].intensity !== undefined) {
-          intensitySlider.value = this.audioReactivity[controlId].intensity;
+        // Update intensity slider
+        const intensitySlider = document.getElementById(`${currentTheme}_${controlId}_intensity`);
+        if (intensitySlider && audioConfig.intensity !== undefined) {
+          intensitySlider.value = audioConfig.intensity;
 
           // Update intensity value display
-          const intensityValue = button.parentElement?.querySelector('.intensity-value');
+          const intensityValue = intensitySlider.parentElement?.querySelector('.intensity-value');
           if (intensityValue) {
-            intensityValue.textContent = `${Math.round(this.audioReactivity[controlId].intensity * 100)}%`;
+            intensityValue.textContent = `${Math.round(audioConfig.intensity * 100)}%`;
           }
         }
+
+        // Show/hide intensity container
+        const intensityContainer = document.getElementById(`${currentTheme}_${controlId}_intensityContainer`);
+        if (intensityContainer) {
+          intensityContainer.style.display = sourceId === 'none' ? 'none' : 'flex';
+        }
+
+        console.log(`  ✓ Updated audio selector ${controlId} = ${sourceId} (${Math.round((audioConfig.intensity || 0) * 100)}%)`);
       }
-    });
+    }
 
     console.log('🔄 Refreshed all control UI elements');
+  }
+
+  /**
+   * Update a single control's UI to reflect a new value
+   * Used when loading scenes from Beat Pad
+   */
+  updateControlValue(controlId, value, themeName) {
+    const context = themeName || window.soundscape?.currentTheme;
+    if (!context) return;
+
+    const elementKey = `${context}_${controlId}`;
+    const element = this.controlElements.get(elementKey);
+
+    if (!element) {
+      console.warn(`⚠️ Control element not found: ${elementKey}`);
+      return;
+    }
+
+    // Update slider value
+    if (element.type === 'range') {
+      element.value = value;
+
+      // Update value display
+      const valueDisplay = document.getElementById(`${context}_${controlId}_value`);
+      if (valueDisplay) {
+        valueDisplay.textContent = getFormattedValue(controlId, value);
+      }
+
+      console.log(`🎛️ Updated UI for ${controlId} = ${value}`);
+    }
+    // Update button group
+    else if (element.classList.contains('density-options')) {
+      // Remove active from all buttons
+      element.querySelectorAll('.density-option').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.value === value) {
+          btn.classList.add('active');
+        }
+      });
+
+      console.log(`🎛️ Updated button group for ${controlId} = ${value}`);
+    }
   }
 }
 
@@ -2275,6 +2345,20 @@ class AudioModulationEngine {
     }
     // Fall back to base value
     return window.state.settings[context]?.[controlId];
+  }
+
+  /**
+   * Set a control value (updates base value in state)
+   */
+  setValue(context, controlId, value) {
+    // Initialize settings for this context if needed
+    if (!window.state.settings[context]) {
+      window.state.settings[context] = {};
+    }
+
+    // Update the base value
+    window.state.settings[context][controlId] = value;
+    console.log(`🎛️ AudioEngine.setValue: ${context}.${controlId} = ${value}`);
   }
 
   /**
