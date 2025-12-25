@@ -1348,6 +1348,268 @@
             background: rgba(100, 255, 100, 0.95);
         }
 
+        /* ===== BPM SYNC PANEL ===== */
+        .bpm-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 2px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .bpm-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+        }
+
+        .bpm-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .bpm-mode {
+            font-size: 8px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .bpm-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .bpm-button {
+            flex: 1;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 9px;
+            padding: 0.5rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.15s ease;
+        }
+
+        .bpm-button:hover {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        .bpm-button:active {
+            transform: scale(0.95);
+        }
+
+        .bpm-button.active {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        .beat-indicators {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            justify-content: center;
+        }
+
+        .beat-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #333;
+            border: 1px solid #666;
+            transition: all 0.1s ease;
+        }
+
+        .beat-dot.active {
+            background: #fff;
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        .bpm-confidence {
+            font-size: 8px;
+            color: #999;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .quantize-select {
+            width: 100%;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 9px;
+            padding: 0.5rem;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .quantize-select:focus {
+            outline: none;
+            border-color: #fff;
+        }
+
+        /* ===== LAYER PANEL ===== */
+        .layer-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 2px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .layer-panel h3 {
+            margin-bottom: 1rem;
+        }
+
+        .layer-item {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 2px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .layer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .layer-name {
+            font-size: 10px;
+            font-weight: 600;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        .layer-controls {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .layer-icon-btn {
+            width: 20px;
+            height: 20px;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .layer-icon-btn:hover {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        .layer-icon-btn.active {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        .layer-theme-select {
+            width: 100%;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 9px;
+            padding: 0.4rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .layer-opacity {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .layer-opacity-label {
+            font-size: 8px;
+            color: #999;
+            min-width: 45px;
+        }
+
+        .layer-opacity-slider {
+            flex: 1;
+            height: 1px;
+        }
+
+        .layer-opacity-value {
+            font-size: 8px;
+            color: #fff;
+            min-width: 30px;
+            text-align: right;
+        }
+
+        .layer-blend-select {
+            width: 100%;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 8px;
+            padding: 0.3rem;
+        }
+
+        .crossfader-container {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #333;
+        }
+
+        .crossfader-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8px;
+            color: #999;
+            margin-bottom: 0.5rem;
+        }
+
+        .crossfader {
+            width: 100%;
+            height: 2px;
+            appearance: none;
+            background: linear-gradient(to right, #fff 0%, #fff 50%, #fff 100%);
+            outline: none;
+        }
+
+        .crossfader::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border: 2px solid #000;
+            cursor: pointer;
+        }
+
+        .crossfader::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border: 2px solid #000;
+            cursor: pointer;
+        }
+
         /* ===== RESPONSIVE DESIGN ===== */
         @media (max-width: 768px) {
             .sidebar {
@@ -1706,6 +1968,107 @@
                 <option value="wave">WAVE</option>
             </select>
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
+        </section>
+
+        <!-- BPM Sync Panel -->
+        <section class="bpm-panel" id="bpmPanel">
+            <div class="bpm-display">
+                <span class="bpm-value" id="bpmValue">120.0</span>
+                <span class="bpm-mode" id="bpmMode">AUTO</span>
+            </div>
+            <div class="bpm-controls">
+                <button class="bpm-button" id="tapTempoBtn">TAP</button>
+                <button class="bpm-button active" id="autoModeBtn">AUTO</button>
+                <button class="bpm-button" id="manualModeBtn">MANUAL</button>
+            </div>
+            <div class="beat-indicators">
+                <div class="beat-dot" data-beat="0"></div>
+                <div class="beat-dot" data-beat="1"></div>
+                <div class="beat-dot" data-beat="2"></div>
+                <div class="beat-dot" data-beat="3"></div>
+            </div>
+            <div class="bpm-confidence" id="bpmConfidence">Confidence: --</div>
+            <select class="quantize-select" id="quantizeSelect">
+                <option value="off">Quantize: OFF</option>
+                <option value="beat">Quantize: BEAT</option>
+                <option value="bar">Quantize: BAR (4 beats)</option>
+                <option value="4bar">Quantize: 4-BAR (16 beats)</option>
+            </select>
+        </section>
+
+        <!-- Layer Panel -->
+        <section class="layer-panel" id="layerPanel">
+            <h3>LAYERS</h3>
+
+            <!-- Layer A -->
+            <div class="layer-item" data-layer="0">
+                <div class="layer-header">
+                    <span class="layer-name">LAYER A</span>
+                    <div class="layer-controls">
+                        <button class="layer-icon-btn active" id="layer0Visible" title="Visibility">👁</button>
+                        <button class="layer-icon-btn" id="layer0Solo" title="Solo">S</button>
+                    </div>
+                </div>
+                <select class="layer-theme-select" id="layer0Theme">
+                    <option value="linear">LINEAR</option>
+                    <option value="neon">NEON</option>
+                    <option value="glitch">GLITCH</option>
+                    <option value="stars">STARS</option>
+                    <option value="wave">WAVE</option>
+                </select>
+                <div class="layer-opacity">
+                    <span class="layer-opacity-label">OPACITY</span>
+                    <input type="range" class="layer-opacity-slider" id="layer0Opacity" min="0" max="1" step="0.01" value="1">
+                    <span class="layer-opacity-value" id="layer0OpacityValue">100%</span>
+                </div>
+                <select class="layer-blend-select" id="layer0Blend">
+                    <option value="normal">Blend: Normal</option>
+                    <option value="add">Blend: Add</option>
+                    <option value="multiply">Blend: Multiply</option>
+                    <option value="screen">Blend: Screen</option>
+                    <option value="overlay">Blend: Overlay</option>
+                </select>
+            </div>
+
+            <!-- Layer B -->
+            <div class="layer-item" data-layer="1">
+                <div class="layer-header">
+                    <span class="layer-name">LAYER B</span>
+                    <div class="layer-controls">
+                        <button class="layer-icon-btn" id="layer1Visible" title="Visibility">👁</button>
+                        <button class="layer-icon-btn" id="layer1Solo" title="Solo">S</button>
+                    </div>
+                </div>
+                <select class="layer-theme-select" id="layer1Theme">
+                    <option value="linear">LINEAR</option>
+                    <option value="neon" selected>NEON</option>
+                    <option value="glitch">GLITCH</option>
+                    <option value="stars">STARS</option>
+                    <option value="wave">WAVE</option>
+                </select>
+                <div class="layer-opacity">
+                    <span class="layer-opacity-label">OPACITY</span>
+                    <input type="range" class="layer-opacity-slider" id="layer1Opacity" min="0" max="1" step="0.01" value="0">
+                    <span class="layer-opacity-value" id="layer1OpacityValue">0%</span>
+                </div>
+                <select class="layer-blend-select" id="layer1Blend">
+                    <option value="normal">Blend: Normal</option>
+                    <option value="add">Blend: Add</option>
+                    <option value="multiply">Blend: Multiply</option>
+                    <option value="screen">Blend: Screen</option>
+                    <option value="overlay">Blend: Overlay</option>
+                </select>
+            </div>
+
+            <!-- Crossfader -->
+            <div class="crossfader-container">
+                <div class="crossfader-label">
+                    <span>A</span>
+                    <span>CROSSFADER</span>
+                    <span>B</span>
+                </div>
+                <input type="range" class="crossfader" id="crossfader" min="0" max="1" step="0.01" value="0">
+            </div>
         </section>
 
         <!-- Dynamic Theme Controls (Generated by Control System) -->
@@ -2347,6 +2710,8 @@
             // Beat and BPM detection
             beatDetector: new BeatDetector(),
             bpmDetector: new BPMDetector(),
+            beatSync: null, // Will be initialized after BeatDetector/BPMDetector
+            layerManager: null, // Will be initialized after canvas setup
 
             // User-created gradient centers (for NEON theme)
             userGradientCenters: [],
@@ -2444,6 +2809,157 @@
         }
 
         // =====================================================
+        // BEAT SYNC UI SETUP
+        // =====================================================
+
+        function setupBeatSyncUI() {
+            const tapBtn = document.getElementById('tapTempoBtn');
+            const autoBtn = document.getElementById('autoModeBtn');
+            const manualBtn = document.getElementById('manualModeBtn');
+            const quantizeSelect = document.getElementById('quantizeSelect');
+
+            if (!state.beatSync) return;
+
+            // Tap tempo button
+            if (tapBtn) {
+                tapBtn.addEventListener('click', () => {
+                    state.beatSync.tap();
+                    updateBPMDisplay();
+                });
+            }
+
+            // Auto mode button
+            if (autoBtn) {
+                autoBtn.addEventListener('click', () => {
+                    state.beatSync.setBPMMode('auto');
+                    autoBtn.classList.add('active');
+                    manualBtn.classList.remove('active');
+                    document.getElementById('bpmMode').textContent = 'AUTO';
+                    updateBPMDisplay();
+                });
+            }
+
+            // Manual mode button
+            if (manualBtn) {
+                manualBtn.addEventListener('click', () => {
+                    state.beatSync.setBPMMode('manual');
+                    manualBtn.classList.add('active');
+                    autoBtn.classList.remove('active');
+                    document.getElementById('bpmMode').textContent = 'MANUAL';
+                    updateBPMDisplay();
+                });
+            }
+
+            // Quantize select
+            if (quantizeSelect) {
+                quantizeSelect.addEventListener('change', (e) => {
+                    state.beatSync.setQuantizeMode(e.target.value);
+                });
+            }
+        }
+
+        function updateBPMDisplay() {
+            if (!state.beatSync) return;
+
+            const bpmState = state.beatSync.getState();
+
+            // Update BPM value
+            const bpmValue = document.getElementById('bpmValue');
+            if (bpmValue) {
+                bpmValue.textContent = bpmState.bpm.toFixed(1);
+            }
+
+            // Update confidence
+            const confidenceEl = document.getElementById('bpmConfidence');
+            if (confidenceEl && bpmState.bpmMode === 'auto') {
+                const pct = (bpmState.confidence * 100).toFixed(0);
+                confidenceEl.textContent = `Confidence: ${pct}%`;
+            } else if (confidenceEl) {
+                confidenceEl.textContent = `Taps: ${bpmState.tapCount}`;
+            }
+
+            // Update beat indicators
+            const beatDots = document.querySelectorAll('.beat-dot');
+            bpmState.beatIndicators.forEach((indicator, i) => {
+                if (beatDots[i]) {
+                    beatDots[i].classList.toggle('active', indicator.active);
+                }
+            });
+        }
+
+        // =====================================================
+        // LAYER UI SETUP
+        // =====================================================
+
+        function setupLayerUI() {
+            if (!state.layerManager) return;
+
+            // Layer 0 controls
+            setupLayerControls(0);
+            // Layer 1 controls
+            setupLayerControls(1);
+
+            // Crossfader
+            const crossfader = document.getElementById('crossfader');
+            if (crossfader) {
+                crossfader.addEventListener('input', (e) => {
+                    const position = parseFloat(e.target.value);
+                    state.layerManager.setCrossfaderPosition(position);
+                });
+            }
+        }
+
+        function setupLayerControls(layerId) {
+            if (!state.layerManager) return;
+
+            const themeSelect = document.getElementById(`layer${layerId}Theme`);
+            const opacitySlider = document.getElementById(`layer${layerId}Opacity`);
+            const opacityValue = document.getElementById(`layer${layerId}OpacityValue`);
+            const blendSelect = document.getElementById(`layer${layerId}Blend`);
+            const visibleBtn = document.getElementById(`layer${layerId}Visible`);
+            const soloBtn = document.getElementById(`layer${layerId}Solo`);
+
+            // Theme selection
+            if (themeSelect) {
+                themeSelect.addEventListener('change', (e) => {
+                    state.layerManager.setLayerTheme(layerId, e.target.value);
+                });
+            }
+
+            // Opacity slider
+            if (opacitySlider && opacityValue) {
+                opacitySlider.addEventListener('input', (e) => {
+                    const opacity = parseFloat(e.target.value);
+                    state.layerManager.setLayerOpacity(layerId, opacity);
+                    opacityValue.textContent = `${Math.round(opacity * 100)}%`;
+                });
+            }
+
+            // Blend mode
+            if (blendSelect) {
+                blendSelect.addEventListener('change', (e) => {
+                    state.layerManager.setLayerBlendMode(layerId, e.target.value);
+                });
+            }
+
+            // Visibility toggle
+            if (visibleBtn) {
+                visibleBtn.addEventListener('click', () => {
+                    state.layerManager.toggleLayerVisibility(layerId);
+                    visibleBtn.classList.toggle('active');
+                });
+            }
+
+            // Solo toggle
+            if (soloBtn) {
+                soloBtn.addEventListener('click', () => {
+                    state.layerManager.soloLayer(layerId);
+                    soloBtn.classList.toggle('active');
+                });
+            }
+        }
+
+        // =====================================================
         // INITIALIZATION
         // =====================================================
 
@@ -2513,6 +3029,24 @@
                     soundscapeExists: !!window.soundscape,
                     controlSystemUIExists: !!controlSystemUI
                 });
+            }
+
+            // Initialize Beat Sync Manager
+            if (typeof BeatSyncManager !== 'undefined') {
+                state.beatSync = new BeatSyncManager(state.beatDetector, state.bpmDetector);
+                setupBeatSyncUI();
+                console.log('✅ Beat Sync Manager initialized');
+            } else {
+                console.warn('⚠️ Beat Sync Manager not available');
+            }
+
+            // Initialize Layer Manager (after canvas is ready)
+            if (typeof LayerManager !== 'undefined' && elements.canvas) {
+                state.layerManager = new LayerManager(elements.canvas);
+                setupLayerUI();
+                console.log('✅ Layer Manager initialized');
+            } else {
+                console.warn('⚠️ Layer Manager not available');
             }
 
             // Auto-start audio capture
@@ -7948,6 +8482,12 @@
 
     <!-- Unified Control System -->
     <script src="control-system.js"></script>
+
+    <!-- Layer Manager -->
+    <script src="layer-manager.js"></script>
+
+    <!-- Beat Sync Manager -->
+    <script src="beat-sync.js"></script>
 
     <!-- Beat Pad Scene System -->
     <script src="beat-pad.js"></script>
