@@ -3738,6 +3738,13 @@
                 state.bpmDetector.addBeat(timestamp);
             }
 
+            // Update Beat Sync Manager
+            if (state.beatSync) {
+                state.beatSync.update(beatResult.isBeat, timestamp);
+                // Update UI periodically (every frame is fine for beat indicators)
+                updateBPMDisplay();
+            }
+
             // Get current BPM (normalized 0-1, where 120 BPM = 0.5)
             const bpmValue = (state.bpmDetector.getBPM() - 60) / 140; // 60-200 BPM -> 0-1
             const bpmConfidence = state.bpmDetector.getConfidence();

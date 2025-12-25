@@ -532,6 +532,22 @@ class BeatPad {
       settingsCount: Object.keys(scene.settings).length
     });
 
+    // Check for quantization (if BeatSync is available)
+    if (window.state && window.state.beatSync) {
+      const timestamp = performance.now();
+      const shouldTrigger = window.state.beatSync.shouldTrigger(timestamp);
+
+      if (!shouldTrigger) {
+        const timeUntilNext = window.state.beatSync.getTimeUntilNextTrigger();
+        const quantizeMode = window.state.beatSync.quantizeMode;
+        console.log(`⏱️ Quantize (${quantizeMode}): Waiting ${Math.round(timeUntilNext)}ms until next trigger`);
+
+        // Queue the scene load for the next beat
+        setTimeout(() => this.loadScene(index), timeUntilNext);
+        return;
+      }
+    }
+
     // Apply scene with selected transition type
     switch (this.transitionType) {
       case 'CUT':
