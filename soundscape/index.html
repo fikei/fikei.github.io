@@ -325,6 +325,48 @@
             pointer-events: none;
         }
 
+        /* Record Toggle */
+        .record-toggle {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            z-index: 101;
+            width: 30px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #fff;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .record-toggle:hover {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            transform: scale(1.1);
+        }
+
+        .record-toggle.recording {
+            background: #ff0000;
+            border-color: #ff0000;
+            animation: recording-pulse 1s infinite;
+        }
+
+        @keyframes recording-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .record-toggle.hidden-control {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         /* Beat Pad Toggle */
         .beatpad-toggle {
             position: fixed;
@@ -1689,6 +1731,9 @@
     <!-- Fullscreen Toggle -->
     <button class="fullscreen-toggle" id="fullscreenToggle" aria-label="Toggle fullscreen">⛶</button>
 
+    <!-- Record Toggle -->
+    <button class="record-toggle" id="recordToggle" aria-label="Record video" title="Record Video">⏺</button>
+
     <!-- Beat Pad Toggle -->
     <button class="beatpad-toggle" id="beatpadToggle" aria-label="Toggle Beat Pad" title="Beat Pad (Shift+B)">
         <span class="grid-icon"></span>
@@ -2713,6 +2758,14 @@
             beatSync: null, // Will be initialized after BeatDetector/BPMDetector
             layerManager: null, // Will be initialized after canvas setup
 
+            // Video recording
+            recording: {
+                isRecording: false,
+                mediaRecorder: null,
+                chunks: [],
+                stream: null
+            },
+
             // User-created gradient centers (for NEON theme)
             userGradientCenters: [],
 
@@ -2805,6 +2858,123 @@
                 console.log('✅ Unified Control System initialized');
             } catch (error) {
                 console.error('❌ Failed to initialize Control System:', error);
+            }
+        }
+
+        // =====================================================
+        // VIDEO RECORDING
+        // =====================================================
+
+        async function startRecording() {
+            try {
+                // Get canvas stream (capturing the entire visualization container)
+                const canvas = document.getElementById('stars-canvas') ||
+                              document.querySelector('canvas') ||
+                              document.getElementById('visualization-container');
+
+                let stream;
+                if (canvas && canvas.captureStream) {
+                    stream = canvas.captureStream(30); // 30 FPS
+                } else {
+                    // Fallback to screen capture if canvas stream not available
+                    stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            mediaSource: 'screen',
+                            width: 1920,
+                            height: 1080,
+                            frameRate: 30
+                        }
+                    });
+                }
+
+                // Add audio track from microphone if available
+                if (state.analyser && state.audioContext) {
+                    const destination = state.audioContext.createMediaStreamDestination();
+                    const source = state.audioContext.createMediaStreamSource(state.microphone);
+                    source.connect(destination);
+
+                    stream.addTrack(destination.stream.getAudioTracks()[0]);
+                }
+
+                // Create MediaRecorder
+                const options = {
+                    mimeType: 'video/webm;codecs=vp9',
+                    videoBitsPerSecond: 5000000 // 5 Mbps
+                };
+
+                const mediaRecorder = new MediaRecorder(stream, options);
+                state.recording.chunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) {
+                        state.recording.chunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(state.recording.chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+
+                    // Create download link
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `soundscape-${Date.now()}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    // Clean up
+                    URL.revokeObjectURL(url);
+                    state.recording.chunks = [];
+
+                    console.log('✅ Recording saved');
+                };
+
+                mediaRecorder.start();
+                state.recording.isRecording = true;
+                state.recording.mediaRecorder = mediaRecorder;
+                state.recording.stream = stream;
+
+                // Update UI
+                const recordBtn = document.getElementById('recordToggle');
+                if (recordBtn) {
+                    recordBtn.classList.add('recording');
+                    recordBtn.title = 'Stop Recording';
+                }
+
+                console.log('🎥 Recording started');
+            } catch (error) {
+                console.error('❌ Failed to start recording:', error);
+                alert('Failed to start recording. Please ensure you have granted screen capture permissions.');
+            }
+        }
+
+        function stopRecording() {
+            if (!state.recording.isRecording || !state.recording.mediaRecorder) return;
+
+            state.recording.mediaRecorder.stop();
+            state.recording.isRecording = false;
+
+            // Stop all tracks
+            if (state.recording.stream) {
+                state.recording.stream.getTracks().forEach(track => track.stop());
+            }
+
+            // Update UI
+            const recordBtn = document.getElementById('recordToggle');
+            if (recordBtn) {
+                recordBtn.classList.remove('recording');
+                recordBtn.title = 'Record Video';
+            }
+
+            console.log('⏹️ Recording stopped');
+        }
+
+        function toggleRecording() {
+            if (state.recording.isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
             }
         }
 
@@ -5650,7 +5820,51 @@
         };
 
         function drawLines() {
-            // Render background theme
+            // Simplified layer system: Use layer controls for theme switching and crossfading
+            if (state.layerManager && state.layerManager.layers.length >= 2) {
+                const layer0 = state.layerManager.layers[0];
+                const layer1 = state.layerManager.layers[1];
+
+                // If crossfader is in middle range (layer mixing), handle crossfade
+                const crossfaderPos = state.layerManager.crossfaderPosition;
+
+                if (crossfaderPos > 0 && crossfaderPos < 1 && layer0.theme !== layer1.theme) {
+                    // Crossfading between two themes
+                    // For now, just switch at 50% point (instant switch)
+                    // TODO: Implement smooth crossfade in future
+                    const activeTheme = crossfaderPos < 0.5 ? layer0.theme : layer1.theme;
+
+                    if (state.settings.theme !== activeTheme) {
+                        console.log(`🎚️ Crossfader switching theme to ${activeTheme} (position: ${(crossfaderPos * 100).toFixed(0)}%)`);
+                        state.settings.theme = activeTheme;
+
+                        // Update theme select UI
+                        const themeSelect = document.getElementById('themeSelect');
+                        if (themeSelect) {
+                            themeSelect.value = activeTheme;
+                        }
+
+                        // Show appropriate controls
+                        if (controlSystemUI) {
+                            controlSystemUI.showTheme(activeTheme);
+                        }
+                    }
+                } else if (crossfaderPos === 0) {
+                    // Full layer A
+                    if (state.settings.theme !== layer0.theme) {
+                        state.settings.theme = layer0.theme;
+                        if (controlSystemUI) controlSystemUI.showTheme(layer0.theme);
+                    }
+                } else if (crossfaderPos === 1) {
+                    // Full layer B
+                    if (state.settings.theme !== layer1.theme) {
+                        state.settings.theme = layer1.theme;
+                        if (controlSystemUI) controlSystemUI.showTheme(layer1.theme);
+                    }
+                }
+            }
+
+            // Render current theme
             const renderer = themeRenderers[state.settings.theme] || drawLinesLinear;
             renderer();
 
@@ -6354,6 +6568,12 @@
                         fullscreenToggle.textContent = '⛶'; // Enter fullscreen icon
                     }
                 });
+            }
+
+            // Record toggle
+            const recordToggle = document.getElementById('recordToggle');
+            if (recordToggle) {
+                recordToggle.addEventListener('click', toggleRecording);
             }
 
             // Pairing code display click - show pairing panel
