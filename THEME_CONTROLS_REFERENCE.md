@@ -385,6 +385,7 @@ MIDI messages send values 0-127. Soundscape automatically transforms these to ma
 ## Recent Fixes (2025-12-26)
 - Fixed NEON theme crash (`state.beatDetector.isBeat is not a function`)
 - Fixed Beat Pad theme switching (scenes now properly change themes)
+- Fixed syntax error (missing closing brace in `applyStrobe()`)
 
 ---
 
