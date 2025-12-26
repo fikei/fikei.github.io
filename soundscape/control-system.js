@@ -880,10 +880,6 @@ const THEME_CONFIGS = {
       },
 
       // Geometry
-      points: {
-        default: 8,
-        category: 'geometry'
-      },
       spread: {
         default: 12,
         category: 'geometry'
@@ -922,7 +918,6 @@ const THEME_CONFIGS = {
       amplitude: { enabled: true, frequency: 'allLevels', intensity: 0.7, mode: 'modulate' },
 
       // All other controls default to Static (None)
-      points: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       spread: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
       lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
@@ -965,19 +960,6 @@ const THEME_CONFIGS = {
         category: 'style',
         audioReactive: false,
         description: 'How colors change over time'
-      },
-      density: {
-        type: 'buttonGroup',
-        label: 'DENSITY',
-        options: [
-          { value: 'low', label: 'L' },
-          { value: 'medium', label: 'M' },
-          { value: 'high', label: 'H' }
-        ],
-        default: 'medium',
-        category: 'style',
-        audioReactive: false,
-        requiresReinit: true
       },
 
       // Color

@@ -57,6 +57,37 @@ See `.claude/docs-config.json` for:
 - **Configuration file**: Defines what to track and how
 - **Templates**: Guide content structure (`.claude/templates/`)
 
+## Quality Reviews
+
+### When to Run Reviews
+
+Before committing significant changes, consider running quality reviews:
+
+**New Theme:**
+- Code reviewer (performance, best practices)
+- Design lead (visual quality, audio mapping)
+- VJ specialist (control consistency, workflow)
+- Product manager (completeness check)
+
+**Control System Changes:**
+- Product manager (integration check)
+- VJ specialist (workflow impact)
+
+**Performance Optimizations:**
+- Code reviewer (verify correctness)
+- Product manager (feature parity)
+
+**Command**: Ask Claude to "run quality reviews on [FEATURE_NAME]"
+
+### Review Types Available
+
+1. **Code Review** - Performance, best practices, canvas usage
+2. **Product Review** - Completeness, documentation, acceptance
+3. **Design Review** - Visual quality, UX, audio reactivity
+4. **VJ Specialist Review** - Control consistency, live usability
+
+See `.claude/AUTOMATED_REVIEW_SYSTEM.md` for details.
+
 ## Quick Reference
 
 ### Theme Documentation Template
@@ -80,3 +111,4 @@ Total controls = Sum of all theme control counts
 ---
 
 **Read `.claude/docs-config.json` for project-specific tracking details**
+**See `.claude/AUTOMATED_REVIEW_SYSTEM.md` for quality review system**
