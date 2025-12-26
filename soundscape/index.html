@@ -4243,10 +4243,17 @@
                     }
                 });
             }
+
+            // Initial UI update
+            updateBPMDisplay();
+            console.log('✅ Beat Sync UI initialized and updated');
         }
 
         function updateBPMDisplay() {
-            if (!state.beatSync) return;
+            if (!state.beatSync) {
+                console.warn('⚠️ updateBPMDisplay called but state.beatSync is null');
+                return;
+            }
 
             const bpmState = state.beatSync.getState();
 
@@ -4254,19 +4261,29 @@
             const bpmValue = document.getElementById('bpmValue');
             if (bpmValue) {
                 bpmValue.textContent = bpmState.bpm.toFixed(1);
+            } else {
+                console.warn('⚠️ BPM value element not found');
             }
 
             // Update confidence
             const confidenceEl = document.getElementById('bpmConfidence');
-            if (confidenceEl && bpmState.bpmMode === 'auto') {
-                const pct = (bpmState.confidence * 100).toFixed(0);
-                confidenceEl.textContent = `Confidence: ${pct}%`;
-            } else if (confidenceEl) {
-                confidenceEl.textContent = `Taps: ${bpmState.tapCount}`;
+            if (confidenceEl) {
+                if (bpmState.bpmMode === 'auto') {
+                    const pct = (bpmState.confidence * 100).toFixed(0);
+                    confidenceEl.textContent = `Confidence: ${pct}%`;
+                } else {
+                    confidenceEl.textContent = `Taps: ${bpmState.tapCount}`;
+                }
+            } else {
+                console.warn('⚠️ Confidence element not found');
             }
 
             // Update beat indicators
             const beatDots = document.querySelectorAll('.beat-dot');
+            if (beatDots.length === 0) {
+                console.warn('⚠️ No beat dots found');
+            }
+
             bpmState.beatIndicators.forEach((indicator, i) => {
                 if (beatDots[i]) {
                     beatDots[i].classList.toggle('active', indicator.active);
