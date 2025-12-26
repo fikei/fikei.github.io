@@ -6033,22 +6033,34 @@
             const time = state.currentTime;
 
             // Get values from control system (with fallbacks to old state)
-            const hue = window.audioEngine ? (window.audioEngine.getValue('stars', 'hue') || state.settings.starHue) : state.settings.starHue;
+            const baseHue = window.audioEngine ? (window.audioEngine.getValue('stars', 'hue') || state.settings.starHue) : state.settings.starHue;
             const saturation = window.audioEngine ? (window.audioEngine.getValue('stars', 'saturation') || state.settings.starSaturation) : state.settings.starSaturation;
-            const speed = window.audioEngine ? (window.audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
-            const brightness = window.audioEngine ? (window.audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
+            const baseSpeed = window.audioEngine ? (window.audioEngine.getValue('stars', 'speed') || state.settings.starSpeed) : state.settings.starSpeed;
+            const baseBrightness = window.audioEngine ? (window.audioEngine.getValue('stars', 'brightness') || state.settings.starBrightness) : state.settings.starBrightness;
             const zSpeed = window.audioEngine ? (window.audioEngine.getValue('stars', 'zSpeed') || state.settings.starZSpeed) : state.settings.starZSpeed;
-            const backgroundShift = window.audioEngine ? (window.audioEngine.getValue('stars', 'backgroundShift') || 1.0) : 1.0;
-            const minOpacity = window.audioEngine ? (window.audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
-            const maxOpacity = window.audioEngine ? (window.audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
-            const diameter = window.audioEngine ? (window.audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
+            const baseBackgroundShift = window.audioEngine ? (window.audioEngine.getValue('stars', 'backgroundShift') || 1.0) : 1.0;
+            const baseMinOpacity = window.audioEngine ? (window.audioEngine.getValue('stars', 'minOpacity') || state.settings.starMinOpacity) : state.settings.starMinOpacity;
+            const baseMaxOpacity = window.audioEngine ? (window.audioEngine.getValue('stars', 'maxOpacity') || state.settings.starMaxOpacity) : state.settings.starMaxOpacity;
+            const baseDiameter = window.audioEngine ? (window.audioEngine.getValue('stars', 'diameter') || 1.0) : 1.0;
             const twinkleRate = window.audioEngine ? (window.audioEngine.getValue('stars', 'twinkleRate') || state.settings.starTwinkle) : state.settings.starTwinkle;
             const audioBoost = window.audioEngine ? (window.audioEngine.getValue('stars', 'audioBoost') || state.settings.starAudioBoost) : state.settings.starAudioBoost;
             const count = window.audioEngine ? (window.audioEngine.getValue('stars', 'count') || state.settings.starCount) : state.settings.starCount;
             const trailLength = window.audioEngine ? (window.audioEngine.getValue('stars', 'trailLength') || 0) : 0;
-            const bloom = window.audioEngine ? (window.audioEngine.getValue('stars', 'bloom') || 0) : 0;
+            const baseBloom = window.audioEngine ? (window.audioEngine.getValue('stars', 'bloom') || 0) : 0;
             const perspective = window.audioEngine ? (window.audioEngine.getValue('stars', 'perspective') || 1.0) : 1.0;
             const smoothing = window.audioEngine ? (window.audioEngine.getValue('stars', 'smoothing') || 0.5) : 0.5;
+            const bpmSync = window.audioEngine ? (window.audioEngine.getValue('stars', 'bpmSync') || 'off') : 'off';
+
+            // Apply global modifiers
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const speed = getBPMSyncedSpeed(baseSpeed, bpmSync);
+            const brightness = applyGlobalModifiers(baseBrightness, 'brightness');
+            const backgroundShift = getBPMSyncedSpeed(baseBackgroundShift, bpmSync);
+            const minOpacity = applyGlobalModifiers(baseMinOpacity, 'opacity');
+            const maxOpacity = applyGlobalModifiers(baseMaxOpacity, 'opacity');
+            const diameter = applyGlobalModifiers(baseDiameter, 'size');
+            const bloom = applyGlobalModifiers(baseBloom, 'glow');
+            const strobeMultiplier = applyStrobe();
 
             // Hide SVG paths for STARS theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -6145,7 +6157,8 @@
                     // Alpha also scales with distance (closer = brighter)
                     const perspectiveAlpha = (star.alpha + brightnessBoost) * scale;
 
-                    ctx.globalAlpha = perspectiveAlpha;
+                    // Apply strobe multiplier
+                    ctx.globalAlpha = perspectiveAlpha * strobeMultiplier;
 
                     // Apply bloom/glow effect if enabled
                     if (bloom > 0) {
@@ -6224,20 +6237,30 @@
             // Get values from control system (with fallbacks)
             const visualMode = audioEngine ? (audioEngine.getValue('wave', 'visualMode') || state.settings.waveMode) : state.settings.waveMode;
             const layers = audioEngine ? (audioEngine.getValue('wave', 'layers') || state.settings.waveLayers) : state.settings.waveLayers;
-            const hue = audioEngine ? (audioEngine.getValue('wave', 'hue') || state.settings.waveHue) : state.settings.waveHue;
+            const baseHue = audioEngine ? (audioEngine.getValue('wave', 'hue') || state.settings.waveHue) : state.settings.waveHue;
             const saturation = audioEngine ? (audioEngine.getValue('wave', 'saturation') || state.settings.waveSaturation) : state.settings.waveSaturation;
-            const amplitude = audioEngine ? (audioEngine.getValue('wave', 'amplitude') || 1.0) : 1.0;
+            const baseAmplitude = audioEngine ? (audioEngine.getValue('wave', 'amplitude') || 1.0) : 1.0;
             const wavelength = audioEngine ? (audioEngine.getValue('wave', 'wavelength') || 1.0) : 1.0;
-            const lineWidth = audioEngine ? (audioEngine.getValue('wave', 'lineWidth') || 2) : 2;
-            const speed = audioEngine ? (audioEngine.getValue('wave', 'speed') || state.settings.starSpeed || 1.0) : (state.settings.starSpeed || 1.0);
+            const baseLineWidth = audioEngine ? (audioEngine.getValue('wave', 'lineWidth') || 2) : 2;
+            const baseSpeed = audioEngine ? (audioEngine.getValue('wave', 'speed') || state.settings.starSpeed || 1.0) : (state.settings.starSpeed || 1.0);
             const rotationX = audioEngine ? (audioEngine.getValue('wave', 'rotationX') || 0) : 0;
             const rotationY = audioEngine ? (audioEngine.getValue('wave', 'rotationY') || 0) : 0;
-            const glow = audioEngine ? (audioEngine.getValue('wave', 'glow') || 0) : 0;
+            const baseGlow = audioEngine ? (audioEngine.getValue('wave', 'glow') || 0) : 0;
             const perspective = audioEngine ? (audioEngine.getValue('wave', 'perspective') || 1.0) : 1.0;
             const depth = audioEngine ? (audioEngine.getValue('wave', 'depth') || 1.0) : 1.0;
             const turbulence = audioEngine ? (audioEngine.getValue('wave', 'turbulence') || 0) : 0;
             const phaseShift = audioEngine ? (audioEngine.getValue('wave', 'phaseShift') || 0) : 0;
-            const backgroundShift = audioEngine ? (audioEngine.getValue('wave', 'backgroundShift') || 1.0) : 1.0;
+            const baseBackgroundShift = audioEngine ? (audioEngine.getValue('wave', 'backgroundShift') || 1.0) : 1.0;
+            const bpmSync = audioEngine ? (audioEngine.getValue('wave', 'bpmSync') || 'off') : 'off';
+
+            // Apply global modifiers
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const amplitude = applyGlobalModifiers(baseAmplitude, 'amplitude');
+            const lineWidth = applyGlobalModifiers(baseLineWidth, 'size');
+            const speed = getBPMSyncedSpeed(baseSpeed, bpmSync);
+            const glow = applyGlobalModifiers(baseGlow, 'glow');
+            const backgroundShift = getBPMSyncedSpeed(baseBackgroundShift, bpmSync);
+            const strobeMultiplier = applyStrobe();
 
             // Hide SVG paths for WAVE theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -6318,6 +6341,7 @@
 
                     // Get pre-rendered gradient from cache (with glow effect)
                     const size = 25 * star.size * amplitude * (1 + glow);
+                    ctx.globalAlpha = strobeMultiplier;
                     ctx.drawImage(
                         state.stars.gradientCanvas,
                         0, 0, 50, 50,
@@ -6326,6 +6350,7 @@
                         size * 2,
                         size * 2
                     );
+                    ctx.globalAlpha = 1.0;
 
                     // Update orbit
                     star.timePassed += star.baseSpeed * speed * speedBoost;
@@ -6353,9 +6378,9 @@
                     // Draw grid with radial gradient shading
                     const gridSize = Math.max(w, h) / cellSize;
                     const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, gridSize * cellSize / 2);
-                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, 60%, ${0.3 + mid * 0.2})`);
-                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, 40%, ${0.2 + mid * 0.1})`);
-                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, 20%, ${0.05})`);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, 60%, ${(0.3 + mid * 0.2) * strobeMultiplier})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, 40%, ${(0.2 + mid * 0.1) * strobeMultiplier})`);
+                    gradient.addColorStop(1, `hsla(${hue}, ${sat}%, 20%, ${0.05 * strobeMultiplier})`);
                     ctx.strokeStyle = gradient;
 
                     for (let i = -gridSize; i < gridSize; i++) {
@@ -6422,8 +6447,8 @@
 
                     // Radial gradient for shading (with glow effect)
                     const gradient = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 2 * (1 + glow));
-                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${star.alpha + mid * 0.3})`);
-                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5})`);
+                    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${brightness}%, ${(star.alpha + mid * 0.3) * strobeMultiplier})`);
+                    gradient.addColorStop(0.5, `hsla(${hue}, ${sat}%, ${brightness * 0.7}%, ${star.alpha * 0.5 * strobeMultiplier})`);
                     gradient.addColorStop(1, `hsla(${hue}, ${sat}%, ${brightness * 0.3}%, 0)`);
 
                     ctx.fillStyle = gradient;
@@ -6452,13 +6477,21 @@
             const time = state.currentTime;
 
             // Get values from control system (with fallbacks)
-            const hue = window.audioEngine ? (window.audioEngine.getValue('plasma', 'hue') || theme.hue) : theme.hue;
+            const baseHue = window.audioEngine ? (window.audioEngine.getValue('plasma', 'hue') || theme.hue) : theme.hue;
             const saturation = window.audioEngine ? (window.audioEngine.getValue('plasma', 'saturation') || theme.saturation) : theme.saturation;
-            const scale = window.audioEngine ? (window.audioEngine.getValue('plasma', 'scale') || theme.scale) : theme.scale;
-            const speed = window.audioEngine ? (window.audioEngine.getValue('plasma', 'speed') || theme.speed) : theme.speed;
+            const baseScale = window.audioEngine ? (window.audioEngine.getValue('plasma', 'scale') || theme.scale) : theme.scale;
+            const baseSpeed = window.audioEngine ? (window.audioEngine.getValue('plasma', 'speed') || theme.speed) : theme.speed;
             const complexity = window.audioEngine ? (window.audioEngine.getValue('plasma', 'complexity') || theme.complexity) : theme.complexity;
-            const brightness = window.audioEngine ? (window.audioEngine.getValue('plasma', 'brightness') || theme.brightness) : theme.brightness;
+            const baseBrightness = window.audioEngine ? (window.audioEngine.getValue('plasma', 'brightness') || theme.brightness) : theme.brightness;
             const contrast = window.audioEngine ? (window.audioEngine.getValue('plasma', 'contrast') || theme.contrast) : theme.contrast;
+            const bpmSync = window.audioEngine ? (window.audioEngine.getValue('plasma', 'bpmSync') || 'off') : 'off';
+
+            // Apply global modifiers
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const scale = applyGlobalModifiers(baseScale, 'scale');
+            const speed = getBPMSyncedSpeed(baseSpeed, bpmSync);
+            const brightness = applyGlobalModifiers(baseBrightness, 'brightness');
+            const strobeMultiplier = applyStrobe();
 
             // Hide SVG paths for PLASMA theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -6582,7 +6615,7 @@
                             data[i] = r;
                             data[i + 1] = g;
                             data[i + 2] = b;
-                            data[i + 3] = 255;
+                            data[i + 3] = Math.floor(255 * strobeMultiplier);
                         }
                     }
                 }
@@ -6601,14 +6634,22 @@
             const time = state.currentTime;
 
             // Get values from control system (with fallbacks)
-            const hue = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'hue') || theme.hue) : theme.hue;
+            const baseHue = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'hue') || theme.hue) : theme.hue;
             const saturation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'saturation') || theme.saturation) : theme.saturation;
-            const speed = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'speed') || theme.speed) : theme.speed;
-            const rotation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rotation') || theme.rotation) : theme.rotation;
+            const baseSpeed = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'speed') || theme.speed) : theme.speed;
+            const baseRotation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rotation') || theme.rotation) : theme.rotation;
             const ringCount = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rings') || theme.rings) : theme.rings;
             const perspective = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'perspective') || theme.perspective) : theme.perspective;
-            const lineWidth = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'lineWidth') || theme.lineWidth) : theme.lineWidth;
+            const baseLineWidth = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'lineWidth') || theme.lineWidth) : theme.lineWidth;
             const segments = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'segments') || theme.segments) : theme.segments;
+            const bpmSync = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'bpmSync') || 'off') : 'off';
+
+            // Apply global modifiers
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const speed = getBPMSyncedSpeed(baseSpeed, bpmSync);
+            const rotation = getBPMSyncedSpeed(baseRotation, bpmSync);
+            const lineWidth = applyGlobalModifiers(baseLineWidth, 'size');
+            const strobeMultiplier = applyStrobe();
 
             // Hide SVG paths for TUNNEL theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -6676,7 +6717,7 @@
                 // Alpha based on depth (fade out far rings)
                 const alpha = depth * 0.8 + 0.2;
 
-                ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness}%, ${alpha})`;
+                ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness}%, ${alpha * strobeMultiplier})`;
                 ctx.lineWidth = lineWidth * scale;
 
                 // Draw ring as polygon
@@ -6703,7 +6744,7 @@
                         const prevScale = 1 / (1 - prevZ * 0.9);
                         const prevRadius = theme.ringSpacing * prevScale;
 
-                        ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness * 0.5}%, ${alpha * 0.5})`;
+                        ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness * 0.5}%, ${alpha * 0.5 * strobeMultiplier})`;
                         ctx.lineWidth = lineWidth * scale * 0.5;
 
                         for (let seg = 0; seg < segments; seg += 3) {
@@ -6752,22 +6793,28 @@
             const theme = config.themes.particles;
             const { low, mid, high } = state.audioLevels;
 
-            // Helper function to get control values
-            const getControl = (key) => window.audioEngine?.getValue('particles', key) || theme[key];
+            // Get values from control system (with fallbacks)
+            const count = window.audioEngine ? (window.audioEngine.getValue('particles', 'count') || theme.count) : theme.count;
+            const baseSize = window.audioEngine ? (window.audioEngine.getValue('particles', 'size') || theme.size) : theme.size;
+            const baseSpeed = window.audioEngine ? (window.audioEngine.getValue('particles', 'speed') || theme.speed) : theme.speed;
+            const gravity = window.audioEngine ? (window.audioEngine.getValue('particles', 'gravity') || theme.gravity) : theme.gravity;
+            const damping = window.audioEngine ? (window.audioEngine.getValue('particles', 'damping') || theme.damping) : theme.damping;
+            const baseHue = window.audioEngine ? (window.audioEngine.getValue('particles', 'hue') || theme.hue) : theme.hue;
+            const saturation = window.audioEngine ? (window.audioEngine.getValue('particles', 'saturation') || theme.saturation) : theme.saturation;
+            const baseBrightness = window.audioEngine ? (window.audioEngine.getValue('particles', 'brightness') || theme.brightness) : theme.brightness;
+            const trailLength = window.audioEngine ? (window.audioEngine.getValue('particles', 'trailLength') || theme.trailLength) : theme.trailLength;
+            const baseBloom = window.audioEngine ? (window.audioEngine.getValue('particles', 'bloom') || theme.bloom) : theme.bloom;
+            const explosionThreshold = window.audioEngine ? (window.audioEngine.getValue('particles', 'explosionThreshold') || theme.explosionThreshold) : theme.explosionThreshold;
+            const mode = window.audioEngine ? (window.audioEngine.getValue('particles', 'mode') || theme.mode) : theme.mode;
+            const bpmSync = window.audioEngine ? (window.audioEngine.getValue('particles', 'bpmSync') || 'off') : 'off';
 
-            // Get all control values
-            const count = getControl('count');
-            const size = getControl('size');
-            const speed = getControl('speed');
-            const gravity = getControl('gravity');
-            const damping = getControl('damping');
-            const hue = getControl('hue');
-            const saturation = getControl('saturation');
-            const brightness = getControl('brightness');
-            const trailLength = getControl('trailLength');
-            const bloom = getControl('bloom');
-            const explosionThreshold = getControl('explosionThreshold');
-            const mode = getControl('mode');
+            // Apply global modifiers
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const size = applyGlobalModifiers(baseSize, 'size');
+            const speed = getBPMSyncedSpeed(baseSpeed, bpmSync);
+            const brightness = applyGlobalModifiers(baseBrightness, 'brightness');
+            const bloom = applyGlobalModifiers(baseBloom, 'glow');
+            const strobeMultiplier = applyStrobe();
 
             // Hide SVG paths for PARTICLES theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -6914,9 +6961,9 @@
                     particle.x, particle.y, 0,
                     particle.x, particle.y, bloomSize * 2
                 );
-                gradient.addColorStop(0, `hsla(${particleHue}, ${saturation}%, ${particleBrightness}%, 1)`);
-                gradient.addColorStop(0.3, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.8}%, 0.8)`);
-                gradient.addColorStop(0.6, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.5}%, 0.4)`);
+                gradient.addColorStop(0, `hsla(${particleHue}, ${saturation}%, ${particleBrightness}%, ${1 * strobeMultiplier})`);
+                gradient.addColorStop(0.3, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.8}%, ${0.8 * strobeMultiplier})`);
+                gradient.addColorStop(0.6, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.5}%, ${0.4 * strobeMultiplier})`);
                 gradient.addColorStop(1, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.2}%, 0)`);
 
                 ctx.fillStyle = gradient;

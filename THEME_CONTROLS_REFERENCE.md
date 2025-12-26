@@ -2,10 +2,12 @@
 ## Soundscape Audio-Reactive Visualizer - Complete Control Listing
 
 **Global Modifiers Integration Status**:
-- ✅ **Fully Integrated**: LINEAR, NEON, GLITCH (global modifiers + BPM sync active)
-- ⏳ **Pending**: STARS, WAVE, TUNNEL, PLASMA, PARTICLES (configuration ready, renderer integration in progress)
+- ✅ **Fully Integrated**: All 8 themes (LINEAR, NEON, GLITCH, STARS, WAVE, TUNNEL, PLASMA, PARTICLES)
+- ✅ Global modifiers (masterIntensity, masterBrightness, globalHueShift, audioSensitivity) active across all themes
+- ✅ BPM sync (OFF/1X/2X/0.5X/4X) active across all themes
+- ✅ Strobe effect (beat-synced brightness flash) active across all themes
 
-> All themes have global controls and BPM sync configured. Themes marked as "Pending" have the configuration but are awaiting renderer integration to apply the modifiers.
+> All 8 themes now have complete global modifier, BPM sync, and strobe integration. Master controls affect all themes simultaneously for unified live performance control.
 
 ---
 
