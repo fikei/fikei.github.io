@@ -39,9 +39,9 @@
 ## 🚧 IN PROGRESS
 
 ### New Themes (HIGH PRIORITY)
-- [ ] TUNNEL theme - 3D perspective vortex (canvas-based)
-- [ ] PLASMA theme - Organic blob waves with shader (canvas-based)
-- [ ] PARTICLES theme - Swarm/explosion system (canvas-based)
+- [x] TUNNEL theme ✅ - 3D perspective vortex (canvas-based, 8 controls) - COMPLETED
+- [x] PLASMA theme ✅ - Organic blob waves with sine interference (canvas-based, 7 controls) - COMPLETED
+- [x] PARTICLES theme ⚠️ - Swarm/explosion system (canvas-based, 12 controls) - **IN PROGRESS: Control system integration needed**
 
 ### Multi-Layer Compositing - HYBRID APPROACH
 - [x] LayerManager class implementation ✅ (CREATED)

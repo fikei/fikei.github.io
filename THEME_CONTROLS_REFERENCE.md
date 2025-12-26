@@ -163,26 +163,34 @@
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
+| mode | select | 3 options | explode | Physics mode: Explode, Converge, Swarm |
 | count | slider | 100-5000 | 1000 | Number of particles |
 | size | slider | 1-10 | 2 | Particle size |
+| hue | slider | 0-360 | 180 | Particle color (cyan default) |
+| saturation | slider | 0-100 | 80 | Color saturation |
+| brightness | slider | 0-1 | 0.6 | Overall brightness |
 | speed | slider | 0-5 | 1.0 | Particle velocity |
 | gravity | slider | -2-2 | 0 | Gravity force |
 | damping | slider | 0-1 | 0.98 | Velocity damping |
-| hue | slider | 0-360 | 180 | Particle color (cyan default) |
-| saturation | slider | 0-100 | 80 | Color saturation |
-| mode | select | - | explode | Explode, Converge, Swarm |
+| trailLength | slider | 0-1 | 0.15 | Motion trail fade amount |
+| bloom | slider | 0-2 | 0 | Glow/bloom intensity |
+| explosionThreshold | slider | 0-1 | 0.3 | Bass level for explosions |
 
-**Audio Reactivity**:
-- Bass: Particle size boost + explosion force (explode mode)
-- Mid: Brightness boost + velocity multiplier
-- High: Color hue shift
+**Audio Reactivity (Default Mappings)**:
+- Bass: Particle size boost
+- Mid: Brightness boost
+- High: Hue shift
 
-**Physics**:
-- **Explode Mode**: Particles burst from center on bass hits
+**Physics Modes**:
+- **Explode Mode**: Particles burst from center when bass exceeds explosionThreshold
 - **Converge Mode**: Particles pull towards center
-- **Swarm Mode**: Attraction to center + separation from neighbors
+- **Swarm Mode**: Boids-like behavior (attraction + separation) - Optimized with spatial grid for O(n) performance
 
-**Total Controls**: 8
+**Performance**:
+- Spatial grid optimization in swarm mode handles 5000 particles at 60 FPS
+- Recommended: 1000-2000 particles for smooth performance
+
+**Total Controls**: 12
 
 ---
 
@@ -195,11 +203,11 @@
 | GLITCH | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | STARS | 15 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | WAVE | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| TUNNEL | 8 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
-| PLASMA | 7 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
-| PARTICLES | 8 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
+| TUNNEL | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| PLASMA | 7 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| PARTICLES | 12 | Canvas | ✅ Per-control | ✅ (When implemented) |
 
-**TOTAL CONTROLS ACROSS ALL THEMES**: 82 parameters
+**TOTAL CONTROLS ACROSS ALL THEMES**: 86 parameters
 
 ---
 

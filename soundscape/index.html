@@ -2842,14 +2842,18 @@
                 particles: {
                     bg: '#000000',
                     opacity: 1.0,
-                    count: 1000, // Number of particles
-                    size: 2, // Particle size
-                    speed: 1.0, // Base velocity
-                    gravity: 0, // Gravity force
-                    damping: 0.98, // Velocity damping
-                    hue: 180, // Cyan
-                    saturation: 80,
-                    mode: 'explode' // explode, converge, swarm
+                    count: 1000, // Number of particles (100-5000)
+                    size: 2, // Particle size (1-10)
+                    speed: 1.0, // Base velocity (0-5)
+                    gravity: 0, // Gravity force (-2 to 2)
+                    damping: 0.98, // Velocity damping (0-1)
+                    hue: 180, // Cyan (0-360)
+                    saturation: 80, // Color saturation (0-100)
+                    brightness: 0.6, // Overall brightness (0-1)
+                    trailLength: 0.15, // Motion trail fade (0-1)
+                    bloom: 0, // Glow/bloom intensity (0-2)
+                    explosionThreshold: 0.3, // Bass level for explosions (0-1)
+                    mode: 'explode' // Physics mode: explode, converge, swarm
                 }
             }
         };
@@ -6548,7 +6552,6 @@
                     y: state.particles.centerY,
                     vx: (Math.random() - 0.5) * 10,
                     vy: (Math.random() - 0.5) * 10,
-                    life: 1.0,
                     size: 1 + Math.random() * 3,
                     hueOffset: Math.random() * 60 - 30
                 });
@@ -6560,17 +6563,23 @@
         function drawLinesParticles() {
             const theme = config.themes.particles;
             const { low, mid, high } = state.audioLevels;
-            const time = state.currentTime;
 
-            // Get values from control system (with fallbacks)
-            const count = window.audioEngine ? (window.audioEngine.getValue('particles', 'count') || theme.count) : theme.count;
-            const size = window.audioEngine ? (window.audioEngine.getValue('particles', 'size') || theme.size) : theme.size;
-            const speed = window.audioEngine ? (window.audioEngine.getValue('particles', 'speed') || theme.speed) : theme.speed;
-            const gravity = window.audioEngine ? (window.audioEngine.getValue('particles', 'gravity') || theme.gravity) : theme.gravity;
-            const damping = window.audioEngine ? (window.audioEngine.getValue('particles', 'damping') || theme.damping) : theme.damping;
-            const hue = window.audioEngine ? (window.audioEngine.getValue('particles', 'hue') || theme.hue) : theme.hue;
-            const saturation = window.audioEngine ? (window.audioEngine.getValue('particles', 'saturation') || theme.saturation) : theme.saturation;
-            const mode = window.audioEngine ? (window.audioEngine.getValue('particles', 'mode') || theme.mode) : theme.mode;
+            // Helper function to get control values
+            const getControl = (key) => window.audioEngine?.getValue('particles', key) || theme[key];
+
+            // Get all control values
+            const count = getControl('count');
+            const size = getControl('size');
+            const speed = getControl('speed');
+            const gravity = getControl('gravity');
+            const damping = getControl('damping');
+            const hue = getControl('hue');
+            const saturation = getControl('saturation');
+            const brightness = getControl('brightness');
+            const trailLength = getControl('trailLength');
+            const bloom = getControl('bloom');
+            const explosionThreshold = getControl('explosionThreshold');
+            const mode = getControl('mode');
 
             // Hide SVG paths for PARTICLES theme
             state.paths.forEach(path => path.setAttribute('d', ''));
@@ -6603,9 +6612,9 @@
             state.particles.centerX = w / 2;
             state.particles.centerY = h / 2;
 
-            // Clear with fade effect for trails
+            // Clear with fade effect for trails (uses trailLength control)
             ctx.globalCompositeOperation = 'source-over';
-            ctx.globalAlpha = 0.15;
+            ctx.globalAlpha = trailLength;
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, w, h);
             ctx.globalAlpha = 1.0;
@@ -6617,11 +6626,24 @@
             // Update and draw particles
             ctx.globalCompositeOperation = 'lighter';
 
+            // Build spatial grid for swarm mode optimization (O(n) instead of O(n²))
+            const GRID_SIZE = 50;
+            const grid = {};
+            if (mode === 'swarm') {
+                state.particles.particleArray.forEach((particle, index) => {
+                    const gridX = Math.floor(particle.x / GRID_SIZE);
+                    const gridY = Math.floor(particle.y / GRID_SIZE);
+                    const key = `${gridX},${gridY}`;
+                    if (!grid[key]) grid[key] = [];
+                    grid[key].push({ particle, index });
+                });
+            }
+
             state.particles.particleArray.forEach((particle, index) => {
                 // Mode-specific behavior
                 if (mode === 'explode') {
-                    // Explode from center on bass hits
-                    if (low > 0.5) {
+                    // Explode from center on bass hits (uses explosionThreshold control)
+                    if (low > explosionThreshold) {
                         const angle = Math.random() * Math.PI * 2;
                         particle.vx += Math.cos(angle) * bassForce;
                         particle.vy += Math.sin(angle) * bassForce;
@@ -6636,7 +6658,7 @@
                         particle.vy += (dy / dist) * 0.5 * speed;
                     }
                 } else if (mode === 'swarm') {
-                    // Swarm behavior - attraction + separation
+                    // Swarm behavior - attraction + separation (OPTIMIZED with spatial grid)
                     const dx = state.particles.centerX - particle.x;
                     const dy = state.particles.centerY - particle.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -6647,18 +6669,30 @@
                         particle.vy += (dy / dist) * 0.2 * speed;
                     }
 
-                    // Separation from neighbors
-                    state.particles.particleArray.forEach((other, i) => {
-                        if (i !== index) {
-                            const dx2 = particle.x - other.x;
-                            const dy2 = particle.y - other.y;
-                            const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-                            if (dist2 < 30 && dist2 > 0) {
-                                particle.vx += (dx2 / dist2) * 0.5;
-                                particle.vy += (dy2 / dist2) * 0.5;
-                            }
+                    // Separation from neighbors (only check nearby grid cells)
+                    const gridX = Math.floor(particle.x / GRID_SIZE);
+                    const gridY = Math.floor(particle.y / GRID_SIZE);
+
+                    for (let gx = gridX - 1; gx <= gridX + 1; gx++) {
+                        for (let gy = gridY - 1; gy <= gridY + 1; gy++) {
+                            const key = `${gx},${gy}`;
+                            const nearby = grid[key];
+                            if (!nearby) continue;
+
+                            nearby.forEach(({particle: other, index: i}) => {
+                                if (i !== index) {
+                                    const dx2 = particle.x - other.x;
+                                    const dy2 = particle.y - other.y;
+                                    const distSq = dx2 * dx2 + dy2 * dy2;
+                                    if (distSq < 900 && distSq > 0) { // 30² = 900
+                                        const dist2 = Math.sqrt(distSq);
+                                        particle.vx += (dx2 / dist2) * 0.5;
+                                        particle.vy += (dy2 / dist2) * 0.5;
+                                    }
+                                }
+                            });
                         }
-                    });
+                    }
                 }
 
                 // Apply gravity
@@ -6682,22 +6716,24 @@
                 if (particle.y < 0) particle.y = h;
                 if (particle.y > h) particle.y = 0;
 
-                // Draw particle
+                // Draw particle (uses brightness and bloom controls)
                 const particleHue = (hue + particle.hueOffset + high * 60) % 360;
-                const brightness = 50 + mid * 30;
-                const particleSize = size * particle.size * (1 + low * 0.5);
+                const particleBrightness = (brightness * 100) + mid * 30; // Convert 0-1 to 0-100 range + audio boost
+                const audioReactiveSize = size * particle.size * (1 + low * 0.5);
+                const bloomSize = audioReactiveSize * (1 + bloom); // Bloom increases particle size
 
                 const gradient = ctx.createRadialGradient(
                     particle.x, particle.y, 0,
-                    particle.x, particle.y, particleSize * 2
+                    particle.x, particle.y, bloomSize * 2
                 );
-                gradient.addColorStop(0, `hsla(${particleHue}, ${saturation}%, ${brightness}%, 1)`);
-                gradient.addColorStop(0.5, `hsla(${particleHue}, ${saturation}%, ${brightness * 0.7}%, 0.5)`);
-                gradient.addColorStop(1, `hsla(${particleHue}, ${saturation}%, ${brightness * 0.3}%, 0)`);
+                gradient.addColorStop(0, `hsla(${particleHue}, ${saturation}%, ${particleBrightness}%, 1)`);
+                gradient.addColorStop(0.3, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.8}%, 0.8)`);
+                gradient.addColorStop(0.6, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.5}%, 0.4)`);
+                gradient.addColorStop(1, `hsla(${particleHue}, ${saturation}%, ${particleBrightness * 0.2}%, 0)`);
 
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.arc(particle.x, particle.y, particleSize * 2, 0, Math.PI * 2);
+                ctx.arc(particle.x, particle.y, bloomSize * 2, 0, Math.PI * 2);
                 ctx.fill();
             });
 

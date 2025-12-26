@@ -1379,6 +1379,232 @@ const THEME_CONFIGS = {
       phaseShift: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
     }
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // TUNNEL THEME
+  // ─────────────────────────────────────────────────────────
+  tunnel: {
+    name: 'TUNNEL',
+    description: '3D perspective vortex with concentric rings',
+    controls: {
+      // Color
+      hue: {
+        default: 180,
+        category: 'color'
+      },
+      saturation: {
+        default: 80,
+        category: 'color'
+      },
+
+      // Motion
+      speed: {
+        default: 1.0,
+        category: 'motion',
+        description: 'Tunnel movement speed'
+      },
+      rotation: {
+        default: 0.5,
+        category: 'motion',
+        description: 'Ring rotation speed'
+      },
+
+      // Geometry
+      rings: {
+        default: 50,
+        category: 'geometry',
+        description: 'Number of rings in tunnel'
+      },
+      perspective: {
+        default: 1.0,
+        category: 'geometry',
+        description: 'Depth perspective multiplier'
+      },
+      lineWidth: {
+        default: 2,
+        category: 'geometry'
+      },
+      segments: {
+        default: 12,
+        category: 'geometry',
+        description: 'Segments per ring (roundness)'
+      }
+    },
+    audioReactivity: {
+      // Original: Speed and rotation respond to audio
+      speed: { enabled: true, frequency: 'bass', intensity: 0.7, mode: 'modulate' },
+      rotation: { enabled: true, frequency: 'mids', intensity: 0.6, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      rings: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      perspective: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      segments: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' }
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // PLASMA THEME
+  // ─────────────────────────────────────────────────────────
+  plasma: {
+    name: 'PLASMA',
+    description: 'Organic plasma with sine wave interference patterns',
+    controls: {
+      // Color
+      hue: {
+        default: 280,
+        category: 'color'
+      },
+      saturation: {
+        default: 85,
+        category: 'color'
+      },
+      brightness: {
+        default: 0.6,
+        category: 'color',
+        description: 'Overall brightness (0-1)'
+      },
+      contrast: {
+        default: 1.0,
+        category: 'color',
+        description: 'Contrast multiplier'
+      },
+
+      // Geometry
+      scale: {
+        default: 3.0,
+        category: 'geometry',
+        description: 'Wave scale/frequency'
+      },
+      complexity: {
+        default: 3,
+        category: 'geometry',
+        description: 'Number of sine wave layers (1-5)'
+      },
+
+      // Motion
+      speed: {
+        default: 1.0,
+        category: 'motion',
+        description: 'Animation speed'
+      }
+    },
+    audioReactivity: {
+      // Original: Speed responds to audio
+      speed: { enabled: true, frequency: 'bass', intensity: 0.6, mode: 'modulate' },
+      brightness: { enabled: true, frequency: 'mids', intensity: 0.4, mode: 'modulate' },
+      hue: { enabled: true, frequency: 'highs', intensity: 0.5, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      contrast: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      scale: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      complexity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // PARTICLES THEME
+  // ─────────────────────────────────────────────────────────
+  particles: {
+    name: 'PARTICLES',
+    description: 'Physics-based particle system with swarm behaviors',
+    controls: {
+      // Style
+      mode: {
+        type: 'buttonGroup',
+        label: 'PHYSICS MODE',
+        options: [
+          { value: 'explode', label: 'EXPLODE' },
+          { value: 'converge', label: 'CONVERGE' },
+          { value: 'swarm', label: 'SWARM' }
+        ],
+        default: 'explode',
+        category: 'style',
+        audioReactive: false,
+        description: 'Particle behavior mode'
+      },
+
+      // Geometry
+      count: {
+        default: 1000,
+        category: 'geometry',
+        description: 'Number of particles (100-5000)'
+      },
+      size: {
+        default: 2,
+        category: 'geometry',
+        description: 'Base particle size (1-10)'
+      },
+
+      // Color
+      hue: {
+        default: 180,
+        category: 'color'
+      },
+      saturation: {
+        default: 80,
+        category: 'color'
+      },
+      brightness: {
+        default: 0.6,
+        category: 'color',
+        description: 'Overall brightness (0-1)'
+      },
+
+      // Motion
+      speed: {
+        default: 1.0,
+        category: 'motion',
+        description: 'Base velocity multiplier (0-5)'
+      },
+      gravity: {
+        default: 0,
+        category: 'motion',
+        description: 'Gravity force (-2 to 2)'
+      },
+      damping: {
+        default: 0.98,
+        category: 'motion',
+        description: 'Velocity damping/friction (0-1)'
+      },
+
+      // Effects
+      trailLength: {
+        default: 0.15,
+        category: 'effects',
+        description: 'Motion trail fade amount (0-1)'
+      },
+      bloom: {
+        default: 0,
+        category: 'effects',
+        description: 'Glow/bloom intensity (0-2)'
+      },
+      explosionThreshold: {
+        default: 0.3,
+        category: 'effects',
+        description: 'Bass level for explosions (0-1)'
+      }
+    },
+    audioReactivity: {
+      // Original: Size and hue respond to audio
+      size: { enabled: true, frequency: 'bass', intensity: 0.5, mode: 'modulate' },
+      hue: { enabled: true, frequency: 'highs', intensity: 0.6, mode: 'modulate' },
+      brightness: { enabled: true, frequency: 'mids', intensity: 0.3, mode: 'modulate' },
+
+      // All other controls default to Static (None)
+      count: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      speed: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      gravity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      damping: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' },
+      trailLength: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      bloom: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
+      explosionThreshold: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+    }
   }
 };
 
