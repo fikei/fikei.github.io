@@ -2956,12 +2956,16 @@
             constructor() {
                 this.energyHistory = [];
                 this.historySize = 43; // ~1 second at 43 FPS
-                this.threshold = 1.15; // Beat detected if energy > avg * threshold (lowered for breakbeat/complex rhythms)
                 this.minTimeBetweenBeats = 250; // ms (prevents double-triggering, allows up to 240 BPM)
                 this.lastBeatTime = 0;
                 this.beatStrength = 0;
                 this.decayRate = 0.95; // How fast beat strength decays
                 this.lastLogTime = 0; // For throttling debug logs
+
+                // Adaptive threshold parameters
+                this.minThreshold = 1.05; // Minimum threshold (very sensitive)
+                this.maxThreshold = 1.3;  // Maximum threshold (less sensitive)
+                this.adaptiveThreshold = 1.15; // Current adaptive threshold
             }
 
             detectBeat(currentEnergy, timestamp) {
@@ -2971,25 +2975,58 @@
                     this.energyHistory.shift();
                 }
 
-                // Calculate average energy
-                const avgEnergy = this.energyHistory.reduce((sum, e) => sum + e, 0) / this.energyHistory.length;
+                // Need at least 5 frames for peak detection
+                if (this.energyHistory.length < 5) {
+                    return { isBeat: false, strength: 0, energy: currentEnergy, avgEnergy: currentEnergy };
+                }
 
-                // Detect beat if current energy significantly exceeds average
+                // Calculate average and variance
+                const avgEnergy = this.energyHistory.reduce((sum, e) => sum + e, 0) / this.energyHistory.length;
+                const variance = this.energyHistory.reduce((sum, e) => sum + Math.pow(e - avgEnergy, 2), 0) / this.energyHistory.length;
+                const stdDev = Math.sqrt(variance);
+
+                // Adapt threshold based on variance
+                // High variance (dynamic music) = use max threshold
+                // Low variance (subtle/steady music) = use lower threshold to catch subtle beats
+                const varianceRatio = stdDev / avgEnergy;
+                if (varianceRatio > 0.3) {
+                    // High variance - use higher threshold to avoid false positives
+                    this.adaptiveThreshold = this.maxThreshold;
+                } else if (varianceRatio < 0.1) {
+                    // Low variance - use minimum threshold to catch subtle beats
+                    this.adaptiveThreshold = this.minThreshold;
+                } else {
+                    // Medium variance - interpolate
+                    const t = (varianceRatio - 0.1) / 0.2; // Normalize 0.1-0.3 to 0-1
+                    this.adaptiveThreshold = this.minThreshold + t * (this.maxThreshold - this.minThreshold);
+                }
+
+                // Check for local peak (is current energy higher than recent neighbors?)
+                const recentHistory = this.energyHistory.slice(-5); // Last 5 frames
+                const isLocalPeak = currentEnergy >= Math.max(...recentHistory);
+
+                // Calculate energy ratio
                 const timeSinceLastBeat = timestamp - this.lastBeatTime;
                 const energyRatio = currentEnergy / avgEnergy;
-                const isBeat = energyRatio > this.threshold &&
+
+                // Beat detected if:
+                // 1. Energy exceeds adaptive threshold
+                // 2. Is a local peak (prevents triggering on sustained high energy)
+                // 3. Enough time since last beat
+                const isBeat = energyRatio > this.adaptiveThreshold &&
+                              isLocalPeak &&
                               timeSinceLastBeat > this.minTimeBetweenBeats;
 
                 // Debug logging for beat detection (throttled to avoid spam)
                 if (!this.lastLogTime || timestamp - this.lastLogTime > 1000) {
-                    console.log(`🎯 Beat Detection: energy=${currentEnergy.toFixed(3)}, avg=${avgEnergy.toFixed(3)}, ratio=${energyRatio.toFixed(2)}x, threshold=${this.threshold}x, timeSince=${timeSinceLastBeat.toFixed(0)}ms`);
+                    console.log(`🎯 Beat Detection: energy=${currentEnergy.toFixed(3)}, avg=${avgEnergy.toFixed(3)}, ratio=${energyRatio.toFixed(2)}x, threshold=${this.adaptiveThreshold.toFixed(2)}x (adaptive), variance=${varianceRatio.toFixed(3)}, peak=${isLocalPeak}, timeSince=${timeSinceLastBeat.toFixed(0)}ms`);
                     this.lastLogTime = timestamp;
                 }
 
                 if (isBeat) {
-                    this.beatStrength = Math.min(1.0, (currentEnergy / avgEnergy - 1) / (this.threshold - 1));
+                    this.beatStrength = Math.min(1.0, (energyRatio - 1) / 0.5); // Normalize strength
                     this.lastBeatTime = timestamp;
-                    console.log(`💥 BEAT DETECTED! Strength: ${this.beatStrength.toFixed(2)}, Energy: ${energyRatio.toFixed(2)}x average`);
+                    console.log(`💥 BEAT DETECTED! Strength: ${this.beatStrength.toFixed(2)}, Energy: ${energyRatio.toFixed(2)}x avg, Threshold: ${this.adaptiveThreshold.toFixed(2)}x, Variance: ${varianceRatio.toFixed(3)}`);
                 } else {
                     // Decay beat strength over time
                     this.beatStrength *= this.decayRate;
@@ -3007,6 +3044,7 @@
                 this.energyHistory = [];
                 this.beatStrength = 0;
                 this.lastBeatTime = 0;
+                this.adaptiveThreshold = 1.15;
             }
         }
 
