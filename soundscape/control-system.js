@@ -1454,26 +1454,55 @@ const THEME_CONFIGS = {
       // Color
       hue: {
         type: 'slider',
+        min: 0,
+        max: 360,
+        step: 1,
         default: 180,
-        category: 'color'
+        category: 'color',
+        audioReactive: true,
+        description: 'Color hue'
       },
       saturation: {
         type: 'slider',
+        min: 0,
+        max: 100,
+        step: 1,
         default: 80,
-        category: 'color'
+        category: 'color',
+        audioReactive: true,
+        description: 'Color saturation'
+      },
+      brightness: {
+        type: 'slider',
+        label: 'BRIGHTNESS',
+        min: 0,
+        max: 100,
+        step: 1,
+        default: 60,
+        category: 'color',
+        audioReactive: true,
+        description: 'Overall brightness'
       },
 
       // Motion
       speed: {
         type: 'slider',
+        min: 0,
+        max: 5,
+        step: 0.1,
         default: 1.0,
         category: 'motion',
+        audioReactive: true,
         description: 'Tunnel movement speed'
       },
       rotation: {
         type: 'slider',
+        min: 0,
+        max: 2,
+        step: 0.1,
         default: 0.5,
         category: 'motion',
+        audioReactive: true,
         description: 'Ring rotation speed'
       },
       bpmSync: {
@@ -1495,26 +1524,55 @@ const THEME_CONFIGS = {
       // Geometry
       rings: {
         type: 'slider',
+        min: 10,
+        max: 100,
+        step: 1,
         default: 50,
         category: 'geometry',
+        audioReactive: true,
         description: 'Number of rings in tunnel'
+      },
+      ringSpacing: {
+        type: 'slider',
+        label: 'LINE DISTANCE',
+        min: 10,
+        max: 100,
+        step: 1,
+        default: 40,
+        category: 'geometry',
+        audioReactive: true,
+        description: 'Spacing between rings'
       },
       perspective: {
         type: 'slider',
+        min: 0,
+        max: 2,
+        step: 0.1,
         default: 1.0,
         category: 'geometry',
+        audioReactive: true,
         description: 'Depth perspective multiplier'
       },
       lineWidth: {
         type: 'slider',
-        default: 2,
-        category: 'geometry'
+        min: 0.1,
+        max: 10,
+        step: 0.1,
+        default: 0.5,
+        category: 'geometry',
+        audioReactive: true,
+        description: 'Ring line thickness'
       },
       segments: {
         type: 'slider',
-        default: 12,
+        label: 'POINTS',
+        min: 3,
+        max: 200,
+        step: 1,
+        default: 100,
         category: 'geometry',
-        description: 'Segments per ring (roundness)'
+        audioReactive: true,
+        description: 'Polygon points per ring (higher = smoother)'
       },
       shape: {
         type: 'buttonGroup',
@@ -1551,7 +1609,31 @@ const THEME_CONFIGS = {
         default: 0.0,
         category: 'geometry',
         audioReactive: true,
-        description: 'Path curvature/warp (-1 to 1)'
+        description: 'Radial warp/distortion (-1 inward, +1 outward)'
+      },
+
+      // Visual Effects
+      glow: {
+        type: 'slider',
+        label: 'GLOW',
+        min: 0,
+        max: 20,
+        step: 0.5,
+        default: 0,
+        category: 'effects',
+        audioReactive: true,
+        description: 'Blur/glow amount (0-20px)'
+      },
+      glowIntensity: {
+        type: 'slider',
+        label: 'GLOW INTENSITY',
+        min: 0,
+        max: 2,
+        step: 0.1,
+        default: 1.0,
+        category: 'effects',
+        audioReactive: true,
+        description: 'Glow opacity multiplier (0-2)'
       }
     },
     audioReactivity: {
@@ -1562,13 +1644,17 @@ const THEME_CONFIGS = {
       // All other controls default to Static (None)
       hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      brightness: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
       rings: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      ringSpacing: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       perspective: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       segments: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' },
       shape: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' },
       smoothing: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       curvature: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      glow: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
+      glowIntensity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },

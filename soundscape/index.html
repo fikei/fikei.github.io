@@ -3728,14 +3728,17 @@
                     ringSpacing: 40, // Base spacing between rings
                     hue: 180, // Cyan by default
                     saturation: 80,
-                    lineWidth: 2,
+                    brightness: 60, // Base brightness (0-100)
+                    lineWidth: 0.5, // Line thickness (default 0.5)
                     perspective: 1.0, // Depth perspective multiplier
-                    speed: 1.0, // Base animation speed
+                    speed: 1.0, // Base animation speed (will be scaled down)
                     rotation: 0.5, // Rotation speed
-                    segments: 12, // Number of segments per ring (more = rounder)
+                    segments: 100, // Number of segments per ring (more = rounder)
                     shape: 'circle', // Shape: circle, square, triangle, hexagon, star
                     smoothing: 0.0, // Edge smoothing (0-1)
                     curvature: 0.0, // Path curvature/warp (-1 to 1)
+                    glow: 0, // Glow/blur amount (0-20)
+                    glowIntensity: 1.0, // Glow opacity multiplier (0-2)
                     bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 plasma: {
@@ -8172,19 +8175,24 @@
             // Get values from control system (with fallbacks)
             const baseHue = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'hue') || theme.hue) : theme.hue;
             const saturation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'saturation') || theme.saturation) : theme.saturation;
+            const baseBrightness = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'brightness') || theme.brightness) : theme.brightness;
             const baseSpeed = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'speed') || theme.speed) : theme.speed;
             const baseRotation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rotation') || theme.rotation) : theme.rotation;
             const ringCount = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rings') || theme.rings) : theme.rings;
+            const ringSpacing = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'ringSpacing') || theme.ringSpacing) : theme.ringSpacing;
             const perspective = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'perspective') || theme.perspective) : theme.perspective;
             const baseLineWidth = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'lineWidth') || theme.lineWidth) : theme.lineWidth;
             const segments = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'segments') || theme.segments) : theme.segments;
             const shape = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'shape') || theme.shape) : theme.shape;
             const smoothing = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'smoothing') || theme.smoothing) : theme.smoothing;
             const curvature = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'curvature') || theme.curvature) : theme.curvature;
+            const glow = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'glow') || theme.glow) : theme.glow;
+            const glowIntensity = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'glowIntensity') || theme.glowIntensity) : theme.glowIntensity;
             const bpmSync = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'bpmSync') || 'off') : 'off';
 
             // Apply global modifiers
             const hue = applyGlobalModifiers(baseHue, 'hue');
+            const brightness = applyGlobalModifiers(baseBrightness, 'brightness');
             const speed = getBPMSyncedSpeed(baseSpeed, bpmSync);
             const rotation = getBPMSyncedSpeed(baseRotation, bpmSync);
             const lineWidth = applyGlobalModifiers(baseLineWidth, 'size');
@@ -8221,12 +8229,13 @@
             const centerY = h / 2;
 
             // Bass controls tunnel speed (movement towards camera)
+            // Reduced speed multiplier significantly (0.0001 instead of 0.001)
             const tunnelSpeed = speed * (1 + low * 2);
-            const timeOffset = time * tunnelSpeed * 0.001;
+            const timeOffset = time * tunnelSpeed * 0.0001;
 
             // Mid frequencies control rotation
             const rotationSpeed = rotation * (1 + mid);
-            const rotationAngle = time * rotationSpeed * 0.001;
+            const rotationAngle = time * rotationSpeed * 0.0001;
 
             // Helper function to get vertices for different shapes
             const getShapeVertices = (shape, segments, radius, bassPulse, rotationAngle) => {
@@ -8307,6 +8316,15 @@
             ctx.save();
             ctx.translate(centerX, centerY);
 
+            // Apply glow/blur effect
+            if (glow > 0) {
+                ctx.filter = `blur(${glow}px)`;
+                ctx.globalAlpha = glowIntensity;
+            } else {
+                ctx.filter = 'none';
+                ctx.globalAlpha = 1.0;
+            }
+
             // Apply smoothing settings
             if (smoothing > 0) {
                 ctx.lineJoin = 'round';
@@ -8327,10 +8345,10 @@
 
                 // Perspective scale (larger when closer)
                 const scale = 1 / (1 - z * 0.9);
-                const radius = theme.ringSpacing * scale;
+                const radius = ringSpacing * scale;
 
-                // Brightness based on depth (brighter when closer)
-                const brightness = 20 + depth * 60 + high * 20;
+                // Brightness based on depth and control (brighter when closer)
+                const depthBrightness = brightness * 0.5 + (depth * brightness * 0.3) + (high * brightness * 0.2);
 
                 // Ring size pulse with bass
                 const bassPulse = 1 + low * 0.3;
@@ -8341,7 +8359,7 @@
                 // Alpha based on depth (fade out far rings)
                 const alpha = depth * 0.8 + 0.2;
 
-                ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness}%, ${alpha * strobeMultiplier})`;
+                ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${depthBrightness}%, ${alpha * strobeMultiplier})`;
                 ctx.lineWidth = lineWidth * scale;
 
                 // Get vertices for the selected shape
@@ -8376,9 +8394,9 @@
                     const prevZ = prevDepth * perspective;
                     if (prevZ > 0) {
                         const prevScale = 1 / (1 - prevZ * 0.9);
-                        const prevRadius = theme.ringSpacing * prevScale;
+                        const prevRadius = ringSpacing * prevScale;
 
-                        ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness * 0.5}%, ${alpha * 0.5 * strobeMultiplier})`;
+                        ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${depthBrightness * 0.5}%, ${alpha * 0.5 * strobeMultiplier})`;
                         ctx.lineWidth = lineWidth * scale * 0.5;
 
                         // Get vertices for previous ring
