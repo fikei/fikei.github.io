@@ -141,6 +141,41 @@
             50% { opacity: 0; }
         }
 
+        /* ===== DEBUG MODE INDICATOR ===== */
+        .debug-indicator {
+            position: fixed;
+            top: 1rem;
+            left: 6rem;
+            z-index: 20;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 165, 0, 0.9);
+            border: 1px solid #ff8800;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 700;
+            color: #000;
+            animation: debug-pulse 2s ease-in-out infinite;
+        }
+
+        .debug-icon {
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .debug-text {
+            font-size: 10px;
+            letter-spacing: 0.15em;
+        }
+
+        @keyframes debug-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
         /* ===== PAIRING PANEL ===== */
         .pairing-panel {
             position: fixed;
@@ -768,13 +803,35 @@
             transform: translateY(-20px);
         }
 
+        /* Beat flash animation */
+        .beat-pad-container.beat-flash {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.8),
+                        inset 0 0 20px rgba(255, 255, 255, 0.3);
+            animation: beat-flash-pulse 0.1s ease-out;
+        }
+
+        @keyframes beat-flash-pulse {
+            0% {
+                box-shadow: 0 0 20px rgba(255, 255, 255, 0.8),
+                            inset 0 0 20px rgba(255, 255, 255, 0.3);
+            }
+            100% {
+                box-shadow: 0 0 5px rgba(255, 255, 255, 0.2),
+                            inset 0 0 5px rgba(255, 255, 255, 0.1);
+            }
+        }
+
         .beat-pad-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid #333333;
+        }
+
+        .beat-pad-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
         }
 
         .beat-pad-header h3 {
@@ -784,6 +841,33 @@
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: #ffffff;
+        }
+
+        .beat-pad-status {
+            display: flex;
+            gap: 1rem;
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .beat-pad-bpm {
+            color: #00ffff;
+        }
+
+        .beat-pad-quantize {
+            color: #ffff00;
+        }
+
+        .beat-pad-rec {
+            color: #ff0000;
+            animation: rec-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes rec-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .beat-pad-actions {
@@ -871,6 +955,45 @@
         .beat-pad.active .beat-pad-key {
             color: #ffffff;
             opacity: 0.8;
+        }
+
+        .beat-pad-theme-badge {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            font-size: 6px;
+            font-weight: 700;
+            padding: 0.15rem 0.3rem;
+            border-radius: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.9;
+        }
+
+        /* Theme color coding */
+        .beat-pad-theme-badge[data-theme="linear"] {
+            background: rgba(138, 43, 226, 0.8);
+            color: #ffffff;
+        }
+
+        .beat-pad-theme-badge[data-theme="neon"] {
+            background: rgba(255, 20, 147, 0.8);
+            color: #ffffff;
+        }
+
+        .beat-pad-theme-badge[data-theme="glitch"] {
+            background: rgba(255, 0, 0, 0.8);
+            color: #ffffff;
+        }
+
+        .beat-pad-theme-badge[data-theme="stars"] {
+            background: rgba(255, 215, 0, 0.8);
+            color: #000000;
+        }
+
+        .beat-pad-theme-badge[data-theme="wave"] {
+            background: rgba(0, 191, 255, 0.8);
+            color: #ffffff;
         }
 
         .beat-pad-number {
@@ -1706,6 +1829,12 @@
     <div class="status-bar" id="statusBar">
         <div class="status-indicator"></div>
         <span>activ</span>
+    </div>
+
+    <!-- Debug Mode Indicator -->
+    <div class="debug-indicator" id="debugIndicator" style="display: none;">
+        <span class="debug-icon">🐛</span>
+        <span class="debug-text">DEBUG</span>
     </div>
 
     <!-- Pairing Code Display -->
@@ -2756,6 +2885,7 @@
             beatDetector: new BeatDetector(),
             bpmDetector: new BPMDetector(),
             beatSync: null, // Will be initialized after BeatDetector/BPMDetector
+            lastBPMUpdate: 0, // Timestamp of last BPM display update (for throttling)
             layerManager: null, // Will be initialized after canvas setup
 
             // Video recording
@@ -2764,6 +2894,20 @@
                 mediaRecorder: null,
                 chunks: [],
                 stream: null
+            },
+
+            // Debug mode
+            debug: {
+                enabled: false,  // Toggle with 'D' key
+                categories: {
+                    beatpad: true,
+                    audio: true,
+                    rendering: false,
+                    controls: false,
+                    performance: false,
+                    layers: true,
+                    recording: true
+                }
             },
 
             // User-created gradient centers (for NEON theme)
@@ -2862,6 +3006,46 @@
         }
 
         // =====================================================
+        // DEBUG LOGGING SYSTEM
+        // =====================================================
+
+        /**
+         * Debug logging function - respects debug mode and category filters
+         * @param {string} category - Debug category (beatpad, audio, rendering, controls, performance, layers, recording)
+         * @param {...any} args - Arguments to log
+         */
+        function debugLog(category, ...args) {
+            if (state.debug.enabled && state.debug.categories[category]) {
+                console.log(...args);
+            }
+        }
+
+        // Make debugLog globally accessible
+        window.debugLog = debugLog;
+
+        /**
+         * Toggle debug mode on/off
+         */
+        function toggleDebugMode() {
+            state.debug.enabled = !state.debug.enabled;
+
+            // Show visual indicator
+            const indicator = document.getElementById('debugIndicator');
+            if (indicator) {
+                indicator.style.display = state.debug.enabled ? 'block' : 'none';
+            }
+
+            console.log(`🐛 Debug mode: ${state.debug.enabled ? 'ON' : 'OFF'}`);
+
+            if (state.debug.enabled) {
+                console.log('Active categories:', Object.entries(state.debug.categories)
+                    .filter(([_, enabled]) => enabled)
+                    .map(([category]) => category)
+                    .join(', '));
+            }
+        }
+
+        // =====================================================
         // VIDEO RECORDING
         // =====================================================
 
@@ -2942,6 +3126,11 @@
                     recordBtn.title = 'Stop Recording';
                 }
 
+                // Update Beat Pad status
+                if (window.beatPad && typeof window.beatPad.updateStatus === 'function') {
+                    window.beatPad.updateStatus();
+                }
+
                 console.log('🎥 Recording started');
             } catch (error) {
                 console.error('❌ Failed to start recording:', error);
@@ -2965,6 +3154,11 @@
             if (recordBtn) {
                 recordBtn.classList.remove('recording');
                 recordBtn.title = 'Record Video';
+            }
+
+            // Update Beat Pad status
+            if (window.beatPad && typeof window.beatPad.updateStatus === 'function') {
+                window.beatPad.updateStatus();
             }
 
             console.log('⏹️ Recording stopped');
@@ -3024,6 +3218,10 @@
             if (quantizeSelect) {
                 quantizeSelect.addEventListener('change', (e) => {
                     state.beatSync.setQuantizeMode(e.target.value);
+                    // Update Beat Pad status
+                    if (window.beatPad && typeof window.beatPad.updateStatus === 'function') {
+                        window.beatPad.updateStatus();
+                    }
                 });
             }
         }
@@ -3055,6 +3253,11 @@
                     beatDots[i].classList.toggle('active', indicator.active);
                 }
             });
+
+            // Update Beat Pad status header
+            if (window.beatPad && typeof window.beatPad.updateStatus === 'function') {
+                window.beatPad.updateStatus();
+            }
         }
 
         // =====================================================
@@ -3911,8 +4114,20 @@
             // Update Beat Sync Manager
             if (state.beatSync) {
                 state.beatSync.update(beatResult.isBeat, timestamp);
-                // Update UI periodically (every frame is fine for beat indicators)
-                updateBPMDisplay();
+
+                // Throttle BPM display updates to 10 FPS (every 100ms)
+                if (!state.lastBPMUpdate || timestamp - state.lastBPMUpdate > 100) {
+                    updateBPMDisplay();
+                    state.lastBPMUpdate = timestamp;
+                }
+
+                // Flash Beat Pad on beat
+                if (beatResult.isBeat && window.beatPad && window.beatPad.gridContainer) {
+                    window.beatPad.gridContainer.classList.add('beat-flash');
+                    setTimeout(() => {
+                        window.beatPad.gridContainer.classList.remove('beat-flash');
+                    }, 100);
+                }
             }
 
             // Get current BPM (normalized 0-1, where 120 BPM = 0.5)
@@ -6595,6 +6810,11 @@
 
             // 'h' key to toggle UI visibility (all nav icons)
             document.addEventListener('keydown', (e) => {
+                // 'd' key - toggle debug mode
+                if (e.key === 'd' || e.key === 'D') {
+                    toggleDebugMode();
+                }
+
                 // 'h' key - toggle UI visibility
                 if (e.key === 'h' || e.key === 'H') {
                     const statusBar = document.getElementById('statusBar');

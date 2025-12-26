@@ -26,6 +26,18 @@ class BeatPad {
   }
 
   /**
+   * Debug log helper (uses global debug system if available)
+   */
+  log(...args) {
+    if (typeof window.debugLog === 'function') {
+      window.debugLog('beatpad', ...args);
+    } else {
+      // Fallback if debug system not ready yet
+      console.log(...args);
+    }
+  }
+
+  /**
    * Initialize the beat pad system
    */
   init() {
@@ -56,7 +68,14 @@ class BeatPad {
     const header = document.createElement('div');
     header.className = 'beat-pad-header';
     header.innerHTML = `
-      <h3>BEAT PAD</h3>
+      <div class="beat-pad-header-row">
+        <h3>BEAT PAD</h3>
+        <div class="beat-pad-status">
+          <span class="beat-pad-bpm" id="beatPadBPM" title="Current BPM">-- BPM</span>
+          <span class="beat-pad-quantize" id="beatPadQuantize" title="Quantize mode">♩ OFF</span>
+          <span class="beat-pad-rec" id="beatPadRec" style="display: none;" title="Recording">⏺ REC</span>
+        </div>
+      </div>
       <div class="beat-pad-actions">
         <button class="beat-pad-btn" id="beat-pad-save-current" title="Save current state to selected pad">SAVE</button>
         <button class="beat-pad-btn" id="beat-pad-export" title="Export all scenes as JSON">EXPORT</button>
@@ -111,6 +130,10 @@ class BeatPad {
       padKeyHint.className = 'beat-pad-key';
       padKeyHint.textContent = keyHints[i];
 
+      const padThemeBadge = document.createElement('div');
+      padThemeBadge.className = 'beat-pad-theme-badge';
+      padThemeBadge.textContent = '';
+
       const padNumber = document.createElement('div');
       padNumber.className = 'beat-pad-number';
       padNumber.textContent = i + 1;
@@ -120,6 +143,7 @@ class BeatPad {
       padLabel.textContent = 'EMPTY';
 
       pad.appendChild(padKeyHint);
+      pad.appendChild(padThemeBadge);
       pad.appendChild(padNumber);
       pad.appendChild(padLabel);
       grid.appendChild(pad);
@@ -157,16 +181,16 @@ class BeatPad {
     const toggleBtn = document.getElementById('beatpadToggle');
     const isHidden = this.gridContainer.classList.contains('hidden');
 
-    console.log('🔧 Toggle called. Current state:', { isHidden, gridContainer: this.gridContainer, toggleBtn });
+    this.log('🔧 Toggle called. Current state:', { isHidden, gridContainer: this.gridContainer, toggleBtn });
 
     if (isHidden) {
       this.gridContainer.classList.remove('hidden');
       if (toggleBtn) toggleBtn.classList.add('active');
-      console.log('✅ Beat Pad opened');
+      this.log('✅ Beat Pad opened');
     } else {
       this.gridContainer.classList.add('hidden');
       if (toggleBtn) toggleBtn.classList.remove('active');
-      console.log('❌ Beat Pad closed');
+      this.log('❌ Beat Pad closed');
     }
   }
 
@@ -787,11 +811,12 @@ class BeatPad {
    */
   updateGridUI() {
     const pads = this.gridContainer.querySelectorAll('.beat-pad');
-    console.log(`🔄 Updating grid UI: ${pads.length} pads, ${this.scenes.filter(s => s !== null).length} scenes loaded`);
+    this.log(`🔄 Updating grid UI: ${pads.length} pads, ${this.scenes.filter(s => s !== null).length} scenes loaded`);
 
     pads.forEach((pad, index) => {
       const scene = this.scenes[index];
       const label = pad.querySelector('.beat-pad-label');
+      const themeBadge = pad.querySelector('.beat-pad-theme-badge');
 
       // Remove all state classes
       pad.classList.remove('empty', 'loaded', 'active');
@@ -801,6 +826,12 @@ class BeatPad {
         pad.classList.add('loaded');
         label.textContent = scene.name || `Scene ${index + 1}`;
 
+        // Update theme badge
+        if (themeBadge && scene.theme) {
+          themeBadge.textContent = scene.theme.toUpperCase();
+          themeBadge.dataset.theme = scene.theme;
+        }
+
         if (index === this.activePadIndex) {
           pad.classList.add('active');
         }
@@ -808,6 +839,12 @@ class BeatPad {
         // Pad is empty
         pad.classList.add('empty');
         label.textContent = 'EMPTY';
+
+        // Clear theme badge
+        if (themeBadge) {
+          themeBadge.textContent = '';
+          delete themeBadge.dataset.theme;
+        }
       }
     });
   }
@@ -1039,6 +1076,42 @@ class BeatPad {
       console.log('💾 Saved to localStorage:', { sceneCount: this.scenes.filter(s => s !== null).length, total: this.scenes.length });
     } catch (e) {
       console.error('Failed to save scenes to localStorage:', e);
+    }
+  }
+
+  /**
+   * Update Beat Pad header status (BPM, quantize, recording)
+   */
+  updateStatus() {
+    const bpmEl = document.getElementById('beatPadBPM');
+    const quantizeEl = document.getElementById('beatPadQuantize');
+    const recEl = document.getElementById('beatPadRec');
+
+    // Update BPM
+    if (bpmEl && window.state && window.state.beatSync) {
+      const bpm = window.state.beatSync.getBPM();
+      bpmEl.textContent = `${bpm.toFixed(1)} BPM`;
+    }
+
+    // Update quantize mode
+    if (quantizeEl && window.state && window.state.beatSync) {
+      const mode = window.state.beatSync.quantizeMode;
+      const modeLabels = {
+        'off': '♩ OFF',
+        'beat': '♩ BEAT',
+        'bar': '♩ BAR',
+        '4bar': '♩ 4BAR'
+      };
+      quantizeEl.textContent = modeLabels[mode] || '♩ OFF';
+    }
+
+    // Update recording status
+    if (recEl && window.state && window.state.recording) {
+      if (window.state.recording.isRecording) {
+        recEl.style.display = 'inline';
+      } else {
+        recEl.style.display = 'none';
+      }
     }
   }
 
