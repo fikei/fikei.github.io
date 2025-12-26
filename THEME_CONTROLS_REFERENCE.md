@@ -33,7 +33,7 @@
 ---
 
 ## NEON Theme
-**Visual Style**: SVG gradient mesh with organic movement
+**Visual Style**: SVG gradient mesh with organic movement + beat-triggered bursts
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
@@ -44,18 +44,26 @@
 | colorChangeMode | select | - | static | How colors evolve over time |
 | cycleSpeed | slider | 0-1 | 0.1 | Speed of color cycling (cycle mode) |
 | warmCool | slider | 0-1 | 0.5 | Color temperature (warm/cool) |
+| colorPalette | dropdown | 13 palettes | vibrant | Color palette preset (Vibrant, Warm, Cool, Sunset, Ocean, Forest, Neon, Fire, Ice, Analogous, Triadic, Complementary, Split-Comp) |
 | burstSize | slider | 0.1-5 | 1.0 | Gradient sphere size |
 | movement | slider | 0-2 | 1.0 | Gradient movement intensity |
 | glow | slider | 0-5 | 1.5 | Glow/bloom effect intensity |
 | blur | slider | 0-20 | 0 | Blur effect amount |
 | responsiveness | slider | 0-3 | 1.0 | Audio response sensitivity |
 | smoothing | slider | 0-1 | 0.7 | Audio smoothing (0 = instant, 1 = very smooth) |
-| meshDensity | slider | 4-16 | 8 | Number of gradient centers |
+| meshDensity | slider | 4-16 | 8 | Number of gradient centers (pulses +30% on beats) |
 | backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect |
 | bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
+| beatBurstMode | dropdown | OFF/BEAT/BAR/KICK | BEAT | Beat-triggered gradient burst mode |
+| beatBurstCount | slider | 1-5 | 1 | Number of bursts spawned per beat |
+| beatBurstLifetime | slider | 500-5000ms | 2000 | Burst lifetime (ms) |
+| beatBurstSpawnMode | dropdown | 5 modes | random | Burst spawn location (Random, Center, Edges, Stereo, Bass-Follow) |
+| beatBurstIntensityThreshold | slider | 0-1 | 0.5 | Minimum beat energy to spawn bursts |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 16
+**Beat Burst System**: Automatic gradient explosions on detected beats with lifecycle animation
+**Color Palettes**: 13 professional presets for quick mood changes
+**Total Controls**: 22
 
 ---
 
@@ -236,9 +244,9 @@
 
 | Theme | Total Controls | Canvas/SVG | Audio Reactive | Supports Transparency |
 |-------|---------------|------------|----------------|---------------------|
-| LINEAR | 6 | SVG | ✅ Per-control | ❌ (Hard switch) |
-| NEON | 16 | SVG | ✅ Per-control | ❌ (Hard switch) |
-| GLITCH | 9 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| LINEAR | 10 | SVG | ✅ Per-control | ❌ (Hard switch) |
+| NEON | 22 | SVG | ✅ Per-control + Beat Bursts | ❌ (Hard switch) |
+| GLITCH | 11 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | STARS | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | WAVE | 17 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | TUNNEL | 9 | Canvas | ✅ Per-control | ✅ (When implemented) |
@@ -246,9 +254,9 @@
 | PARTICLES | 13 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | **GLOBAL** | **9** | **N/A** | **❌ Master Controls** | **N/A** |
 
-**TOTAL THEME CONTROLS**: 94 parameters
+**TOTAL THEME CONTROLS**: 106 parameters
 **TOTAL GLOBAL CONTROLS**: 9 parameters
-**GRAND TOTAL**: 103 parameters
+**GRAND TOTAL**: 115 parameters
 
 ---
 
