@@ -158,7 +158,7 @@
 
 ---
 
-## PARTICLES Theme (PLANNED)
+## PARTICLES Theme (NEW)
 **Visual Style**: Particle system with physics
 
 | Control | Type | Range | Default | Description |
@@ -168,12 +168,21 @@
 | speed | slider | 0-5 | 1.0 | Particle velocity |
 | gravity | slider | -2-2 | 0 | Gravity force |
 | damping | slider | 0-1 | 0.98 | Velocity damping |
-| hue | slider | 0-360 | 180 | Particle color |
+| hue | slider | 0-360 | 180 | Particle color (cyan default) |
 | saturation | slider | 0-100 | 80 | Color saturation |
-| mode | select | - | explode | Explode, Converge, Swarm, Orbit |
+| mode | select | - | explode | Explode, Converge, Swarm |
 
-**Audio Reactivity**: TBD
-**Total Controls**: 8 (planned)
+**Audio Reactivity**:
+- Bass: Particle size boost + explosion force (explode mode)
+- Mid: Brightness boost + velocity multiplier
+- High: Color hue shift
+
+**Physics**:
+- **Explode Mode**: Particles burst from center on bass hits
+- **Converge Mode**: Particles pull towards center
+- **Swarm Mode**: Attraction to center + separation from neighbors
+
+**Total Controls**: 8
 
 ---
 
@@ -187,10 +196,10 @@
 | STARS | 15 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | WAVE | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | TUNNEL | 8 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
-| PLASMA | 7 | Canvas | 🚧 TBD | ✅ (When implemented) |
-| PARTICLES | 8 | Canvas | 🚧 TBD | ✅ (When implemented) |
+| PLASMA | 7 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
+| PARTICLES | 8 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
 
-**TOTAL CONTROLS ACROSS ALL THEMES**: 82+ parameters
+**TOTAL CONTROLS ACROSS ALL THEMES**: 82 parameters
 
 ---
 

@@ -2160,6 +2160,7 @@
                 <option value="wave">WAVE</option>
                 <option value="tunnel">TUNNEL</option>
                 <option value="plasma">PLASMA</option>
+                <option value="particles">PARTICLES</option>
             </select>
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
@@ -2214,6 +2215,7 @@
                     <option value="wave">WAVE</option>
                     <option value="tunnel">TUNNEL</option>
                     <option value="plasma">PLASMA</option>
+                    <option value="particles">PARTICLES</option>
                 </select>
                 <div class="layer-opacity">
                     <span class="layer-opacity-label">OPACITY</span>
@@ -2246,6 +2248,7 @@
                     <option value="wave">WAVE</option>
                     <option value="tunnel">TUNNEL</option>
                     <option value="plasma">PLASMA</option>
+                    <option value="particles">PARTICLES</option>
                 </select>
                 <div class="layer-opacity">
                     <span class="layer-opacity-label">OPACITY</span>
@@ -3017,6 +3020,13 @@
                 gridNodes: [],
                 orbitalDots: [],
                 noiseOffset: 0
+            },
+
+            particles: {
+                initialized: false,
+                particleArray: [],
+                centerX: 0,
+                centerY: 0
             },
 
             // Image objects (for LINEAR/NEON overlay images)
@@ -6523,6 +6533,177 @@
             ctx.restore();
         }
 
+        // =====================================================
+        // PARTICLES THEME RENDERING
+        // =====================================================
+
+        function initializeParticles(count, w, h) {
+            state.particles.particleArray = [];
+            state.particles.centerX = w / 2;
+            state.particles.centerY = h / 2;
+
+            for (let i = 0; i < count; i++) {
+                state.particles.particleArray.push({
+                    x: state.particles.centerX,
+                    y: state.particles.centerY,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    size: 1 + Math.random() * 3,
+                    hueOffset: Math.random() * 60 - 30
+                });
+            }
+
+            state.particles.initialized = true;
+        }
+
+        function drawLinesParticles() {
+            const theme = config.themes.particles;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            // Get values from control system (with fallbacks)
+            const count = window.audioEngine ? (window.audioEngine.getValue('particles', 'count') || theme.count) : theme.count;
+            const size = window.audioEngine ? (window.audioEngine.getValue('particles', 'size') || theme.size) : theme.size;
+            const speed = window.audioEngine ? (window.audioEngine.getValue('particles', 'speed') || theme.speed) : theme.speed;
+            const gravity = window.audioEngine ? (window.audioEngine.getValue('particles', 'gravity') || theme.gravity) : theme.gravity;
+            const damping = window.audioEngine ? (window.audioEngine.getValue('particles', 'damping') || theme.damping) : theme.damping;
+            const hue = window.audioEngine ? (window.audioEngine.getValue('particles', 'hue') || theme.hue) : theme.hue;
+            const saturation = window.audioEngine ? (window.audioEngine.getValue('particles', 'saturation') || theme.saturation) : theme.saturation;
+            const mode = window.audioEngine ? (window.audioEngine.getValue('particles', 'mode') || theme.mode) : theme.mode;
+
+            // Hide SVG paths for PARTICLES theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
+
+            // Get or create particles canvas
+            let particlesCanvas = document.getElementById('particles-canvas');
+            if (!particlesCanvas) {
+                particlesCanvas = document.createElement('canvas');
+                particlesCanvas.id = 'particles-canvas';
+                particlesCanvas.style.position = 'fixed';
+                particlesCanvas.style.top = '0';
+                particlesCanvas.style.left = '0';
+                particlesCanvas.style.width = '100%';
+                particlesCanvas.style.height = '100%';
+                particlesCanvas.style.pointerEvents = 'none';
+                particlesCanvas.style.zIndex = '0';
+                document.body.insertBefore(particlesCanvas, document.body.firstChild);
+            }
+
+            const ctx = particlesCanvas.getContext('2d');
+            const w = particlesCanvas.width = state.boundingRect.width;
+            const h = particlesCanvas.height = state.boundingRect.height;
+
+            // Initialize particles if needed or count changed significantly
+            if (!state.particles.initialized || Math.abs(state.particles.particleArray.length - count) > 100) {
+                initializeParticles(count, w, h);
+            }
+
+            // Update center point
+            state.particles.centerX = w / 2;
+            state.particles.centerY = h / 2;
+
+            // Clear with fade effect for trails
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.15;
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+            ctx.globalAlpha = 1.0;
+
+            // Audio-reactive forces
+            const bassForce = low * 5;
+            const midForce = mid * 3;
+
+            // Update and draw particles
+            ctx.globalCompositeOperation = 'lighter';
+
+            state.particles.particleArray.forEach((particle, index) => {
+                // Mode-specific behavior
+                if (mode === 'explode') {
+                    // Explode from center on bass hits
+                    if (low > 0.5) {
+                        const angle = Math.random() * Math.PI * 2;
+                        particle.vx += Math.cos(angle) * bassForce;
+                        particle.vy += Math.sin(angle) * bassForce;
+                    }
+                } else if (mode === 'converge') {
+                    // Pull towards center
+                    const dx = state.particles.centerX - particle.x;
+                    const dy = state.particles.centerY - particle.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 10) {
+                        particle.vx += (dx / dist) * 0.5 * speed;
+                        particle.vy += (dy / dist) * 0.5 * speed;
+                    }
+                } else if (mode === 'swarm') {
+                    // Swarm behavior - attraction + separation
+                    const dx = state.particles.centerX - particle.x;
+                    const dy = state.particles.centerY - particle.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Attraction to center
+                    if (dist > 100) {
+                        particle.vx += (dx / dist) * 0.2 * speed;
+                        particle.vy += (dy / dist) * 0.2 * speed;
+                    }
+
+                    // Separation from neighbors
+                    state.particles.particleArray.forEach((other, i) => {
+                        if (i !== index) {
+                            const dx2 = particle.x - other.x;
+                            const dy2 = particle.y - other.y;
+                            const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+                            if (dist2 < 30 && dist2 > 0) {
+                                particle.vx += (dx2 / dist2) * 0.5;
+                                particle.vy += (dy2 / dist2) * 0.5;
+                            }
+                        }
+                    });
+                }
+
+                // Apply gravity
+                particle.vy += gravity * 0.1;
+
+                // Apply audio-reactive boost
+                particle.vx *= 1 + midForce * 0.01;
+                particle.vy *= 1 + midForce * 0.01;
+
+                // Apply damping
+                particle.vx *= damping;
+                particle.vy *= damping;
+
+                // Update position
+                particle.x += particle.vx * speed;
+                particle.y += particle.vy * speed;
+
+                // Wrap around screen edges
+                if (particle.x < 0) particle.x = w;
+                if (particle.x > w) particle.x = 0;
+                if (particle.y < 0) particle.y = h;
+                if (particle.y > h) particle.y = 0;
+
+                // Draw particle
+                const particleHue = (hue + particle.hueOffset + high * 60) % 360;
+                const brightness = 50 + mid * 30;
+                const particleSize = size * particle.size * (1 + low * 0.5);
+
+                const gradient = ctx.createRadialGradient(
+                    particle.x, particle.y, 0,
+                    particle.x, particle.y, particleSize * 2
+                );
+                gradient.addColorStop(0, `hsla(${particleHue}, ${saturation}%, ${brightness}%, 1)`);
+                gradient.addColorStop(0.5, `hsla(${particleHue}, ${saturation}%, ${brightness * 0.7}%, 0.5)`);
+                gradient.addColorStop(1, `hsla(${particleHue}, ${saturation}%, ${brightness * 0.3}%, 0)`);
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particleSize * 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
         // Theme renderer dispatcher
         const themeRenderers = {
             linear: drawLinesLinear,
@@ -6531,7 +6712,8 @@
             stars: drawLinesStars,
             wave: drawLinesWave,
             tunnel: drawLinesTunnel,
-            plasma: drawLinesPlasma
+            plasma: drawLinesPlasma,
+            particles: drawLinesParticles
         };
 
         function drawLines() {
