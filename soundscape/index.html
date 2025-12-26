@@ -2883,7 +2883,34 @@
                     sizeMultiplierRange: 1.5, // Will multiply size by 1.0-2.5x
                     movementBase: 150,
                     movementMultiplier: 300,
-                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
+                    bpmSync: 'off', // BPM sync: off, 1x, 2x, 0.5x, 4x
+
+                    // Beat burst system
+                    beatBurstMode: 'beat',        // off, beat, bar, kick
+                    beatBurstCount: 1,            // 1-5 bursts per trigger
+                    beatBurstLifetime: 2000,      // ms until burst fades
+                    beatBurstSpawnMode: 'random', // random, center, edges, stereo, bass-follow
+                    beatBurstIntensityThreshold: 0.5, // 0-1, only spawn on beats above this energy
+                    beatBurstGrowTime: 200,       // ms for growing phase
+                    beatBurstFadeTime: 200,       // ms for fading phase
+
+                    // Color palettes (12 presets)
+                    colorPalettes: {
+                        'vibrant': [180, 300, 60, 120, 340],      // Default: cyan, magenta, yellow, lime, pink
+                        'warm': [0, 30, 45, 60, 15],              // Reds, oranges, yellows
+                        'cool': [180, 210, 240, 270, 200],        // Blues, cyans, purples
+                        'sunset': [0, 15, 30, 300, 270],          // Red-orange-purple
+                        'ocean': [180, 200, 220, 160, 240],       // Blues and teals
+                        'forest': [90, 120, 150, 75, 135],        // Greens
+                        'neon': [300, 330, 180, 60, 120],         // Hot pink, cyan, yellow
+                        'fire': [0, 20, 40, 10, 330],             // Red-orange-pink
+                        'ice': [180, 200, 220, 190, 210],         // Cold blues
+                        'analogous': [180, 210, 240, 150, 270],   // Adjacent colors
+                        'triadic': [0, 120, 240, 60, 180],        // 120° apart
+                        'complementary': [180, 0, 200, 20, 340],  // Opposite sides
+                        'split-comp': [180, 30, 330, 200, 60]     // Y-shaped harmony
+                    },
+                    colorPalette: 'vibrant'  // Active palette
                 },
                 glitch: {
                     bg: '#000000',
@@ -5090,8 +5117,16 @@
                     reactiveHue: hue,
                     lastBeatTime: 0,
                     targetHue: hue,
-                    currentHue: hue
+                    currentHue: hue,
+                    beatBursts: [],           // Array of active beat bursts
+                    lastBurstTime: 0          // Timestamp of last burst spawn (for throttling)
                 };
+            }
+
+            // Initialize beatBursts array if missing (for backward compatibility)
+            if (!state.neon.beatBursts) {
+                state.neon.beatBursts = [];
+                state.neon.lastBurstTime = 0;
             }
 
             // Apply exponential smoothing to audio levels
@@ -5104,6 +5139,116 @@
             const lowSmooth = state.neon.smoothedAudio.low * responsiveness;
             const midSmooth = state.neon.smoothedAudio.mid * responsiveness;
             const highSmooth = state.neon.smoothedAudio.high * responsiveness;
+
+            // Beat burst spawning system
+            const beatBurstMode = theme.beatBurstMode || 'off';
+            const beatBurstCount = theme.beatBurstCount || 1;
+            const beatBurstLifetime = theme.beatBurstLifetime || 2000;
+            const beatBurstSpawnMode = theme.beatBurstSpawnMode || 'random';
+            const beatBurstIntensityThreshold = theme.beatBurstIntensityThreshold || 0.5;
+            const beatBurstGrowTime = theme.beatBurstGrowTime || 200;
+            const beatBurstFadeTime = theme.beatBurstFadeTime || 200;
+
+            // Detect beats and spawn bursts
+            if (beatBurstMode !== 'off') {
+                const beatDetected = state.beatDetector && state.beatDetector.isBeat();
+                const beatEnergy = lowSmooth; // Use bass energy for intensity check
+                const timeSinceLastBurst = time - state.neon.lastBurstTime;
+                const minBurstInterval = 100; // Minimum 100ms between bursts to prevent spam
+
+                if (beatDetected && beatEnergy >= beatBurstIntensityThreshold && timeSinceLastBurst >= minBurstInterval) {
+                    // Spawn bursts based on count
+                    for (let i = 0; i < beatBurstCount; i++) {
+                        const burst = {
+                            x: 0,  // Will be set by spawn mode
+                            y: 0,  // Will be set by spawn mode
+                            age: 0,
+                            lifetime: beatBurstLifetime,
+                            intensity: beatEnergy, // Store spawn intensity
+                            phase: 'growing',
+                            growTime: beatBurstGrowTime,
+                            fadeTime: beatBurstFadeTime
+                        };
+
+                        // Calculate spawn position based on mode
+                        const canvasWidth = state.boundingRect.width;
+                        const canvasHeight = state.boundingRect.height;
+
+                        switch (beatBurstSpawnMode) {
+                            case 'center':
+                                burst.x = canvasWidth / 2;
+                                burst.y = canvasHeight / 2;
+                                break;
+
+                            case 'edges':
+                                const edge = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+                                switch (edge) {
+                                    case 0: // Top
+                                        burst.x = Math.random() * canvasWidth;
+                                        burst.y = 0;
+                                        break;
+                                    case 1: // Right
+                                        burst.x = canvasWidth;
+                                        burst.y = Math.random() * canvasHeight;
+                                        break;
+                                    case 2: // Bottom
+                                        burst.x = Math.random() * canvasWidth;
+                                        burst.y = canvasHeight;
+                                        break;
+                                    case 3: // Left
+                                        burst.x = 0;
+                                        burst.y = Math.random() * canvasHeight;
+                                        break;
+                                }
+                                break;
+
+                            case 'stereo':
+                                // Alternate left/right based on burst count
+                                if (i % 2 === 0) {
+                                    burst.x = canvasWidth * 0.25;
+                                } else {
+                                    burst.x = canvasWidth * 0.75;
+                                }
+                                burst.y = canvasHeight / 2;
+                                break;
+
+                            case 'bass-follow':
+                                // Spawn near bottom-center when bass is strong
+                                burst.x = canvasWidth / 2 + (Math.random() - 0.5) * canvasWidth * 0.3;
+                                burst.y = canvasHeight * (0.6 + Math.random() * 0.3);
+                                break;
+
+                            case 'random':
+                            default:
+                                burst.x = Math.random() * canvasWidth;
+                                burst.y = Math.random() * canvasHeight;
+                                break;
+                        }
+
+                        state.neon.beatBursts.push(burst);
+                    }
+
+                    state.neon.lastBurstTime = time;
+                }
+            }
+
+            // Update beat burst lifecycle and clean up dead bursts
+            const currentTime = performance.now();
+            state.neon.beatBursts = state.neon.beatBursts.filter(burst => {
+                burst.age += 16.67; // Assume ~60fps (16.67ms per frame)
+
+                // Update phase based on age
+                if (burst.age < burst.growTime) {
+                    burst.phase = 'growing';
+                } else if (burst.age > burst.lifetime - burst.fadeTime) {
+                    burst.phase = 'fading';
+                } else {
+                    burst.phase = 'stable';
+                }
+
+                // Remove if dead
+                return burst.age <= burst.lifetime;
+            });
 
             // Hide all line paths for NEON theme
             state.paths.forEach(path => {
@@ -5173,6 +5318,12 @@
                     hueShift = baseHue;
             }
 
+            // Get active color palette (use selected palette or fall back to vibrant)
+            const colorPalette = theme.colorPalette || 'vibrant';
+            const activeHues = theme.colorPalettes && theme.colorPalettes[colorPalette] ?
+                              theme.colorPalettes[colorPalette] :
+                              theme.baseHues; // Fallback to legacy baseHues
+
             // Saturation mapping: use control value as base, modulate with smoothed audio
             const saturationFromLow = lowSmooth * 30; // Bass increases saturation
             const saturationFromHigh = -highSmooth * 20; // Highs decrease saturation
@@ -5206,7 +5357,11 @@
 
             // Create multiple gradient centers for organic look
             // Use meshDensity control to determine number of gradient centers
-            const numBaseCenters = Math.floor(meshDensity);
+            // Add beat breathing: density pulses 30% higher on detected beats
+            const beatDetected = state.beatDetector && state.beatDetector.isBeat();
+            const beatPulse = beatDetected ? 1.3 : 1.0;
+            const densityWithPulse = meshDensity * beatPulse;
+            const numBaseCenters = Math.floor(densityWithPulse);
             const numUserCenters = state.userGradientCenters.length;
 
             // Get or create gradient definitions in defs
@@ -5264,7 +5419,7 @@
                     const frequencyBalance = (high - low) * colorTempIntensity; // -1 to 1 range
                     // Map: -1 (low/cool) = 210 (cyan-blue), +1 (high/warm) = 30 (orange-red)
                     const frequencyHue = 120 - frequencyBalance * 90; // 210 to 30
-                    const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+                    const baseHueOffset = activeHues[i % activeHues.length];
                     hue = ((frequencyHue + baseHueOffset * 0.3 + hueShift * 0.5) % 360);
 
                     // Pastel colors: higher saturation but softer
@@ -5272,7 +5427,7 @@
                     finalLightness = Math.max(60, Math.min(85, lightness + 10)); // Lighter for pastel
                 } else {
                     // Bright mode (default): Original vibrant colors
-                    const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+                    const baseHueOffset = activeHues[i % activeHues.length];
                     hue = (baseHueOffset + hueShift) % 360;
                     finalSaturation = saturation;
                     finalLightness = lightness;
@@ -5341,13 +5496,13 @@
                     // Pastel mode with frequency mapping
                     const frequencyBalance = (high - low) * colorTempIntensity;
                     const frequencyHue = 120 - frequencyBalance * 90;
-                    const baseHue = theme.baseHues[i % theme.baseHues.length];
+                    const baseHue = activeHues[i % activeHues.length];
                     userHue = ((frequencyHue + baseHue * 0.3 + hueShift * 0.5 + 45) % 360);
                     userSaturation = Math.max(40, Math.min(70, saturation * 0.7));
                     userLightness = Math.max(60, Math.min(85, lightness + 10));
                 } else {
                     // Bright mode
-                    userHue = (theme.baseHues[i % theme.baseHues.length] + hueShift + 45) % 360;
+                    userHue = (activeHues[i % activeHues.length] + hueShift + 45) % 360;
                     userSaturation = saturation;
                     userLightness = lightness;
                 }
@@ -5366,6 +5521,92 @@
                     stopElement.setAttribute('offset', stop.offset);
                     stopElement.setAttribute('stop-color', `hsl(${userHue}, ${userSaturation}%, ${userLightness}%)`);
                     stopElement.setAttribute('stop-opacity', stop.opacity * strobeMultiplier);
+                    gradient.appendChild(stopElement);
+                });
+
+                // Create circle with gradient fill
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', radius);
+                circle.setAttribute('fill', `url(#${gradientId})`);
+                circle.setAttribute('filter', 'url(#neon-glow)');
+
+                gradientMeshGroup.appendChild(circle);
+            }
+
+            // Render beat bursts with lifecycle animation
+            for (let i = 0; i < state.neon.beatBursts.length; i++) {
+                const burst = state.neon.beatBursts[i];
+                const cx = burst.x;
+                const cy = burst.y;
+
+                // Calculate lifecycle scale (growing → stable → fading)
+                let scaleMultiplier = 1.0;
+                let opacityMultiplier = 1.0;
+
+                if (burst.phase === 'growing') {
+                    // Ease-out growth from 0 to 1
+                    const progress = burst.age / burst.growTime;
+                    scaleMultiplier = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+                } else if (burst.phase === 'fading') {
+                    // Linear fade from 1 to 0
+                    const fadeProgress = (burst.age - (burst.lifetime - burst.fadeTime)) / burst.fadeTime;
+                    opacityMultiplier = 1 - fadeProgress;
+                }
+                // stable phase: scale = 1.0, opacity = 1.0
+
+                // Calculate size (larger than base centers for visual impact)
+                const baseRadius = Math.max(canvasWidth, canvasHeight) * 0.8;
+                const radius = baseRadius * sizeMultiplier * burstSize * scaleMultiplier * burst.intensity;
+
+                // Create radial gradient for this burst
+                const gradientId = `neon-burst-${i}`;
+                let gradient = defsElement.querySelector(`#${gradientId}`);
+                if (!gradient) {
+                    gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+                    gradient.setAttribute('id', gradientId);
+                    defsElement.appendChild(gradient);
+                }
+
+                gradient.setAttribute('cx', '50%');
+                gradient.setAttribute('cy', '50%');
+                gradient.setAttribute('r', '50%');
+
+                // Use dynamic hue based on color mode (same as base centers)
+                let burstHue, burstSaturation, burstLightness;
+                const baseHueOffset = theme.baseHues[i % theme.baseHues.length];
+
+                if (colorMode === 'gray') {
+                    burstHue = 0;
+                    burstSaturation = 0;
+                    burstLightness = Math.max(0, Math.min(100, lightness));
+                } else if (colorMode === 'pastel') {
+                    const frequencyBalance = (high - low) * colorTempIntensity;
+                    const frequencyHue = 120 - frequencyBalance * 90;
+                    burstHue = ((frequencyHue + baseHueOffset * 0.3 + hueShift * 0.5) % 360);
+                    burstSaturation = Math.max(40, Math.min(70, saturation * 0.7));
+                    burstLightness = Math.max(60, Math.min(85, lightness + 10));
+                } else {
+                    burstHue = (baseHueOffset + hueShift) % 360;
+                    burstSaturation = saturation;
+                    burstLightness = lightness;
+                }
+
+                // Create gradient stops with higher opacity for visual punch
+                const stops = [
+                    { offset: '0%', opacity: 1.0 },
+                    { offset: '30%', opacity: 0.8 },
+                    { offset: '60%', opacity: 0.4 },
+                    { offset: '100%', opacity: 0 }
+                ];
+
+                gradient.innerHTML = '';
+                stops.forEach(stop => {
+                    const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                    stopElement.setAttribute('offset', stop.offset);
+                    stopElement.setAttribute('stop-color', `hsl(${burstHue}, ${burstSaturation}%, ${burstLightness}%)`);
+                    stopElement.setAttribute('stop-opacity', stop.opacity * opacityMultiplier * strobeMultiplier);
                     gradient.appendChild(stopElement);
                 });
 
