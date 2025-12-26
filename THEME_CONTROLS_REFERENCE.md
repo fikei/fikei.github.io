@@ -13,9 +13,10 @@
 | opacity | slider | 0-1 | 0.6 | Line opacity |
 | lineWidth | slider | 1-10 | 3 | Line thickness |
 | backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect intensity |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 5
+**Total Controls**: 6
 
 ---
 
@@ -26,7 +27,7 @@
 |---------|------|-------|---------|-------------|
 | hue | slider | 0-360 | 280 | Base color hue |
 | saturation | slider | 0-100 | 70 | Color saturation |
-| lightness | slider | 0-100 | 50 | Color lightness |
+| brightness | slider | 0-1 | 0.5 | Overall brightness (0-1) |
 | colorMode | select | - | static | Static, Cycle, Pulse, Reactive |
 | colorChangeMode | select | - | static | How colors evolve over time |
 | cycleSpeed | slider | 0-1 | 0.1 | Speed of color cycling (cycle mode) |
@@ -39,9 +40,10 @@
 | smoothing | slider | 0-1 | 0.7 | Audio smoothing (0 = instant, 1 = very smooth) |
 | meshDensity | slider | 4-16 | 8 | Number of gradient centers |
 | backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 15
+**Total Controls**: 16
 
 ---
 
@@ -58,9 +60,10 @@
 | blockSize | slider | 1-50 | 10 | Glitch block size |
 | scanlines | slider | 0-1 | 0.5 | Scanline intensity |
 | colorShift | slider | 0-360 | 0 | Hue shift amount |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 8
+**Total Controls**: 9
 **Note**: Requires image upload to display
 
 ---
@@ -70,10 +73,10 @@
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
-| hue | slider | 0-360 | 217 | Star color hue (blue default) |
-| saturation | slider | 0-100 | 80 | Color saturation |
+| hue | slider | 0-360 | 44 | Star color hue |
+| saturation | slider | 0-100 | 12 | Color saturation |
 | speed | slider | 0-5 | 1.0 | Orbit speed |
-| brightness | slider | 0-2 | 0.8 | Overall star brightness |
+| brightness | slider | 0-1 | 0.8 | Overall star brightness (0-1) |
 | zSpeed | slider | 0-5 | 1.0 | Speed moving towards camera |
 | minOpacity | slider | 0-1 | 0.2 | Minimum star opacity |
 | maxOpacity | slider | 0-1 | 1.0 | Maximum star opacity |
@@ -85,9 +88,10 @@
 | bloom | slider | 0-2 | 0 | Glow/bloom effect |
 | perspective | slider | 0-2 | 1.0 | Depth perspective strength |
 | smoothing | slider | 0-1 | 0.5 | Audio smoothing |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 15
+**Total Controls**: 16
 
 ---
 
@@ -97,24 +101,25 @@
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
 | visualMode | select | - | orbital | Mesh, Orbital, or Mixed mode |
-| layers | slider | 3-12 | 5 | Number of depth layers |
 | hue | slider | 0-360 | 280 | Color hue |
 | saturation | slider | 0-100 | 70 | Color saturation |
-| amplitude | slider | 0-3 | 1.0 | Wave height/displacement |
-| wavelength | slider | 0.1-3 | 1.0 | Wave frequency |
-| lineWidth | slider | 1-5 | 2 | Line thickness |
+| amplitude | slider | 0-3 | 1.2 | Wave height/displacement |
+| wavelength | slider | 0.1-100 | 50 | Wave frequency |
+| lineWidth | slider | 1-5 | 3 | Line thickness |
+| layers | slider | 1-10 | 3 | Number of layers |
 | speed | slider | 0-5 | 1.0 | Animation speed |
-| rotationX | slider | -180-180 | 0 | X-axis rotation |
-| rotationY | slider | -180-180 | 0 | Y-axis rotation |
+| rotationX | slider | 0-2 | 0.3 | X-axis rotation |
+| rotationY | slider | 0-2 | 0.3 | Y-axis rotation |
 | glow | slider | 0-3 | 0 | Glow effect intensity |
 | perspective | slider | 0-2 | 1.0 | Depth perspective |
 | depth | slider | 0-2 | 1.0 | Layer depth spacing |
 | turbulence | slider | 0-2 | 0 | Noise displacement |
 | phaseShift | slider | 0-6.28 | 0 | Wave phase offset |
 | backgroundShift | slider | 0-2 | 1.0 | Camera parallax |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 16
+**Total Controls**: 17
 
 ---
 
@@ -131,12 +136,10 @@
 | perspective | slider | 0-2 | 1.0 | Depth perspective strength |
 | lineWidth | slider | 1-5 | 2 | Ring line thickness |
 | segments | slider | 6-24 | 12 | Polygon segments per ring |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
-**Audio Reactivity**:
-- Bass: Tunnel speed multiplier (movement towards camera)
-- Mid: Rotation speed multiplier
-- High: Brightness boost
-**Total Controls**: 8
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 9
 
 ---
 
@@ -152,9 +155,10 @@
 | complexity | slider | 1-5 | 3 | Number of wave layers |
 | brightness | slider | 0-1 | 0.6 | Overall brightness |
 | contrast | slider | 0-3 | 1.0 | Contrast multiplier |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
-**Audio Reactivity**: TBD
-**Total Controls**: 7 (planned)
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 8
 
 ---
 
@@ -175,6 +179,7 @@
 | trailLength | slider | 0-1 | 0.15 | Motion trail fade amount |
 | bloom | slider | 0-2 | 0 | Glow/bloom intensity |
 | explosionThreshold | slider | 0-1 | 0.3 | Bass level for explosions |
+| bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity (Default Mappings)**:
 - Bass: Particle size boost
@@ -190,7 +195,24 @@
 - Spatial grid optimization in swarm mode handles 5000 particles at 60 FPS
 - Recommended: 1000-2000 particles for smooth performance
 
-**Total Controls**: 12
+**Total Controls**: 13
+
+---
+
+## GLOBAL Controls (Master Controls)
+**Description**: Master controls that affect all themes simultaneously
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| masterIntensity | slider | 0-200 | 100 | Multiplies all size, amplitude, and glow parameters |
+| masterBrightness | slider | 0-200 | 100 | Multiplies all brightness, lightness, and opacity parameters |
+| globalHueShift | slider | -180-180 | 0 | Shifts all hue values (color rotation) |
+| audioSensitivity | slider | 0-300 | 100 | Multiplies all audio reactivity intensity |
+| strobeEnabled | toggle | ON/OFF | OFF | Enable beat-synced strobe effect |
+| strobeRate | buttonGroup | BEAT/1/2/2X | BEAT | Strobe flash rate |
+| bpmDisplay | toggle | ON/OFF | ON | Show BPM in UI |
+
+**Total Controls**: 7
 
 ---
 
@@ -198,16 +220,19 @@
 
 | Theme | Total Controls | Canvas/SVG | Audio Reactive | Supports Transparency |
 |-------|---------------|------------|----------------|---------------------|
-| LINEAR | 5 | SVG | ✅ Per-control | ❌ (Hard switch) |
-| NEON | 15 | SVG | ✅ Per-control | ❌ (Hard switch) |
-| GLITCH | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| STARS | 15 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| WAVE | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| TUNNEL | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| PLASMA | 7 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| PARTICLES | 12 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| LINEAR | 6 | SVG | ✅ Per-control | ❌ (Hard switch) |
+| NEON | 16 | SVG | ✅ Per-control | ❌ (Hard switch) |
+| GLITCH | 9 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| STARS | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| WAVE | 17 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| TUNNEL | 9 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| PLASMA | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| PARTICLES | 13 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| **GLOBAL** | **7** | **N/A** | **❌ Master Controls** | **N/A** |
 
-**TOTAL CONTROLS ACROSS ALL THEMES**: 86 parameters
+**TOTAL THEME CONTROLS**: 94 parameters
+**TOTAL GLOBAL CONTROLS**: 7 parameters
+**GRAND TOTAL**: 101 parameters
 
 ---
 

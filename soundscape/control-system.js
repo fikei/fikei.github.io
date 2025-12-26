@@ -911,6 +911,21 @@ const THEME_CONFIGS = {
       backgroundShift: {
         default: 1.0,
         category: 'motion'
+      },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
       }
     },
     audioReactivity: {
@@ -923,7 +938,8 @@ const THEME_CONFIGS = {
       hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       opacity: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
-      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -991,9 +1007,10 @@ const THEME_CONFIGS = {
         default: 70,
         category: 'color'
       },
-      lightness: {
-        default: 50,
-        category: 'color'
+      brightness: {
+        default: 0.5,
+        category: 'color',
+        description: 'Overall brightness (0-1)'
       },
 
       // Geometry
@@ -1039,6 +1056,21 @@ const THEME_CONFIGS = {
         audioReactive: false,
         description: 'Movement smoothing amount'
       },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
+      },
 
       // Effects
       glow: {
@@ -1060,10 +1092,11 @@ const THEME_CONFIGS = {
       warmCool: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       hue: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
-      lightness: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
+      brightness: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       meshDensity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       blur: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
-      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -1096,6 +1129,21 @@ const THEME_CONFIGS = {
       backgroundShift: {
         default: 1.0,
         category: 'motion'
+      },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
       },
 
       // Effects - Media manipulation
@@ -1140,7 +1188,8 @@ const THEME_CONFIGS = {
       scanlines: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       noise: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       pixelation: { enabled: false, frequency: 'none', intensity: 0.7, mode: 'modulate' },
-      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -1177,6 +1226,21 @@ const THEME_CONFIGS = {
       smoothing: {
         default: 0.5,
         category: 'motion'
+      },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
       },
 
       // Appearance
@@ -1244,7 +1308,8 @@ const THEME_CONFIGS = {
       trailLength: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
       bloom: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
       count: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
-      perspective: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+      perspective: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -1318,6 +1383,21 @@ const THEME_CONFIGS = {
         default: 1.0,
         category: 'motion'
       },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
+      },
 
       // Effects
       glow: {
@@ -1359,7 +1439,8 @@ const THEME_CONFIGS = {
       depth: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       turbulence: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
       phaseShift: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
-      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' }
+      backgroundShift: { enabled: true, frequency: 'bass', intensity: 1.0, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -1390,6 +1471,21 @@ const THEME_CONFIGS = {
         default: 0.5,
         category: 'motion',
         description: 'Ring rotation speed'
+      },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
       },
 
       // Geometry
@@ -1424,7 +1520,8 @@ const THEME_CONFIGS = {
       rings: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       perspective: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
-      segments: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' }
+      segments: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -1472,6 +1569,21 @@ const THEME_CONFIGS = {
         default: 1.0,
         category: 'motion',
         description: 'Animation speed'
+      },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
       }
     },
     audioReactivity: {
@@ -1484,7 +1596,8 @@ const THEME_CONFIGS = {
       saturation: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       contrast: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       scale: { enabled: false, frequency: 'none', intensity: 0.5, mode: 'modulate' },
-      complexity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+      complexity: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },
 
@@ -1553,6 +1666,21 @@ const THEME_CONFIGS = {
         category: 'motion',
         description: 'Velocity damping/friction (0-1)'
       },
+      bpmSync: {
+        type: 'buttonGroup',
+        label: 'BPM SYNC',
+        options: [
+          { value: 'off', label: 'OFF' },
+          { value: '1x', label: '1X' },
+          { value: '2x', label: '2X' },
+          { value: '0.5x', label: '0.5X' },
+          { value: '4x', label: '4X' }
+        ],
+        default: 'off',
+        category: 'motion',
+        audioReactive: false,
+        description: 'Lock animation speed to detected BPM'
+      },
 
       // Effects
       trailLength: {
@@ -1585,7 +1713,104 @@ const THEME_CONFIGS = {
       damping: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' },
       trailLength: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       bloom: { enabled: false, frequency: 'none', intensity: 0.6, mode: 'modulate' },
-      explosionThreshold: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' }
+      explosionThreshold: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // GLOBAL CONTROLS (Affect All Themes)
+  // ─────────────────────────────────────────────────────────
+  global: {
+    name: 'GLOBAL',
+    description: 'Master controls that affect all themes simultaneously',
+    controls: {
+      // Master multipliers
+      masterIntensity: {
+        type: 'slider',
+        label: 'MASTER INTENSITY',
+        min: 0,
+        max: 200,
+        step: 1,
+        default: 100,
+        unit: '%',
+        category: 'master',
+        audioReactive: false,
+        description: 'Multiplies all size, amplitude, and glow parameters'
+      },
+      masterBrightness: {
+        type: 'slider',
+        label: 'MASTER BRIGHTNESS',
+        min: 0,
+        max: 200,
+        step: 1,
+        default: 100,
+        unit: '%',
+        category: 'master',
+        audioReactive: false,
+        description: 'Multiplies all brightness, lightness, and opacity parameters'
+      },
+      globalHueShift: {
+        type: 'slider',
+        label: 'GLOBAL HUE SHIFT',
+        min: -180,
+        max: 180,
+        step: 1,
+        default: 0,
+        unit: '°',
+        category: 'master',
+        audioReactive: false,
+        description: 'Shifts all hue values (color rotation)'
+      },
+      audioSensitivity: {
+        type: 'slider',
+        label: 'AUDIO SENSITIVITY',
+        min: 0,
+        max: 300,
+        step: 1,
+        default: 100,
+        unit: '%',
+        category: 'master',
+        audioReactive: false,
+        description: 'Multiplies all audio reactivity intensity'
+      },
+
+      // Strobe effect
+      strobeEnabled: {
+        type: 'toggle',
+        label: 'STROBE',
+        default: false,
+        category: 'effects',
+        audioReactive: false,
+        description: 'Enable beat-synced brightness strobe'
+      },
+      strobeRate: {
+        type: 'buttonGroup',
+        label: 'STROBE RATE',
+        options: [
+          { value: 'beat', label: 'BEAT' },
+          { value: 'half', label: '1/2' },
+          { value: 'double', label: '2X' }
+        ],
+        default: 'beat',
+        category: 'effects',
+        audioReactive: false,
+        visibleWhen: (state) => state.settings?.global?.strobeEnabled || false,
+        description: 'Strobe flash frequency'
+      },
+
+      // Display options
+      bpmDisplay: {
+        type: 'toggle',
+        label: 'SHOW BPM',
+        default: true,
+        category: 'display',
+        audioReactive: false,
+        description: 'Display detected BPM in UI'
+      }
+    },
+    audioReactivity: {
+      // Global controls are not audio-reactive (they control audio reactivity)
     }
   }
 };

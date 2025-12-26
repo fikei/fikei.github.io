@@ -2765,8 +2765,8 @@
                     blurMultiplier: 20,
                     saturationBase: 85,
                     saturationMultiplier: 15,
-                    lightnessBase: 55,
-                    lightnessRange: 35, // Will range from (55-35) to (55+35) = 20-90%
+                    brightnessBase: 0.55,
+                    brightnessRange: 0.35, // Will range from (0.55-0.35) to (0.55+0.35) = 0.2-0.9
                     bg: '#000000',
                     opacity: 0.9,
                     baseHues: [180, 300, 60, 120, 340], // cyan, magenta, yellow, lime, pink
@@ -2790,23 +2790,54 @@
                 stars: {
                     bg: '#000000',
                     opacity: 1.0,
-                    maxStars: 1200,
-                    hue: 217, // Base color hue (0-360)
-                    brightness: 0.8, // Overall star brightness (0-1)
-                    baseSpeed: 0.00002, // Base orbit speed
-                    speedMultiplier: 3.0, // Audio-reactive speed boost
-                    twinkleIntensity: 20, // How often stars twinkle (higher = less frequent)
-                    alphaMin: 0.2, // Minimum alpha for stars
-                    alphaMax: 1.0, // Maximum alpha for stars
-                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
+                    // Color
+                    hue: 44,
+                    saturation: 12,
+                    brightness: 0.8, // 0-1
+                    // Motion
+                    speed: 1.0,
+                    zSpeed: 0,
+                    backgroundShift: 1.0,
+                    smoothing: 0.5,
+                    bpmSync: 'off', // off, 1x, 2x, 0.5x, 4x
+                    // Appearance
+                    minOpacity: 0.2,
+                    maxOpacity: 1.0,
+                    diameter: 1.0,
+                    // Effects
+                    twinkleRate: 200,
+                    trailLength: 0,
+                    bloom: 0,
+                    // Geometry
+                    count: 1200,
+                    perspective: 1.0,
+                    // Audio
+                    audioBoost: 3.0
                 },
                 wave: {
                     bg: '#000000',
                     opacity: 1.0,
-                    hue: 280, // Purple hue
-                    saturation: 70, // Color saturation
-
-                    // Mesh grid properties
+                    // Color
+                    hue: 280,
+                    saturation: 70,
+                    // Geometry
+                    amplitude: 1.2,
+                    wavelength: 50,
+                    lineWidth: 3,
+                    layers: 3,
+                    // Motion
+                    rotationX: 0.3,
+                    rotationY: 0.3,
+                    speed: 1.0,
+                    backgroundShift: 1.0,
+                    bpmSync: 'off', // off, 1x, 2x, 0.5x, 4x
+                    // Effects
+                    glow: 0,
+                    perspective: 1.0,
+                    depth: 1.0,
+                    turbulence: 0,
+                    phaseShift: 0,
+                    // Legacy properties (for backward compatibility)
                     gridDensity: {
                         low: { cols: 15, rows: 10 },
                         medium: { cols: 20, rows: 12 },
@@ -2815,21 +2846,14 @@
                     nodeSize: 3,
                     noiseScale: 0.05,
                     distortionIntensity: 1.5,
-                    speed: 1.0,
-                    glow: 1.0,
-
-                    // Orbital dots
                     dotCount: 200,
                     orbitRadius: 100,
                     dotSize: 2,
-
-                    // Color modes
                     colorModes: {
                         mono: { baseHue: 0, saturation: 0 },
                         warm: { baseHue: 30, saturation: 60 },
                         cool: { baseHue: 200, saturation: 60 }
-                    },
-                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
+                    }
                 },
                 tunnel: {
                     bg: '#000000',
@@ -3439,6 +3463,117 @@
                     state.layerManager.soloLayer(layerId);
                     soloBtn.classList.toggle('active');
                 });
+            }
+        }
+
+        // =====================================================
+        // GLOBAL MODIFIER HELPER FUNCTIONS
+        // =====================================================
+
+        /**
+         * Apply global modifiers to a value based on type
+         * @param {number} value - The base value to modify
+         * @param {string} type - The type of modification ('size', 'brightness', 'hue', 'audio')
+         * @returns {number} - The modified value
+         */
+        function applyGlobalModifiers(value, type) {
+            const global = config.global;
+
+            switch(type) {
+                case 'size':
+                case 'amplitude':
+                case 'glow':
+                case 'scale':
+                    // Multiply by masterIntensity (100 = 1.0x, 200 = 2.0x, 0 = 0x)
+                    return value * (global.masterIntensity / 100);
+
+                case 'brightness':
+                case 'lightness':
+                case 'opacity':
+                    // Multiply by masterBrightness (100 = 1.0x, 200 = 2.0x, 0 = 0x)
+                    return value * (global.masterBrightness / 100);
+
+                case 'hue':
+                    // Add globalHueShift (-180 to +180 degrees)
+                    return (value + global.globalHueShift + 360) % 360;
+
+                case 'audio':
+                    // Multiply audio reactivity by audioSensitivity (100 = 1.0x, 300 = 3.0x)
+                    return value * (global.audioSensitivity / 100);
+
+                default:
+                    return value;
+            }
+        }
+
+        /**
+         * Get BPM-synced speed based on detected BPM and sync mode
+         * @param {number} baseSpeed - The base animation speed
+         * @param {string} bpmSyncMode - The sync mode ('off', '1x', '2x', '0.5x', '4x')
+         * @returns {number} - The BPM-synced speed
+         */
+        function getBPMSyncedSpeed(baseSpeed, bpmSyncMode) {
+            if (bpmSyncMode === 'off' || !state.bpmDetector) {
+                return baseSpeed;
+            }
+
+            const bpm = state.bpmDetector.getCurrentBPM();
+            if (!bpm || bpm === 0) {
+                return baseSpeed; // No BPM detected, use base speed
+            }
+
+            // Calculate BPM multiplier based on mode
+            const multipliers = {
+                '1x': 1.0,
+                '2x': 2.0,
+                '0.5x': 0.5,
+                '4x': 4.0
+            };
+
+            const multiplier = multipliers[bpmSyncMode] || 1.0;
+
+            // Normalize to 120 BPM baseline
+            // At 120 BPM with 1x, speed should be baseSpeed
+            // At 60 BPM with 1x, speed should be baseSpeed * 0.5
+            // At 240 BPM with 1x, speed should be baseSpeed * 2.0
+            return baseSpeed * (bpm / 120) * multiplier;
+        }
+
+        /**
+         * Apply strobe effect based on beat detection
+         * @returns {number} - Strobe multiplier (0-1, where 1 = full brightness)
+         */
+        function applyStrobe() {
+            const global = config.global;
+
+            if (!global.strobeEnabled || !state.beatDetector) {
+                return 1.0; // No strobe, full brightness
+            }
+
+            const isBeat = state.beatDetector.isBeat();
+            if (!isBeat) {
+                return 1.0; // Not on beat, full brightness
+            }
+
+            // Calculate strobe based on rate
+            const beatProgress = state.beatDetector.getBeatProgress(); // 0-1 within beat
+
+            switch(global.strobeRate) {
+                case 'beat':
+                    // Flash on every beat
+                    return beatProgress < 0.1 ? 0.0 : 1.0; // 10% flash duration
+
+                case 'half':
+                    // Flash on every other beat
+                    const beatCount = state.beatDetector.getBeatCount();
+                    return (beatCount % 2 === 0 && beatProgress < 0.1) ? 0.0 : 1.0;
+
+                case 'double':
+                    // Flash twice per beat
+                    return (beatProgress < 0.05 || (beatProgress >= 0.5 && beatProgress < 0.55)) ? 0.0 : 1.0;
+
+                default:
+                    return 1.0;
             }
         }
 
@@ -4706,7 +4841,8 @@
             const glow = window.audioEngine ? (window.audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
             const baseHue = window.audioEngine ? (window.audioEngine.getValue('neon', 'hue') || 280) : 280;
             const baseSaturationControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'saturation') || 70) : 70;
-            const baseLightnessControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'lightness') || 50) : 50;
+            const baseBrightnessControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'brightness') || 0.5) : 0.5;
+            const baseLightnessControl = baseBrightnessControl * 100; // Convert 0-1 to 0-100 for HSL
             const blur = window.audioEngine ? (window.audioEngine.getValue('neon', 'blur') || 0) : 0;
             const responsiveness = window.audioEngine ? (window.audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
             const smoothing = window.audioEngine ? (window.audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
@@ -5059,10 +5195,10 @@
             const saturationFromHigh = -high * 20;
             const saturation = Math.max(0, Math.min(100, baseSaturation + saturationFromLow + saturationFromHigh));
 
-            // Lightness
-            const lightnessFromLow = -low * theme.lightnessRange * 0.5;
-            const lightnessFromHigh = high * theme.lightnessRange * 0.7;
-            const lightness = theme.lightnessBase + lightnessFromLow + lightnessFromHigh;
+            // Brightness (convert from 0-1 to 0-100 for HSL lightness)
+            const lightnessFromLow = -low * theme.brightnessRange * 100 * 0.5;
+            const lightnessFromHigh = high * theme.brightnessRange * 100 * 0.7;
+            const lightness = (theme.brightnessBase * 100) + lightnessFromLow + lightnessFromHigh;
 
             // Blur based on bass
             const blurRadius = theme.blurBase + low * theme.blurMultiplier;
