@@ -3879,27 +3879,47 @@
         async function enumerateAudioDevices() {
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
-                state.audioDevices = devices.filter(device => device.kind === 'audioinput');
 
-                console.log(`🎤 Found ${state.audioDevices.length} audio input devices:`, state.audioDevices);
+                // Filter to only show actual available audio inputs
+                // Exclude: devices without labels, "default", and "communications" (which are aliases)
+                state.audioDevices = devices.filter(device => {
+                    if (device.kind !== 'audioinput') return false;
+
+                    // Must have a label (means it's accessible)
+                    if (!device.label || device.label.trim() === '') return false;
+
+                    // Exclude "default" and "communications" pseudo-devices (they're just aliases)
+                    if (device.deviceId === 'default' || device.deviceId === 'communications') return false;
+
+                    return true;
+                });
+
+                console.log(`🎤 Found ${state.audioDevices.length} available audio input devices:`, state.audioDevices);
 
                 // Update UI
                 const select = document.getElementById('audioSourceSelect');
-                if (select && state.audioDevices.length > 0) {
-                    select.innerHTML = '';
+                if (select) {
+                    if (state.audioDevices.length > 0) {
+                        select.innerHTML = '';
 
-                    state.audioDevices.forEach((device, index) => {
-                        const option = document.createElement('option');
-                        option.value = device.deviceId;
-                        // Use device label or fallback to generic name
-                        const label = device.label || `Audio Input ${index + 1}`;
-                        option.textContent = label;
-                        select.appendChild(option);
-                    });
+                        state.audioDevices.forEach((device, index) => {
+                            const option = document.createElement('option');
+                            option.value = device.deviceId;
+                            option.textContent = device.label;
+                            select.appendChild(option);
+                        });
 
-                    // Select current device if set
-                    if (state.selectedAudioDeviceId) {
-                        select.value = state.selectedAudioDeviceId;
+                        // Select current device if set, otherwise select first device
+                        if (state.selectedAudioDeviceId) {
+                            select.value = state.selectedAudioDeviceId;
+                        } else if (state.audioDevices.length > 0) {
+                            // Auto-select the first available device
+                            state.selectedAudioDeviceId = state.audioDevices[0].deviceId;
+                            select.value = state.selectedAudioDeviceId;
+                        }
+                    } else {
+                        // No devices available
+                        select.innerHTML = '<option value="">No audio inputs available</option>';
                     }
                 }
             } catch (err) {
