@@ -1507,6 +1507,31 @@ const THEME_CONFIGS = {
         default: 12,
         category: 'geometry',
         description: 'Segments per ring (roundness)'
+      },
+      shape: {
+        type: 'buttonGroup',
+        label: 'SHAPE',
+        options: [
+          { value: 'circle', label: 'CIRCLE' },
+          { value: 'square', label: 'SQUARE' },
+          { value: 'triangle', label: 'TRIANGLE' },
+          { value: 'hexagon', label: 'HEXAGON' },
+          { value: 'star', label: 'STAR' }
+        ],
+        default: 'circle',
+        category: 'geometry',
+        audioReactive: false,
+        description: 'Geometric shape of tunnel rings'
+      },
+      smoothing: {
+        default: 0.0,
+        category: 'geometry',
+        description: 'Edge smoothing (0-1)'
+      },
+      curvature: {
+        default: 0.0,
+        category: 'geometry',
+        description: 'Path curvature/warp (-1 to 1)'
       }
     },
     audioReactivity: {
@@ -1521,6 +1546,9 @@ const THEME_CONFIGS = {
       perspective: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       lineWidth: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
       segments: { enabled: false, frequency: 'none', intensity: 0.2, mode: 'modulate' },
+      shape: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' },
+      smoothing: { enabled: false, frequency: 'none', intensity: 0.3, mode: 'modulate' },
+      curvature: { enabled: false, frequency: 'none', intensity: 0.4, mode: 'modulate' },
       bpmSync: { enabled: false, frequency: 'none', intensity: 0, mode: 'modulate' }
     }
   },

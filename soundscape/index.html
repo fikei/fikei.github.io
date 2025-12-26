@@ -3729,6 +3729,9 @@
                     speed: 1.0, // Base animation speed
                     rotation: 0.5, // Rotation speed
                     segments: 12, // Number of segments per ring (more = rounder)
+                    shape: 'circle', // Shape: circle, square, triangle, hexagon, star
+                    smoothing: 0.0, // Edge smoothing (0-1)
+                    curvature: 0.0, // Path curvature/warp (-1 to 1)
                     bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 plasma: {
@@ -8162,6 +8165,9 @@
             const perspective = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'perspective') || theme.perspective) : theme.perspective;
             const baseLineWidth = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'lineWidth') || theme.lineWidth) : theme.lineWidth;
             const segments = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'segments') || theme.segments) : theme.segments;
+            const shape = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'shape') || theme.shape) : theme.shape;
+            const smoothing = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'smoothing') || theme.smoothing) : theme.smoothing;
+            const curvature = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'curvature') || theme.curvature) : theme.curvature;
             const bpmSync = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'bpmSync') || 'off') : 'off';
 
             // Apply global modifiers
@@ -8209,8 +8215,93 @@
             const rotationSpeed = rotation * (1 + mid);
             const rotationAngle = time * rotationSpeed * 0.001;
 
+            // Helper function to get vertices for different shapes
+            const getShapeVertices = (shape, segments, radius, bassPulse, rotationAngle) => {
+                const vertices = [];
+
+                if (shape === 'circle') {
+                    // Circle: smooth polygon with many segments
+                    for (let seg = 0; seg <= segments; seg++) {
+                        const angle = (seg / segments) * Math.PI * 2 + rotationAngle;
+                        vertices.push({
+                            x: Math.cos(angle) * radius * bassPulse,
+                            y: Math.sin(angle) * radius * bassPulse
+                        });
+                    }
+                } else if (shape === 'square') {
+                    // Square: 4 vertices
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i / 4) * Math.PI * 2 + rotationAngle + Math.PI / 4;
+                        vertices.push({
+                            x: Math.cos(angle) * radius * bassPulse,
+                            y: Math.sin(angle) * radius * bassPulse
+                        });
+                    }
+                    vertices.push(vertices[0]); // Close path
+                } else if (shape === 'triangle') {
+                    // Triangle: 3 vertices
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (i / 3) * Math.PI * 2 + rotationAngle - Math.PI / 2;
+                        vertices.push({
+                            x: Math.cos(angle) * radius * bassPulse,
+                            y: Math.sin(angle) * radius * bassPulse
+                        });
+                    }
+                    vertices.push(vertices[0]); // Close path
+                } else if (shape === 'hexagon') {
+                    // Hexagon: 6 vertices
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + rotationAngle;
+                        vertices.push({
+                            x: Math.cos(angle) * radius * bassPulse,
+                            y: Math.sin(angle) * radius * bassPulse
+                        });
+                    }
+                    vertices.push(vertices[0]); // Close path
+                } else if (shape === 'star') {
+                    // Star: 5 points with inner and outer radius
+                    const points = 5;
+                    const innerRadius = radius * 0.5; // Inner radius is 50% of outer
+                    for (let i = 0; i < points * 2; i++) {
+                        const angle = (i / (points * 2)) * Math.PI * 2 + rotationAngle - Math.PI / 2;
+                        const r = (i % 2 === 0) ? radius : innerRadius;
+                        vertices.push({
+                            x: Math.cos(angle) * r * bassPulse,
+                            y: Math.sin(angle) * r * bassPulse
+                        });
+                    }
+                    vertices.push(vertices[0]); // Close path
+                }
+
+                return vertices;
+            };
+
+            // Helper function to apply curvature transformation
+            const applyCurvature = (x, y, depth, curvature) => {
+                if (curvature === 0) return { x, y };
+
+                // Apply radial warp based on distance from center and depth
+                const dist = Math.sqrt(x * x + y * y);
+                const warpAmount = curvature * depth * 0.5;
+                const warpFactor = 1 + warpAmount * (dist / 100);
+
+                return {
+                    x: x * warpFactor,
+                    y: y * warpFactor
+                };
+            };
+
             ctx.save();
             ctx.translate(centerX, centerY);
+
+            // Apply smoothing settings
+            if (smoothing > 0) {
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+            } else {
+                ctx.lineJoin = 'miter';
+                ctx.lineCap = 'butt';
+            }
 
             // Draw rings from back to front
             for (let i = 0; i < ringCount; i++) {
@@ -8240,17 +8331,27 @@
                 ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness}%, ${alpha * strobeMultiplier})`;
                 ctx.lineWidth = lineWidth * scale;
 
-                // Draw ring as polygon
-                ctx.beginPath();
-                for (let seg = 0; seg <= segments; seg++) {
-                    const angle = (seg / segments) * Math.PI * 2 + rotationAngle;
-                    const x = Math.cos(angle) * radius * bassPulse;
-                    const y = Math.sin(angle) * radius * bassPulse;
+                // Get vertices for the selected shape
+                const vertices = getShapeVertices(shape, segments, radius, bassPulse, rotationAngle);
 
-                    if (seg === 0) {
-                        ctx.moveTo(x, y);
+                // Draw shape with curvature applied
+                ctx.beginPath();
+                for (let v = 0; v < vertices.length; v++) {
+                    const { x, y } = applyCurvature(vertices[v].x, vertices[v].y, depth, curvature);
+
+                    if (smoothing > 0 && v > 0 && v < vertices.length - 1 && shape === 'circle') {
+                        // Apply bezier smoothing for circles
+                        const prevV = vertices[v - 1];
+                        const { x: prevX, y: prevY } = applyCurvature(prevV.x, prevV.y, depth, curvature);
+                        const cpX = prevX + (x - prevX) * smoothing;
+                        const cpY = prevY + (y - prevY) * smoothing;
+                        ctx.quadraticCurveTo(cpX, cpY, x, y);
                     } else {
-                        ctx.lineTo(x, y);
+                        if (v === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
                     }
                 }
                 ctx.closePath();
@@ -8267,17 +8368,21 @@
                         ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness * 0.5}%, ${alpha * 0.5 * strobeMultiplier})`;
                         ctx.lineWidth = lineWidth * scale * 0.5;
 
-                        for (let seg = 0; seg < segments; seg += 3) {
-                            const angle = (seg / segments) * Math.PI * 2 + rotationAngle;
-                            const x1 = Math.cos(angle) * prevRadius * bassPulse;
-                            const y1 = Math.sin(angle) * prevRadius * bassPulse;
-                            const x2 = Math.cos(angle) * radius * bassPulse;
-                            const y2 = Math.sin(angle) * radius * bassPulse;
+                        // Get vertices for previous ring
+                        const prevVertices = getShapeVertices(shape, segments, prevRadius, bassPulse, rotationAngle);
 
-                            ctx.beginPath();
-                            ctx.moveTo(x1, y1);
-                            ctx.lineTo(x2, y2);
-                            ctx.stroke();
+                        // Connect corresponding vertices (every 3rd vertex for performance)
+                        const step = Math.max(1, Math.floor(vertices.length / 12));
+                        for (let v = 0; v < vertices.length; v += step) {
+                            if (v < prevVertices.length) {
+                                const { x: x1, y: y1 } = applyCurvature(prevVertices[v].x, prevVertices[v].y, prevDepth, curvature);
+                                const { x: x2, y: y2 } = applyCurvature(vertices[v].x, vertices[v].y, depth, curvature);
+
+                                ctx.beginPath();
+                                ctx.moveTo(x1, y1);
+                                ctx.lineTo(x2, y2);
+                                ctx.stroke();
+                            }
                         }
                     }
                 }
