@@ -161,6 +161,18 @@
   - ✅ Caused "Unexpected end of input" error
   - **Impact:** Application now loads without syntax errors
 
+- [x] **Audio input dropdown blank** ✅ - Device detection fix
+  - ✅ Detect active device from audioStream.getAudioTracks()
+  - ✅ Add current device to list if not already present
+  - ✅ Fallback to "Microphone (Active)" if stream active but no devices enumerated
+  - **Impact:** Audio source dropdown now shows active microphone
+
+- [x] **BPM display not initializing** ✅ - UI initialization fix
+  - ✅ Call updateBPMDisplay() at end of setupBeatSyncUI()
+  - ✅ Added debug logging for missing elements
+  - ✅ Confidence now shows "0%" on load instead of "--"
+  - **Impact:** BPM panel displays correctly on initialization, beat indicators update
+
 ---
 
 ## 📋 ROADMAP (Prioritized)
