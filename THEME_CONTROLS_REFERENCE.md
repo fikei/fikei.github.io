@@ -1,0 +1,247 @@
+# Theme Controls Reference
+## Soundscape Audio-Reactive Visualizer - Complete Control Listing
+
+---
+
+## LINEAR Theme
+**Visual Style**: Animated SVG paths with smooth motion
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| hue | slider | 0-360 | 280 | Color hue (purple default) |
+| saturation | slider | 0-100 | 0 | Color saturation (0 = grayscale) |
+| opacity | slider | 0-1 | 0.6 | Line opacity |
+| lineWidth | slider | 1-10 | 3 | Line thickness |
+| backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect intensity |
+
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 5
+
+---
+
+## NEON Theme
+**Visual Style**: SVG gradient mesh with organic movement
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| hue | slider | 0-360 | 280 | Base color hue |
+| saturation | slider | 0-100 | 70 | Color saturation |
+| lightness | slider | 0-100 | 50 | Color lightness |
+| colorMode | select | - | static | Static, Cycle, Pulse, Reactive |
+| colorChangeMode | select | - | static | How colors evolve over time |
+| cycleSpeed | slider | 0-1 | 0.1 | Speed of color cycling (cycle mode) |
+| warmCool | slider | 0-1 | 0.5 | Color temperature (warm/cool) |
+| burstSize | slider | 0.1-5 | 1.0 | Gradient sphere size |
+| movement | slider | 0-2 | 1.0 | Gradient movement intensity |
+| glow | slider | 0-5 | 1.5 | Glow/bloom effect intensity |
+| blur | slider | 0-20 | 0 | Blur effect amount |
+| responsiveness | slider | 0-3 | 1.0 | Audio response sensitivity |
+| smoothing | slider | 0-1 | 0.7 | Audio smoothing (0 = instant, 1 = very smooth) |
+| meshDensity | slider | 4-16 | 8 | Number of gradient centers |
+| backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect |
+
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 15
+
+---
+
+## GLITCH Theme
+**Visual Style**: RGB channel-separated glitch effect (requires loaded image)
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| rotation | slider | 0-360 | 0 | Image rotation angle |
+| glitchIntensity | slider | 0-2 | 1.0 | Overall glitch effect strength |
+| contrast | slider | 0-3 | 1.0 | Image contrast |
+| channelOffset | slider | 0-50 | 5 | RGB channel separation distance |
+| displacement | slider | 0-100 | 10 | Glitch displacement amount |
+| blockSize | slider | 1-50 | 10 | Glitch block size |
+| scanlines | slider | 0-1 | 0.5 | Scanline intensity |
+| colorShift | slider | 0-360 | 0 | Hue shift amount |
+
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 8
+**Note**: Requires image upload to display
+
+---
+
+## STARS Theme
+**Visual Style**: 3D star field with perspective depth
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| hue | slider | 0-360 | 217 | Star color hue (blue default) |
+| saturation | slider | 0-100 | 80 | Color saturation |
+| speed | slider | 0-5 | 1.0 | Orbit speed |
+| brightness | slider | 0-2 | 0.8 | Overall star brightness |
+| zSpeed | slider | 0-5 | 1.0 | Speed moving towards camera |
+| minOpacity | slider | 0-1 | 0.2 | Minimum star opacity |
+| maxOpacity | slider | 0-1 | 1.0 | Maximum star opacity |
+| diameter | slider | 0.1-3 | 1.0 | Star size multiplier |
+| twinkleRate | slider | 0-100 | 20 | Twinkle frequency (higher = less) |
+| audioBoost | slider | 0-10 | 3.0 | Audio reactivity intensity |
+| count | slider | 100-1200 | 600 | Number of stars |
+| trailLength | slider | 0-1 | 0 | Motion trail length |
+| bloom | slider | 0-2 | 0 | Glow/bloom effect |
+| perspective | slider | 0-2 | 1.0 | Depth perspective strength |
+| smoothing | slider | 0-1 | 0.5 | Audio smoothing |
+
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 15
+
+---
+
+## WAVE Theme
+**Visual Style**: 3D geometric mesh with orbiting particles
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| visualMode | select | - | orbital | Mesh, Orbital, or Mixed mode |
+| layers | slider | 3-12 | 5 | Number of depth layers |
+| hue | slider | 0-360 | 280 | Color hue |
+| saturation | slider | 0-100 | 70 | Color saturation |
+| amplitude | slider | 0-3 | 1.0 | Wave height/displacement |
+| wavelength | slider | 0.1-3 | 1.0 | Wave frequency |
+| lineWidth | slider | 1-5 | 2 | Line thickness |
+| speed | slider | 0-5 | 1.0 | Animation speed |
+| rotationX | slider | -180-180 | 0 | X-axis rotation |
+| rotationY | slider | -180-180 | 0 | Y-axis rotation |
+| glow | slider | 0-3 | 0 | Glow effect intensity |
+| perspective | slider | 0-2 | 1.0 | Depth perspective |
+| depth | slider | 0-2 | 1.0 | Layer depth spacing |
+| turbulence | slider | 0-2 | 0 | Noise displacement |
+| phaseShift | slider | 0-6.28 | 0 | Wave phase offset |
+| backgroundShift | slider | 0-2 | 1.0 | Camera parallax |
+
+**Audio Reactivity**: Each control can map to 25+ audio features
+**Total Controls**: 16
+
+---
+
+## TUNNEL Theme (NEW)
+**Visual Style**: 3D perspective tunnel with concentric rings
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| hue | slider | 0-360 | 180 | Color hue (cyan default) |
+| saturation | slider | 0-100 | 80 | Color saturation |
+| speed | slider | 0-5 | 1.0 | Tunnel movement speed |
+| rotation | slider | 0-2 | 0.5 | Rotation speed |
+| rings | slider | 10-100 | 50 | Number of rings |
+| perspective | slider | 0-2 | 1.0 | Depth perspective strength |
+| lineWidth | slider | 1-5 | 2 | Ring line thickness |
+| segments | slider | 6-24 | 12 | Polygon segments per ring |
+
+**Audio Reactivity**:
+- Bass: Tunnel speed multiplier (movement towards camera)
+- Mid: Rotation speed multiplier
+- High: Brightness boost
+**Total Controls**: 8
+
+---
+
+## PLASMA Theme (IN PROGRESS)
+**Visual Style**: Organic sine wave interference patterns
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| hue | slider | 0-360 | 280 | Base color hue |
+| saturation | slider | 0-100 | 85 | Color saturation |
+| scale | slider | 1-10 | 3.0 | Wave frequency/scale |
+| speed | slider | 0-5 | 1.0 | Animation speed |
+| complexity | slider | 1-5 | 3 | Number of wave layers |
+| brightness | slider | 0-1 | 0.6 | Overall brightness |
+| contrast | slider | 0-3 | 1.0 | Contrast multiplier |
+
+**Audio Reactivity**: TBD
+**Total Controls**: 7 (planned)
+
+---
+
+## PARTICLES Theme (PLANNED)
+**Visual Style**: Particle system with physics
+
+| Control | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| count | slider | 100-5000 | 1000 | Number of particles |
+| size | slider | 1-10 | 2 | Particle size |
+| speed | slider | 0-5 | 1.0 | Particle velocity |
+| gravity | slider | -2-2 | 0 | Gravity force |
+| damping | slider | 0-1 | 0.98 | Velocity damping |
+| hue | slider | 0-360 | 180 | Particle color |
+| saturation | slider | 0-100 | 80 | Color saturation |
+| mode | select | - | explode | Explode, Converge, Swarm, Orbit |
+
+**Audio Reactivity**: TBD
+**Total Controls**: 8 (planned)
+
+---
+
+## Summary
+
+| Theme | Total Controls | Canvas/SVG | Audio Reactive | Supports Transparency |
+|-------|---------------|------------|----------------|---------------------|
+| LINEAR | 5 | SVG | ✅ Per-control | ❌ (Hard switch) |
+| NEON | 15 | SVG | ✅ Per-control | ❌ (Hard switch) |
+| GLITCH | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| STARS | 15 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| WAVE | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| TUNNEL | 8 | Canvas | ✅ Fixed mapping | ✅ (When implemented) |
+| PLASMA | 7 | Canvas | 🚧 TBD | ✅ (When implemented) |
+| PARTICLES | 8 | Canvas | 🚧 TBD | ✅ (When implemented) |
+
+**TOTAL CONTROLS ACROSS ALL THEMES**: 82+ parameters
+
+---
+
+## Audio Reactivity Sources (Available for All Controls)
+
+Each theme control can be mapped to any of these 25+ audio features:
+
+### Frequency Bands
+- Sub-bass (20-60 Hz)
+- Bass (60-250 Hz)
+- Low-mids (250-500 Hz)
+- Mids (500-2000 Hz)
+- High-mids (2000-4000 Hz)
+- Highs (4000-6000 Hz)
+- Brilliance (6000+ Hz)
+
+### Amplitude Features
+- Peak
+- RMS
+- Decibels
+
+### Rhythm Features
+- Beat
+- Onset
+- BPM
+
+### Spectral Features (Meyda)
+- Spectral Centroid
+- Spectral Flux
+- Spectral Rolloff
+- Spectral Flatness
+- Spectral Spread
+- Loudness
+- Zero Crossing Rate
+- Chroma
+
+### Modulation
+- Each control has intensity slider (0-100%)
+- Inverted mapping option
+- Range limiting
+
+---
+
+## Usage Notes
+
+1. **Per-Control Audio Reactivity**: Every slider can react to music independently
+2. **Theme Switching**: Use Beat Pad for instant scene changes
+3. **Layer Blending**: Canvas themes (GLITCH, STARS, WAVE, TUNNEL, PLASMA, PARTICLES) will support smooth opacity blending
+4. **SVG Themes**: LINEAR and NEON use vector graphics (better quality) but hard-switch when crossfading
+5. **Performance**: More complex themes (NEON, WAVE) may impact frame rate on older hardware
+
+---
+
+Last Updated: 2025-12-26

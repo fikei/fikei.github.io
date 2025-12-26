@@ -2159,6 +2159,7 @@
                 <option value="stars">STARS</option>
                 <option value="wave">WAVE</option>
                 <option value="tunnel">TUNNEL</option>
+                <option value="plasma">PLASMA</option>
             </select>
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
@@ -2212,6 +2213,7 @@
                     <option value="stars">STARS</option>
                     <option value="wave">WAVE</option>
                     <option value="tunnel">TUNNEL</option>
+                    <option value="plasma">PLASMA</option>
                 </select>
                 <div class="layer-opacity">
                     <span class="layer-opacity-label">OPACITY</span>
@@ -2243,6 +2245,7 @@
                     <option value="stars">STARS</option>
                     <option value="wave">WAVE</option>
                     <option value="tunnel">TUNNEL</option>
+                    <option value="plasma">PLASMA</option>
                 </select>
                 <div class="layer-opacity">
                     <span class="layer-opacity-label">OPACITY</span>
@@ -2821,6 +2824,29 @@
                     speed: 1.0, // Base animation speed
                     rotation: 0.5, // Rotation speed
                     segments: 12 // Number of segments per ring (more = rounder)
+                },
+                plasma: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    hue: 280, // Purple by default
+                    saturation: 85,
+                    scale: 3.0, // Wave scale/frequency
+                    speed: 1.0, // Animation speed
+                    complexity: 3, // Number of sine wave layers (1-5)
+                    brightness: 0.6, // Overall brightness (0-1)
+                    contrast: 1.0 // Contrast multiplier
+                },
+                particles: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    count: 1000, // Number of particles
+                    size: 2, // Particle size
+                    speed: 1.0, // Base velocity
+                    gravity: 0, // Gravity force
+                    damping: 0.98, // Velocity damping
+                    hue: 180, // Cyan
+                    saturation: 80,
+                    mode: 'explode' // explode, converge, swarm
                 }
             }
         };
@@ -6215,6 +6241,155 @@
         }
 
         // =====================================================
+        // PLASMA THEME RENDERING
+        // =====================================================
+
+        function drawLinesPlasma() {
+            const theme = config.themes.plasma;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            // Get values from control system (with fallbacks)
+            const hue = window.audioEngine ? (window.audioEngine.getValue('plasma', 'hue') || theme.hue) : theme.hue;
+            const saturation = window.audioEngine ? (window.audioEngine.getValue('plasma', 'saturation') || theme.saturation) : theme.saturation;
+            const scale = window.audioEngine ? (window.audioEngine.getValue('plasma', 'scale') || theme.scale) : theme.scale;
+            const speed = window.audioEngine ? (window.audioEngine.getValue('plasma', 'speed') || theme.speed) : theme.speed;
+            const complexity = window.audioEngine ? (window.audioEngine.getValue('plasma', 'complexity') || theme.complexity) : theme.complexity;
+            const brightness = window.audioEngine ? (window.audioEngine.getValue('plasma', 'brightness') || theme.brightness) : theme.brightness;
+            const contrast = window.audioEngine ? (window.audioEngine.getValue('plasma', 'contrast') || theme.contrast) : theme.contrast;
+
+            // Hide SVG paths for PLASMA theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
+
+            // Get or create plasma canvas
+            let plasmaCanvas = document.getElementById('plasma-canvas');
+            if (!plasmaCanvas) {
+                plasmaCanvas = document.createElement('canvas');
+                plasmaCanvas.id = 'plasma-canvas';
+                plasmaCanvas.style.position = 'fixed';
+                plasmaCanvas.style.top = '0';
+                plasmaCanvas.style.left = '0';
+                plasmaCanvas.style.width = '100%';
+                plasmaCanvas.style.height = '100%';
+                plasmaCanvas.style.pointerEvents = 'none';
+                plasmaCanvas.style.zIndex = '0';
+                document.body.insertBefore(plasmaCanvas, document.body.firstChild);
+            }
+
+            const ctx = plasmaCanvas.getContext('2d');
+            const w = plasmaCanvas.width = state.boundingRect.width;
+            const h = plasmaCanvas.height = state.boundingRect.height;
+
+            // Clear canvas
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Audio-reactive parameters
+            const timeSpeed = speed * (1 + low * 0.5);
+            const t = time * timeSpeed * 0.0001;
+
+            // Pixel-by-pixel plasma effect (optimized - every 4th pixel)
+            const imageData = ctx.createImageData(w, h);
+            const data = imageData.data;
+
+            const step = 4; // Render every 4th pixel for performance
+
+            for (let y = 0; y < h; y += step) {
+                for (let x = 0; x < w; x += step) {
+                    // Normalized coordinates
+                    const nx = x / w;
+                    const ny = y / h;
+
+                    // Multiple sine wave interference
+                    let value = 0;
+
+                    // Layer 1: Horizontal waves
+                    value += Math.sin((nx * scale + t) * Math.PI * 2);
+
+                    // Layer 2: Vertical waves
+                    value += Math.sin((ny * scale + t * 0.7) * Math.PI * 2);
+
+                    if (complexity >= 2) {
+                        // Layer 3: Diagonal waves
+                        value += Math.sin(((nx + ny) * scale * 0.7 + t * 0.5) * Math.PI * 2);
+                    }
+
+                    if (complexity >= 3) {
+                        // Layer 4: Radial from center
+                        const dx = nx - 0.5;
+                        const dy = ny - 0.5;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        value += Math.sin((dist * scale * 2 + t) * Math.PI * 2);
+                    }
+
+                    if (complexity >= 4) {
+                        // Layer 5: Spiral
+                        const dx = nx - 0.5;
+                        const dy = ny - 0.5;
+                        const angle = Math.atan2(dy, dx);
+                        value += Math.sin((angle * 2 + t * 0.3) * Math.PI);
+                    }
+
+                    if (complexity >= 5) {
+                        // Layer 6: Noise-like
+                        value += Math.sin((nx * ny * scale * 5 + t * 0.8) * Math.PI * 2);
+                    }
+
+                    // Normalize value to 0-1
+                    value = (value / complexity + 1) * 0.5;
+
+                    // Apply contrast
+                    value = Math.pow(value, contrast);
+
+                    // Audio-reactive brightness boost
+                    const audioBoost = mid * 0.3 + high * 0.2;
+                    value = Math.min(1, value * brightness + audioBoost);
+
+                    // Convert to color
+                    const colorHue = (hue + value * 60) % 360;
+                    const lightness = value * 70 + 15; // 15-85% range
+
+                    // Convert HSL to RGB
+                    const c = (1 - Math.abs(2 * (lightness / 100) - 1)) * (saturation / 100);
+                    const x2 = c * (1 - Math.abs(((colorHue / 60) % 2) - 1));
+                    const m = (lightness / 100) - c / 2;
+
+                    let r, g, b;
+                    if (colorHue < 60) {
+                        r = c; g = x2; b = 0;
+                    } else if (colorHue < 120) {
+                        r = x2; g = c; b = 0;
+                    } else if (colorHue < 180) {
+                        r = 0; g = c; b = x2;
+                    } else if (colorHue < 240) {
+                        r = 0; g = x2; b = c;
+                    } else if (colorHue < 300) {
+                        r = x2; g = 0; b = c;
+                    } else {
+                        r = c; g = 0; b = x2;
+                    }
+
+                    r = Math.floor((r + m) * 255);
+                    g = Math.floor((g + m) * 255);
+                    b = Math.floor((b + m) * 255);
+
+                    // Fill 4x4 block for performance
+                    for (let dy = 0; dy < step && y + dy < h; dy++) {
+                        for (let dx = 0; dx < step && x + dx < w; dx++) {
+                            const i = ((y + dy) * w + (x + dx)) * 4;
+                            data[i] = r;
+                            data[i + 1] = g;
+                            data[i + 2] = b;
+                            data[i + 3] = 255;
+                        }
+                    }
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        // =====================================================
         // TUNNEL THEME RENDERING
         // =====================================================
 
@@ -6355,7 +6530,8 @@
             glitch: drawLinesGlitch,
             stars: drawLinesStars,
             wave: drawLinesWave,
-            tunnel: drawLinesTunnel
+            tunnel: drawLinesTunnel,
+            plasma: drawLinesPlasma
         };
 
         function drawLines() {
