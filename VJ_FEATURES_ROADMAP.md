@@ -10,7 +10,7 @@
 - [x] 59 granular controls across all themes
 - [x] Per-control audio reactivity (unique!)
 - [x] 7-band frequency analysis (sub-bass to brilliance)
-- [x] Beat detection (energy-based kick detection, tuned for breakbeat/complex rhythms)
+- [x] Beat detection (adaptive algorithm with local peak detection, works for all genres)
 - [x] BPM detection (auto tempo tracking)
 - [x] Onset detection
 

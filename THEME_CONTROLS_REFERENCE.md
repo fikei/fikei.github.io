@@ -391,7 +391,7 @@ MIDI messages send values 0-127. Soundscape automatically transforms these to ma
 - Fixed syntax error (missing closing brace in `applyStrobe()`)
 - Fixed audio input dropdown (now detects and shows active microphone)
 - Fixed BPM display initialization (confidence and beat indicators now update correctly)
-- Improved beat detection sensitivity for breakbeat/complex rhythms (threshold: 1.3x → 1.15x)
+- Completely rewrote beat detection with adaptive algorithm (1.05-1.3x threshold based on variance + local peak detection)
 
 ---
 
