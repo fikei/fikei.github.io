@@ -4707,8 +4707,18 @@
                     return state.settings.theme || 'linear';
                 },
                 switchTheme(theme) {
+                    // Update state first
+                    state.settings.theme = theme;
+
+                    // Then update UI
                     if (controlSystemUI) {
                         controlSystemUI.showTheme(theme);
+                    }
+
+                    // Update theme select dropdown
+                    const themeSelect = document.getElementById('themeSelect');
+                    if (themeSelect && themeSelect.value !== theme) {
+                        themeSelect.value = theme;
                     }
                 },
                 get themeConfig() {
