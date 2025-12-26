@@ -4670,32 +4670,14 @@
                 return 1.0; // No strobe, full brightness
             }
 
-            const isBeat = state.beatDetector.isBeat();
+            const isBeat = state.audioLevels && state.audioLevels._beatDetected;
             if (!isBeat) {
                 return 1.0; // Not on beat, full brightness
             }
 
-            // Calculate strobe based on rate
-            const beatProgress = state.beatDetector.getBeatProgress(); // 0-1 within beat
-
-            switch(global.strobeRate) {
-                case 'beat':
-                    // Flash on every beat
-                    return beatProgress < 0.1 ? 0.0 : 1.0; // 10% flash duration
-
-                case 'half':
-                    // Flash on every other beat
-                    const beatCount = state.beatDetector.getBeatCount();
-                    return (beatCount % 2 === 0 && beatProgress < 0.1) ? 0.0 : 1.0;
-
-                case 'double':
-                    // Flash twice per beat
-                    return (beatProgress < 0.05 || (beatProgress >= 0.5 && beatProgress < 0.55)) ? 0.0 : 1.0;
-
-                default:
-                    return 1.0;
-            }
-        }
+            // Simple strobe flash on beat (10% duration)
+            // TODO: Full strobe implementation with beatProgress and beatCount
+            return state.beatDetector.beatStrength > 0.5 ? 0.0 : 1.0;
 
         // =====================================================
         // INITIALIZATION
@@ -6129,7 +6111,7 @@
 
             // Detect beats and spawn bursts
             if (beatBurstMode !== 'off') {
-                const beatDetected = state.beatDetector && state.beatDetector.isBeat();
+                const beatDetected = state.audioLevels && state.audioLevels._beatDetected;
                 const beatEnergy = lowSmooth; // Use bass energy for intensity check
                 const timeSinceLastBurst = time - state.neon.lastBurstTime;
                 const minBurstInterval = 100; // Minimum 100ms between bursts to prevent spam
@@ -6336,7 +6318,7 @@
             // Create multiple gradient centers for organic look
             // Use meshDensity control to determine number of gradient centers
             // Add beat breathing: density pulses 30% higher on detected beats
-            const beatDetected = state.beatDetector && state.beatDetector.isBeat();
+            const beatDetected = state.audioLevels && state.audioLevels._beatDetected;
             const beatPulse = beatDetected ? 1.3 : 1.0;
             const densityWithPulse = meshDensity * beatPulse;
             const numBaseCenters = Math.floor(densityWithPulse);
