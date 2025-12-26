@@ -1894,6 +1894,245 @@
             cursor: pointer;
         }
 
+        /* ===== MIDI PANEL ===== */
+        .midi-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 2px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .midi-panel h3 {
+            margin-bottom: 1rem;
+            font-size: 10px;
+        }
+
+        .midi-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 2px;
+            margin-bottom: 0.75rem;
+            font-size: 8px;
+        }
+
+        .midi-status-icon {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .midi-status-icon.connected {
+            color: #0f0;
+            animation: midi-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes midi-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .midi-status-text {
+            color: #999;
+        }
+
+        .midi-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 8px;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .midi-devices {
+            margin-bottom: 0.75rem;
+        }
+
+        .midi-device-list {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 2px;
+            padding: 0.5rem;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .midi-device-item {
+            font-size: 8px;
+            color: #ccc;
+            padding: 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .midi-device-icon {
+            color: #0f0;
+            font-size: 8px;
+        }
+
+        .midi-learn-btn {
+            width: 100%;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 10px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+        }
+
+        .midi-learn-btn:hover:not(:disabled) {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        .midi-learn-btn.active {
+            background: #ff6600;
+            color: #fff;
+            border-color: #ff6600;
+            animation: midi-learn-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes midi-learn-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .midi-learn-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .midi-learn-icon {
+            font-size: 14px;
+        }
+
+        .midi-mappings {
+            margin-bottom: 0.75rem;
+        }
+
+        .midi-mapping-list {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 2px;
+            padding: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .midi-mapping-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem;
+            margin-bottom: 0.25rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+            font-size: 7px;
+        }
+
+        .midi-mapping-info {
+            flex: 1;
+        }
+
+        .midi-mapping-source {
+            color: #0f0;
+            font-weight: 600;
+        }
+
+        .midi-mapping-target {
+            color: #999;
+        }
+
+        .midi-mapping-remove {
+            background: none;
+            border: none;
+            color: #f00;
+            cursor: pointer;
+            font-size: 10px;
+            padding: 0 0.3rem;
+            opacity: 0.6;
+            transition: opacity 0.15s ease;
+        }
+
+        .midi-mapping-remove:hover {
+            opacity: 1;
+        }
+
+        .midi-clear-btn {
+            background: none;
+            border: none;
+            color: #f00;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+            opacity: 0.6;
+            transition: opacity 0.15s ease;
+        }
+
+        .midi-clear-btn:hover {
+            opacity: 1;
+        }
+
+        .midi-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .midi-action-btn {
+            flex: 1;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 8px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+        }
+
+        .midi-action-btn:hover {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        .midi-activity {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 7px;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 2px;
+        }
+
+        .midi-activity-label {
+            color: #666;
+        }
+
+        .midi-activity-value {
+            color: #0f0;
+            font-family: monospace;
+        }
+
         /* ===== RESPONSIVE DESIGN ===== */
         @media (max-width: 768px) {
             .sidebar {
@@ -2379,6 +2618,54 @@
                     <span>B</span>
                 </div>
                 <input type="range" class="crossfader" id="crossfader" min="0" max="1" step="0.01" value="0">
+            </div>
+        </section>
+
+        <!-- MIDI Settings Panel -->
+        <section class="midi-panel" id="midiPanel">
+            <h3>MIDI CONTROL</h3>
+
+            <!-- MIDI Status -->
+            <div class="midi-status" id="midiStatus">
+                <span class="midi-status-icon" id="midiStatusIcon">●</span>
+                <span class="midi-status-text" id="midiStatusText">Checking...</span>
+            </div>
+
+            <!-- Connected Devices -->
+            <div class="midi-devices" id="midiDevicesSection" style="display: none;">
+                <div class="midi-section-header">CONNECTED DEVICES</div>
+                <div class="midi-device-list" id="midiDeviceList"></div>
+            </div>
+
+            <!-- MIDI Learn Button -->
+            <button class="midi-learn-btn" id="midiLearnBtn" disabled>
+                <span class="midi-learn-icon">🎹</span>
+                <span class="midi-learn-text">MIDI LEARN</span>
+            </button>
+
+            <!-- Active Mappings -->
+            <div class="midi-mappings" id="midiMappingsSection" style="display: none;">
+                <div class="midi-section-header">
+                    <span>ACTIVE MAPPINGS (<span id="midiMappingCount">0</span>)</span>
+                    <button class="midi-clear-btn" id="midiClearAllBtn" title="Clear All">✕</button>
+                </div>
+                <div class="midi-mapping-list" id="midiMappingList"></div>
+            </div>
+
+            <!-- Export/Import -->
+            <div class="midi-actions" id="midiActionsSection" style="display: none;">
+                <button class="midi-action-btn" id="midiExportBtn">
+                    <span>↓</span> EXPORT
+                </button>
+                <button class="midi-action-btn" id="midiImportBtn">
+                    <span>↑</span> IMPORT
+                </button>
+            </div>
+
+            <!-- MIDI Activity Indicator (minimal) -->
+            <div class="midi-activity" id="midiActivity" style="display: none;">
+                <span class="midi-activity-label">LAST:</span>
+                <span class="midi-activity-value" id="midiActivityValue">--</span>
             </div>
         </section>
 
@@ -4065,6 +4352,241 @@
         }
 
         // =====================================================
+        // MIDI UI SETUP
+        // =====================================================
+
+        function setupMIDIUI() {
+            if (!state.midiManager) return;
+
+            const midiManager = state.midiManager;
+
+            // Get UI elements
+            const statusIcon = document.getElementById('midiStatusIcon');
+            const statusText = document.getElementById('midiStatusText');
+            const devicesSection = document.getElementById('midiDevicesSection');
+            const deviceList = document.getElementById('midiDeviceList');
+            const learnBtn = document.getElementById('midiLearnBtn');
+            const mappingsSection = document.getElementById('midiMappingsSection');
+            const mappingList = document.getElementById('midiMappingList');
+            const mappingCount = document.getElementById('midiMappingCount');
+            const clearAllBtn = document.getElementById('midiClearAllBtn');
+            const actionsSection = document.getElementById('midiActionsSection');
+            const exportBtn = document.getElementById('midiExportBtn');
+            const importBtn = document.getElementById('midiImportBtn');
+            const activitySection = document.getElementById('midiActivity');
+            const activityValue = document.getElementById('midiActivityValue');
+
+            // Update status based on MIDI support
+            function updateMIDIStatus() {
+                if (!midiManager.isSupported()) {
+                    statusIcon.classList.remove('connected');
+                    statusText.textContent = 'MIDI not supported in this browser';
+                    learnBtn.disabled = true;
+                    return;
+                }
+
+                const deviceList = midiManager.getDeviceList();
+                const hasDevices = deviceList.inputs.length > 0;
+
+                if (hasDevices) {
+                    statusIcon.classList.add('connected');
+                    statusText.textContent = `${deviceList.inputs.length} device(s) connected`;
+                    learnBtn.disabled = false;
+                } else {
+                    statusIcon.classList.remove('connected');
+                    statusText.textContent = 'No MIDI devices detected';
+                    learnBtn.disabled = true;
+                }
+            }
+
+            // Update device list
+            function updateDeviceList() {
+                if (!deviceList) return;
+
+                const devices = midiManager.getDeviceList();
+
+                if (devices.inputs.length === 0) {
+                    devicesSection.style.display = 'none';
+                    return;
+                }
+
+                devicesSection.style.display = 'block';
+                deviceList.innerHTML = '';
+
+                devices.inputs.forEach(device => {
+                    const item = document.createElement('div');
+                    item.className = 'midi-device-item';
+                    item.innerHTML = `
+                        <span class="midi-device-icon">●</span>
+                        <span>${device.name}</span>
+                    `;
+                    deviceList.appendChild(item);
+                });
+            }
+
+            // Update mapping list
+            function updateMappingList() {
+                if (!mappingList || !mappingCount) return;
+
+                const mappings = midiManager.getMappingList();
+
+                mappingCount.textContent = mappings.length;
+
+                if (mappings.length === 0) {
+                    mappingsSection.style.display = 'none';
+                    actionsSection.style.display = 'none';
+                    return;
+                }
+
+                mappingsSection.style.display = 'block';
+                actionsSection.style.display = 'flex';
+                mappingList.innerHTML = '';
+
+                mappings.forEach(mapping => {
+                    const item = document.createElement('div');
+                    item.className = 'midi-mapping-item';
+
+                    // Format MIDI source
+                    let source = '';
+                    if (mapping.midi.type === 'cc') {
+                        source = `CC${mapping.midi.cc}`;
+                    } else if (mapping.midi.type === 'noteOn') {
+                        source = `Note ${mapping.midi.note}`;
+                    }
+
+                    // Format target control
+                    const target = mapping.target.controlId;
+
+                    item.innerHTML = `
+                        <div class="midi-mapping-info">
+                            <div class="midi-mapping-source">${source}</div>
+                            <div class="midi-mapping-target">→ ${target}</div>
+                        </div>
+                        <button class="midi-mapping-remove" data-mapping-id="${mapping.id}">✕</button>
+                    `;
+
+                    mappingList.appendChild(item);
+                });
+
+                // Add remove handlers
+                mappingList.querySelectorAll('.midi-mapping-remove').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const mappingId = e.target.dataset.mappingId;
+                        // Find the mapping key
+                        const mapping = mappings.find(m => m.id === mappingId);
+                        if (mapping) {
+                            const key = mapping.midi.type === 'cc'
+                                ? `cc_${mapping.midi.cc}_ch${mapping.midi.channel}`
+                                : `note_${mapping.midi.note}_ch${mapping.midi.channel}`;
+                            midiManager.removeMapping(key);
+                        }
+                    });
+                });
+            }
+
+            // MIDI Learn button
+            if (learnBtn) {
+                learnBtn.addEventListener('click', () => {
+                    if (midiManager.learnMode) {
+                        midiManager.exitLearnMode();
+                        learnBtn.classList.remove('active');
+                        learnBtn.querySelector('.midi-learn-text').textContent = 'MIDI LEARN';
+                    } else {
+                        // Enter learn mode - next control clicked will be mapped
+                        alert('MIDI Learn Mode:\n\n1. Click any control (slider, button, etc.)\n2. Move a MIDI controller (knob, fader, pad)\n3. Mapping will be created automatically\n\nPress Escape to cancel.');
+                        // Note: The actual learn mode will be activated when a control is clicked
+                        // This is just to show the user how it works
+                    }
+                });
+            }
+
+            // Clear all mappings
+            if (clearAllBtn) {
+                clearAllBtn.addEventListener('click', () => {
+                    if (confirm('Clear all MIDI mappings?')) {
+                        midiManager.clearAllMappings();
+                    }
+                });
+            }
+
+            // Export mappings
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => {
+                    const json = midiManager.exportMappings();
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'soundscape-midi-mappings.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            }
+
+            // Import mappings
+            if (importBtn) {
+                importBtn.addEventListener('click', () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.json';
+                    input.onchange = (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                                const success = midiManager.importMappings(event.target.result);
+                                if (success) {
+                                    alert('MIDI mappings imported successfully!');
+                                } else {
+                                    alert('Failed to import MIDI mappings. Invalid file format.');
+                                }
+                            };
+                            reader.readAsText(file);
+                        }
+                    };
+                    input.click();
+                });
+            }
+
+            // Set up callbacks
+            midiManager.onDeviceChange = (devices) => {
+                updateMIDIStatus();
+                updateDeviceList();
+            };
+
+            midiManager.onMappingChange = (mappings) => {
+                updateMappingList();
+            };
+
+            midiManager.onMIDIMessage = (activity) => {
+                // Update activity indicator
+                if (activityValue && activitySection) {
+                    activitySection.style.display = 'flex';
+                    let displayValue = '';
+                    if (activity.type === 'cc') {
+                        displayValue = `CC${activity.value}`;
+                    } else if (activity.type === 'noteOn') {
+                        displayValue = `Note ${activity.value}`;
+                    }
+                    activityValue.textContent = displayValue;
+
+                    // Flash animation
+                    activityValue.style.opacity = '1';
+                    setTimeout(() => {
+                        activityValue.style.opacity = '0.5';
+                    }, 100);
+                }
+            };
+
+            // Initial UI update
+            updateMIDIStatus();
+            updateDeviceList();
+            updateMappingList();
+
+            console.log('✅ MIDI UI initialized');
+        }
+
+        // =====================================================
         // GLOBAL MODIFIER HELPER FUNCTIONS
         // =====================================================
 
@@ -4272,8 +4794,10 @@
                     console.log('✅ MIDI system initialized');
                     console.log(`   📱 MIDI Inputs: ${state.midiManager.inputs.size}`);
                     console.log(`   🎹 MIDI Outputs: ${state.midiManager.outputs.size}`);
+                    setupMIDIUI();
                 } else {
                     console.log('ℹ️ MIDI not available (browser may not support Web MIDI API)');
+                    setupMIDIUI(); // Still setup UI to show "not supported" message
                 }
             }
 
