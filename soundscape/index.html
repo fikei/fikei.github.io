@@ -3041,6 +3041,8 @@
                 // Convert to BPM
                 const bpm = 60000 / medianInterval;
 
+                console.log(`📊 BPM Calculation: ${bpm.toFixed(1)} BPM (median interval: ${medianInterval.toFixed(0)}ms, ${this.beatTimes.length} beats)`);
+
                 // Clamp to realistic range
                 if (bpm >= 60 && bpm <= 200) {
                     this.lastBPM = bpm;
@@ -3048,6 +3050,10 @@
                     // Calculate confidence based on interval consistency
                     const stdDev = Math.sqrt(intervals.reduce((sum, i) => sum + Math.pow(i - medianInterval, 2), 0) / intervals.length);
                     this.confidence = Math.max(0, 1 - (stdDev / medianInterval));
+
+                    console.log(`✅ BPM accepted: ${bpm.toFixed(1)} BPM, confidence: ${(this.confidence * 100).toFixed(0)}%`);
+                } else {
+                    console.warn(`⚠️ BPM rejected: ${bpm.toFixed(1)} BPM (out of range 60-200)`);
                 }
 
                 return this.lastBPM;
