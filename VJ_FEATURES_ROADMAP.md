@@ -38,21 +38,33 @@
 
 ## 🚧 IN PROGRESS
 
-### Multi-Layer Compositing (Phase 1)
-- [ ] LayerManager class implementation ✅ (CREATED)
-- [ ] 2-layer system (A/B)
-- [ ] Layer opacity control
-- [ ] Blend modes (Normal, Add, Multiply, Screen)
-- [ ] Crossfader between layers
-- [ ] Layer UI panel
+### New Themes (HIGH PRIORITY)
+- [ ] TUNNEL theme - 3D perspective vortex (canvas-based)
+- [ ] PLASMA theme - Organic blob waves with shader (canvas-based)
+- [ ] PARTICLES theme - Swarm/explosion system (canvas-based)
 
-### Beat Sync Enhancements (Phase 1)
-- [ ] BeatSyncManager class implementation ✅ (CREATED)
-- [ ] BPM display UI
-- [ ] Tap tempo button
-- [ ] Beat flash indicator (4 quarter notes)
-- [ ] Confidence meter display
-- [ ] Quantized Beat Pad triggers
+### Multi-Layer Compositing - HYBRID APPROACH
+- [x] LayerManager class implementation ✅ (CREATED)
+- [x] 2-layer system (A/B) ✅ (CREATED)
+- [x] Crossfader between layers ✅ (CREATED)
+- [x] Layer UI panel ✅ (CREATED)
+- [x] Simplified theme switching at 50% ✅ (WORKING)
+- [ ] **TRUE TRANSPARENCY** for canvas themes (GLITCH, STARS, WAVE, PLASMA, TUNNEL, PARTICLES)
+- [ ] Layer opacity control (functional for canvas themes)
+- [ ] Blend modes (Normal, Add, Multiply, Screen) for canvas themes
+- [ ] SVG themes (LINEAR, NEON) keep instant switch behavior
+
+### Beat Sync & UI Enhancements
+- [x] BeatSyncManager class implementation ✅ (CREATED)
+- [x] BPM display UI ✅ (CREATED)
+- [x] Tap tempo button ✅ (CREATED)
+- [x] Beat flash indicator (4 quarter notes) ✅ (CREATED)
+- [x] Confidence meter display ✅ (CREATED)
+- [x] Quantized Beat Pad triggers ✅ (CREATED)
+- [x] Audio source selection (mic vs audio input) ✅ (CREATED)
+- [x] Debug mode toggle ✅ (CREATED)
+- [x] Beat Pad status header ✅ (CREATED)
+- [x] Theme badges on scenes ✅ (CREATED)
 
 ---
 
@@ -99,6 +111,52 @@
 - [ ] FPS limiter/target selector
 - [ ] Performance monitor overlay
 - [ ] Low-latency mode
+
+---
+
+### PHASE 1.5: Theme Expansion & Transparency System
+**Goal**: Add compelling new themes + smooth layer blending
+**Timeline**: 1-2 weeks
+
+#### 1.5.1 High Priority Themes (Canvas-Based)
+- [ ] **TUNNEL** - 3D perspective vortex
+  - Infinite tunnel pulling viewer in
+  - Rings pulsing to bass
+  - Tunnel speed = BPM, ring size = bass, rotation = mids
+  - Complexity: 🟢 Low (similar to STARS)
+  - VJ Value: 🔥 High (classic VJ effect)
+
+- [ ] **PLASMA** - Organic blob waves
+  - Swirling, morphing color fields (lava lamp effect)
+  - Shader-based sine wave interference
+  - Wave frequency = highs, amplitude = bass, color shift = mids
+  - Complexity: 🟡 Medium (WebGL fragment shader)
+  - VJ Value: 🔥 High (hypnotic, psychedelic)
+
+- [ ] **PARTICLES** - Swarm/explosion system
+  - Thousands of particles exploding/converging to music
+  - Particle physics with audio control
+  - Particle count = intensity, velocity = bass hits, color = spectrum
+  - Complexity: 🟢 Low (like STARS but with physics)
+  - VJ Value: 🔥 High (reactive bursts on drops)
+
+#### 1.5.2 Hybrid Transparency System
+- [ ] Detect canvas vs SVG themes
+- [ ] Implement alpha blending for canvas themes (GLITCH, STARS, WAVE, PLASMA, TUNNEL, PARTICLES)
+- [ ] Keep instant switch for SVG themes (LINEAR, NEON)
+- [ ] Make opacity sliders functional for canvas layers
+- [ ] Add blend modes: Normal, Add, Multiply, Screen, Overlay
+- [ ] Smooth crossfade transitions for same-theme layers
+- [ ] Visual feedback showing which themes support transparency
+
+**Result**: 6/8 themes will have beautiful smooth blending, 2/8 will hard-switch
+
+#### 1.5.3 Medium Priority Themes (Future)
+- [ ] SCOPE - Classic waveform oscilloscope (canvas)
+- [ ] KALEIDOSCOPE - Symmetrical mirrors (canvas transform)
+- [ ] MESH - 3D deforming grid (WebGL vertex shader)
+- [ ] FRACTAL - Mandelbrot/Julia zoom (WebGL fragment shader)
+- [ ] FLUID - Real-time fluid simulation (WebGL compute shader)
 
 ---
 
