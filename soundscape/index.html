@@ -4765,12 +4765,21 @@
             const opacityValue = window.audioEngine ? window.audioEngine.getValue('linear', 'opacity') : null;
             const lineWidthValue = window.audioEngine ? window.audioEngine.getValue('linear', 'lineWidth') : null;
             const backgroundShiftValue = window.audioEngine ? window.audioEngine.getValue('linear', 'backgroundShift') : null;
+            const bpmSyncValue = window.audioEngine ? window.audioEngine.getValue('linear', 'bpmSync') : null;
 
-            const hue = hueValue !== null && hueValue !== undefined ? hueValue : (theme.hue !== undefined ? theme.hue : 280);
+            const baseHue = hueValue !== null && hueValue !== undefined ? hueValue : (theme.hue !== undefined ? theme.hue : 280);
             const saturation = saturationValue !== null && saturationValue !== undefined ? saturationValue : (theme.saturation !== undefined ? theme.saturation : 0);
-            const opacity = opacityValue !== null && opacityValue !== undefined ? opacityValue : theme.opacity;
-            const lineWidth = lineWidthValue !== null && lineWidthValue !== undefined ? lineWidthValue : 3;
-            const backgroundShift = backgroundShiftValue !== null && backgroundShiftValue !== undefined ? backgroundShiftValue : 1.0;
+            const baseOpacity = opacityValue !== null && opacityValue !== undefined ? opacityValue : theme.opacity;
+            const baseLineWidth = lineWidthValue !== null && lineWidthValue !== undefined ? lineWidthValue : 3;
+            const baseBackgroundShift = backgroundShiftValue !== null && backgroundShiftValue !== undefined ? backgroundShiftValue : 1.0;
+            const bpmSync = bpmSyncValue !== null && bpmSyncValue !== undefined ? bpmSyncValue : 'off';
+
+            // Apply global modifiers
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const opacity = applyGlobalModifiers(baseOpacity, 'opacity');
+            const lineWidth = applyGlobalModifiers(baseLineWidth, 'size');
+            const backgroundShift = getBPMSyncedSpeed(baseBackgroundShift, bpmSync);
+            const strobeMultiplier = applyStrobe();
 
             // Calculate background shift transform
             const shiftX = state.backgroundShift ? state.backgroundShift.x * backgroundShift : 0;
@@ -4785,7 +4794,7 @@
 
             // Calculate overall audio energy for dramatic effect
             const totalEnergy = (low + mid + high) / 3;
-            const dynamicOpacity = opacity + totalEnergy * theme.opacityMultiplier;
+            const dynamicOpacity = (opacity + totalEnergy * theme.opacityMultiplier) * strobeMultiplier;
 
             state.lines.forEach((points, lineIndex) => {
                 if (points.length < 2 || !state.paths[lineIndex]) return;
@@ -4818,7 +4827,7 @@
                     path.removeAttribute('transform');
                 }
 
-                path.setAttribute('opacity', Math.min(1.0, dynamicOpacity));
+                path.setAttribute('opacity', Math.max(0, Math.min(1.0, dynamicOpacity)));
                 path.setAttribute('stroke-width', lineWidth);
 
                 // Update stroke color from control system
@@ -4836,27 +4845,37 @@
             const colorChangeMode = window.audioEngine ? (window.audioEngine.getValue('neon', 'colorChangeMode') || 'static') : 'static';
             const cycleSpeed = window.audioEngine ? (window.audioEngine.getValue('neon', 'cycleSpeed') || 0.1) : 0.1;
             const warmCool = window.audioEngine ? (window.audioEngine.getValue('neon', 'warmCool') || state.settings.colorTemp) : state.settings.colorTemp;
-            const burstSize = window.audioEngine ? (window.audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
-            const movement = window.audioEngine ? (window.audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
-            const glow = window.audioEngine ? (window.audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
+            const baseBurstSize = window.audioEngine ? (window.audioEngine.getValue('neon', 'burstSize') || state.settings.burstSize) : state.settings.burstSize;
+            const baseMovement = window.audioEngine ? (window.audioEngine.getValue('neon', 'movement') || 1.0) : 1.0;
+            const baseGlow = window.audioEngine ? (window.audioEngine.getValue('neon', 'glow') || 1.5) : 1.5;
             const baseHue = window.audioEngine ? (window.audioEngine.getValue('neon', 'hue') || 280) : 280;
             const baseSaturationControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'saturation') || 70) : 70;
             const baseBrightnessControl = window.audioEngine ? (window.audioEngine.getValue('neon', 'brightness') || 0.5) : 0.5;
-            const baseLightnessControl = baseBrightnessControl * 100; // Convert 0-1 to 0-100 for HSL
             const blur = window.audioEngine ? (window.audioEngine.getValue('neon', 'blur') || 0) : 0;
             const responsiveness = window.audioEngine ? (window.audioEngine.getValue('neon', 'responsiveness') || 1.0) : 1.0;
             const smoothing = window.audioEngine ? (window.audioEngine.getValue('neon', 'smoothing') || 0.7) : 0.7;
             const meshDensity = window.audioEngine ? (window.audioEngine.getValue('neon', 'meshDensity') || 8) : 8;
-            const backgroundShift = window.audioEngine ? (window.audioEngine.getValue('neon', 'backgroundShift') || 1.0) : 1.0;
+            const baseBackgroundShift = window.audioEngine ? (window.audioEngine.getValue('neon', 'backgroundShift') || 1.0) : 1.0;
+            const bpmSync = window.audioEngine ? (window.audioEngine.getValue('neon', 'bpmSync') || 'off') : 'off';
+
+            // Apply global modifiers
+            const burstSize = applyGlobalModifiers(baseBurstSize, 'size');
+            const movement = getBPMSyncedSpeed(baseMovement, bpmSync);
+            const glow = applyGlobalModifiers(baseGlow, 'glow');
+            const hue = applyGlobalModifiers(baseHue, 'hue');
+            const brightnessControl = applyGlobalModifiers(baseBrightnessControl, 'brightness');
+            const baseLightnessControl = brightnessControl * 100; // Convert 0-1 to 0-100 for HSL
+            const backgroundShift = getBPMSyncedSpeed(baseBackgroundShift, bpmSync);
+            const strobeMultiplier = applyStrobe();
 
             // Initialize NEON state if needed (for smoothing and reactive mode)
             if (!state.neon) {
                 state.neon = {
                     smoothedAudio: { low: 0, mid: 0, high: 0 },
-                    reactiveHue: baseHue,
+                    reactiveHue: hue,
                     lastBeatTime: 0,
-                    targetHue: baseHue,
-                    currentHue: baseHue
+                    targetHue: hue,
+                    currentHue: hue
                 };
             }
 
@@ -5057,7 +5076,7 @@
                     const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
                     stopElement.setAttribute('offset', stop.offset);
                     stopElement.setAttribute('stop-color', `hsl(${hue}, ${finalSaturation}%, ${finalLightness}%)`);
-                    stopElement.setAttribute('stop-opacity', stop.opacity);
+                    stopElement.setAttribute('stop-opacity', stop.opacity * strobeMultiplier);
                     gradient.appendChild(stopElement);
                 });
 
@@ -5131,7 +5150,7 @@
                     const stopElement = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
                     stopElement.setAttribute('offset', stop.offset);
                     stopElement.setAttribute('stop-color', `hsl(${userHue}, ${userSaturation}%, ${userLightness}%)`);
-                    stopElement.setAttribute('stop-opacity', stop.opacity);
+                    stopElement.setAttribute('stop-opacity', stop.opacity * strobeMultiplier);
                     gradient.appendChild(stopElement);
                 });
 
@@ -5308,15 +5327,25 @@
             if (!img) return;
 
             // Get values from control system (with fallbacks)
-            const rotation = window.audioEngine ? (window.audioEngine.getValue('glitch', 'rotation') || state.settings.rotationIntensity) : state.settings.rotationIntensity;
-            const glitchIntensityControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'glitchIntensity') || state.settings.glitchEffectIntensity) : state.settings.glitchEffectIntensity;
-            const contrast = window.audioEngine ? (window.audioEngine.getValue('glitch', 'contrast') || 1.0) : 1.0;
-            const channelOffsetControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'channelOffset') || 5) : 5;
-            const displacementControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'displacement') || 10) : 10;
+            const baseRotation = window.audioEngine ? (window.audioEngine.getValue('glitch', 'rotation') || state.settings.rotationIntensity) : state.settings.rotationIntensity;
+            const baseGlitchIntensityControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'glitchIntensity') || state.settings.glitchEffectIntensity) : state.settings.glitchEffectIntensity;
+            const baseContrast = window.audioEngine ? (window.audioEngine.getValue('glitch', 'contrast') || 1.0) : 1.0;
+            const baseChannelOffsetControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'channelOffset') || 5) : 5;
+            const baseDisplacementControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'displacement') || 10) : 10;
             const scanlinesControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'scanlines') || 0) : 0;
             const noiseControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'noise') || 0) : 0;
             const pixelationControl = window.audioEngine ? (window.audioEngine.getValue('glitch', 'pixelation') || 1) : 1;
-            const backgroundShift = window.audioEngine ? (window.audioEngine.getValue('glitch', 'backgroundShift') || 1.0) : 1.0;
+            const baseBackgroundShift = window.audioEngine ? (window.audioEngine.getValue('glitch', 'backgroundShift') || 1.0) : 1.0;
+            const bpmSync = window.audioEngine ? (window.audioEngine.getValue('glitch', 'bpmSync') || 'off') : 'off';
+
+            // Apply global modifiers
+            const rotation = getBPMSyncedSpeed(baseRotation, bpmSync);
+            const glitchIntensityControl = applyGlobalModifiers(baseGlitchIntensityControl, 'amplitude');
+            const contrast = baseContrast; // No global modifier for contrast
+            const channelOffsetControl = applyGlobalModifiers(baseChannelOffsetControl, 'size');
+            const displacementControl = applyGlobalModifiers(baseDisplacementControl, 'size');
+            const backgroundShift = getBPMSyncedSpeed(baseBackgroundShift, bpmSync);
+            const strobeMultiplier = applyStrobe();
 
             // Calculate glitch parameters with user intensity multipliers
             const glitchEffectIntensity = glitchIntensityControl;
@@ -5503,12 +5532,16 @@
             // Apply contrast filter (using control system value)
             ctx.filter = `contrast(${contrast})`;
 
+            // Apply strobe effect to entire canvas
+            ctx.globalAlpha = strobeMultiplier;
+
             ctx.drawImage(redCanvas, -channelSeparation, 0);
             ctx.drawImage(greenCanvas, 0, 0);
             ctx.drawImage(blueCanvas, channelSeparation, 0);
 
             ctx.filter = 'none';
             ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1.0; // Reset global alpha
 
             // Apply scanlines effect (CRT-style horizontal lines)
             if (scanlinesControl > 0) {
