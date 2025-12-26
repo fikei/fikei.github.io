@@ -141,6 +141,21 @@
 
 **Impact:** NEON theme elevated from 60% to 100% performance-ready. Now competitive with Resolume/VDMX beat-reactive features.
 
+### Bug Fixes (2025-12-26)
+- [x] **state.beatDetector.isBeat is not a function** ✅ - CRITICAL crash fix
+  - ✅ Fixed NEON theme crash when switching themes
+  - ✅ Fixed beat burst spawning (line 6114)
+  - ✅ Fixed mesh density breathing (line 6321)
+  - ✅ Fixed applyStrobe() function (line 4673)
+  - ✅ Changed to use state.audioLevels._beatDetected instead
+  - **Impact:** NEON and other themes now render without crashing
+
+- [x] **Beat Pad theme switching not working** ✅ - Scene switching fix
+  - ✅ window.soundscape.switchTheme() now updates state.settings.theme
+  - ✅ Syncs theme select dropdown
+  - ✅ Ensures theme actually changes when loading scenes
+  - **Impact:** Beat Pad scene switching now works correctly
+
 ---
 
 ## 📋 ROADMAP (Prioritized)
