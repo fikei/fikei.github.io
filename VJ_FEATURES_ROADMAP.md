@@ -43,25 +43,25 @@
 - [x] PLASMA theme ✅ - Organic blob waves with sine interference (canvas-based, 7 controls) - COMPLETED
 - [x] PARTICLES theme ✅ - Swarm/explosion system (canvas-based, 12 controls) - COMPLETED
 
-### VJ Performance Enhancements (HIGH PRIORITY - IN PROGRESS)
-- [ ] **Global Master Controls** ⚠️ - Master Intensity, Brightness, Hue Shift, Audio Sensitivity (4 controls)
-  - Config added to index.html
-  - Implementation pending (helper functions, UI, renderers)
+### VJ Performance Enhancements (HIGH PRIORITY - CONFIGURATION COMPLETE)
+- [x] **Global Master Controls** ✅ - Master Intensity, Brightness, Hue Shift, Audio Sensitivity, Strobe (7 controls total)
+  - ✅ Config added to index.html (config.global)
+  - ✅ THEME_CONFIGS added to control-system.js
+  - ✅ Helper functions implemented: applyGlobalModifiers(), applyStrobe()
+  - ⏳ Renderer integration pending (apply modifiers in theme draw functions)
   - VJ Specialist recommendation: Critical for live performance
 
-- [ ] **BPM Sync System** ⚠️ - Lock animation speeds to detected BPM
-  - Config added to all 8 themes
-  - Options: OFF, 1X, 2X, 0.5X, 4X
-  - Implementation pending (getBPMSyncedSpeed function, UI)
+- [x] **BPM Sync System** ✅ - Lock animation speeds to detected BPM
+  - ✅ Config added to all 8 themes (bpmSync: off/1x/2x/0.5x/4x)
+  - ✅ Added to THEME_CONFIGS for all themes
+  - ✅ Helper function implemented: getBPMSyncedSpeed()
+  - ⏳ Renderer integration pending (use in animation loops)
 
-- [ ] **Global Strobe Effect** ⚠️ - Beat-synced brightness flash
-  - Config added (strobeEnabled, strobeRate)
-  - Options: BEAT, HALF, DOUBLE
-  - Implementation pending
-
-- [ ] **Brightness Standardization** - Standardize to 0-1 scale across all themes
-  - Affects: NEON (lightness → brightness), STARS (0-2 → 0-1)
-  - Prevents jarring transitions between themes
+- [x] **Brightness Standardization** ✅ - Standardize to 0-1 scale across all themes
+  - ✅ NEON: lightness (0-100%) → brightness (0-1)
+  - ✅ STARS: brightness already at 0-1 scale
+  - ✅ Updated configs, THEME_CONFIGS, and renderers
+  - ✅ Prevents jarring transitions between themes
 
 ### Multi-Layer Compositing - HYBRID APPROACH
 - [x] LayerManager class implementation ✅ (CREATED)
