@@ -4260,8 +4260,14 @@
 
             const bpmState = state.beatSync.getState();
 
-            // Debug: Log update (commented out after debugging)
-            // console.log('🎵 BPM Display Update:', bpmState);
+            // Debug: Log update to diagnose display issues
+            console.log('🎵 BPM Display Update:', {
+                bpm: bpmState.bpm,
+                beatCount: bpmState.beatCount,
+                confidence: bpmState.confidence,
+                beatPhase: bpmState.beatPhase,
+                beatIndicators: bpmState.beatIndicators.map(i => ({ phase: i.phase, active: i.active }))
+            });
 
             // Update BPM value
             const bpmValue = document.getElementById('bpmValue');
