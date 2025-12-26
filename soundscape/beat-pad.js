@@ -18,6 +18,12 @@ class BeatPad {
     this.transitionDuration = 1000; // milliseconds
     this.isTransitioning = false;
 
+    // Quantize feedback state
+    this.queuedSceneIndex = null; // Index of scene waiting for beat
+    this.queuedTimeout = null; // setTimeout reference for queued scene
+    this.queuedStartTime = null; // When the scene was queued
+    this.queuedWaitDuration = 0; // How long to wait (ms)
+
     // Drag state
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
@@ -75,6 +81,11 @@ class BeatPad {
           <span class="beat-pad-quantize" id="beatPadQuantize" title="Quantize mode">♩ OFF</span>
           <span class="beat-pad-rec" id="beatPadRec" style="display: none;" title="Recording">⏺ REC</span>
         </div>
+      </div>
+      <div class="beat-pad-waiting" id="beatPadWaiting" style="display: none;">
+        <span class="waiting-icon">⏱️</span>
+        <span class="waiting-text">WAITING FOR BEAT</span>
+        <span class="waiting-countdown" id="beatPadCountdown"></span>
       </div>
       <div class="beat-pad-actions">
         <button class="beat-pad-btn" id="beat-pad-save-current" title="Save current state to selected pad">SAVE</button>
@@ -566,8 +577,14 @@ class BeatPad {
         const quantizeMode = window.state.beatSync.quantizeMode;
         console.log(`⏱️ Quantize (${quantizeMode}): Waiting ${Math.round(timeUntilNext)}ms until next trigger`);
 
+        // Show waiting indicator
+        this.showWaitingIndicator(index, timeUntilNext);
+
         // Queue the scene load for the next beat
-        setTimeout(() => this.loadScene(index), timeUntilNext);
+        this.queuedTimeout = setTimeout(() => {
+          this.hideWaitingIndicator();
+          this.loadScene(index);
+        }, timeUntilNext);
         return;
       }
     }
@@ -819,7 +836,7 @@ class BeatPad {
       const themeBadge = pad.querySelector('.beat-pad-theme-badge');
 
       // Remove all state classes
-      pad.classList.remove('empty', 'loaded', 'active');
+      pad.classList.remove('empty', 'loaded', 'active', 'queued');
 
       if (scene) {
         // Pad has a scene
@@ -834,6 +851,11 @@ class BeatPad {
 
         if (index === this.activePadIndex) {
           pad.classList.add('active');
+        }
+
+        // Highlight queued pad (waiting for beat)
+        if (index === this.queuedSceneIndex) {
+          pad.classList.add('queued');
         }
       } else {
         // Pad is empty
@@ -1112,6 +1134,83 @@ class BeatPad {
       } else {
         recEl.style.display = 'none';
       }
+    }
+  }
+
+  /**
+   * Show waiting indicator when scene is queued for next beat
+   */
+  showWaitingIndicator(sceneIndex, waitDuration) {
+    this.queuedSceneIndex = sceneIndex;
+    this.queuedStartTime = performance.now();
+    this.queuedWaitDuration = waitDuration;
+
+    const waitingEl = document.getElementById('beatPadWaiting');
+    if (waitingEl) {
+      waitingEl.style.display = 'flex';
+    }
+
+    // Add pulsing class to grid container
+    if (this.gridContainer) {
+      this.gridContainer.classList.add('waiting-for-beat');
+    }
+
+    // Highlight the queued pad
+    this.updateGridUI();
+
+    // Start countdown update loop
+    this.updateCountdown();
+  }
+
+  /**
+   * Hide waiting indicator when scene loads or is cancelled
+   */
+  hideWaitingIndicator() {
+    this.queuedSceneIndex = null;
+    this.queuedStartTime = null;
+    this.queuedWaitDuration = 0;
+
+    const waitingEl = document.getElementById('beatPadWaiting');
+    if (waitingEl) {
+      waitingEl.style.display = 'none';
+    }
+
+    // Remove pulsing class from grid container
+    if (this.gridContainer) {
+      this.gridContainer.classList.remove('waiting-for-beat');
+    }
+
+    // Clear any existing timeout
+    if (this.queuedTimeout) {
+      clearTimeout(this.queuedTimeout);
+      this.queuedTimeout = null;
+    }
+
+    this.updateGridUI();
+  }
+
+  /**
+   * Update countdown timer (called continuously while waiting)
+   */
+  updateCountdown() {
+    if (this.queuedSceneIndex === null) return;
+
+    const elapsed = performance.now() - this.queuedStartTime;
+    const remaining = Math.max(0, this.queuedWaitDuration - elapsed);
+    const remainingMs = Math.round(remaining);
+
+    const countdownEl = document.getElementById('beatPadCountdown');
+    if (countdownEl) {
+      if (remainingMs > 1000) {
+        countdownEl.textContent = `(${(remainingMs / 1000).toFixed(1)}s)`;
+      } else {
+        countdownEl.textContent = `(${remainingMs}ms)`;
+      }
+    }
+
+    // Continue updating if still waiting
+    if (remainingMs > 0) {
+      requestAnimationFrame(() => this.updateCountdown());
     }
   }
 

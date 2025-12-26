@@ -176,6 +176,43 @@
             50% { opacity: 0.7; }
         }
 
+        /* ===== FPS MONITOR ===== */
+        .fps-monitor {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 20;
+            padding: 0.5rem 0.75rem;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #666;
+            font-size: 9px;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+            color: #ffffff;
+            transition: border-color 0.3s ease;
+        }
+
+        .fps-monitor.warning {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+
+        .fps-monitor.critical {
+            border-color: #ff3333;
+            color: #ff3333;
+        }
+
+        .fps-current {
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .fps-stats {
+            font-size: 8px;
+            color: #999;
+            margin-top: 0.25rem;
+        }
+
         /* ===== PAIRING PANEL ===== */
         .pairing-panel {
             position: fixed;
@@ -1292,6 +1329,70 @@
             background: #000000;
         }
 
+        /* Beat Pad Waiting Indicator */
+        .beat-pad-waiting {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: rgba(255, 200, 0, 0.15);
+            border: 1px solid rgba(255, 200, 0, 0.5);
+            margin: 0.5rem 0;
+            font-size: 9px;
+            color: #ffcc00;
+            animation: waiting-pulse 1s ease-in-out infinite;
+        }
+
+        .beat-pad-waiting .waiting-icon {
+            font-size: 12px;
+        }
+
+        .beat-pad-waiting .waiting-text {
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .beat-pad-waiting .waiting-countdown {
+            margin-left: auto;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #ffdd44;
+        }
+
+        @keyframes waiting-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Beat Pad Container Pulsing (when waiting) */
+        .beat-pad-container.waiting-for-beat {
+            animation: container-pulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes container-pulse {
+            0%, 100% { box-shadow: 0 0 0 rgba(255, 200, 0, 0); }
+            50% { box-shadow: 0 0 20px rgba(255, 200, 0, 0.6); }
+        }
+
+        /* Queued Pad Highlighting */
+        .beat-pad.queued {
+            border-color: #ffcc00 !important;
+            background: rgba(255, 200, 0, 0.1) !important;
+            animation: queued-pulse 0.5s ease-in-out infinite;
+        }
+
+        .beat-pad.queued .beat-pad-number {
+            color: #ffcc00;
+        }
+
+        .beat-pad.queued .beat-pad-label {
+            color: #ffcc00;
+        }
+
+        @keyframes queued-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
         /* ===== UNIFIED CONTROL SYSTEM ===== */
 
         /* Category Sections */
@@ -1853,6 +1954,12 @@
     <div class="debug-indicator" id="debugIndicator" style="display: none;">
         <span class="debug-icon">🐛</span>
         <span class="debug-text">DEBUG</span>
+    </div>
+
+    <!-- FPS Monitor -->
+    <div class="fps-monitor" id="fpsMonitor">
+        <div class="fps-current">FPS <span id="fpsValue">60</span></div>
+        <div class="fps-stats" id="fpsStats">AVG: 60 | MIN: 60 | MAX: 60</div>
     </div>
 
     <!-- Pairing Code Display -->
@@ -2725,7 +2832,9 @@
                 audioSensitivity: 100,     // 0-300% - Multiplies all audio reactivity
                 strobeEnabled: false,      // Enable beat-synced strobe
                 strobeRate: 'beat',        // 'beat', 'half', 'double'
-                bpmDisplay: true           // Show BPM in UI
+                bpmDisplay: true,          // Show BPM in UI
+                borderFlash: true,         // Flash canvas border on detected beats
+                borderFlashIntensity: 100  // 0-200% - Border flash brightness/thickness
             },
 
             // Audio settings
@@ -3004,6 +3113,24 @@
             lastBPMUpdate: 0, // Timestamp of last BPM display update (for throttling)
             layerManager: null, // Will be initialized after canvas setup
 
+            // FPS monitoring (for performance diagnostics)
+            fps: {
+                frameTimes: [],
+                lastFrameTime: 0,
+                current: 60,
+                avg: 60,
+                min: 60,
+                max: 60,
+                sampleSize: 60  // Track last 60 frames for average
+            },
+
+            // Border flash animation (on detected beats)
+            borderFlash: {
+                active: false,
+                intensity: 0,    // 0-1, decays over time
+                decayRate: 0.05  // How fast the flash fades
+            },
+
             // Video recording
             recording: {
                 isRecording: false,
@@ -3046,7 +3173,9 @@
                 dragStartX: 0,
                 dragStartY: 0,
                 dragStartWidth: 0,
-                dragStartHeight: 0
+                dragStartHeight: 0,
+                // Canvas cache (prevents memory leak from creating canvases every frame)
+                tempCanvases: null  // Will be initialized as { temp, red, green, blue }
             },
 
             // STARS theme state
@@ -4322,6 +4451,23 @@
         function animate(time = 0) {
             if (!state.isActive) return;
 
+            // Track FPS
+            if (state.fps.lastFrameTime > 0) {
+                const frameDuration = time - state.fps.lastFrameTime;
+                const fps = frameDuration > 0 ? 1000 / frameDuration : 60;
+
+                state.fps.frameTimes.push(fps);
+                if (state.fps.frameTimes.length > state.fps.sampleSize) {
+                    state.fps.frameTimes.shift();
+                }
+
+                state.fps.current = fps;
+                state.fps.avg = state.fps.frameTimes.reduce((a, b) => a + b, 0) / state.fps.frameTimes.length;
+                state.fps.min = Math.min(...state.fps.frameTimes);
+                state.fps.max = Math.max(...state.fps.frameTimes);
+            }
+            state.fps.lastFrameTime = time;
+
             // Update mouse smoothing
             updateMouse();
 
@@ -4331,8 +4477,71 @@
             // Draw all lines
             drawLines();
 
+            // Update FPS display (if exists)
+            updateFPSDisplay();
+
+            // Update and apply border flash
+            updateBorderFlash();
+            applyBorderFlash();
+
             // Continue loop
             requestAnimationFrame(animate);
+        }
+
+        // Throttled FPS display update (only update UI 3 times per second to avoid DOM thrashing)
+        let lastFPSUpdateTime = 0;
+        function updateFPSDisplay() {
+            const now = performance.now();
+            if (now - lastFPSUpdateTime < 333) return; // Update every ~333ms (3 times per second)
+            lastFPSUpdateTime = now;
+
+            const fpsMonitor = document.getElementById('fpsMonitor');
+            const fpsValue = document.getElementById('fpsValue');
+            const fpsStats = document.getElementById('fpsStats');
+
+            if (!fpsMonitor || !fpsValue || !fpsStats) return;
+
+            // Update values
+            fpsValue.textContent = state.fps.current.toFixed(1);
+            fpsStats.textContent = `AVG: ${state.fps.avg.toFixed(1)} | MIN: ${state.fps.min.toFixed(1)} | MAX: ${state.fps.max.toFixed(1)}`;
+
+            // Update warning state
+            fpsMonitor.classList.remove('warning', 'critical');
+            if (state.fps.avg < 30) {
+                fpsMonitor.classList.add('critical');
+            } else if (state.fps.avg < 45) {
+                fpsMonitor.classList.add('warning');
+            }
+        }
+
+        // Update border flash animation (decay over time)
+        function updateBorderFlash() {
+            if (state.borderFlash.active) {
+                // Decay intensity
+                state.borderFlash.intensity -= state.borderFlash.decayRate;
+
+                // Deactivate when fully faded
+                if (state.borderFlash.intensity <= 0) {
+                    state.borderFlash.active = false;
+                    state.borderFlash.intensity = 0;
+                }
+            }
+        }
+
+        // Apply border flash visual effect to visualization container
+        function applyBorderFlash() {
+            const container = document.getElementById('visualization-container');
+            if (!container) return;
+
+            if (state.borderFlash.active && state.borderFlash.intensity > 0) {
+                const intensity = state.borderFlash.intensity;
+                const thickness = Math.floor(2 + (intensity * 8)); // 2-10px based on intensity
+                const opacity = Math.min(intensity * 0.8, 0.8); // Max 80% opacity
+
+                container.style.boxShadow = `inset 0 0 ${thickness}px ${thickness}px rgba(255, 255, 255, ${opacity})`;
+            } else {
+                container.style.boxShadow = 'none';
+            }
         }
 
         function updateMouse() {
@@ -4492,6 +4701,12 @@
             // Update BPM when beat detected
             if (beatResult.isBeat) {
                 state.bpmDetector.addBeat(timestamp);
+
+                // Trigger border flash if enabled
+                if (config.global.borderFlash) {
+                    state.borderFlash.active = true;
+                    state.borderFlash.intensity = config.global.borderFlashIntensity / 100;
+                }
             }
 
             // Update Beat Sync Manager
@@ -5378,10 +5593,25 @@
             const scaledWidth = Math.floor(canvas.width / pixelSize);
             const scaledHeight = Math.floor(canvas.height / pixelSize);
 
-            // Create temporary canvas for RGB channel separation
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
+            // Initialize canvas cache if not exists (prevents memory leak)
+            if (!state.glitchImage.tempCanvases) {
+                state.glitchImage.tempCanvases = {
+                    temp: document.createElement('canvas'),
+                    red: document.createElement('canvas'),
+                    green: document.createElement('canvas'),
+                    blue: document.createElement('canvas')
+                };
+            }
+
+            // Get cached canvases
+            const tempCanvas = state.glitchImage.tempCanvases.temp;
+
+            // Resize if needed
+            if (tempCanvas.width !== canvas.width || tempCanvas.height !== canvas.height) {
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+            }
+
             const tempCtx = tempCanvas.getContext('2d');
 
             // Use stored image dimensions and position from state.glitchImage
@@ -5457,12 +5687,17 @@
             // RGB Channel Separation - use visualMode from control system
             const visualMode = window.audioEngine ? (window.audioEngine.getValue('glitch', 'visualMode') || state.settings.glitchMode) : state.settings.glitchMode;
             const glitchMode = visualMode || 'rgb';
-            const redCanvas = document.createElement('canvas');
-            const greenCanvas = document.createElement('canvas');
-            const blueCanvas = document.createElement('canvas');
 
-            redCanvas.width = greenCanvas.width = blueCanvas.width = canvas.width;
-            redCanvas.height = greenCanvas.height = blueCanvas.height = canvas.height;
+            // Use cached RGB canvases (already initialized above)
+            const redCanvas = state.glitchImage.tempCanvases.red;
+            const greenCanvas = state.glitchImage.tempCanvases.green;
+            const blueCanvas = state.glitchImage.tempCanvases.blue;
+
+            // Resize if needed
+            if (redCanvas.width !== canvas.width || redCanvas.height !== canvas.height) {
+                redCanvas.width = greenCanvas.width = blueCanvas.width = canvas.width;
+                redCanvas.height = greenCanvas.height = blueCanvas.height = canvas.height;
+            }
 
             const redCtx = redCanvas.getContext('2d');
             const greenCtx = greenCanvas.getContext('2d');
@@ -5602,10 +5837,25 @@
             const scaledWidth = Math.floor(canvas.width / pixelSize);
             const scaledHeight = Math.floor(canvas.height / pixelSize);
 
-            // Create temporary canvas for RGB channel separation
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
+            // Initialize canvas cache if not exists (prevents memory leak)
+            if (!state.glitchImage.tempCanvases) {
+                state.glitchImage.tempCanvases = {
+                    temp: document.createElement('canvas'),
+                    red: document.createElement('canvas'),
+                    green: document.createElement('canvas'),
+                    blue: document.createElement('canvas')
+                };
+            }
+
+            // Get cached temp canvas
+            const tempCanvas = state.glitchImage.tempCanvases.temp;
+
+            // Resize if needed
+            if (tempCanvas.width !== canvas.width || tempCanvas.height !== canvas.height) {
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+            }
+
             const tempCtx = tempCanvas.getContext('2d');
 
             // Draw pixelated base image
@@ -5721,20 +5971,19 @@
                 }
             }
 
-            // Create canvases for channel separation
-            const redCanvas = document.createElement('canvas');
-            redCanvas.width = canvas.width;
-            redCanvas.height = canvas.height;
+            // Use cached RGB canvases (already initialized above)
+            const redCanvas = state.glitchImage.tempCanvases.red;
+            const greenCanvas = state.glitchImage.tempCanvases.green;
+            const blueCanvas = state.glitchImage.tempCanvases.blue;
+
+            // Resize if needed
+            if (redCanvas.width !== canvas.width || redCanvas.height !== canvas.height) {
+                redCanvas.width = greenCanvas.width = blueCanvas.width = canvas.width;
+                redCanvas.height = greenCanvas.height = blueCanvas.height = canvas.height;
+            }
+
             const redCtx = redCanvas.getContext('2d');
-
-            const greenCanvas = document.createElement('canvas');
-            greenCanvas.width = canvas.width;
-            greenCanvas.height = canvas.height;
             const greenCtx = greenCanvas.getContext('2d');
-
-            const blueCanvas = document.createElement('canvas');
-            blueCanvas.width = canvas.width;
-            blueCanvas.height = canvas.height;
             const blueCtx = blueCanvas.getContext('2d');
 
             // Extract individual color channels based on mode
