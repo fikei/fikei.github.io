@@ -1623,6 +1623,24 @@
             border-color: #fff;
         }
 
+        .audio-source-select {
+            width: 100%;
+            background: #000;
+            border: 1px solid #666;
+            color: #fff;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 9px;
+            padding: 0.5rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+
+        .audio-source-select:focus {
+            outline: none;
+            border-color: #fff;
+        }
+
         /* ===== LAYER PANEL ===== */
         .layer-panel {
             background: rgba(0, 0, 0, 0.5);
@@ -2167,6 +2185,9 @@
                 <option value="beat">Quantize: BEAT</option>
                 <option value="bar">Quantize: BAR (4 beats)</option>
                 <option value="4bar">Quantize: 4-BAR (16 beats)</option>
+            </select>
+            <select class="audio-source-select" id="audioSourceSelect">
+                <option value="">Audio Source: Loading...</option>
             </select>
         </section>
 
@@ -2841,6 +2862,9 @@
             dataArray: null,
             bufferLength: 0,
             isActive: false,
+            audioDevices: [], // Available audio input devices
+            selectedAudioDeviceId: null, // Currently selected device ID
+            audioStream: null, // Current audio stream
 
             // Meyda audio analysis
             meydaAnalyzer: null,
@@ -3221,6 +3245,17 @@
                     // Update Beat Pad status
                     if (window.beatPad && typeof window.beatPad.updateStatus === 'function') {
                         window.beatPad.updateStatus();
+                    }
+                });
+            }
+
+            // Audio source select
+            const audioSourceSelect = document.getElementById('audioSourceSelect');
+            if (audioSourceSelect) {
+                audioSourceSelect.addEventListener('change', (e) => {
+                    const deviceId = e.target.value;
+                    if (deviceId && state.isActive) {
+                        switchAudioDevice(deviceId);
                     }
                 });
             }
@@ -3838,17 +3873,132 @@
         // AUDIO CAPTURE
         // =====================================================
 
+        /**
+         * Enumerate available audio input devices
+         */
+        async function enumerateAudioDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                state.audioDevices = devices.filter(device => device.kind === 'audioinput');
+
+                console.log(`🎤 Found ${state.audioDevices.length} audio input devices:`, state.audioDevices);
+
+                // Update UI
+                const select = document.getElementById('audioSourceSelect');
+                if (select && state.audioDevices.length > 0) {
+                    select.innerHTML = '';
+
+                    state.audioDevices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        // Use device label or fallback to generic name
+                        const label = device.label || `Audio Input ${index + 1}`;
+                        option.textContent = label;
+                        select.appendChild(option);
+                    });
+
+                    // Select current device if set
+                    if (state.selectedAudioDeviceId) {
+                        select.value = state.selectedAudioDeviceId;
+                    }
+                }
+            } catch (err) {
+                console.error('❌ Failed to enumerate audio devices:', err);
+            }
+        }
+
+        /**
+         * Switch to a different audio input device
+         */
+        async function switchAudioDevice(deviceId) {
+            try {
+                console.log(`🔄 Switching to audio device: ${deviceId}`);
+
+                // Stop current audio stream if exists
+                if (state.audioStream) {
+                    state.audioStream.getTracks().forEach(track => track.stop());
+                }
+
+                // Stop Meyda analyzer if running
+                if (state.meydaAnalyzer) {
+                    state.meydaAnalyzer.stop();
+                    state.meydaAnalyzer = null;
+                }
+
+                // Disconnect current microphone node
+                if (state.microphone) {
+                    state.microphone.disconnect();
+                }
+
+                // Get new stream with selected device
+                const constraints = {
+                    audio: {
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                state.audioStream = stream;
+                state.selectedAudioDeviceId = deviceId;
+
+                // Create new microphone source
+                state.microphone = state.audioContext.createMediaStreamSource(stream);
+                state.microphone.connect(state.analyser);
+
+                // Reinitialize Meyda with new source
+                if (typeof Meyda !== 'undefined') {
+                    try {
+                        state.meydaAnalyzer = Meyda.createMeydaAnalyzer({
+                            audioContext: state.audioContext,
+                            source: state.microphone,
+                            bufferSize: 512,
+                            featureExtractors: [
+                                'spectralCentroid',
+                                'spectralFlatness',
+                                'spectralRolloff',
+                                'spectralSpread',
+                                'loudness',
+                                'chroma'
+                            ],
+                            callback: features => {
+                                try {
+                                    if (features && typeof features === 'object') {
+                                        state.meydaFeatures = features;
+                                    }
+                                } catch (err) {
+                                    // Silently ignore Meyda calculation errors
+                                }
+                            }
+                        });
+                        state.meydaAnalyzer.start();
+                        console.log('✅ Switched to new audio device');
+                    } catch (err) {
+                        console.warn('⚠️ Meyda reinitialization failed:', err);
+                    }
+                }
+            } catch (err) {
+                console.error('❌ Failed to switch audio device:', err);
+                alert('Failed to switch audio device. Please check permissions and try again.');
+            }
+        }
+
         async function startAudioCapture() {
             try {
                 console.log('🎤 Requesting microphone access...');
 
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: {
+                        deviceId: state.selectedAudioDeviceId ? { exact: state.selectedAudioDeviceId } : undefined,
                         echoCancellation: false,
                         noiseSuppression: false,
                         autoGainControl: false
                     }
                 });
+
+                state.audioStream = stream;
 
                 // Setup audio context
                 state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -3917,6 +4067,9 @@
 
                 // Start idle timeout for controls
                 showControls();
+
+                // Enumerate audio devices (now that we have permissions)
+                await enumerateAudioDevices();
 
                 // Start animation loop
                 requestAnimationFrame(animate);
