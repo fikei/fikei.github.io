@@ -300,6 +300,77 @@ Each theme control can be mapped to any of these 25+ audio features:
 
 ---
 
+## MIDI Control System
+
+**Status:** Foundation Complete ✅ (Hardware testing pending)
+
+Soundscape supports Web MIDI API for hardware controller integration. All 115 parameters can be mapped to MIDI CC/Note messages.
+
+### Supported Controllers
+- ✅ MIDI keyboards (Note On triggers, CC knobs)
+- ✅ APC40/APC40 mkII (48 knobs, 40 buttons, 8 faders)
+- ✅ Novation Launchpad (64 pads for Beat Pad scenes)
+- ✅ Generic MIDI controllers (any device with CC/Note support)
+- ✅ MIDI mixers (Behringer X-Touch, etc.)
+
+### MIDI Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Device Detection | ✅ | Auto-detect connected MIDI devices |
+| Hot-Plug Support | ✅ | Devices can connect/disconnect while app running |
+| MIDI Learn | 🚧 | Click control, move MIDI knob (backend ready) |
+| CC Mapping | ✅ | Map Control Change (0-127) to parameters |
+| Note Mapping | ✅ | Map Note On/Off to toggles and triggers |
+| Beat Pad Triggers | ✅ | MIDI Notes 60-68 → Scenes 1-9 |
+| Velocity-Based Transitions | ✅ | Note velocity 0-42=CUT, 43-84=CROSSFADE, 85-127=MORPH |
+| Value Transformations | ✅ | 6 transform types (normalized, hue360, hueShift, percentage200, toggle, buttonGroup) |
+| Mapping Management | ✅ | View, delete, clear all mappings |
+| Export/Import | ✅ | Save/load mappings as JSON |
+| localStorage Persistence | ✅ | Mappings saved across sessions |
+| Multi-Device | ✅ | Use multiple MIDI controllers simultaneously |
+| Activity Indicator | ✅ | Real-time MIDI message display |
+
+### Value Transformations
+
+MIDI messages send values 0-127. Soundscape automatically transforms these to match parameter ranges:
+
+- **normalized** (0-127 → 0-1): Most sliders
+- **hue360** (0-127 → 0-360): Hue controls
+- **hueShift** (0-127 → -180 to +180): Hue shift controls
+- **percentage200** (0-127 → 0-200): Intensity/brightness controls
+- **toggle** (0-127 → true/false): Buttons (>64 = true)
+- **buttonGroup** (0-127 → option index): Button groups (maps ranges to options)
+
+### Usage
+
+1. **Connect MIDI Controller** → Auto-detected, status shows in MIDI panel
+2. **Create Mapping** → Click MIDI Learn, click control, move MIDI knob
+3. **View Mappings** → See all CC/Note → Control mappings
+4. **Export/Import** → Share controller configs between sessions/users
+
+### Browser Compatibility
+
+- ✅ **Chrome/Edge**: Full support
+- ✅ **Opera**: Full support
+- ⚠️ **Firefox**: Behind flag (user must enable `dom.webmidi.enabled`)
+- ❌ **Safari**: No support (WebKit limitation)
+
+**Note:** Use Chrome/Edge for best MIDI experience
+
+### Beat Pad MIDI Integration
+
+| MIDI Note | Scene | Velocity Range | Transition |
+|-----------|-------|----------------|------------|
+| 60 (C3) | Scene 1 | 0-42 | CUT |
+| 61 (C#3) | Scene 2 | 43-84 | CROSSFADE |
+| 62 (D3) | Scene 3 | 85-127 | MORPH |
+| 63-68 | Scenes 4-9 | Velocity-based | Variable |
+
+**Example:** Press pad at velocity 100 → Triggers scene with MORPH transition
+
+---
+
 ## Usage Notes
 
 1. **Per-Control Audio Reactivity**: Every slider can react to music independently
@@ -307,6 +378,7 @@ Each theme control can be mapped to any of these 25+ audio features:
 3. **Layer Blending**: Canvas themes (GLITCH, STARS, WAVE, TUNNEL, PLASMA, PARTICLES) will support smooth opacity blending
 4. **SVG Themes**: LINEAR and NEON use vector graphics (better quality) but hard-switch when crossfading
 5. **Performance**: More complex themes (NEON, WAVE) may impact frame rate on older hardware
+6. **MIDI Control**: Hardware controllers can map to all 115 parameters (use Chrome/Edge)
 
 ---
 
