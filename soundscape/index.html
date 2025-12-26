@@ -2776,6 +2776,445 @@
             }
         }
 
+        // ===== MIDI MAPPING SYSTEM =====
+        class MIDIManager {
+            constructor() {
+                this.midiAccess = null;
+                this.inputs = new Map(); // MIDI input devices
+                this.outputs = new Map(); // MIDI output devices
+                this.mappings = new Map(); // Key: "cc_48_ch1" or "note_60_ch1", Value: mapping config
+                this.learnMode = false;
+                this.learnTarget = null; // { controlId, theme, controlType }
+                this.onMappingChange = null; // Callback when mappings change
+                this.onDeviceChange = null; // Callback when devices connect/disconnect
+                this.onMIDIMessage = null; // Callback for all MIDI messages (for activity indicator)
+                this.lastActivity = { type: '', value: 0, timestamp: 0 };
+                this.updateQueue = new Map(); // Queue for parameter updates (throttled via RAF)
+                this.animationFrameId = null;
+                this.supported = false;
+
+                // Value transformation functions
+                this.transformations = {
+                    // 0-127 → 0-1 (most common)
+                    normalized: (midiValue) => midiValue / 127,
+
+                    // 0-127 → 0-360 (hue)
+                    hue360: (midiValue) => (midiValue / 127) * 360,
+
+                    // 0-127 → -180 to +180 (hue shift)
+                    hueShift: (midiValue) => ((midiValue / 127) * 360) - 180,
+
+                    // 0-127 → 0-200% (master intensity/brightness)
+                    percentage200: (midiValue) => (midiValue / 127) * 200,
+
+                    // 0-127 → min-max range (custom)
+                    range: (midiValue, min, max) => min + (midiValue / 127) * (max - min),
+
+                    // Toggle (note on/off or CC > 64)
+                    toggle: (midiValue) => midiValue > 64,
+
+                    // Button groups (map CC ranges to button options)
+                    buttonGroup: (midiValue, options) => {
+                        const index = Math.floor((midiValue / 127) * options.length);
+                        return options[Math.min(index, options.length - 1)];
+                    }
+                };
+            }
+
+            async initialize() {
+                // Check Web MIDI API support
+                if (!navigator.requestMIDIAccess) {
+                    console.warn('Web MIDI API not supported in this browser');
+                    this.supported = false;
+                    return false;
+                }
+
+                try {
+                    this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+                    this.supported = true;
+
+                    // Enumerate devices
+                    this.enumerateDevices();
+
+                    // Listen for device connection/disconnection
+                    this.midiAccess.onstatechange = (e) => {
+                        console.log('MIDI device state change:', e.port.name, e.port.state);
+                        this.enumerateDevices();
+                        if (this.onDeviceChange) {
+                            this.onDeviceChange(this.getDeviceList());
+                        }
+                    };
+
+                    // Load saved mappings from localStorage
+                    this.loadMappings();
+
+                    console.log('MIDI system initialized successfully');
+                    return true;
+                } catch (error) {
+                    console.error('Failed to initialize MIDI:', error);
+                    this.supported = false;
+                    return false;
+                }
+            }
+
+            enumerateDevices() {
+                // Clear existing inputs/outputs
+                this.inputs.clear();
+                this.outputs.clear();
+
+                // Enumerate inputs
+                for (const input of this.midiAccess.inputs.values()) {
+                    this.inputs.set(input.id, input);
+                    input.onmidimessage = (event) => this.handleMIDIMessage(event);
+                    console.log('MIDI Input detected:', input.name);
+                }
+
+                // Enumerate outputs
+                for (const output of this.midiAccess.outputs.values()) {
+                    this.outputs.set(output.id, output);
+                    console.log('MIDI Output detected:', output.name);
+                }
+            }
+
+            handleMIDIMessage(event) {
+                const msg = this.parseMIDIMessage(event);
+                if (!msg) return;
+
+                // Update last activity (for UI indicator)
+                this.lastActivity = {
+                    type: msg.type,
+                    value: msg.value !== undefined ? msg.value : msg.velocity,
+                    timestamp: performance.now()
+                };
+
+                if (this.onMIDIMessage) {
+                    this.onMIDIMessage(this.lastActivity);
+                }
+
+                // MIDI Learn mode: Capture message and create mapping
+                if (this.learnMode && this.learnTarget) {
+                    this.createMappingFromLearn(msg);
+                    return;
+                }
+
+                // Normal mode: Check for existing mapping and apply
+                const mappingKey = this.getMappingKey(msg);
+                const mapping = this.mappings.get(mappingKey);
+
+                if (mapping) {
+                    this.applyMapping(mapping, msg);
+                }
+            }
+
+            parseMIDIMessage(event) {
+                const [status, data1, data2] = event.data;
+                const messageType = status & 0xF0; // Upper nibble
+                const channel = (status & 0x0F) + 1; // Lower nibble (1-16)
+
+                switch (messageType) {
+                    case 0x80: // Note Off
+                        return { type: 'noteOff', note: data1, velocity: data2, channel };
+                    case 0x90: // Note On
+                        // Note On with velocity 0 is actually Note Off
+                        if (data2 === 0) {
+                            return { type: 'noteOff', note: data1, velocity: data2, channel };
+                        }
+                        return { type: 'noteOn', note: data1, velocity: data2, channel };
+                    case 0xB0: // Control Change
+                        return { type: 'cc', cc: data1, value: data2, channel };
+                    case 0xE0: // Pitch Bend
+                        const bend = (data2 << 7) | data1; // Combine 14-bit value
+                        return { type: 'pitchBend', value: bend, channel };
+                    case 0xC0: // Program Change
+                        return { type: 'programChange', program: data1, channel };
+                    default:
+                        return null;
+                }
+            }
+
+            getMappingKey(msg) {
+                // Create unique key for mapping lookup
+                switch (msg.type) {
+                    case 'cc':
+                        return `cc_${msg.cc}_ch${msg.channel}`;
+                    case 'noteOn':
+                    case 'noteOff':
+                        return `note_${msg.note}_ch${msg.channel}`;
+                    case 'pitchBend':
+                        return `pitchBend_ch${msg.channel}`;
+                    case 'programChange':
+                        return `program_ch${msg.channel}`;
+                    default:
+                        return null;
+                }
+            }
+
+            enterLearnMode(controlId, theme, controlType) {
+                this.learnMode = true;
+                this.learnTarget = { controlId, theme, controlType };
+                console.log('MIDI Learn mode enabled for:', controlId);
+            }
+
+            exitLearnMode() {
+                this.learnMode = false;
+                this.learnTarget = null;
+                console.log('MIDI Learn mode disabled');
+            }
+
+            createMappingFromLearn(msg) {
+                if (!this.learnTarget) return;
+
+                const mappingKey = this.getMappingKey(msg);
+                const { controlId, theme, controlType } = this.learnTarget;
+
+                // Auto-detect appropriate transformation based on control type
+                let transform = 'normalized';
+                let min = 0;
+                let max = 1;
+
+                // Special handling for specific controls
+                if (controlId.includes('hue') && !controlId.includes('shift')) {
+                    transform = 'hue360';
+                    min = 0;
+                    max = 360;
+                } else if (controlId.includes('hueShift') || controlId === 'globalHueShift') {
+                    transform = 'hueShift';
+                    min = -180;
+                    max = 180;
+                } else if (controlId.includes('Intensity') || controlId.includes('Brightness')) {
+                    transform = 'percentage200';
+                    min = 0;
+                    max = 200;
+                } else if (controlType === 'toggle') {
+                    transform = 'toggle';
+                }
+
+                // Create mapping
+                const mapping = {
+                    id: `mapping_${Date.now()}`,
+                    midi: msg.type === 'cc'
+                        ? { type: 'cc', cc: msg.cc, channel: msg.channel }
+                        : { type: msg.type, note: msg.note, channel: msg.channel },
+                    target: {
+                        controlId,
+                        theme,
+                        min,
+                        max,
+                        transform
+                    }
+                };
+
+                this.mappings.set(mappingKey, mapping);
+                this.saveMappings();
+
+                console.log('MIDI mapping created:', mappingKey, '→', controlId);
+
+                // Callback
+                if (this.onMappingChange) {
+                    this.onMappingChange(Array.from(this.mappings.values()));
+                }
+
+                // Exit learn mode
+                this.exitLearnMode();
+            }
+
+            applyMapping(mapping, msg) {
+                const { controlId, theme, transform, min, max } = mapping.target;
+
+                // Get MIDI value
+                let midiValue = msg.value !== undefined ? msg.value : msg.velocity;
+
+                // Handle Beat Pad scene triggering (Notes 60-68)
+                if (msg.type === 'noteOn' && msg.note >= 60 && msg.note <= 68) {
+                    const sceneIndex = msg.note - 60; // 0-8
+                    this.triggerBeatPadScene(sceneIndex, msg.velocity);
+                    return;
+                }
+
+                // Apply transformation
+                let transformedValue;
+                if (transform === 'toggle') {
+                    transformedValue = this.transformations.toggle(midiValue);
+                } else if (transform === 'range') {
+                    transformedValue = this.transformations.range(midiValue, min, max);
+                } else if (this.transformations[transform]) {
+                    transformedValue = this.transformations[transform](midiValue);
+                } else {
+                    transformedValue = this.transformations.normalized(midiValue);
+                }
+
+                // Queue parameter update (throttled via RAF)
+                this.updateQueue.set(controlId, { theme, value: transformedValue });
+
+                if (!this.animationFrameId) {
+                    this.animationFrameId = requestAnimationFrame(() => this.flushUpdates());
+                }
+            }
+
+            flushUpdates() {
+                // Apply all queued parameter updates
+                this.updateQueue.forEach(({ theme, value }, controlId) => {
+                    this.updateParameter(controlId, theme, value);
+                });
+                this.updateQueue.clear();
+                this.animationFrameId = null;
+            }
+
+            updateParameter(controlId, theme, value) {
+                // Update the actual parameter in config
+                // This will be integrated with the control system
+                if (theme === 'global') {
+                    if (config.global.hasOwnProperty(controlId)) {
+                        config.global[controlId] = value;
+                    }
+                } else if (config.themes && config.themes[theme]) {
+                    if (config.themes[theme].hasOwnProperty(controlId)) {
+                        config.themes[theme][controlId] = value;
+                    }
+                }
+
+                // Trigger UI update if control system exists
+                if (window.controlSystemUI && window.controlSystemUI.updateControlValue) {
+                    window.controlSystemUI.updateControlValue(controlId, value);
+                }
+            }
+
+            triggerBeatPadScene(sceneIndex, velocity) {
+                // Determine transition type based on velocity
+                let transitionType = 'CROSSFADE'; // Default
+                if (velocity < 43) {
+                    transitionType = 'CUT';
+                } else if (velocity >= 85) {
+                    transitionType = 'MORPH';
+                }
+
+                console.log(`MIDI Beat Pad: Trigger Scene ${sceneIndex + 1} with ${transitionType}`);
+
+                // Trigger the scene (will integrate with Beat Pad system)
+                if (window.beatPad && window.beatPad.triggerScene) {
+                    window.beatPad.triggerScene(sceneIndex, transitionType);
+                }
+            }
+
+            removeMapping(mappingKey) {
+                this.mappings.delete(mappingKey);
+                this.saveMappings();
+
+                if (this.onMappingChange) {
+                    this.onMappingChange(Array.from(this.mappings.values()));
+                }
+            }
+
+            clearAllMappings() {
+                this.mappings.clear();
+                this.saveMappings();
+
+                if (this.onMappingChange) {
+                    this.onMappingChange([]);
+                }
+            }
+
+            saveMappings() {
+                try {
+                    const mappingsArray = Array.from(this.mappings.entries());
+                    localStorage.setItem('soundscape_midi_mappings', JSON.stringify(mappingsArray));
+                } catch (error) {
+                    console.error('Failed to save MIDI mappings:', error);
+                }
+            }
+
+            loadMappings() {
+                try {
+                    const saved = localStorage.getItem('soundscape_midi_mappings');
+                    if (saved) {
+                        const mappingsArray = JSON.parse(saved);
+                        this.mappings = new Map(mappingsArray);
+                        console.log(`Loaded ${this.mappings.size} MIDI mappings from localStorage`);
+                    }
+                } catch (error) {
+                    console.error('Failed to load MIDI mappings:', error);
+                }
+            }
+
+            exportMappings() {
+                const mappingsObj = {
+                    name: 'Soundscape MIDI Mapping',
+                    author: 'User',
+                    created: new Date().toISOString().split('T')[0],
+                    device: this.inputs.size > 0 ? Array.from(this.inputs.values())[0].name : 'Unknown',
+                    version: '1.0',
+                    mappings: Array.from(this.mappings.values())
+                };
+
+                return JSON.stringify(mappingsObj, null, 2);
+            }
+
+            importMappings(jsonString) {
+                try {
+                    const imported = JSON.parse(jsonString);
+
+                    if (!imported.mappings || !Array.isArray(imported.mappings)) {
+                        throw new Error('Invalid mapping file format');
+                    }
+
+                    // Clear existing mappings
+                    this.mappings.clear();
+
+                    // Import new mappings
+                    imported.mappings.forEach(mapping => {
+                        const key = mapping.midi.type === 'cc'
+                            ? `cc_${mapping.midi.cc}_ch${mapping.midi.channel}`
+                            : `note_${mapping.midi.note}_ch${mapping.midi.channel}`;
+                        this.mappings.set(key, mapping);
+                    });
+
+                    this.saveMappings();
+
+                    if (this.onMappingChange) {
+                        this.onMappingChange(Array.from(this.mappings.values()));
+                    }
+
+                    console.log(`Imported ${this.mappings.size} MIDI mappings`);
+                    return true;
+                } catch (error) {
+                    console.error('Failed to import MIDI mappings:', error);
+                    return false;
+                }
+            }
+
+            getDeviceList() {
+                const inputs = Array.from(this.inputs.values()).map(input => ({
+                    id: input.id,
+                    name: input.name,
+                    manufacturer: input.manufacturer,
+                    state: input.state,
+                    type: 'input'
+                }));
+
+                const outputs = Array.from(this.outputs.values()).map(output => ({
+                    id: output.id,
+                    name: output.name,
+                    manufacturer: output.manufacturer,
+                    state: output.state,
+                    type: 'output'
+                }));
+
+                return { inputs, outputs };
+            }
+
+            getMappingList() {
+                return Array.from(this.mappings.values());
+            }
+
+            isSupported() {
+                return this.supported;
+            }
+
+            getLastActivity() {
+                return this.lastActivity;
+            }
+        }
+
         // Simple 2D noise function (Perlin-like)
         function createNoise2D() {
             const permutation = [];
@@ -3139,6 +3578,9 @@
             beatSync: null, // Will be initialized after BeatDetector/BPMDetector
             lastBPMUpdate: 0, // Timestamp of last BPM display update (for throttling)
             layerManager: null, // Will be initialized after canvas setup
+
+            // MIDI control system
+            midiManager: new MIDIManager(),
 
             // FPS monitoring (for performance diagnostics)
             fps: {
@@ -3821,6 +4263,18 @@
                 console.log('✅ Layer Manager initialized');
             } else {
                 console.warn('⚠️ Layer Manager not available');
+            }
+
+            // Initialize MIDI Manager
+            if (state.midiManager) {
+                const midiInitialized = await state.midiManager.initialize();
+                if (midiInitialized) {
+                    console.log('✅ MIDI system initialized');
+                    console.log(`   📱 MIDI Inputs: ${state.midiManager.inputs.size}`);
+                    console.log(`   🎹 MIDI Outputs: ${state.midiManager.outputs.size}`);
+                } else {
+                    console.log('ℹ️ MIDI not available (browser may not support Web MIDI API)');
+                }
             }
 
             // Auto-start audio capture
