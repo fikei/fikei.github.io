@@ -2956,7 +2956,7 @@
             constructor() {
                 this.energyHistory = [];
                 this.historySize = 43; // ~1 second at 43 FPS
-                this.threshold = 1.2; // Beat detected if energy > avg * threshold (reduced from 1.3 for better sensitivity)
+                this.threshold = 1.15; // Beat detected if energy > avg * threshold (lowered for breakbeat/complex rhythms)
                 this.minTimeBetweenBeats = 250; // ms (prevents double-triggering, allows up to 240 BPM)
                 this.lastBeatTime = 0;
                 this.beatStrength = 0;
