@@ -2717,6 +2717,17 @@
 
         // ===== CONFIGURATION =====
         const config = {
+            // Global VJ Controls (affect all themes)
+            global: {
+                masterIntensity: 100,      // 0-200% - Multiplies size/amplitude/glow
+                masterBrightness: 100,     // 0-200% - Multiplies brightness/lightness/opacity
+                globalHueShift: 0,         // -180 to +180° - Shifts all hues
+                audioSensitivity: 100,     // 0-300% - Multiplies all audio reactivity
+                strobeEnabled: false,      // Enable beat-synced strobe
+                strobeRate: 'beat',        // 'beat', 'half', 'double'
+                bpmDisplay: true           // Show BPM in UI
+            },
+
             // Audio settings
             fftSize: 128, // Reduced from 256 for lower latency
             smoothing: 0.5, // Default smoothing value
@@ -2746,7 +2757,8 @@
                     colors: ['#ffffff', '#999999'],
                     bg: '#000000',
                     opacity: 0.6,
-                    opacityMultiplier: 0.4 // Dynamic opacity range
+                    opacityMultiplier: 0.4, // Dynamic opacity range
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 neon: {
                     blurBase: 3,
@@ -2761,7 +2773,8 @@
                     sizeMultiplierBase: 1.0,
                     sizeMultiplierRange: 1.5, // Will multiply size by 1.0-2.5x
                     movementBase: 150,
-                    movementMultiplier: 300
+                    movementMultiplier: 300,
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 glitch: {
                     bg: '#000000',
@@ -2771,7 +2784,8 @@
                     channelSeparationMultiplier: 12, // Bass increases RGB separation
                     glitchIntensityMultiplier: 8, // Mids control random displacement
                     quantizationBase: 1,
-                    quantizationMultiplier: 8 // Highs increase pixelation
+                    quantizationMultiplier: 8, // Highs increase pixelation
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 stars: {
                     bg: '#000000',
@@ -2783,7 +2797,8 @@
                     speedMultiplier: 3.0, // Audio-reactive speed boost
                     twinkleIntensity: 20, // How often stars twinkle (higher = less frequent)
                     alphaMin: 0.2, // Minimum alpha for stars
-                    alphaMax: 1.0 // Maximum alpha for stars
+                    alphaMax: 1.0, // Maximum alpha for stars
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 wave: {
                     bg: '#000000',
@@ -2813,7 +2828,8 @@
                         mono: { baseHue: 0, saturation: 0 },
                         warm: { baseHue: 30, saturation: 60 },
                         cool: { baseHue: 200, saturation: 60 }
-                    }
+                    },
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 tunnel: {
                     bg: '#000000',
@@ -2826,7 +2842,8 @@
                     perspective: 1.0, // Depth perspective multiplier
                     speed: 1.0, // Base animation speed
                     rotation: 0.5, // Rotation speed
-                    segments: 12 // Number of segments per ring (more = rounder)
+                    segments: 12, // Number of segments per ring (more = rounder)
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 plasma: {
                     bg: '#000000',
@@ -2837,7 +2854,8 @@
                     speed: 1.0, // Animation speed
                     complexity: 3, // Number of sine wave layers (1-5)
                     brightness: 0.6, // Overall brightness (0-1)
-                    contrast: 1.0 // Contrast multiplier
+                    contrast: 1.0, // Contrast multiplier
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 },
                 particles: {
                     bg: '#000000',
@@ -2853,7 +2871,8 @@
                     trailLength: 0.15, // Motion trail fade (0-1)
                     bloom: 0, // Glow/bloom intensity (0-2)
                     explosionThreshold: 0.3, // Bass level for explosions (0-1)
-                    mode: 'explode' // Physics mode: explode, converge, swarm
+                    mode: 'explode', // Physics mode: explode, converge, swarm
+                    bpmSync: 'off' // BPM sync: off, 1x, 2x, 0.5x, 4x
                 }
             }
         };
