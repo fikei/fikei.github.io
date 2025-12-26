@@ -129,8 +129,31 @@
 - [ ] Offscreen canvas rendering for layers
 - [ ] WebGL acceleration (where possible)
 - [ ] FPS limiter/target selector
-- [ ] Performance monitor overlay
+- [x] Performance monitor overlay ✅ (FPS counter)
 - [ ] Low-latency mode
+
+#### 1.6 MIDI Mapping (CRITICAL - Dealbreaker for Professional VJs)
+**Status:** Specification Complete (see MIDI_MAPPING_SPEC.md)
+**Priority:** HIGHEST - Required for hardware controller support
+**Timeline:** 1-2 weeks (60-80 hours)
+
+- [ ] Web MIDI API integration
+- [ ] MIDI device detection & hot-plug support
+- [ ] MIDI Learn mode (click control, move MIDI knob)
+- [ ] Map MIDI CC to any of 108 parameters
+- [ ] MIDI note triggers for Beat Pad scenes (Notes 60-68)
+- [ ] Value transformation (MIDI 0-127 → param ranges)
+- [ ] Manual mapping UI (advanced users)
+- [ ] Mapping management (view, delete, clear all)
+- [ ] Export/import mappings as JSON
+- [ ] Visual feedback (MIDI activity indicator, mapped control icons)
+- [ ] Beat Pad quantization + MIDI integration
+- [ ] localStorage persistence
+- [ ] Multi-device support
+- [ ] Profile system (save/load controller configs)
+- [ ] Pre-made mappings for APC40, Launchpad, generic controllers
+
+**Documentation:** See `/MIDI_MAPPING_SPEC.md` for complete technical specification
 
 ---
 
@@ -187,16 +210,9 @@
 **Goal**: Feature parity with Resolume/VDMX basics
 **Timeline**: 4-8 weeks
 
-#### 2.1 MIDI Mapping
-- [ ] Web MIDI API integration
-- [ ] MIDI device detection
-- [ ] MIDI learn mode
-- [ ] Map MIDI CC to any parameter
-- [ ] MIDI note triggers for Beat Pad
-- [ ] MIDI mapping preset save/load
-- [ ] Support for popular controllers (APC40, Launchpad)
+**Note:** MIDI Mapping moved to Phase 1.6 (critical priority)
 
-#### 2.2 Effects Chain
+#### 2.1 Effects Chain
 - [ ] Stackable post-processing effects
 - [ ] Effect bypass/enable toggles
 - [ ] Effect presets

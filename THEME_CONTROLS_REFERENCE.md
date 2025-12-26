@@ -16,15 +16,19 @@
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
+| visualMode | buttonGroup | FLOW/HOLE/CRUNCH | FLOW | Visual flow pattern mode |
+| density | buttonGroup | L/M/H | M | Line density (Low/Medium/High) |
 | hue | slider | 0-360 | 280 | Color hue (purple default) |
 | saturation | slider | 0-100 | 0 | Color saturation (0 = grayscale) |
 | opacity | slider | 0-1 | 0.6 | Line opacity |
 | lineWidth | slider | 1-10 | 3 | Line thickness |
+| spread | slider | 0-2 | 1.0 | Line spread/spacing multiplier |
+| amplitude | slider | 0-2 | 1.0 | Wave amplitude multiplier |
 | backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect intensity |
 | bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 6
+**Total Controls**: 10
 
 ---
 
@@ -60,18 +64,20 @@
 
 | Control | Type | Range | Default | Description |
 |---------|------|-------|---------|-------------|
+| visualMode | buttonGroup | RGB/B&R/GRAY | RGB | Color channel mode |
 | rotation | slider | 0-360 | 0 | Image rotation angle |
 | glitchIntensity | slider | 0-2 | 1.0 | Overall glitch effect strength |
 | contrast | slider | 0-3 | 1.0 | Image contrast |
 | channelOffset | slider | 0-50 | 5 | RGB channel separation distance |
 | displacement | slider | 0-100 | 10 | Glitch displacement amount |
-| blockSize | slider | 1-50 | 10 | Glitch block size |
+| noise | slider | 0-1 | 0 | Digital noise amount |
+| pixelation | slider | 1-50 | 1 | Pixelation level (1 = none, 50 = very pixelated) |
 | scanlines | slider | 0-1 | 0.5 | Scanline intensity |
-| colorShift | slider | 0-360 | 0 | Hue shift amount |
+| backgroundShift | slider | 0-2 | 1.0 | Camera parallax effect |
 | bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 9
+**Total Controls**: 11
 **Note**: Requires image upload to display
 
 ---
