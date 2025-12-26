@@ -5233,6 +5233,29 @@
 
                 console.log(`🎤 Found ${state.audioDevices.length} available audio input devices:`, state.audioDevices);
 
+                // If audio stream is active, detect which device is being used
+                if (state.audioStream && state.audioStream.getAudioTracks().length > 0) {
+                    const audioTrack = state.audioStream.getAudioTracks()[0];
+                    const settings = audioTrack.getSettings();
+
+                    if (settings.deviceId) {
+                        state.selectedAudioDeviceId = settings.deviceId;
+                        console.log(`🎤 Current audio device: ${settings.deviceId} (${audioTrack.label})`);
+
+                        // If current device not in list, add it
+                        const deviceExists = state.audioDevices.some(d => d.deviceId === settings.deviceId);
+                        if (!deviceExists && audioTrack.label) {
+                            state.audioDevices.unshift({
+                                deviceId: settings.deviceId,
+                                kind: 'audioinput',
+                                label: audioTrack.label,
+                                groupId: settings.groupId || ''
+                            });
+                            console.log(`🎤 Added current device to list: ${audioTrack.label}`);
+                        }
+                    }
+                }
+
                 // Update UI
                 const select = document.getElementById('audioSourceSelect');
                 if (select) {
@@ -5255,8 +5278,12 @@
                             select.value = state.selectedAudioDeviceId;
                         }
                     } else {
-                        // No devices available
-                        select.innerHTML = '<option value="">No audio inputs available</option>';
+                        // No devices available, but if stream is active, show "Microphone"
+                        if (state.audioStream && state.audioStream.getAudioTracks().length > 0) {
+                            select.innerHTML = '<option value="">Microphone (Active)</option>';
+                        } else {
+                            select.innerHTML = '<option value="">No audio inputs available</option>';
+                        }
                     }
                 }
             } catch (err) {
