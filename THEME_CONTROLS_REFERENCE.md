@@ -225,8 +225,10 @@
 | strobeEnabled | toggle | ON/OFF | OFF | Enable beat-synced strobe effect |
 | strobeRate | buttonGroup | BEAT/1/2/2X | BEAT | Strobe flash rate |
 | bpmDisplay | toggle | ON/OFF | ON | Show BPM in UI |
+| borderFlash | toggle | ON/OFF | ON | Flash canvas border on detected beats |
+| borderFlashIntensity | slider | 0-200 | 100 | Border flash brightness and thickness |
 
-**Total Controls**: 7
+**Total Controls**: 9
 
 ---
 
@@ -242,11 +244,11 @@
 | TUNNEL | 9 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | PLASMA | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | PARTICLES | 13 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| **GLOBAL** | **7** | **N/A** | **❌ Master Controls** | **N/A** |
+| **GLOBAL** | **9** | **N/A** | **❌ Master Controls** | **N/A** |
 
 **TOTAL THEME CONTROLS**: 94 parameters
-**TOTAL GLOBAL CONTROLS**: 7 parameters
-**GRAND TOTAL**: 101 parameters
+**TOTAL GLOBAL CONTROLS**: 9 parameters
+**GRAND TOTAL**: 103 parameters
 
 ---
 

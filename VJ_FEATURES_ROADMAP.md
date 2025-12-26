@@ -44,7 +44,7 @@
 - [x] PARTICLES theme ✅ - Swarm/explosion system (canvas-based, 12 controls) - COMPLETED
 
 ### VJ Performance Enhancements (HIGH PRIORITY - COMPLETED ✅)
-- [x] **Global Master Controls** ✅ - Master Intensity, Brightness, Hue Shift, Audio Sensitivity, Strobe (7 controls total)
+- [x] **Global Master Controls** ✅ - Master Intensity, Brightness, Hue Shift, Audio Sensitivity, Strobe, Border Flash (9 controls total)
   - ✅ Config added to index.html (config.global)
   - ✅ THEME_CONFIGS added to control-system.js
   - ✅ Helper functions implemented: applyGlobalModifiers(), getBPMSyncedSpeed(), applyStrobe()
@@ -86,6 +86,32 @@
 - [x] Beat Pad status header ✅ (CREATED)
 - [x] Theme badges on scenes ✅ (CREATED)
 
+### Performance & Visual Feedback Enhancements
+- [x] **FPS Monitor** ✅ - Real-time performance diagnostics
+  - ✅ Top-right display showing current/avg/min/max FPS
+  - ✅ 60-frame rolling average for stability
+  - ✅ Color-coded warnings (yellow <45 FPS, red <30 FPS)
+  - ✅ Throttled UI updates (3x per second) to prevent DOM thrashing
+
+- [x] **Border Flash (Global Control)** ✅ - Beat-synced canvas border flash
+  - ✅ config.global.borderFlash (on/off toggle)
+  - ✅ config.global.borderFlashIntensity (0-200%, default 100%)
+  - ✅ Smooth decay animation with inset box-shadow
+  - ✅ Triggers on detected beats (beatResult.isBeat)
+
+- [x] **Quantize Visual Feedback** ✅ - Beat Pad waiting indicators
+  - ✅ "⏱️ WAITING FOR BEAT" banner in Beat Pad header
+  - ✅ Real-time countdown timer (ms/seconds)
+  - ✅ Yellow pulsing border on Beat Pad container
+  - ✅ Highlighted queued pad with gold border and pulse animation
+  - ✅ Auto-clears when scene loads or is cancelled
+
+- [x] **GLITCH Theme Memory Leak Fix** ✅ - Canvas caching optimization
+  - ✅ Cache temp/red/green/blue canvases in state.glitchImage.tempCanvases
+  - ✅ Prevents creating 240 canvas objects per second (4 canvases @ 60 FPS)
+  - ✅ Lazy initialization, resize only on dimension change
+  - ✅ Applied to renderGlitchImageBackground() and renderGlitchImage()
+
 ---
 
 ## 📋 ROADMAP (Prioritized)
@@ -100,14 +126,14 @@
 - [ ] Add 4-dot beat indicator
 - [ ] Show confidence meter
 - [ ] Auto/Manual BPM toggle
-- [ ] Visual beat flash on canvas border
+- [x] Visual beat flash on canvas border ✅ (Global setting: borderFlash + borderFlashIntensity)
 
 #### 1.2 Quantization System
 - [ ] Integrate BeatSyncManager into main loop
 - [ ] Add quantize mode selector (OFF, BEAT, BAR, 4BAR)
 - [ ] Queue Beat Pad scene changes to beat
-- [ ] Visual countdown to next trigger point
-- [ ] "Waiting for beat..." indicator
+- [x] Visual countdown to next trigger point ✅ (Real-time countdown in Beat Pad)
+- [x] "Waiting for beat..." indicator ✅ (Yellow pulsing banner + queued pad highlighting)
 
 #### 1.3 Multi-Layer System
 - [ ] Integrate LayerManager into render pipeline
