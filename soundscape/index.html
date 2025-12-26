@@ -4257,10 +4257,21 @@
 
             const bpmState = state.beatSync.getState();
 
+            // Debug: Log update (commented out after debugging)
+            // console.log('🎵 BPM Display Update:', bpmState);
+
             // Update BPM value
             const bpmValue = document.getElementById('bpmValue');
             if (bpmValue) {
-                bpmValue.textContent = bpmState.bpm.toFixed(1);
+                // Show "Waiting..." when no beats detected yet
+                if (bpmState.beatCount === 0 && bpmState.confidence === 0) {
+                    bpmValue.textContent = 'Waiting...';
+                } else if (bpmState.beatCount < 4) {
+                    // Need 4+ beats to calculate BPM
+                    bpmValue.textContent = `Detecting... (${bpmState.beatCount}/4)`;
+                } else {
+                    bpmValue.textContent = bpmState.bpm.toFixed(1);
+                }
             } else {
                 console.warn('⚠️ BPM value element not found');
             }
@@ -4269,8 +4280,12 @@
             const confidenceEl = document.getElementById('bpmConfidence');
             if (confidenceEl) {
                 if (bpmState.bpmMode === 'auto') {
-                    const pct = (bpmState.confidence * 100).toFixed(0);
-                    confidenceEl.textContent = `Confidence: ${pct}%`;
+                    if (bpmState.beatCount === 0) {
+                        confidenceEl.textContent = 'Listening...';
+                    } else {
+                        const pct = (bpmState.confidence * 100).toFixed(0);
+                        confidenceEl.textContent = `Confidence: ${pct}%`;
+                    }
                 } else {
                     confidenceEl.textContent = `Taps: ${bpmState.tapCount}`;
                 }
