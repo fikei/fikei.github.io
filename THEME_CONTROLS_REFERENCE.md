@@ -158,10 +158,13 @@
 | perspective | slider | 0-2 | 1.0 | Depth perspective strength |
 | lineWidth | slider | 1-5 | 2 | Ring line thickness |
 | segments | slider | 6-24 | 12 | Polygon segments per ring |
+| **shape** | **buttonGroup** | **CIRCLE/SQUARE/TRIANGLE/HEXAGON/STAR** | **circle** | **Geometric shape of tunnel rings** |
+| **smoothing** | **slider** | **0-1** | **0.0** | **Edge smoothing (rounded corners/bezier curves)** |
+| **curvature** | **slider** | **-1 to 1** | **0.0** | **Radial warp/distortion effect** |
 | bpmSync | buttonGroup | OFF/1X/2X/0.5X/4X | OFF | Lock animation speed to detected BPM |
 
 **Audio Reactivity**: Each control can map to 25+ audio features
-**Total Controls**: 9
+**Total Controls**: 12 (3 new geometric controls added)
 
 ---
 
@@ -249,7 +252,7 @@
 | GLITCH | 11 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | STARS | 16 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | WAVE | 17 | Canvas | ✅ Per-control | ✅ (When implemented) |
-| TUNNEL | 9 | Canvas | ✅ Per-control | ✅ (When implemented) |
+| TUNNEL | 12 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | PLASMA | 8 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | PARTICLES | 13 | Canvas | ✅ Per-control | ✅ (When implemented) |
 | **GLOBAL** | **9** | **N/A** | **❌ Master Controls** | **N/A** |

@@ -141,6 +141,29 @@
 
 **Impact:** NEON theme elevated from 60% to 100% performance-ready. Now competitive with Resolume/VDMX beat-reactive features.
 
+### TUNNEL Theme VJ Enhancements
+- [x] **Geometric Shape Variations** ✅ - Multiple tunnel geometries
+  - ✅ Circle (default, smooth polygon)
+  - ✅ Square (4 vertices, geometric precision)
+  - ✅ Triangle (3 vertices, minimal geometry)
+  - ✅ Hexagon (6 vertices, organic flow)
+  - ✅ Star (5-point with inner/outer radius)
+  - ✅ Shape dropdown control in UI (CIRCLE/SQUARE/TRIANGLE/HEXAGON/STAR)
+
+- [x] **Edge Smoothing Control** ✅ - Artistic refinement
+  - ✅ Smoothing slider (0-1 range)
+  - ✅ Rounded line joins and caps when enabled
+  - ✅ Bezier curve smoothing for circle shapes
+  - ✅ Professional polish for live visuals
+
+- [x] **Curvature/Warp System** ✅ - Spatial distortion
+  - ✅ Curvature slider (-1 to 1 range)
+  - ✅ Radial warp transformation based on depth
+  - ✅ Dynamic spatial effects for dramatic moments
+  - ✅ Applied to both ring shapes and connecting lines
+
+**Impact:** TUNNEL theme now offers 5× geometric variety with professional refinement controls. Shape morphing creates dramatic transitions perfect for build-ups and drops.
+
 ### Bug Fixes (2025-12-26)
 - [x] **state.beatDetector.isBeat is not a function** ✅ - CRITICAL crash fix
   - ✅ Fixed NEON theme crash when switching themes

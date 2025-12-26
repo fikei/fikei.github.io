@@ -1453,21 +1453,25 @@ const THEME_CONFIGS = {
     controls: {
       // Color
       hue: {
+        type: 'slider',
         default: 180,
         category: 'color'
       },
       saturation: {
+        type: 'slider',
         default: 80,
         category: 'color'
       },
 
       // Motion
       speed: {
+        type: 'slider',
         default: 1.0,
         category: 'motion',
         description: 'Tunnel movement speed'
       },
       rotation: {
+        type: 'slider',
         default: 0.5,
         category: 'motion',
         description: 'Ring rotation speed'
@@ -1490,20 +1494,24 @@ const THEME_CONFIGS = {
 
       // Geometry
       rings: {
+        type: 'slider',
         default: 50,
         category: 'geometry',
         description: 'Number of rings in tunnel'
       },
       perspective: {
+        type: 'slider',
         default: 1.0,
         category: 'geometry',
         description: 'Depth perspective multiplier'
       },
       lineWidth: {
+        type: 'slider',
         default: 2,
         category: 'geometry'
       },
       segments: {
+        type: 'slider',
         default: 12,
         category: 'geometry',
         description: 'Segments per ring (roundness)'
@@ -1524,13 +1532,25 @@ const THEME_CONFIGS = {
         description: 'Geometric shape of tunnel rings'
       },
       smoothing: {
+        type: 'slider',
+        label: 'SMOOTHING',
+        min: 0,
+        max: 1,
+        step: 0.01,
         default: 0.0,
         category: 'geometry',
+        audioReactive: true,
         description: 'Edge smoothing (0-1)'
       },
       curvature: {
+        type: 'slider',
+        label: 'CURVATURE',
+        min: -1,
+        max: 1,
+        step: 0.01,
         default: 0.0,
         category: 'geometry',
+        audioReactive: true,
         description: 'Path curvature/warp (-1 to 1)'
       }
     },
@@ -1805,8 +1825,12 @@ const THEME_CONFIGS = {
 
       // Strobe effect
       strobeEnabled: {
-        type: 'toggle',
+        type: 'buttonGroup',
         label: 'STROBE',
+        options: [
+          { value: false, label: 'OFF' },
+          { value: true, label: 'ON' }
+        ],
         default: false,
         category: 'effects',
         audioReactive: false,
@@ -1829,8 +1853,12 @@ const THEME_CONFIGS = {
 
       // Display options
       bpmDisplay: {
-        type: 'toggle',
+        type: 'buttonGroup',
         label: 'SHOW BPM',
+        options: [
+          { value: false, label: 'OFF' },
+          { value: true, label: 'ON' }
+        ],
         default: true,
         category: 'display',
         audioReactive: false,
