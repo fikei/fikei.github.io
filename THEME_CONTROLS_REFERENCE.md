@@ -1,6 +1,12 @@
 # Theme Controls Reference
 ## Soundscape Audio-Reactive Visualizer - Complete Control Listing
 
+**Global Modifiers Integration Status**:
+- ✅ **Fully Integrated**: LINEAR, NEON, GLITCH (global modifiers + BPM sync active)
+- ⏳ **Pending**: STARS, WAVE, TUNNEL, PLASMA, PARTICLES (configuration ready, renderer integration in progress)
+
+> All themes have global controls and BPM sync configured. Themes marked as "Pending" have the configuration but are awaiting renderer integration to apply the modifiers.
+
 ---
 
 ## LINEAR Theme
