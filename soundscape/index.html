@@ -2158,6 +2158,7 @@
                 <option value="glitch">GLITCH</option>
                 <option value="stars">STARS</option>
                 <option value="wave">WAVE</option>
+                <option value="tunnel">TUNNEL</option>
             </select>
             <div id="themeDescription" style="margin-top: 0.5rem; font-size: 8px; color: white; font-family: 'Space Grotesk', monospace; line-height: 1.4;"></div>
         </section>
@@ -2210,6 +2211,7 @@
                     <option value="glitch">GLITCH</option>
                     <option value="stars">STARS</option>
                     <option value="wave">WAVE</option>
+                    <option value="tunnel">TUNNEL</option>
                 </select>
                 <div class="layer-opacity">
                     <span class="layer-opacity-label">OPACITY</span>
@@ -2240,6 +2242,7 @@
                     <option value="glitch">GLITCH</option>
                     <option value="stars">STARS</option>
                     <option value="wave">WAVE</option>
+                    <option value="tunnel">TUNNEL</option>
                 </select>
                 <div class="layer-opacity">
                     <span class="layer-opacity-label">OPACITY</span>
@@ -2805,6 +2808,19 @@
                         warm: { baseHue: 30, saturation: 60 },
                         cool: { baseHue: 200, saturation: 60 }
                     }
+                },
+                tunnel: {
+                    bg: '#000000',
+                    opacity: 1.0,
+                    rings: 50, // Number of rings in the tunnel
+                    ringSpacing: 40, // Base spacing between rings
+                    hue: 180, // Cyan by default
+                    saturation: 80,
+                    lineWidth: 2,
+                    perspective: 1.0, // Depth perspective multiplier
+                    speed: 1.0, // Base animation speed
+                    rotation: 0.5, // Rotation speed
+                    segments: 12 // Number of segments per ring (more = rounder)
                 }
             }
         };
@@ -6198,13 +6214,148 @@
             ctx.restore();
         }
 
+        // =====================================================
+        // TUNNEL THEME RENDERING
+        // =====================================================
+
+        function drawLinesTunnel() {
+            const theme = config.themes.tunnel;
+            const { low, mid, high } = state.audioLevels;
+            const time = state.currentTime;
+
+            // Get values from control system (with fallbacks)
+            const hue = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'hue') || theme.hue) : theme.hue;
+            const saturation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'saturation') || theme.saturation) : theme.saturation;
+            const speed = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'speed') || theme.speed) : theme.speed;
+            const rotation = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rotation') || theme.rotation) : theme.rotation;
+            const ringCount = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'rings') || theme.rings) : theme.rings;
+            const perspective = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'perspective') || theme.perspective) : theme.perspective;
+            const lineWidth = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'lineWidth') || theme.lineWidth) : theme.lineWidth;
+            const segments = window.audioEngine ? (window.audioEngine.getValue('tunnel', 'segments') || theme.segments) : theme.segments;
+
+            // Hide SVG paths for TUNNEL theme
+            state.paths.forEach(path => path.setAttribute('d', ''));
+
+            // Get or create tunnel canvas
+            let tunnelCanvas = document.getElementById('tunnel-canvas');
+            if (!tunnelCanvas) {
+                tunnelCanvas = document.createElement('canvas');
+                tunnelCanvas.id = 'tunnel-canvas';
+                tunnelCanvas.style.position = 'fixed';
+                tunnelCanvas.style.top = '0';
+                tunnelCanvas.style.left = '0';
+                tunnelCanvas.style.width = '100%';
+                tunnelCanvas.style.height = '100%';
+                tunnelCanvas.style.pointerEvents = 'none';
+                tunnelCanvas.style.zIndex = '0';
+                document.body.insertBefore(tunnelCanvas, document.body.firstChild);
+            }
+
+            const ctx = tunnelCanvas.getContext('2d');
+            const w = tunnelCanvas.width = state.boundingRect.width;
+            const h = tunnelCanvas.height = state.boundingRect.height;
+
+            // Clear canvas
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Center point
+            const centerX = w / 2;
+            const centerY = h / 2;
+
+            // Bass controls tunnel speed (movement towards camera)
+            const tunnelSpeed = speed * (1 + low * 2);
+            const timeOffset = time * tunnelSpeed * 0.001;
+
+            // Mid frequencies control rotation
+            const rotationSpeed = rotation * (1 + mid);
+            const rotationAngle = time * rotationSpeed * 0.001;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+
+            // Draw rings from back to front
+            for (let i = 0; i < ringCount; i++) {
+                // Calculate depth position (0 = far, 1 = near)
+                const depth = ((i + timeOffset) % ringCount) / ringCount;
+                const z = depth * perspective;
+
+                // Skip rings that are behind camera
+                if (z <= 0) continue;
+
+                // Perspective scale (larger when closer)
+                const scale = 1 / (1 - z * 0.9);
+                const radius = theme.ringSpacing * scale;
+
+                // Brightness based on depth (brighter when closer)
+                const brightness = 20 + depth * 60 + high * 20;
+
+                // Ring size pulse with bass
+                const bassPulse = 1 + low * 0.3;
+
+                // Color shift based on depth
+                const depthHue = (hue + depth * 60) % 360;
+
+                // Alpha based on depth (fade out far rings)
+                const alpha = depth * 0.8 + 0.2;
+
+                ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness}%, ${alpha})`;
+                ctx.lineWidth = lineWidth * scale;
+
+                // Draw ring as polygon
+                ctx.beginPath();
+                for (let seg = 0; seg <= segments; seg++) {
+                    const angle = (seg / segments) * Math.PI * 2 + rotationAngle;
+                    const x = Math.cos(angle) * radius * bassPulse;
+                    const y = Math.sin(angle) * radius * bassPulse;
+
+                    if (seg === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                ctx.stroke();
+
+                // Add connecting lines between rings for extra depth
+                if (i > 0 && i % 3 === 0) {
+                    const prevDepth = ((i - 3 + timeOffset) % ringCount) / ringCount;
+                    const prevZ = prevDepth * perspective;
+                    if (prevZ > 0) {
+                        const prevScale = 1 / (1 - prevZ * 0.9);
+                        const prevRadius = theme.ringSpacing * prevScale;
+
+                        ctx.strokeStyle = `hsla(${depthHue}, ${saturation}%, ${brightness * 0.5}%, ${alpha * 0.5})`;
+                        ctx.lineWidth = lineWidth * scale * 0.5;
+
+                        for (let seg = 0; seg < segments; seg += 3) {
+                            const angle = (seg / segments) * Math.PI * 2 + rotationAngle;
+                            const x1 = Math.cos(angle) * prevRadius * bassPulse;
+                            const y1 = Math.sin(angle) * prevRadius * bassPulse;
+                            const x2 = Math.cos(angle) * radius * bassPulse;
+                            const y2 = Math.sin(angle) * radius * bassPulse;
+
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            ctx.restore();
+        }
+
         // Theme renderer dispatcher
         const themeRenderers = {
             linear: drawLinesLinear,
             neon: drawLinesNeon,
             glitch: drawLinesGlitch,
             stars: drawLinesStars,
-            wave: drawLinesWave
+            wave: drawLinesWave,
+            tunnel: drawLinesTunnel
         };
 
         function drawLines() {
