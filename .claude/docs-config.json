@@ -1,0 +1,53 @@
+{
+  "project": {
+    "name": "Soundscape Audio-Reactive Visualizer",
+    "type": "web-app",
+    "language": "JavaScript",
+    "repository": "fikei/fikei.github.io"
+  },
+  "documentation": {
+    "roadmap": {
+      "file": "VJ_FEATURES_ROADMAP.md",
+      "trackSections": ["IN PROGRESS", "COMPLETED", "Phase 1.5"],
+      "updateOn": ["feature-complete", "milestone", "theme-added"],
+      "template": ".claude/templates/roadmap-entry.md"
+    },
+    "changelog": {
+      "file": "CHANGELOG.md",
+      "format": "keep-a-changelog",
+      "updateOn": ["push"],
+      "autoGenerate": false
+    },
+    "controls": {
+      "file": "THEME_CONTROLS_REFERENCE.md",
+      "trackSections": ["Themes", "Controls", "Audio Reactivity", "Summary"],
+      "updateOn": ["theme-added", "control-added", "control-modified"],
+      "autoCalculate": ["total-controls", "theme-count"]
+    }
+  },
+  "tracking": {
+    "themes": {
+      "source": "soundscape/index.html",
+      "pattern": "config.themes.{name}",
+      "extractControls": true,
+      "controlsPattern": "^\\s*([a-zA-Z]+):\\s*(.+),$"
+    },
+    "features": {
+      "source": "VJ_FEATURES_ROADMAP.md",
+      "completionMarker": "✅",
+      "inProgressMarker": "⏳",
+      "plannedMarker": "[ ]"
+    }
+  },
+  "automation": {
+    "preCommitCheck": false,
+    "prePushUpdate": true,
+    "sessionReminder": true,
+    "blockOnStale": true
+  },
+  "notifications": {
+    "onStaleDocumentation": "⚠️  Documentation may be stale - please review and update",
+    "onMissingDocumentation": "❌ Required documentation files not found",
+    "onSuccess": "✅ Documentation validation passed"
+  }
+}
