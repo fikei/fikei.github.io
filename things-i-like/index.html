@@ -699,9 +699,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Metadata Fetcher
   // ============================================
-  const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+  const CORS_PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?'
+  ];
   const FETCH_TIMEOUT = 15000; // 15 seconds
   const MAX_RETRIES = 2;
+
+  // Strip tracking parameters to make URLs shorter/faster
+  function cleanUrl(url) {
+    try {
+      const u = new URL(url);
+      const dominated = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id',
+        'fbclid', 'gclid', 'tw_source', 'tw_adid', 'sl_source_ad_platform', 'sl_source_campaign_id',
+        'sl_source_placement', 'sl_source_ad_id', 'adset_name', 'ad_name', 'campaign_id', 'ad_id', 'media_type'];
+      for (const p of dominated) u.searchParams.delete(p);
+      return u.toString();
+    } catch { return url; }
+  }
 
   async function fetchWithTimeout(url, timeout) {
     const controller = new AbortController();
@@ -722,26 +737,35 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     console.log('[fetchMetadata] Domain:', domain);
     const meta = { title: domain, description: '', image: null, domain };
 
+    // Clean URL to remove tracking params (makes fetch faster)
+    const fetchUrl = cleanUrl(url);
+    if (fetchUrl !== url) console.log('[fetchMetadata] Cleaned URL:', fetchUrl);
+
     let html = null;
     let lastError = null;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        if (attempt > 0) console.log('[fetchMetadata] Retry attempt', attempt);
-        console.log('[fetchMetadata] Fetching via proxy...');
-        const res = await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url), FETCH_TIMEOUT);
-        console.log('[fetchMetadata] Response status:', res.status);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        html = await res.text();
-        console.log('[fetchMetadata] HTML length:', html.length);
-        break;
-      } catch (e) {
-        lastError = e;
-        console.error('[fetchMetadata] Attempt', attempt, 'failed:', e.message);
-        if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    // Try each proxy with retries
+    for (const proxy of CORS_PROXIES) {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          if (attempt > 0) console.log('[fetchMetadata] Retry attempt', attempt);
+          console.log('[fetchMetadata] Fetching via proxy:', proxy.split('?')[0]);
+          const res = await fetchWithTimeout(proxy + encodeURIComponent(fetchUrl), FETCH_TIMEOUT);
+          console.log('[fetchMetadata] Response status:', res.status);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          html = await res.text();
+          console.log('[fetchMetadata] HTML length:', html.length);
+          break;
+        } catch (e) {
+          lastError = e;
+          console.error('[fetchMetadata] Attempt', attempt, 'failed:', e.message);
+          if (attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          }
         }
       }
+      if (html) break; // Got HTML, stop trying proxies
+      console.log('[fetchMetadata] Trying next proxy...');
     }
 
     if (!html) {
