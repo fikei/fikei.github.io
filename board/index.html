@@ -969,40 +969,32 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Categorizer
   // ============================================
   const PATTERNS = {
-    clothing: {
-      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote'],
-      domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com']
+    wear: {
+      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote', 'jewelry', 'jewellery', 'ring', 'necklace', 'earring', 'bracelet', 'pendant', 'chain', 'gold', 'silver', 'sterling', 'signet', 'hoop', 'cuff', 'bangle', 'shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat'],
+      domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com', 'mejuri.com', 'catbirdnyc.com', 'auratenewyork.com', 'stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com']
     },
-    jewelry: {
-      kw: ['jewelry', 'jewellery', 'ring', 'necklace', 'earring', 'bracelet', 'pendant', 'chain', 'gold', 'silver', 'sterling', 'signet', 'hoop', 'cuff', 'bangle'],
-      domains: ['mejuri.com', 'catbirdnyc.com', 'auratenewyork.com']
+    watch: {
+      kw: ['video', 'music', 'podcast', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'playlist', 'track', 'artist', 'band', 'concert', 'episode', 'series', 'show'],
+      domains: ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com', 'vimeo.com', 'bandcamp.com', 'tiktok.com', 'netflix.com']
     },
-    shoes: {
-      kw: ['shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat'],
-      domains: ['stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com']
-    },
-    music: {
-      kw: ['video', 'music', 'podcast', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'watch', 'playlist', 'track', 'artist', 'band', 'concert'],
-      domains: ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com', 'vimeo.com', 'bandcamp.com', 'tiktok.com']
-    },
-    tools: {
-      kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer'],
+    use: {
+      kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer', 'utility', 'product'],
       domains: ['github.com', 'gitlab.com', 'npmjs.com', 'producthunt.com']
     },
-    food: {
-      kw: ['restaurant', 'cafe', 'bar', 'food', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation'],
+    eat: {
+      kw: ['restaurant', 'cafe', 'bar', 'food', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation', 'brunch', 'dinner', 'lunch'],
       domains: ['yelp.com', 'tripadvisor.com', 'opentable.com', 'doordash.com', 'ubereats.com', 'resy.com']
     },
-    places: {
-      kw: ['hotel', 'travel', 'map', 'city', 'venue', 'booking', 'destination', 'trip', 'flight', 'stay', 'vacation'],
+    go: {
+      kw: ['hotel', 'travel', 'map', 'city', 'venue', 'booking', 'destination', 'trip', 'flight', 'stay', 'vacation', 'visit', 'explore'],
       domains: ['google.com/maps', 'airbnb.com', 'booking.com', 'expedia.com']
     },
-    people: {
-      kw: ['profile', 'portfolio', 'about', 'bio', 'founder', 'creator', 'designer', 'author', 'interview'],
+    follow: {
+      kw: ['profile', 'portfolio', 'about', 'bio', 'founder', 'creator', 'designer', 'author', 'interview', 'person'],
       domains: ['linkedin.com', 'twitter.com', 'x.com', 'instagram.com', 'behance.net', 'dribbble.com']
     },
-    reading: {
-      kw: ['article', 'essay', 'blog', 'opinion', 'thought', 'idea', 'research', 'paper', 'guide', 'tutorial', 'learn', 'book', 'review', 'news'],
+    read: {
+      kw: ['article', 'essay', 'blog', 'opinion', 'thought', 'idea', 'research', 'paper', 'guide', 'tutorial', 'learn', 'book', 'review', 'news', 'story'],
       domains: ['medium.com', 'substack.com', 'wikipedia.org', 'news.ycombinator.com', 'nytimes.com', 'theguardian.com']
     }
   };
