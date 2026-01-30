@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Things I Like</title>
+  <title>Board</title>
   <style>
 /* ============================================
-   Things I Like - Swiss Grid + Web 1.0 Typography
+   Board - Swiss Grid + Web 1.0 Typography
    ============================================ */
 
 :root {
@@ -1220,8 +1220,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const links = currentFilter === 'all' ? allLinks : allLinks.filter(l => l.category === currentFilter);
 
     if (links.length === 0) {
-      grid.innerHTML = `<div class="empty-state" id="emptyState" style="cursor:pointer"><h2 class="empty-state__title">Paste a link to begin</h2></div>`;
-      $('emptyState').onclick = () => openModal(addModal);
+      grid.innerHTML = `<div class="empty-state" id="emptyState">
+        <h2 class="empty-state__title">Your Board</h2>
+        <p class="empty-state__text" style="max-width: 320px; margin: 0 auto;">
+          Save links you like. Paste URLs anywhere on this page or click + to add.<br><br>
+          Links are auto-categorized and stored locally in your browser.
+        </p>
+      </div>`;
       return;
     }
 
@@ -1664,11 +1669,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       processLinks(text);
     }
   });
-
-  // First-use: auto-open add modal if no links exist
-  if (getAllLinks().length === 0) {
-    setTimeout(() => openModal(addModal), 100);
-  }
 
 })();
   </script>
