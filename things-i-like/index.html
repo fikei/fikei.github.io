@@ -700,6 +700,21 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Metadata Fetcher
   // ============================================
   const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+  const FETCH_TIMEOUT = 10000; // 10 seconds
+  const MAX_RETRIES = 2;
+
+  async function fetchWithTimeout(url, timeout) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(id);
+      return res;
+    } catch (e) {
+      clearTimeout(id);
+      throw e;
+    }
+  }
 
   async function fetchMetadata(url) {
     console.log('[fetchMetadata] Starting for:', url);
@@ -707,14 +722,35 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     console.log('[fetchMetadata] Domain:', domain);
     const meta = { title: domain, description: '', image: null, domain };
 
-    try {
-      console.log('[fetchMetadata] Fetching via proxy...');
-      const res = await fetch(CORS_PROXY + encodeURIComponent(url));
-      console.log('[fetchMetadata] Response status:', res.status);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const html = await res.text();
-      console.log('[fetchMetadata] HTML length:', html.length);
+    let html = null;
+    let lastError = null;
 
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) console.log('[fetchMetadata] Retry attempt', attempt);
+        console.log('[fetchMetadata] Fetching via proxy...');
+        const res = await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url), FETCH_TIMEOUT);
+        console.log('[fetchMetadata] Response status:', res.status);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        html = await res.text();
+        console.log('[fetchMetadata] HTML length:', html.length);
+        break;
+      } catch (e) {
+        lastError = e;
+        console.error('[fetchMetadata] Attempt', attempt, 'failed:', e.message);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
+    }
+
+    if (!html) {
+      console.error('[fetchMetadata] All attempts failed:', url, lastError?.message);
+      meta.title = generateTitleFromUrl(url);
+      return meta;
+    }
+
+    try {
       // Title
       const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
                       html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:title["']/i);
@@ -783,9 +819,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       } else {
         console.log('[fetchMetadata] No image found');
       }
-    } catch (e) {
-      console.error('[fetchMetadata] Failed:', url, e.message);
-      meta.title = generateTitleFromUrl(url);
+    } catch (parseErr) {
+      console.error('[fetchMetadata] Parse error:', parseErr.message);
     }
 
     console.log('[fetchMetadata] Result:', meta);
