@@ -588,6 +588,55 @@ body {
   color: var(--black);
   border: 2px solid var(--black);
 }
+
+/* ============================================
+   Dev Menu
+   ============================================ */
+.dev-menu {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 200;
+  background: var(--white);
+  border: 2px solid var(--black);
+  padding: var(--space-2);
+  display: none;
+}
+
+.dev-menu--visible {
+  display: block;
+}
+
+.dev-menu__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--black);
+  margin-bottom: var(--space-2);
+}
+
+.dev-menu__btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.dev-menu__btn:hover {
+  background: var(--gray-light);
+}
+
+.dev-menu__btn--danger {
+  color: var(--black);
+  font-weight: bold;
+}
   </style>
 </head>
 <body>
@@ -653,6 +702,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Dev Menu -->
+  <div class="dev-menu" id="devMenu">
+    <div class="dev-menu__title">Dev Menu (Ctrl+Shift+D)</div>
+    <button class="dev-menu__btn" id="devExport">Export Data</button>
+    <button class="dev-menu__btn" id="devRefetch">Refetch All Images</button>
+    <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
+  </div>
 
   <script>
 // ============================================
@@ -1279,7 +1336,66 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     };
   });
 
-  document.onkeydown = (e) => { if (e.key === 'Escape') closeAll(); };
+  document.onkeydown = (e) => {
+    if (e.key === 'Escape') closeAll();
+    // Ctrl+Shift+D toggles dev menu
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      e.preventDefault();
+      $('devMenu').classList.toggle('dev-menu--visible');
+    }
+  };
+
+  // ============================================
+  // Dev Menu
+  // ============================================
+  $('devClearAll').onclick = () => {
+    if (confirm('Delete ALL links and categories? This cannot be undone.')) {
+      if (confirm('Are you sure? This will clear everything.')) {
+        localStorage.removeItem(STORAGE_KEY);
+        renderFilters();
+        renderGrid();
+        $('devMenu').classList.remove('dev-menu--visible');
+        toast('All data cleared');
+      }
+    }
+  };
+
+  $('devExport').onclick = () => {
+    const data = load();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'things-i-like-backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Data exported');
+  };
+
+  $('devRefetch').onclick = async () => {
+    const links = getAllLinks().filter(l => !l.image);
+    if (links.length === 0) {
+      toast('No links missing images');
+      return;
+    }
+    toast(`Refetching ${links.length} links...`);
+    $('devMenu').classList.remove('dev-menu--visible');
+
+    let updated = 0;
+    for (const link of links) {
+      try {
+        const meta = await fetchMetadata(link.url);
+        if (meta.image) {
+          updateLink(link.id, { image: meta.image });
+          updated++;
+        }
+      } catch (e) {
+        console.error('[devRefetch] Failed:', link.url, e);
+      }
+    }
+    renderGrid();
+    toast(`Updated ${updated} of ${links.length} links`);
+  };
 
   // ============================================
   // Helpers
