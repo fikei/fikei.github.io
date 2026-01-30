@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Things I Like</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="header__title">Things I Like</h1>
+    <button class="header__add-btn" id="addBtn" aria-label="Add links">+</button>
+  </header>
+
+  <nav class="filters" id="filters">
+    <button class="filter-token filter-token--active" data-category="all">All</button>
+  </nav>
+
+  <main class="grid" id="grid">
+    <!-- Grid items will be rendered here -->
+  </main>
+
+  <!-- Add Link Modal -->
+  <div class="modal" id="addModal" aria-hidden="true">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Add Links</h2>
+        <button class="modal__close" data-close aria-label="Close">&times;</button>
+      </div>
+      <form id="addForm" class="add-form">
+        <textarea
+          id="linkInput"
+          class="add-form__input"
+          placeholder="Paste URLs here (one or more, any format)..."
+          rows="6"
+          required
+        ></textarea>
+        <div class="add-form__status" id="formStatus"></div>
+        <button type="submit" class="add-form__submit">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Link Detail Overlay (Mobile) -->
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="overlay__backdrop" data-close></div>
+    <div class="overlay__content">
+      <button class="overlay__close" data-close aria-label="Close">&times;</button>
+      <img class="overlay__image" id="overlayImage" src="" alt="">
+      <div class="overlay__details">
+        <h2 class="overlay__title" id="overlayTitle"></h2>
+        <p class="overlay__domain" id="overlayDomain"></p>
+        <p class="overlay__description" id="overlayDescription"></p>
+        <div class="overlay__meta">
+          <span class="overlay__category" id="overlayCategory"></span>
+          <span class="overlay__date" id="overlayDate"></span>
+        </div>
+        <div class="overlay__actions">
+          <a class="overlay__link" id="overlayLink" href="" target="_blank" rel="noopener">Visit</a>
+          <button class="overlay__action" id="overlayRecategorize">Move</button>
+          <button class="overlay__action overlay__action--danger" id="overlayDelete">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Select Modal -->
+  <div class="modal modal--small" id="categoryModal" aria-hidden="true">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Move to Category</h2>
+        <button class="modal__close" data-close aria-label="Close">&times;</button>
+      </div>
+      <div class="category-list" id="categoryList">
+        <!-- Categories will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
