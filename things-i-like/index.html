@@ -1194,9 +1194,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   };
 
   $('overlayRecategorize').onclick = () => { closeModal(overlay); openCategorySelect(); };
-  $('overlayDelete').onclick = () => {
-    if (!selectedLink) return;
+  $('overlayDelete').onclick = (e) => {
+    e.stopPropagation();
+    console.log('[delete] clicked, selectedLink:', selectedLink);
+    if (!selectedLink) {
+      console.log('[delete] No selectedLink, aborting');
+      return;
+    }
     if (confirm('Delete this link?')) {
+      console.log('[delete] Confirmed, deleting:', selectedLink.id);
       deleteLink(selectedLink.id);
       closeModal(overlay);
       renderFilters();
