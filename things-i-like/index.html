@@ -153,6 +153,16 @@ body {
   cursor: pointer;
   background: var(--gray-light);
   border: 1px solid var(--black);
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+.grid-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.grid-item.drag-over {
+  border: 2px dashed var(--black);
 }
 
 .grid-item__image {
@@ -1060,9 +1070,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   function load() {
     try {
       const d = localStorage.getItem(STORAGE_KEY);
-      if (d) return JSON.parse(d);
+      if (d) {
+        const data = JSON.parse(d);
+        // Ensure linkOrder exists
+        if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
+        return data;
+      }
     } catch {}
-    return { links: [], categories: { uncategorized: { pinned: true } } };
+    return { links: [], categories: { uncategorized: { pinned: true } }, linkOrder: [] };
   }
 
   function save(data) {
@@ -1111,6 +1126,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     data.links.push({ ...link, addedAt: new Date().toISOString() });
+    // Add to beginning of order (newest first)
+    if (!data.linkOrder) data.linkOrder = [];
+    data.linkOrder.unshift(link.id);
     if (!data.categories[link.category]) {
       data.categories[link.category] = { pinned: false };
     }
@@ -1132,6 +1150,19 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   function deleteLink(id) {
     const data = load();
     data.links = data.links.filter(l => l.id !== id);
+    if (data.linkOrder) data.linkOrder = data.linkOrder.filter(i => i !== id);
+    save(data);
+  }
+
+  function reorderLinks(fromId, toId) {
+    const data = load();
+    if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
+    const fromIdx = data.linkOrder.indexOf(fromId);
+    const toIdx = data.linkOrder.indexOf(toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    // Remove from old position and insert at new position
+    data.linkOrder.splice(fromIdx, 1);
+    data.linkOrder.splice(toIdx, 0, fromId);
     save(data);
   }
 
@@ -1201,7 +1232,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   function renderGrid() {
-    const links = currentFilter === 'all' ? getAllLinks() : getAllLinks().filter(l => l.category === currentFilter);
+    const allLinks = getAllLinks();
+    const links = currentFilter === 'all' ? allLinks : allLinks.filter(l => l.category === currentFilter);
 
     if (links.length === 0) {
       grid.innerHTML = `<div class="empty-state" id="emptyState" style="cursor:pointer"><h2 class="empty-state__title">Paste a link to begin</h2></div>`;
@@ -1209,7 +1241,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       return;
     }
 
-    const sorted = [...links].sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+    // Sort by saved order, fallback to date
+    const data = load();
+    const order = data.linkOrder || [];
+    const sorted = [...links].sort((a, b) => {
+      const aIdx = order.indexOf(a.id);
+      const bIdx = order.indexOf(b.id);
+      if (aIdx === -1 && bIdx === -1) return new Date(b.addedAt) - new Date(a.addedAt);
+      if (aIdx === -1) return 1;
+      if (bIdx === -1) return -1;
+      return aIdx - bIdx;
+    });
+
     let html = '';
 
     for (const l of sorted) {
@@ -1217,13 +1260,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       const initial = l.title ? l.title.charAt(0).toUpperCase() : '?';
 
       if (hasImg) {
-        html += `<article class="grid-item" data-id="${l.id}">
+        html += `<article class="grid-item" data-id="${l.id}" draggable="true">
           <img class="grid-item__image" src="${l.image}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
         </article>`;
       } else {
-        html += `<article class="grid-item grid-item--placeholder" data-id="${l.id}">
+        html += `<article class="grid-item grid-item--placeholder" data-id="${l.id}" draggable="true">
           <span class="grid-item__initial">${initial}</span>
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
@@ -1308,7 +1351,55 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   grid.onclick = (e) => {
     const item = e.target.closest('.grid-item');
-    if (item) openDetail(item.dataset.id);
+    if (item && !isDragging) openDetail(item.dataset.id);
+  };
+
+  // Drag and drop reordering
+  let draggedId = null;
+  let isDragging = false;
+
+  grid.ondragstart = (e) => {
+    const item = e.target.closest('.grid-item');
+    if (!item) return;
+    draggedId = item.dataset.id;
+    isDragging = true;
+    item.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedId);
+  };
+
+  grid.ondragend = (e) => {
+    const item = e.target.closest('.grid-item');
+    if (item) item.classList.remove('dragging');
+    draggedId = null;
+    setTimeout(() => { isDragging = false; }, 100);
+  };
+
+  grid.ondragover = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const item = e.target.closest('.grid-item');
+    if (item && item.dataset.id !== draggedId) {
+      item.classList.add('drag-over');
+    }
+  };
+
+  grid.ondragleave = (e) => {
+    const item = e.target.closest('.grid-item');
+    if (item) item.classList.remove('drag-over');
+  };
+
+  grid.ondrop = (e) => {
+    e.preventDefault();
+    const targetItem = e.target.closest('.grid-item');
+    if (!targetItem || !draggedId) return;
+    targetItem.classList.remove('drag-over');
+    const targetId = targetItem.dataset.id;
+    if (draggedId !== targetId) {
+      reorderLinks(draggedId, targetId);
+      renderGrid();
+      toast('Reordered');
+    }
   };
 
   $('overlayRecategorize').onclick = () => { closeModal(overlay); openCategorySelect(); };
