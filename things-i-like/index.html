@@ -882,8 +882,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   const PATTERNS = {
     clothing: {
-      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan'],
+      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote'],
       domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com']
+    },
+    jewelry: {
+      kw: ['jewelry', 'jewellery', 'ring', 'necklace', 'earring', 'bracelet', 'pendant', 'chain', 'gold', 'silver', 'sterling', 'signet', 'hoop', 'cuff', 'bangle'],
+      domains: ['mejuri.com', 'catbirdnyc.com', 'auratenewyork.com']
     },
     shoes: {
       kw: ['shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat'],
@@ -894,11 +898,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       domains: ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com', 'vimeo.com', 'bandcamp.com', 'tiktok.com']
     },
     tools: {
-      kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer'],
+      kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer'],
       domains: ['github.com', 'gitlab.com', 'npmjs.com', 'producthunt.com']
     },
     food: {
-      kw: ['restaurant', 'cafe', 'bar', 'food', 'eat', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation'],
+      kw: ['restaurant', 'cafe', 'bar', 'food', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation'],
       domains: ['yelp.com', 'tripadvisor.com', 'opentable.com', 'doordash.com', 'ubereats.com', 'resy.com']
     },
     places: {
@@ -906,7 +910,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       domains: ['google.com/maps', 'airbnb.com', 'booking.com', 'expedia.com']
     },
     people: {
-      kw: ['profile', 'portfolio', 'about', 'bio', 'founder', 'creator', 'artist', 'designer', 'author', 'interview'],
+      kw: ['profile', 'portfolio', 'about', 'bio', 'founder', 'creator', 'designer', 'author', 'interview'],
       domains: ['linkedin.com', 'twitter.com', 'x.com', 'instagram.com', 'behance.net', 'dribbble.com']
     },
     reading: {
