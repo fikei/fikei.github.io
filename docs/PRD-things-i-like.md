@@ -8,14 +8,14 @@
 
 ## Overview
 
-"Things I Like" is a personal link curation tool that automatically categorizes URLs into broad primitive categories. Users submit links via unstructured text input, and the system fetches metadata, selects hero images, and organizes content into a visually minimal grid following Swiss design principles blended with Web 1.0 aesthetics.
+"Things I Like" is a personal link curation tool that automatically categorizes URLs into emergent, evolving categories. Users submit links via unstructured text input, and the system fetches metadata, selects hero images, and organizes content into a visually minimal grid following Swiss design principles blended with Web 1.0 aesthetics. Categories are not predefined—they emerge organically from the content you save and evolve as your collection grows.
 
 ---
 
 ## Goals
 
 1. Effortless link capture from mobile or desktop via simple text input
-2. Automatic intelligent categorization biased toward primitive categories
+2. Intelligent categorization that evolves with your collection
 3. Clean, fast, distraction-free browsing of saved links
 4. User control over categorization and organization
 
@@ -74,24 +74,68 @@ maybe later: another-site.com/resource
 
 ### 2. Automatic Categorization
 
-**Categories:** Bias toward very broad primitives
+**Categories:** Emergent and evolving—no predefined set
 
-| Category | Examples |
-|----------|----------|
-| Media | Articles, videos, music, podcasts, books |
-| Tools | Software, apps, utilities, services |
-| Places | Restaurants, locations, travel, maps |
-| People | Profiles, portfolios, interviews, creators |
-| Ideas | Essays, concepts, research, philosophy |
+Categories are generated dynamically based on the content you save. The system learns your interests and organizes accordingly.
+
+**Category Lifecycle:**
+
+| Phase | Behavior |
+|-------|----------|
+| **Genesis** | First link creates an "Uncategorized" holding area |
+| **Emergence** | After 3-5 similar links, AI proposes a new category |
+| **Growth** | Categories expand as more related content is added |
+| **Splitting** | Large categories (15+ items) may split into subcategories |
+| **Merging** | AI suggests merging similar low-population categories |
+| **Retirement** | Empty categories auto-archive after 30 days |
 
 **AI Behavior:**
-- Analyze URL metadata (title, description, content type)
-- Assign to single most appropriate primitive category
-- Confidence threshold: if uncertain, prompt user
 
-**User Override:**
-- User can reassign category at any time
-- User can request new primitive categories (system learns)
+```
+New link submitted
+    │
+    ▼
+Analyze content (title, description, domain, content type)
+    │
+    ▼
+Compare against existing categories
+    │
+    ├─ Strong match (>80% confidence) ──► Assign to category
+    │
+    ├─ Partial match (50-80%) ──► Assign + flag for review
+    │
+    ├─ Weak match (<50%) ──► Check for cluster potential
+    │       │
+    │       ├─ 3+ similar uncategorized ──► Propose new category
+    │       │
+    │       └─ <3 similar ──► Place in Uncategorized
+    │
+    └─ No match ──► Place in Uncategorized
+```
+
+**Category Naming:**
+- AI generates short, primitive names (1-2 words max)
+- Bias toward concrete nouns over abstract concepts
+- Examples: "Music", "Recipes", "Code", "Essays", "Gear", "Places"
+- Avoid: "Interesting Things", "Stuff I Like", "Miscellaneous"
+
+**User Controls:**
+- Rename any category
+- Merge two categories into one
+- Split a category manually
+- Move links between categories
+- Delete a category (links move to Uncategorized)
+- Pin categories to prevent auto-merge/split
+
+**Evolution Triggers:**
+
+| Trigger | Action |
+|---------|--------|
+| 3+ uncategorized links cluster | Propose new category |
+| Category reaches 15+ items | Suggest split options |
+| Two categories <5 items each, similar | Suggest merge |
+| User moves 3+ links to same category | Increase AI confidence for that pattern |
+| User rejects AI assignment 3x | Lower confidence, learn from corrections |
 
 ---
 
@@ -141,18 +185,26 @@ For each URL, fetch:
 **Implementation:** Persistent token-style filters at top
 
 **Behavior:**
-- All categories visible as horizontal token/pill buttons
+- All active categories visible as horizontal token/pill buttons
+- Categories ordered by: pinned first, then by item count (descending)
 - Sticky positioning (always visible while scrolling)
 - Active filter highlighted (inverted: white text on black)
-- "All" token selected by default
+- "All" token always first, selected by default
+- "Uncategorized" token appears when items exist (shows count badge)
 - Single-select (one category at a time)
-- URL updates to reflect filter state (`?category=media`)
+- URL updates to reflect filter state (`?category=music`)
+- Horizontal scroll on overflow (mobile)
 
 **Visual Style:**
 ```
-[All] [Media] [Tools] [Places] [People] [Ideas]
+[All] [Music] [Code] [Essays] [Recipes] [Uncategorized (3)]
   ^active (inverted)
 ```
+
+**Dynamic Updates:**
+- New categories animate in when created
+- Categories fade out when emptied
+- Count badges update in real-time
 
 ---
 
@@ -181,11 +233,31 @@ For each URL, fetch:
 **File Structure:**
 ```
 /content/links/
-  media.md
-  tools.md
-  places.md
-  people.md
-  ideas.md
+  _uncategorized.md      # Holding area for new/unmatched links
+  _categories.md         # Category metadata and settings
+  music.md               # Dynamically created
+  code.md                # Dynamically created
+  essays.md              # etc.
+  ...
+```
+
+**Category Metadata (`_categories.md`):**
+```markdown
+# Categories
+
+## music
+- **created:** 2026-01-15
+- **pinned:** false
+- **auto_generated:** true
+- **item_count:** 12
+
+## code
+- **created:** 2026-01-20
+- **pinned:** true
+- **auto_generated:** true
+- **item_count:** 8
+
+---
 ```
 
 **Entry Format:**
@@ -197,6 +269,8 @@ For each URL, fetch:
 - **description:** Optional description text
 - **image:** /images/links/[hash].jpg
 - **image_source:** fetched | generated
+- **ai_confidence:** 0.85
+- **user_verified:** false
 
 ---
 ```
@@ -279,6 +353,37 @@ Swiss design sensibility.
 3. Option to "View existing" or dismiss
 ```
 
+### Flow 5: Category Emergence
+
+```
+1. User adds 5th link about cooking/recipes
+2. System detects cluster in Uncategorized
+3. Toast notification: "Create 'Recipes' category?"
+4. User taps "Create" or "Not now"
+5. If created: links animate from Uncategorized to new category
+6. New token appears in filter bar
+```
+
+### Flow 6: Category Split Suggestion
+
+```
+1. "Music" category reaches 18 items
+2. AI detects two clusters: electronic + classical
+3. Notification: "Split Music into Electronic and Classical?"
+4. User can: Accept, Customize names, or Dismiss
+5. If accepted: items redistribute, two new tokens appear
+```
+
+### Flow 7: Category Merge Suggestion
+
+```
+1. "Synths" has 3 items, "Gear" has 4 items
+2. AI detects overlap
+3. Notification: "Merge Synths into Gear?"
+4. User can: Accept, Reverse (Gear into Synths), or Dismiss
+5. If accepted: items merge, one token removed
+```
+
 ---
 
 ## Non-Functional Requirements
@@ -311,7 +416,9 @@ Swiss design sensibility.
 1. Should there be a "recently added" section on the main view?
 2. Archive vs. delete - should deleted items be recoverable?
 3. Rate limiting on nanobanana image generation?
-4. Custom category creation - user-initiated or AI-suggested only?
+4. What's the minimum cluster size to trigger category creation (3? 5?)?
+5. Should users be able to manually create empty categories, or only AI-proposed?
+6. How long should Uncategorized items wait before prompting user action?
 
 ---
 
@@ -320,9 +427,11 @@ Swiss design sensibility.
 | Metric | Target |
 |--------|--------|
 | Links added per week | Baseline + growth |
-| Categorization accuracy | >90% correct on first assignment |
+| AI categorization accepted | >85% without user override |
 | Time to add link (mobile) | <10 seconds |
-| User overrides of category | <10% of additions |
+| Uncategorized items | <15% of total at any time |
+| Category churn | <2 merges/splits per month after stabilization |
+| User-initiated recategorization | <10% of items |
 
 ---
 
