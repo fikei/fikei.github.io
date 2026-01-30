@@ -266,7 +266,8 @@ body {
   grid-column: 1 / -1;
   display: flex;
   justify-content: center;
-  padding: var(--space-8) var(--space-4);
+  align-items: center;
+  min-height: calc(100vh - 100px);
 }
 
 .empty-state__box {
@@ -279,7 +280,8 @@ body {
 .empty-state__text {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--gray-dark);
+  font-weight: bold;
+  color: var(--black);
   line-height: var(--line-height-normal);
 }
 
