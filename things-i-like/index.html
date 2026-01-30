@@ -705,13 +705,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
   async function fetchMetadata(url) {
+    console.log('[fetchMetadata] Starting for:', url);
     const domain = extractDomain(url);
+    console.log('[fetchMetadata] Domain:', domain);
     const meta = { title: domain, description: '', image: null, domain };
 
     try {
+      console.log('[fetchMetadata] Fetching via proxy...');
       const res = await fetch(CORS_PROXY + encodeURIComponent(url));
+      console.log('[fetchMetadata] Response status:', res.status);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const html = await res.text();
+      console.log('[fetchMetadata] HTML length:', html.length);
 
       // Title
       const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
@@ -738,10 +743,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         meta.image = img;
       }
     } catch (e) {
-      console.warn('Fetch failed:', url, e.message);
+      console.error('[fetchMetadata] Failed:', url, e.message);
       meta.title = generateTitleFromUrl(url);
     }
 
+    console.log('[fetchMetadata] Result:', meta);
     return meta;
   }
 
@@ -787,7 +793,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   };
 
   function categorize(link) {
+    console.log('[categorize] Input link:', link);
     const text = `${link.title || ''} ${link.description || ''} ${link.url || ''}`.toLowerCase();
+    console.log('[categorize] Text to analyze:', text);
     let best = 'uncategorized', maxScore = 0;
 
     for (const [cat, p] of Object.entries(PATTERNS)) {
@@ -795,10 +803,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       for (const d of p.domains) if ((link.domain || '').includes(d) || (link.url || '').includes(d)) { score += 0.5; break; }
       for (const k of p.kw) if (text.includes(k)) score += 0.1;
       score = Math.min(score, 1);
+      if (score > 0) console.log('[categorize] Category', cat, 'score:', score);
       if (score > maxScore) { maxScore = score; best = cat; }
     }
 
-    return { category: maxScore >= 0.4 ? best : 'uncategorized', confidence: maxScore };
+    const result = { category: maxScore >= 0.4 ? best : 'uncategorized', confidence: maxScore };
+    console.log('[categorize] Result:', result);
+    return result;
   }
 
   function detectClusters(items) {
@@ -977,9 +988,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   addForm.onsubmit = async (e) => {
     e.preventDefault();
     const text = linkInput.value.trim();
+    console.log('[addForm] Input text:', text);
     if (!text) return;
 
     const urls = extractUrls(text);
+    console.log('[addForm] Extracted URLs:', urls);
     if (urls.length === 0) {
       showStatus('No valid URLs found', true);
       return;
@@ -989,13 +1002,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     let added = 0;
 
     for (const url of urls) {
+      console.log('[addForm] Processing URL:', url);
       try {
-        if (findByUrl(url)) { toast(`${extractDomain(url)} already exists`, true); continue; }
+        if (findByUrl(url)) {
+          console.log('[addForm] URL already exists');
+          toast(`${extractDomain(url)} already exists`, true);
+          continue;
+        }
         const meta = await fetchMetadata(url);
+        console.log('[addForm] Metadata:', meta);
         const cat = categorize(meta);
-        addLink({ id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence });
+        console.log('[addForm] Category:', cat);
+        const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
+        console.log('[addForm] Adding link:', linkObj);
+        addLink(linkObj);
         added++;
-      } catch (err) { toast(err.message, true); }
+        console.log('[addForm] Link added successfully');
+      } catch (err) {
+        console.error('[addForm] Error:', err);
+        toast(err.message, true);
+      }
     }
 
     if (added > 0) {
