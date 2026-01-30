@@ -700,7 +700,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Metadata Fetcher
   // ============================================
   const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-  const FETCH_TIMEOUT = 10000; // 10 seconds
+  const FETCH_TIMEOUT = 15000; // 15 seconds
   const MAX_RETRIES = 2;
 
   async function fetchWithTimeout(url, timeout) {
@@ -1002,16 +1002,25 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     if (existing) {
       console.log('[addLink] Duplicate found, updating:', link.url);
-      // Update existing item with fresh metadata and categorization
+      // Update existing item, but preserve existing data if new data is worse
       const i = data.links.findIndex(l => l.id === existing.id);
       if (i !== -1) {
+        // Preserve existing image/description/title if new ones are empty
+        const mergedImage = link.image || existing.image;
+        const mergedDescription = link.description || existing.description;
+        const mergedTitle = (link.title && link.title !== link.domain) ? link.title : existing.title;
+
         data.links[i] = {
           ...existing,
           ...link,
+          image: mergedImage,
+          description: mergedDescription,
+          title: mergedTitle,
           id: existing.id, // Keep original ID
           addedAt: existing.addedAt, // Keep original add date
           updatedAt: new Date().toISOString()
         };
+        console.log('[addLink] Merged - preserved image:', !!mergedImage, 'desc:', !!mergedDescription);
       }
       if (!data.categories[link.category]) {
         data.categories[link.category] = { pinned: false };
