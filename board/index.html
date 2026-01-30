@@ -302,54 +302,150 @@ body {
   color: var(--bg);
 }
 
-/* Expanded State */
-.grid-item--expanded {
-  grid-column: span 3;
+/* Expanded States - Shared */
+.grid-item--expanded-medium,
+.grid-item--expanded-large {
   aspect-ratio: auto;
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: var(--space-4);
   padding: var(--space-4);
   background: var(--bg);
+  position: relative;
 }
 
-.grid-item--expanded .grid-item__image {
-  aspect-ratio: 1;
-  width: 100%;
-  height: auto;
+.grid-item--expanded-medium .grid-item__overlay,
+.grid-item--expanded-large .grid-item__overlay {
+  display: none;
+}
+
+.grid-item--expanded-medium .grid-item__category,
+.grid-item--expanded-large .grid-item__category {
+  opacity: 1;
+}
+
+.grid-item--expanded-medium .grid-item__image,
+.grid-item--expanded-large .grid-item__image {
   filter: grayscale(0%);
 }
 
-.grid-item--expanded .grid-item__initial-wrap {
-  aspect-ratio: 1;
+.grid-item--expanded-medium .grid-item__details,
+.grid-item--expanded-large .grid-item__details {
+  display: flex;
+}
+
+/* Medium State: 2×2 */
+.grid-item--expanded-medium {
+  grid-column: span 2;
+  grid-row: span 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-3);
+}
+
+.grid-item--expanded-medium .grid-item__image {
+  grid-row: 1 / 2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.grid-item--expanded-medium .grid-item__initial-wrap {
+  grid-row: 1 / 2;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--fg);
 }
 
-.grid-item--expanded .grid-item__initial {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-2xl);
-  color: var(--bg);
+.grid-item--expanded-medium .grid-item__details {
+  grid-row: 1 / 2;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.grid-item--expanded .grid-item__overlay {
-  display: none;
+.grid-item--expanded-medium .grid-item__actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
-.grid-item--expanded .grid-item__category {
-  opacity: 1;
+.grid-item--expanded-medium .grid-item__details-description {
+  -webkit-line-clamp: 2;
 }
 
-.grid-item__details {
-  display: none;
+/* Large State: 3×2 */
+.grid-item--expanded-large {
+  grid-column: span 3;
+  grid-row: span 2;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-4);
+}
+
+.grid-item--expanded-large .grid-item__image {
+  grid-row: 1 / 3;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.grid-item--expanded-large .grid-item__initial-wrap {
+  grid-row: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg);
+}
+
+.grid-item--expanded-large .grid-item__details {
+  grid-row: 1 / 2;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.grid-item--expanded .grid-item__details {
+.grid-item--expanded-large .grid-item__actions {
+  grid-row: 2;
+}
+
+.grid-item--expanded-large .grid-item__details-description {
+  -webkit-line-clamp: 4;
+}
+
+/* Resize Handle */
+.grid-item__resize {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  cursor: nwse-resize;
+  display: none;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 4px;
+}
+
+.grid-item--expanded-medium .grid-item__resize,
+.grid-item--expanded-large .grid-item__resize {
   display: flex;
+}
+
+.grid-item__resize::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+}
+
+.grid-item__resize:hover::before {
+  border-color: var(--fg);
+}
+
+/* Shared detail styles */
+.grid-item__details {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .grid-item__details-title {
@@ -418,11 +514,40 @@ body {
   color: #fff;
 }
 
-/* Responsive expanded state */
+/* Responsive: Mobile */
 @media (max-width: 599px) {
-  .grid-item--expanded {
-    grid-column: span 2;
+  /* On mobile, both states become full-width stacked */
+  .grid-item--expanded-medium,
+  .grid-item--expanded-large {
+    grid-column: 1 / -1;
+    grid-row: span 1;
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .grid-item--expanded-medium .grid-item__image,
+  .grid-item--expanded-large .grid-item__image,
+  .grid-item--expanded-medium .grid-item__initial-wrap,
+  .grid-item--expanded-large .grid-item__initial-wrap {
+    grid-row: 1;
+    aspect-ratio: 16/9;
+    height: auto;
+  }
+
+  .grid-item--expanded-medium .grid-item__details,
+  .grid-item--expanded-large .grid-item__details {
+    grid-row: 2;
+  }
+
+  .grid-item--expanded-medium .grid-item__actions,
+  .grid-item--expanded-large .grid-item__actions {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  /* Hide resize on mobile - use tap to toggle */
+  .grid-item__resize {
+    display: none !important;
   }
 }
 
@@ -1218,6 +1343,19 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Storage
   // ============================================
   const STORAGE_KEY = 'things-i-like';
+  const EXPANDED_KEY = 'board-expanded-cards';
+
+  // Load/save expanded cards state
+  function loadExpandedCards() {
+    try {
+      const d = localStorage.getItem(EXPANDED_KEY);
+      return d ? JSON.parse(d) : {};
+    } catch { return {}; }
+  }
+
+  function saveExpandedCards(cards) {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(cards));
+  }
 
   function load() {
     try {
@@ -1349,7 +1487,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   let currentFilter = 'all';
   let selectedLink = null;
-  let expandedId = null;
+  let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
 
   // ============================================
   // DOM
@@ -1424,8 +1562,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     for (const l of sorted) {
       const hasImg = l.image && l.image.length > 0;
       const initial = l.title ? l.title.charAt(0).toUpperCase() : '?';
-      const isExpanded = expandedId === l.id;
-      const expandedClass = isExpanded ? ' grid-item--expanded' : '';
+      const expansionState = expandedCards[l.id]; // 'medium', 'large', or undefined
+      const expandedClass = expansionState ? ` grid-item--expanded-${expansionState}` : '';
+      const isExpanded = !!expansionState;
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
       const detailsHtml = `
@@ -1442,7 +1581,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             <button class="grid-item__action" data-action="category">Category</button>
             <button class="grid-item__action grid-item__action--danger" data-action="delete">Delete</button>
           </div>
-        </div>`;
+        </div>
+        <div class="grid-item__resize" data-action="resize"></div>`;
 
       if (hasImg) {
         html += `<article class="grid-item${expandedClass}" data-id="${l.id}" draggable="true">
@@ -1539,6 +1679,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       if (actionType === 'visit') {
         // Let the link handle itself
         return;
+      } else if (actionType === 'resize') {
+        // Toggle between medium and large
+        const currentState = expandedCards[id];
+        if (currentState === 'medium') {
+          expandedCards[id] = 'large';
+        } else {
+          expandedCards[id] = 'medium';
+        }
+        saveExpandedCards(expandedCards);
+        renderGrid();
+        return;
       } else if (actionType === 'category') {
         selectedLink = getAllLinks().find(l => l.id === id);
         openCategorySelect();
@@ -1546,7 +1697,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         const confirmed = await showConfirm('Delete this link?', 'Delete');
         if (confirmed) {
           deleteLink(id);
-          expandedId = null;
+          delete expandedCards[id];
+          saveExpandedCards(expandedCards);
           renderFilters();
           renderGrid();
           showToast('Deleted');
@@ -1555,15 +1707,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       return;
     }
 
-    // Toggle expansion
+    // Toggle expansion (collapsed ↔ medium)
     const item = e.target.closest('.grid-item');
     if (item && !isDragging) {
       const id = item.dataset.id;
-      if (expandedId === id) {
-        expandedId = null;
+      if (expandedCards[id]) {
+        // Collapse
+        delete expandedCards[id];
       } else {
-        expandedId = id;
+        // Expand to medium
+        expandedCards[id] = 'medium';
       }
+      saveExpandedCards(expandedCards);
       renderGrid();
     }
   };
@@ -1633,6 +1788,51 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
   };
 
+  // Drag-to-resize functionality
+  let resizeState = null;
+  const RESIZE_THRESHOLD = 50; // pixels to trigger size change
+
+  grid.onmousedown = (e) => {
+    const handle = e.target.closest('.grid-item__resize');
+    if (!handle) return;
+    e.preventDefault();
+    const item = e.target.closest('.grid-item');
+    if (!item) return;
+    resizeState = {
+      id: item.dataset.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      currentState: expandedCards[item.dataset.id] || 'medium'
+    };
+    document.body.style.cursor = 'nwse-resize';
+  };
+
+  document.onmousemove = (e) => {
+    if (!resizeState) return;
+    const deltaX = e.clientX - resizeState.startX;
+    // Visual feedback could be added here
+  };
+
+  document.onmouseup = (e) => {
+    if (!resizeState) return;
+    const deltaX = e.clientX - resizeState.startX;
+    const id = resizeState.id;
+
+    // Determine new size based on drag distance
+    if (deltaX > RESIZE_THRESHOLD && resizeState.currentState === 'medium') {
+      expandedCards[id] = 'large';
+      saveExpandedCards(expandedCards);
+      renderGrid();
+    } else if (deltaX < -RESIZE_THRESHOLD && resizeState.currentState === 'large') {
+      expandedCards[id] = 'medium';
+      saveExpandedCards(expandedCards);
+      renderGrid();
+    }
+
+    resizeState = null;
+    document.body.style.cursor = '';
+  };
+
   $('overlayRecategorize').onclick = () => { closeModal(overlay); openCategorySelect(); };
   $('overlayDelete').onclick = async (e) => {
     e.stopPropagation();
@@ -1672,6 +1872,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const second = await showConfirm('Are you sure? This will clear everything.', 'Final Warning');
     if (second) {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(EXPANDED_KEY);
+      expandedCards = {};
       renderFilters();
       renderGrid();
       $('devMenu').classList.remove('dev-menu--visible');
