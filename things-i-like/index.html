@@ -994,11 +994,28 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   function addLink(link) {
     const existing = findByUrl(link.url);
-    if (existing) {
-      console.log('[addLink] Duplicate found, skipping:', link.url);
-      return { success: false, reason: 'duplicate', category: existing.category };
-    }
     const data = load();
+
+    if (existing) {
+      console.log('[addLink] Duplicate found, updating:', link.url);
+      // Update existing item with fresh metadata and categorization
+      const i = data.links.findIndex(l => l.id === existing.id);
+      if (i !== -1) {
+        data.links[i] = {
+          ...existing,
+          ...link,
+          id: existing.id, // Keep original ID
+          addedAt: existing.addedAt, // Keep original add date
+          updatedAt: new Date().toISOString()
+        };
+      }
+      if (!data.categories[link.category]) {
+        data.categories[link.category] = { pinned: false };
+      }
+      save(data);
+      return { success: true, updated: true };
+    }
+
     data.links.push({ ...link, addedAt: new Date().toISOString() });
     if (!data.categories[link.category]) {
       data.categories[link.category] = { pinned: false };
@@ -1142,7 +1159,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     showStatus(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
-    let added = 0, skipped = 0;
+    let added = 0, updated = 0, failed = 0;
 
     for (const url of urls) {
       console.log('[addForm] Processing URL:', url);
@@ -1155,27 +1172,34 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         console.log('[addForm] Adding link:', linkObj);
         const result = addLink(linkObj);
         if (result.success) {
-          added++;
-          console.log('[addForm] Link added successfully');
-        } else {
-          skipped++;
-          console.log('[addForm] Skipped:', result.reason);
+          if (result.updated) {
+            updated++;
+            console.log('[addForm] Link updated');
+          } else {
+            added++;
+            console.log('[addForm] Link added successfully');
+          }
         }
       } catch (err) {
         console.error('[addForm] Error:', err);
-        skipped++;
+        failed++;
       }
     }
 
-    if (added > 0) {
-      showStatus(`Added ${added}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+    const parts = [];
+    if (added > 0) parts.push(`Added ${added}`);
+    if (updated > 0) parts.push(`Updated ${updated}`);
+    if (failed > 0) parts.push(`${failed} failed`);
+
+    if (added > 0 || updated > 0) {
+      showStatus(parts.join(', '));
       linkInput.value = '';
       renderFilters();
       renderGrid();
       checkClusters();
       setTimeout(() => { closeModal(addModal); showStatus(''); }, 800);
-    } else if (skipped > 0) {
-      showStatus(`${skipped} already exist${skipped === 1 ? 's' : ''}`, true);
+    } else if (failed > 0) {
+      showStatus(parts.join(', '), true);
     }
   };
 
@@ -1327,7 +1351,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     toast(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
 
-    let added = 0, skipped = 0;
+    let added = 0, updated = 0, failed = 0;
     for (const url of urls) {
       console.log('[processLinks] Processing URL:', url);
       try {
@@ -1339,25 +1363,32 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         console.log('[processLinks] Adding link:', linkObj);
         const result = addLink(linkObj);
         if (result.success) {
-          added++;
-          console.log('[processLinks] Link added successfully');
-        } else {
-          skipped++;
-          console.log('[processLinks] Skipped:', result.reason);
+          if (result.updated) {
+            updated++;
+            console.log('[processLinks] Link updated');
+          } else {
+            added++;
+            console.log('[processLinks] Link added successfully');
+          }
         }
       } catch (err) {
         console.error('[processLinks] Error:', err);
-        skipped++;
+        failed++;
       }
     }
 
-    if (added > 0) {
-      toast(`Added ${added} link${added > 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+    const parts = [];
+    if (added > 0) parts.push(`${added} added`);
+    if (updated > 0) parts.push(`${updated} updated`);
+    if (failed > 0) parts.push(`${failed} failed`);
+
+    if (added > 0 || updated > 0) {
+      toast(parts.join(', '));
       renderFilters();
       renderGrid();
       checkClusters();
-    } else if (skipped > 0) {
-      toast(`${skipped} link${skipped > 1 ? 's' : ''} already exist${skipped === 1 ? 's' : ''}`, true);
+    } else if (failed > 0) {
+      toast(parts.join(', '), true);
     }
   }
 
