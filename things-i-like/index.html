@@ -1388,7 +1388,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   document.onkeydown = (e) => {
     if (e.key === 'Escape') closeAll();
     // Ctrl+Shift+D toggles dev menu
-    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
       $('devMenu').classList.toggle('dev-menu--visible');
     }
