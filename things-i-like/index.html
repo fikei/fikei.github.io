@@ -60,35 +60,29 @@ body {
 }
 
 /* ============================================
-   Header
+   Floating Add Button
    ============================================ */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: var(--space-6) var(--space-4);
-  border-bottom: 1px solid var(--black);
-}
-
-.header__title {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  font-weight: normal;
-  letter-spacing: -0.02em;
-}
-
-.header__add-btn {
+.fab {
+  position: fixed;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  width: 48px;
+  height: 48px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
-  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-xl);
   background: var(--black);
   color: var(--white);
   border: none;
   cursor: pointer;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.header__add-btn:hover {
-  text-decoration: underline;
+.fab:hover {
+  outline: 2px solid var(--black);
+  outline-offset: 2px;
 }
 
 /* ============================================
@@ -591,16 +585,13 @@ body {
   </style>
 </head>
 <body>
-  <header class="header">
-    <h1 class="header__title">Things I Like</h1>
-    <button class="header__add-btn" id="addBtn">+</button>
-  </header>
-
   <nav class="filters" id="filters">
     <button class="filter-token filter-token--active" data-category="all">All</button>
   </nav>
 
   <main class="grid" id="grid"></main>
+
+  <button class="fab" id="addBtn">+</button>
 
   <!-- Add Modal -->
   <div class="modal" id="addModal">
@@ -770,29 +761,37 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Categorizer
   // ============================================
   const PATTERNS = {
-    media: {
-      kw: ['video', 'music', 'podcast', 'youtube', 'spotify', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'watch', 'playlist'],
+    clothing: {
+      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan'],
+      domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com']
+    },
+    shoes: {
+      kw: ['shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat'],
+      domains: ['stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com']
+    },
+    music: {
+      kw: ['video', 'music', 'podcast', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'watch', 'playlist', 'track', 'artist', 'band', 'concert'],
       domains: ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com', 'vimeo.com', 'bandcamp.com', 'tiktok.com']
     },
     tools: {
-      kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin'],
+      kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer'],
       domains: ['github.com', 'gitlab.com', 'npmjs.com', 'producthunt.com']
     },
-    shopping: {
-      kw: ['product', 'products', 'buy', 'shop', 'store', 'cart', 'price', 'sale', 'jacket', 'shirt', 'pants', 'shoes', 'clothing', 'wear', 'fashion', 'outfit', 'gear', 'equipment', 'variant', 'size', 'color', 'add to cart', 'checkout'],
-      domains: ['amazon.com', 'ebay.com', 'etsy.com', 'shopify.com', 'ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'stockx.com']
+    food: {
+      kw: ['restaurant', 'cafe', 'bar', 'food', 'eat', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation'],
+      domains: ['yelp.com', 'tripadvisor.com', 'opentable.com', 'doordash.com', 'ubereats.com', 'resy.com']
     },
     places: {
-      kw: ['restaurant', 'cafe', 'bar', 'hotel', 'travel', 'map', 'city', 'venue', 'food', 'eat', 'reservation', 'booking'],
-      domains: ['yelp.com', 'tripadvisor.com', 'google.com/maps', 'airbnb.com', 'opentable.com']
+      kw: ['hotel', 'travel', 'map', 'city', 'venue', 'booking', 'destination', 'trip', 'flight', 'stay', 'vacation'],
+      domains: ['google.com/maps', 'airbnb.com', 'booking.com', 'expedia.com']
     },
     people: {
       kw: ['profile', 'portfolio', 'about', 'bio', 'founder', 'creator', 'artist', 'designer', 'author', 'interview'],
       domains: ['linkedin.com', 'twitter.com', 'x.com', 'instagram.com', 'behance.net', 'dribbble.com']
     },
-    ideas: {
-      kw: ['article', 'essay', 'blog', 'opinion', 'thought', 'idea', 'research', 'paper', 'guide', 'tutorial', 'learn'],
-      domains: ['medium.com', 'substack.com', 'wikipedia.org', 'news.ycombinator.com']
+    reading: {
+      kw: ['article', 'essay', 'blog', 'opinion', 'thought', 'idea', 'research', 'paper', 'guide', 'tutorial', 'learn', 'book', 'review', 'news'],
+      domains: ['medium.com', 'substack.com', 'wikipedia.org', 'news.ycombinator.com', 'nytimes.com', 'theguardian.com']
     }
   };
 
@@ -1166,10 +1165,69 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   // ============================================
+  // Direct paste processing
+  // ============================================
+  async function processLinks(text) {
+    console.log('[processLinks] Input:', text);
+    const urls = extractUrls(text);
+    console.log('[processLinks] Extracted URLs:', urls);
+
+    if (urls.length === 0) {
+      toast('No valid URLs found', true);
+      return;
+    }
+
+    toast(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
+
+    let added = 0;
+    for (const url of urls) {
+      console.log('[processLinks] Processing URL:', url);
+      try {
+        if (findByUrl(url)) {
+          console.log('[processLinks] URL already exists');
+          toast(`${extractDomain(url)} already exists`, true);
+          continue;
+        }
+        const meta = await fetchMetadata(url);
+        console.log('[processLinks] Metadata:', meta);
+        const cat = categorize(meta);
+        console.log('[processLinks] Category:', cat);
+        const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
+        console.log('[processLinks] Adding link:', linkObj);
+        addLink(linkObj);
+        added++;
+        console.log('[processLinks] Link added successfully');
+      } catch (err) {
+        console.error('[processLinks] Error:', err);
+        toast(err.message, true);
+      }
+    }
+
+    if (added > 0) {
+      toast(`Added ${added} link${added > 1 ? 's' : ''}`);
+      renderFilters();
+      renderGrid();
+      checkClusters();
+    }
+  }
+
+  // ============================================
   // Init
   // ============================================
   renderFilters();
   renderGrid();
+
+  // Listen for paste anywhere on page
+  document.addEventListener('paste', (e) => {
+    // Don't intercept if pasting into textarea/input
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+    const text = e.clipboardData.getData('text');
+    if (text && extractUrls(text).length > 0) {
+      e.preventDefault();
+      processLinks(text);
+    }
+  });
 
   // First-use: auto-open add modal if no links exist
   if (getAllLinks().length === 0) {
