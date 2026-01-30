@@ -264,20 +264,23 @@ body {
    ============================================ */
 .empty-state {
   grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
   padding: var(--space-8) var(--space-4);
-  text-align: center;
 }
 
-.empty-state__title {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
-  margin-bottom: var(--space-2);
+.empty-state__box {
+  border: 1px solid var(--black);
+  padding: var(--space-6);
+  max-width: 320px;
+  text-align: center;
 }
 
 .empty-state__text {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--gray-mid);
+  color: var(--gray-dark);
+  line-height: var(--line-height-normal);
 }
 
 /* ============================================
@@ -1222,12 +1225,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const links = currentFilter === 'all' ? allLinks : allLinks.filter(l => l.category === currentFilter);
 
     if (links.length === 0) {
-      grid.innerHTML = `<div class="empty-state" id="emptyState">
-        <h2 class="empty-state__title">Your Board</h2>
-        <p class="empty-state__text" style="max-width: 320px; margin: 0 auto;">
-          Save links you like. Paste URLs anywhere on this page or click + to add.<br><br>
-          Links are auto-categorized and stored locally in your browser.
-        </p>
+      grid.innerHTML = `<div class="empty-state">
+        <div class="empty-state__box">
+          <p class="empty-state__text">
+            Save links you like. Paste URLs anywhere on this page or click + to add.<br><br>
+            Links are auto-categorized and stored locally in your browser.
+          </p>
+        </div>
       </div>`;
       return;
     }
