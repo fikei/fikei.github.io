@@ -1359,18 +1359,22 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   $('overlayRecategorize').onclick = () => { closeModal(overlay); openCategorySelect(); };
   $('overlayDelete').onclick = (e) => {
     e.stopPropagation();
-    console.log('[delete] clicked, selectedLink:', selectedLink);
+    console.log('[delete] clicked, selectedLink:', selectedLink?.id);
     if (!selectedLink) {
       console.log('[delete] No selectedLink, aborting');
       return;
     }
-    if (confirm('Delete this link?')) {
-      console.log('[delete] Confirmed, deleting:', selectedLink.id);
+    console.log('[delete] About to show confirm dialog');
+    const confirmed = confirm('Delete this link?');
+    console.log('[delete] Confirm result:', confirmed);
+    if (confirmed) {
+      console.log('[delete] Deleting:', selectedLink.id);
       deleteLink(selectedLink.id);
       closeModal(overlay);
       renderFilters();
       renderGrid();
       toast('Deleted');
+      console.log('[delete] Done');
     }
   };
 
