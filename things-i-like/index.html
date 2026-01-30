@@ -799,14 +799,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   async function fetchMetadata(url) {
-    console.log('[fetchMetadata] Starting for:', url);
     const domain = extractDomain(url);
-    console.log('[fetchMetadata] Domain:', domain);
     const meta = { title: domain, description: '', image: null, domain };
 
     // Clean URL to remove tracking params (makes fetch faster)
     const fetchUrl = cleanUrl(url);
-    if (fetchUrl !== url) console.log('[fetchMetadata] Cleaned URL:', fetchUrl);
 
     let html = null;
     let lastError = null;
@@ -815,28 +812,21 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     for (const proxy of CORS_PROXIES) {
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-          if (attempt > 0) console.log('[fetchMetadata] Retry attempt', attempt);
-          console.log('[fetchMetadata] Fetching via proxy:', proxy.split('?')[0]);
           const res = await fetchWithTimeout(proxy + encodeURIComponent(fetchUrl), FETCH_TIMEOUT);
-          console.log('[fetchMetadata] Response status:', res.status);
           if (!res.ok) throw new Error('HTTP ' + res.status);
           html = await res.text();
-          console.log('[fetchMetadata] HTML length:', html.length);
           break;
         } catch (e) {
           lastError = e;
-          console.error('[fetchMetadata] Attempt', attempt, 'failed:', e.message);
           if (attempt < MAX_RETRIES) {
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           }
         }
       }
-      if (html) break; // Got HTML, stop trying proxies
-      console.log('[fetchMetadata] Trying next proxy...');
+      if (html) break;
     }
 
     if (!html) {
-      console.error('[fetchMetadata] All attempts failed:', url, lastError?.message);
       meta.title = generateTitleFromUrl(url);
       return meta;
     }
@@ -857,14 +847,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       else if (desc) meta.description = decodeEntities(desc[1]);
 
       // Image - try multiple patterns with more flexible regex
-      console.log('[fetchMetadata] Looking for og:image...');
-      // Try og:image with flexible attribute ordering and spacing
       let ogImg = html.match(/<meta[^>]*property\s*=\s*["']og:image["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
                   html.match(/<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*property\s*=\s*["']og:image["']/i);
 
       // Try twitter:image
       if (!ogImg) {
-        console.log('[fetchMetadata] Trying twitter:image...');
         ogImg = html.match(/<meta[^>]*name\s*=\s*["']twitter:image["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
                 html.match(/<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*name\s*=\s*["']twitter:image["']/i) ||
                 html.match(/<meta[^>]*name\s*=\s*["']twitter:image:src["'][^>]*content\s*=\s*["']([^"']+)["']/i);
@@ -872,28 +859,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
       // Try og:image:url and og:image:secure_url
       if (!ogImg) {
-        console.log('[fetchMetadata] Trying og:image:url...');
         ogImg = html.match(/<meta[^>]*property\s*=\s*["']og:image:url["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
                 html.match(/<meta[^>]*property\s*=\s*["']og:image:secure_url["'][^>]*content\s*=\s*["']([^"']+)["']/i);
       }
 
       // Try itemprop image (schema.org)
       if (!ogImg) {
-        console.log('[fetchMetadata] Trying itemprop image...');
         ogImg = html.match(/<meta[^>]*itemprop\s*=\s*["']image["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
                 html.match(/<link[^>]*rel\s*=\s*["']image_src["'][^>]*href\s*=\s*["']([^"']+)["']/i);
       }
 
       // Fallback: try to find first significant image tag
       if (!ogImg) {
-        console.log('[fetchMetadata] Trying first large img tag...');
         const imgMatch = html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi);
         if (imgMatch) {
           for (const img of imgMatch.slice(0, 5)) {
             const src = img.match(/src\s*=\s*["']([^"']+)["']/i);
             if (src && src[1] && !src[1].includes('logo') && !src[1].includes('icon') && !src[1].includes('sprite')) {
               ogImg = [null, src[1]];
-              console.log('[fetchMetadata] Found img tag:', src[1]);
               break;
             }
           }
@@ -902,18 +885,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
       if (ogImg) {
         let img = ogImg[1];
-        console.log('[fetchMetadata] Found image candidate:', img);
         // Skip logos, favicons, icons
         const imgLower = img.toLowerCase();
         if (imgLower.includes('logo') || imgLower.includes('favicon') || imgLower.includes('icon') || imgLower.includes('sprite') || imgLower.includes('profile')) {
-          console.log('[fetchMetadata] Skipping logo/favicon, looking for product image...');
           // Try to find a product image instead
           const productImg = html.match(/<img[^>]*class\s*=\s*["'][^"']*product[^"']*["'][^>]*src\s*=\s*["']([^"']+)["']/i) ||
                             html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*["'][^"']*product[^"']*["']/i) ||
                             html.match(/<img[^>]*data-src\s*=\s*["']([^"']+)["']/i);
           if (productImg && productImg[1]) {
             img = productImg[1];
-            console.log('[fetchMetadata] Found product image:', img);
           } else {
             // Try first significant image that's not a logo
             const imgMatch = html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi);
@@ -924,7 +904,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
                   const srcLower = src[1].toLowerCase();
                   if (!srcLower.includes('logo') && !srcLower.includes('favicon') && !srcLower.includes('icon') && !srcLower.includes('sprite') && !srcLower.includes('profile') && !srcLower.includes('avatar')) {
                     img = src[1];
-                    console.log('[fetchMetadata] Found fallback image:', img);
                     break;
                   }
                 }
@@ -939,17 +918,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         const finalLower = img.toLowerCase();
         if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
           meta.image = img;
-        } else {
-          console.log('[fetchMetadata] Could not find non-logo image');
         }
-      } else {
-        console.log('[fetchMetadata] No image found');
       }
     } catch (parseErr) {
-      console.error('[fetchMetadata] Parse error:', parseErr.message);
+      // Parse error - continue with defaults
     }
 
-    console.log('[fetchMetadata] Result:', meta);
     return meta;
   }
 
@@ -1011,38 +985,28 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   };
 
   function categorize(link) {
-    console.log('[categorize] Input link:', link);
     const text = `${link.title || ''} ${link.description || ''} ${link.url || ''}`.toLowerCase();
-    console.log('[categorize] Text to analyze:', text);
     let best = 'uncategorized', maxScore = 0;
 
     for (const [cat, p] of Object.entries(PATTERNS)) {
       let score = 0;
-      let matchedKw = [];
       // Domain match gives 0.5
       for (const d of p.domains) {
         if ((link.domain || '').includes(d) || (link.url || '').includes(d)) {
           score += 0.5;
-          console.log('[categorize]', cat, 'domain match:', d);
           break;
         }
       }
       // Keyword match gives 0.15 each (so 2 matches = 0.3 which passes threshold)
       for (const k of p.kw) {
-        if (text.includes(k)) {
-          score += 0.15;
-          matchedKw.push(k);
-        }
+        if (text.includes(k)) score += 0.15;
       }
       score = Math.min(score, 1);
-      if (matchedKw.length > 0) console.log('[categorize]', cat, 'keywords:', matchedKw.join(', '), '| score:', score.toFixed(2));
       if (score > maxScore) { maxScore = score; best = cat; }
     }
 
     // Lower threshold to 0.15 (single keyword match is enough)
-    const result = { category: maxScore >= 0.15 ? best : 'uncategorized', confidence: maxScore };
-    console.log('[categorize] Result:', result);
-    return result;
+    return { category: maxScore >= 0.15 ? best : 'uncategorized', confidence: maxScore };
   }
 
   function detectClusters(items) {
@@ -1097,7 +1061,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const data = load();
 
     if (existing) {
-      console.log('[addLink] Duplicate found, updating:', link.url);
       // Update existing item, but preserve existing data if new data is worse
       const i = data.links.findIndex(l => l.id === existing.id);
       if (i !== -1) {
@@ -1116,7 +1079,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           addedAt: existing.addedAt, // Keep original add date
           updatedAt: new Date().toISOString()
         };
-        console.log('[addLink] Merged - preserved image:', !!mergedImage, 'desc:', !!mergedDescription);
       }
       if (!data.categories[link.category]) {
         data.categories[link.category] = { pinned: false };
@@ -1148,10 +1110,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   function deleteLink(id) {
+    console.log('[deleteLink] Deleting id:', id);
     const data = load();
+    const before = data.links.length;
     data.links = data.links.filter(l => l.id !== id);
+    const after = data.links.length;
+    console.log('[deleteLink] Links before:', before, 'after:', after);
     if (data.linkOrder) data.linkOrder = data.linkOrder.filter(i => i !== id);
     save(data);
+    console.log('[deleteLink] Saved');
   }
 
   function reorderLinks(fromId, toId) {
@@ -1285,11 +1252,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   addForm.onsubmit = async (e) => {
     e.preventDefault();
     const text = linkInput.value.trim();
-    console.log('[addForm] Input text:', text);
     if (!text) return;
 
     const urls = extractUrls(text);
-    console.log('[addForm] Extracted URLs:', urls);
     if (urls.length === 0) {
       showStatus('No valid URLs found', true);
       return;
@@ -1299,26 +1264,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     let added = 0, updated = 0, failed = 0;
 
     for (const url of urls) {
-      console.log('[addForm] Processing URL:', url);
       try {
         const meta = await fetchMetadata(url);
-        console.log('[addForm] Metadata:', meta);
         const cat = categorize(meta);
-        console.log('[addForm] Category:', cat);
         const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
-        console.log('[addForm] Adding link:', linkObj);
         const result = addLink(linkObj);
         if (result.success) {
-          if (result.updated) {
-            updated++;
-            console.log('[addForm] Link updated');
-          } else {
-            added++;
-            console.log('[addForm] Link added successfully');
-          }
+          if (result.updated) updated++;
+          else added++;
         }
       } catch (err) {
-        console.error('[addForm] Error:', err);
         failed++;
       }
     }
@@ -1398,7 +1353,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     if (draggedId !== targetId) {
       reorderLinks(draggedId, targetId);
       renderGrid();
-      toast('Reordered');
     }
   };
 
@@ -1481,7 +1435,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           updated++;
         }
       } catch (e) {
-        console.error('[devRefetch] Failed:', link.url, e);
+        // Fetch failed, continue
       }
     }
     renderGrid();
@@ -1496,9 +1450,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   function closeAll() { [addModal, overlay, categoryModal].forEach(closeModal); }
 
   function openDetail(id) {
+    console.log('[openDetail] Opening id:', id);
     const l = getAllLinks().find(x => x.id === id);
-    if (!l) return;
+    if (!l) {
+      console.log('[openDetail] Link not found');
+      return;
+    }
     selectedLink = l;
+    console.log('[openDetail] selectedLink set to:', l.id, l.title);
     $('overlayImage').src = l.image || '';
     $('overlayImage').style.display = l.image ? 'block' : 'none';
     $('overlayTitle').textContent = l.title;
@@ -1584,9 +1543,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Direct paste processing
   // ============================================
   async function processLinks(text) {
-    console.log('[processLinks] Input:', text);
     const urls = extractUrls(text);
-    console.log('[processLinks] Extracted URLs:', urls);
 
     if (urls.length === 0) {
       toast('No valid URLs found', true);
@@ -1597,26 +1554,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     let added = 0, updated = 0, failed = 0;
     for (const url of urls) {
-      console.log('[processLinks] Processing URL:', url);
       try {
         const meta = await fetchMetadata(url);
-        console.log('[processLinks] Metadata:', meta);
         const cat = categorize(meta);
-        console.log('[processLinks] Category:', cat);
         const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
-        console.log('[processLinks] Adding link:', linkObj);
         const result = addLink(linkObj);
         if (result.success) {
-          if (result.updated) {
-            updated++;
-            console.log('[processLinks] Link updated');
-          } else {
-            added++;
-            console.log('[processLinks] Link added successfully');
-          }
+          if (result.updated) updated++;
+          else added++;
         }
       } catch (err) {
-        console.error('[processLinks] Error:', err);
         failed++;
       }
     }
@@ -1643,20 +1590,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const uncategorized = getAllLinks().filter(l => l.category === 'uncategorized');
     if (uncategorized.length === 0) return;
 
-    console.log('[recategorize] Found', uncategorized.length, 'uncategorized items');
     let moved = 0;
-
     for (const link of uncategorized) {
       const cat = categorize(link);
       if (cat.category !== 'uncategorized') {
-        console.log('[recategorize] Moving', link.url, 'to', cat.category);
         updateLink(link.id, { category: cat.category, confidence: cat.confidence });
         moved++;
       }
     }
 
     if (moved > 0) {
-      console.log('[recategorize] Moved', moved, 'items');
       renderFilters();
       renderGrid();
       toast(`Recategorized ${moved} item${moved > 1 ? 's' : ''}`);
