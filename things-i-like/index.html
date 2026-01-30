@@ -811,11 +811,46 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
       if (ogImg) {
         let img = ogImg[1];
-        console.log('[fetchMetadata] Found image:', img);
+        console.log('[fetchMetadata] Found image candidate:', img);
+        // Skip logos, favicons, icons
+        const imgLower = img.toLowerCase();
+        if (imgLower.includes('logo') || imgLower.includes('favicon') || imgLower.includes('icon') || imgLower.includes('sprite') || imgLower.includes('profile')) {
+          console.log('[fetchMetadata] Skipping logo/favicon, looking for product image...');
+          // Try to find a product image instead
+          const productImg = html.match(/<img[^>]*class\s*=\s*["'][^"']*product[^"']*["'][^>]*src\s*=\s*["']([^"']+)["']/i) ||
+                            html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*["'][^"']*product[^"']*["']/i) ||
+                            html.match(/<img[^>]*data-src\s*=\s*["']([^"']+)["']/i);
+          if (productImg && productImg[1]) {
+            img = productImg[1];
+            console.log('[fetchMetadata] Found product image:', img);
+          } else {
+            // Try first significant image that's not a logo
+            const imgMatch = html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi);
+            if (imgMatch) {
+              for (const imgTag of imgMatch.slice(0, 10)) {
+                const src = imgTag.match(/src\s*=\s*["']([^"']+)["']/i);
+                if (src && src[1]) {
+                  const srcLower = src[1].toLowerCase();
+                  if (!srcLower.includes('logo') && !srcLower.includes('favicon') && !srcLower.includes('icon') && !srcLower.includes('sprite') && !srcLower.includes('profile') && !srcLower.includes('avatar')) {
+                    img = src[1];
+                    console.log('[fetchMetadata] Found fallback image:', img);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
         if (!img.startsWith('http')) {
           try { img = new URL(img, url).href; } catch {}
         }
-        meta.image = img;
+        // Final check - don't use if still a logo
+        const finalLower = img.toLowerCase();
+        if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
+          meta.image = img;
+        } else {
+          console.log('[fetchMetadata] Could not find non-logo image');
+        }
       } else {
         console.log('[fetchMetadata] No image found');
       }
