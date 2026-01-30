@@ -1254,10 +1254,40 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   // ============================================
+  // Re-categorize uncategorized items
+  // ============================================
+  function recategorizeUncategorized() {
+    const uncategorized = getAllLinks().filter(l => l.category === 'uncategorized');
+    if (uncategorized.length === 0) return;
+
+    console.log('[recategorize] Found', uncategorized.length, 'uncategorized items');
+    let moved = 0;
+
+    for (const link of uncategorized) {
+      const cat = categorize(link);
+      if (cat.category !== 'uncategorized') {
+        console.log('[recategorize] Moving', link.url, 'to', cat.category);
+        updateLink(link.id, { category: cat.category, confidence: cat.confidence });
+        moved++;
+      }
+    }
+
+    if (moved > 0) {
+      console.log('[recategorize] Moved', moved, 'items');
+      renderFilters();
+      renderGrid();
+      toast(`Recategorized ${moved} item${moved > 1 ? 's' : ''}`);
+    }
+  }
+
+  // ============================================
   // Init
   // ============================================
   renderFilters();
   renderGrid();
+
+  // Re-check uncategorized items on load
+  recategorizeUncategorized();
 
   // Listen for paste anywhere on page
   document.addEventListener('paste', (e) => {
