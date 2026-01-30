@@ -723,15 +723,33 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       if (ogDesc) meta.description = decodeEntities(ogDesc[1]);
       else if (desc) meta.description = decodeEntities(desc[1]);
 
-      // Image
-      const ogImg = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) ||
-                    html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:image["']/i);
+      // Image - try multiple patterns
+      console.log('[fetchMetadata] Looking for og:image...');
+      let ogImg = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) ||
+                  html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:image["']/i);
+
+      // Also try twitter:image
+      if (!ogImg) {
+        console.log('[fetchMetadata] Trying twitter:image...');
+        ogImg = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']*)["']/i) ||
+                html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']twitter:image["']/i);
+      }
+
+      // Try to find any image in meta tags
+      if (!ogImg) {
+        console.log('[fetchMetadata] Trying any meta image...');
+        ogImg = html.match(/<meta[^>]*property=["']og:image:url["'][^>]*content=["']([^"']*)["']/i);
+      }
+
       if (ogImg) {
         let img = ogImg[1];
+        console.log('[fetchMetadata] Found image:', img);
         if (!img.startsWith('http')) {
           try { img = new URL(img, url).href; } catch {}
         }
         meta.image = img;
+      } else {
+        console.log('[fetchMetadata] No image found');
       }
     } catch (e) {
       console.error('[fetchMetadata] Failed:', url, e.message);
@@ -803,14 +821,29 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     for (const [cat, p] of Object.entries(PATTERNS)) {
       let score = 0;
-      for (const d of p.domains) if ((link.domain || '').includes(d) || (link.url || '').includes(d)) { score += 0.5; break; }
-      for (const k of p.kw) if (text.includes(k)) score += 0.1;
+      let matchedKw = [];
+      // Domain match gives 0.5
+      for (const d of p.domains) {
+        if ((link.domain || '').includes(d) || (link.url || '').includes(d)) {
+          score += 0.5;
+          console.log('[categorize]', cat, 'domain match:', d);
+          break;
+        }
+      }
+      // Keyword match gives 0.15 each (so 2 matches = 0.3 which passes threshold)
+      for (const k of p.kw) {
+        if (text.includes(k)) {
+          score += 0.15;
+          matchedKw.push(k);
+        }
+      }
       score = Math.min(score, 1);
-      if (score > 0) console.log('[categorize] Category', cat, 'score:', score);
+      if (matchedKw.length > 0) console.log('[categorize]', cat, 'keywords:', matchedKw.join(', '), '| score:', score.toFixed(2));
       if (score > maxScore) { maxScore = score; best = cat; }
     }
 
-    const result = { category: maxScore >= 0.4 ? best : 'uncategorized', confidence: maxScore };
+    // Lower threshold to 0.15 (single keyword match is enough)
+    const result = { category: maxScore >= 0.15 ? best : 'uncategorized', confidence: maxScore };
     console.log('[categorize] Result:', result);
     return result;
   }
@@ -858,13 +891,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   function addLink(link) {
-    if (findByUrl(link.url)) throw new Error('Link exists in ' + findByUrl(link.url).category);
+    const existing = findByUrl(link.url);
+    if (existing) {
+      console.log('[addLink] Duplicate found, skipping:', link.url);
+      return { success: false, reason: 'duplicate', category: existing.category };
+    }
     const data = load();
     data.links.push({ ...link, addedAt: new Date().toISOString() });
     if (!data.categories[link.category]) {
       data.categories[link.category] = { pinned: false };
     }
     save(data);
+    return { success: true };
   }
 
   function updateLink(id, updates) {
@@ -1002,38 +1040,40 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     showStatus(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
-    let added = 0;
+    let added = 0, skipped = 0;
 
     for (const url of urls) {
       console.log('[addForm] Processing URL:', url);
       try {
-        if (findByUrl(url)) {
-          console.log('[addForm] URL already exists');
-          toast(`${extractDomain(url)} already exists`, true);
-          continue;
-        }
         const meta = await fetchMetadata(url);
         console.log('[addForm] Metadata:', meta);
         const cat = categorize(meta);
         console.log('[addForm] Category:', cat);
         const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
         console.log('[addForm] Adding link:', linkObj);
-        addLink(linkObj);
-        added++;
-        console.log('[addForm] Link added successfully');
+        const result = addLink(linkObj);
+        if (result.success) {
+          added++;
+          console.log('[addForm] Link added successfully');
+        } else {
+          skipped++;
+          console.log('[addForm] Skipped:', result.reason);
+        }
       } catch (err) {
         console.error('[addForm] Error:', err);
-        toast(err.message, true);
+        skipped++;
       }
     }
 
     if (added > 0) {
-      showStatus(`Added ${added} link${added > 1 ? 's' : ''}`);
+      showStatus(`Added ${added}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
       linkInput.value = '';
       renderFilters();
       renderGrid();
       checkClusters();
       setTimeout(() => { closeModal(addModal); showStatus(''); }, 800);
+    } else if (skipped > 0) {
+      showStatus(`${skipped} already exist${skipped === 1 ? 's' : ''}`, true);
     }
   };
 
@@ -1179,35 +1219,37 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     toast(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
 
-    let added = 0;
+    let added = 0, skipped = 0;
     for (const url of urls) {
       console.log('[processLinks] Processing URL:', url);
       try {
-        if (findByUrl(url)) {
-          console.log('[processLinks] URL already exists');
-          toast(`${extractDomain(url)} already exists`, true);
-          continue;
-        }
         const meta = await fetchMetadata(url);
         console.log('[processLinks] Metadata:', meta);
         const cat = categorize(meta);
         console.log('[processLinks] Category:', cat);
         const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
         console.log('[processLinks] Adding link:', linkObj);
-        addLink(linkObj);
-        added++;
-        console.log('[processLinks] Link added successfully');
+        const result = addLink(linkObj);
+        if (result.success) {
+          added++;
+          console.log('[processLinks] Link added successfully');
+        } else {
+          skipped++;
+          console.log('[processLinks] Skipped:', result.reason);
+        }
       } catch (err) {
         console.error('[processLinks] Error:', err);
-        toast(err.message, true);
+        skipped++;
       }
     }
 
     if (added > 0) {
-      toast(`Added ${added} link${added > 1 ? 's' : ''}`);
+      toast(`Added ${added} link${added > 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
       renderFilters();
       renderGrid();
       checkClusters();
+    } else if (skipped > 0) {
+      toast(`${skipped} link${skipped > 1 ? 's' : ''} already exist${skipped === 1 ? 's' : ''}`, true);
     }
   }
 
