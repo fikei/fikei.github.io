@@ -787,12 +787,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   };
 
   function categorize(link) {
-    const text = `${link.title} ${link.description} ${link.url}`.toLowerCase();
+    const text = `${link.title || ''} ${link.description || ''} ${link.url || ''}`.toLowerCase();
     let best = 'uncategorized', maxScore = 0;
 
     for (const [cat, p] of Object.entries(PATTERNS)) {
       let score = 0;
-      for (const d of p.domains) if (link.domain.includes(d) || link.url.includes(d)) { score += 0.5; break; }
+      for (const d of p.domains) if ((link.domain || '').includes(d) || (link.url || '').includes(d)) { score += 0.5; break; }
       for (const k of p.kw) if (text.includes(k)) score += 0.1;
       score = Math.min(score, 1);
       if (score > maxScore) { maxScore = score; best = cat; }
