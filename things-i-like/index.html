@@ -721,6 +721,23 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
   </div>
 
+  <!-- Confirm Modal -->
+  <div class="modal modal--small" id="confirmModal">
+    <div class="modal__backdrop"></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title" id="confirmTitle">Confirm</h2>
+      </div>
+      <div style="padding: var(--space-4);">
+        <p id="confirmMessage" style="margin-bottom: var(--space-4); font-family: var(--font-serif);"></p>
+        <div style="display: flex; gap: var(--space-2);">
+          <button class="overlay__action" id="confirmCancel" style="flex: 1;">Cancel</button>
+          <button class="overlay__action overlay__action--danger" id="confirmOk" style="flex: 1; background: var(--black); color: var(--white);">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
 // ============================================
 // Things I Like - Single File App
@@ -1357,24 +1374,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   };
 
   $('overlayRecategorize').onclick = () => { closeModal(overlay); openCategorySelect(); };
-  $('overlayDelete').onclick = (e) => {
+  $('overlayDelete').onclick = async (e) => {
     e.stopPropagation();
-    console.log('[delete] clicked, selectedLink:', selectedLink?.id);
-    if (!selectedLink) {
-      console.log('[delete] No selectedLink, aborting');
-      return;
-    }
-    console.log('[delete] About to show confirm dialog');
-    const confirmed = confirm('Delete this link?');
-    console.log('[delete] Confirm result:', confirmed);
+    if (!selectedLink) return;
+    const confirmed = await showConfirm('Delete this link?', 'Delete');
     if (confirmed) {
-      console.log('[delete] Deleting:', selectedLink.id);
       deleteLink(selectedLink.id);
       closeModal(overlay);
       renderFilters();
       renderGrid();
       toast('Deleted');
-      console.log('[delete] Done');
     }
   };
 
@@ -1397,15 +1406,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Dev Menu
   // ============================================
-  $('devClearAll').onclick = () => {
-    if (confirm('Delete ALL links and categories? This cannot be undone.')) {
-      if (confirm('Are you sure? This will clear everything.')) {
-        localStorage.removeItem(STORAGE_KEY);
-        renderFilters();
-        renderGrid();
-        $('devMenu').classList.remove('dev-menu--visible');
-        toast('All data cleared');
-      }
+  $('devClearAll').onclick = async () => {
+    const first = await showConfirm('Delete ALL links and categories? This cannot be undone.', 'Clear All Data');
+    if (!first) return;
+    const second = await showConfirm('Are you sure? This will clear everything.', 'Final Warning');
+    if (second) {
+      localStorage.removeItem(STORAGE_KEY);
+      renderFilters();
+      renderGrid();
+      $('devMenu').classList.remove('dev-menu--visible');
+      toast('All data cleared');
     }
   };
 
@@ -1451,7 +1461,31 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   function openModal(m) { m.classList.add('modal--visible', 'overlay--visible'); }
   function closeModal(m) { m.classList.remove('modal--visible', 'overlay--visible'); }
-  function closeAll() { [addModal, overlay, categoryModal].forEach(closeModal); }
+  function closeAll() { [addModal, overlay, categoryModal, confirmModal].forEach(closeModal); }
+
+  // Custom confirm dialog (native confirm() is blocked in some contexts)
+  const confirmModal = $('confirmModal');
+  const confirmTitle = $('confirmTitle');
+  const confirmMessage = $('confirmMessage');
+  const confirmOkBtn = $('confirmOk');
+  const confirmCancelBtn = $('confirmCancel');
+
+  function showConfirm(message, title = 'Confirm') {
+    return new Promise((resolve) => {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      openModal(confirmModal);
+
+      const cleanup = () => {
+        confirmOkBtn.onclick = null;
+        confirmCancelBtn.onclick = null;
+        closeModal(confirmModal);
+      };
+
+      confirmOkBtn.onclick = () => { cleanup(); resolve(true); };
+      confirmCancelBtn.onclick = () => { cleanup(); resolve(false); };
+    });
+  }
 
   function openDetail(id) {
     console.log('[openDetail] Opening id:', id);
