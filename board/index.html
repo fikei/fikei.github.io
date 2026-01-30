@@ -302,6 +302,130 @@ body {
   color: var(--bg);
 }
 
+/* Expanded State */
+.grid-item--expanded {
+  grid-column: span 3;
+  aspect-ratio: auto;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg);
+}
+
+.grid-item--expanded .grid-item__image {
+  aspect-ratio: 1;
+  width: 100%;
+  height: auto;
+  filter: grayscale(0%);
+}
+
+.grid-item--expanded .grid-item__initial-wrap {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg);
+}
+
+.grid-item--expanded .grid-item__initial {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-2xl);
+  color: var(--bg);
+}
+
+.grid-item--expanded .grid-item__overlay {
+  display: none;
+}
+
+.grid-item--expanded .grid-item__category {
+  opacity: 1;
+}
+
+.grid-item__details {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.grid-item--expanded .grid-item__details {
+  display: flex;
+}
+
+.grid-item__details-title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  font-weight: normal;
+  line-height: var(--line-height-tight);
+}
+
+.grid-item__details-domain {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.grid-item__details-description {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  line-height: var(--line-height-normal);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.grid-item__details-meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  display: flex;
+  gap: var(--space-3);
+}
+
+.grid-item__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.grid-item__action {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.grid-item__action:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.grid-item__action--danger {
+  border-color: #c00;
+  color: #c00;
+}
+
+.grid-item__action--danger:hover {
+  background: #c00;
+  color: #fff;
+}
+
+/* Responsive expanded state */
+@media (max-width: 599px) {
+  .grid-item--expanded {
+    grid-column: span 2;
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ============================================
    Empty State
    ============================================ */
@@ -1225,6 +1349,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   let currentFilter = 'all';
   let selectedLink = null;
+  let expandedId = null;
 
   // ============================================
   // DOM
@@ -1299,18 +1424,39 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     for (const l of sorted) {
       const hasImg = l.image && l.image.length > 0;
       const initial = l.title ? l.title.charAt(0).toUpperCase() : '?';
+      const isExpanded = expandedId === l.id;
+      const expandedClass = isExpanded ? ' grid-item--expanded' : '';
+      const dateStr = new Date(l.addedAt).toLocaleDateString();
+
+      const detailsHtml = `
+        <div class="grid-item__details">
+          <h2 class="grid-item__details-title">${esc(l.title)}</h2>
+          <p class="grid-item__details-domain">${esc(l.domain)}</p>
+          ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
+          <div class="grid-item__details-meta">
+            <span>${cap(l.category)}</span>
+            <span>${dateStr}</span>
+          </div>
+          <div class="grid-item__actions">
+            <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
+            <button class="grid-item__action" data-action="category">Category</button>
+            <button class="grid-item__action grid-item__action--danger" data-action="delete">Delete</button>
+          </div>
+        </div>`;
 
       if (hasImg) {
-        html += `<article class="grid-item" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item${expandedClass}" data-id="${l.id}" draggable="true">
           <img class="grid-item__image" src="${l.image}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
+          ${detailsHtml}
         </article>`;
       } else {
-        html += `<article class="grid-item grid-item--placeholder" data-id="${l.id}" draggable="true">
-          <span class="grid-item__initial">${initial}</span>
+        html += `<article class="grid-item grid-item--placeholder${expandedClass}" data-id="${l.id}" draggable="true">
+          ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
+          ${detailsHtml}
         </article>`;
       }
     }
@@ -1334,8 +1480,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       return;
     }
 
-    showStatus(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
+    // Close modal immediately so user can watch links appear
+    linkInput.value = '';
+    closeModal(addModal);
+    showStatus('');
+
     let added = 0, updated = 0, failed = 0;
+    const total = urls.length;
 
     for (const url of urls) {
       try {
@@ -1346,27 +1497,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         if (result.success) {
           if (result.updated) updated++;
           else added++;
+          // Render immediately after each successful add
+          renderFilters();
+          renderGrid();
         }
       } catch (err) {
         failed++;
       }
     }
 
+    // Show summary toast at end
     const parts = [];
     if (added > 0) parts.push(`Added ${added}`);
     if (updated > 0) parts.push(`Updated ${updated}`);
     if (failed > 0) parts.push(`${failed} failed`);
-
-    if (added > 0 || updated > 0) {
-      showStatus(parts.join(', '));
-      linkInput.value = '';
-      renderFilters();
-      renderGrid();
-      checkClusters();
-      setTimeout(() => { closeModal(addModal); showStatus(''); }, 800);
-    } else if (failed > 0) {
-      showStatus(parts.join(', '), true);
+    if (parts.length > 0) {
+      showToast(parts.join(', '));
     }
+    checkClusters();
   };
 
   filters.onclick = (e) => {
@@ -1378,9 +1526,46 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
   };
 
-  grid.onclick = (e) => {
+  grid.onclick = async (e) => {
+    // Handle action buttons in expanded card
+    const action = e.target.closest('[data-action]');
+    if (action) {
+      e.stopPropagation();
+      const item = e.target.closest('.grid-item');
+      const id = item?.dataset.id;
+      if (!id) return;
+
+      const actionType = action.dataset.action;
+      if (actionType === 'visit') {
+        // Let the link handle itself
+        return;
+      } else if (actionType === 'category') {
+        selectedLink = getAllLinks().find(l => l.id === id);
+        openCategorySelect();
+      } else if (actionType === 'delete') {
+        const confirmed = await showConfirm('Delete this link?', 'Delete');
+        if (confirmed) {
+          deleteLink(id);
+          expandedId = null;
+          renderFilters();
+          renderGrid();
+          showToast('Deleted');
+        }
+      }
+      return;
+    }
+
+    // Toggle expansion
     const item = e.target.closest('.grid-item');
-    if (item && !isDragging) openDetail(item.dataset.id);
+    if (item && !isDragging) {
+      const id = item.dataset.id;
+      if (expandedId === id) {
+        expandedId = null;
+      } else {
+        expandedId = id;
+      }
+      renderGrid();
+    }
   };
 
   // Drag and drop reordering
@@ -1663,8 +1848,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       return;
     }
 
-    toast(`Processing ${urls.length} link${urls.length > 1 ? 's' : ''}...`);
-
     let added = 0, updated = 0, failed = 0;
     for (const url of urls) {
       try {
@@ -1675,25 +1858,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         if (result.success) {
           if (result.updated) updated++;
           else added++;
+          // Render immediately after each successful add
+          renderFilters();
+          renderGrid();
         }
       } catch (err) {
         failed++;
       }
     }
 
+    // Show summary toast at end
     const parts = [];
     if (added > 0) parts.push(`${added} added`);
     if (updated > 0) parts.push(`${updated} updated`);
     if (failed > 0) parts.push(`${failed} failed`);
-
-    if (added > 0 || updated > 0) {
-      toast(parts.join(', '));
-      renderFilters();
-      renderGrid();
-      checkClusters();
-    } else if (failed > 0) {
-      toast(parts.join(', '), true);
+    if (parts.length > 0) {
+      showToast(parts.join(', '));
     }
+    checkClusters();
   }
 
   // ============================================
