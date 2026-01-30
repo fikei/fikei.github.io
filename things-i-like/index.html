@@ -221,6 +221,12 @@ body {
   background: var(--white);
   border-right: 1px solid var(--black);
   border-bottom: 1px solid var(--black);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.grid-item:hover .grid-item__category {
+  opacity: 1;
 }
 
 /* Placeholder */
@@ -723,22 +729,48 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       if (ogDesc) meta.description = decodeEntities(ogDesc[1]);
       else if (desc) meta.description = decodeEntities(desc[1]);
 
-      // Image - try multiple patterns
+      // Image - try multiple patterns with more flexible regex
       console.log('[fetchMetadata] Looking for og:image...');
-      let ogImg = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']*)["']/i) ||
-                  html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:image["']/i);
+      // Try og:image with flexible attribute ordering and spacing
+      let ogImg = html.match(/<meta[^>]*property\s*=\s*["']og:image["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
+                  html.match(/<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*property\s*=\s*["']og:image["']/i);
 
-      // Also try twitter:image
+      // Try twitter:image
       if (!ogImg) {
         console.log('[fetchMetadata] Trying twitter:image...');
-        ogImg = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']*)["']/i) ||
-                html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']twitter:image["']/i);
+        ogImg = html.match(/<meta[^>]*name\s*=\s*["']twitter:image["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
+                html.match(/<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*name\s*=\s*["']twitter:image["']/i) ||
+                html.match(/<meta[^>]*name\s*=\s*["']twitter:image:src["'][^>]*content\s*=\s*["']([^"']+)["']/i);
       }
 
-      // Try to find any image in meta tags
+      // Try og:image:url and og:image:secure_url
       if (!ogImg) {
-        console.log('[fetchMetadata] Trying any meta image...');
-        ogImg = html.match(/<meta[^>]*property=["']og:image:url["'][^>]*content=["']([^"']*)["']/i);
+        console.log('[fetchMetadata] Trying og:image:url...');
+        ogImg = html.match(/<meta[^>]*property\s*=\s*["']og:image:url["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
+                html.match(/<meta[^>]*property\s*=\s*["']og:image:secure_url["'][^>]*content\s*=\s*["']([^"']+)["']/i);
+      }
+
+      // Try itemprop image (schema.org)
+      if (!ogImg) {
+        console.log('[fetchMetadata] Trying itemprop image...');
+        ogImg = html.match(/<meta[^>]*itemprop\s*=\s*["']image["'][^>]*content\s*=\s*["']([^"']+)["']/i) ||
+                html.match(/<link[^>]*rel\s*=\s*["']image_src["'][^>]*href\s*=\s*["']([^"']+)["']/i);
+      }
+
+      // Fallback: try to find first significant image tag
+      if (!ogImg) {
+        console.log('[fetchMetadata] Trying first large img tag...');
+        const imgMatch = html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi);
+        if (imgMatch) {
+          for (const img of imgMatch.slice(0, 5)) {
+            const src = img.match(/src\s*=\s*["']([^"']+)["']/i);
+            if (src && src[1] && !src[1].includes('logo') && !src[1].includes('icon') && !src[1].includes('sprite')) {
+              ogImg = [null, src[1]];
+              console.log('[fetchMetadata] Found img tag:', src[1]);
+              break;
+            }
+          }
+        }
       }
 
       if (ogImg) {
@@ -974,7 +1006,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     let html = `<button class="filter-token ${currentFilter === 'all' ? 'filter-token--active' : ''}" data-category="all">All</button>`;
 
     const sorted = Object.entries(cats)
-      .filter(([n]) => counts[n] > 0 || n === 'uncategorized')
+      .filter(([n]) => counts[n] > 0 && n !== 'uncategorized')
       .sort((a, b) => (b[1].pinned ? 1 : 0) - (a[1].pinned ? 1 : 0) || (counts[b[0]] || 0) - (counts[a[0]] || 0));
 
     for (const [name] of sorted) {
