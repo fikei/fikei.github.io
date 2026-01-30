@@ -157,12 +157,18 @@ body {
 }
 
 .grid-item.dragging {
-  opacity: 0.5;
+  opacity: 0.4;
   transform: scale(0.95);
 }
 
-.grid-item.drag-over {
-  border: 2px dashed var(--black);
+.grid-item.drag-before {
+  transform: translateX(8px);
+  box-shadow: -4px 0 0 0 var(--black);
+}
+
+.grid-item.drag-after {
+  transform: translateX(-8px);
+  box-shadow: 4px 0 0 0 var(--black);
 }
 
 .grid-item__image {
@@ -1138,15 +1144,19 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     console.log('[deleteLink] Saved');
   }
 
-  function reorderLinks(fromId, toId) {
+  function reorderLinks(fromId, toId, position = 'before') {
     const data = load();
     if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
     const fromIdx = data.linkOrder.indexOf(fromId);
-    const toIdx = data.linkOrder.indexOf(toId);
+    let toIdx = data.linkOrder.indexOf(toId);
     if (fromIdx === -1 || toIdx === -1) return;
-    // Remove from old position and insert at new position
+    // Remove from old position
     data.linkOrder.splice(fromIdx, 1);
-    data.linkOrder.splice(toIdx, 0, fromId);
+    // Recalculate target index after removal
+    toIdx = data.linkOrder.indexOf(toId);
+    // Insert at new position (after target if position is 'after')
+    const insertIdx = position === 'after' ? toIdx + 1 : toIdx;
+    data.linkOrder.splice(insertIdx, 0, fromId);
     save(data);
   }
 
@@ -1334,6 +1344,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Drag and drop reordering
   let draggedId = null;
   let isDragging = false;
+  let dropPosition = null; // 'before' or 'after'
+
+  function clearDragClasses() {
+    grid.querySelectorAll('.drag-before, .drag-after').forEach(el => {
+      el.classList.remove('drag-before', 'drag-after');
+    });
+  }
 
   grid.ondragstart = (e) => {
     const item = e.target.closest('.grid-item');
@@ -1348,7 +1365,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   grid.ondragend = (e) => {
     const item = e.target.closest('.grid-item');
     if (item) item.classList.remove('dragging');
+    clearDragClasses();
     draggedId = null;
+    dropPosition = null;
     setTimeout(() => { isDragging = false; }, 100);
   };
 
@@ -1357,23 +1376,32 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     e.dataTransfer.dropEffect = 'move';
     const item = e.target.closest('.grid-item');
     if (item && item.dataset.id !== draggedId) {
-      item.classList.add('drag-over');
+      // Determine if dropping before or after based on mouse position
+      const rect = item.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      const isBefore = e.clientX < midX;
+
+      clearDragClasses();
+      item.classList.add(isBefore ? 'drag-before' : 'drag-after');
+      dropPosition = isBefore ? 'before' : 'after';
     }
   };
 
   grid.ondragleave = (e) => {
     const item = e.target.closest('.grid-item');
-    if (item) item.classList.remove('drag-over');
+    if (item) {
+      item.classList.remove('drag-before', 'drag-after');
+    }
   };
 
   grid.ondrop = (e) => {
     e.preventDefault();
     const targetItem = e.target.closest('.grid-item');
     if (!targetItem || !draggedId) return;
-    targetItem.classList.remove('drag-over');
+    clearDragClasses();
     const targetId = targetItem.dataset.id;
     if (draggedId !== targetId) {
-      reorderLinks(draggedId, targetId);
+      reorderLinks(draggedId, targetId, dropPosition);
       renderGrid();
     }
   };
