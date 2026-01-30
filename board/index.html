@@ -56,14 +56,31 @@
   position: fixed;
   top: var(--space-4);
   right: var(--space-4);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  padding: var(--space-1) var(--space-2);
-  background: var(--bg);
-  color: var(--fg);
+  width: 32px;
+  height: 18px;
+  background: transparent;
   border: 1px solid var(--fg);
   cursor: pointer;
   z-index: 100;
+  padding: 2px;
+  transition: background 0.2s ease;
+}
+
+.theme-toggle__knob {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+:root.light .theme-toggle {
+  background: var(--fg);
+}
+
+:root.light .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
 }
 
 *, *::before, *::after {
@@ -82,6 +99,7 @@ body {
   line-height: var(--line-height-normal);
   color: var(--fg);
   background: var(--bg);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* ============================================
@@ -686,7 +704,7 @@ body {
   </style>
 </head>
 <body>
-  <button class="theme-toggle" id="themeToggle">Light</button>
+  <button class="theme-toggle" id="themeToggle"><div class="theme-toggle__knob"></div></button>
 
   <nav class="filters" id="filters">
     <button class="filter-token filter-token--active" data-category="all">All</button>
@@ -1710,12 +1728,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   if (savedTheme === 'light') {
     document.documentElement.classList.add('light');
-    themeToggle.textContent = 'Dark';
   }
 
   themeToggle.onclick = () => {
     const isLight = document.documentElement.classList.toggle('light');
-    themeToggle.textContent = isLight ? 'Dark' : 'Light';
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
   };
 
