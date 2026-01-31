@@ -1692,9 +1692,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   // Supabase sync functions (async, background)
   async function syncLinkToSupabase(link) {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log('[sync] Skipped - not logged in');
+      return;
+    }
     try {
-      await supabase.from('links').upsert({
+      const { error } = await supabase.from('links').upsert({
         id: link.id,
         user_id: currentUser.id,
         url: link.url,
@@ -1707,7 +1710,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         created_at: link.addedAt,
         updated_at: link.updatedAt || null
       });
-    } catch (e) { console.error('Supabase sync error:', e); }
+      if (error) {
+        console.error('[sync] Upload failed:', error.message);
+      } else {
+        console.log('[sync] Uploaded:', link.url);
+      }
+    } catch (e) { console.error('[sync] Error:', e); }
   }
 
   async function syncOrderToSupabase(orderIds) {
