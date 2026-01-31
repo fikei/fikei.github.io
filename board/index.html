@@ -2632,48 +2632,103 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
   }
 
+  // Sync status tracking
+  let syncInProgress = false;
+
   async function forceSync() {
-    try {
-      if (!currentUser) {
-        alert('Not logged in');
-        return;
-      }
+    console.log('[sync] === Starting Force Sync ===');
 
-      const local = load();
-      alert('Found ' + local.links.length + ' links');
-
-      if (local.links.length === 0) return;
-
-      let results = [];
-
-      for (let i = 0; i < local.links.length; i++) {
-        const link = local.links[i];
-
-        try {
-          const { error } = await supabase.from('links').upsert({
-            id: link.id || String(Date.now()),
-            user_id: currentUser.id,
-            url: link.url || '',
-            title: link.title || '',
-            description: link.description || '',
-            image: link.image || '',
-            domain: link.domain || '',
-            category: link.category || 'uncategorized',
-            confidence: link.confidence || 0,
-            created_at: link.addedAt || new Date().toISOString(),
-            updated_at: link.updatedAt || null
-          });
-
-          results.push(error ? 'FAIL' : 'OK');
-        } catch (e) {
-          results.push('ERR');
-        }
-      }
-
-      alert('Results: ' + results.join(', '));
-    } catch (e) {
-      alert('Crashed: ' + e.message);
+    // Prevent double-sync
+    if (syncInProgress) {
+      console.log('[sync] Already in progress, skipping');
+      toast('Sync already in progress');
+      return;
     }
+
+    // Check login
+    if (!currentUser) {
+      console.log('[sync] Not logged in');
+      toast('Login required to sync', true);
+      return;
+    }
+    console.log('[sync] User:', currentUser.email);
+
+    // Get local data
+    const local = load();
+    console.log('[sync] Local links:', local.links.length);
+
+    if (local.links.length === 0) {
+      toast('No links to sync');
+      return;
+    }
+
+    syncInProgress = true;
+    const syncBtn = $('syncBtn');
+    syncBtn.textContent = 'Syncing...';
+    syncBtn.disabled = true;
+
+    let uploaded = 0;
+    let failed = 0;
+    const errors = [];
+
+    // Upload each link
+    for (let i = 0; i < local.links.length; i++) {
+      const link = local.links[i];
+      console.log(`[sync] Uploading ${i + 1}/${local.links.length}: ${link.url}`);
+
+      try {
+        const payload = {
+          id: link.id,
+          user_id: currentUser.id,
+          url: link.url,
+          title: link.title || null,
+          description: link.description || null,
+          image: link.image || null,
+          domain: link.domain || null,
+          category: link.category || 'uncategorized',
+          confidence: link.confidence || 0,
+          created_at: link.addedAt || new Date().toISOString(),
+          updated_at: link.updatedAt || null
+        };
+        console.log('[sync] Payload:', JSON.stringify(payload).substring(0, 200));
+
+        const { data, error } = await supabase.from('links').upsert(payload).select();
+
+        if (error) {
+          console.error('[sync] Supabase error:', error);
+          failed++;
+          errors.push(`${link.url}: ${error.message}`);
+        } else {
+          console.log('[sync] Success:', data);
+          uploaded++;
+        }
+      } catch (e) {
+        console.error('[sync] Exception:', e);
+        failed++;
+        errors.push(`${link.url}: ${e.message}`);
+      }
+    }
+
+    // Sync link order
+    console.log('[sync] Syncing link order...');
+    try {
+      await syncOrderToSupabase(local.linkOrder);
+      console.log('[sync] Order synced');
+    } catch (e) {
+      console.error('[sync] Order sync failed:', e);
+    }
+
+    // Done
+    syncInProgress = false;
+    syncBtn.textContent = 'Sync';
+    syncBtn.disabled = false;
+
+    console.log(`[sync] === Complete: ${uploaded} uploaded, ${failed} failed ===`);
+    if (errors.length > 0) {
+      console.log('[sync] Errors:', errors);
+    }
+
+    toast(`Synced: ${uploaded} ok, ${failed} failed`);
   }
 
   let authCountdownInterval = null;
@@ -2788,7 +2843,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
   };
 
-  $('syncBtn').onclick = forceSync;
+  $('syncBtn').onclick = () => forceSync();
 
   authForm.onsubmit = (e) => {
     e.preventDefault();
