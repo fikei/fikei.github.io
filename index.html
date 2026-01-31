@@ -134,18 +134,9 @@ body {
   padding: 0 var(--space-4);
 }
 
-/* Hero */
-.hero {
-  min-height: calc(100vh - 200px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: var(--space-16) 0;
-}
-
 /* Header */
 .header {
-  margin-bottom: 0;
+  padding: var(--space-4) 0;
 }
 
 .site-title {
@@ -154,7 +145,14 @@ body {
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  margin-bottom: var(--space-6);
+}
+
+/* Hero */
+.hero {
+  min-height: calc(100vh - 240px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .site-description {
@@ -260,10 +258,10 @@ body {
 /* Responsive */
 @media (max-width: 600px) {
   .hero {
-    min-height: 100vh;
-    min-height: 100svh;
+    min-height: calc(100vh - 40px);
+    min-height: calc(100svh - 40px);
     justify-content: flex-start;
-    padding-top: 30vh;
+    padding-top: 25vh;
   }
 }
   </style>
@@ -279,12 +277,14 @@ body {
   </button>
 
   <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="site-title">ctrl.rodeo</h1>
+    </header>
+
     <!-- Hero -->
     <div class="hero">
-      <header class="header">
-        <h1 class="site-title">ctrl.rodeo</h1>
-        <p class="site-description">A collection of small tools and experiments. Each project starts with a question and ends wherever the learning stops being interesting.</p>
-      </header>
+      <p class="site-description">A collection of small tools and experiments. Each project starts with a question and ends wherever the learning stops being interesting.</p>
     </div>
 
     <!-- Projects -->
