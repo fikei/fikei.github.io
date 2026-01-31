@@ -2517,7 +2517,38 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
   }
 
+  let authCountdownInterval = null;
+
+  function clearAuthCountdown() {
+    if (authCountdownInterval) {
+      clearInterval(authCountdownInterval);
+      authCountdownInterval = null;
+    }
+  }
+
+  function startAuthCountdown(seconds) {
+    clearAuthCountdown();
+    authSubmit.disabled = true;
+
+    let remaining = seconds;
+    authStatus.textContent = `Security cooldown: ${remaining}s`;
+    authStatus.className = 'auth-modal__status auth-modal__status--error';
+
+    authCountdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining > 0) {
+        authStatus.textContent = `Security cooldown: ${remaining}s`;
+      } else {
+        clearAuthCountdown();
+        authStatus.textContent = 'Ready to retry';
+        authStatus.className = 'auth-modal__status';
+        authSubmit.disabled = false;
+      }
+    }, 1000);
+  }
+
   async function handleLogin(email) {
+    clearAuthCountdown();
     authSubmit.disabled = true;
     authStatus.textContent = 'Sending magic link...';
     authStatus.className = 'auth-modal__status';
@@ -2534,11 +2565,20 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
       authStatus.textContent = 'Check your email for the magic link!';
       authEmail.value = '';
-    } catch (e) {
-      authStatus.textContent = e.message || 'Failed to send magic link';
-      authStatus.className = 'auth-modal__status auth-modal__status--error';
-    } finally {
       authSubmit.disabled = false;
+    } catch (e) {
+      const msg = e.message || 'Failed to send magic link';
+
+      // Check for rate limit / security cooldown (e.g., "...after 45 seconds")
+      const secMatch = msg.match(/after\s+(\d+)\s+second/i);
+      if (secMatch) {
+        const waitSecs = parseInt(secMatch[1], 10);
+        startAuthCountdown(waitSecs);
+      } else {
+        authStatus.textContent = msg;
+        authStatus.className = 'auth-modal__status auth-modal__status--error';
+        authSubmit.disabled = false;
+      }
     }
   }
 
@@ -2596,7 +2636,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   authModal.onclick = (e) => {
     if (e.target === authModal) {
       authModal.classList.remove('auth-modal--visible');
+      clearAuthCountdown();
       authStatus.textContent = '';
+      authStatus.className = 'auth-modal__status';
+      authSubmit.disabled = false;
     }
   };
 
