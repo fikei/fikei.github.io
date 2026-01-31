@@ -1232,6 +1232,7 @@ body {
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
     <span class="auth-bar__user" id="authUser"></span>
+    <button class="auth-bar__btn" id="syncBtn" style="display:none">Sync</button>
     <button class="auth-bar__btn" id="authBtn">Login</button>
   </div>
 
@@ -2619,13 +2620,45 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Auth Functions
   // ============================================
   function updateAuthUI() {
+    const syncBtn = $('syncBtn');
     if (currentUser) {
       authUser.textContent = currentUser.email;
       authBtn.textContent = 'Logout';
+      syncBtn.style.display = '';
     } else {
       authUser.textContent = '';
       authBtn.textContent = 'Login';
+      syncBtn.style.display = 'none';
     }
+  }
+
+  async function forceSync() {
+    if (!currentUser) return;
+    const local = load();
+    if (local.links.length === 0) {
+      toast('Nothing to sync');
+      return;
+    }
+    toast('Syncing...');
+    let synced = 0;
+    for (const link of local.links) {
+      const { error } = await supabase.from('links').upsert({
+        id: link.id,
+        user_id: currentUser.id,
+        url: link.url,
+        title: link.title,
+        description: link.description,
+        image: link.image,
+        domain: link.domain,
+        category: link.category,
+        confidence: link.confidence,
+        created_at: link.addedAt,
+        updated_at: link.updatedAt || null
+      });
+      if (!error) synced++;
+    }
+    await syncOrderToSupabase(local.linkOrder);
+    toast(`Synced ${synced}/${local.links.length} links`);
   }
 
   let authCountdownInterval = null;
@@ -2739,6 +2772,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       authEmail.focus();
     }
   };
+
+  $('syncBtn').onclick = forceSync;
 
   authForm.onsubmit = (e) => {
     e.preventDefault();
