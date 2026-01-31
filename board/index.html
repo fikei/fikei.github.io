@@ -1343,30 +1343,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_8BSidj4aR5okYFV7OBt8sA_9DjlQ0Si';
-  const AUTH_STORAGE_KEY = 'board-auth';
-
-  // Custom storage to ensure persistence on mobile
-  const customStorage = {
-    getItem: (key) => {
-      const item = localStorage.getItem(key);
-      return item;
-    },
-    setItem: (key, value) => {
-      localStorage.setItem(key, value);
-    },
-    removeItem: (key) => {
-      localStorage.removeItem(key);
-    }
-  };
-
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       detectSessionInUrl: true,
       flowType: 'implicit',
       autoRefreshToken: true,
-      persistSession: true,
-      storageKey: AUTH_STORAGE_KEY,
-      storage: customStorage
+      persistSession: true
     }
   });
 
@@ -2705,6 +2687,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   async function onAuthStateChange(event, session) {
+    console.log('[auth] onAuthStateChange:', event, session?.user?.email || 'no user');
     const wasLoggedOut = !currentUser;
     currentUser = session?.user || null;
     updateAuthUI();
@@ -2784,17 +2767,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Check if this is a magic link callback (has tokens in hash)
     const hash = window.location.hash;
+    console.log('[auth] hash:', hash ? 'present' : 'none');
     if (hash.includes('access_token') || hash.includes('error')) {
-      await new Promise(r => setTimeout(r, 200));
-      if (window.history.replaceState) {
-        window.history.replaceState(null, '', window.location.pathname);
-      }
+      console.log('[auth] Magic link callback detected, waiting for Supabase...');
+      // Don't clear hash - let Supabase handle it
     }
 
     // Revalidate: check session and fetch fresh data from cloud
     const t1 = performance.now();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
     console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
+    console.log('[auth] session:', session ? session.user.email : 'none', 'error:', error?.message || 'none');
 
     if (session) {
       currentUser = session.user;
