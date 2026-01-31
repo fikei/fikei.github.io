@@ -131,12 +131,21 @@ body {
 .container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: var(--space-16) var(--space-4);
+  padding: 0 var(--space-4);
+}
+
+/* Hero */
+.hero {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-16) 0;
 }
 
 /* Header */
 .header {
-  margin-bottom: var(--space-16);
+  margin-bottom: 0;
 }
 
 .site-title {
@@ -157,7 +166,7 @@ body {
 
 /* Section */
 .section {
-  margin-bottom: var(--space-16);
+  padding-bottom: var(--space-16);
 }
 
 .section-title {
@@ -237,8 +246,7 @@ body {
 
 /* Footer */
 .footer {
-  margin-top: var(--space-16);
-  padding-top: var(--space-6);
+  padding: var(--space-6) 0 var(--space-16);
   border-top: 1px solid var(--subtle);
 }
 
@@ -251,8 +259,11 @@ body {
 
 /* Responsive */
 @media (max-width: 600px) {
-  .container {
-    padding: var(--space-8) var(--space-4);
+  .hero {
+    min-height: 100vh;
+    min-height: 100svh;
+    justify-content: flex-start;
+    padding-top: 30vh;
   }
 }
   </style>
@@ -268,11 +279,13 @@ body {
   </button>
 
   <div class="container">
-    <!-- Header -->
-    <header class="header">
-      <h1 class="site-title">ctrl.rodeo</h1>
-      <p class="site-description">A collection of small tools and experiments. Each project starts with a question and ends wherever the learning stops being interesting.</p>
-    </header>
+    <!-- Hero -->
+    <div class="hero">
+      <header class="header">
+        <h1 class="site-title">ctrl.rodeo</h1>
+        <p class="site-description">A collection of small tools and experiments. Each project starts with a question and ends wherever the learning stops being interesting.</p>
+      </header>
+    </div>
 
     <!-- Projects -->
     <section class="section">
@@ -297,7 +310,7 @@ body {
         <a href="https://github.com/fikei/parking" class="grid-item">
           <div>
             <h3 class="grid-item__name">Parking</h3>
-            <span class="grid-item__path">github</span>
+            <span class="grid-item__path">iOS</span>
           </div>
           <p class="grid-item__description">iOS app for tracking where you parked. Location, photo, timer.</p>
         </a>
@@ -305,7 +318,7 @@ body {
         <a href="https://github.com/fikei/add-to-calendar" class="grid-item">
           <div>
             <h3 class="grid-item__name">Add to Calendar</h3>
-            <span class="grid-item__path">github</span>
+            <span class="grid-item__path">Chrome Extension</span>
           </div>
           <p class="grid-item__description">Browser extension. Select text, create calendar event.</p>
         </a>
