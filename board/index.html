@@ -1269,12 +1269,30 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_8BSidj4aR5okYFV7OBt8sA_9DjlQ0Si';
+  const AUTH_STORAGE_KEY = 'board-auth';
+
+  // Custom storage to ensure persistence on mobile
+  const customStorage = {
+    getItem: (key) => {
+      const item = localStorage.getItem(key);
+      return item;
+    },
+    setItem: (key, value) => {
+      localStorage.setItem(key, value);
+    },
+    removeItem: (key) => {
+      localStorage.removeItem(key);
+    }
+  };
+
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       detectSessionInUrl: true,
       flowType: 'implicit',
       autoRefreshToken: true,
-      persistSession: true
+      persistSession: true,
+      storageKey: AUTH_STORAGE_KEY,
+      storage: customStorage
     }
   });
 
@@ -2662,6 +2680,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Init
   // ============================================
   async function init() {
+    // Debug: check localStorage persistence
+    console.log('Storage check:', {
+      links: localStorage.getItem(STORAGE_KEY) ? 'exists' : 'none',
+      expanded: localStorage.getItem(EXPANDED_KEY) ? 'exists' : 'none',
+      auth: localStorage.getItem(AUTH_STORAGE_KEY) ? 'exists' : 'none',
+      theme: localStorage.getItem('theme') || 'none'
+    });
+
     // Load saved theme
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
@@ -2684,7 +2710,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     // Check for existing session
-    const { data: { session } } = await supabase.auth.getSession();
+    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+    console.log('Stored auth:', storedAuth ? 'exists' : 'none');
+
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Session check:', session ? session.user.email : 'no session', sessionError || '');
+
     if (session) {
       currentUser = session.user;
       updateAuthUI();
