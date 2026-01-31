@@ -129,9 +129,9 @@ body {
 
 /* Container */
 .container {
-  max-width: 800px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: var(--space-16) var(--space-6);
+  padding: var(--space-16) var(--space-4);
 }
 
 /* Header */
@@ -172,38 +172,46 @@ body {
   border-bottom: 1px solid var(--subtle);
 }
 
-/* Projects */
-.projects-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
 }
 
-.project-item {
-  display: block;
+@media (min-width: 600px) {
+  .grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (min-width: 1200px) {
+  .grid { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* Grid Item */
+.grid-item {
+  position: relative;
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 1px solid var(--subtle);
   text-decoration: none;
   color: var(--fg);
-  padding: var(--space-6);
-  border: 1px solid var(--subtle);
-  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-4);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
-.project-item:hover {
+.grid-item:hover {
   border-color: var(--fg);
   background: var(--bg);
 }
 
-.project-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.project-name {
+.grid-item__name {
   font-family: var(--font-primary);
   font-size: 10px;
   font-weight: 700;
@@ -211,15 +219,16 @@ body {
   letter-spacing: 0.1em;
 }
 
-.project-path {
+.grid-item__path {
   font-family: var(--font-primary);
   font-size: 10px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  margin-top: var(--space-1);
 }
 
-.project-description {
+.grid-item__description {
   font-family: var(--font-primary);
   font-size: 10px;
   color: var(--muted);
@@ -245,11 +254,6 @@ body {
   .container {
     padding: var(--space-8) var(--space-4);
   }
-
-  .project-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
   </style>
 </head>
@@ -273,21 +277,21 @@ body {
     <!-- Projects -->
     <section class="section">
       <h2 class="section-title">Projects</h2>
-      <div class="projects-list">
-        <a href="/board/" class="project-item">
-          <div class="project-header">
-            <h3 class="project-name">Board</h3>
-            <span class="project-path">/board</span>
+      <div class="grid">
+        <a href="/board/" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Board</h3>
+            <span class="grid-item__path">/board</span>
           </div>
-          <p class="project-description">A personal link curation tool. Save URLs, auto-categorize content, and organize your finds in a visual grid with drag-and-drop reordering.</p>
+          <p class="grid-item__description">Personal link curation. Save URLs, auto-categorize, drag-and-drop grid.</p>
         </a>
 
-        <a href="/soundscape/" class="project-item">
-          <div class="project-header">
-            <h3 class="project-name">Soundscape</h3>
-            <span class="project-path">/soundscape</span>
+        <a href="/soundscape/" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Soundscape</h3>
+            <span class="grid-item__path">/soundscape</span>
           </div>
-          <p class="project-description">Audio-reactive wave visualization. Real-time microphone input drives a simplex-noise wave grid with multiple visual themes and WebSocket remote control.</p>
+          <p class="grid-item__description">Audio-reactive visualization. Mic input drives wave grid with themes.</p>
         </a>
       </div>
     </section>
