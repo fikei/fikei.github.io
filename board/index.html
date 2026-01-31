@@ -1695,23 +1695,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   function load() {
     try {
       const d = localStorage.getItem(STORAGE_KEY);
-      console.log('load() raw:', d ? d.substring(0, 100) + '...' : 'empty');
       if (d) {
         const data = JSON.parse(d);
         if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
-        console.log('load() parsed:', data.links.length, 'links');
         return data;
       }
-    } catch (e) { console.error('load() error:', e); }
+    } catch (e) {}
     return { links: [], categories: { uncategorized: { pinned: true } }, linkOrder: [] };
   }
 
   function save(data) {
-    console.log('save():', data.links.length, 'links');
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    // Verify it was saved
-    const verify = localStorage.getItem(STORAGE_KEY);
-    console.log('save() verified:', verify ? 'ok' : 'FAILED');
   }
 
   // Supabase sync functions (async, background)
