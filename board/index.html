@@ -51,11 +51,139 @@
   --subtle: #e0e0e0;
 }
 
+/* Auth bar */
+.auth-bar {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  z-index: 100;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.auth-bar__user {
+  color: var(--muted);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-bar__btn {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.auth-bar__btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* Auth modal */
+.auth-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-modal--visible {
+  display: flex;
+}
+
+.auth-modal__content {
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  padding: var(--space-6);
+  max-width: 320px;
+  width: 90%;
+}
+
+.auth-modal__title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-4);
+}
+
+.auth-modal__input {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+  box-sizing: border-box;
+}
+
+.auth-modal__input:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--fg);
+}
+
+.auth-modal__submit {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.auth-modal__submit:hover {
+  opacity: 0.9;
+}
+
+.auth-modal__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-modal__status {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-top: var(--space-3);
+  text-align: center;
+}
+
+.auth-modal__status--error {
+  color: #c00;
+}
+
+.auth-modal__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  padding: var(--space-2);
+}
+
 /* Theme toggle */
 .theme-toggle {
   position: fixed;
   top: var(--space-4);
-  right: var(--space-4);
+  right: calc(var(--space-4) + 120px);
   width: 32px;
   height: 18px;
   background: transparent;
@@ -950,8 +1078,15 @@ body {
   font-weight: bold;
 }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+  <!-- Auth UI -->
+  <div class="auth-bar" id="authBar">
+    <span class="auth-bar__user" id="authUser"></span>
+    <button class="auth-bar__btn" id="authBtn">Login</button>
+  </div>
+
   <button class="theme-toggle" id="themeToggle"><div class="theme-toggle__knob"></div></button>
 
   <nav class="filters" id="filters">
@@ -1017,6 +1152,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="authModal">
+    <div class="auth-modal__content">
+      <h2 class="auth-modal__title">Login with Email</h2>
+      <form id="authForm">
+        <input type="email" class="auth-modal__input" id="authEmail" placeholder="you@example.com" required>
+        <button type="submit" class="auth-modal__submit" id="authSubmit">Send Magic Link</button>
+      </form>
+      <p class="auth-modal__status" id="authStatus"></p>
+    </div>
+  </div>
+
   <!-- Dev Menu -->
   <div class="dev-menu" id="devMenu">
     <div class="dev-menu__title">Dev Menu (Ctrl+Shift+D)</div>
@@ -1044,11 +1191,21 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   <script>
 // ============================================
-// Things I Like - Single File App
+// Board - Single File App with Supabase
 // ============================================
 
 (function() {
   'use strict';
+
+  // ============================================
+  // Supabase Setup
+  // ============================================
+  const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8BSidj4aR5okYFV7OBt8sA_9DjlQ0Si';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;
+  let isOnline = true; // Track online status for offline support
 
   // ============================================
   // URL Parser
@@ -1340,12 +1497,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   // ============================================
-  // Storage
+  // Storage - Hybrid localStorage + Supabase
   // ============================================
   const STORAGE_KEY = 'things-i-like';
   const EXPANDED_KEY = 'board-expanded-cards';
 
-  // Load/save expanded cards state
+  // Load/save expanded cards state (localStorage + Supabase sync)
   function loadExpandedCards() {
     try {
       const d = localStorage.getItem(EXPANDED_KEY);
@@ -1355,14 +1512,21 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   function saveExpandedCards(cards) {
     localStorage.setItem(EXPANDED_KEY, JSON.stringify(cards));
+    // Sync to Supabase if logged in
+    if (currentUser) {
+      supabase.from('expanded_cards').upsert({
+        user_id: currentUser.id,
+        cards: cards
+      }).then(() => {});
+    }
   }
 
+  // Local storage functions (sync, fast)
   function load() {
     try {
       const d = localStorage.getItem(STORAGE_KEY);
       if (d) {
         const data = JSON.parse(d);
-        // Ensure linkOrder exists
         if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
         return data;
       }
@@ -1372,6 +1536,118 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   function save(data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  // Supabase sync functions (async, background)
+  async function syncLinkToSupabase(link) {
+    if (!currentUser) return;
+    try {
+      await supabase.from('links').upsert({
+        id: link.id,
+        user_id: currentUser.id,
+        url: link.url,
+        title: link.title,
+        description: link.description,
+        image: link.image,
+        domain: link.domain,
+        category: link.category,
+        confidence: link.confidence,
+        created_at: link.addedAt,
+        updated_at: link.updatedAt || null
+      });
+    } catch (e) { console.error('Supabase sync error:', e); }
+  }
+
+  async function syncOrderToSupabase(orderIds) {
+    if (!currentUser) return;
+    try {
+      await supabase.from('link_order').upsert({
+        user_id: currentUser.id,
+        order_ids: orderIds
+      });
+    } catch (e) { console.error('Supabase order sync error:', e); }
+  }
+
+  async function deleteLinkFromSupabase(id) {
+    if (!currentUser) return;
+    try {
+      await supabase.from('links').delete().eq('id', id).eq('user_id', currentUser.id);
+    } catch (e) { console.error('Supabase delete error:', e); }
+  }
+
+  async function fetchFromSupabase() {
+    if (!currentUser) return null;
+    try {
+      const [linksRes, orderRes, expandedRes] = await Promise.all([
+        supabase.from('links').select('*').eq('user_id', currentUser.id),
+        supabase.from('link_order').select('order_ids').eq('user_id', currentUser.id).single(),
+        supabase.from('expanded_cards').select('cards').eq('user_id', currentUser.id).single()
+      ]);
+
+      const links = (linksRes.data || []).map(l => ({
+        id: l.id,
+        url: l.url,
+        title: l.title,
+        description: l.description,
+        image: l.image,
+        domain: l.domain,
+        category: l.category,
+        confidence: l.confidence,
+        addedAt: l.created_at,
+        updatedAt: l.updated_at
+      }));
+
+      const categories = { uncategorized: { pinned: true } };
+      links.forEach(l => {
+        if (l.category && !categories[l.category]) {
+          categories[l.category] = { pinned: false };
+        }
+      });
+
+      const linkOrder = orderRes.data?.order_ids || links.map(l => l.id);
+      const expanded = expandedRes.data?.cards || {};
+
+      return { links, categories, linkOrder, expanded };
+    } catch (e) {
+      console.error('Supabase fetch error:', e);
+      return null;
+    }
+  }
+
+  async function migrateLocalToSupabase() {
+    if (!currentUser) return;
+    const local = load();
+    if (local.links.length === 0) return;
+
+    // Check if user already has data in Supabase
+    const { count } = await supabase.from('links').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+
+    if (count > 0) {
+      // User has cloud data, ask if they want to merge
+      const merge = await showConfirm(
+        `You have ${local.links.length} local links and ${count} cloud links. Merge local data to cloud?`,
+        'Sync Data'
+      );
+      if (!merge) return;
+    }
+
+    // Upload all local links
+    toast('Syncing to cloud...');
+    for (const link of local.links) {
+      await syncLinkToSupabase(link);
+    }
+    await syncOrderToSupabase(local.linkOrder);
+
+    // Sync expanded cards
+    const expanded = loadExpandedCards();
+    if (Object.keys(expanded).length > 0) {
+      await supabase.from('expanded_cards').upsert({
+        user_id: currentUser.id,
+        cards: expanded
+      });
+    }
+
+    toast(`Synced ${local.links.length} links to cloud`);
   }
 
   function getAllLinks() { return load().links; }
@@ -1387,10 +1663,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const data = load();
 
     if (existing) {
-      // Update existing item, but preserve existing data if new data is worse
       const i = data.links.findIndex(l => l.id === existing.id);
       if (i !== -1) {
-        // Preserve existing image/description/title if new ones are empty
         const mergedImage = link.image || existing.image;
         const mergedDescription = link.description || existing.description;
         const mergedTitle = (link.title && link.title !== link.domain) ? link.title : existing.title;
@@ -1401,10 +1675,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           image: mergedImage,
           description: mergedDescription,
           title: mergedTitle,
-          id: existing.id, // Keep original ID
-          addedAt: existing.addedAt, // Keep original add date
+          id: existing.id,
+          addedAt: existing.addedAt,
           updatedAt: new Date().toISOString()
         };
+        syncLinkToSupabase(data.links[i]); // Background sync
       }
       if (!data.categories[link.category]) {
         data.categories[link.category] = { pinned: false };
@@ -1413,14 +1688,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       return { success: true, updated: true };
     }
 
-    data.links.push({ ...link, addedAt: new Date().toISOString() });
-    // Add to beginning of order (newest first)
+    const newLink = { ...link, addedAt: new Date().toISOString() };
+    data.links.push(newLink);
     if (!data.linkOrder) data.linkOrder = [];
     data.linkOrder.unshift(link.id);
     if (!data.categories[link.category]) {
       data.categories[link.category] = { pinned: false };
     }
     save(data);
+    syncLinkToSupabase(newLink); // Background sync
+    syncOrderToSupabase(data.linkOrder); // Background sync
     return { success: true };
   }
 
@@ -1428,23 +1705,21 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const data = load();
     const i = data.links.findIndex(l => l.id === id);
     if (i === -1) throw new Error('Not found');
-    data.links[i] = { ...data.links[i], ...updates };
+    data.links[i] = { ...data.links[i], ...updates, updatedAt: new Date().toISOString() };
     if (updates.category && !data.categories[updates.category]) {
       data.categories[updates.category] = { pinned: false };
     }
     save(data);
+    syncLinkToSupabase(data.links[i]); // Background sync
   }
 
   function deleteLink(id) {
-    console.log('[deleteLink] Deleting id:', id);
     const data = load();
-    const before = data.links.length;
     data.links = data.links.filter(l => l.id !== id);
-    const after = data.links.length;
-    console.log('[deleteLink] Links before:', before, 'after:', after);
     if (data.linkOrder) data.linkOrder = data.linkOrder.filter(i => i !== id);
     save(data);
-    console.log('[deleteLink] Saved');
+    deleteLinkFromSupabase(id); // Background sync
+    syncOrderToSupabase(data.linkOrder);
   }
 
   function reorderLinks(fromId, toId, position = 'before') {
@@ -1453,14 +1728,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const fromIdx = data.linkOrder.indexOf(fromId);
     let toIdx = data.linkOrder.indexOf(toId);
     if (fromIdx === -1 || toIdx === -1) return;
-    // Remove from old position
     data.linkOrder.splice(fromIdx, 1);
-    // Recalculate target index after removal
     toIdx = data.linkOrder.indexOf(toId);
-    // Insert at new position (after target if position is 'after')
     const insertIdx = position === 'after' ? toIdx + 1 : toIdx;
     data.linkOrder.splice(insertIdx, 0, fromId);
     save(data);
+    syncOrderToSupabase(data.linkOrder); // Background sync
   }
 
   function createCategory(name) {
@@ -1476,7 +1749,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const data = load();
     for (const id of ids) {
       const i = data.links.findIndex(l => l.id === id);
-      if (i !== -1) data.links[i].category = category;
+      if (i !== -1) {
+        data.links[i].category = category;
+        syncLinkToSupabase(data.links[i]); // Background sync
+      }
     }
     if (!data.categories[category]) data.categories[category] = { pinned: false };
     save(data);
@@ -1503,6 +1779,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const categoryModal = $('categoryModal');
   const categoryList = $('categoryList');
   const toastContainer = $('toastContainer');
+
+  // Auth DOM
+  const authBar = $('authBar');
+  const authUser = $('authUser');
+  const authBtn = $('authBtn');
+  const authModal = $('authModal');
+  const authForm = $('authForm');
+  const authEmail = $('authEmail');
+  const authSubmit = $('authSubmit');
+  const authStatus = $('authStatus');
 
   // ============================================
   // Render
@@ -1652,7 +1938,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     if (updated > 0) parts.push(`Updated ${updated}`);
     if (failed > 0) parts.push(`${failed} failed`);
     if (parts.length > 0) {
-      showToast(parts.join(', '));
+      toast(parts.join(', '));
     }
     checkClusters();
   };
@@ -1701,7 +1987,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           saveExpandedCards(expandedCards);
           renderFilters();
           renderGrid();
-          showToast('Deleted');
+          toast('Deleted');
         }
       }
       return;
@@ -1871,9 +2157,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     if (!first) return;
     const second = await showConfirm('Are you sure? This will clear everything.', 'Final Warning');
     if (second) {
+      // Clear localStorage
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(EXPANDED_KEY);
       expandedCards = {};
+
+      // Clear Supabase if logged in
+      if (currentUser) {
+        await supabase.from('links').delete().eq('user_id', currentUser.id);
+        await supabase.from('link_order').delete().eq('user_id', currentUser.id);
+        await supabase.from('expanded_cards').delete().eq('user_id', currentUser.id);
+      }
+
       renderFilters();
       renderGrid();
       $('devMenu').classList.remove('dev-menu--visible');
@@ -2075,7 +2370,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     if (updated > 0) parts.push(`${updated} updated`);
     if (failed > 0) parts.push(`${failed} failed`);
     if (parts.length > 0) {
-      showToast(parts.join(', '));
+      toast(parts.join(', '));
     }
     checkClusters();
   }
@@ -2119,13 +2414,132 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   };
 
   // ============================================
+  // Auth Functions
+  // ============================================
+  function updateAuthUI() {
+    if (currentUser) {
+      authUser.textContent = currentUser.email;
+      authBtn.textContent = 'Logout';
+    } else {
+      authUser.textContent = '';
+      authBtn.textContent = 'Login';
+    }
+  }
+
+  async function handleLogin(email) {
+    authSubmit.disabled = true;
+    authStatus.textContent = 'Sending magic link...';
+    authStatus.className = 'auth-modal__status';
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: window.location.href
+        }
+      });
+
+      if (error) throw error;
+
+      authStatus.textContent = 'Check your email for the magic link!';
+      authEmail.value = '';
+    } catch (e) {
+      authStatus.textContent = e.message || 'Failed to send magic link';
+      authStatus.className = 'auth-modal__status auth-modal__status--error';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    currentUser = null;
+    updateAuthUI();
+    toast('Logged out');
+  }
+
+  async function onAuthStateChange(event, session) {
+    const wasLoggedOut = !currentUser;
+    currentUser = session?.user || null;
+    updateAuthUI();
+
+    if (currentUser && wasLoggedOut) {
+      // Just logged in - close modal and sync
+      authModal.classList.remove('auth-modal--visible');
+      toast('Logged in as ' + currentUser.email);
+
+      // Check for local data to migrate
+      const localData = load();
+      if (localData.links.length > 0) {
+        await migrateLocalToSupabase();
+      }
+
+      // Fetch from Supabase and update local cache
+      const cloudData = await fetchFromSupabase();
+      if (cloudData) {
+        save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
+        expandedCards = cloudData.expanded;
+        localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
+        renderFilters();
+        renderGrid();
+      }
+    }
+  }
+
+  // Auth event handlers
+  authBtn.onclick = () => {
+    if (currentUser) {
+      handleLogout();
+    } else {
+      authModal.classList.add('auth-modal--visible');
+      authEmail.focus();
+    }
+  };
+
+  authForm.onsubmit = (e) => {
+    e.preventDefault();
+    const email = authEmail.value.trim();
+    if (email) handleLogin(email);
+  };
+
+  authModal.onclick = (e) => {
+    if (e.target === authModal) {
+      authModal.classList.remove('auth-modal--visible');
+      authStatus.textContent = '';
+    }
+  };
+
+  // ============================================
   // Init
   // ============================================
-  renderFilters();
-  renderGrid();
+  async function init() {
+    // Check for existing session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      updateAuthUI();
 
-  // Re-check uncategorized items on load
-  recategorizeUncategorized();
+      // Fetch from Supabase
+      const cloudData = await fetchFromSupabase();
+      if (cloudData && cloudData.links.length > 0) {
+        save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
+        expandedCards = cloudData.expanded;
+        localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
+      }
+    }
+
+    // Listen for auth changes
+    supabase.auth.onAuthStateChange(onAuthStateChange);
+
+    // Render
+    renderFilters();
+    renderGrid();
+
+    // Re-check uncategorized items on load
+    recategorizeUncategorized();
+  }
+
+  init();
 
   // Listen for paste anywhere on page
   document.addEventListener('paste', (e) => {
