@@ -2692,18 +2692,27 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         };
         console.log('[sync] Payload:', JSON.stringify(payload).substring(0, 200));
 
-        const { data, error } = await supabase.from('links').upsert(payload).select();
+        // Add timeout to detect hanging requests
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout after 10s')), 10000)
+        );
 
-        if (error) {
-          console.error('[sync] Supabase error:', error);
+        const upsertPromise = supabase.from('links').upsert(payload);
+
+        console.log('[sync] Calling Supabase...');
+        const result = await Promise.race([upsertPromise, timeoutPromise]);
+        console.log('[sync] Got response:', result);
+
+        if (result.error) {
+          console.error('[sync] Supabase error:', result.error);
           failed++;
-          errors.push(`${link.url}: ${error.message}`);
+          errors.push(`${link.url}: ${result.error.message}`);
         } else {
-          console.log('[sync] Success:', data);
+          console.log('[sync] Success');
           uploaded++;
         }
       } catch (e) {
-        console.error('[sync] Exception:', e);
+        console.error('[sync] Exception:', e.message);
         failed++;
         errors.push(`${link.url}: ${e.message}`);
       }
