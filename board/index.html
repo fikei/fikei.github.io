@@ -327,10 +327,12 @@ body {
   color: var(--fg);
   border: 1px solid var(--fg);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
 .filter-token:hover {
-  text-decoration: underline;
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .filter-token--active {
@@ -859,14 +861,14 @@ body {
   letter-spacing: 0.1em;
   background: var(--fg);
   color: var(--bg);
-  border: 2px solid var(--fg);
+  border: 1px solid var(--fg);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
 .add-form__submit:hover {
   background: var(--bg);
   color: var(--fg);
-  text-decoration: underline;
 }
 
 /* ============================================
@@ -1032,14 +1034,16 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   background: none;
+  color: var(--fg);
   border: none;
   border-bottom: 1px solid var(--subtle);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
 .category-list__item:hover {
-  background: var(--subtle);
-  text-decoration: underline;
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .category-list__item--active {
