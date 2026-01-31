@@ -51,6 +51,48 @@
   --subtle: #e0e0e0;
 }
 
+/* Progress bar */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--subtle);
+  z-index: 1000;
+  display: none;
+}
+
+.progress-bar--visible {
+  display: block;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--fg);
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+.progress-status {
+  position: fixed;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  padding: var(--space-2) var(--space-4);
+  z-index: 1000;
+  display: none;
+}
+
+.progress-status--visible {
+  display: block;
+}
+
 /* Auth bar */
 .auth-bar {
   position: fixed;
@@ -1081,6 +1123,12 @@ body {
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+  <!-- Progress Bar -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-bar__fill" id="progressFill"></div>
+  </div>
+  <div class="progress-status" id="progressStatus"></div>
+
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
     <span class="auth-bar__user" id="authUser"></span>
@@ -1790,6 +1838,27 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const authSubmit = $('authSubmit');
   const authStatus = $('authStatus');
 
+  // Progress DOM
+  const progressBar = $('progressBar');
+  const progressFill = $('progressFill');
+  const progressStatus = $('progressStatus');
+
+  // Progress helpers
+  function showProgress(current, total, url) {
+    progressBar.classList.add('progress-bar--visible');
+    progressStatus.classList.add('progress-status--visible');
+    const pct = Math.round((current / total) * 100);
+    progressFill.style.width = pct + '%';
+    const domain = extractDomain(url);
+    progressStatus.textContent = `Processing ${current}/${total}: ${domain}`;
+  }
+
+  function hideProgress() {
+    progressBar.classList.remove('progress-bar--visible');
+    progressStatus.classList.remove('progress-status--visible');
+    progressFill.style.width = '0%';
+  }
+
   // ============================================
   // Render
   // ============================================
@@ -1914,7 +1983,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     let added = 0, updated = 0, failed = 0;
     const total = urls.length;
 
-    for (const url of urls) {
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      showProgress(i + 1, total, url);
       try {
         const meta = await fetchMetadata(url);
         const cat = categorize(meta);
@@ -1931,6 +2002,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         failed++;
       }
     }
+
+    hideProgress();
 
     // Show summary toast at end
     const parts = [];
@@ -2346,7 +2419,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     let added = 0, updated = 0, failed = 0;
-    for (const url of urls) {
+    const total = urls.length;
+
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      showProgress(i + 1, total, url);
       try {
         const meta = await fetchMetadata(url);
         const cat = categorize(meta);
@@ -2363,6 +2440,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         failed++;
       }
     }
+
+    hideProgress();
 
     // Show summary toast at end
     const parts = [];
