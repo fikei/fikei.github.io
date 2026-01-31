@@ -1,0 +1,510 @@
+/* ============================================
+   CTRL Design System - Components
+   Reusable UI components
+   ============================================ */
+
+/* ============================================
+   Reset
+   ============================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+
+/* Base button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  text-decoration: none;
+  background: transparent;
+  color: var(--fg);
+  border: var(--border-thin) solid var(--border);
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default),
+              color var(--duration-normal) var(--ease-default);
+}
+
+.btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Button variants */
+.btn--filled {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.btn--filled:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.btn--danger {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.btn--danger:hover {
+  background: var(--color-error);
+  color: var(--color-white);
+}
+
+.btn--ghost {
+  border-color: transparent;
+}
+
+.btn--ghost:hover {
+  border-color: var(--border);
+}
+
+/* Button sizes */
+.btn--sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-2xs);
+}
+
+.btn--lg {
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-sm);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ============================================
+   Inputs
+   ============================================ */
+.input {
+  width: 100%;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg);
+  color: var(--fg);
+  border: var(--border-thin) solid var(--border);
+  transition: box-shadow var(--duration-normal) var(--ease-default);
+}
+
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--fg);
+}
+
+.input::placeholder {
+  color: var(--fg-muted);
+}
+
+/* Textarea */
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Select */
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  padding-right: var(--space-8);
+}
+
+:root.light .select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23000' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+
+/* ============================================
+   Cards
+   ============================================ */
+.card {
+  background: var(--bg-surface);
+  border: var(--border-thin) solid var(--border);
+  padding: var(--space-4);
+}
+
+.card--interactive {
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default);
+}
+
+.card--interactive:hover {
+  background: var(--bg-elevated);
+}
+
+/* ============================================
+   Tokens / Tags
+   ============================================ */
+.token {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  background: var(--bg);
+  color: var(--fg);
+  border: var(--border-thin) solid var(--border);
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default),
+              color var(--duration-normal) var(--ease-default);
+}
+
+.token:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.token--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ============================================
+   Modal / Overlay
+   ============================================ */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay-medium);
+  z-index: var(--z-modal);
+}
+
+.modal--visible {
+  display: flex;
+}
+
+.modal__content {
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border);
+  padding: var(--space-6);
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: normal;
+  margin-bottom: var(--space-4);
+}
+
+.modal__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* ============================================
+   Toast / Notifications
+   ============================================ */
+.toast-container {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toast {
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--fg);
+  color: var(--bg);
+  border: var(--border-thin) solid var(--border);
+  animation: toast-in var(--duration-slow) var(--ease-out);
+}
+
+.toast--error {
+  background: var(--color-error);
+  color: var(--color-white);
+  border-color: var(--color-error);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   Progress Bar
+   ============================================ */
+.progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--border-subtle);
+  z-index: var(--z-overlay);
+}
+
+.progress__fill {
+  height: 100%;
+  background: var(--fg);
+  width: 0%;
+  transition: width var(--duration-slow) var(--ease-default);
+}
+
+.progress__status {
+  position: fixed;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border);
+  padding: var(--space-2) var(--space-4);
+  z-index: var(--z-overlay);
+}
+
+/* ============================================
+   Grid System
+   ============================================ */
+.grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.grid--2 { grid-template-columns: repeat(2, 1fr); }
+.grid--3 { grid-template-columns: repeat(3, 1fr); }
+.grid--4 { grid-template-columns: repeat(4, 1fr); }
+.grid--5 { grid-template-columns: repeat(5, 1fr); }
+
+@media (max-width: 900px) {
+  .grid--5 { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .grid--5, .grid--4, .grid--3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ============================================
+   Toggle Switch
+   ============================================ */
+.toggle {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background: transparent;
+  border: var(--border-thin) solid var(--fg);
+  cursor: pointer;
+  padding: 2px;
+  transition: background var(--duration-slow) var(--ease-default);
+}
+
+.toggle__knob {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  transition: transform var(--duration-slow) var(--ease-default);
+}
+
+.toggle--active {
+  background: var(--fg);
+}
+
+.toggle--active .toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
+}
+
+/* ============================================
+   Range Slider
+   ============================================ */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--border-subtle);
+  cursor: pointer;
+}
+
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  border: var(--border-thin) solid var(--fg);
+  cursor: pointer;
+}
+
+.range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  border: var(--border-thin) solid var(--fg);
+  cursor: pointer;
+}
+
+/* ============================================
+   Status Indicators
+   ============================================ */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+}
+
+.status__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--fg-muted);
+}
+
+.status--success .status__dot {
+  background: var(--color-success);
+}
+
+.status--error .status__dot {
+  background: var(--color-error);
+}
+
+.status--blink .status__dot {
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ============================================
+   Tabs
+   ============================================ */
+.tabs {
+  display: flex;
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.tab {
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
+  background: none;
+  border: none;
+  border-bottom: var(--border-thin) solid transparent;
+  cursor: pointer;
+  transition: color var(--duration-normal) var(--ease-default),
+              border-color var(--duration-normal) var(--ease-default);
+}
+
+.tab:hover {
+  color: var(--fg);
+}
+
+.tab--active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+/* ============================================
+   Spinner / Loading
+   ============================================ */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--fg);
+  border-radius: var(--radius-full);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Utilities
+   ============================================ */
+
+/* Text */
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+
+.text-mono { font-family: var(--font-mono); }
+.text-serif { font-family: var(--font-serif); }
+.text-sans { font-family: var(--font-sans); }
+
+.text-muted { color: var(--fg-muted); }
+.text-subtle { color: var(--fg-subtle); }
+.text-uppercase { text-transform: uppercase; }
+
+/* Display */
+.hidden { display: none; }
+.block { display: block; }
+.flex { display: flex; }
+.grid { display: grid; }
+
+/* Flexbox */
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-1 { gap: var(--space-1); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
+
+/* Spacing */
+.p-2 { padding: var(--space-2); }
+.p-4 { padding: var(--space-4); }
+.p-6 { padding: var(--space-6); }
+.m-0 { margin: 0; }
+.mt-2 { margin-top: var(--space-2); }
+.mt-4 { margin-top: var(--space-4); }
+.mb-2 { margin-bottom: var(--space-2); }
+.mb-4 { margin-bottom: var(--space-4); }

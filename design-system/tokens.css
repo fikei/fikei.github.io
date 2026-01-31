@@ -1,0 +1,162 @@
+/* ============================================
+   CTRL Design System
+   A unified design language for ctrl.rodeo projects
+   ============================================ */
+
+/* ============================================
+   Color Tokens
+   ============================================ */
+:root {
+  /* Core palette */
+  --color-black: #000;
+  --color-white: #fff;
+
+  /* Grays - 10 step scale */
+  --gray-100: #111;
+  --gray-200: #1a1a1a;
+  --gray-300: #222;
+  --gray-400: #333;
+  --gray-500: #666;
+  --gray-600: #888;
+  --gray-700: #999;
+  --gray-800: #ccc;
+  --gray-900: #e0e0e0;
+
+  /* Status colors */
+  --color-success: #0f0;
+  --color-error: #c00;
+  --color-warning: #f90;
+
+  /* Overlays */
+  --overlay-light: rgba(0, 0, 0, 0.5);
+  --overlay-medium: rgba(0, 0, 0, 0.8);
+  --overlay-heavy: rgba(0, 0, 0, 0.95);
+}
+
+/* ============================================
+   Semantic Color Tokens (Theme-aware)
+   ============================================ */
+:root {
+  /* Dark mode (default) */
+  --bg: var(--gray-100);
+  --bg-surface: var(--gray-200);
+  --bg-elevated: var(--gray-300);
+
+  --fg: var(--color-white);
+  --fg-muted: var(--gray-600);
+  --fg-subtle: var(--gray-500);
+
+  --border: var(--color-white);
+  --border-subtle: var(--gray-400);
+
+  --interactive: var(--color-white);
+  --interactive-hover: var(--color-black);
+}
+
+:root.light {
+  /* Light mode */
+  --bg: var(--color-white);
+  --bg-surface: var(--color-white);
+  --bg-elevated: var(--gray-900);
+
+  --fg: var(--color-black);
+  --fg-muted: var(--gray-600);
+  --fg-subtle: var(--gray-500);
+
+  --border: var(--color-black);
+  --border-subtle: var(--gray-800);
+
+  --interactive: var(--color-black);
+  --interactive-hover: var(--color-white);
+}
+
+/* ============================================
+   Typography Tokens
+   ============================================ */
+:root {
+  /* Font families */
+  --font-serif: Georgia, "Times New Roman", Times, serif;
+  --font-mono: "Courier New", Courier, monospace;
+  --font-sans: "Space Grotesk", -apple-system, sans-serif;
+  --font-mono-alt: "IBM Plex Mono", monospace;
+
+  /* Font sizes - modular scale */
+  --text-2xs: 8px;
+  --text-xs: 10px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 48px;
+
+  /* Line heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.8;
+
+  /* Letter spacing */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+  --tracking-widest: 0.3em;
+}
+
+/* ============================================
+   Spacing Tokens
+   ============================================ */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
+
+/* ============================================
+   Animation Tokens
+   ============================================ */
+:root {
+  /* Durations */
+  --duration-fast: 0.1s;
+  --duration-normal: 0.15s;
+  --duration-slow: 0.2s;
+  --duration-slower: 0.3s;
+  --duration-slowest: 0.5s;
+
+  /* Easings */
+  --ease-default: ease;
+  --ease-linear: linear;
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+}
+
+/* ============================================
+   Layout Tokens
+   ============================================ */
+:root {
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --border-thin: 1px;
+  --border-medium: 2px;
+  --border-thick: 4px;
+
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 50;
+  --z-modal: 100;
+  --z-overlay: 200;
+  --z-toast: 300;
+}
