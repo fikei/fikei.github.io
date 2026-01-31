@@ -754,6 +754,31 @@ body {
   line-height: var(--line-height-normal);
 }
 
+.loader {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 100px);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+}
+
+.loader::after {
+  content: 'Loading';
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0%, 20% { content: 'Loading'; }
+  40% { content: 'Loading.'; }
+  60% { content: 'Loading..'; }
+  80%, 100% { content: 'Loading...'; }
+}
+
 /* ============================================
    Modal
    ============================================ */
@@ -2738,61 +2763,58 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Init
   // ============================================
-  async function init() {
-    // Debug: check localStorage persistence
-    console.log('Storage check:', {
-      links: localStorage.getItem(STORAGE_KEY) ? 'exists' : 'none',
-      expanded: localStorage.getItem(EXPANDED_KEY) ? 'exists' : 'none',
-      auth: localStorage.getItem(AUTH_STORAGE_KEY) ? 'exists' : 'none',
-      theme: localStorage.getItem('theme') || 'none'
-    });
+  function showLoader() {
+    grid.innerHTML = '<div class="loader"></div>';
+  }
 
+  async function init() {
     // Load saved theme
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
       document.documentElement.classList.add('light');
     }
 
-    // Render immediately from localStorage (don't wait for network)
-    renderFilters();
-    renderGrid();
+    // Check if user might be logged in (show loader while checking)
+    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (storedAuth) {
+      showLoader();
+    } else {
+      // Not logged in - render from localStorage immediately
+      renderFilters();
+      renderGrid();
+    }
 
-    // Listen for auth changes FIRST (before getSession)
+    // Listen for auth changes
     supabase.auth.onAuthStateChange(onAuthStateChange);
 
     // Check if this is a magic link callback (has tokens in hash)
     const hash = window.location.hash;
     if (hash.includes('access_token') || hash.includes('error')) {
-      // Give Supabase a moment to process hash tokens on mobile
+      showLoader();
       await new Promise(r => setTimeout(r, 200));
 
-      // Clean up the URL after processing
       if (window.history.replaceState) {
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
 
     // Check for existing session
-    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
-    console.log('Stored auth:', storedAuth ? 'exists' : 'none');
-
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('Session check:', session ? session.user.email : 'no session', sessionError || '');
+    const { data: { session } } = await supabase.auth.getSession();
 
     if (session) {
       currentUser = session.user;
       updateAuthUI();
 
-      // Fetch from Supabase
+      // Supabase is source of truth - fetch and render
       const cloudData = await fetchFromSupabase();
-      if (cloudData && cloudData.links.length > 0) {
+      if (cloudData) {
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
         expandedCards = cloudData.expanded;
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
       }
     }
 
-    // Render
+    // Render (or re-render after cloud fetch)
     renderFilters();
     renderGrid();
 
