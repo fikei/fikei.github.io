@@ -2592,6 +2592,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Init
   // ============================================
   async function init() {
+    // Load saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light');
+    }
+
     // Check for existing session
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
