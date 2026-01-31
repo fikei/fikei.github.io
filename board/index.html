@@ -2778,15 +2778,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       document.documentElement.classList.add('light');
     }
 
-    // Check if user might be logged in (show loader while checking)
-    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (storedAuth) {
-      showLoader();
-    } else {
-      // Not logged in - render from localStorage immediately
-      renderFilters();
-      renderGrid();
-    }
+    // Stale-while-revalidate: render from localStorage immediately
+    renderFilters();
+    renderGrid();
+    console.log(`[perf] Initial render: ${(performance.now() - initStart).toFixed(0)}ms`);
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange(onAuthStateChange);
@@ -2794,15 +2789,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     // Check if this is a magic link callback (has tokens in hash)
     const hash = window.location.hash;
     if (hash.includes('access_token') || hash.includes('error')) {
-      showLoader();
       await new Promise(r => setTimeout(r, 200));
-
       if (window.history.replaceState) {
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
 
-    // Check for existing session
+    // Revalidate: check session and fetch fresh data from cloud
     const t1 = performance.now();
     const { data: { session } } = await supabase.auth.getSession();
     console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
@@ -2811,20 +2804,27 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       currentUser = session.user;
       updateAuthUI();
 
-      // Supabase is source of truth - fetch and render
+      // Fetch from Supabase and update if different
       const t2 = performance.now();
       const cloudData = await fetchFromSupabase();
-      console.log(`[perf] fetchFromSupabase total: ${(performance.now() - t2).toFixed(0)}ms`);
+      console.log(`[perf] fetchFromSupabase: ${(performance.now() - t2).toFixed(0)}ms`);
+
       if (cloudData) {
-        save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-        expandedCards = cloudData.expanded;
-        localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
+        const localData = load();
+        const hasChanges = cloudData.links.length !== localData.links.length ||
+          JSON.stringify(cloudData.linkOrder) !== JSON.stringify(localData.linkOrder);
+
+        if (hasChanges) {
+          save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
+          expandedCards = cloudData.expanded;
+          localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
+          renderFilters();
+          renderGrid();
+          console.log(`[perf] Re-rendered with cloud data`);
+        }
       }
     }
 
-    // Render (or re-render after cloud fetch)
-    renderFilters();
-    renderGrid();
     console.log(`[perf] Total init: ${(performance.now() - initStart).toFixed(0)}ms`);
 
     // Re-check uncategorized items on load
