@@ -1761,11 +1761,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   async function fetchFromSupabase() {
     if (!currentUser) return null;
     try {
+      const t0 = performance.now();
       const [linksRes, orderRes, expandedRes] = await Promise.all([
         supabase.from('links').select('*').eq('user_id', currentUser.id),
         supabase.from('link_order').select('order_ids').eq('user_id', currentUser.id).single(),
         supabase.from('expanded_cards').select('cards').eq('user_id', currentUser.id).single()
       ]);
+      console.log(`[perf] Supabase queries: ${(performance.now() - t0).toFixed(0)}ms`);
 
       const links = (linksRes.data || []).map(l => ({
         id: l.id,
@@ -2775,6 +2777,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   async function init() {
+    const initStart = performance.now();
+
     // Load saved theme
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
@@ -2806,14 +2810,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     // Check for existing session
+    const t1 = performance.now();
     const { data: { session } } = await supabase.auth.getSession();
+    console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
 
     if (session) {
       currentUser = session.user;
       updateAuthUI();
 
       // Supabase is source of truth - fetch and render
+      const t2 = performance.now();
       const cloudData = await fetchFromSupabase();
+      console.log(`[perf] fetchFromSupabase total: ${(performance.now() - t2).toFixed(0)}ms`);
       if (cloudData) {
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
         expandedCards = cloudData.expanded;
@@ -2824,6 +2832,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     // Render (or re-render after cloud fetch)
     renderFilters();
     renderGrid();
+    console.log(`[perf] Total init: ${(performance.now() - initStart).toFixed(0)}ms`);
 
     // Re-check uncategorized items on load
     recategorizeUncategorized();
