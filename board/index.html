@@ -1272,7 +1272,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       detectSessionInUrl: true,
-      flowType: 'pkce',
+      flowType: 'implicit',
       autoRefreshToken: true,
       persistSession: true
     }
@@ -2545,16 +2545,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     authSubmit.disabled = true;
 
     let remaining = seconds;
-    authStatus.textContent = `Security cooldown: ${remaining}s`;
+    authStatus.textContent = `Wait ${remaining}s`;
     authStatus.className = 'auth-modal__status auth-modal__status--error';
 
     authCountdownInterval = setInterval(() => {
       remaining--;
       if (remaining > 0) {
-        authStatus.textContent = `Security cooldown: ${remaining}s`;
+        authStatus.textContent = `Wait ${remaining}s`;
       } else {
         clearAuthCountdown();
-        authStatus.textContent = 'Ready to retry';
+        authStatus.textContent = 'Try again';
         authStatus.className = 'auth-modal__status';
         authSubmit.disabled = false;
       }
@@ -2568,10 +2568,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     authStatus.className = 'auth-modal__status';
 
     try {
+      const redirectUrl = window.location.origin + window.location.pathname;
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.href
+          emailRedirectTo: redirectUrl
         }
       });
 
@@ -2670,28 +2671,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     // Listen for auth changes FIRST (before getSession)
     supabase.auth.onAuthStateChange(onAuthStateChange);
 
-    // Check if this is a magic link callback (has tokens in hash or query)
+    // Check if this is a magic link callback (has tokens in hash)
     const hash = window.location.hash;
-    const search = window.location.search;
-    const isAuthCallback = hash.includes('access_token') ||
-                           hash.includes('error') ||
-                           search.includes('code=') ||
-                           search.includes('error=');
-
-    if (isAuthCallback) {
-      // Exchange code for session if using PKCE flow
-      if (search.includes('code=')) {
-        try {
-          await supabase.auth.exchangeCodeForSession(
-            new URLSearchParams(search).get('code')
-          );
-        } catch (e) {
-          console.error('Auth code exchange failed:', e);
-        }
-      }
-
+    if (hash.includes('access_token') || hash.includes('error')) {
       // Give Supabase a moment to process hash tokens on mobile
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 200));
 
       // Clean up the URL after processing
       if (window.history.replaceState) {
