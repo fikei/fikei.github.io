@@ -2538,16 +2538,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     authSubmit.disabled = true;
 
     let remaining = seconds;
-    authStatus.textContent = `Security cooldown: ${remaining}s`;
+    authStatus.textContent = `Wait ${remaining}s`;
     authStatus.className = 'auth-modal__status auth-modal__status--error';
 
     authCountdownInterval = setInterval(() => {
       remaining--;
       if (remaining > 0) {
-        authStatus.textContent = `Security cooldown: ${remaining}s`;
+        authStatus.textContent = `Wait ${remaining}s`;
       } else {
         clearAuthCountdown();
-        authStatus.textContent = 'Ready to retry';
+        authStatus.textContent = 'Try again';
         authStatus.className = 'auth-modal__status';
         authSubmit.disabled = false;
       }
