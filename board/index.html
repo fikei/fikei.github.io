@@ -2626,32 +2626,57 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   async function forceSync() {
-    if (!currentUser) return;
+    if (!currentUser) {
+      alert('Not logged in');
+      return;
+    }
     const local = load();
     if (local.links.length === 0) {
       toast('Nothing to sync');
       return;
     }
-    toast('Syncing...');
+
     let synced = 0;
-    for (const link of local.links) {
-      const { error } = await supabase.from('links').upsert({
-        id: link.id,
-        user_id: currentUser.id,
-        url: link.url,
-        title: link.title,
-        description: link.description,
-        image: link.image,
-        domain: link.domain,
-        category: link.category,
-        confidence: link.confidence,
-        created_at: link.addedAt,
-        updated_at: link.updatedAt || null
-      });
-      if (!error) synced++;
+    let failed = 0;
+
+    for (let i = 0; i < local.links.length; i++) {
+      const link = local.links[i];
+      toast(`Syncing ${i + 1}/${local.links.length}...`);
+
+      try {
+        const { error } = await supabase.from('links').upsert({
+          id: link.id,
+          user_id: currentUser.id,
+          url: link.url,
+          title: link.title || '',
+          description: link.description || '',
+          image: link.image || '',
+          domain: link.domain || '',
+          category: link.category || 'uncategorized',
+          confidence: link.confidence || 0,
+          created_at: link.addedAt || new Date().toISOString(),
+          updated_at: link.updatedAt || null
+        });
+
+        if (error) {
+          failed++;
+          alert(`Failed: ${link.url}\n${error.message}`);
+        } else {
+          synced++;
+        }
+      } catch (e) {
+        failed++;
+        alert(`Error: ${link.url}\n${e.message}`);
+      }
     }
-    await syncOrderToSupabase(local.linkOrder);
-    toast(`Synced ${synced}/${local.links.length} links`);
+
+    try {
+      await syncOrderToSupabase(local.linkOrder);
+    } catch (e) {
+      alert('Order sync failed: ' + e.message);
+    }
+
+    toast(`Done: ${synced} synced, ${failed} failed`);
   }
 
   let authCountdownInterval = null;
