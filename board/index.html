@@ -2673,6 +2673,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Init
   // ============================================
   async function init() {
+    // Debug: check localStorage persistence
+    console.log('Storage check:', {
+      links: localStorage.getItem(STORAGE_KEY) ? 'exists' : 'none',
+      expanded: localStorage.getItem(EXPANDED_KEY) ? 'exists' : 'none',
+      auth: localStorage.getItem(AUTH_STORAGE_KEY) ? 'exists' : 'none',
+      theme: localStorage.getItem('theme') || 'none'
+    });
+
     // Load saved theme
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
