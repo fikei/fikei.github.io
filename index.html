@@ -140,19 +140,19 @@ body {
 }
 
 .site-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-3xl);
-  font-weight: 400;
-  letter-spacing: 0.1em;
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
-.site-tagline {
-  font-size: var(--font-size-sm);
+.site-description {
+  font-size: 10px;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  line-height: 1.8;
+  max-width: 480px;
 }
 
 /* Section */
@@ -161,8 +161,8 @@ body {
 }
 
 .section-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-family: var(--font-primary);
+  font-size: 10px;
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.15em;
@@ -204,42 +204,26 @@ body {
 }
 
 .project-name {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  font-weight: 400;
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
 .project-path {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-family: var(--font-primary);
+  font-size: 10px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .project-description {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-family: var(--font-primary);
+  font-size: 10px;
   color: var(--muted);
-  line-height: var(--line-height-normal);
-}
-
-/* About */
-.about-content {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-base);
-  line-height: 1.8;
-  color: var(--muted);
-}
-
-.about-content p {
-  margin-bottom: var(--space-4);
-}
-
-.about-content p:last-child {
-  margin-bottom: 0;
+  line-height: 1.6;
 }
 
 /* Footer */
@@ -250,7 +234,7 @@ body {
 }
 
 .footer-text {
-  font-size: var(--font-size-xs);
+  font-size: 10px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -262,17 +246,9 @@ body {
     padding: var(--space-8) var(--space-4);
   }
 
-  .site-title {
-    font-size: var(--font-size-2xl);
-  }
-
   .project-header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .project-name {
-    font-size: var(--font-size-lg);
   }
 }
   </style>
@@ -291,7 +267,7 @@ body {
     <!-- Header -->
     <header class="header">
       <h1 class="site-title">ctrl.rodeo</h1>
-      <p class="site-tagline">Experiments in interfaces, sound, and systems</p>
+      <p class="site-description">A collection of small tools and experiments. Each project starts with a question and ends wherever the learning stops being interesting.</p>
     </header>
 
     <!-- Projects -->
@@ -313,15 +289,6 @@ body {
           </div>
           <p class="project-description">Audio-reactive wave visualization. Real-time microphone input drives a simplex-noise wave grid with multiple visual themes and WebSocket remote control.</p>
         </a>
-      </div>
-    </section>
-
-    <!-- About -->
-    <section class="section">
-      <h2 class="section-title">About</h2>
-      <div class="about-content">
-        <p>ctrl.rodeo is a collection of small tools and experiments. Each project starts with a question and ends wherever the learning stops being interesting.</p>
-        <p>No roadmaps. No obligation to scale. Just things that seemed worth building.</p>
       </div>
     </section>
 
