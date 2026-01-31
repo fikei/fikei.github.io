@@ -2646,19 +2646,25 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
     console.log('[sync] User:', currentUser.email);
 
-    // Test Supabase connection first
-    console.log('[sync] Testing Supabase connection...');
+    // Test Supabase connection with raw fetch first
+    console.log('[sync] Testing raw fetch to Supabase...');
     try {
       const testStart = performance.now();
-      const { count, error } = await supabase.from('links').select('*', { count: 'exact', head: true });
-      console.log(`[sync] Connection test: ${(performance.now() - testStart).toFixed(0)}ms`, error ? 'ERROR: ' + error.message : 'OK, count=' + count);
-      if (error) {
-        toast('Supabase error: ' + error.message, true);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/links?select=id&limit=1`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+      const data = await res.json();
+      console.log(`[sync] Raw fetch: ${(performance.now() - testStart).toFixed(0)}ms`, res.status, data);
+      if (!res.ok) {
+        toast('Supabase error: ' + res.status, true);
         return;
       }
     } catch (e) {
-      console.error('[sync] Connection test failed:', e);
-      toast('Cannot reach Supabase', true);
+      console.error('[sync] Raw fetch failed:', e);
+      toast('Cannot reach Supabase: ' + e.message, true);
       return;
     }
 
