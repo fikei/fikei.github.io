@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" id="viewport">
   <title>Board</title>
 
   <!-- Space Grotesk Font -->
@@ -1088,6 +1088,62 @@ body {
   border: 2px solid var(--fg);
 }
 
+.clipboard-prompt {
+  position: fixed;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  z-index: 1000;
+  border: 1px solid var(--fg);
+}
+
+.clipboard-prompt__text {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clipboard-prompt__btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  border: 1px solid var(--bg);
+  transition: background 0.15s, color 0.15s;
+}
+
+.clipboard-prompt__btn--add {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.clipboard-prompt__btn--add:hover {
+  background: transparent;
+  color: var(--bg);
+}
+
+.clipboard-prompt__btn--dismiss {
+  background: transparent;
+  color: var(--bg);
+  border: none;
+  padding: var(--space-1);
+}
+
+.clipboard-prompt__btn--dismiss:hover {
+  opacity: 0.7;
+}
+
 /* ============================================
    Dev Menu
    ============================================ */
@@ -1516,8 +1572,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Categorizer
   // ============================================
   const PATTERNS = {
+    home: {
+      kw: ['furniture', 'chair', 'table', 'sofa', 'couch', 'desk', 'lamp', 'light', 'lighting', 'shelf', 'shelving', 'cabinet', 'bed', 'mattress', 'dresser', 'mirror', 'rug', 'carpet', 'curtain', 'pillow', 'blanket', 'vase', 'planter', 'decor', 'interior', 'stool', 'bench', 'armchair', 'ottoman', 'credenza', 'sideboard', 'bookshelf', 'nightstand', 'wardrobe', 'storage', 'ceramic', 'pottery', 'candle', 'throw'],
+      domains: ['dwr.com', 'designwithinreach.com', 'hay.dk', 'muuto.com', 'fritzhansen.com', 'knoll.com', 'hermanmiller.com', 'cb2.com', 'westelm.com', 'restorationhardware.com', 'rh.com', 'ikea.com', '1stdibs.com', 'chairish.com', 'etsy.com/listing']
+    },
     wear: {
-      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote', 'jewelry', 'jewellery', 'ring', 'necklace', 'earring', 'bracelet', 'pendant', 'chain', 'gold', 'silver', 'sterling', 'signet', 'hoop', 'cuff', 'bangle', 'shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat'],
+      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote', 'jewelry', 'jewellery', 'necklace', 'earring', 'bracelet', 'pendant', 'signet', 'hoop', 'cuff', 'bangle', 'shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat', 'clothing', 'apparel', 'menswear', 'womenswear'],
       domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com', 'mejuri.com', 'catbirdnyc.com', 'auratenewyork.com', 'stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com']
     },
     watch: {
@@ -2741,6 +2801,53 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Re-check uncategorized items on load
     recategorizeUncategorized();
+
+    // Check clipboard for URLs
+    checkClipboardForUrls();
+  }
+
+  async function checkClipboardForUrls() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const urls = extractUrls(text);
+      if (urls.length > 0) {
+        // Check if these URLs are already saved
+        const newUrls = urls.filter(url => !findByUrl(url));
+        if (newUrls.length > 0) {
+          showClipboardPrompt(newUrls, text);
+        }
+      }
+    } catch (e) {
+      // Permission denied or not supported - that's fine
+    }
+  }
+
+  function showClipboardPrompt(urls, originalText) {
+    const existing = document.querySelector('.clipboard-prompt');
+    if (existing) existing.remove();
+
+    const prompt = document.createElement('div');
+    prompt.className = 'clipboard-prompt';
+    const count = urls.length;
+    const preview = urls[0].replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    prompt.innerHTML = `
+      <span class="clipboard-prompt__text">${count === 1 ? preview : count + ' links'} in clipboard</span>
+      <button class="clipboard-prompt__btn clipboard-prompt__btn--add">Add</button>
+      <button class="clipboard-prompt__btn clipboard-prompt__btn--dismiss">✕</button>
+    `;
+
+    prompt.querySelector('.clipboard-prompt__btn--add').onclick = () => {
+      prompt.remove();
+      processLinks(originalText);
+    };
+    prompt.querySelector('.clipboard-prompt__btn--dismiss').onclick = () => {
+      prompt.remove();
+    };
+
+    document.body.appendChild(prompt);
+
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => prompt.remove(), 10000);
   }
 
   init();
