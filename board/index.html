@@ -1262,7 +1262,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_8BSidj4aR5okYFV7OBt8sA_9DjlQ0Si';
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+      autoRefreshToken: true,
+      persistSession: true
+    }
+  });
 
   let currentUser = null;
   let isOnline = true; // Track online status for offline support
@@ -2653,6 +2660,38 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       document.documentElement.classList.add('light');
     }
 
+    // Listen for auth changes FIRST (before getSession)
+    supabase.auth.onAuthStateChange(onAuthStateChange);
+
+    // Check if this is a magic link callback (has tokens in hash or query)
+    const hash = window.location.hash;
+    const search = window.location.search;
+    const isAuthCallback = hash.includes('access_token') ||
+                           hash.includes('error') ||
+                           search.includes('code=') ||
+                           search.includes('error=');
+
+    if (isAuthCallback) {
+      // Exchange code for session if using PKCE flow
+      if (search.includes('code=')) {
+        try {
+          await supabase.auth.exchangeCodeForSession(
+            new URLSearchParams(search).get('code')
+          );
+        } catch (e) {
+          console.error('Auth code exchange failed:', e);
+        }
+      }
+
+      // Give Supabase a moment to process hash tokens on mobile
+      await new Promise(r => setTimeout(r, 150));
+
+      // Clean up the URL after processing
+      if (window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
     // Check for existing session
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
@@ -2667,9 +2706,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
       }
     }
-
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange(onAuthStateChange);
 
     // Render
     renderFilters();
