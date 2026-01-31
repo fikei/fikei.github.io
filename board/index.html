@@ -2753,6 +2753,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       document.documentElement.classList.add('light');
     }
 
+    // Render immediately from localStorage (don't wait for network)
+    renderFilters();
+    renderGrid();
+
     // Listen for auth changes FIRST (before getSession)
     supabase.auth.onAuthStateChange(onAuthStateChange);
 
