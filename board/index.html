@@ -1081,6 +1081,62 @@ body {
   border: 2px solid var(--fg);
 }
 
+.clipboard-prompt {
+  position: fixed;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  z-index: 1000;
+  border: 1px solid var(--fg);
+}
+
+.clipboard-prompt__text {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clipboard-prompt__btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  border: 1px solid var(--bg);
+  transition: background 0.15s, color 0.15s;
+}
+
+.clipboard-prompt__btn--add {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.clipboard-prompt__btn--add:hover {
+  background: transparent;
+  color: var(--bg);
+}
+
+.clipboard-prompt__btn--dismiss {
+  background: transparent;
+  color: var(--bg);
+  border: none;
+  padding: var(--space-1);
+}
+
+.clipboard-prompt__btn--dismiss:hover {
+  opacity: 0.7;
+}
+
 /* ============================================
    Dev Menu
    ============================================ */
@@ -2734,6 +2790,53 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Re-check uncategorized items on load
     recategorizeUncategorized();
+
+    // Check clipboard for URLs
+    checkClipboardForUrls();
+  }
+
+  async function checkClipboardForUrls() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const urls = extractUrls(text);
+      if (urls.length > 0) {
+        // Check if these URLs are already saved
+        const newUrls = urls.filter(url => !findByUrl(url));
+        if (newUrls.length > 0) {
+          showClipboardPrompt(newUrls, text);
+        }
+      }
+    } catch (e) {
+      // Permission denied or not supported - that's fine
+    }
+  }
+
+  function showClipboardPrompt(urls, originalText) {
+    const existing = document.querySelector('.clipboard-prompt');
+    if (existing) existing.remove();
+
+    const prompt = document.createElement('div');
+    prompt.className = 'clipboard-prompt';
+    const count = urls.length;
+    const preview = urls[0].replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    prompt.innerHTML = `
+      <span class="clipboard-prompt__text">${count === 1 ? preview : count + ' links'} in clipboard</span>
+      <button class="clipboard-prompt__btn clipboard-prompt__btn--add">Add</button>
+      <button class="clipboard-prompt__btn clipboard-prompt__btn--dismiss">✕</button>
+    `;
+
+    prompt.querySelector('.clipboard-prompt__btn--add').onclick = () => {
+      prompt.remove();
+      processLinks(originalText);
+    };
+    prompt.querySelector('.clipboard-prompt__btn--dismiss').onclick = () => {
+      prompt.remove();
+    };
+
+    document.body.appendChild(prompt);
+
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => prompt.remove(), 10000);
   }
 
   init();
