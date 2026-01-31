@@ -1350,30 +1350,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_8BSidj4aR5okYFV7OBt8sA_9DjlQ0Si';
-  const AUTH_STORAGE_KEY = 'board-auth';
-
-  // Custom storage to ensure persistence on mobile
-  const customStorage = {
-    getItem: (key) => {
-      const item = localStorage.getItem(key);
-      return item;
-    },
-    setItem: (key, value) => {
-      localStorage.setItem(key, value);
-    },
-    removeItem: (key) => {
-      localStorage.removeItem(key);
-    }
-  };
-
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       detectSessionInUrl: true,
       flowType: 'implicit',
       autoRefreshToken: true,
-      persistSession: true,
-      storageKey: AUTH_STORAGE_KEY,
-      storage: customStorage
+      persistSession: true
     }
   });
 
@@ -1762,6 +1744,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         supabase.from('expanded_cards').select('cards').eq('user_id', currentUser.id).single()
       ]);
       console.log(`[perf] Supabase queries: ${(performance.now() - t0).toFixed(0)}ms`);
+      console.log('[supabase] links:', linksRes.data?.length || 0, 'error:', linksRes.error?.message || 'none');
+      console.log('[supabase] order:', orderRes.data ? 'found' : 'none', 'error:', orderRes.error?.message || 'none');
 
       const links = (linksRes.data || []).map(l => ({
         id: l.id,
@@ -2710,6 +2694,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   async function onAuthStateChange(event, session) {
+    console.log('[auth] onAuthStateChange:', event, session?.user?.email || 'no user');
     const wasLoggedOut = !currentUser;
     currentUser = session?.user || null;
     updateAuthUI();
@@ -2789,17 +2774,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Check if this is a magic link callback (has tokens in hash)
     const hash = window.location.hash;
+    console.log('[auth] hash:', hash ? 'present' : 'none');
     if (hash.includes('access_token') || hash.includes('error')) {
-      await new Promise(r => setTimeout(r, 200));
-      if (window.history.replaceState) {
-        window.history.replaceState(null, '', window.location.pathname);
-      }
+      console.log('[auth] Magic link callback detected, waiting for Supabase...');
+      // Don't clear hash - let Supabase handle it
     }
 
     // Revalidate: check session and fetch fresh data from cloud
     const t1 = performance.now();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
     console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
+    console.log('[auth] session:', session ? session.user.email : 'none', 'error:', error?.message || 'none');
 
     if (session) {
       currentUser = session.user;
@@ -2812,17 +2797,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
       if (cloudData) {
         const localData = load();
-        const hasChanges = cloudData.links.length !== localData.links.length ||
-          JSON.stringify(cloudData.linkOrder) !== JSON.stringify(localData.linkOrder);
+        console.log('[sync] cloud:', cloudData.links.length, 'links, local:', localData.links.length, 'links');
 
-        if (hasChanges) {
-          save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-          expandedCards = cloudData.expanded;
-          localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
-          renderFilters();
-          renderGrid();
-          console.log(`[perf] Re-rendered with cloud data`);
-        }
+        // Always update from cloud (source of truth)
+        save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
+        expandedCards = cloudData.expanded;
+        localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
+        renderFilters();
+        renderGrid();
+        console.log('[sync] Updated from cloud');
+      } else {
+        console.log('[sync] No cloud data returned');
       }
     }
 
