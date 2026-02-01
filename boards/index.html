@@ -2393,41 +2393,37 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       console.log('%c[ENRICH] Processing:', 'color: #e74c3c', item.url);
 
       try {
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession())?.data?.session?.access_token || ''}`
-          },
-          body: JSON.stringify({
+        // Use Supabase's invoke method - handles auth and CORS automatically
+        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
+          body: {
             url: item.url,
             title: item.title,
             description: item.description,
             linkId: item.linkId
-          })
+          }
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log('%c[ENRICH] Server result:', 'color: #27ae60; font-weight: bold', result);
+        if (error) {
+          console.error('%c[ENRICH] Server error:', 'color: #e74c3c', error.message || error);
+          continue;
+        }
 
-          // Update local state
-          const data = load();
-          const link = data.links.find(l => l.id === item.linkId);
-          if (link) {
-            if (result.content_type && result.content_type !== 'unknown') {
-              link.content_type = result.content_type;
-              link.type_confidence = result.type_confidence;
-            }
-            if (result.image_url) {
-              link.image = result.image_url;
-              link.image_source = result.image_source;
-            }
-            save(data);
-            renderGrid();
+        console.log('%c[ENRICH] Server result:', 'color: #27ae60; font-weight: bold', result);
+
+        // Update local state
+        const data = load();
+        const link = data.links.find(l => l.id === item.linkId);
+        if (link) {
+          if (result.content_type && result.content_type !== 'unknown') {
+            link.content_type = result.content_type;
+            link.type_confidence = result.type_confidence;
           }
-        } else {
-          console.error('%c[ENRICH] Server error:', 'color: #e74c3c', response.status);
+          if (result.image_url) {
+            link.image = result.image_url;
+            link.image_source = result.image_source;
+          }
+          save(data);
+          renderGrid();
         }
       } catch (e) {
         console.error('%c[ENRICH] Failed:', 'color: #e74c3c', e);
