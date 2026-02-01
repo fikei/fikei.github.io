@@ -3329,6 +3329,16 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         }
       }
 
+      // Get ordered link IDs for the category being shared
+      const data = load();
+      const orderedIds = data.linkOrder || [];
+      let linkOrderForShare = orderedIds;
+      if (shareCategory) {
+        const categoryLinks = getAllLinks().filter(l => l.category === shareCategory);
+        const categoryIds = new Set(categoryLinks.map(l => l.id));
+        linkOrderForShare = orderedIds.filter(id => categoryIds.has(id));
+      }
+
       const payload = {
         user_id: currentUser.id,
         category: shareCategory || null,
@@ -3336,6 +3346,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         update_mode: updateMode,
         snapshot_link_ids: snapshotIds,
         expanded_cards: expandedForShare,
+        link_order: linkOrderForShare,
         updated_at: new Date().toISOString()
       };
 
