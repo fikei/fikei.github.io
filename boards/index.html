@@ -2453,6 +2453,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // App State
   // ============================================
   const FILTER_KEY = 'boards-filter';
+  const PENDING_SAVES_KEY = 'boards_pending_saves';
   let currentFilter = localStorage.getItem(FILTER_KEY) || 'all';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
@@ -3740,6 +3741,56 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     toast('Logged out');
   }
 
+  async function processPendingSaves() {
+    const pending = JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || '[]');
+    if (pending.length === 0) return;
+
+    console.log('[pending] Processing', pending.length, 'pending saves');
+
+    const existingLinks = getAllLinks();
+    const existingUrls = new Set(existingLinks.map(l => l.url));
+    let added = 0;
+
+    for (const link of pending) {
+      // Skip duplicates
+      if (existingUrls.has(link.url)) {
+        console.log('[pending] Skipping duplicate:', link.url);
+        continue;
+      }
+
+      // Add to local state first
+      const newLink = {
+        id: link.id || crypto.randomUUID(),
+        url: link.url,
+        title: link.title,
+        description: link.description,
+        image: link.image,
+        domain: link.domain,
+        category: link.category || 'uncategorized',
+        confidence: link.confidence || null,
+        created_at: link.created_at || new Date().toISOString()
+      };
+
+      const data = load();
+      data.links.push(newLink);
+      data.linkOrder.unshift(newLink.id);
+      save(data);
+      existingUrls.add(link.url);
+      added++;
+    }
+
+    // Clear pending saves
+    localStorage.removeItem(PENDING_SAVES_KEY);
+
+    if (added > 0) {
+      toast(`Added ${added} saved link${added > 1 ? 's' : ''} to your board`);
+      // Sync to Supabase
+      await syncToSupabase();
+      renderFilters();
+      renderGrid();
+    }
+  }
+
   async function onAuthStateChange(event, session) {
     console.log('[auth] onAuthStateChange:', event, session?.user?.email || 'no user');
     const wasLoggedOut = !currentUser;
@@ -3766,6 +3817,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         renderFilters();
         renderGrid();
       }
+
+      // Process any links saved from shared boards while logged out
+      await processPendingSaves();
     }
   }
 
@@ -3868,6 +3922,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       } else {
         console.log('[sync] No cloud data returned');
       }
+
+      // Process any links saved from shared boards while logged out
+      await processPendingSaves();
     }
 
     console.log(`[perf] Total init: ${(performance.now() - initStart).toFixed(0)}ms`);

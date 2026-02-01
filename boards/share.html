@@ -1016,6 +1016,42 @@ body {
     return auth?.user || null;
   }
 
+  const PENDING_SAVES_KEY = 'boards_pending_saves';
+
+  function getPendingSaves() {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || '[]');
+    } catch { return []; }
+  }
+
+  function savePendingSave(linkData) {
+    const pending = getPendingSaves();
+    // Check if URL already in pending
+    if (pending.some(p => p.url === linkData.url)) {
+      return false; // Already pending
+    }
+    pending.push(linkData);
+    localStorage.setItem(PENDING_SAVES_KEY, JSON.stringify(pending));
+    return true;
+  }
+
+  async function checkDuplicate(url, accessToken) {
+    try {
+      const encodedUrl = encodeURIComponent(url);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/links?url=eq.${encodedUrl}&select=id`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      if (res.ok) {
+        const existing = await res.json();
+        return existing.length > 0;
+      }
+    } catch {}
+    return false;
+  }
+
   async function saveLink(id, btn) {
     const link = links.find(l => l.id === id);
     if (!link || !btn) return;
@@ -1023,22 +1059,73 @@ body {
     const accessToken = getAccessToken();
     const user = getCurrentUser();
 
-    // If not logged in, copy to clipboard
-    if (!accessToken || !user) {
-      try {
-        await navigator.clipboard.writeText(link.url);
-        toast('Link copied - log in to Boards to save directly');
-      } catch {
-        toast('Open Boards and paste this link');
-      }
-      return;
-    }
-
     // Disable button during save
     btn.disabled = true;
     btn.textContent = 'Saving...';
 
+    // If not logged in, save to pending queue
+    if (!accessToken || !user) {
+      // Check if already in pending saves
+      const pending = getPendingSaves();
+      if (pending.some(p => p.url === link.url)) {
+        btn.textContent = 'Already Saved';
+        btn.classList.add('grid-item__action--saved');
+        setTimeout(() => {
+          btn.textContent = 'View on Board';
+          btn.disabled = false;
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            window.open('/boards/', '_blank');
+          };
+        }, 1500);
+        return;
+      }
+
+      // Save to pending queue
+      const linkData = {
+        id: crypto.randomUUID(),
+        url: link.url,
+        title: link.title,
+        description: link.description,
+        image: link.image,
+        domain: link.domain,
+        category: link.category,
+        confidence: link.confidence || null,
+        created_at: new Date().toISOString()
+      };
+      savePendingSave(linkData);
+
+      // Animate same as logged-in save
+      btn.textContent = 'Saved ✓';
+      btn.classList.add('grid-item__action--saved');
+      setTimeout(() => {
+        btn.textContent = 'View on Board';
+        btn.disabled = false;
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          window.open('/boards/', '_blank');
+        };
+      }, 1500);
+      return;
+    }
+
     try {
+      // Check for duplicate by URL
+      const isDuplicate = await checkDuplicate(link.url, accessToken);
+      if (isDuplicate) {
+        btn.textContent = 'Already Saved';
+        btn.classList.add('grid-item__action--saved');
+        setTimeout(() => {
+          btn.textContent = 'View on Board';
+          btn.disabled = false;
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            window.open('/boards/', '_blank');
+          };
+        }, 1500);
+        return;
+      }
+
       // Generate new ID for the saved link
       const newId = crypto.randomUUID();
 
