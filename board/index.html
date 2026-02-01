@@ -390,6 +390,22 @@ body {
   box-shadow: 4px 0 0 0 var(--fg);
 }
 
+/* New item animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.grid-item--new {
+  animation: slideIn 0.4s ease-out forwards;
+}
+
 .grid-item__image {
   width: 100%;
   height: 100%;
@@ -1342,7 +1358,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   console.log(`[board] v${VERSION}`);
 
   // ============================================
@@ -1697,14 +1713,47 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }
 
-  // Supabase sync functions (async, background)
+  // Auth helpers - read from localStorage (Supabase client hangs)
+  const AUTH_STORAGE_KEY = 'sb-yfhudwakpgzswiylhfbh-auth-token';
+
+  function getStoredAuth() {
+    try {
+      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('[auth] Failed to read stored auth:', e);
+    }
+    return null;
+  }
+
+  function getAccessToken() {
+    const auth = getStoredAuth();
+    return auth?.access_token || null;
+  }
+
+  function getStoredSession() {
+    const auth = getStoredAuth();
+    if (auth?.user && auth?.access_token) {
+      return { user: auth.user, access_token: auth.access_token };
+    }
+    return null;
+  }
+
+  // Supabase sync functions (async, background, using raw fetch)
   async function syncLinkToSupabase(link) {
     if (!currentUser) {
       console.log('[sync] Skipped - not logged in');
       return;
     }
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      console.log('[sync] Skipped - no access token');
+      return;
+    }
     try {
-      const { error } = await supabase.from('links').upsert({
+      const payload = {
         id: link.id,
         user_id: currentUser.id,
         url: link.url,
@@ -1716,9 +1765,19 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         confidence: link.confidence,
         created_at: link.addedAt,
         updated_at: link.updatedAt || null
+      };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(payload)
       });
-      if (error) {
-        console.error('[sync] Upload failed:', error.message);
+      if (!res.ok) {
+        console.error('[sync] Upload failed:', res.status);
       } else {
         console.log('[sync] Uploaded:', link.url);
       }
@@ -1727,38 +1786,44 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   async function syncOrderToSupabase(orderIds) {
     if (!currentUser) return;
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
     try {
-      await supabase.from('link_order').upsert({
-        user_id: currentUser.id,
-        order_ids: orderIds
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/link_order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({ user_id: currentUser.id, order_ids: orderIds })
       });
-    } catch (e) { console.error('Supabase order sync error:', e); }
+      if (!res.ok) console.error('[sync] Order sync failed:', res.status);
+    } catch (e) { console.error('[sync] Order sync error:', e); }
   }
 
   async function deleteLinkFromSupabase(id) {
     if (!currentUser) return;
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
     try {
-      await supabase.from('links').delete().eq('id', id).eq('user_id', currentUser.id);
-    } catch (e) { console.error('Supabase delete error:', e); }
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      if (!res.ok) console.error('[sync] Delete failed:', res.status);
+      else console.log('[sync] Deleted:', id);
+    } catch (e) { console.error('[sync] Delete error:', e); }
   }
 
   async function fetchFromSupabase() {
     if (!currentUser) return null;
 
-    // Get access token from localStorage (Supabase client hangs)
-    let accessToken = null;
-    try {
-      const storageKey = 'sb-yfhudwakpgzswiylhfbh-auth-token';
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        accessToken = parsed.access_token;
-      }
-    } catch (e) {
-      console.error('[fetch] Failed to get token:', e);
-      return null;
-    }
-
+    const accessToken = getAccessToken();
     if (!accessToken) {
       console.log('[fetch] No access token');
       return null;
@@ -2040,7 +2105,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     filters.innerHTML = html;
   }
 
-  function renderGrid() {
+  function renderGrid(newIds = []) {
+    const newIdSet = new Set(newIds);
     const allLinks = getAllLinks();
     const links = currentFilter === 'all' ? allLinks : allLinks.filter(l => l.category === currentFilter);
 
@@ -2075,6 +2141,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       const initial = l.title ? l.title.charAt(0).toUpperCase() : '?';
       const expansionState = expandedCards[l.id]; // 'medium', 'large', or undefined
       const expandedClass = expansionState ? ` grid-item--expanded-${expansionState}` : '';
+      const isNew = newIdSet.has(l.id);
+      const newClass = isNew ? ' grid-item--new' : '';
       const isExpanded = !!expansionState;
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
@@ -2096,14 +2164,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <div class="grid-item__resize" data-action="resize"></div>`;
 
       if (hasImg) {
-        html += `<article class="grid-item${expandedClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item${expandedClass}${newClass}" data-id="${l.id}" draggable="true">
           <img class="grid-item__image" src="${l.image}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
           ${detailsHtml}
         </article>`;
       } else {
-        html += `<article class="grid-item grid-item--placeholder${expandedClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item grid-item--placeholder${expandedClass}${newClass}" data-id="${l.id}" draggable="true">
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
@@ -2113,6 +2181,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     grid.innerHTML = html;
+
+    // Remove animation class after animation completes
+    if (newIds.length > 0) {
+      setTimeout(() => {
+        document.querySelectorAll('.grid-item--new').forEach(el => {
+          el.classList.remove('grid-item--new');
+        });
+      }, 600);
+    }
   }
 
   // ============================================
@@ -2992,19 +3069,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Revalidate: check session from localStorage (Supabase client hangs)
     const t1 = performance.now();
-    let session = null;
-    try {
-      const storageKey = 'sb-yfhudwakpgzswiylhfbh-auth-token';
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.user && parsed.access_token) {
-          session = { user: parsed.user, access_token: parsed.access_token };
-        }
-      }
-    } catch (e) {
-      console.error('[auth] Failed to read session:', e);
-    }
+    const session = getStoredSession();
     console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
     console.log('[auth] session:', session ? session.user.email : 'none');
 
@@ -3040,6 +3105,69 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Check clipboard for URLs
     checkClipboardForUrls();
+
+    // Start polling for cross-device sync (every 30s)
+    startPolling();
+  }
+
+  // Polling for cross-device sync
+  let pollingInterval = null;
+  const POLL_INTERVAL = 30000; // 30 seconds
+
+  function startPolling() {
+    if (pollingInterval) return;
+    pollingInterval = setInterval(pollForChanges, POLL_INTERVAL);
+    console.log('[poll] Started polling every 30s');
+  }
+
+  function stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+      console.log('[poll] Stopped polling');
+    }
+  }
+
+  async function pollForChanges() {
+    if (!currentUser) return;
+
+    const cloudData = await fetchFromSupabase();
+    if (!cloudData) return;
+
+    const localData = load();
+    const localIds = new Set(localData.links.map(l => l.id));
+    const cloudIds = new Set(cloudData.links.map(l => l.id));
+
+    // Find new items from cloud
+    const newIds = cloudData.links
+      .filter(l => !localIds.has(l.id))
+      .map(l => l.id);
+
+    // Find deleted items (in local but not cloud)
+    const deletedIds = localData.links
+      .filter(l => !cloudIds.has(l.id))
+      .map(l => l.id);
+
+    // Check for any changes
+    const hasChanges = newIds.length > 0 || deletedIds.length > 0 ||
+      cloudData.links.length !== localData.links.length;
+
+    if (hasChanges) {
+      console.log(`[poll] Changes detected: +${newIds.length} new, -${deletedIds.length} deleted`);
+
+      // Save the new data
+      save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
+      expandedCards = cloudData.expanded;
+      localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
+
+      // Re-render with animation for new items
+      renderFilters();
+      renderGrid(newIds);
+
+      if (newIds.length > 0) {
+        toast(`${newIds.length} new link${newIds.length > 1 ? 's' : ''} synced`);
+      }
+    }
   }
 
   async function checkClipboardForUrls() {
