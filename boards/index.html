@@ -1867,46 +1867,60 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   // Classify content type using rules (fast, free)
   function classifyByRules(url, title, description) {
+    console.log('%c[CLASSIFY] Starting rules-based classification:', 'color: #2ecc71; font-weight: bold', { url, title });
     try {
       const parsed = new URL(url);
       const domain = parsed.hostname.replace('www.', '');
       const path = parsed.pathname.toLowerCase();
       const text = `${title} ${description}`.toLowerCase();
+      console.log('%c[CLASSIFY] Parsed:', 'color: #2ecc71', { domain, path });
 
       // Check domain cache first
       if (domainProfileCache[domain]?.primaryType) {
-        return {
+        const result = {
           type: domainProfileCache[domain].primaryType,
           confidence: domainProfileCache[domain].confidence || 0.9,
           source: 'cache'
         };
+        console.log('%c[CLASSIFY] Found in cache:', 'color: #27ae60; font-weight: bold', result);
+        return result;
       }
 
       // Check known domains
       for (const t of BUILTIN_TYPES) {
         if (t.domains?.some(d => domain.includes(d))) {
-          return { type: t.name, confidence: 0.95, source: 'domain' };
+          const result = { type: t.name, confidence: 0.95, source: 'domain', signals: [`domain match: ${domain}`] };
+          console.log('%c[CLASSIFY] Domain match:', 'color: #27ae60; font-weight: bold', result);
+          return result;
         }
       }
 
       // Check URL patterns
       for (const t of BUILTIN_TYPES) {
-        if (t.patterns?.some(p => path.includes(p) || url.includes(p))) {
-          return { type: t.name, confidence: 0.8, source: 'pattern' };
+        const matchedPattern = t.patterns?.find(p => path.includes(p) || url.includes(p));
+        if (matchedPattern) {
+          const result = { type: t.name, confidence: 0.8, source: 'pattern', signals: [`pattern: ${matchedPattern}`] };
+          console.log('%c[CLASSIFY] Pattern match:', 'color: #27ae60; font-weight: bold', result);
+          return result;
         }
       }
 
       // Check keywords in title/description
       for (const t of BUILTIN_TYPES) {
-        const matches = t.keywords?.filter(k => text.includes(k)).length || 0;
-        if (matches >= 2) {
-          return { type: t.name, confidence: 0.6 + (matches * 0.1), source: 'keywords' };
+        const matchedKeywords = t.keywords?.filter(k => text.includes(k)) || [];
+        if (matchedKeywords.length >= 2) {
+          const result = { type: t.name, confidence: 0.6 + (matchedKeywords.length * 0.1), source: 'keywords', signals: matchedKeywords };
+          console.log('%c[CLASSIFY] Keyword match:', 'color: #27ae60; font-weight: bold', result);
+          return result;
         }
       }
 
-      return { type: 'unknown', confidence: 0.3, source: 'fallback' };
-    } catch {
-      return { type: 'unknown', confidence: 0.1, source: 'error' };
+      const result = { type: 'unknown', confidence: 0.3, source: 'fallback', signals: ['no matches'] };
+      console.log('%c[CLASSIFY] No match, fallback:', 'color: #f39c12', result);
+      return result;
+    } catch (e) {
+      console.error('%c[CLASSIFY] Error:', 'color: #e74c3c', e);
+      return { type: 'unknown', confidence: 0.1, source: 'error', signals: [e.message] };
     }
   }
 
@@ -2016,97 +2030,133 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   let isProcessingImages = false;
 
   function queueImageResolution(linkId, url, title, description, contentType) {
+    console.log('%c[IMAGE QUEUE] Adding to queue:', 'color: #9b59b6; font-weight: bold', {
+      linkId,
+      url,
+      contentType,
+      queueSizeBefore: imageQueue.length
+    });
     imageQueue.push({ linkId, url, title, description, contentType });
+    console.log('%c[IMAGE QUEUE] Queue size now:', 'color: #9b59b6', imageQueue.length);
     if (!isProcessingImages) {
       processImageQueue();
     }
   }
 
   async function processImageQueue() {
-    if (isProcessingImages || imageQueue.length === 0) return;
+    if (isProcessingImages || imageQueue.length === 0) {
+      console.log('%c[IMAGE QUEUE] Skip processing:', 'color: #9b59b6', {
+        alreadyProcessing: isProcessingImages,
+        queueEmpty: imageQueue.length === 0
+      });
+      return;
+    }
     isProcessingImages = true;
+    console.log('%c[IMAGE QUEUE] Starting processing, items:', 'color: #9b59b6; font-weight: bold', imageQueue.length);
 
     while (imageQueue.length > 0) {
       const item = imageQueue.shift();
+      console.log('%c[IMAGE QUEUE] Processing item:', 'color: #9b59b6', item.url);
       try {
         const result = await resolveImage(item);
+        console.log('%c[IMAGE QUEUE] Resolution result:', 'color: #9b59b6', result);
         if (result?.imageUrl) {
           await updateLinkImage(item.linkId, result.imageUrl, result.source);
+          console.log('%c[IMAGE QUEUE] Updated link image successfully', 'color: #27ae60; font-weight: bold');
+        } else {
+          console.log('%c[IMAGE QUEUE] No image found, using template fallback', 'color: #f39c12');
         }
       } catch (e) {
-        console.error('[image] Resolution failed:', e);
+        console.error('%c[IMAGE QUEUE] Resolution failed:', 'color: #e74c3c', e);
       }
     }
 
     isProcessingImages = false;
+    console.log('%c[IMAGE QUEUE] Processing complete', 'color: #9b59b6; font-weight: bold');
   }
 
   async function resolveImage({ url, title, description, contentType }) {
     const strategies = IMAGE_STRATEGIES[contentType] || IMAGE_STRATEGIES.unknown;
+    console.log('%c[IMAGE RESOLVE] Starting resolution:', 'color: #3498db; font-weight: bold', {
+      url,
+      contentType,
+      strategies: strategies.join(' → ')
+    });
 
     for (const strategy of strategies) {
+      console.log('%c[IMAGE RESOLVE] Trying strategy:', 'color: #3498db', strategy);
       try {
         let result = null;
 
         switch (strategy) {
           case 'scrape':
-            // Already tried during initial fetch, skip
+            console.log('%c[IMAGE RESOLVE] Scrape: skipped (already tried during fetch)', 'color: #7f8c8d');
             break;
 
           case 'platform':
+            console.log('%c[IMAGE RESOLVE] Platform: checking known APIs...', 'color: #3498db');
             result = await resolvePlatformImage(url);
             break;
 
           case 'search':
+            console.log('%c[IMAGE RESOLVE] Search: querying image search...', 'color: #3498db');
             result = await searchImage(title);
             break;
 
           case 'favicon':
+            console.log('%c[IMAGE RESOLVE] Favicon: fetching site icon...', 'color: #3498db');
             result = await resolveFavicon(url);
             break;
 
           case 'generate':
-            // AI generation - placeholder for future
+            console.log('%c[IMAGE RESOLVE] Generate: AI generation not yet implemented', 'color: #7f8c8d');
             break;
 
           case 'template':
-            // Fallback to styled card - handled by renderer
+            console.log('%c[IMAGE RESOLVE] Template: using styled fallback', 'color: #f39c12');
             return { imageUrl: null, source: 'template' };
         }
 
         if (result?.imageUrl) {
+          console.log('%c[IMAGE RESOLVE] Success with strategy:', 'color: #27ae60; font-weight: bold', strategy, result.imageUrl);
           return result;
+        } else if (result) {
+          console.log('%c[IMAGE RESOLVE] Strategy returned no image:', 'color: #f39c12', strategy);
         }
       } catch (e) {
-        console.error(`[image] Strategy ${strategy} failed:`, e);
+        console.error('%c[IMAGE RESOLVE] Strategy failed:', 'color: #e74c3c', strategy, e);
       }
     }
 
+    console.log('%c[IMAGE RESOLVE] All strategies exhausted, no image found', 'color: #e74c3c');
     return null;
   }
 
   async function resolvePlatformImage(url) {
     try {
       const domain = new URL(url).hostname;
+      console.log('%c[PLATFORM] Checking domain:', 'color: #e67e22', domain);
 
       // YouTube
       if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
         const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?]+)/)?.[1];
+        console.log('%c[PLATFORM] YouTube detected, videoId:', 'color: #e67e22', videoId);
         if (videoId) {
-          return {
-            imageUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-            source: 'platform_api'
-          };
+          const imageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
+          return { imageUrl, source: 'platform_api' };
         }
       }
 
       // Vimeo
       if (domain.includes('vimeo.com')) {
         const videoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
+        console.log('%c[PLATFORM] Vimeo detected, videoId:', 'color: #e67e22', videoId);
         if (videoId) {
           const response = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
           if (response.ok) {
             const data = await response.json();
+            console.log('%c[PLATFORM] Vimeo thumbnail:', 'color: #27ae60', data[0]?.thumbnail_large);
             return { imageUrl: data[0]?.thumbnail_large, source: 'platform_api' };
           }
         }
@@ -2114,17 +2164,18 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
       // GitHub
       if (domain.includes('github.com')) {
-        // GitHub generates social preview images
         const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+        console.log('%c[PLATFORM] GitHub detected, repo:', 'color: #e67e22', match?.[1], match?.[2]);
         if (match) {
-          return {
-            imageUrl: `https://opengraph.githubassets.com/1/${match[1]}/${match[2]}`,
-            source: 'platform_api'
-          };
+          const imageUrl = `https://opengraph.githubassets.com/1/${match[1]}/${match[2]}`;
+          console.log('%c[PLATFORM] GitHub social preview:', 'color: #27ae60', imageUrl);
+          return { imageUrl, source: 'platform_api' };
         }
       }
+
+      console.log('%c[PLATFORM] No platform match for domain:', 'color: #7f8c8d', domain);
     } catch (e) {
-      console.error('[image] Platform API error:', e);
+      console.error('%c[PLATFORM] API error:', 'color: #e74c3c', e);
     }
 
     return null;
@@ -3218,11 +3269,22 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const url = urls[i];
       showProgress(i + 1, total, url);
       try {
+        console.log('%c[LINK FLOW] Step 1: Fetching metadata for:', 'color: #1abc9c; font-weight: bold', url);
         const meta = await fetchMetadata(url);
+        console.log('%c[LINK FLOW] Step 2: Metadata received:', 'color: #1abc9c', {
+          title: meta.title,
+          image: meta.image ? 'YES' : 'NO',
+          description: meta.description?.substring(0, 50) + '...'
+        });
+
+        console.log('%c[LINK FLOW] Step 3: AI categorization...', 'color: #1abc9c');
         const cat = await smartCategorize(meta);
+        console.log('%c[LINK FLOW] Category:', 'color: #1abc9c', cat);
 
         // Content type classification
+        console.log('%c[LINK FLOW] Step 4: Content type classification...', 'color: #1abc9c');
         const contentType = classifyByRules(url, meta.title, meta.description);
+        console.log('%c[LINK FLOW] Content type result:', 'color: #1abc9c', contentType);
 
         const linkObj = {
           id: generateId(url),
@@ -3234,21 +3296,29 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
           type_confidence: contentType.confidence,
           type_signals: contentType.signals
         };
+        console.log('%c[LINK FLOW] Step 5: Adding link to storage...', 'color: #1abc9c');
         const result = addLink(linkObj);
+        console.log('%c[LINK FLOW] Add result:', 'color: #1abc9c', result);
+
         if (result.success) {
           if (result.updated) updated++;
           else added++;
 
           // Queue image resolution if no image found
           if (!meta.image) {
+            console.log('%c[LINK FLOW] Step 6: No image found, queuing resolution...', 'color: #f39c12; font-weight: bold');
             queueImageResolution(linkObj.id, url, meta.title, meta.description, contentType.type);
+          } else {
+            console.log('%c[LINK FLOW] Step 6: Image already present, skipping queue', 'color: #27ae60');
           }
 
           // Render immediately after each successful add
           renderFilters();
           renderGrid();
+          console.log('%c[LINK FLOW] ✓ Link processed successfully', 'color: #27ae60; font-weight: bold');
         }
       } catch (err) {
+        console.error('%c[LINK FLOW] ✗ Failed to process link:', 'color: #e74c3c; font-weight: bold', err);
         failed++;
       }
     }
@@ -3758,11 +3828,22 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const url = urls[i];
       showProgress(i + 1, total, url);
       try {
+        console.log('%c[LINK FLOW] Step 1: Fetching metadata for:', 'color: #1abc9c; font-weight: bold', url);
         const meta = await fetchMetadata(url);
+        console.log('%c[LINK FLOW] Step 2: Metadata received:', 'color: #1abc9c', {
+          title: meta.title,
+          image: meta.image ? 'YES' : 'NO',
+          description: meta.description?.substring(0, 50) + '...'
+        });
+
+        console.log('%c[LINK FLOW] Step 3: AI categorization...', 'color: #1abc9c');
         const cat = await smartCategorize(meta);
+        console.log('%c[LINK FLOW] Category:', 'color: #1abc9c', cat);
 
         // Content type classification
+        console.log('%c[LINK FLOW] Step 4: Content type classification...', 'color: #1abc9c');
         const contentType = classifyByRules(url, meta.title, meta.description);
+        console.log('%c[LINK FLOW] Content type result:', 'color: #1abc9c', contentType);
 
         const linkObj = {
           id: generateId(url),
@@ -3774,21 +3855,29 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
           type_confidence: contentType.confidence,
           type_signals: contentType.signals
         };
+        console.log('%c[LINK FLOW] Step 5: Adding link to storage...', 'color: #1abc9c');
         const result = addLink(linkObj);
+        console.log('%c[LINK FLOW] Add result:', 'color: #1abc9c', result);
+
         if (result.success) {
           if (result.updated) updated++;
           else added++;
 
           // Queue image resolution if no image found
           if (!meta.image) {
+            console.log('%c[LINK FLOW] Step 6: No image found, queuing resolution...', 'color: #f39c12; font-weight: bold');
             queueImageResolution(linkObj.id, url, meta.title, meta.description, contentType.type);
+          } else {
+            console.log('%c[LINK FLOW] Step 6: Image already present, skipping queue', 'color: #27ae60');
           }
 
           // Render immediately after each successful add
           renderFilters();
           renderGrid();
+          console.log('%c[LINK FLOW] ✓ Link processed successfully', 'color: #27ae60; font-weight: bold');
         }
       } catch (err) {
+        console.error('%c[LINK FLOW] ✗ Failed to process link:', 'color: #e74c3c; font-weight: bold', err);
         failed++;
       }
     }
