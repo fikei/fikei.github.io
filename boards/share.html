@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Board</title>
+
+  <!-- Space Grotesk Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+/* ============================================
+   Shared Board View - Public Page
+   ============================================ */
+
+:root {
+  --font-primary: "Space Grotesk", sans-serif;
+  --font-serif: "Space Grotesk", sans-serif;
+  --font-mono: "Space Grotesk", monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --bg: #fff;
+  --fg: #000;
+  --subtle: #eee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --subtle: #222;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-primary);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--fg);
+  z-index: 100;
+}
+
+.header__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.header__meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+}
+
+.header__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.header__btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.header__btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.header__btn--primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* Filters */
+.filters {
+  position: fixed;
+  top: 45px;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--subtle);
+  overflow-x: auto;
+  z-index: 99;
+}
+
+.filter-token {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-token:hover,
+.filter-token--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--fg);
+  margin-top: 90px;
+}
+
+@media (min-width: 600px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+.grid-item {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg);
+}
+
+.grid-item__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(100%) contrast(1.1);
+  transition: filter 0.2s;
+}
+
+.grid-item:hover .grid-item__image {
+  filter: grayscale(0%);
+}
+
+.grid-item__overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-3);
+  background: var(--bg);
+  border-top: 1px solid var(--fg);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.grid-item:hover .grid-item__overlay {
+  opacity: 1;
+}
+
+.grid-item__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-item__domain {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+}
+
+.grid-item__category {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--bg);
+  border: 1px solid var(--fg);
+}
+
+/* Placeholder (no image) */
+.grid-item--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--subtle);
+}
+
+.grid-item__initial {
+  font-family: var(--font-mono);
+  font-size: 48px;
+  font-weight: bold;
+  opacity: 0.3;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  margin-top: 90px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Error */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  margin-top: 90px;
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.error__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-2);
+}
+
+.error__message {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-sm);
+  opacity: 0.7;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  z-index: 200;
+}
+
+.toast {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  margin-top: var(--space-2);
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Save Modal */
+.save-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.save-modal--visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.save-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+}
+
+.save-modal__content {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  background: var(--bg);
+  border: 2px solid var(--fg);
+  padding: var(--space-4);
+}
+
+.save-modal__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-3);
+}
+
+.save-modal__link {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--subtle);
+  margin-bottom: var(--space-3);
+}
+
+.save-modal__link-image {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  background: var(--subtle);
+}
+
+.save-modal__link-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.save-modal__link-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  margin-bottom: var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-modal__link-domain {
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+}
+
+.save-modal__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.save-modal__btn {
+  flex: 1;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fg);
+  cursor: pointer;
+}
+
+.save-modal__btn--primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.save-modal__btn--secondary {
+  background: var(--bg);
+  color: var(--fg);
+}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="header">
+    <div>
+      <h1 class="header__title" id="boardTitle">Loading...</h1>
+      <p class="header__meta" id="boardMeta"></p>
+    </div>
+    <div class="header__actions">
+      <a href="/boards/" class="header__btn">Create Your Own</a>
+    </div>
+  </header>
+
+  <nav class="filters" id="filters" style="display:none;"></nav>
+
+  <div class="loading" id="loading">Loading...</div>
+  <div class="error" id="error" style="display:none;">
+    <h2 class="error__title">Board Not Found</h2>
+    <p class="error__message">This board may have been removed or the link is incorrect.</p>
+  </div>
+
+  <main class="grid" id="grid" style="display:none;"></main>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Save Modal -->
+  <div class="save-modal" id="saveModal">
+    <div class="save-modal__backdrop" id="saveModalBackdrop"></div>
+    <div class="save-modal__content">
+      <h2 class="save-modal__title">Save to Your Board</h2>
+      <div class="save-modal__link" id="saveModalLink"></div>
+      <div class="save-modal__actions">
+        <button class="save-modal__btn save-modal__btn--secondary" id="saveModalCancel">Cancel</button>
+        <button class="save-modal__btn save-modal__btn--primary" id="saveModalConfirm">Save Link</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================================
+  // Config
+  // ============================================
+  const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+
+  // ============================================
+  // DOM
+  // ============================================
+  const $ = id => document.getElementById(id);
+  const boardTitle = $('boardTitle');
+  const boardMeta = $('boardMeta');
+  const filters = $('filters');
+  const loading = $('loading');
+  const error = $('error');
+  const grid = $('grid');
+  const toastContainer = $('toastContainer');
+  const saveModal = $('saveModal');
+  const saveModalLink = $('saveModalLink');
+
+  // ============================================
+  // State
+  // ============================================
+  let board = null;
+  let links = [];
+  let currentFilter = 'all';
+  let selectedLink = null;
+
+  // ============================================
+  // Helpers
+  // ============================================
+  function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function cap(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+  }
+
+  function toast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    toastContainer.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  // ============================================
+  // Load Board
+  // ============================================
+  async function loadBoard() {
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('id');
+
+    if (!slug) {
+      showError();
+      return;
+    }
+
+    try {
+      // Fetch board info
+      const boardRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/shared_boards?slug=eq.${slug}&select=*`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY
+          }
+        }
+      );
+
+      if (!boardRes.ok) throw new Error('Failed to load board');
+
+      const boardData = await boardRes.json();
+      if (boardData.length === 0) {
+        showError();
+        return;
+      }
+
+      board = boardData[0];
+
+      // Record view
+      recordView(board.id);
+
+      // Fetch links
+      await loadLinks();
+
+    } catch (e) {
+      console.error('Failed to load board:', e);
+      showError();
+    }
+  }
+
+  async function loadLinks() {
+    try {
+      let linkIds;
+
+      if (board.update_mode === 'snapshot' && board.snapshot_link_ids) {
+        // Use snapshot link IDs
+        linkIds = board.snapshot_link_ids;
+        const idsParam = linkIds.map(id => `"${id}"`).join(',');
+        const linksRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/links?id=in.(${idsParam})&select=*`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY
+            }
+          }
+        );
+        links = await linksRes.json();
+      } else {
+        // Live mode - fetch user's current links
+        let query = `${SUPABASE_URL}/rest/v1/links?user_id=eq.${board.user_id}&select=*`;
+        if (board.category) {
+          query += `&category=eq.${board.category}`;
+        }
+
+        const linksRes = await fetch(query, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY
+          }
+        });
+        links = await linksRes.json();
+      }
+
+      showBoard();
+
+    } catch (e) {
+      console.error('Failed to load links:', e);
+      showError();
+    }
+  }
+
+  async function recordView(boardId) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/board_views`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          board_id: boardId,
+          referrer: document.referrer || null,
+          user_agent: navigator.userAgent
+        })
+      });
+    } catch (e) {
+      // Ignore view tracking errors
+    }
+  }
+
+  function showError() {
+    loading.style.display = 'none';
+    error.style.display = 'flex';
+  }
+
+  function showBoard() {
+    loading.style.display = 'none';
+    grid.style.display = 'grid';
+
+    // Set title
+    const title = board.name || (board.category ? cap(board.category) : 'All Links');
+    boardTitle.textContent = title;
+    document.title = `${title} - Shared Board`;
+
+    // Set meta
+    boardMeta.textContent = `${links.length} link${links.length !== 1 ? 's' : ''}`;
+
+    // Show filters if showing all categories
+    if (!board.category) {
+      renderFilters();
+      filters.style.display = 'flex';
+    }
+
+    renderGrid();
+  }
+
+  // ============================================
+  // Render
+  // ============================================
+  function renderFilters() {
+    const categories = {};
+    for (const l of links) {
+      categories[l.category] = (categories[l.category] || 0) + 1;
+    }
+
+    let html = `<button class="filter-token ${currentFilter === 'all' ? 'filter-token--active' : ''}" data-category="all">All (${links.length})</button>`;
+
+    const sorted = Object.entries(categories)
+      .filter(([cat]) => cat !== 'uncategorized')
+      .sort((a, b) => b[1] - a[1]);
+
+    for (const [cat, count] of sorted) {
+      const active = currentFilter === cat ? 'filter-token--active' : '';
+      html += `<button class="filter-token ${active}" data-category="${cat}">${cap(cat)} (${count})</button>`;
+    }
+
+    filters.innerHTML = html;
+  }
+
+  function renderGrid() {
+    const filtered = currentFilter === 'all' ? links : links.filter(l => l.category === currentFilter);
+
+    if (filtered.length === 0) {
+      grid.innerHTML = '<div class="loading">No links in this category</div>';
+      return;
+    }
+
+    let html = '';
+    for (const l of filtered) {
+      const hasImg = l.image && l.image.length > 0;
+      const initial = l.title ? l.title.charAt(0).toUpperCase() : '?';
+
+      if (hasImg) {
+        html += `<article class="grid-item" data-id="${l.id}" data-url="${esc(l.url)}">
+          <img class="grid-item__image" src="${l.image}" alt="" loading="lazy">
+          <div class="grid-item__overlay">
+            <h3 class="grid-item__title">${esc(l.title)}</h3>
+            <p class="grid-item__domain">${esc(l.domain)}</p>
+          </div>
+          <span class="grid-item__category">${cap(l.category)}</span>
+        </article>`;
+      } else {
+        html += `<article class="grid-item grid-item--placeholder" data-id="${l.id}" data-url="${esc(l.url)}">
+          <span class="grid-item__initial">${initial}</span>
+          <div class="grid-item__overlay">
+            <h3 class="grid-item__title">${esc(l.title)}</h3>
+            <p class="grid-item__domain">${esc(l.domain)}</p>
+          </div>
+          <span class="grid-item__category">${cap(l.category)}</span>
+        </article>`;
+      }
+    }
+
+    grid.innerHTML = html;
+  }
+
+  // ============================================
+  // Events
+  // ============================================
+  filters.onclick = (e) => {
+    const btn = e.target.closest('.filter-token');
+    if (!btn) return;
+    currentFilter = btn.dataset.category;
+    renderFilters();
+    renderGrid();
+  };
+
+  grid.onclick = (e) => {
+    const item = e.target.closest('.grid-item');
+    if (!item) return;
+
+    const url = item.dataset.url;
+    const id = item.dataset.id;
+
+    // Find the link
+    selectedLink = links.find(l => l.id === id);
+
+    // If holding Alt/Option, open save modal
+    if (e.altKey) {
+      openSaveModal(selectedLink);
+    } else {
+      // Open link
+      window.open(url, '_blank');
+    }
+  };
+
+  // ============================================
+  // Save Modal
+  // ============================================
+  function openSaveModal(link) {
+    if (!link) return;
+
+    saveModalLink.innerHTML = `
+      ${link.image ? `<img class="save-modal__link-image" src="${link.image}" alt="">` : '<div class="save-modal__link-image"></div>'}
+      <div class="save-modal__link-info">
+        <h3 class="save-modal__link-title">${esc(link.title)}</h3>
+        <p class="save-modal__link-domain">${esc(link.domain)}</p>
+      </div>
+    `;
+
+    saveModal.classList.add('save-modal--visible');
+  }
+
+  function closeSaveModal() {
+    saveModal.classList.remove('save-modal--visible');
+    selectedLink = null;
+  }
+
+  $('saveModalBackdrop').onclick = closeSaveModal;
+  $('saveModalCancel').onclick = closeSaveModal;
+
+  $('saveModalConfirm').onclick = async () => {
+    if (!selectedLink) return;
+
+    // Copy link URL to clipboard with a message
+    const text = `${selectedLink.url}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Link copied - paste in your Boards to save');
+    } catch (e) {
+      toast('Open Boards and paste this link');
+    }
+
+    closeSaveModal();
+  };
+
+  // ============================================
+  // Init
+  // ============================================
+  loadBoard();
+
+})();
+</script>
+</body>
+</html>

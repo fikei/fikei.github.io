@@ -1099,6 +1099,186 @@ body {
 }
 
 /* ============================================
+   Share Modal
+   ============================================ */
+.share-modal__body {
+  padding: var(--space-4);
+}
+
+.share-modal__section {
+  margin-bottom: var(--space-4);
+}
+
+.share-modal__label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-2);
+  color: var(--fg);
+  opacity: 0.7;
+}
+
+.share-modal__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.share-modal__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.share-modal__option:hover {
+  border-color: var(--fg);
+}
+
+.share-modal__option:has(input:checked) {
+  border-color: var(--fg);
+  background: var(--subtle);
+}
+
+.share-modal__option input {
+  margin-top: 2px;
+}
+
+.share-modal__option-icon {
+  font-size: 16px;
+}
+
+.share-modal__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share-modal__option-text strong {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.share-modal__option-text small {
+  font-family: var(--font-serif);
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.share-modal__link-section {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--subtle);
+}
+
+.share-modal__link-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.share-modal__link-input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.share-modal__copy-btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.share-modal__copy-btn:hover {
+  opacity: 0.8;
+}
+
+.share-modal__stats {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.share-modal__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--subtle);
+}
+
+.share-modal__btn {
+  flex: 1;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.share-modal__btn--primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.share-modal__btn--primary:hover {
+  opacity: 0.8;
+}
+
+.share-modal__btn--secondary {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.share-modal__btn--secondary:hover {
+  background: var(--subtle);
+}
+
+/* Share button in header */
+.share-btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.share-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.share-btn--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ============================================
    Toast
    ============================================ */
 .toast-container {
@@ -1248,6 +1428,7 @@ body {
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
     <span class="auth-bar__user" id="authUser"></span>
+    <button class="share-btn" id="shareBtn" style="display:none;">Share</button>
     <button class="auth-bar__btn" id="authBtn">Login</button>
   </div>
 
@@ -1314,6 +1495,73 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
+  <!-- Share Modal -->
+  <div class="modal modal--small" id="shareModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title" id="shareModalTitle">Share Board</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="share-modal__body">
+        <div class="share-modal__section">
+          <label class="share-modal__label">Visibility</label>
+          <div class="share-modal__options">
+            <label class="share-modal__option">
+              <input type="radio" name="shareVisibility" value="link" checked>
+              <span class="share-modal__option-icon">🔗</span>
+              <span class="share-modal__option-text">
+                <strong>Anyone with link</strong>
+                <small>Only people with the link can view</small>
+              </span>
+            </label>
+            <label class="share-modal__option">
+              <input type="radio" name="shareVisibility" value="public">
+              <span class="share-modal__option-icon">🌐</span>
+              <span class="share-modal__option-text">
+                <strong>Public</strong>
+                <small>Discoverable on your profile</small>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="share-modal__section">
+          <label class="share-modal__label">Updates</label>
+          <div class="share-modal__options">
+            <label class="share-modal__option">
+              <input type="radio" name="shareUpdateMode" value="live" checked>
+              <span class="share-modal__option-icon">⚡</span>
+              <span class="share-modal__option-text">
+                <strong>Live</strong>
+                <small>Always shows latest links</small>
+              </span>
+            </label>
+            <label class="share-modal__option">
+              <input type="radio" name="shareUpdateMode" value="snapshot">
+              <span class="share-modal__option-icon">📸</span>
+              <span class="share-modal__option-text">
+                <strong>Snapshot</strong>
+                <small>Frozen at time of sharing</small>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="share-modal__section share-modal__link-section" id="shareLinkSection" style="display:none;">
+          <label class="share-modal__label">Share Link</label>
+          <div class="share-modal__link-row">
+            <input type="text" class="share-modal__link-input" id="shareLinkInput" readonly>
+            <button class="share-modal__copy-btn" id="shareCopyBtn">Copy</button>
+          </div>
+          <div class="share-modal__stats" id="shareStats"></div>
+        </div>
+        <div class="share-modal__actions">
+          <button class="share-modal__btn share-modal__btn--secondary" id="shareStopBtn" style="display:none;">Stop Sharing</button>
+          <button class="share-modal__btn share-modal__btn--primary" id="shareCreateBtn">Create Share Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Auth Modal -->
@@ -1366,7 +1614,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.4.0';
+  const VERSION = '1.5.0';
   console.log(`[boards] v${VERSION}`);
 
   // ============================================
@@ -2921,14 +3169,265 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Auth Functions
   // ============================================
   function updateAuthUI() {
+    const shareBtn = $('shareBtn');
     if (currentUser) {
       authUser.textContent = currentUser.email;
       authBtn.textContent = 'Logout';
+      shareBtn.style.display = '';
     } else {
       authUser.textContent = '';
       authBtn.textContent = 'Login';
+      shareBtn.style.display = 'none';
     }
   }
+
+  // ============================================
+  // Share Functions
+  // ============================================
+  const shareModal = $('shareModal');
+  const shareModalTitle = $('shareModalTitle');
+  const shareLinkSection = $('shareLinkSection');
+  const shareLinkInput = $('shareLinkInput');
+  const shareStats = $('shareStats');
+  const shareCreateBtn = $('shareCreateBtn');
+  const shareStopBtn = $('shareStopBtn');
+  const shareCopyBtn = $('shareCopyBtn');
+
+  let currentShare = null; // Current share being edited
+  let shareCategory = null; // Category being shared (null = all)
+
+  function openShareModal(category = null) {
+    if (!currentUser) {
+      toast('Login required to share', true);
+      return;
+    }
+
+    shareCategory = category;
+    shareModalTitle.textContent = category ? `Share "${cap(category)}"` : 'Share All Links';
+
+    // Reset UI
+    shareLinkSection.style.display = 'none';
+    shareCreateBtn.style.display = '';
+    shareStopBtn.style.display = 'none';
+    shareCreateBtn.textContent = 'Create Share Link';
+
+    // Check if already shared
+    loadExistingShare(category);
+
+    openModal(shareModal);
+  }
+
+  async function loadExistingShare(category) {
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
+
+    try {
+      const categoryFilter = category ? `&category=eq.${category}` : '&category=is.null';
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/shared_boards?user_id=eq.${currentUser.id}${categoryFilter}&select=*`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.length > 0) {
+          currentShare = data[0];
+          showExistingShare(currentShare);
+        } else {
+          currentShare = null;
+        }
+      }
+    } catch (e) {
+      console.error('[share] Failed to load existing share:', e);
+    }
+  }
+
+  function showExistingShare(share) {
+    // Set visibility radio
+    const visRadio = document.querySelector(`input[name="shareVisibility"][value="${share.visibility}"]`);
+    if (visRadio) visRadio.checked = true;
+
+    // Set update mode radio
+    const modeRadio = document.querySelector(`input[name="shareUpdateMode"][value="${share.update_mode}"]`);
+    if (modeRadio) modeRadio.checked = true;
+
+    // Show link
+    const shareUrl = `${window.location.origin}/boards/share.html?id=${share.slug}`;
+    shareLinkInput.value = shareUrl;
+    shareLinkSection.style.display = 'block';
+
+    // Update buttons
+    shareCreateBtn.textContent = 'Update';
+    shareStopBtn.style.display = '';
+
+    // Load stats
+    loadShareStats(share.id);
+  }
+
+  async function loadShareStats(boardId) {
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
+
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/board_views?board_id=eq.${boardId}&select=id`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        shareStats.textContent = `${data.length} view${data.length !== 1 ? 's' : ''}`;
+      }
+    } catch (e) {
+      console.error('[share] Failed to load stats:', e);
+    }
+  }
+
+  async function createOrUpdateShare() {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      toast('Login required', true);
+      return;
+    }
+
+    const visibility = document.querySelector('input[name="shareVisibility"]:checked')?.value || 'link';
+    const updateMode = document.querySelector('input[name="shareUpdateMode"]:checked')?.value || 'live';
+
+    shareCreateBtn.disabled = true;
+    shareCreateBtn.textContent = currentShare ? 'Updating...' : 'Creating...';
+
+    try {
+      let snapshotIds = null;
+      if (updateMode === 'snapshot') {
+        const links = shareCategory
+          ? getAllLinks().filter(l => l.category === shareCategory)
+          : getAllLinks();
+        snapshotIds = links.map(l => l.id);
+      }
+
+      const payload = {
+        user_id: currentUser.id,
+        category: shareCategory || null,
+        visibility,
+        update_mode: updateMode,
+        snapshot_link_ids: snapshotIds,
+        updated_at: new Date().toISOString()
+      };
+
+      let res;
+      if (currentShare) {
+        // Update existing
+        res = await fetch(
+          `${SUPABASE_URL}/rest/v1/shared_boards?id=eq.${currentShare.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(payload)
+          }
+        );
+      } else {
+        // Create new - generate slug
+        const slug = Math.random().toString(36).substring(2, 10);
+        payload.slug = slug;
+
+        res = await fetch(
+          `${SUPABASE_URL}/rest/v1/shared_boards`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(payload)
+          }
+        );
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        currentShare = Array.isArray(data) ? data[0] : data;
+        showExistingShare(currentShare);
+        toast(currentShare ? 'Share updated' : 'Share link created');
+      } else {
+        const err = await res.text();
+        console.error('[share] Failed:', res.status, err);
+        toast('Failed to create share', true);
+      }
+    } catch (e) {
+      console.error('[share] Error:', e);
+      toast('Failed to create share', true);
+    } finally {
+      shareCreateBtn.disabled = false;
+      shareCreateBtn.textContent = currentShare ? 'Update' : 'Create Share Link';
+    }
+  }
+
+  async function stopSharing() {
+    if (!currentShare) return;
+
+    const confirmed = await showConfirm('Stop sharing this board? The link will no longer work.', 'Stop Sharing');
+    if (!confirmed) return;
+
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
+
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/shared_boards?id=eq.${currentShare.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (res.ok) {
+        currentShare = null;
+        shareLinkSection.style.display = 'none';
+        shareCreateBtn.textContent = 'Create Share Link';
+        shareStopBtn.style.display = 'none';
+        toast('Sharing stopped');
+      }
+    } catch (e) {
+      console.error('[share] Failed to stop sharing:', e);
+      toast('Failed to stop sharing', true);
+    }
+  }
+
+  function copyShareLink() {
+    shareLinkInput.select();
+    document.execCommand('copy');
+    toast('Link copied');
+  }
+
+  // Share button click handler
+  $('shareBtn').onclick = () => openShareModal(currentFilter === 'all' ? null : currentFilter);
+  shareCreateBtn.onclick = createOrUpdateShare;
+  shareStopBtn.onclick = stopSharing;
+  shareCopyBtn.onclick = copyShareLink;
+
+  // Close share modal on backdrop click
+  shareModal.querySelector('[data-close]').onclick = () => closeModal(shareModal);
+  shareModal.querySelector('.modal__close').onclick = () => closeModal(shareModal);
 
   // Sync status tracking
   let syncInProgress = false;
