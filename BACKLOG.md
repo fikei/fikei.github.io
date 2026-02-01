@@ -322,84 +322,37 @@
 
 ---
 
-## Epic: Intelligent Image System
+## Epic: Content Type System
 
-> Automatically detect content types, select appropriate visual strategies, and evolve over time.
+> Detect, classify, and evolve content types for links.
 > **PRD:** [docs/PRD-intelligent-image-system.md](docs/PRD-intelligent-image-system.md)
 > **Tech Spec:** [docs/TECH-intelligent-image-system.md](docs/TECH-intelligent-image-system.md)
 
-### Phase 1: Foundation
+### Phase 1: Detection
 
-#### Story: Content Type Detection
+#### Story: Content Type Classification
 > As a system, I want to detect what type of content a link represents.
 
 **Tasks:**
-- [ ] Create `content_types` table with builtin types
-- [ ] Create `domain_profiles` table for caching
+- [ ] Create `content_types` table with builtin types (product, article, video, music, repository, social, document, tool, unknown)
+- [ ] Add `content_type` field to links table
 - [ ] Implement ContentClassifier interface (provider-agnostic)
 - [ ] Implement AnthropicClassifier provider
 - [ ] Implement OpenAIClassifier provider (backup)
 - [ ] Build classification prompt with type definitions
-- [ ] Add confidence threshold handling
-- [ ] Store classification results with links
-
-#### Story: Basic Image Strategies
-> As a system, I want to resolve images based on content type.
-
-**Tasks:**
-- [ ] Create `image_strategies` table
-- [ ] Define pipeline for each builtin type
-- [ ] Implement ImageResolver interface
-- [ ] Implement scrape method (re-fetch OG image)
-- [ ] Implement search method (Unsplash API)
-- [ ] Implement platform_api method (YouTube, Spotify, GitHub)
-- [ ] Implement template method (styled text cards)
-- [ ] Add image_source field to links table
+- [ ] Add confidence threshold handling (0.7)
+- [ ] Return type + confidence + signals from classifier
 
 #### Story: Domain Profile Caching
 > As a system, I want to cache domain classifications to reduce API costs.
 
 **Tasks:**
+- [ ] Create `domain_profiles` table
 - [ ] Implement DomainProfileManager
 - [ ] Cache single-type domains at domain level
-- [ ] Detect multi-type vs single-type domains
-- [ ] Set appropriate TTLs for cache entries
+- [ ] Set appropriate TTLs (30 days for known, 7 days for unknown)
 - [ ] Add cache hit/miss logging
-
-#### Story: Manual Image Override
-> As a user, I want to replace any auto-selected image with my own choice.
-
-**Tasks:**
-- [ ] Add "Edit image" button to link cards
-- [ ] Build image edit modal UI
-- [ ] Option: Re-fetch from URL
-- [ ] Option: Search for image (keyword input)
-- [ ] Option: Upload custom image
-- [ ] Save override and mark source as 'uploaded'
-
-### Phase 2: Intelligence
-
-#### Story: Multi-Type Domain Handling
-> As a system, I want to correctly classify links from domains with multiple content types.
-
-**Tasks:**
-- [ ] Track types_seen per domain
-- [ ] Detect multi-type domains after N samples
-- [ ] Store path samples for pattern analysis
-- [ ] AI-analyze path patterns periodically
-- [ ] Cache at path-pattern level for multi-type domains
-- [ ] Handle new paths with API fallback
-
-#### Story: Background Processing Queue
-> As a system, I want to resolve images in the background without blocking link addition.
-
-**Tasks:**
-- [ ] Implement client-side image queue
-- [ ] Show placeholder immediately on add
-- [ ] Process queue in background
-- [ ] Fade in resolved images
-- [ ] Handle resolution failures gracefully
-- [ ] Add retry logic with backoff
+- [ ] Skip API call for cached domains
 
 #### Story: Classification Batching
 > As a system, I want to batch API calls for cost efficiency.
@@ -409,53 +362,160 @@
 - [ ] Batch queue items (10-20 per call)
 - [ ] Build batch classification prompt
 - [ ] Parse batch responses
-- [ ] Flush queue on timeout or size threshold
+- [ ] Flush queue on timeout (1s) or size threshold
 
-#### Story: Performance Tracking
-> As a system, I want to track which image strategies perform well.
+### Phase 2: Multi-Type Domains
+
+#### Story: Domain Type Learning
+> As a system, I want to learn which domains have multiple content types.
 
 **Tasks:**
-- [ ] Create `strategy_performance` table
-- [ ] Track manual override rate per type
-- [ ] Track image load success rate
-- [ ] Track resolution time percentiles
-- [ ] Build admin dashboard for metrics
+- [ ] Track types_seen per domain in domain_profiles
+- [ ] Detect multi-type domains after 5+ samples
+- [ ] Mark domain as single_type or multi_type
+- [ ] Calculate confidence based on type distribution
+
+#### Story: Path Pattern Learning
+> As a system, I want to learn URL patterns for multi-type domains.
+
+**Tasks:**
+- [ ] Store path samples for multi-type domains
+- [ ] AI-analyze path patterns periodically (every 10 samples)
+- [ ] Extract regex patterns (e.g., ^/blog/, ^/products?/)
+- [ ] Cache at path-pattern level
+- [ ] Handle new paths with API fallback
 
 ### Phase 3: Evolution
 
-#### Story: Type Discovery Pipeline
-> As a system, I want to automatically discover new content types from usage patterns.
+#### Story: Uncertain Classification Tracking
+> As a system, I want to track low-confidence classifications for analysis.
 
 **Tasks:**
 - [ ] Create `classification_log` table
 - [ ] Store uncertain classifications (confidence < 0.7)
-- [ ] Generate embeddings for uncertain items
-- [ ] Implement weekly clustering job
-- [ ] AI-analyze clusters for new types
-- [ ] Validate proposals on holdout set
-- [ ] Queue proposals for review or auto-promote
+- [ ] Include URL, title, description, predicted type
+- [ ] Generate embeddings for clustering
 
-#### Story: Visual Strategy Improvement
-> As a system, I want to automatically improve image strategies based on user behavior.
+#### Story: Type Discovery Pipeline
+> As a system, I want to automatically discover new content types.
 
 **Tasks:**
-- [ ] Track user override patterns
-- [ ] Analyze what users replace images with
-- [ ] AI-propose strategy improvements
-- [ ] Implement A/B testing framework
-- [ ] Promote winning strategies automatically
+- [ ] Implement weekly clustering job
+- [ ] Cluster uncertain items by embedding similarity
+- [ ] AI-analyze clusters (min 10 items) for new types
+- [ ] Generate type proposal with name, definition, signals
+- [ ] Validate proposals on holdout set (>80% accuracy)
 
-#### Story: New Type Promotion
+#### Story: Type Promotion
 > As an admin, I want to review and promote discovered content types.
 
 **Tasks:**
 - [ ] Build type proposal review UI
 - [ ] Show cluster samples and AI analysis
 - [ ] Approve/reject/edit proposals
-- [ ] Auto-promote high-confidence types
+- [ ] Auto-promote high-confidence types (>0.9, >100 samples)
 - [ ] Notify admin of new discoveries
 
-### Future: Personalized Styles (Backlog)
+---
+
+## Epic: Image Resolution System
+
+> Resolve, generate, and improve images for links based on content type.
+> **PRD:** [docs/PRD-intelligent-image-system.md](docs/PRD-intelligent-image-system.md)
+> **Tech Spec:** [docs/TECH-intelligent-image-system.md](docs/TECH-intelligent-image-system.md)
+
+### Phase 1: Resolution Pipeline
+
+#### Story: Image Strategy Registry
+> As a system, I want to define image resolution strategies per content type.
+
+**Tasks:**
+- [ ] Create `image_strategies` table
+- [ ] Define pipeline for each builtin type
+- [ ] Store as ordered list of approaches with configs
+- [ ] Add image_source field to links table (scraped, searched, generated, uploaded, platform_api)
+
+#### Story: Image Resolver
+> As a system, I want to resolve images using type-specific strategies.
+
+**Tasks:**
+- [ ] Implement ImageResolver interface
+- [ ] Implement scrape method (re-fetch OG image, headless option)
+- [ ] Implement search method (Unsplash API)
+- [ ] Implement platform_api method (YouTube, Spotify, GitHub)
+- [ ] Implement template method (styled text cards)
+- [ ] Execute pipeline in order, stop on first success
+
+#### Story: Background Processing
+> As a system, I want to resolve images without blocking link addition.
+
+**Tasks:**
+- [ ] Implement client-side image queue
+- [ ] Show placeholder immediately on add
+- [ ] Process queue in background
+- [ ] Fade in resolved images with CSS transition
+- [ ] Handle resolution failures gracefully
+- [ ] Add retry logic with exponential backoff
+
+### Phase 2: Generation & Override
+
+#### Story: AI Image Generation
+> As a system, I want to generate images when other methods fail.
+
+**Tasks:**
+- [ ] Integrate DALL-E or Stable Diffusion API
+- [ ] Build generation prompts from content type + title + description
+- [ ] Apply visual guidelines to prompts
+- [ ] Store generated images in Supabase Storage
+- [ ] Add generation as final pipeline step for appropriate types
+
+#### Story: Manual Image Override
+> As a user, I want to replace any auto-selected image.
+
+**Tasks:**
+- [ ] Add "Edit image" button to link cards
+- [ ] Build image edit modal UI
+- [ ] Option: Re-fetch from URL
+- [ ] Option: Search for image (keyword input)
+- [ ] Option: Generate with AI
+- [ ] Option: Upload custom image
+- [ ] Save override and mark source as 'uploaded'
+
+### Phase 3: Improvement
+
+#### Story: Strategy Performance Tracking
+> As a system, I want to track which image strategies work well.
+
+**Tasks:**
+- [ ] Create `strategy_performance` table
+- [ ] Track manual override rate per type/strategy
+- [ ] Track image load success rate
+- [ ] Track resolution time percentiles
+- [ ] Build admin dashboard for metrics
+
+#### Story: Strategy Auto-Improvement
+> As a system, I want to improve strategies based on user behavior.
+
+**Tasks:**
+- [ ] Track what users replace images with
+- [ ] Analyze override patterns by content type
+- [ ] AI-propose strategy improvements
+- [ ] Implement A/B testing framework
+- [ ] Promote winning strategies automatically
+
+### Future: Visual Personalization (Backlog)
+
+#### Story: Global Visual Guidelines (Admin)
+> As an admin, I want to define system-wide visual style parameters.
+
+**Tasks:**
+- [ ] Create visual_guidelines config table
+- [ ] Define aesthetic (description, references, mood tags)
+- [ ] Define color system (mode, backgrounds, text, accent strategy)
+- [ ] Define imagery preferences (type, density, color treatment)
+- [ ] Define guardrails (hard rules, banned patterns)
+- [ ] Build admin UI for guideline management
+- [ ] Apply guidelines to all AI generation prompts
 
 #### Story: User Visual Style Profiles
 > As a user, I want to define my own visual aesthetic for my board.
@@ -473,17 +533,7 @@
 **Tasks:**
 - [ ] Add style_mode to boards (system/user_default/custom)
 - [ ] Allow style overrides per board
-- [ ] Style inheritance hierarchy
-
-#### Story: Global Visual Guidelines (Admin)
-> As an admin, I want to define system-wide visual style parameters.
-
-**Tasks:**
-- [ ] Create visual_guidelines config table
-- [ ] Define aesthetic rules (colors, typography, imagery)
-- [ ] Define guardrails (hard rules, soft rules, banned patterns)
-- [ ] Build admin UI for guideline management
-- [ ] Apply guidelines to all AI generation prompts
+- [ ] Style inheritance hierarchy (item > board > user > system)
 
 ---
 
