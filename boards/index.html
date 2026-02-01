@@ -2452,7 +2452,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // App State
   // ============================================
-  let currentFilter = 'all';
+  const FILTER_KEY = 'boards-filter';
+  let currentFilter = localStorage.getItem(FILTER_KEY) || 'all';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
 
@@ -2675,6 +2676,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const t = e.target.closest('.filter-token');
     if (t) {
       currentFilter = t.dataset.category;
+      localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
       renderGrid();
       updateShareButton();
@@ -3807,6 +3809,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
       document.documentElement.classList.add('light');
+    }
+
+    // Validate saved filter still exists
+    if (currentFilter !== 'all') {
+      const cats = getCategories();
+      const links = getAllLinks();
+      const validCategories = new Set(['all', ...Object.keys(cats), ...links.map(l => l.category)]);
+      if (!validCategories.has(currentFilter)) {
+        currentFilter = 'all';
+        localStorage.setItem(FILTER_KEY, 'all');
+      }
     }
 
     // Stale-while-revalidate: render from localStorage immediately
