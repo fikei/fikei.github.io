@@ -148,6 +148,31 @@
 - [ ] Update shared board display to use username
 - [ ] Add username edit in settings
 
+### Story: Fix Pending Saves Not Syncing
+> As a viewer, I want links saved from shared boards to appear on my board immediately (before login too).
+
+**Context:**
+- When not logged in on share.html, clicking "Save Link" stores link data to `localStorage.boards_pending_saves`
+- **Key requirement:** Saved links should appear on index.html immediately, even before login
+- Currently `processPendingSaves()` only runs after login - needs to also run for anonymous users
+- After login, pending saves should sync to Supabase
+- Current implementation stores `created_at` in share.html but index.html expects `addedAt` (fixed but may need verification)
+- `processPendingSaves()` is called in two places: after `onAuthStateChange` login and in `init()` after cloud sync (but only if logged in)
+- Console logging added: look for `[pending] Raw localStorage:` and `[pending] Processing X pending saves`
+
+**Files:**
+- `boards/share.html`: `saveLink()` function (lines ~1014-1137), `savePendingSave()` (lines ~986-995)
+- `boards/index.html`: `processPendingSaves()` (lines ~3745-3793), `PENDING_SAVES_KEY` constant (line ~2456)
+
+**Tasks:**
+- [ ] Call `processPendingSaves()` in init() even when not logged in (add to local state only)
+- [ ] Debug why pending saves aren't appearing on the board
+- [ ] Verify localStorage key `boards_pending_saves` matches between share.html and index.html
+- [ ] Check if pending saves are cleared before `processPendingSaves()` runs
+- [ ] Test cross-tab localStorage sync behavior (save on share.html, check on index.html)
+- [ ] Verify link structure matches: share.html stores `created_at`, index.html converts to `addedAt`
+- [ ] On login, sync pending saves that were added to local state to Supabase
+
 ### Story: Persistent Saved Link State
 > As a viewer, I want to see which links I've already saved when I revisit a shared board.
 
