@@ -3743,10 +3743,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   async function processPendingSaves() {
-    const pending = JSON.parse(localStorage.getItem(PENDING_SAVES_KEY) || '[]');
-    if (pending.length === 0) return;
+    const rawPending = localStorage.getItem(PENDING_SAVES_KEY);
+    console.log('[pending] Raw localStorage:', rawPending);
+    const pending = JSON.parse(rawPending || '[]');
+    if (pending.length === 0) {
+      console.log('[pending] No pending saves found');
+      return;
+    }
 
-    console.log('[pending] Processing', pending.length, 'pending saves');
+    console.log('[pending] Processing', pending.length, 'pending saves:', pending);
 
     const existingLinks = getAllLinks();
     const existingUrls = new Set(existingLinks.map(l => l.url));

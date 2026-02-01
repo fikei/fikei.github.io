@@ -148,6 +148,15 @@
 - [ ] Update shared board display to use username
 - [ ] Add username edit in settings
 
+### Story: Persistent Saved Link State
+> As a viewer, I want to see which links I've already saved when I revisit a shared board.
+
+**Tasks:**
+- [ ] Store saved link IDs in localStorage per shared board
+- [ ] Show "View on Board" button for already-saved links on page load
+- [ ] Handle pending saves (not yet synced) in saved state
+- [ ] Clear saved state when link is deleted from personal board
+
 ### Story: Board Fork/Copy
 > As a viewer, I want to copy an entire shared board to my personal board.
 
