@@ -645,7 +645,7 @@ body {
   let board = null;
   let links = [];
   let currentFilter = 'all';
-  let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
+  let expandedCards = null; // Will be set from localStorage or board default
 
   // Load/save expanded state
   function getExpandedKey() {
@@ -656,8 +656,19 @@ body {
   function loadExpandedCards() {
     try {
       const saved = localStorage.getItem(getExpandedKey());
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
+      return saved ? JSON.parse(saved) : null; // null means use board default
+    } catch { return null; }
+  }
+
+  function initExpandedCards() {
+    const saved = loadExpandedCards();
+    if (saved !== null) {
+      // Use viewer's saved state
+      expandedCards = saved;
+    } else {
+      // First visit - use board owner's expansion state
+      expandedCards = (board && board.expanded_cards) ? { ...board.expanded_cards } : {};
+    }
   }
 
   function saveExpandedCards() {
@@ -801,6 +812,9 @@ body {
   function showBoard() {
     loading.style.display = 'none';
     grid.style.display = 'grid';
+
+    // Initialize expanded cards (from localStorage or board default)
+    initExpandedCards();
 
     // Set title
     const title = board.name || (board.category ? cap(board.category) : 'All Links');

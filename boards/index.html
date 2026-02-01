@@ -3315,12 +3315,27 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         snapshotIds = links.map(l => l.id);
       }
 
+      // Get expanded cards for the category being shared
+      let expandedForShare = expandedCards;
+      if (shareCategory) {
+        // Filter to only cards in this category
+        const categoryLinks = getAllLinks().filter(l => l.category === shareCategory);
+        const categoryIds = new Set(categoryLinks.map(l => l.id));
+        expandedForShare = {};
+        for (const [id, state] of Object.entries(expandedCards)) {
+          if (categoryIds.has(id)) {
+            expandedForShare[id] = state;
+          }
+        }
+      }
+
       const payload = {
         user_id: currentUser.id,
         category: shareCategory || null,
         visibility,
         update_mode: updateMode,
         snapshot_link_ids: snapshotIds,
+        expanded_cards: expandedForShare,
         updated_at: new Date().toISOString()
       };
 
