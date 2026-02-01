@@ -2677,6 +2677,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       currentFilter = t.dataset.category;
       renderFilters();
       renderGrid();
+      updateShareButton();
     }
   };
 
@@ -3195,6 +3196,53 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   let currentShare = null; // Current share being edited
   let shareCategory = null; // Category being shared (null = all)
+  let userShares = []; // All user's shared boards
+
+  async function loadAllShares() {
+    const accessToken = getAccessToken();
+    if (!accessToken || !currentUser) {
+      userShares = [];
+      updateShareButton();
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/shared_boards?user_id=eq.${currentUser.id}&select=id,category,slug`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (res.ok) {
+        userShares = await res.json();
+      } else {
+        userShares = [];
+      }
+    } catch {
+      userShares = [];
+    }
+    updateShareButton();
+  }
+
+  function updateShareButton() {
+    const shareBtn = $('shareBtn');
+    if (!shareBtn || !currentUser) return;
+
+    const category = currentFilter === 'all' ? null : currentFilter;
+    const isShared = userShares.some(s => s.category === category);
+
+    if (isShared) {
+      shareBtn.textContent = 'Shared ✓';
+      shareBtn.classList.add('share-btn--active');
+    } else {
+      shareBtn.textContent = 'Share';
+      shareBtn.classList.remove('share-btn--active');
+    }
+  }
 
   function openShareModal(category = null) {
     if (!currentUser) {
@@ -3347,6 +3395,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         snapshot_link_ids: snapshotIds,
         expanded_cards: expandedForShare,
         link_order: linkOrderForShare,
+        owner_email: currentUser.email,
         updated_at: new Date().toISOString()
       };
 
@@ -3391,6 +3440,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         currentShare = Array.isArray(data) ? data[0] : data;
         showExistingShare(currentShare);
         toast(currentShare ? 'Share updated' : 'Share link created');
+        loadAllShares(); // Refresh share status
       } else {
         const err = await res.text();
         console.error('[share] Failed:', res.status, err);
@@ -3432,6 +3482,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         shareCreateBtn.textContent = 'Create Share Link';
         shareStopBtn.style.display = 'none';
         toast('Sharing stopped');
+        loadAllShares(); // Refresh share status
       }
     } catch (e) {
       console.error('[share] Failed to stop sharing:', e);
@@ -3783,6 +3834,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     if (session) {
       currentUser = session.user;
       updateAuthUI();
+      loadAllShares(); // Load user's shared boards
 
       // Fetch from Supabase and update if different
       const t2 = performance.now();

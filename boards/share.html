@@ -464,6 +464,16 @@ body {
   color: var(--bg);
 }
 
+.grid-item__action--saved {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.grid-item__action:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 /* Resize Handle */
 .grid-item__resize {
   position: absolute;
@@ -831,10 +841,11 @@ body {
     // Initialize expanded cards (from localStorage or board default)
     initExpandedCards();
 
-    // Set title
-    const title = board.name || (board.category ? cap(board.category) : 'All Links');
-    boardTitle.textContent = title;
-    document.title = `${title} - Shared Board`;
+    // Set title with owner email
+    const categoryName = board.name || (board.category ? cap(board.category) : 'All Links');
+    const ownerEmail = board.owner_email || 'Anonymous';
+    boardTitle.textContent = `${ownerEmail} / ${categoryName}`;
+    document.title = `${categoryName} - ${ownerEmail}`;
 
     // Set meta
     boardMeta.textContent = `${links.length} link${links.length !== 1 ? 's' : ''}`;
@@ -958,7 +969,8 @@ body {
 
     if (action === 'save') {
       e.preventDefault();
-      saveLink(id);
+      const btn = e.target.closest('[data-action="save"]');
+      saveLink(id, btn);
       return;
     }
 
@@ -985,22 +997,96 @@ body {
     renderGrid();
   }
 
-  async function saveLink(id) {
+  // Auth helpers
+  function getStoredAuth() {
+    try {
+      const key = `sb-yfhudwakpgzswiylhfbh-auth-token`;
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch { return null; }
+  }
+
+  function getAccessToken() {
+    const auth = getStoredAuth();
+    return auth?.access_token || null;
+  }
+
+  function getCurrentUser() {
+    const auth = getStoredAuth();
+    return auth?.user || null;
+  }
+
+  async function saveLink(id, btn) {
     const link = links.find(l => l.id === id);
-    if (!link) return;
+    if (!link || !btn) return;
+
+    const accessToken = getAccessToken();
+    const user = getCurrentUser();
+
+    // If not logged in, copy to clipboard
+    if (!accessToken || !user) {
+      try {
+        await navigator.clipboard.writeText(link.url);
+        toast('Link copied - log in to Boards to save directly');
+      } catch {
+        toast('Open Boards and paste this link');
+      }
+      return;
+    }
+
+    // Disable button during save
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
 
     try {
-      await navigator.clipboard.writeText(link.url);
-      toast('Link copied - paste in your Boards to save');
+      // Generate new ID for the saved link
+      const newId = crypto.randomUUID();
+
+      // Save link to user's board
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          id: newId,
+          user_id: user.id,
+          url: link.url,
+          title: link.title,
+          description: link.description,
+          image: link.image,
+          domain: link.domain,
+          category: link.category,
+          confidence: link.confidence || null,
+          created_at: new Date().toISOString()
+        })
+      });
+
+      if (res.ok) {
+        // Animate to "Saved ✓"
+        btn.textContent = 'Saved ✓';
+        btn.classList.add('grid-item__action--saved');
+
+        // After delay, show "View on your board"
+        setTimeout(() => {
+          btn.textContent = 'View on Board';
+          btn.disabled = false;
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            window.open('/boards/', '_blank');
+          };
+        }, 1500);
+      } else {
+        throw new Error('Failed to save');
+      }
     } catch (e) {
-      // Fallback
-      const input = document.createElement('input');
-      input.value = link.url;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      input.remove();
-      toast('Link copied');
+      console.error('Save failed:', e);
+      btn.textContent = 'Save Link';
+      btn.disabled = false;
+      toast('Failed to save - try again', true);
     }
   }
 
