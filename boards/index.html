@@ -1333,6 +1333,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <div class="dev-menu__title">Dev Menu (Ctrl+Shift+D)</div>
     <button class="dev-menu__btn" id="devExport">Export Data</button>
     <button class="dev-menu__btn" id="devRefetch">Refetch All Images</button>
+    <button class="dev-menu__btn" id="devMigrate">Re-categorize All (AI)</button>
+    <button class="dev-menu__btn" id="devClearCache">Clear AI Cache</button>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
   </div>
 
@@ -1364,7 +1366,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   console.log(`[boards] v${VERSION}`);
 
   // ============================================
@@ -1622,11 +1624,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   async function categorizeWithAI(link) {
     const domain = link.domain || new URL(link.url).hostname;
+    const startTime = performance.now();
 
     // Check cache first (domain-level)
     if (categoryCache[domain]) {
-      console.log(`[ai] Cache hit for ${domain}: ${categoryCache[domain]}`);
-      return { category: categoryCache[domain], confidence: 0.8, cached: true };
+      const ms = (performance.now() - startTime).toFixed(0);
+      console.log(`%c[categorize] ${domain}`, 'color: #888',
+        `\n  → ${categoryCache[domain]} (cached)`,
+        `\n  ⏱ ${ms}ms`);
+      return { category: categoryCache[domain], confidence: 0.8, cached: true, source: 'cache' };
     }
 
     // Call Supabase Edge Function
@@ -1648,12 +1654,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       });
 
       if (!res.ok) {
-        console.warn('[ai] API error:', res.status);
+        console.warn('[categorize] API error:', res.status);
         return null; // Fall back to rule-based
       }
 
       const data = await res.json();
-      console.log(`[ai] Categorized ${domain} as ${data.category} (${data.confidence})`);
+      const ms = (performance.now() - startTime).toFixed(0);
+
+      console.log(`%c[categorize] ${domain}`, 'color: #10b981',
+        `\n  → ${data.category} (AI, ${(data.confidence * 100).toFixed(0)}%)`,
+        `\n  💭 ${data.reason || 'no reason'}`,
+        `\n  ⏱ ${ms}ms`);
 
       // Cache the result by domain
       if (data.category && data.category !== 'uncategorized') {
@@ -1661,9 +1672,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         saveCategoryCache(categoryCache);
       }
 
-      return { category: data.category, confidence: data.confidence || 0.9, cached: false };
+      return { category: data.category, confidence: data.confidence || 0.9, cached: false, source: 'ai', reason: data.reason };
     } catch (e) {
-      console.warn('[ai] Failed to categorize:', e.message);
+      console.warn('[categorize] AI failed:', e.message);
       return null; // Fall back to rule-based
     }
   }
@@ -1677,8 +1688,81 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     // Fall back to rule-based
-    console.log('[ai] Falling back to rule-based categorization');
-    return categorize(link);
+    const startTime = performance.now();
+    const result = categorize(link);
+    const ms = (performance.now() - startTime).toFixed(0);
+    const domain = link.domain || 'unknown';
+
+    console.log(`%c[categorize] ${domain}`, 'color: #f59e0b',
+      `\n  → ${result.category} (rules, ${(result.confidence * 100).toFixed(0)}%)`,
+      `\n  ⏱ ${ms}ms`);
+
+    return { ...result, source: 'rules' };
+  }
+
+  // ============================================
+  // Migration: Re-categorize all links with AI
+  // ============================================
+  let migrationInProgress = false;
+
+  async function migrateCategories() {
+    if (migrationInProgress) {
+      toast('Migration already in progress');
+      return;
+    }
+
+    const allLinks = getAllLinks();
+    if (allLinks.length === 0) {
+      toast('No links to migrate');
+      return;
+    }
+
+    migrationInProgress = true;
+    console.log(`%c[migrate] Starting migration of ${allLinks.length} links`, 'color: #8b5cf6; font-weight: bold');
+    toast(`Migrating ${allLinks.length} links...`);
+
+    let updated = 0;
+    let failed = 0;
+    let unchanged = 0;
+
+    for (let i = 0; i < allLinks.length; i++) {
+      const link = allLinks[i];
+      const oldCategory = link.category;
+
+      try {
+        // Clear cache for this domain to force AI re-categorization
+        const domain = link.domain || new URL(link.url).hostname;
+        delete categoryCache[domain];
+
+        const result = await smartCategorize(link);
+
+        if (result.category !== oldCategory) {
+          updateLink(link.id, { category: result.category, confidence: result.confidence });
+          updated++;
+          console.log(`%c[migrate] ${i + 1}/${allLinks.length}`, 'color: #8b5cf6',
+            `${link.domain}: ${oldCategory} → ${result.category}`);
+        } else {
+          unchanged++;
+        }
+      } catch (e) {
+        console.error(`[migrate] Failed for ${link.url}:`, e.message);
+        failed++;
+      }
+
+      // Small delay to avoid rate limiting
+      if (i < allLinks.length - 1) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    migrationInProgress = false;
+    saveCategoryCache(categoryCache);
+    renderFilters();
+    renderGrid();
+
+    const summary = `Migration complete: ${updated} updated, ${unchanged} unchanged, ${failed} failed`;
+    console.log(`%c[migrate] ${summary}`, 'color: #8b5cf6; font-weight: bold');
+    toast(summary);
   }
 
   // ============================================
@@ -2607,6 +2691,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
     renderGrid();
     toast(`Updated ${updated} of ${links.length} links`);
+  };
+
+  $('devMigrate').onclick = async () => {
+    const confirmed = await showConfirm(
+      'Re-categorize all links using AI? This will update categories based on Claude analysis.',
+      'Re-categorize All'
+    );
+    if (confirmed) {
+      $('devMenu').classList.remove('dev-menu--visible');
+      migrateCategories();
+    }
+  };
+
+  $('devClearCache').onclick = () => {
+    categoryCache = {};
+    saveCategoryCache(categoryCache);
+    $('devMenu').classList.remove('dev-menu--visible');
+    toast('AI category cache cleared');
   };
 
   // ============================================
