@@ -272,3 +272,76 @@
 - [ ] Support Raindrop.io export format
 - [ ] Support browser bookmarks HTML export
 - [ ] Run AI categorization on imported links
+
+---
+
+## Epic: Rich Media Support
+
+### Story: Video Support
+> As a user, I want to save and preview video links on my board.
+
+**Tasks:**
+- [ ] Detect video URLs (YouTube, Vimeo, etc.)
+- [ ] Extract video thumbnails and metadata
+- [ ] Show video duration on grid item
+- [ ] Inline video preview in expanded card
+- [ ] Handle video embed permissions
+
+### Story: Music Support
+> As a user, I want to save and preview music links on my board.
+
+**Tasks:**
+- [ ] Detect music URLs (Spotify, SoundCloud, Apple Music, etc.)
+- [ ] Extract album art and track metadata
+- [ ] Show artist/track info on grid item
+- [ ] Inline audio preview in expanded card (where API permits)
+- [ ] Handle music embed permissions
+
+### Story: Direct Image Upload
+> As a user, I want to upload images directly to my board.
+
+**Tasks:**
+- [ ] Add image upload button/dropzone
+- [ ] Upload to Supabase Storage
+- [ ] Generate thumbnail for grid display
+- [ ] Support drag-and-drop upload
+- [ ] Handle image compression/optimization
+- [ ] Set storage limits per user
+
+### Story: Direct Video Upload
+> As a user, I want to upload videos directly to my board.
+
+**Tasks:**
+- [ ] Add video upload button/dropzone
+- [ ] Upload to Supabase Storage (or external provider)
+- [ ] Generate video thumbnail
+- [ ] Support common video formats (mp4, webm, mov)
+- [ ] Handle video compression
+- [ ] Set storage/size limits per user
+- [ ] Show upload progress
+
+### Story: Null Image Handling
+> As a user, I want links without images to still look good on my board.
+
+**Tasks:**
+- [ ] Improve placeholder design for links without images
+- [ ] AI agent image selection (search for relevant image)
+- [ ] AI image generation for missing thumbnails
+- [ ] Allow manual image selection/upload for any link
+- [ ] Domain favicon fallback
+- [ ] Category-based default images
+
+---
+
+## Epic: Generative UI
+
+### Story: Generative UI Widgets v1
+> As a user, I want dynamic AI-generated UI elements on my board.
+
+**Tasks:**
+- [ ] Define widget types (summary, chart, preview, action)
+- [ ] AI-generated link summaries in expanded view
+- [ ] Smart category suggestions widget
+- [ ] Related links widget
+- [ ] Quick actions based on link type
+- [ ] Widget customization options
