@@ -2589,7 +2589,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
       if (hasImg) {
         html += `<article class="grid-item${expandedClass}${newClass}" data-id="${l.id}" draggable="true">
-          <img class="grid-item__image" src="${l.image}" alt="" loading="lazy">
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
           ${detailsHtml}
@@ -3003,7 +3003,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
     selectedLink = l;
     console.log('[openDetail] selectedLink set to:', l.id, l.title);
-    $('overlayImage').src = l.image || '';
+    $('overlayImage').src = secureImg(l.image) || '';
     $('overlayImage').style.display = l.image ? 'block' : 'none';
     $('overlayTitle').textContent = l.title;
     $('overlayDomain').textContent = l.domain;
@@ -3083,6 +3083,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function secureImg(url) { return url ? url.replace(/^http:\/\//i, 'https://') : ''; }
 
   // ============================================
   // Direct paste processing
