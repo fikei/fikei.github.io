@@ -325,8 +325,8 @@
 ## Epic: Content Type System
 
 > Detect, classify, and evolve content types for links.
-> **PRD:** [docs/PRD-intelligent-image-system.md](docs/PRD-intelligent-image-system.md)
-> **Tech Spec:** [docs/TECH-intelligent-image-system.md](docs/TECH-intelligent-image-system.md)
+> **PRD:** [docs/PRD-content-type-and-image-systems.md](docs/PRD-content-type-and-image-systems.md)
+> **Tech Spec:** [docs/TECH-content-type-and-image-systems.md](docs/TECH-content-type-and-image-systems.md)
 
 ### Phase 1: Detection
 
@@ -421,8 +421,8 @@
 ## Epic: Image Resolution System
 
 > Resolve, generate, and improve images for links based on content type.
-> **PRD:** [docs/PRD-intelligent-image-system.md](docs/PRD-intelligent-image-system.md)
-> **Tech Spec:** [docs/TECH-intelligent-image-system.md](docs/TECH-intelligent-image-system.md)
+> **PRD:** [docs/PRD-content-type-and-image-systems.md](docs/PRD-content-type-and-image-systems.md)
+> **Tech Spec:** [docs/TECH-content-type-and-image-systems.md](docs/TECH-content-type-and-image-systems.md)
 
 ### Phase 1: Resolution Pipeline
 

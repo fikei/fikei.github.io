@@ -1,8 +1,45 @@
-# PRD: Intelligent Image System
+# PRD: Content Type System & Image Resolution System
 
 ## Overview
 
-A smart image resolution system that automatically detects content types, selects appropriate visual strategies, and evolves over time based on usage patterns.
+Two interconnected systems that work together to ensure every link on Board looks appropriate and visually appealing:
+
+1. **Content Type System** - Detects and classifies what kind of content a link represents (product, article, video, etc.)
+2. **Image Resolution System** - Selects and resolves appropriate images based on content type
+
+These systems are designed to be distinct but complementary, with clear interfaces between them.
+
+---
+
+## System Boundaries
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     CONTENT TYPE SYSTEM                          │
+│                                                                 │
+│  Responsibilities:                                              │
+│  - Classify links into content types                            │
+│  - Cache domain/path patterns                                   │
+│  - Discover new content types                                   │
+│  - Evolve type definitions                                      │
+│                                                                 │
+│  Output: { type: string, confidence: number, signals: [] }      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   IMAGE RESOLUTION SYSTEM                        │
+│                                                                 │
+│  Responsibilities:                                              │
+│  - Define image strategies per content type                     │
+│  - Execute resolution pipeline                                  │
+│  - Generate/search for images                                   │
+│  - Track performance and improve                                │
+│                                                                 │
+│  Input: content_type + link metadata                            │
+│  Output: { imageUrl: string, source: string }                   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -23,17 +60,23 @@ Current behavior shows a letter placeholder, which:
 
 ## Goals
 
+### Content Type System
+1. **Accurate classification** - >90% accuracy on known types
+2. **Self-improving** - Discovers new types from usage patterns
+3. **Cost-efficient** - Smart caching reduces API calls by 60-80%
+4. **Portable** - Provider-agnostic (Anthropic, OpenAI, local models)
+
+### Image Resolution System
 1. **Every link looks good** - No more empty placeholders
-2. **Context-appropriate visuals** - Products look like products, articles like articles
-3. **Self-improving** - System learns from usage, discovers new types
-4. **Cost-efficient** - Smart caching, cheap models, minimal API calls
-5. **Portable** - Not locked to any single AI provider
+2. **Context-appropriate** - Products look like products, articles like articles
+3. **Fast** - Background processing, <3s p95 resolution time
+4. **Improvable** - Learns from user overrides
 
 ---
 
 ## Non-Goals (Backlog)
 
-- User-defined custom visual styles (see Future: Personalized Styles)
+- User-defined custom visual styles
 - Per-board style customization
 - Style sharing between users
 
