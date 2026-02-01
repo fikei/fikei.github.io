@@ -399,27 +399,36 @@
 
 ### Phase 1: Server-Side AI Classification
 
-#### Story: Edge Function Setup
+#### Story: Edge Function Setup ✓ CODE COMPLETE
 > As a developer, I want a secure server endpoint for AI operations.
 
 **Tasks:**
-- [ ] Create `supabase/functions/enrich-link/index.ts`
-- [ ] Configure CORS for boards domain
-- [ ] Add request validation and error handling
-- [ ] Set up environment variables (API keys)
-- [ ] Deploy to Supabase Edge Functions
+- [x] Create `supabase/functions/enrich-link/index.ts`
+- [x] Configure CORS for boards domain
+- [x] Add request validation and error handling
+- [ ] Set up environment variables (API keys) **← USER ACTION REQUIRED**
+- [ ] Deploy to Supabase Edge Functions **← USER ACTION REQUIRED**
 - [ ] Test endpoint manually
 
-#### Story: AI Classification (Server)
+#### Story: AI Classification (Server) ✓ CODE COMPLETE
 > As a system, I want accurate AI-powered classification when rules fail.
 
 **Tasks:**
-- [ ] Implement Anthropic classifier (claude-3-haiku)
-- [ ] Add OpenAI fallback (gpt-4o-mini)
-- [ ] Build classification prompt with type definitions
-- [ ] Parse JSON response with error handling
-- [ ] Add confidence threshold handling (0.7)
+- [x] Implement Anthropic classifier (claude-3-haiku)
+- [ ] Add OpenAI fallback (gpt-4o-mini) *(stretch)*
+- [x] Build classification prompt with type definitions
+- [x] Parse JSON response with error handling
+- [x] Add confidence threshold handling (0.7)
 - [ ] Log classifications for type discovery
+
+#### Story: Dev Tools Integration ✓ COMPLETE
+> As a developer, I want to manually trigger the AI pipeline from dev tools.
+
+**Tasks:**
+- [x] Add "Run AI Enrichment Pipeline" button to dev menu
+- [x] Implement queueAllForEnrichment() function
+- [x] Show progress toast during enrichment
+- [x] Update UI when enrichment completes
 
 #### Story: Domain Profile Caching
 > As a system, I want to cache domain classifications to reduce API costs.
@@ -516,24 +525,28 @@
 - [x] Integrate into link add flow (queue if no OG image)
 - [x] Display image stats in admin panel
 
-### Phase 1: Server-Side Resolution
+### Phase 1: Server-Side Resolution ✓ CODE COMPLETE
 
-#### Story: Server Image Resolution
+#### Story: Server Image Resolution ✓ CODE COMPLETE
 > As a system, I want to resolve images without CORS restrictions.
 
 **Tasks:**
-- [ ] Add image resolution to enrich-link Edge Function
-- [ ] Implement headless scrape (Puppeteer/Browserless)
-- [ ] Implement Unsplash API search
-- [ ] Implement platform API calls (with API keys)
-- [ ] Return image_url and image_source
+- [x] Add image resolution to enrich-link Edge Function
+- [x] Implement server-side OG scrape (no CORS)
+- [x] Implement Unsplash API search
+- [x] Implement platform API calls (YouTube, Vimeo, GitHub)
+- [x] Return image_url and image_source
+- [ ] Implement headless scrape with Puppeteer *(stretch)*
 
-#### Story: Client-Server Integration
+#### Story: Client-Server Integration ✓ CODE COMPLETE
 > As a user, I want seamless image resolution with instant + async combined.
 
 **Tasks:**
-- [ ] Client: Try platform resolution first (instant)
-- [ ] Client: If no image, call enrich-link endpoint
+- [x] Client: Try platform resolution first (instant)
+- [x] Client: Queue server enrichment for low confidence/no image
+- [x] Client: Receive result, update UI
+- [x] Add "Refresh Image" action to kebab menu
+- [ ] Add fade-in animation for resolved images
 - [ ] Client: Receive result, update UI with fade-in
 - [ ] Client: Handle errors gracefully, show placeholder
 - [ ] Add retry logic with exponential backoff

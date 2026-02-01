@@ -715,6 +715,99 @@ body {
   color: #fff;
 }
 
+/* Kebab Menu */
+.grid-item__menu-container {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 10;
+}
+
+.grid-item__menu-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.grid-item--expanded-medium .grid-item__menu-btn,
+.grid-item--expanded-large .grid-item__menu-btn {
+  opacity: 1;
+}
+
+.grid-item__menu-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.grid-item__menu-btn::before {
+  content: '•••';
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transform: rotate(90deg);
+}
+
+.grid-item__menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-1);
+  background: var(--bg);
+  border: 1px solid var(--subtle);
+  border-radius: 4px;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+}
+
+.grid-item__menu--visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.grid-item__menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.grid-item__menu-item:hover {
+  background: var(--subtle);
+}
+
+.grid-item__menu-item:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.grid-item__menu-item:last-child {
+  border-radius: 0 0 4px 4px;
+}
+
+.grid-item__menu-divider {
+  height: 1px;
+  background: var(--subtle);
+  margin: var(--space-1) 0;
+}
+
 /* Responsive: Mobile */
 @media (max-width: 599px) {
   /* On mobile, both states become full-width stacked */
@@ -1601,6 +1694,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
+  <!-- Content Type Modal -->
+  <div class="modal modal--small" id="contentTypeModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Change Content Type</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="category-list" id="contentTypeList"></div>
+    </div>
+  </div>
+
   <!-- Share Modal -->
   <div class="modal modal--small" id="shareModal">
     <div class="modal__backdrop" data-close></div>
@@ -1688,6 +1793,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn" id="devExport">Export Data</button>
     <button class="dev-menu__btn" id="devRefetch">Refetch All Images</button>
     <button class="dev-menu__btn" id="devMigrate">Re-categorize All (AI)</button>
+    <button class="dev-menu__btn" id="devEnrich">Run AI Enrichment Pipeline</button>
     <button class="dev-menu__btn" id="devClearCache">Clear AI Cache</button>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
     <button class="dev-menu__btn dev-menu__btn--admin" id="devAdminPanel" style="display:none;">Admin Panel</button>
@@ -2258,6 +2364,104 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
   // Initialize domain cache on load
   loadDomainCache();
+
+  // ============================================
+  // Server-Side Enrichment Queue
+  // ============================================
+  const enrichmentQueue = [];
+  let isProcessingEnrichment = false;
+
+  function queueServerEnrichment(linkId, url, title, description) {
+    console.log('%c[ENRICH] Queuing for server enrichment:', 'color: #e74c3c; font-weight: bold', url);
+    enrichmentQueue.push({ linkId, url, title, description });
+
+    // Don't auto-process - requires API key setup
+    // processEnrichmentQueue();
+  }
+
+  async function processEnrichmentQueue() {
+    if (isProcessingEnrichment || enrichmentQueue.length === 0) {
+      console.log('%c[ENRICH] Queue empty or already processing', 'color: #e74c3c');
+      return;
+    }
+
+    isProcessingEnrichment = true;
+    console.log('%c[ENRICH] Starting server enrichment, items:', 'color: #e74c3c; font-weight: bold', enrichmentQueue.length);
+
+    while (enrichmentQueue.length > 0) {
+      const item = enrichmentQueue.shift();
+      console.log('%c[ENRICH] Processing:', 'color: #e74c3c', item.url);
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession())?.data?.session?.access_token || ''}`
+          },
+          body: JSON.stringify({
+            url: item.url,
+            title: item.title,
+            description: item.description,
+            linkId: item.linkId
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('%c[ENRICH] Server result:', 'color: #27ae60; font-weight: bold', result);
+
+          // Update local state
+          const data = load();
+          const link = data.links.find(l => l.id === item.linkId);
+          if (link) {
+            if (result.content_type && result.content_type !== 'unknown') {
+              link.content_type = result.content_type;
+              link.type_confidence = result.type_confidence;
+            }
+            if (result.image_url) {
+              link.image = result.image_url;
+              link.image_source = result.image_source;
+            }
+            save(data);
+            renderGrid();
+          }
+        } else {
+          console.error('%c[ENRICH] Server error:', 'color: #e74c3c', response.status);
+        }
+      } catch (e) {
+        console.error('%c[ENRICH] Failed:', 'color: #e74c3c', e);
+      }
+    }
+
+    isProcessingEnrichment = false;
+    console.log('%c[ENRICH] Queue complete', 'color: #e74c3c; font-weight: bold');
+  }
+
+  // Queue all links needing enrichment (for dev tools)
+  async function queueAllForEnrichment() {
+    const links = getAllLinks();
+    const needEnrichment = links.filter(l =>
+      !l.content_type ||
+      l.content_type === 'unknown' ||
+      (l.type_confidence && l.type_confidence < 0.7) ||
+      !l.image
+    );
+
+    console.log('%c[ENRICH] Queueing', 'color: #e74c3c; font-weight: bold', needEnrichment.length, 'links for enrichment');
+
+    for (const link of needEnrichment) {
+      enrichmentQueue.push({
+        linkId: link.id,
+        url: link.url,
+        title: link.title,
+        description: link.description
+      });
+    }
+
+    // Start processing
+    await processEnrichmentQueue();
+  }
 
   // ============================================
   // URL Parser
@@ -3096,6 +3300,8 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   const overlay = $('overlay');
   const categoryModal = $('categoryModal');
   const categoryList = $('categoryList');
+  const contentTypeModal = $('contentTypeModal');
+  const contentTypeList = $('contentTypeList');
   const toastContainer = $('toastContainer');
 
   // Auth DOM
@@ -3195,19 +3401,31 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const isExpanded = !!expansionState;
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
+      const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
       const detailsHtml = `
+        <div class="grid-item__menu-container">
+          <button class="grid-item__menu-btn" data-action="menu" aria-label="More options"></button>
+          <div class="grid-item__menu" data-menu-id="${l.id}">
+            <button class="grid-item__menu-item" data-action="share">Share Link</button>
+            <button class="grid-item__menu-item" data-action="refresh-image">Refresh Image</button>
+            <div class="grid-item__menu-divider"></div>
+            <button class="grid-item__menu-item" data-action="category">Change Category</button>
+            <button class="grid-item__menu-item" data-action="content-type">Change Content Type</button>
+            <div class="grid-item__menu-divider"></div>
+            <button class="grid-item__menu-item" data-action="delete" style="color: #c00;">Delete</button>
+          </div>
+        </div>
         <div class="grid-item__details">
           <h2 class="grid-item__details-title">${esc(l.title)}</h2>
           <p class="grid-item__details-domain">${esc(l.domain)}</p>
           ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
           <div class="grid-item__details-meta">
             <span>${cap(l.category)}</span>
+            ${contentTypeDisplay ? `<span>${contentTypeDisplay}</span>` : ''}
             <span>${dateStr}</span>
           </div>
           <div class="grid-item__actions">
             <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
-            <button class="grid-item__action" data-action="category">Category</button>
-            <button class="grid-item__action grid-item__action--danger" data-action="delete">Delete</button>
           </div>
         </div>
         <div class="grid-item__resize" data-action="resize"></div>`;
@@ -3304,12 +3522,21 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
           if (result.updated) updated++;
           else added++;
 
-          // Queue image resolution if no image found
-          if (!meta.image) {
-            console.log('%c[LINK FLOW] Step 6: No image found, queuing resolution...', 'color: #f39c12; font-weight: bold');
-            queueImageResolution(linkObj.id, url, meta.title, meta.description, contentType.type);
+          // Queue for server enrichment if low confidence or no image
+          const needsEnrichment = contentType.confidence < 0.7 || !meta.image;
+          if (needsEnrichment) {
+            console.log('%c[LINK FLOW] Step 6: Queuing server enrichment...', 'color: #f39c12; font-weight: bold', {
+              lowConfidence: contentType.confidence < 0.7,
+              noImage: !meta.image
+            });
+            // Try client-side first for known platforms
+            if (!meta.image) {
+              queueImageResolution(linkObj.id, url, meta.title, meta.description, contentType.type);
+            }
+            // Also queue for server enrichment (will handle AI classification + better image resolution)
+            queueServerEnrichment(linkObj.id, url, meta.title, meta.description);
           } else {
-            console.log('%c[LINK FLOW] Step 6: Image already present, skipping queue', 'color: #27ae60');
+            console.log('%c[LINK FLOW] Step 6: High confidence, skipping server enrichment', 'color: #27ae60');
           }
 
           // Render immediately after each successful add
@@ -3350,6 +3577,15 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     }
   };
 
+  // Close any open menus when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.grid-item__menu-container')) {
+      document.querySelectorAll('.grid-item__menu--visible').forEach(menu => {
+        menu.classList.remove('grid-item__menu--visible');
+      });
+    }
+  });
+
   grid.onclick = async (e) => {
     // Handle action buttons in expanded card
     const action = e.target.closest('[data-action]');
@@ -3360,6 +3596,24 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       if (!id) return;
 
       const actionType = action.dataset.action;
+
+      // Toggle kebab menu
+      if (actionType === 'menu') {
+        const menu = item.querySelector('.grid-item__menu');
+        if (menu) {
+          // Close other menus first
+          document.querySelectorAll('.grid-item__menu--visible').forEach(m => {
+            if (m !== menu) m.classList.remove('grid-item__menu--visible');
+          });
+          menu.classList.toggle('grid-item__menu--visible');
+        }
+        return;
+      }
+
+      // Close menu after action
+      const openMenu = item.querySelector('.grid-item__menu--visible');
+      if (openMenu) openMenu.classList.remove('grid-item__menu--visible');
+
       if (actionType === 'visit') {
         // Let the link handle itself
         return;
@@ -3374,9 +3628,31 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         saveExpandedCards(expandedCards);
         renderGrid();
         return;
+      } else if (actionType === 'share') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          try {
+            await navigator.clipboard.writeText(link.url);
+            toast('Link copied to clipboard');
+          } catch (err) {
+            toast('Failed to copy link', true);
+          }
+        }
+        return;
+      } else if (actionType === 'refresh-image') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          toast('Refreshing image...');
+          console.log('%c[REFRESH] Queuing image refresh for:', 'color: #9b59b6; font-weight: bold', link.url);
+          queueImageResolution(id, link.url, link.title, link.description, link.content_type || 'unknown');
+        }
+        return;
       } else if (actionType === 'category') {
         selectedLink = getAllLinks().find(l => l.id === id);
         openCategorySelect();
+      } else if (actionType === 'content-type') {
+        selectedLink = getAllLinks().find(l => l.id === id);
+        openContentTypeSelect();
       } else if (actionType === 'delete') {
         const confirmed = await showConfirm('Delete this link?', 'Delete');
         if (confirmed) {
@@ -3629,6 +3905,28 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     toast('AI category cache cleared');
   };
 
+  $('devEnrich').onclick = async () => {
+    const links = getAllLinks();
+    const needEnrichment = links.filter(l =>
+      !l.content_type ||
+      l.content_type === 'unknown' ||
+      (l.type_confidence && l.type_confidence < 0.7) ||
+      !l.image
+    );
+
+    const confirmed = await showConfirm(
+      `Run AI enrichment on ${needEnrichment.length} links? This requires the Edge Function to be deployed with API keys configured.`,
+      'Run AI Pipeline'
+    );
+
+    if (confirmed) {
+      $('devMenu').classList.remove('dev-menu--visible');
+      toast(`Starting enrichment for ${needEnrichment.length} links...`);
+      await queueAllForEnrichment();
+      toast('Enrichment complete');
+    }
+  };
+
   // ============================================
   // Admin Panel
   // ============================================
@@ -3693,7 +3991,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   // ============================================
   function openModal(m) { m.classList.add('modal--visible', 'overlay--visible'); }
   function closeModal(m) { m.classList.remove('modal--visible', 'overlay--visible'); }
-  function closeAll() { [addModal, overlay, categoryModal, confirmModal, adminModal].forEach(closeModal); }
+  function closeAll() { [addModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -3775,6 +4073,40 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     renderGrid();
     toast('Moved to ' + cap(cat));
   }
+
+  // Content type selector
+  const CONTENT_TYPE_NAMES = BUILTIN_TYPES.map(t => t.name);
+
+  function openContentTypeSelect() {
+    let html = '';
+    for (const typeName of CONTENT_TYPE_NAMES) {
+      const active = selectedLink && selectedLink.content_type === typeName ? 'category-list__item--active' : '';
+      html += `<button class="category-list__item ${active}" data-type="${typeName}">${cap(typeName)}</button>`;
+    }
+    contentTypeList.innerHTML = html;
+
+    contentTypeList.onclick = (e) => {
+      const btn = e.target.closest('.category-list__item');
+      if (!btn) return;
+      const newType = btn.dataset.type;
+      if (selectedLink) {
+        updateLink(selectedLink.id, {
+          content_type: newType,
+          type_confidence: 1.0,
+          type_signals: ['user_override']
+        });
+        closeModal(contentTypeModal);
+        renderGrid();
+        toast('Content type changed to ' + cap(newType));
+      }
+    };
+
+    openModal(contentTypeModal);
+  }
+
+  // Close content type modal on backdrop/close button
+  contentTypeModal.querySelector('.modal__backdrop').onclick = () => closeModal(contentTypeModal);
+  contentTypeModal.querySelector('.modal__close').onclick = () => closeModal(contentTypeModal);
 
   function checkClusters() {
     const uncat = getAllLinks().filter(l => l.category === 'uncategorized');
@@ -3863,12 +4195,21 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
           if (result.updated) updated++;
           else added++;
 
-          // Queue image resolution if no image found
-          if (!meta.image) {
-            console.log('%c[LINK FLOW] Step 6: No image found, queuing resolution...', 'color: #f39c12; font-weight: bold');
-            queueImageResolution(linkObj.id, url, meta.title, meta.description, contentType.type);
+          // Queue for server enrichment if low confidence or no image
+          const needsEnrichment = contentType.confidence < 0.7 || !meta.image;
+          if (needsEnrichment) {
+            console.log('%c[LINK FLOW] Step 6: Queuing server enrichment...', 'color: #f39c12; font-weight: bold', {
+              lowConfidence: contentType.confidence < 0.7,
+              noImage: !meta.image
+            });
+            // Try client-side first for known platforms
+            if (!meta.image) {
+              queueImageResolution(linkObj.id, url, meta.title, meta.description, contentType.type);
+            }
+            // Also queue for server enrichment (will handle AI classification + better image resolution)
+            queueServerEnrichment(linkObj.id, url, meta.title, meta.description);
           } else {
-            console.log('%c[LINK FLOW] Step 6: Image already present, skipping queue', 'color: #27ae60');
+            console.log('%c[LINK FLOW] Step 6: High confidence, skipping server enrichment', 'color: #27ae60');
           }
 
           // Render immediately after each successful add
