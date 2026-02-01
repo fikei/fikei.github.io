@@ -2,6 +2,61 @@
 
 ---
 
+## Epic: Admin System
+
+> Admin-only tools for system management, accessible via developer tools.
+> Admin users: fike101@gmail.com
+
+### Story: Admin Access Control ✓ COMPLETE
+> As the system owner, I want admin features restricted to my account only.
+
+**Tasks:**
+- [x] Define ADMIN_EMAILS constant
+- [x] Implement isAdmin() check function
+- [x] Gate admin UI behind email check
+- [x] Add admin indicator to auth UI
+
+### Story: Admin Panel in Dev Tools ✓ COMPLETE
+> As an admin, I want to access admin features through the developer tools menu.
+
+**Tasks:**
+- [x] Add "Admin Panel" option to dev tools (admin only)
+- [x] Create admin panel modal UI
+- [x] Add placeholder sections for future features
+- [x] Style consistent with existing UI
+
+### Story: Content Type Management (Future)
+> As an admin, I want to manage content types and review discovered types.
+
+**Tasks:**
+- [ ] List all content types (builtin + discovered)
+- [ ] Edit type definitions and signals
+- [ ] Review type proposals from discovery pipeline
+- [ ] Approve/reject/edit proposals
+- [ ] View type usage statistics
+
+### Story: Visual Guidelines Management (Future)
+> As an admin, I want to configure system-wide visual style parameters.
+
+**Tasks:**
+- [ ] Edit aesthetic description and references
+- [ ] Configure color system
+- [ ] Set imagery preferences
+- [ ] Define guardrails and banned patterns
+- [ ] Preview changes with sample cards
+
+### Story: System Metrics Dashboard (Future)
+> As an admin, I want to view system health and usage metrics.
+
+**Tasks:**
+- [ ] Classification API call volume and costs
+- [ ] Cache hit/miss rates
+- [ ] Image resolution success rates
+- [ ] User activity metrics
+- [ ] Error rates and logs
+
+---
+
 ## Epic: Collaborative Boards
 > Allow multiple users to contribute links to a shared board with role-based permissions.
 > **PRD:** [docs/PRD-collaborative-boards.md](docs/PRD-collaborative-boards.md)
@@ -272,3 +327,280 @@
 - [ ] Support Raindrop.io export format
 - [ ] Support browser bookmarks HTML export
 - [ ] Run AI categorization on imported links
+
+---
+
+## Epic: Rich Media Support
+
+### Story: Video Support
+> As a user, I want to save and preview video links on my board.
+
+**Tasks:**
+- [ ] Detect video URLs (YouTube, Vimeo, etc.)
+- [ ] Extract video thumbnails and metadata
+- [ ] Show video duration on grid item
+- [ ] Inline video preview in expanded card
+- [ ] Handle video embed permissions
+
+### Story: Music Support
+> As a user, I want to save and preview music links on my board.
+
+**Tasks:**
+- [ ] Detect music URLs (Spotify, SoundCloud, Apple Music, etc.)
+- [ ] Extract album art and track metadata
+- [ ] Show artist/track info on grid item
+- [ ] Inline audio preview in expanded card (where API permits)
+- [ ] Handle music embed permissions
+
+### Story: Direct Image Upload
+> As a user, I want to upload images directly to my board.
+
+**Tasks:**
+- [ ] Add image upload button/dropzone
+- [ ] Upload to Supabase Storage
+- [ ] Generate thumbnail for grid display
+- [ ] Support drag-and-drop upload
+- [ ] Handle image compression/optimization
+- [ ] Set storage limits per user
+
+### Story: Direct Video Upload
+> As a user, I want to upload videos directly to my board.
+
+**Tasks:**
+- [ ] Add video upload button/dropzone
+- [ ] Upload to Supabase Storage (or external provider)
+- [ ] Generate video thumbnail
+- [ ] Support common video formats (mp4, webm, mov)
+- [ ] Handle video compression
+- [ ] Set storage/size limits per user
+- [ ] Show upload progress
+
+---
+
+## Epic: Content Type System
+
+> Detect, classify, and evolve content types for links.
+> **PRD:** [docs/PRD-content-type-and-image-systems.md](docs/PRD-content-type-and-image-systems.md)
+> **Tech Spec:** [docs/TECH-content-type-and-image-systems.md](docs/TECH-content-type-and-image-systems.md)
+
+### Phase 1: Detection
+
+#### Story: Content Type Classification
+> As a system, I want to detect what type of content a link represents.
+
+**Tasks:**
+- [ ] Create `content_types` table with builtin types (product, article, video, music, repository, social, document, tool, unknown)
+- [ ] Add `content_type` field to links table
+- [ ] Implement ContentClassifier interface (provider-agnostic)
+- [ ] Implement AnthropicClassifier provider
+- [ ] Implement OpenAIClassifier provider (backup)
+- [ ] Build classification prompt with type definitions
+- [ ] Add confidence threshold handling (0.7)
+- [ ] Return type + confidence + signals from classifier
+
+#### Story: Domain Profile Caching
+> As a system, I want to cache domain classifications to reduce API costs.
+
+**Tasks:**
+- [ ] Create `domain_profiles` table
+- [ ] Implement DomainProfileManager
+- [ ] Cache single-type domains at domain level
+- [ ] Set appropriate TTLs (30 days for known, 7 days for unknown)
+- [ ] Add cache hit/miss logging
+- [ ] Skip API call for cached domains
+
+#### Story: Classification Batching
+> As a system, I want to batch API calls for cost efficiency.
+
+**Tasks:**
+- [ ] Implement classification queue
+- [ ] Batch queue items (10-20 per call)
+- [ ] Build batch classification prompt
+- [ ] Parse batch responses
+- [ ] Flush queue on timeout (1s) or size threshold
+
+### Phase 2: Multi-Type Domains
+
+#### Story: Domain Type Learning
+> As a system, I want to learn which domains have multiple content types.
+
+**Tasks:**
+- [ ] Track types_seen per domain in domain_profiles
+- [ ] Detect multi-type domains after 5+ samples
+- [ ] Mark domain as single_type or multi_type
+- [ ] Calculate confidence based on type distribution
+
+#### Story: Path Pattern Learning
+> As a system, I want to learn URL patterns for multi-type domains.
+
+**Tasks:**
+- [ ] Store path samples for multi-type domains
+- [ ] AI-analyze path patterns periodically (every 10 samples)
+- [ ] Extract regex patterns (e.g., ^/blog/, ^/products?/)
+- [ ] Cache at path-pattern level
+- [ ] Handle new paths with API fallback
+
+### Phase 3: Evolution
+
+#### Story: Uncertain Classification Tracking
+> As a system, I want to track low-confidence classifications for analysis.
+
+**Tasks:**
+- [ ] Create `classification_log` table
+- [ ] Store uncertain classifications (confidence < 0.7)
+- [ ] Include URL, title, description, predicted type
+- [ ] Generate embeddings for clustering
+
+#### Story: Type Discovery Pipeline
+> As a system, I want to automatically discover new content types.
+
+**Tasks:**
+- [ ] Implement weekly clustering job
+- [ ] Cluster uncertain items by embedding similarity
+- [ ] AI-analyze clusters (min 10 items) for new types
+- [ ] Generate type proposal with name, definition, signals
+- [ ] Validate proposals on holdout set (>80% accuracy)
+
+#### Story: Type Promotion
+> As an admin, I want to review and promote discovered content types.
+
+**Tasks:**
+- [ ] Build type proposal review UI
+- [ ] Show cluster samples and AI analysis
+- [ ] Approve/reject/edit proposals
+- [ ] Auto-promote high-confidence types (>0.9, >100 samples)
+- [ ] Notify admin of new discoveries
+
+---
+
+## Epic: Image Resolution System
+
+> Resolve, generate, and improve images for links based on content type.
+> **PRD:** [docs/PRD-content-type-and-image-systems.md](docs/PRD-content-type-and-image-systems.md)
+> **Tech Spec:** [docs/TECH-content-type-and-image-systems.md](docs/TECH-content-type-and-image-systems.md)
+
+### Phase 1: Resolution Pipeline
+
+#### Story: Image Strategy Registry
+> As a system, I want to define image resolution strategies per content type.
+
+**Tasks:**
+- [ ] Create `image_strategies` table
+- [ ] Define pipeline for each builtin type
+- [ ] Store as ordered list of approaches with configs
+- [ ] Add image_source field to links table (scraped, searched, generated, uploaded, platform_api)
+
+#### Story: Image Resolver
+> As a system, I want to resolve images using type-specific strategies.
+
+**Tasks:**
+- [ ] Implement ImageResolver interface
+- [ ] Implement scrape method (re-fetch OG image, headless option)
+- [ ] Implement search method (Unsplash API)
+- [ ] Implement platform_api method (YouTube, Spotify, GitHub)
+- [ ] Implement template method (styled text cards)
+- [ ] Execute pipeline in order, stop on first success
+
+#### Story: Background Processing
+> As a system, I want to resolve images without blocking link addition.
+
+**Tasks:**
+- [ ] Implement client-side image queue
+- [ ] Show placeholder immediately on add
+- [ ] Process queue in background
+- [ ] Fade in resolved images with CSS transition
+- [ ] Handle resolution failures gracefully
+- [ ] Add retry logic with exponential backoff
+
+### Phase 2: Generation & Override
+
+#### Story: AI Image Generation
+> As a system, I want to generate images when other methods fail.
+
+**Tasks:**
+- [ ] Integrate DALL-E or Stable Diffusion API
+- [ ] Build generation prompts from content type + title + description
+- [ ] Apply visual guidelines to prompts
+- [ ] Store generated images in Supabase Storage
+- [ ] Add generation as final pipeline step for appropriate types
+
+#### Story: Manual Image Override
+> As a user, I want to replace any auto-selected image.
+
+**Tasks:**
+- [ ] Add "Edit image" button to link cards
+- [ ] Build image edit modal UI
+- [ ] Option: Re-fetch from URL
+- [ ] Option: Search for image (keyword input)
+- [ ] Option: Generate with AI
+- [ ] Option: Upload custom image
+- [ ] Save override and mark source as 'uploaded'
+
+### Phase 3: Improvement
+
+#### Story: Strategy Performance Tracking
+> As a system, I want to track which image strategies work well.
+
+**Tasks:**
+- [ ] Create `strategy_performance` table
+- [ ] Track manual override rate per type/strategy
+- [ ] Track image load success rate
+- [ ] Track resolution time percentiles
+- [ ] Build admin dashboard for metrics
+
+#### Story: Strategy Auto-Improvement
+> As a system, I want to improve strategies based on user behavior.
+
+**Tasks:**
+- [ ] Track what users replace images with
+- [ ] Analyze override patterns by content type
+- [ ] AI-propose strategy improvements
+- [ ] Implement A/B testing framework
+- [ ] Promote winning strategies automatically
+
+### Future: Visual Personalization (Backlog)
+
+#### Story: Global Visual Guidelines (Admin)
+> As an admin, I want to define system-wide visual style parameters.
+
+**Tasks:**
+- [ ] Create visual_guidelines config table
+- [ ] Define aesthetic (description, references, mood tags)
+- [ ] Define color system (mode, backgrounds, text, accent strategy)
+- [ ] Define imagery preferences (type, density, color treatment)
+- [ ] Define guardrails (hard rules, banned patterns)
+- [ ] Build admin UI for guideline management
+- [ ] Apply guidelines to all AI generation prompts
+
+#### Story: User Visual Style Profiles
+> As a user, I want to define my own visual aesthetic for my board.
+
+**Tasks:**
+- [ ] Build style definition UI (links, images, copy inputs)
+- [ ] AI-extract style attributes from inputs
+- [ ] Generate style preview with sample cards
+- [ ] Apply user style to image generation prompts
+- [ ] Allow style refinement through feedback
+
+#### Story: Per-Board Style Customization
+> As a user, I want different boards to have different visual styles.
+
+**Tasks:**
+- [ ] Add style_mode to boards (system/user_default/custom)
+- [ ] Allow style overrides per board
+- [ ] Style inheritance hierarchy (item > board > user > system)
+
+---
+
+## Epic: Generative UI
+
+### Story: Generative UI Widgets v1
+> As a user, I want dynamic AI-generated UI elements on my board.
+
+**Tasks:**
+- [ ] Define widget types (summary, chart, preview, action)
+- [ ] AI-generated link summaries in expanded view
+- [ ] Smart category suggestions widget
+- [ ] Related links widget
+- [ ] Quick actions based on link type
+- [ ] Widget customization options
