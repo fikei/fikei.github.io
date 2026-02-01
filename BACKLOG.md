@@ -148,35 +148,19 @@
 - [ ] Update shared board display to use username
 - [ ] Add username edit in settings
 
-### Story: Fix Pending Saves Not Syncing
+### Story: Fix Pending Saves Not Syncing ✓ COMPLETE
 > As a viewer, I want links saved from shared boards to appear on my board immediately (before login too).
 
-**Context:**
-- When not logged in on share.html, clicking "Save Link" stores link data to `localStorage.boards_pending_saves`
-- **Key requirement:** Saved links should appear on index.html immediately, even before login
-- **Root cause confirmed:** `processPendingSaves()` is inside `if (session)` block in init() (line ~3907-3934), so it ONLY runs when logged in
-- After login, pending saves should sync to Supabase
-- Current implementation stores `created_at` in share.html but index.html expects `addedAt` (fixed but may need verification)
-- Console logging added: look for `[pending] Raw localStorage:` and `[pending] Processing X pending saves`
-
-**Fix approach:**
-- Move/duplicate `processPendingSaves()` call OUTSIDE the `if (session)` block
-- For anonymous: add to local state only (skip Supabase sync)
-- For logged-in: add to local state AND sync to Supabase
-- Call it BEFORE initial render so pending saves show immediately
-
-**Files:**
-- `boards/share.html`: `saveLink()` function (lines ~1014-1137), `savePendingSave()` (lines ~986-995)
-- `boards/index.html`: `processPendingSaves()` (lines ~3745-3793), `PENDING_SAVES_KEY` constant (line ~2456)
+**Solution implemented:**
+- For anonymous users: `processPendingSaves()` called BEFORE initial render
+- For logged-in users: called AFTER cloud sync to avoid overwriting
+- Only syncs to Supabase when `currentUser` exists
 
 **Tasks:**
-- [ ] Call `processPendingSaves()` in init() even when not logged in (add to local state only)
-- [ ] Debug why pending saves aren't appearing on the board
-- [ ] Verify localStorage key `boards_pending_saves` matches between share.html and index.html
-- [ ] Check if pending saves are cleared before `processPendingSaves()` runs
-- [ ] Test cross-tab localStorage sync behavior (save on share.html, check on index.html)
-- [ ] Verify link structure matches: share.html stores `created_at`, index.html converts to `addedAt`
-- [ ] On login, sync pending saves that were added to local state to Supabase
+- [x] Call `processPendingSaves()` in init() for anonymous users before render
+- [x] Skip Supabase sync when not logged in
+- [x] Verify link structure matches: share.html stores `created_at`, index.html converts to `addedAt`
+- [x] On login, sync pending saves that were added to local state to Supabase
 
 ### Story: Persistent Saved Link State
 > As a viewer, I want to see which links I've already saved when I revisit a shared board.
