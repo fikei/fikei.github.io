@@ -1365,7 +1365,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   console.log(`[board] v${VERSION}`);
 
   // ============================================
@@ -1599,7 +1599,91 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   }
 
   // ============================================
-  // Categorizer
+  // AI Categorization
+  // ============================================
+  const AI_CATEGORIZE_ENDPOINT = `${SUPABASE_URL}/functions/v1/categorize`;
+  const CATEGORY_CACHE_KEY = 'board-category-cache';
+  const CATEGORIES = ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read'];
+
+  // Load domain->category cache from localStorage
+  function loadCategoryCache() {
+    try {
+      const d = localStorage.getItem(CATEGORY_CACHE_KEY);
+      return d ? JSON.parse(d) : {};
+    } catch { return {}; }
+  }
+
+  function saveCategoryCache(cache) {
+    try {
+      localStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(cache));
+    } catch (e) { console.error('[ai] Failed to save cache:', e); }
+  }
+
+  let categoryCache = loadCategoryCache();
+
+  async function categorizeWithAI(link) {
+    const domain = link.domain || new URL(link.url).hostname;
+
+    // Check cache first (domain-level)
+    if (categoryCache[domain]) {
+      console.log(`[ai] Cache hit for ${domain}: ${categoryCache[domain]}`);
+      return { category: categoryCache[domain], confidence: 0.8, cached: true };
+    }
+
+    // Call Supabase Edge Function
+    try {
+      const accessToken = getAccessToken();
+      const res = await fetch(AI_CATEGORIZE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          url: link.url,
+          title: link.title || '',
+          description: link.description || '',
+          domain: domain,
+          categories: CATEGORIES
+        })
+      });
+
+      if (!res.ok) {
+        console.warn('[ai] API error:', res.status);
+        return null; // Fall back to rule-based
+      }
+
+      const data = await res.json();
+      console.log(`[ai] Categorized ${domain} as ${data.category} (${data.confidence})`);
+
+      // Cache the result by domain
+      if (data.category && data.category !== 'uncategorized') {
+        categoryCache[domain] = data.category;
+        saveCategoryCache(categoryCache);
+      }
+
+      return { category: data.category, confidence: data.confidence || 0.9, cached: false };
+    } catch (e) {
+      console.warn('[ai] Failed to categorize:', e.message);
+      return null; // Fall back to rule-based
+    }
+  }
+
+  // Smart categorize: tries AI first, falls back to rules
+  async function smartCategorize(link) {
+    // Try AI first
+    const aiResult = await categorizeWithAI(link);
+    if (aiResult) {
+      return aiResult;
+    }
+
+    // Fall back to rule-based
+    console.log('[ai] Falling back to rule-based categorization');
+    return categorize(link);
+  }
+
+  // ============================================
+  // Rule-based Categorizer (fallback)
   // ============================================
   const PATTERNS = {
     home: {
@@ -2228,7 +2312,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       showProgress(i + 1, total, url);
       try {
         const meta = await fetchMetadata(url);
-        const cat = categorize(meta);
+        const cat = await smartCategorize(meta);
         const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
         const result = addLink(linkObj);
         if (result.success) {
@@ -2666,7 +2750,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       showProgress(i + 1, total, url);
       try {
         const meta = await fetchMetadata(url);
-        const cat = categorize(meta);
+        const cat = await smartCategorize(meta);
         const linkObj = { id: generateId(url), url, ...meta, category: cat.category, confidence: cat.confidence };
         const result = addLink(linkObj);
         if (result.success) {
@@ -2697,13 +2781,13 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Re-categorize uncategorized items
   // ============================================
-  function recategorizeUncategorized() {
+  async function recategorizeUncategorized() {
     const uncategorized = getAllLinks().filter(l => l.category === 'uncategorized');
     if (uncategorized.length === 0) return;
 
     let moved = 0;
     for (const link of uncategorized) {
-      const cat = categorize(link);
+      const cat = await smartCategorize(link);
       if (cat.category !== 'uncategorized') {
         updateLink(link.id, { category: cat.category, confidence: cat.confidence });
         moved++;
