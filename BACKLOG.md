@@ -154,11 +154,16 @@
 **Context:**
 - When not logged in on share.html, clicking "Save Link" stores link data to `localStorage.boards_pending_saves`
 - **Key requirement:** Saved links should appear on index.html immediately, even before login
-- Currently `processPendingSaves()` only runs after login - needs to also run for anonymous users
+- **Root cause confirmed:** `processPendingSaves()` is inside `if (session)` block in init() (line ~3907-3934), so it ONLY runs when logged in
 - After login, pending saves should sync to Supabase
 - Current implementation stores `created_at` in share.html but index.html expects `addedAt` (fixed but may need verification)
-- `processPendingSaves()` is called in two places: after `onAuthStateChange` login and in `init()` after cloud sync (but only if logged in)
 - Console logging added: look for `[pending] Raw localStorage:` and `[pending] Processing X pending saves`
+
+**Fix approach:**
+- Move/duplicate `processPendingSaves()` call OUTSIDE the `if (session)` block
+- For anonymous: add to local state only (skip Supabase sync)
+- For logged-in: add to local state AND sync to Supabase
+- Call it BEFORE initial render so pending saves show immediately
 
 **Files:**
 - `boards/share.html`: `saveLink()` function (lines ~1014-1137), `savePendingSave()` (lines ~986-995)
