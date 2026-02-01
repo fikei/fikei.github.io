@@ -703,6 +703,10 @@ body {
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
   }
 
+  function secureImg(url) {
+    return url ? url.replace(/^http:\/\//i, 'https://') : '';
+  }
+
   function toast(msg) {
     const t = document.createElement('div');
     t.className = 'toast';
@@ -925,7 +929,7 @@ body {
 
       if (hasImg) {
         html += `<article class="grid-item${expandedClass}" data-id="${l.id}" data-url="${esc(l.url)}">
-          <img class="grid-item__image" src="${l.image}" alt="" loading="lazy">
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
           ${detailsHtml}
