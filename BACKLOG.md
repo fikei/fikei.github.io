@@ -2,6 +2,61 @@
 
 ---
 
+## Epic: Admin System
+
+> Admin-only tools for system management, accessible via developer tools.
+> Admin users: fike101@gmail.com
+
+### Story: Admin Access Control ✓ COMPLETE
+> As the system owner, I want admin features restricted to my account only.
+
+**Tasks:**
+- [x] Define ADMIN_EMAILS constant
+- [x] Implement isAdmin() check function
+- [x] Gate admin UI behind email check
+- [x] Add admin indicator to auth UI
+
+### Story: Admin Panel in Dev Tools ✓ COMPLETE
+> As an admin, I want to access admin features through the developer tools menu.
+
+**Tasks:**
+- [x] Add "Admin Panel" option to dev tools (admin only)
+- [x] Create admin panel modal UI
+- [x] Add placeholder sections for future features
+- [x] Style consistent with existing UI
+
+### Story: Content Type Management (Future)
+> As an admin, I want to manage content types and review discovered types.
+
+**Tasks:**
+- [ ] List all content types (builtin + discovered)
+- [ ] Edit type definitions and signals
+- [ ] Review type proposals from discovery pipeline
+- [ ] Approve/reject/edit proposals
+- [ ] View type usage statistics
+
+### Story: Visual Guidelines Management (Future)
+> As an admin, I want to configure system-wide visual style parameters.
+
+**Tasks:**
+- [ ] Edit aesthetic description and references
+- [ ] Configure color system
+- [ ] Set imagery preferences
+- [ ] Define guardrails and banned patterns
+- [ ] Preview changes with sample cards
+
+### Story: System Metrics Dashboard (Future)
+> As an admin, I want to view system health and usage metrics.
+
+**Tasks:**
+- [ ] Classification API call volume and costs
+- [ ] Cache hit/miss rates
+- [ ] Image resolution success rates
+- [ ] User activity metrics
+- [ ] Error rates and logs
+
+---
+
 ## Epic: Collaborative Boards
 > Allow multiple users to contribute links to a shared board with role-based permissions.
 > **PRD:** [docs/PRD-collaborative-boards.md](docs/PRD-collaborative-boards.md)
