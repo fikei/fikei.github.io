@@ -1256,13 +1256,13 @@ body {
 
 /* Share button in header */
 .share-btn {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-3);
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid var(--fg);
-  background: var(--bg);
+  background: transparent;
   color: var(--fg);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -2452,7 +2452,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // App State
   // ============================================
-  let currentFilter = 'all';
+  const FILTER_KEY = 'boards-filter';
+  let currentFilter = localStorage.getItem(FILTER_KEY) || 'all';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
 
@@ -2675,6 +2676,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const t = e.target.closest('.filter-token');
     if (t) {
       currentFilter = t.dataset.category;
+      localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
       renderGrid();
       updateShareButton();
@@ -3807,6 +3809,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
       document.documentElement.classList.add('light');
+    }
+
+    // Validate saved filter still exists
+    if (currentFilter !== 'all') {
+      const cats = getCategories();
+      const links = getAllLinks();
+      const validCategories = new Set(['all', ...Object.keys(cats), ...links.map(l => l.category)]);
+      if (!validCategories.has(currentFilter)) {
+        currentFilter = 'all';
+        localStorage.setItem(FILTER_KEY, 'all');
+      }
     }
 
     // Stale-while-revalidate: render from localStorage immediately
