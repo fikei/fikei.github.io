@@ -3759,7 +3759,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         continue;
       }
 
-      // Add to local state first
+      // Add to local state first (use addedAt for local storage format)
       const newLink = {
         id: link.id || crypto.randomUUID(),
         url: link.url,
@@ -3769,7 +3769,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         domain: link.domain,
         category: link.category || 'uncategorized',
         confidence: link.confidence || null,
-        created_at: link.created_at || new Date().toISOString()
+        addedAt: link.created_at || new Date().toISOString()
       };
 
       const data = load();
