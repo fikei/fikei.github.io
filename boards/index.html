@@ -3790,8 +3790,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     if (added > 0) {
       toast(`Added ${added} saved link${added > 1 ? 's' : ''} to your board`);
-      // Sync to Supabase
-      await syncToSupabase();
+      // Only sync to Supabase if logged in
+      if (currentUser) {
+        await syncToSupabase();
+      }
       renderFilters();
       renderGrid();
     }
@@ -3869,6 +3871,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
       document.documentElement.classList.add('light');
+    }
+
+    // Check if user is logged in (quick check before full session validation)
+    const quickSession = getStoredSession();
+
+    // For anonymous users: process pending saves BEFORE render so they appear immediately
+    // For logged-in users: we wait until after cloud sync to avoid overwriting
+    if (!quickSession) {
+      await processPendingSaves();
     }
 
     // Validate saved filter still exists
