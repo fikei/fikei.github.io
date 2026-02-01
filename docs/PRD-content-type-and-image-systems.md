@@ -43,6 +43,86 @@ These systems are designed to be distinct but complementary, with clear interfac
 
 ---
 
+## Architecture Decision: Hybrid Client/Server
+
+### Why Hybrid?
+
+| Concern | Client-Only | Server-Only | Hybrid (Chosen) |
+|---------|-------------|-------------|-----------------|
+| **Instant UX** | ✅ Rules-based instant | ❌ Always latency | ✅ Rules instant, AI async |
+| **API key security** | ❌ Exposed in browser | ✅ Secure on server | ✅ Secure on server |
+| **CORS/scraping** | ❌ Most sites blocked | ✅ No restrictions | ✅ No restrictions |
+| **Offline support** | ✅ Works offline | ❌ Requires network | ✅ Degraded but works |
+| **Shared learning** | ❌ Per-device only | ✅ Cross-user cache | ✅ Cross-user cache |
+| **Cost efficiency** | ✅ Rules are free | ❌ Every call costs | ✅ Rules first, API fallback |
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT                                       │
+│  boards/index.html                                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. URL pasted → fetchMetadata() → get OG image                         │
+│  2. classifyByRules() → instant, free, works offline                    │
+│     ├─► Known domain match (amazon, github, youtube) → DONE             │
+│     ├─► URL pattern match (/blog/, /product/) → DONE                    │
+│     ├─► Keyword match in title/description → DONE                       │
+│     └─► Unknown/low confidence → queue for server                       │
+│  3. addLink() → save to localStorage + Supabase                         │
+│  4. If no image OR low type confidence:                                 │
+│     └─► POST to /functions/v1/enrich-link ──────────────────────────┐   │
+│                                                                      │   │
+└──────────────────────────────────────────────────────────────────────┼───┘
+                                                                       │
+                                                                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SERVER (Edge Function)                            │
+│  supabase/functions/enrich-link                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  5. Check domain_profiles cache                                         │
+│     └─► Cache hit with high confidence → skip AI                        │
+│  6. AI Classification (if needed)                                       │
+│     └─► Anthropic/OpenAI API call (keys secure)                         │
+│  7. Image Resolution                                                    │
+│     ├─► Scrape (no CORS restrictions)                                   │
+│     ├─► Platform APIs (YouTube, Vimeo, GitHub)                          │
+│     ├─► Image Search (Unsplash)                                         │
+│     └─► AI Generation (DALL-E)                                          │
+│  8. Update domain_profiles cache                                        │
+│  9. Return { content_type, confidence, image_url, image_source }        │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                                                       │
+                                                                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT                                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  10. Receive enrichment → update link in storage                        │
+│  11. Fade in new image / update content type badge                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Runs Where
+
+| Feature | Client | Server | Notes |
+|---------|--------|--------|-------|
+| Rules-based classification | ✅ | - | Instant, offline-capable |
+| AI classification | - | ✅ | API keys secure |
+| Domain profile cache (read) | ✅ | ✅ | Synced to client for offline |
+| Domain profile cache (write) | - | ✅ | Server updates shared cache |
+| Platform thumbnails (YouTube, etc) | ✅ | ✅ | Client for known patterns, server for complex |
+| Image scraping | - | ✅ | No CORS restrictions |
+| Image search (Unsplash) | - | ✅ | API key required |
+| AI image generation | - | ✅ | API key required |
+| Type discovery | - | ✅ | Scheduled job |
+
+---
+
 ## Problem Statement
 
 Links saved to Board often lack images due to:

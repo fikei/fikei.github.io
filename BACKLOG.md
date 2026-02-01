@@ -380,23 +380,55 @@
 ## Epic: Content Type System
 
 > Detect, classify, and evolve content types for links.
+> **Architecture:** Hybrid client/server - rules on client, AI on server
 > **PRD:** [docs/PRD-content-type-and-image-systems.md](docs/PRD-content-type-and-image-systems.md)
 > **Tech Spec:** [docs/TECH-content-type-and-image-systems.md](docs/TECH-content-type-and-image-systems.md)
 
-### Phase 1: Detection
+### Phase 0: Client-Side Foundation ✓ COMPLETE
 
-#### Story: Content Type Classification
-> As a system, I want to detect what type of content a link represents.
+#### Story: Rules-Based Classification (Client)
+> As a user, I want instant content type detection without network latency.
 
 **Tasks:**
-- [ ] Create `content_types` table with builtin types (product, article, video, music, repository, social, document, tool, unknown)
-- [ ] Add `content_type` field to links table
-- [ ] Implement ContentClassifier interface (provider-agnostic)
-- [ ] Implement AnthropicClassifier provider
-- [ ] Implement OpenAIClassifier provider (backup)
-- [ ] Build classification prompt with type definitions
-- [ ] Add confidence threshold handling (0.7)
-- [ ] Return type + confidence + signals from classifier
+- [x] Define BUILTIN_TYPES with domains, patterns, keywords
+- [x] Implement classifyByRules() for instant classification
+- [x] Implement domain profile cache (client-side)
+- [x] Add logging throughout classification flow
+- [x] Integrate into link add flow
+- [x] Display content type in admin panel
+
+### Phase 1: Server-Side AI Classification
+
+#### Story: Edge Function Setup ✓ CODE COMPLETE
+> As a developer, I want a secure server endpoint for AI operations.
+
+**Tasks:**
+- [x] Create `supabase/functions/enrich-link/index.ts`
+- [x] Configure CORS for boards domain
+- [x] Add request validation and error handling
+- [ ] Set up environment variables (API keys) **← USER ACTION REQUIRED**
+- [ ] Deploy to Supabase Edge Functions **← USER ACTION REQUIRED**
+- [ ] Test endpoint manually
+
+#### Story: AI Classification (Server) ✓ CODE COMPLETE
+> As a system, I want accurate AI-powered classification when rules fail.
+
+**Tasks:**
+- [x] Implement Anthropic classifier (claude-3-haiku)
+- [ ] Add OpenAI fallback (gpt-4o-mini) *(stretch)*
+- [x] Build classification prompt with type definitions
+- [x] Parse JSON response with error handling
+- [x] Add confidence threshold handling (0.7)
+- [ ] Log classifications for type discovery
+
+#### Story: Dev Tools Integration ✓ COMPLETE
+> As a developer, I want to manually trigger the AI pipeline from dev tools.
+
+**Tasks:**
+- [x] Add "Run AI Enrichment Pipeline" button to dev menu
+- [x] Implement queueAllForEnrichment() function
+- [x] Show progress toast during enrichment
+- [x] Update UI when enrichment completes
 
 #### Story: Domain Profile Caching
 > As a system, I want to cache domain classifications to reduce API costs.
@@ -476,41 +508,60 @@
 ## Epic: Image Resolution System
 
 > Resolve, generate, and improve images for links based on content type.
+> **Architecture:** Client handles platform URLs (YouTube, GitHub), server handles scraping + search + generation
 > **PRD:** [docs/PRD-content-type-and-image-systems.md](docs/PRD-content-type-and-image-systems.md)
 > **Tech Spec:** [docs/TECH-content-type-and-image-systems.md](docs/TECH-content-type-and-image-systems.md)
 
-### Phase 1: Resolution Pipeline
+### Phase 0: Client-Side Foundation ✓ COMPLETE
 
-#### Story: Image Strategy Registry
-> As a system, I want to define image resolution strategies per content type.
-
-**Tasks:**
-- [ ] Create `image_strategies` table
-- [ ] Define pipeline for each builtin type
-- [ ] Store as ordered list of approaches with configs
-- [ ] Add image_source field to links table (scraped, searched, generated, uploaded, platform_api)
-
-#### Story: Image Resolver
-> As a system, I want to resolve images using type-specific strategies.
+#### Story: Client-Side Image Resolution
+> As a user, I want instant image resolution for known platforms.
 
 **Tasks:**
-- [ ] Implement ImageResolver interface
-- [ ] Implement scrape method (re-fetch OG image, headless option)
-- [ ] Implement search method (Unsplash API)
-- [ ] Implement platform_api method (YouTube, Spotify, GitHub)
-- [ ] Implement template method (styled text cards)
-- [ ] Execute pipeline in order, stop on first success
+- [x] Implement imageQueue for background processing
+- [x] Implement processImageQueue() async processor
+- [x] Implement resolvePlatformImage() for YouTube, Vimeo, GitHub
+- [x] Add logging throughout image resolution flow
+- [x] Integrate into link add flow (queue if no OG image)
+- [x] Display image stats in admin panel
 
-#### Story: Background Processing
-> As a system, I want to resolve images without blocking link addition.
+### Phase 1: Server-Side Resolution ✓ CODE COMPLETE
+
+#### Story: Server Image Resolution ✓ CODE COMPLETE
+> As a system, I want to resolve images without CORS restrictions.
 
 **Tasks:**
-- [ ] Implement client-side image queue
-- [ ] Show placeholder immediately on add
-- [ ] Process queue in background
-- [ ] Fade in resolved images with CSS transition
-- [ ] Handle resolution failures gracefully
+- [x] Add image resolution to enrich-link Edge Function
+- [x] Implement server-side OG scrape (no CORS)
+- [x] Implement Unsplash API search
+- [x] Implement platform API calls (YouTube, Vimeo, GitHub)
+- [x] Return image_url and image_source
+- [ ] Implement headless scrape with Puppeteer *(stretch)*
+
+#### Story: Client-Server Integration ✓ CODE COMPLETE
+> As a user, I want seamless image resolution with instant + async combined.
+
+**Tasks:**
+- [x] Client: Try platform resolution first (instant)
+- [x] Client: Queue server enrichment for low confidence/no image
+- [x] Client: Receive result, update UI
+- [x] Add "Refresh Image" action to kebab menu
+- [ ] Add fade-in animation for resolved images
+- [ ] Client: Receive result, update UI with fade-in
+- [ ] Client: Handle errors gracefully, show placeholder
 - [ ] Add retry logic with exponential backoff
+
+### Phase 2: Generation & Override
+
+#### Story: AI Image Generation (Server)
+> As a system, I want to generate images when other methods fail.
+
+**Tasks:**
+- [ ] Integrate Stability AI API (cheaper) or DALL-E 3
+- [ ] Build generation prompts from content type + title
+- [ ] Upload generated images to Supabase Storage
+- [ ] Add generation as final pipeline step
+- [ ] Track generation costs
 
 ### Phase 2: Generation & Override
 

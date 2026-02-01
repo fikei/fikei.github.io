@@ -1,59 +1,276 @@
-# Technical Documentation: Intelligent Image System
+# Technical Documentation: Content Type & Image Systems
 
-## Architecture Overview
+## Architecture Overview: Hybrid Client/Server
+
+The system uses a **hybrid architecture** where the client handles fast, free operations and the server handles operations requiring secure API keys or unrestricted network access.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              Client                                      │
-│  boards/index.html                                                       │
+│                              CLIENT                                       │
+│  boards/index.html                                                        │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   addLink() ──► resolveImage() ──► updateLinkImage()                   │
-│                      │                                                  │
-│                      ▼                                                  │
-│              ┌──────────────┐                                          │
-│              │ Image Worker │  (background processing)                  │
-│              └──────────────┘                                          │
-│                      │                                                  │
-└──────────────────────┼──────────────────────────────────────────────────┘
+│                                                                           │
+│  INSTANT (No Network Required)                                            │
+│  ├── classifyByRules()     → Domain/pattern/keyword matching              │
+│  ├── BUILTIN_TYPES[]       → 9 content types with signals                 │
+│  ├── domainProfileCache{}  → Synced from server, used offline             │
+│  └── Platform thumbnails   → YouTube/Vimeo/GitHub URL parsing             │
+│                                                                           │
+│  ASYNC (Background Queue)                                                 │
+│  ├── imageQueue[]          → Links needing image resolution               │
+│  └── enrichmentQueue[]     → Links needing AI classification              │
+│                                                                           │
+│  When confidence < 0.7 OR no image:                                       │
+│  └── POST /functions/v1/enrich-link ────────────────────────────────┐     │
+│                                                                      │     │
+└──────────────────────────────────────────────────────────────────────┼─────┘
+                                                                       │
+                                                                       ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    SERVER (Supabase Edge Function)                        │
+│  supabase/functions/enrich-link/index.ts                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  SINGLE ENDPOINT handles both classification + image resolution           │
+│                                                                           │
+│  1. Check domain_profiles cache (DB)                                      │
+│  2. If cache miss/low confidence → AI Classification                      │
+│  3. Update domain_profiles cache                                          │
+│  4. If no image → Image Resolution Pipeline                               │
+│     ├── Scrape (headless browser, no CORS)                                │
+│     ├── Platform APIs (YouTube Data API, etc)                             │
+│     ├── Image Search (Unsplash API)                                       │
+│     └── AI Generation (DALL-E / Stability AI)                             │
+│  5. Return { content_type, confidence, image_url, source }                │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+                                                                       │
+                       ┌───────────────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Edge Functions                                   │
-│  supabase/functions/                                                     │
+│                          DATABASE                                         │
+│  Supabase PostgreSQL                                                      │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  classify-content/     ──► Content type detection                       │
-│  resolve-image/        ──► Image resolution pipeline                    │
-│  discover-types/       ──► Weekly type discovery job                    │
-│                                                                         │
+│                                                                           │
+│  domain_profiles       → Shared cache (all users benefit)                 │
+│  content_types         → Type registry (builtin + discovered)             │
+│  image_strategies      → Visual strategies per type                       │
+│  classification_log    → Low-confidence items for type discovery          │
+│  links                 → content_type, image_url, image_source fields     │
+│                                                                           │
 └─────────────────────────────────────────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          Database                                        │
-│  Supabase PostgreSQL                                                     │
+│                        EXTERNAL APIs                                      │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  domain_profiles       ──► Cached domain classifications                │
-│  content_types         ──► Type registry (builtin + discovered)         │
-│  image_strategies      ──► Visual strategies per type                   │
-│  classification_log    ──► Tracking for type discovery                  │
-│  links                 ──► Updated with image_url, image_source         │
-│                                                                         │
+│                                                                           │
+│  AI Classification:    Anthropic Claude / OpenAI GPT                      │
+│  Image Search:         Unsplash API / Pexels API                          │
+│  Image Generation:     DALL-E 3 / Stability AI                            │
+│  Headless Scraping:    Browserless / Puppeteer                            │
+│  Platform APIs:        YouTube Data API, Spotify Web API                  │
+│                                                                           │
 └─────────────────────────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        External APIs                                     │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Anthropic / OpenAI    ──► Classification, generation prompts           │
-│  Unsplash API          ──► Image search                                 │
-│  Platform APIs         ──► YouTube, Spotify, GitHub thumbnails          │
-│  Supabase Storage      ──► User uploads, generated images               │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## External API Options & Tradeoffs
+
+### AI Classification APIs
+
+| Provider | Model | Cost per 1K tokens | Pros | Cons |
+|----------|-------|-------------------|------|------|
+| **Anthropic** | claude-3-haiku | $0.25 in / $1.25 out | Fast, accurate, good JSON | Requires header for browser |
+| **Anthropic** | claude-3-5-sonnet | $3 in / $15 out | Most accurate | Expensive for classification |
+| **OpenAI** | gpt-4o-mini | $0.15 in / $0.60 out | Cheapest, fast | Slightly less accurate |
+| **OpenAI** | gpt-4o | $2.50 in / $10 out | Very accurate | Expensive |
+| **Local** | Ollama/llama.cpp | Free (compute only) | No API costs, privacy | Requires self-hosting |
+
+**Recommendation:** Start with **claude-3-haiku** or **gpt-4o-mini** for classification. Both are fast and cheap. Use domain caching to minimize calls.
+
+### Image Search APIs
+
+| Provider | Free Tier | Paid | Pros | Cons |
+|----------|-----------|------|------|------|
+| **Unsplash** | 50 req/hr | Custom | High quality, free for most | Limited to Unsplash library |
+| **Pexels** | 200 req/hr | Custom | Good quality, generous free | Smaller library than Unsplash |
+| **Google Custom Search** | 100/day free | $5/1K | Searches entire web | Complex setup, can return low-quality |
+| **Bing Image Search** | 1K/mo free | $3/1K | Good quality | Microsoft account required |
+
+**Recommendation:** Start with **Unsplash** (free tier is generous). Add Pexels as fallback.
+
+### Image Generation APIs
+
+| Provider | Cost | Quality | Speed | Pros | Cons |
+|----------|------|---------|-------|------|------|
+| **DALL-E 3** | $0.04-0.12/image | Excellent | 10-20s | Best quality, good prompts | Expensive at scale |
+| **DALL-E 2** | $0.016-0.02/image | Good | 5-10s | Cheaper | Lower quality |
+| **Stability AI** | $0.002-0.006/image | Good | 2-5s | Very cheap, fast | Requires more prompt engineering |
+| **Replicate** | Pay per second | Varies | Varies | Many model options | Complex pricing |
+
+**Recommendation:** Start with **Stability AI** for cost efficiency. Use **DALL-E 3** only for high-value cases or when Stability fails.
+
+### Headless Browser / Scraping
+
+| Provider | Free Tier | Paid | Pros | Cons |
+|----------|-----------|------|------|------|
+| **Browserless** | 6 hrs/mo | $20/mo | Easy API, good docs | Limited free tier |
+| **Puppeteer (self-hosted)** | Free | Compute costs | Full control | Need to host |
+| **Playwright (self-hosted)** | Free | Compute costs | Multi-browser | Need to host |
+| **ScrapingBee** | 1K/mo | $49/mo | Handles anti-bot | Expensive |
+
+**Recommendation:** Start with **Puppeteer in Edge Function** (Supabase supports it). Move to Browserless if you hit limits.
+
+---
+
+## Edge Function: enrich-link
+
+Single endpoint that handles both classification and image resolution.
+
+### Request/Response
+
+```typescript
+// POST /functions/v1/enrich-link
+interface EnrichRequest {
+  url: string;
+  title?: string;
+  description?: string;
+  linkId?: string;        // If provided, updates link directly
+  skipClassification?: boolean;
+  skipImage?: boolean;
+}
+
+interface EnrichResponse {
+  content_type: string;
+  type_confidence: number;
+  type_source: 'cache' | 'rules' | 'ai';
+  image_url: string | null;
+  image_source: 'scraped' | 'platform' | 'searched' | 'generated' | 'template';
+  cached: boolean;        // Whether domain was in cache
+}
+```
+
+### Implementation Skeleton
+
+```typescript
+// supabase/functions/enrich-link/index.ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk'
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+)
+
+const anthropic = new Anthropic({
+  apiKey: Deno.env.get('ANTHROPIC_API_KEY')!
+})
+
+serve(async (req) => {
+  const { url, title, description, linkId, skipClassification, skipImage } = await req.json()
+  const domain = new URL(url).hostname.replace('www.', '')
+
+  let contentType = 'unknown'
+  let typeConfidence = 0
+  let typeSource = 'rules'
+  let imageUrl = null
+  let imageSource = 'template'
+  let cached = false
+
+  // 1. Check domain cache
+  if (!skipClassification) {
+    const { data: profile } = await supabase
+      .from('domain_profiles')
+      .select('*')
+      .eq('domain', domain)
+      .single()
+
+    if (profile?.confidence > 0.85) {
+      contentType = profile.primary_type
+      typeConfidence = profile.confidence
+      typeSource = 'cache'
+      cached = true
+    } else {
+      // 2. AI Classification
+      const result = await classifyWithAI(url, title, description)
+      contentType = result.type
+      typeConfidence = result.confidence
+      typeSource = 'ai'
+
+      // 3. Update domain cache
+      await updateDomainProfile(domain, result)
+    }
+  }
+
+  // 4. Image Resolution
+  if (!skipImage) {
+    const imageResult = await resolveImage(url, title, description, contentType)
+    imageUrl = imageResult.url
+    imageSource = imageResult.source
+  }
+
+  // 5. Update link if ID provided
+  if (linkId) {
+    await supabase
+      .from('links')
+      .update({
+        content_type: contentType,
+        type_confidence: typeConfidence,
+        image: imageUrl,
+        image_source: imageSource,
+        enriched_at: new Date().toISOString()
+      })
+      .eq('id', linkId)
+  }
+
+  return new Response(JSON.stringify({
+    content_type: contentType,
+    type_confidence: typeConfidence,
+    type_source: typeSource,
+    image_url: imageUrl,
+    image_source: imageSource,
+    cached
+  }), { headers: { 'Content-Type': 'application/json' } })
+})
+
+async function classifyWithAI(url: string, title: string, description: string) {
+  const response = await anthropic.messages.create({
+    model: 'claude-3-haiku-20240307',
+    max_tokens: 100,
+    messages: [{
+      role: 'user',
+      content: `Classify this link. URL: ${url}, Title: ${title}, Description: ${description?.slice(0, 200)}
+
+Types: product, article, video, music, repository, social, document, tool, unknown
+
+JSON only: {"type": "...", "confidence": 0.0-1.0}`
+    }]
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const match = text.match(/\{[\s\S]*\}/)
+  return match ? JSON.parse(match[0]) : { type: 'unknown', confidence: 0.3 }
+}
+
+async function resolveImage(url: string, title: string, desc: string, type: string) {
+  // Try strategies in order based on content type
+  const strategies = IMAGE_STRATEGIES[type] || ['scrape', 'search', 'template']
+
+  for (const strategy of strategies) {
+    try {
+      const result = await executeStrategy(strategy, url, title, desc)
+      if (result) return result
+    } catch (e) {
+      console.error(`Strategy ${strategy} failed:`, e)
+    }
+  }
+
+  return { url: null, source: 'template' }
+}
 ```
 
 ---
