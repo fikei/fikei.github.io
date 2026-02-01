@@ -148,6 +148,29 @@
 - [ ] Update shared board display to use username
 - [ ] Add username edit in settings
 
+### Story: Fix Pending Saves Not Syncing ✓ COMPLETE
+> As a viewer, I want links saved from shared boards to appear on my board immediately (before login too).
+
+**Solution implemented:**
+- For anonymous users: `processPendingSaves()` called BEFORE initial render
+- For logged-in users: called AFTER cloud sync to avoid overwriting
+- Only syncs to Supabase when `currentUser` exists
+
+**Tasks:**
+- [x] Call `processPendingSaves()` in init() for anonymous users before render
+- [x] Skip Supabase sync when not logged in
+- [x] Verify link structure matches: share.html stores `created_at`, index.html converts to `addedAt`
+- [x] On login, sync pending saves that were added to local state to Supabase
+
+### Story: Persistent Saved Link State
+> As a viewer, I want to see which links I've already saved when I revisit a shared board.
+
+**Tasks:**
+- [ ] Store saved link IDs in localStorage per shared board
+- [ ] Show "View on Board" button for already-saved links on page load
+- [ ] Handle pending saves (not yet synced) in saved state
+- [ ] Clear saved state when link is deleted from personal board
+
 ### Story: Board Fork/Copy
 > As a viewer, I want to copy an entire shared board to my personal board.
 
