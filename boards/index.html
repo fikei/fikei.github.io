@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" id="viewport">
-  <title>Board</title>
+  <title>Boards</title>
 
   <!-- Space Grotesk Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +12,7 @@
 
   <style>
 /* ============================================
-   Board - Swiss Grid + Web 1.0 Typography
+   Boards - Swiss Grid + Web 1.0 Typography
    ============================================ */
 
 :root {
@@ -1248,7 +1248,6 @@ body {
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
     <span class="auth-bar__user" id="authUser"></span>
-    <button class="auth-bar__btn" id="syncBtn" style="display:none">Sync</button>
     <button class="auth-bar__btn" id="authBtn">Login</button>
   </div>
 
@@ -1356,7 +1355,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   <script>
 // ============================================
-// Board - Single File App with Supabase
+// Boards - Single File App with Supabase
 // ============================================
 
 (function() {
@@ -1365,8 +1364,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.2.0';
-  console.log(`[board] v${VERSION}`);
+  const VERSION = '1.3.0';
+  console.log(`[boards] v${VERSION}`);
 
   // ============================================
   // Supabase Setup
@@ -1602,7 +1601,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // AI Categorization
   // ============================================
   const AI_CATEGORIZE_ENDPOINT = `${SUPABASE_URL}/functions/v1/categorize`;
-  const CATEGORY_CACHE_KEY = 'board-category-cache';
+  const CATEGORY_CACHE_KEY = 'boards-category-cache';
   const CATEGORIES = ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read'];
 
   // Load domain->category cache from localStorage
@@ -1766,7 +1765,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Storage - Hybrid localStorage + Supabase
   // ============================================
   const STORAGE_KEY = 'things-i-like';
-  const EXPANDED_KEY = 'board-expanded-cards';
+  const EXPANDED_KEY = 'boards-expanded-cards';
 
   // Load/save expanded cards state (localStorage + Supabase sync)
   function loadExpandedCards() {
@@ -2820,15 +2819,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Auth Functions
   // ============================================
   function updateAuthUI() {
-    const syncBtn = $('syncBtn');
     if (currentUser) {
       authUser.textContent = currentUser.email;
       authBtn.textContent = 'Logout';
-      syncBtn.style.display = '';
     } else {
       authUser.textContent = '';
       authBtn.textContent = 'Login';
-      syncBtn.style.display = 'none';
     }
   }
 
@@ -2906,9 +2902,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     }
 
     syncInProgress = true;
-    const syncBtn = $('syncBtn');
-    syncBtn.textContent = 'Syncing...';
-    syncBtn.disabled = true;
 
     let uploaded = 0;
     let failed = 0;
@@ -2985,8 +2978,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
     // Done
     syncInProgress = false;
-    syncBtn.textContent = 'Sync';
-    syncBtn.disabled = false;
 
     console.log(`[sync] === Complete: ${uploaded} uploaded, ${failed} failed ===`);
     if (errors.length > 0) {
@@ -3107,8 +3098,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       authEmail.focus();
     }
   };
-
-  $('syncBtn').onclick = () => forceSync();
 
   authForm.onsubmit = (e) => {
     e.preventDefault();
