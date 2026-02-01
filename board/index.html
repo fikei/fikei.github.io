@@ -2714,23 +2714,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         };
         console.log('[sync] Payload:', JSON.stringify(payload).substring(0, 200));
 
-        // Add timeout to detect hanging requests
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout after 10s')), 10000)
-        );
+        // Use raw fetch instead of Supabase client (client hangs)
+        console.log('[sync] Uploading via fetch...');
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload)
+        });
 
-        const upsertPromise = supabase.from('links').upsert(payload);
-
-        console.log('[sync] Calling Supabase...');
-        const result = await Promise.race([upsertPromise, timeoutPromise]);
-        console.log('[sync] Got response:', result);
-
-        if (result.error) {
-          console.error('[sync] Supabase error:', result.error);
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error('[sync] Upload failed:', res.status, errText);
           failed++;
-          errors.push(`${link.url}: ${result.error.message}`);
+          errors.push(`${link.url}: ${res.status}`);
         } else {
-          console.log('[sync] Success');
+          console.log('[sync] Success:', res.status);
           uploaded++;
         }
       } catch (e) {
@@ -2740,10 +2743,20 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       }
     }
 
-    // Sync link order
+    // Sync link order via fetch too
     console.log('[sync] Syncing link order...');
     try {
-      await syncOrderToSupabase(local.linkOrder);
+      const orderPayload = { user_id: currentUser.id, order_ids: local.linkOrder };
+      await fetch(`${SUPABASE_URL}/rest/v1/link_order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(orderPayload)
+      });
       console.log('[sync] Order synced');
     } catch (e) {
       console.error('[sync] Order sync failed:', e);
