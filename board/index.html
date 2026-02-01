@@ -1745,18 +1745,51 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   async function fetchFromSupabase() {
     if (!currentUser) return null;
+
+    // Get access token from localStorage (Supabase client hangs)
+    let accessToken = null;
+    try {
+      const storageKey = 'sb-yfhudwakpgzswiylhfbh-auth-token';
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.error('[fetch] Failed to get token:', e);
+      return null;
+    }
+
+    if (!accessToken) {
+      console.log('[fetch] No access token');
+      return null;
+    }
+
     try {
       const t0 = performance.now();
-      const [linksRes, orderRes, expandedRes] = await Promise.all([
-        supabase.from('links').select('*').eq('user_id', currentUser.id),
-        supabase.from('link_order').select('order_ids').eq('user_id', currentUser.id).single(),
-        supabase.from('expanded_cards').select('cards').eq('user_id', currentUser.id).single()
-      ]);
-      console.log(`[perf] Supabase queries: ${(performance.now() - t0).toFixed(0)}ms`);
-      console.log('[supabase] links:', linksRes.data?.length || 0, 'error:', linksRes.error?.message || 'none');
-      console.log('[supabase] order:', orderRes.data ? 'found' : 'none', 'error:', orderRes.error?.message || 'none');
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`
+      };
 
-      const links = (linksRes.data || []).map(l => ({
+      // Fetch all data in parallel using raw fetch
+      const [linksRes, orderRes, expandedRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/links?user_id=eq.${currentUser.id}&select=*`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/link_order?user_id=eq.${currentUser.id}&select=order_ids&limit=1`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/expanded_cards?user_id=eq.${currentUser.id}&select=cards&limit=1`, { headers })
+      ]);
+
+      const [linksData, orderData, expandedData] = await Promise.all([
+        linksRes.json(),
+        orderRes.json(),
+        expandedRes.json()
+      ]);
+
+      console.log(`[perf] Supabase queries: ${(performance.now() - t0).toFixed(0)}ms`);
+      console.log('[supabase] links:', linksData?.length || 0);
+      console.log('[supabase] order:', orderData?.[0] ? 'found' : 'none');
+
+      const links = (linksData || []).map(l => ({
         id: l.id,
         url: l.url,
         title: l.title,
@@ -1776,8 +1809,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         }
       });
 
-      const linkOrder = orderRes.data?.order_ids || links.map(l => l.id);
-      const expanded = expandedRes.data?.cards || {};
+      const linkOrder = orderData?.[0]?.order_ids || links.map(l => l.id);
+      const expanded = expandedData?.[0]?.cards || {};
 
       return { links, categories, linkOrder, expanded };
     } catch (e) {
@@ -2958,11 +2991,23 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       // Don't clear hash - let Supabase handle it
     }
 
-    // Revalidate: check session and fetch fresh data from cloud
+    // Revalidate: check session from localStorage (Supabase client hangs)
     const t1 = performance.now();
-    const { data: { session }, error } = await supabase.auth.getSession();
+    let session = null;
+    try {
+      const storageKey = 'sb-yfhudwakpgzswiylhfbh-auth-token';
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.user && parsed.access_token) {
+          session = { user: parsed.user, access_token: parsed.access_token };
+        }
+      }
+    } catch (e) {
+      console.error('[auth] Failed to read session:', e);
+    }
     console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
-    console.log('[auth] session:', session ? session.user.email : 'none', 'error:', error?.message || 'none');
+    console.log('[auth] session:', session ? session.user.email : 'none');
 
     if (session) {
       currentUser = session.user;
