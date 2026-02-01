@@ -2677,15 +2677,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       return;
     }
 
-    // Get user's access token for authenticated requests
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      console.error('[sync] No access token');
+    // Get user's access token directly from localStorage (Supabase client hangs)
+    console.log('[sync] Getting access token from localStorage...');
+    let accessToken = null;
+    try {
+      const storageKey = 'sb-yfhudwakpgzswiylhfbh-auth-token';
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        accessToken = parsed.access_token;
+        console.log('[sync] Got access token from localStorage');
+      }
+    } catch (e) {
+      console.error('[sync] Failed to get token:', e);
+    }
+
+    if (!accessToken) {
+      console.error('[sync] No access token found');
       toast('Session expired - please login again', true);
       return;
     }
-    const accessToken = session.access_token;
-    console.log('[sync] Got access token');
 
     syncInProgress = true;
     const syncBtn = $('syncBtn');
