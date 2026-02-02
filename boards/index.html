@@ -3055,8 +3055,8 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       domains: ['dwr.com', 'designwithinreach.com', 'hay.dk', 'muuto.com', 'fritzhansen.com', 'knoll.com', 'hermanmiller.com', 'cb2.com', 'westelm.com', 'restorationhardware.com', 'rh.com', 'ikea.com', '1stdibs.com', 'chairish.com', 'etsy.com/listing']
     },
     wear: {
-      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote', 'jewelry', 'jewellery', 'necklace', 'earring', 'bracelet', 'pendant', 'signet', 'hoop', 'cuff', 'bangle', 'shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat', 'clothing', 'apparel', 'menswear', 'womenswear'],
-      domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com', 'mejuri.com', 'catbirdnyc.com', 'auratenewyork.com', 'stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com']
+      kw: ['jacket', 'shirt', 'pants', 'jeans', 'dress', 'coat', 'sweater', 'hoodie', 'tee', 't-shirt', 'shorts', 'skirt', 'blazer', 'suit', 'windbreaker', 'outerwear', 'knitwear', 'denim', 'trousers', 'vest', 'cardigan', 'beanie', 'hat', 'cap', 'scarf', 'gloves', 'bag', 'backpack', 'tote', 'jewelry', 'jewellery', 'necklace', 'earring', 'bracelet', 'pendant', 'signet', 'hoop', 'cuff', 'bangle', 'shoe', 'shoes', 'sneaker', 'sneakers', 'boot', 'boots', 'sandal', 'loafer', 'oxford', 'runner', 'trainer', 'footwear', 'heel', 'flat', 'clothing', 'apparel', 'menswear', 'womenswear', 'cotton', 'wool', 'cashmere', 'leather', 'silk', 'linen', 'parka', 'anorak', 'polo', 'chino', 'jogger', 'legging', 'bodysuit', 'jumpsuit', 'romper', 'blouse', 'tunic', 'pullover', 'crewneck', 'henley', 'flannel', 'overshirt', 'shacket'],
+      domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com', 'mejuri.com', 'catbirdnyc.com', 'auratenewyork.com', 'stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com', 'amiparis.com', 'apc.fr', 'acnestudios.com', 'cos.com', 'arket.com', 'toteme-studio.com', 'lemaire.fr', 'therow.com', 'jilsander.com', 'maison-margiela.com', 'loewe.com', 'bottegaveneta.com', 'celine.com', 'pfrankstore.com', 'eckhauslatta.com', 'ourlegacy.com', 'stussy.com', 'palace.com', 'supremenewyork.com', 'kith.com', 'nordstrom.com', 'shopbop.com', 'revolve.com', 'asos.com', 'zara.com', 'hm.com', 'uniqlo.com', 'everlane.com', 'madewell.com']
     },
     watch: {
       kw: ['video', 'music', 'podcast', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'playlist', 'track', 'artist', 'band', 'concert', 'episode', 'series', 'show'],
@@ -3085,7 +3085,10 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   };
 
   function categorize(link) {
-    const text = `${link.title || ''} ${link.description || ''} ${link.url || ''}`.toLowerCase();
+    // Convert hyphens/underscores to spaces so URL paths like "oversized-trousers" match "trousers"
+    const text = `${link.title || ''} ${link.description || ''} ${link.url || ''}`
+      .toLowerCase()
+      .replace(/[-_]/g, ' ');
     let best = 'uncategorized', maxScore = 0;
 
     for (const [cat, p] of Object.entries(PATTERNS)) {
