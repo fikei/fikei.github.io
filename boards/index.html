@@ -526,12 +526,25 @@ body {
 }
 
 /* ============================================
-   Floating Add Button
+   Bottom Floating Nav
    ============================================ */
-.fab {
+.bottom-nav {
   position: fixed;
   bottom: var(--space-6);
+  left: var(--space-6);
   right: var(--space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.bottom-nav > * {
+  pointer-events: auto;
+}
+
+.fab {
   width: 24px;
   height: 24px;
   font-family: var(--font-mono);
@@ -540,7 +553,6 @@ body {
   color: var(--bg);
   border: none;
   cursor: pointer;
-  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1665,7 +1677,7 @@ body {
   background: var(--subtle);
 }
 
-/* Share button in header */
+/* Share button in bottom nav */
 .share-btn {
   padding: var(--space-1) var(--space-3);
   font-family: var(--font-mono);
@@ -1673,7 +1685,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid var(--fg);
-  background: transparent;
+  background: var(--bg);
   color: var(--fg);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -1687,6 +1699,10 @@ body {
 .share-btn--active {
   background: var(--fg);
   color: var(--bg);
+}
+
+.share-btn--active::before {
+  content: '✓ ';
 }
 
 /* ============================================
@@ -1944,7 +1960,6 @@ body {
 
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
-    <button class="share-btn" id="shareBtn" style="display:none;">Share</button>
     <!-- Logged out state -->
     <button class="auth-bar__btn" id="authBtn">Login</button>
     <!-- Logged in state -->
@@ -1970,7 +1985,11 @@ body {
 
   <main class="grid" id="grid"></main>
 
-  <button class="fab" id="addBtn">+</button>
+  <!-- Bottom Floating Nav -->
+  <div class="bottom-nav">
+    <button class="share-btn" id="shareBtn" style="display:none;">Share</button>
+    <button class="fab" id="addBtn">+</button>
+  </div>
 
   <!-- Add Modal -->
   <div class="modal" id="addModal">
