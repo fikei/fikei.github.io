@@ -2451,8 +2451,8 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   // ============================================
   const enrichmentQueue = [];
   let isProcessingEnrichment = false;
-  const MAX_RETRIES = 3;
-  const RETRY_DELAYS = [2000, 4000, 8000]; // Exponential backoff: 2s, 4s, 8s
+  const ENRICHMENT_MAX_RETRIES = 3;
+  const ENRICHMENT_RETRY_DELAYS = [2000, 4000, 8000]; // Exponential backoff: 2s, 4s, 8s
 
   function queueServerEnrichment(linkId, url, title, description) {
     console.log('%c[ENRICH] Queuing for server enrichment:', 'color: #e74c3c; font-weight: bold', url);
@@ -2471,11 +2471,11 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
     let lastError = null;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= ENRICHMENT_MAX_RETRIES; attempt++) {
       try {
         if (attempt > 0) {
-          const delay = RETRY_DELAYS[attempt - 1] || 8000;
-          console.log(`%c[ENRICH] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`, 'color: #f39c12');
+          const delay = ENRICHMENT_RETRY_DELAYS[attempt - 1] || 8000;
+          console.log(`%c[ENRICH] Retry ${attempt}/${ENRICHMENT_MAX_RETRIES} after ${delay}ms...`, 'color: #f39c12');
           await sleep(delay);
         }
 
@@ -2495,7 +2495,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         if (error) {
           // Check if it's a retryable error (network, 5xx)
           const isRetryable = !error.message?.includes('400') && !error.message?.includes('401');
-          if (isRetryable && attempt < MAX_RETRIES) {
+          if (isRetryable && attempt < ENRICHMENT_MAX_RETRIES) {
             lastError = error;
             continue;
           }
@@ -2506,7 +2506,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       } catch (e) {
         lastError = e;
         // Network errors are retryable
-        if (attempt < MAX_RETRIES) {
+        if (attempt < ENRICHMENT_MAX_RETRIES) {
           continue;
         }
       }
@@ -2709,7 +2709,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     'https://corsproxy.io/?'
   ];
   const FETCH_TIMEOUT = 8000; // 8 seconds (reduced from 15)
-  const MAX_RETRIES = 1; // Only 1 retry per proxy (reduced from 2)
+  const FETCH_MAX_RETRIES = 1; // Only 1 retry per proxy (reduced from 2)
 
   // Strip tracking parameters to make URLs shorter/faster
   function cleanUrl(url) {
@@ -2748,7 +2748,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
     // Try each proxy with retries
     for (const proxy of CORS_PROXIES) {
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      for (let attempt = 0; attempt <= FETCH_MAX_RETRIES; attempt++) {
         try {
           const res = await fetchWithTimeout(proxy + encodeURIComponent(fetchUrl), FETCH_TIMEOUT);
           if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2756,7 +2756,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
           break;
         } catch (e) {
           lastError = e;
-          if (attempt < MAX_RETRIES) {
+          if (attempt < FETCH_MAX_RETRIES) {
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           }
         }
