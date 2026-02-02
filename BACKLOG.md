@@ -281,6 +281,33 @@
 - [ ] Highlight matches in results
 - [ ] Clear search with Escape key
 
+### Story: Smart Grid Expansion
+> As a user, I want expanded cards to automatically choose the best layout based on image dimensions.
+
+**Tasks:**
+- [ ] Store image dimensions (width, height) when resolving images
+- [ ] Calculate aspect ratio from stored dimensions
+- [ ] Define layout rules based on aspect ratio:
+  - Landscape wide (>2:1) → 3x1 or 3x2
+  - Landscape (1.3-2:1) → 2x2 or 3x2
+  - Square (0.8-1.3:1) → 2x2
+  - Portrait (0.5-0.8:1) → 1x3 or 2x3
+  - Portrait tall (<0.5:1) → 1x3
+- [ ] Apply suggested layout on first expand
+- [ ] Allow manual override (preserve user's choice)
+- [ ] Fallback to 2x2 when dimensions unknown
+
+### Story: Grid Reflow on Resize
+> As a user, I want the grid to automatically reflow and remove gaps when cards are resized.
+
+**Tasks:**
+- [ ] Detect when a card is resized (expand/collapse/manual resize)
+- [ ] Implement grid reflow algorithm to fill gaps
+- [ ] Reposition cards to eliminate empty spaces
+- [ ] Animate card movements during reflow
+- [ ] Preserve user's manual card positions when possible
+- [ ] Add option to disable auto-reflow in settings
+
 ---
 
 ## Epic: Performance
@@ -655,3 +682,52 @@
 - [ ] Related links widget
 - [ ] Quick actions based on link type
 - [ ] Widget customization options
+
+---
+
+## Epic: Mobile App MVP
+
+> Native mobile app with quick-save functionality from anywhere on the device.
+
+### Story: App Foundation
+> As a user, I want a native mobile app to access my boards.
+
+**Tasks:**
+- [ ] Choose framework (React Native / Flutter / PWA)
+- [ ] Set up project structure and CI/CD
+- [ ] Implement Supabase authentication flow
+- [ ] Build main board view with grid display
+- [ ] Implement pull-to-refresh and infinite scroll
+- [ ] Add offline caching with sync on reconnect
+
+### Story: Quick Save Shortcut
+> As a user, I want to quickly save content from anywhere on my device.
+
+**Tasks:**
+- [ ] iOS: Implement Share Extension
+- [ ] Android: Implement Share Intent receiver
+- [ ] Extract URL, title, and description from shared content
+- [ ] Show quick category picker overlay
+- [ ] Save link with loading indicator
+- [ ] Haptic feedback on successful save
+- [ ] Handle images/screenshots (save as direct upload)
+
+### Story: Quick Actions Widget
+> As a user, I want a home screen widget for instant access.
+
+**Tasks:**
+- [ ] iOS: Build widget with WidgetKit
+- [ ] Android: Build widget with App Widgets
+- [ ] Show recent links in widget
+- [ ] Add "Quick Save" button to widget
+- [ ] Deep link to specific categories
+
+### Story: Push Notifications
+> As a user, I want to receive notifications for collaborative board activity.
+
+**Tasks:**
+- [ ] Set up push notification service (FCM/APNs)
+- [ ] Notify when someone adds to shared board
+- [ ] Notify when someone saves from my shared board
+- [ ] Notification preferences settings
+- [ ] Badge count for unread activity

@@ -503,6 +503,31 @@ body {
   background: var(--fg);
 }
 
+/* Enrichment failed indicator */
+.grid-item__error-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  background: #c00;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  z-index: 10;
+  opacity: 0.9;
+}
+
+.grid-item__error-badge:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
 .grid-item--placeholder .grid-item__initial {
   font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
@@ -2398,13 +2423,79 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   // ============================================
   const enrichmentQueue = [];
   let isProcessingEnrichment = false;
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [2000, 4000, 8000]; // Exponential backoff: 2s, 4s, 8s
 
   function queueServerEnrichment(linkId, url, title, description) {
     console.log('%c[ENRICH] Queuing for server enrichment:', 'color: #e74c3c; font-weight: bold', url);
-    enrichmentQueue.push({ linkId, url, title, description });
+    enrichmentQueue.push({ linkId, url, title, description, retryCount: 0 });
 
     // Don't auto-process - requires API key setup
     // processEnrichmentQueue();
+  }
+
+  // Helper to sleep for retry delays
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Call enrichment API with retry logic
+  async function callEnrichmentAPI(item, currentImage, forceRefresh) {
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = RETRY_DELAYS[attempt - 1] || 8000;
+          console.log(`%c[ENRICH] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`, 'color: #f39c12');
+          await sleep(delay);
+        }
+
+        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
+          body: {
+            url: item.url,
+            title: item.title,
+            description: item.description,
+            linkId: item.linkId,
+            currentImage: currentImage,
+            skipIfHasImage: !forceRefresh && !!currentImage,
+            skipClassification: item.skipClassification || false,
+            forceRefresh: forceRefresh
+          }
+        });
+
+        if (error) {
+          // Check if it's a retryable error (network, 5xx)
+          const isRetryable = !error.message?.includes('400') && !error.message?.includes('401');
+          if (isRetryable && attempt < MAX_RETRIES) {
+            lastError = error;
+            continue;
+          }
+          throw new Error(error.message || 'Server error');
+        }
+
+        return { success: true, result };
+      } catch (e) {
+        lastError = e;
+        // Network errors are retryable
+        if (attempt < MAX_RETRIES) {
+          continue;
+        }
+      }
+    }
+
+    return { success: false, error: lastError };
+  }
+
+  // Mark a link as having failed enrichment (for UI feedback)
+  function markEnrichmentFailed(linkId) {
+    const data = load();
+    const link = data.links.find(l => l.id === linkId);
+    if (link) {
+      link.enrichment_failed = true;
+      link.enrichment_failed_at = new Date().toISOString();
+      save(data);
+    }
   }
 
   async function processEnrichmentQueue() {
@@ -2414,11 +2505,17 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     }
 
     isProcessingEnrichment = true;
-    console.log('%c[ENRICH] Starting server enrichment, items:', 'color: #e74c3c; font-weight: bold', enrichmentQueue.length);
+    const totalItems = enrichmentQueue.length;
+    let processedCount = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    console.log('%c[ENRICH] Starting server enrichment, items:', 'color: #e74c3c; font-weight: bold', totalItems);
 
     while (enrichmentQueue.length > 0) {
       const item = enrichmentQueue.shift();
-      console.log('%c[ENRICH] Processing:', 'color: #e74c3c', item.url);
+      processedCount++;
+      console.log(`%c[ENRICH] Processing (${processedCount}/${totalItems}):`, 'color: #e74c3c', item.url);
 
       // Get current link data to check existing image
       const currentData = load();
@@ -2426,64 +2523,95 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const currentImage = currentLink?.image || null;
       const forceRefresh = item.forceRefresh || false;
 
+      // Check domain cache first - skip classification if high confidence cached
+      let skipClassification = false;
+      let cachedType = null;
       try {
-        // Use Supabase's invoke method - handles auth and CORS automatically
-        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
-          body: {
-            url: item.url,
-            title: item.title,
-            description: item.description,
-            linkId: item.linkId,
-            currentImage: currentImage,
-            skipIfHasImage: !forceRefresh && !!currentImage, // Don't overwrite unless forced
-            forceRefresh: forceRefresh
-          }
-        });
+        const domain = new URL(item.url).hostname.replace('www.', '');
+        const cached = domainProfileCache[domain];
+        if (cached && cached.confidence >= 0.85) {
+          console.log('%c[ENRICH] Domain cache hit:', 'color: #27ae60', domain, cached.primaryType, cached.confidence);
+          skipClassification = true;
+          cachedType = cached;
+        }
+      } catch {}
 
-        if (error) {
-          console.error('%c[ENRICH] Server error:', 'color: #e74c3c', error.message || error);
-          continue;
+      // Call API with retry logic (skip classification if cached)
+      const { success, result, error } = await callEnrichmentAPI(
+        { ...item, skipClassification },
+        currentImage,
+        forceRefresh
+      );
+
+      if (!success) {
+        console.error('%c[ENRICH] Failed after retries:', 'color: #e74c3c', error?.message || error);
+        markEnrichmentFailed(item.linkId);
+        failCount++;
+        continue;
+      }
+
+      console.log('%c[ENRICH] Server result:', 'color: #27ae60; font-weight: bold', result);
+      successCount++;
+
+      // Update local state
+      const data = load();
+      const link = data.links.find(l => l.id === item.linkId);
+      if (link) {
+        // Clear any previous failure state
+        delete link.enrichment_failed;
+        delete link.enrichment_failed_at;
+
+        // Update content type - prefer server result, fallback to client cache
+        if (result.content_type && result.content_type !== 'unknown') {
+          link.content_type = result.content_type;
+          link.type_confidence = result.type_confidence;
+          // Update client cache with server result
+          try {
+            const domain = new URL(item.url).hostname.replace('www.', '');
+            domainProfileCache[domain] = {
+              primaryType: result.content_type,
+              confidence: result.type_confidence,
+              updatedAt: Date.now()
+            };
+            saveDomainCache();
+          } catch {}
+        } else if (cachedType && cachedType.primaryType) {
+          // Use cached type if server returned unknown
+          link.content_type = cachedType.primaryType;
+          link.type_confidence = cachedType.confidence;
+          console.log('%c[ENRICH] Using cached type:', 'color: #f39c12', cachedType.primaryType);
         }
 
-        console.log('%c[ENRICH] Server result:', 'color: #27ae60; font-weight: bold', result);
-
-        // Update local state
-        const data = load();
-        const link = data.links.find(l => l.id === item.linkId);
-        if (link) {
-          // Always update content type if we got a good one
-          if (result.content_type && result.content_type !== 'unknown') {
-            link.content_type = result.content_type;
-            link.type_confidence = result.type_confidence;
-          }
-
-          // Only update image if:
-          // 1. Force refresh was requested, OR
-          // 2. We don't have an image and server found one
-          if (result.image_url && result.image_source !== 'preserved') {
-            if (forceRefresh || !link.image) {
-              link.image = result.image_url;
-              link.image_source = result.image_source;
-              console.log('%c[ENRICH] Image updated:', 'color: #27ae60', result.image_url);
-            } else {
-              console.log('%c[ENRICH] Keeping existing image (use Refresh Image to override)', 'color: #f39c12');
-            }
-          }
-          save(data);
-          renderGrid();
-
-          // Sync enrichment to Supabase
-          if (currentUser) {
-            await syncLinkToSupabase(link);
+        // Only update image if:
+        // 1. Force refresh was requested, OR
+        // 2. We don't have an image and server found one
+        if (result.image_url && result.image_source !== 'preserved') {
+          if (forceRefresh || !link.image) {
+            link.image = result.image_url;
+            link.image_source = result.image_source;
+            console.log('%c[ENRICH] Image updated:', 'color: #27ae60', result.image_url);
+          } else {
+            console.log('%c[ENRICH] Keeping existing image (use Refresh Image to override)', 'color: #f39c12');
           }
         }
-      } catch (e) {
-        console.error('%c[ENRICH] Failed:', 'color: #e74c3c', e);
+        save(data);
+        renderGrid();
+
+        // Sync enrichment to Supabase
+        if (currentUser) {
+          await syncLinkToSupabase(link);
+        }
       }
     }
 
     isProcessingEnrichment = false;
-    console.log('%c[ENRICH] Queue complete', 'color: #e74c3c; font-weight: bold');
+    console.log('%c[ENRICH] Queue complete:', 'color: #e74c3c; font-weight: bold',
+      `${successCount} succeeded, ${failCount} failed`);
+
+    // Show summary toast if there were failures
+    if (failCount > 0) {
+      toast(`Enrichment complete: ${successCount} succeeded, ${failCount} failed`, failCount > successCount);
+    }
   }
 
   // Queue all links needing enrichment (for dev tools)
@@ -3484,6 +3612,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
       const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
+      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="Enrichment failed - click Refresh Image to retry">!</span>` : '';
       const detailsHtml = `
         <div class="grid-item__menu-container">
           <button class="grid-item__menu-btn" data-action="menu" aria-label="More options"></button>
@@ -3514,6 +3643,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
       if (hasImg) {
         html += `<article class="grid-item${expandedClass}${newClass}" data-id="${l.id}" draggable="true">
+          ${errorBadge}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
@@ -3521,6 +3651,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         </article>`;
       } else {
         html += `<article class="grid-item grid-item--placeholder${expandedClass}${newClass}" data-id="${l.id}" draggable="true">
+          ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(l.category)}</span>
@@ -4089,7 +4220,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     $('adminLowConfidence').textContent = `${lowConfidence} links`;
 
     // Metrics - Domain cache stats
-    const cachedDomains = Object.keys(domainCache).length;
+    const cachedDomains = Object.keys(domainProfileCache).length;
     $('adminCachedDomains').textContent = cachedDomains;
 
     // Calculate cache hit rate from domain cache usage
