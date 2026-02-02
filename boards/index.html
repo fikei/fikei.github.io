@@ -3604,7 +3604,10 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   function renderGrid(newIds = []) {
     const newIdSet = new Set(newIds);
     const allLinks = getAllLinks();
-    const links = currentFilter === 'all' ? allLinks : allLinks.filter(l => l.category === currentFilter);
+    // Always show loading cards regardless of filter
+    const links = currentFilter === 'all'
+      ? allLinks
+      : allLinks.filter(l => l.category === currentFilter || l.loading);
 
     if (links.length === 0) {
       grid.innerHTML = `<div class="empty-state">
