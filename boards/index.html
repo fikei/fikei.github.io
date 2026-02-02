@@ -2942,9 +2942,9 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const data = await res.json();
       const ms = (performance.now() - startTime).toFixed(0);
 
-      console.log(`%c[categorize] ${domain}`, 'color: #10b981',
+      console.log(`%c[categorize] ${domain}`, data.error ? 'color: #ef4444' : 'color: #10b981',
         `\n  → ${data.category} (AI, ${(data.confidence * 100).toFixed(0)}%)`,
-        `\n  💭 ${data.reason || 'no reason'}`,
+        `\n  💭 ${data.reason || data.error || 'no reason'}`,
         `\n  ⏱ ${ms}ms`);
 
       // Cache the result by domain
