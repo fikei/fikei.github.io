@@ -106,6 +106,27 @@ A minimal, high-contrast design system for ctrl.rodeo projects.
 <button class="token token--active">Active</button>
 ```
 
+### Filter Bar
+
+Horizontally scrollable navigation for category/filter selection.
+
+```html
+<nav class="filters">
+  <button class="filter-token filter-token--active" data-category="all">All</button>
+  <button class="filter-token" data-category="home">Home</button>
+  <button class="filter-token" data-category="wear">Wear</button>
+  <!-- More filters... -->
+</nav>
+```
+
+**Filter bar behavior:**
+- Sticky positioned at top of viewport
+- Horizontal scroll when content overflows (no wrap)
+- Hidden scrollbar for clean appearance
+- Tokens don't shrink (flex-shrink: 0)
+- Active state inverts colors (filled)
+- Touch-friendly with momentum scrolling on mobile
+
 ### Modal
 
 ```html
@@ -141,6 +162,55 @@ A minimal, high-contrast design system for ctrl.rodeo projects.
   <div class="toggle__knob"></div>
 </button>
 ```
+
+### User Menu Dropdown
+
+A dropdown menu for user account actions, typically positioned in the top-right corner.
+
+```html
+<div class="user-menu">
+  <button class="user-menu__trigger">
+    <span class="user-menu__email">username</span>
+  </button>
+  <div class="user-menu__dropdown user-menu__dropdown--visible">
+    <div class="user-menu__header">
+      <div class="user-menu__header-email">user@example.com</div>
+      <span class="user-menu__header-badge">Admin</span>
+    </div>
+    <button class="user-menu__item">Account</button>
+    <button class="user-menu__item user-menu__item--danger">Logout</button>
+  </div>
+</div>
+```
+
+**User menu behavior:**
+- Trigger shows truncated email with dropdown arrow
+- Dropdown positioned below trigger, aligned right
+- Header shows full email and optional badge
+- Items are full-width buttons with hover invert
+- Danger variant for destructive actions (red)
+- Close on click outside
+
+### Account Section
+
+Form-like display sections for account information.
+
+```html
+<div class="account-section">
+  <label class="account-label">Email</label>
+  <div class="account-value">user@example.com</div>
+</div>
+
+<div class="account-section">
+  <label class="account-label">User ID</label>
+  <div class="account-value account-value--mono">abc-123-def</div>
+</div>
+```
+
+**Account section behavior:**
+- Label: 9px uppercase monospace, muted color
+- Value: Serif font by default
+- `--mono` modifier for technical values (IDs, codes)
 
 ### Tabs
 

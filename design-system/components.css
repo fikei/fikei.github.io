@@ -450,6 +450,200 @@ body {
 }
 
 /* ============================================
+   User Menu Dropdown
+   ============================================ */
+.user-menu {
+  position: relative;
+}
+
+.user-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: var(--border-thin) solid var(--border);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default),
+              color var(--duration-normal) var(--ease-default);
+  max-width: 200px;
+}
+
+.user-menu__trigger:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.user-menu__trigger::after {
+  content: '▼';
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.user-menu__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu__dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border);
+  z-index: var(--z-dropdown);
+}
+
+.user-menu__dropdown--visible {
+  display: block;
+}
+
+.user-menu__header {
+  padding: var(--space-3);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.user-menu__header-email {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  word-break: break-all;
+}
+
+.user-menu__header-badge {
+  display: inline-block;
+  margin-top: var(--space-1);
+  padding: 2px 6px;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.user-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default),
+              color var(--duration-normal) var(--ease-default);
+}
+
+.user-menu__item:last-child {
+  border-bottom: none;
+}
+
+.user-menu__item:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.user-menu__item--danger {
+  color: var(--color-error);
+}
+
+.user-menu__item--danger:hover {
+  background: var(--color-error);
+  color: var(--color-white);
+}
+
+/* ============================================
+   Account Section
+   ============================================ */
+.account-section {
+  margin-bottom: var(--space-4);
+}
+
+.account-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-1);
+}
+
+.account-value {
+  font-family: var(--font-serif);
+  font-size: var(--text-base);
+  color: var(--fg);
+}
+
+.account-value--mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+/* ============================================
+   Filter Bar
+   ============================================ */
+.filters {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: var(--z-sticky);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-token {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  border: var(--border-thin) solid var(--border);
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default),
+              color var(--duration-normal) var(--ease-default);
+}
+
+.filter-token:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.filter-token--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ============================================
    Spinner / Loading
    ============================================ */
 .spinner {
