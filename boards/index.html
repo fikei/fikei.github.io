@@ -2063,7 +2063,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       if (domainProfileCache[domain]?.primaryType) {
         const result = {
           type: domainProfileCache[domain].primaryType,
-          confidence: domainProfileCache[domain].confidence || 0.9,
+          confidence: domainProfileCache[domain].confidence ?? 0.9,
           source: 'cache'
         };
         console.log('%c[CLASSIFY] Found in cache:', 'color: #27ae60; font-weight: bold', result);
@@ -2953,7 +2953,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         saveCategoryCache(categoryCache);
       }
 
-      return { category: data.category, confidence: data.confidence || 0.9, cached: false, source: 'ai', reason: data.reason };
+      return { category: data.category, confidence: data.confidence ?? 0.9, cached: false, source: 'ai', reason: data.reason };
     } catch (e) {
       console.warn('[categorize] AI failed:', e.message);
       return null; // Fall back to rule-based
