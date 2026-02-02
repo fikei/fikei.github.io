@@ -451,8 +451,14 @@ body {
 
 @media (hover: none) {
   .grid-item__overlay {
-    opacity: 1;
+    opacity: 0;
     padding: var(--space-2);
+  }
+  .grid-item:active .grid-item__overlay,
+  .grid-item:active .grid-item__category,
+  .grid-item--tapped .grid-item__overlay,
+  .grid-item--tapped .grid-item__category {
+    opacity: 1;
   }
 }
 
@@ -3966,6 +3972,16 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     const item = e.target.closest('.grid-item');
     if (item && !isDragging) {
       const id = item.dataset.id;
+
+      // On touch devices, toggle tapped state for label visibility
+      const isTouchDevice = window.matchMedia('(hover: none)').matches;
+      if (isTouchDevice) {
+        document.querySelectorAll('.grid-item--tapped').forEach(el => {
+          if (el !== item) el.classList.remove('grid-item--tapped');
+        });
+        item.classList.toggle('grid-item--tapped');
+      }
+
       if (expandedCards[id]) {
         // Collapse
         delete expandedCards[id];
@@ -5506,6 +5522,27 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   }
 
   init();
+
+  // Continuous clipboard scanning - check when tab becomes visible or gains focus
+  let lastClipboardCheck = 0;
+  const CLIPBOARD_CHECK_THROTTLE = 2000; // Don't check more than once per 2 seconds
+
+  function throttledClipboardCheck() {
+    const now = Date.now();
+    if (now - lastClipboardCheck < CLIPBOARD_CHECK_THROTTLE) return;
+    lastClipboardCheck = now;
+    checkClipboardForUrls();
+  }
+
+  // Check clipboard when tab becomes visible
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      throttledClipboardCheck();
+    }
+  });
+
+  // Check clipboard when window gains focus
+  window.addEventListener('focus', throttledClipboardCheck);
 
   // Listen for paste anywhere on page
   document.addEventListener('paste', (e) => {
