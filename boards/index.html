@@ -2392,6 +2392,12 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const item = enrichmentQueue.shift();
       console.log('%c[ENRICH] Processing:', 'color: #e74c3c', item.url);
 
+      // Get current link data to check existing image
+      const currentData = load();
+      const currentLink = currentData.links.find(l => l.id === item.linkId);
+      const currentImage = currentLink?.image || null;
+      const forceRefresh = item.forceRefresh || false;
+
       try {
         // Use Supabase's invoke method - handles auth and CORS automatically
         const { data: result, error } = await supabase.functions.invoke('enrich-link', {
@@ -2399,7 +2405,10 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
             url: item.url,
             title: item.title,
             description: item.description,
-            linkId: item.linkId
+            linkId: item.linkId,
+            currentImage: currentImage,
+            skipIfHasImage: !forceRefresh && !!currentImage, // Don't overwrite unless forced
+            forceRefresh: forceRefresh
           }
         });
 
@@ -2414,13 +2423,23 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         const data = load();
         const link = data.links.find(l => l.id === item.linkId);
         if (link) {
+          // Always update content type if we got a good one
           if (result.content_type && result.content_type !== 'unknown') {
             link.content_type = result.content_type;
             link.type_confidence = result.type_confidence;
           }
-          if (result.image_url) {
-            link.image = result.image_url;
-            link.image_source = result.image_source;
+
+          // Only update image if:
+          // 1. Force refresh was requested, OR
+          // 2. We don't have an image and server found one
+          if (result.image_url && result.image_source !== 'preserved') {
+            if (forceRefresh || !link.image) {
+              link.image = result.image_url;
+              link.image_source = result.image_source;
+              console.log('%c[ENRICH] Image updated:', 'color: #27ae60', result.image_url);
+            } else {
+              console.log('%c[ENRICH] Keeping existing image (use Refresh Image to override)', 'color: #f39c12');
+            }
           }
           save(data);
           renderGrid();
@@ -3638,9 +3657,17 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       } else if (actionType === 'refresh-image') {
         const link = getAllLinks().find(l => l.id === id);
         if (link) {
-          toast('Refreshing image...');
-          console.log('%c[REFRESH] Queuing image refresh for:', 'color: #9b59b6; font-weight: bold', link.url);
-          queueImageResolution(id, link.url, link.title, link.description, link.content_type || 'unknown');
+          toast('Refreshing image via AI...');
+          console.log('%c[REFRESH] Force refreshing image for:', 'color: #9b59b6; font-weight: bold', link.url);
+          // Use server enrichment with forceRefresh flag
+          enrichmentQueue.push({
+            linkId: link.id,
+            url: link.url,
+            title: link.title,
+            description: link.description,
+            forceRefresh: true // This will override the existing image
+          });
+          processEnrichmentQueue();
         }
         return;
       } else if (actionType === 'category') {
