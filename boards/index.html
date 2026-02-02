@@ -2738,7 +2738,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
   async function fetchMetadata(url) {
     const domain = extractDomain(url);
-    const meta = { title: domain, description: '', image: null, domain };
+    const meta = { url, title: domain, description: '', image: null, domain };
 
     // Clean URL to remove tracking params (makes fetch faster)
     const fetchUrl = cleanUrl(url);
