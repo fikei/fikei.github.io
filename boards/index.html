@@ -139,6 +139,146 @@
   color: var(--bg);
 }
 
+/* User menu dropdown */
+.user-menu {
+  position: relative;
+}
+
+.user-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  max-width: 200px;
+}
+
+.user-menu__trigger:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.user-menu__trigger::after {
+  content: '▼';
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.user-menu__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu__dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  z-index: 101;
+}
+
+.user-menu__dropdown--visible {
+  display: block;
+}
+
+.user-menu__header {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--subtle);
+}
+
+.user-menu__header-email {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  word-break: break-all;
+}
+
+.user-menu__header-badge {
+  display: inline-block;
+  margin-top: var(--space-1);
+  padding: 2px 6px;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.user-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.user-menu__item:last-child {
+  border-bottom: none;
+}
+
+.user-menu__item:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.user-menu__item--danger {
+  color: #c00;
+}
+
+.user-menu__item--danger:hover {
+  background: #c00;
+  color: var(--bg);
+}
+
+/* Account page */
+.account-section {
+  margin-bottom: var(--space-4);
+}
+
+.account-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
+
+.account-value {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-base);
+  color: var(--fg);
+}
+
+.account-value--mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  word-break: break-all;
+}
+
 /* Auth modal */
 .auth-modal {
   display: none;
@@ -1702,9 +1842,23 @@ body {
 
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
-    <span class="auth-bar__user" id="authUser"></span>
     <button class="share-btn" id="shareBtn" style="display:none;">Share</button>
+    <!-- Logged out state -->
     <button class="auth-bar__btn" id="authBtn">Login</button>
+    <!-- Logged in state -->
+    <div class="user-menu" id="userMenu" style="display:none;">
+      <button class="user-menu__trigger" id="userMenuTrigger">
+        <span class="user-menu__email" id="userMenuEmail"></span>
+      </button>
+      <div class="user-menu__dropdown" id="userMenuDropdown">
+        <div class="user-menu__header">
+          <div class="user-menu__header-email" id="userMenuHeaderEmail"></div>
+          <span class="user-menu__header-badge" id="userMenuBadge" style="display:none;">Admin</span>
+        </div>
+        <button class="user-menu__item" id="userMenuAccount">Account</button>
+        <button class="user-menu__item user-menu__item--danger" id="userMenuLogout">Logout</button>
+      </div>
+    </div>
   </div>
 
   <button class="theme-toggle" id="themeToggle"><div class="theme-toggle__knob"></div></button>
@@ -1860,6 +2014,34 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <button type="submit" class="auth-modal__submit" id="authSubmit">Send Magic Link</button>
       </form>
       <p class="auth-modal__status" id="authStatus"></p>
+    </div>
+  </div>
+
+  <!-- Account Modal -->
+  <div class="modal modal--small" id="accountModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Account</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="modal__body" style="padding: var(--space-4);">
+        <div class="account-section">
+          <label class="account-label">Email</label>
+          <div class="account-value" id="accountEmail"></div>
+        </div>
+        <div class="account-section">
+          <label class="account-label">User ID</label>
+          <div class="account-value account-value--mono" id="accountUserId"></div>
+        </div>
+        <div class="account-section">
+          <label class="account-label">Member Since</label>
+          <div class="account-value" id="accountCreatedAt"></div>
+        </div>
+        <div class="account-section" style="margin-top: var(--space-6);">
+          <button class="auth-bar__btn" id="accountLogout" style="width: 100%;">Logout</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3562,13 +3744,29 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
   // Auth DOM
   const authBar = $('authBar');
-  const authUser = $('authUser');
   const authBtn = $('authBtn');
   const authModal = $('authModal');
   const authForm = $('authForm');
   const authEmail = $('authEmail');
   const authSubmit = $('authSubmit');
   const authStatus = $('authStatus');
+
+  // User menu DOM
+  const userMenu = $('userMenu');
+  const userMenuTrigger = $('userMenuTrigger');
+  const userMenuEmail = $('userMenuEmail');
+  const userMenuDropdown = $('userMenuDropdown');
+  const userMenuHeaderEmail = $('userMenuHeaderEmail');
+  const userMenuBadge = $('userMenuBadge');
+  const userMenuAccount = $('userMenuAccount');
+  const userMenuLogout = $('userMenuLogout');
+
+  // Account modal DOM
+  const accountModal = $('accountModal');
+  const accountEmail = $('accountEmail');
+  const accountUserId = $('accountUserId');
+  const accountCreatedAt = $('accountCreatedAt');
+  const accountLogout = $('accountLogout');
 
   // Progress DOM
   const progressBar = $('progressBar');
@@ -4638,19 +4836,28 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     const shareBtn = $('shareBtn');
     const adminBtn = $('devAdminPanel');
     if (currentUser) {
-      authUser.textContent = currentUser.email;
-      authBtn.textContent = 'Logout';
+      // Hide login button, show user menu
+      authBtn.style.display = 'none';
+      userMenu.style.display = '';
       shareBtn.style.display = '';
-      // Show admin button only for admin users
+
+      // Update user menu content
+      const emailShort = currentUser.email.split('@')[0];
+      userMenuEmail.textContent = emailShort;
+      userMenuHeaderEmail.textContent = currentUser.email;
+
+      // Show admin badge and button for admins
       if (isAdmin()) {
         adminBtn.style.display = '';
-        authUser.innerHTML = currentUser.email + '<span class="admin-badge">Admin</span>';
+        userMenuBadge.style.display = '';
       } else {
         adminBtn.style.display = 'none';
+        userMenuBadge.style.display = 'none';
       }
     } else {
-      authUser.textContent = '';
-      authBtn.textContent = 'Login';
+      // Show login button, hide user menu
+      authBtn.style.display = '';
+      userMenu.style.display = 'none';
       shareBtn.style.display = 'none';
       adminBtn.style.display = 'none';
     }
@@ -5303,12 +5510,8 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
   // Auth event handlers
   authBtn.onclick = () => {
-    if (currentUser) {
-      handleLogout();
-    } else {
-      authModal.classList.add('auth-modal--visible');
-      authEmail.focus();
-    }
+    authModal.classList.add('auth-modal--visible');
+    authEmail.focus();
   };
 
   authForm.onsubmit = (e) => {
@@ -5326,6 +5529,51 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       authSubmit.disabled = false;
     }
   };
+
+  // User menu handlers
+  userMenuTrigger.onclick = (e) => {
+    e.stopPropagation();
+    userMenuDropdown.classList.toggle('user-menu__dropdown--visible');
+  };
+
+  userMenuAccount.onclick = () => {
+    userMenuDropdown.classList.remove('user-menu__dropdown--visible');
+    openAccountModal();
+  };
+
+  userMenuLogout.onclick = () => {
+    userMenuDropdown.classList.remove('user-menu__dropdown--visible');
+    handleLogout();
+  };
+
+  // Close user menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!userMenu.contains(e.target)) {
+      userMenuDropdown.classList.remove('user-menu__dropdown--visible');
+    }
+  });
+
+  // Account modal handlers
+  function openAccountModal() {
+    if (!currentUser) return;
+    accountEmail.textContent = currentUser.email;
+    accountUserId.textContent = currentUser.id;
+    const createdAt = currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }) : 'Unknown';
+    accountCreatedAt.textContent = createdAt;
+    openModal(accountModal);
+  }
+
+  accountLogout.onclick = () => {
+    closeModal(accountModal);
+    handleLogout();
+  };
+
+  accountModal.querySelector('[data-close]')?.addEventListener('click', () => closeModal(accountModal));
+  accountModal.querySelector('.modal__backdrop')?.addEventListener('click', () => closeModal(accountModal));
 
   // ============================================
   // Init
