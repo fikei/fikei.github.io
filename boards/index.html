@@ -279,6 +279,111 @@
   word-break: break-all;
 }
 
+/* Settings row */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--subtle);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row__label {
+  flex: 1;
+}
+
+.settings-row__title {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+
+.settings-row__description {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Username input */
+.username-input-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+}
+
+.username-prefix {
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+
+.username-input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  outline: none;
+}
+
+.username-input::placeholder {
+  color: var(--muted);
+}
+
+.username-status {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  margin-top: var(--space-1);
+  min-height: 16px;
+}
+
+.username-status--error {
+  color: #c00;
+}
+
+.username-status--success {
+  color: #0a0;
+}
+
+.username-status--checking {
+  color: var(--muted);
+}
+
+.username-save-btn {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  width: 100%;
+}
+
+.username-save-btn:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.username-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Auth modal */
 .auth-modal {
   display: none;
@@ -374,17 +479,14 @@
 
 /* Theme toggle */
 .theme-toggle {
-  position: fixed;
-  bottom: var(--space-4);
-  left: var(--space-4);
   width: 32px;
   height: 18px;
   background: transparent;
   border: 1px solid var(--fg);
   cursor: pointer;
-  z-index: 100;
   padding: 2px;
   transition: background 0.2s ease;
+  flex-shrink: 0;
 }
 
 .theme-toggle__knob {
@@ -1856,12 +1958,11 @@ body {
           <span class="user-menu__header-badge" id="userMenuBadge" style="display:none;">Admin</span>
         </div>
         <button class="user-menu__item" id="userMenuAccount">Account</button>
+        <button class="user-menu__item" id="userMenuSettings">Settings</button>
         <button class="user-menu__item user-menu__item--danger" id="userMenuLogout">Logout</button>
       </div>
     </div>
   </div>
-
-  <button class="theme-toggle" id="themeToggle"><div class="theme-toggle__knob"></div></button>
 
   <nav class="filters" id="filters">
     <button class="filter-token filter-token--active" data-category="all">All</button>
@@ -2027,19 +2128,50 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       </div>
       <div class="modal__body" style="padding: var(--space-4);">
         <div class="account-section">
-          <label class="account-label">Email</label>
-          <div class="account-value" id="accountEmail"></div>
+          <label class="account-label">Username</label>
+          <div class="username-input-row">
+            <span class="username-prefix">@</span>
+            <input type="text" class="username-input" id="accountUsername" placeholder="username" maxlength="20">
+          </div>
+          <div class="username-status" id="usernameStatus"></div>
+          <button class="username-save-btn" id="usernameSaveBtn" style="display:none;">Save Username</button>
         </div>
         <div class="account-section">
-          <label class="account-label">User ID</label>
-          <div class="account-value account-value--mono" id="accountUserId"></div>
+          <label class="account-label">Email</label>
+          <div class="account-value" id="accountEmail"></div>
         </div>
         <div class="account-section">
           <label class="account-label">Member Since</label>
           <div class="account-value" id="accountCreatedAt"></div>
         </div>
+        <div class="account-section">
+          <label class="account-label">Logged In From</label>
+          <div class="account-value account-value--mono" id="accountDevice"></div>
+        </div>
         <div class="account-section" style="margin-top: var(--space-6);">
           <button class="auth-bar__btn" id="accountLogout" style="width: 100%;">Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal modal--small" id="settingsModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Settings</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="modal__body" style="padding: var(--space-4);">
+        <div class="settings-row">
+          <div class="settings-row__label">
+            <span class="settings-row__title">Light Mode</span>
+            <span class="settings-row__description">Switch to light theme</span>
+          </div>
+          <button class="theme-toggle" id="themeToggle">
+            <div class="theme-toggle__knob"></div>
+          </button>
         </div>
       </div>
     </div>
@@ -3764,9 +3896,16 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   // Account modal DOM
   const accountModal = $('accountModal');
   const accountEmail = $('accountEmail');
-  const accountUserId = $('accountUserId');
   const accountCreatedAt = $('accountCreatedAt');
+  const accountDevice = $('accountDevice');
   const accountLogout = $('accountLogout');
+  const accountUsername = $('accountUsername');
+  const usernameStatus = $('usernameStatus');
+  const usernameSaveBtn = $('usernameSaveBtn');
+
+  // Settings modal DOM
+  const settingsModal = $('settingsModal');
+  const userMenuSettings = $('userMenuSettings');
 
   // Progress DOM
   const progressBar = $('progressBar');
@@ -4832,6 +4971,20 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   // ============================================
   // Auth Functions
   // ============================================
+  function getDisplayName() {
+    // If username is set, show @username
+    if (currentUsername) {
+      return '@' + currentUsername;
+    }
+    // Otherwise show first name from email (capitalized)
+    if (currentUser?.email) {
+      const emailPrefix = currentUser.email.split('@')[0];
+      // Capitalize first letter
+      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+    }
+    return 'User';
+  }
+
   function updateAuthUI() {
     const shareBtn = $('shareBtn');
     const adminBtn = $('devAdminPanel');
@@ -4841,9 +4994,8 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       userMenu.style.display = '';
       shareBtn.style.display = '';
 
-      // Update user menu content
-      const emailShort = currentUser.email.split('@')[0];
-      userMenuEmail.textContent = emailShort;
+      // Update user menu content - show @username or first name
+      userMenuEmail.textContent = getDisplayName();
       userMenuHeaderEmail.textContent = currentUser.email;
 
       // Show admin badge and button for admins
@@ -4928,6 +5080,13 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   function openShareModal(category = null) {
     if (!currentUser) {
       toast('Login required to share', true);
+      return;
+    }
+
+    // Require username before first share
+    if (!currentUsername) {
+      toast('Set a username before sharing', true);
+      openAccountModal();
       return;
     }
 
@@ -5546,6 +5705,11 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     handleLogout();
   };
 
+  userMenuSettings.onclick = () => {
+    userMenuDropdown.classList.remove('user-menu__dropdown--visible');
+    openModal(settingsModal);
+  };
+
   // Close user menu when clicking outside
   document.addEventListener('click', (e) => {
     if (!userMenu.contains(e.target)) {
@@ -5554,18 +5718,107 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   });
 
   // Account modal handlers
+  // Username storage
+  const USERNAME_KEY = 'boards-username';
+  let currentUsername = localStorage.getItem(USERNAME_KEY) || '';
+
+  function getDeviceInfo() {
+    const ua = navigator.userAgent;
+    let browser = 'Unknown Browser';
+    let os = 'Unknown OS';
+
+    // Detect browser
+    if (ua.includes('Firefox')) browser = 'Firefox';
+    else if (ua.includes('Edg')) browser = 'Edge';
+    else if (ua.includes('Chrome')) browser = 'Chrome';
+    else if (ua.includes('Safari')) browser = 'Safari';
+
+    // Detect OS
+    if (ua.includes('Windows')) os = 'Windows';
+    else if (ua.includes('Mac')) os = 'macOS';
+    else if (ua.includes('Linux')) os = 'Linux';
+    else if (ua.includes('Android')) os = 'Android';
+    else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+    return `${browser} on ${os}`;
+  }
+
+  function validateUsername(username) {
+    if (!username) return { valid: false, error: '' };
+    if (username.length < 3) return { valid: false, error: 'At least 3 characters' };
+    if (username.length > 20) return { valid: false, error: 'Max 20 characters' };
+    if (!/^[a-z]/.test(username)) return { valid: false, error: 'Must start with a letter' };
+    if (!/^[a-z][a-z0-9_]*$/.test(username)) return { valid: false, error: 'Only lowercase letters, numbers, underscores' };
+    return { valid: true };
+  }
+
   function openAccountModal() {
     if (!currentUser) return;
     accountEmail.textContent = currentUser.email;
-    accountUserId.textContent = currentUser.id;
     const createdAt = currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     }) : 'Unknown';
     accountCreatedAt.textContent = createdAt;
+    accountDevice.textContent = getDeviceInfo();
+
+    // Load username
+    accountUsername.value = currentUsername;
+    usernameStatus.textContent = '';
+    usernameStatus.className = 'username-status';
+    usernameSaveBtn.style.display = 'none';
+
     openModal(accountModal);
   }
+
+  // Username input handling
+  accountUsername.oninput = () => {
+    const raw = accountUsername.value;
+    const username = raw.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (username !== raw) accountUsername.value = username;
+
+    const validation = validateUsername(username);
+    if (username && !validation.valid) {
+      usernameStatus.textContent = validation.error;
+      usernameStatus.className = 'username-status username-status--error';
+      usernameSaveBtn.style.display = 'none';
+    } else if (username && username !== currentUsername) {
+      usernameStatus.textContent = 'Username available';
+      usernameStatus.className = 'username-status username-status--success';
+      usernameSaveBtn.style.display = '';
+    } else {
+      usernameStatus.textContent = '';
+      usernameStatus.className = 'username-status';
+      usernameSaveBtn.style.display = 'none';
+    }
+  };
+
+  usernameSaveBtn.onclick = async () => {
+    const username = accountUsername.value.toLowerCase();
+    const validation = validateUsername(username);
+    if (!validation.valid) return;
+
+    usernameSaveBtn.disabled = true;
+    usernameSaveBtn.textContent = 'Saving...';
+
+    try {
+      // Save to localStorage (and could sync to Supabase profiles table)
+      currentUsername = username;
+      localStorage.setItem(USERNAME_KEY, username);
+      usernameStatus.textContent = 'Username saved!';
+      usernameStatus.className = 'username-status username-status--success';
+      usernameSaveBtn.style.display = 'none';
+      updateAuthUI(); // Update user menu
+      toast('Username saved');
+    } catch (e) {
+      usernameStatus.textContent = 'Failed to save';
+      usernameStatus.className = 'username-status username-status--error';
+    } finally {
+      usernameSaveBtn.disabled = false;
+      usernameSaveBtn.textContent = 'Save Username';
+    }
+  };
 
   accountLogout.onclick = () => {
     closeModal(accountModal);
@@ -5574,6 +5827,10 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
 
   accountModal.querySelector('[data-close]')?.addEventListener('click', () => closeModal(accountModal));
   accountModal.querySelector('.modal__backdrop')?.addEventListener('click', () => closeModal(accountModal));
+
+  // Settings modal close handlers
+  settingsModal.querySelector('[data-close]')?.addEventListener('click', () => closeModal(settingsModal));
+  settingsModal.querySelector('.modal__backdrop')?.addEventListener('click', () => closeModal(settingsModal));
 
   // ============================================
   // Init
