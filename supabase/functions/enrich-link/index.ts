@@ -135,7 +135,7 @@ serve(async (req) => {
           type_confidence: typeConfidence,
           image: imageUrl,
           image_source: imageSource,
-          enriched_at: new Date().toISOString()
+          image_resolved_at: new Date().toISOString()
         })
         .eq('id', linkId)
     }
@@ -365,48 +365,116 @@ async function resolvePlatformImage(url: string): Promise<{ url: string, source:
 // Scrape OG image from URL (server-side, no CORS issues)
 async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped' } | null> {
   try {
+    // Use a more browser-like User-Agent to avoid bot blocks
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BoardsBot/1.0; +https://boards.app)'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Cache-Control': 'no-cache'
       }
     })
 
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.log('[scrape] HTTP error:', response.status, 'for', url)
+      return null
+    }
 
     const html = await response.text()
+    const base = new URL(url)
 
-    // Try og:image first
+    // Helper to resolve relative URLs
+    const resolveUrl = (imgUrl: string): string => {
+      if (!imgUrl) return ''
+      if (imgUrl.startsWith('//')) return `https:${imgUrl}`
+      if (imgUrl.startsWith('/')) return `${base.origin}${imgUrl}`
+      if (!imgUrl.startsWith('http')) return `${base.origin}/${imgUrl}`
+      return imgUrl
+    }
+
+    // 1. Try og:image first
     const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i)
       || html.match(/<meta[^>]*content="([^"]+)"[^>]*property="og:image"/i)
 
     if (ogMatch?.[1]) {
-      let imageUrl = ogMatch[1]
-      // Handle relative URLs
-      if (imageUrl.startsWith('/')) {
-        const base = new URL(url)
-        imageUrl = `${base.origin}${imageUrl}`
+      const imageUrl = resolveUrl(ogMatch[1])
+      // Skip if it looks like a logo/placeholder
+      if (!isLikelyLogo(imageUrl)) {
+        console.log('[scrape] Found og:image:', imageUrl)
+        return { url: imageUrl, source: 'scraped' }
       }
-      return { url: imageUrl, source: 'scraped' }
+      console.log('[scrape] Skipping og:image (likely logo):', imageUrl)
     }
 
-    // Try twitter:image
+    // 2. Try twitter:image
     const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]+)"/i)
       || html.match(/<meta[^>]*content="([^"]+)"[^>]*name="twitter:image"/i)
 
     if (twitterMatch?.[1]) {
-      let imageUrl = twitterMatch[1]
-      if (imageUrl.startsWith('/')) {
-        const base = new URL(url)
-        imageUrl = `${base.origin}${imageUrl}`
+      const imageUrl = resolveUrl(twitterMatch[1])
+      if (!isLikelyLogo(imageUrl)) {
+        console.log('[scrape] Found twitter:image:', imageUrl)
+        return { url: imageUrl, source: 'scraped' }
       }
-      return { url: imageUrl, source: 'scraped' }
     }
+
+    // 3. Try JSON-LD structured data (common in Shopify, e-commerce)
+    const jsonLdMatches = html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)
+    for (const match of jsonLdMatches) {
+      try {
+        const jsonLd = JSON.parse(match[1])
+        // Handle Product schema
+        const product = jsonLd['@type'] === 'Product' ? jsonLd : jsonLd['@graph']?.find((item: any) => item['@type'] === 'Product')
+        if (product?.image) {
+          const productImage = Array.isArray(product.image) ? product.image[0] : product.image
+          const imageUrl = typeof productImage === 'string' ? productImage : productImage?.url
+          if (imageUrl && !isLikelyLogo(imageUrl)) {
+            console.log('[scrape] Found JSON-LD product image:', imageUrl)
+            return { url: resolveUrl(imageUrl), source: 'scraped' }
+          }
+        }
+      } catch (e) {
+        // JSON parse error, continue
+      }
+    }
+
+    // 4. Try Shopify CDN pattern (common in Shopify stores)
+    const shopifyMatch = html.match(/https:\/\/cdn\.shopify\.com\/s\/files\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i)
+    if (shopifyMatch?.[0] && !isLikelyLogo(shopifyMatch[0])) {
+      console.log('[scrape] Found Shopify CDN image:', shopifyMatch[0])
+      return { url: shopifyMatch[0], source: 'scraped' }
+    }
+
+    // 5. Try first large image in srcset (common in Next.js sites)
+    const srcsetMatch = html.match(/srcset="([^"]+)"/i)
+    if (srcsetMatch?.[1]) {
+      const srcsetParts = srcsetMatch[1].split(',').map(s => s.trim())
+      // Get the largest image (usually last in srcset)
+      const largestSrc = srcsetParts[srcsetParts.length - 1]?.split(' ')[0]
+      if (largestSrc && !isLikelyLogo(largestSrc)) {
+        console.log('[scrape] Found srcset image:', largestSrc)
+        return { url: resolveUrl(largestSrc), source: 'scraped' }
+      }
+    }
+
+    console.log('[scrape] No suitable image found for:', url)
 
   } catch (e) {
     console.error('[scrape] Error:', e)
   }
 
   return null
+}
+
+// Patterns that indicate a logo/icon rather than product image
+const LOGO_PATTERNS = [
+  /logo/i, /icon/i, /favicon/i, /brand/i, /avatar/i,
+  /placeholder/i, /default/i, /blank/i, /spacer/i,
+  /pixel/i, /1x1/i, /transparent/i, /sprite/i
+]
+
+function isLikelyLogo(url: string): boolean {
+  return LOGO_PATTERNS.some(p => p.test(url))
 }
 
 // Search for image using Unsplash API

@@ -418,7 +418,15 @@ body {
   height: 100%;
   object-fit: cover;
   filter: grayscale(100%) contrast(1.1);
-  transition: filter 0.2s;
+  transition: filter 0.2s, opacity 0.4s ease-in-out;
+}
+
+.grid-item__image--loading {
+  opacity: 0;
+}
+
+.grid-item__image--loaded {
+  opacity: 1;
 }
 
 .grid-item:hover .grid-item__image {
@@ -1875,8 +1883,25 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <!-- Metrics -->
         <div class="admin-panel__section">
           <div class="admin-panel__section-title">Metrics</div>
-          <div class="admin-panel__placeholder">
-            Coming soon: API costs, cache hit rates, error logs
+          <div class="admin-panel__item">
+            <span class="admin-panel__item-label">Image Sources</span>
+            <span class="admin-panel__item-value admin-panel__item-value--wrap" id="adminImageSources">-</span>
+          </div>
+          <div class="admin-panel__item">
+            <span class="admin-panel__item-label">High Confidence (&gt;0.7)</span>
+            <span class="admin-panel__item-value" id="adminHighConfidence">-</span>
+          </div>
+          <div class="admin-panel__item">
+            <span class="admin-panel__item-label">Low Confidence (&lt;0.7)</span>
+            <span class="admin-panel__item-value" id="adminLowConfidence">-</span>
+          </div>
+          <div class="admin-panel__item">
+            <span class="admin-panel__item-label">Cached Domains</span>
+            <span class="admin-panel__item-value" id="adminCachedDomains">-</span>
+          </div>
+          <div class="admin-panel__item">
+            <span class="admin-panel__item-label">Cache Hit Rate</span>
+            <span class="admin-panel__item-value" id="adminCacheHitRate">-</span>
           </div>
         </div>
 
@@ -2348,9 +2373,12 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         } else {
           const img = card.querySelector('.grid-item__image');
           if (img) {
-            img.style.opacity = '0';
+            img.classList.add('grid-item__image--loading');
             img.src = secureImg(imageUrl);
-            img.onload = () => { img.style.opacity = '1'; };
+            img.onload = () => {
+              img.classList.remove('grid-item__image--loading');
+              img.classList.add('grid-item__image--loaded');
+            };
           }
         }
       }
@@ -2443,6 +2471,11 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
           }
           save(data);
           renderGrid();
+
+          // Sync enrichment to Supabase
+          if (currentUser) {
+            await syncLinkToSupabase(link);
+          }
         }
       } catch (e) {
         console.error('%c[ENRICH] Failed:', 'color: #e74c3c', e);
@@ -3030,7 +3063,11 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         category: link.category,
         confidence: link.confidence,
         created_at: link.addedAt,
-        updated_at: link.updatedAt || null
+        updated_at: link.updatedAt || null,
+        // Enrichment fields
+        content_type: link.content_type || null,
+        type_confidence: link.type_confidence || null,
+        image_source: link.image_source || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -3086,6 +3123,32 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     } catch (e) { console.error('[sync] Delete error:', e); }
   }
 
+  // Sync all local data to Supabase
+  async function syncToSupabase() {
+    if (!currentUser) {
+      console.log('[sync] Skipped - not logged in');
+      return;
+    }
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      console.log('[sync] Skipped - no access token');
+      return;
+    }
+
+    const data = load();
+    console.log('[sync] Syncing', data.links.length, 'links to Supabase');
+
+    // Sync all links
+    for (const link of data.links) {
+      await syncLinkToSupabase(link);
+    }
+
+    // Sync order
+    await syncOrderToSupabase(data.linkOrder);
+
+    console.log('[sync] Complete');
+  }
+
   async function fetchFromSupabase() {
     if (!currentUser) return null;
 
@@ -3129,7 +3192,11 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         category: l.category,
         confidence: l.confidence,
         addedAt: l.created_at,
-        updatedAt: l.updated_at
+        updatedAt: l.updated_at,
+        // Enrichment fields from server
+        content_type: l.content_type || null,
+        type_confidence: l.type_confidence || null,
+        image_source: l.image_source || null
       }));
 
       const categories = { uncategorized: { pinned: true } };
@@ -4001,6 +4068,36 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     $('adminWithImages').textContent = `${withImages} (${links.length > 0 ? Math.round(withImages / links.length * 100) : 0}%)`;
     $('adminMissingImages').textContent = missingImages;
     $('adminImageQueue').textContent = imageQueue.length;
+
+    // Metrics - Image source breakdown
+    const sourceCounts = {};
+    links.forEach(l => {
+      if (l.image_source) {
+        sourceCounts[l.image_source] = (sourceCounts[l.image_source] || 0) + 1;
+      }
+    });
+    const sourceBreakdown = Object.entries(sourceCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([s, c]) => `${s}: ${c}`)
+      .join(', ') || 'No sources tracked';
+    $('adminImageSources').textContent = sourceBreakdown;
+
+    // Metrics - Confidence distribution
+    const highConfidence = links.filter(l => l.type_confidence && l.type_confidence >= 0.7).length;
+    const lowConfidence = links.filter(l => l.type_confidence && l.type_confidence < 0.7).length;
+    $('adminHighConfidence').textContent = `${highConfidence} links`;
+    $('adminLowConfidence').textContent = `${lowConfidence} links`;
+
+    // Metrics - Domain cache stats
+    const cachedDomains = Object.keys(domainCache).length;
+    $('adminCachedDomains').textContent = cachedDomains;
+
+    // Calculate cache hit rate from domain cache usage
+    const uniqueDomains = new Set(links.map(l => {
+      try { return new URL(l.url).hostname.replace('www.', ''); } catch { return null; }
+    })).size;
+    const cacheHitRate = uniqueDomains > 0 ? Math.round(cachedDomains / uniqueDomains * 100) : 0;
+    $('adminCacheHitRate').textContent = `${cacheHitRate}% (${cachedDomains}/${uniqueDomains} domains)`;
 
     openModal(adminModal);
   }
