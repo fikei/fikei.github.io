@@ -2370,6 +2370,34 @@ body {
   text-overflow: ellipsis;
 }
 
+.widget-complete__image-wrap--product {
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg) 100%);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-complete__product-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.widget-complete__item--suggestion {
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.widget-complete__item--suggestion:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.widget-complete__item--suggestion:hover .widget-complete__image-wrap--product {
+  border-color: var(--accent);
+}
+
 .widget-complete__item-brand {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -3727,26 +3755,30 @@ Return JSON:
       while (suggestions.length < 3 && extras.length) suggestions.push(extras.shift());
     }
 
+    // Category icons for suggestions
+    const categoryIcons = {
+      tops: '👔', bottoms: '👖', footwear: '👟', accessories: '⌚', outerwear: '🧥',
+      dresses: '👗', unknown: '🛍️'
+    };
+
     let suggestionsHtml = '';
     for (const sug of suggestions.slice(0, 3)) {
       const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
-      // Use Unsplash source for product images based on imageQuery or category
-      const imageQuery = encodeURIComponent(sug.imageQuery || sug.category || 'fashion');
-      const imageUrl = `https://source.unsplash.com/300x300/?${imageQuery}`;
+      const cat = sug.category || 'unknown';
+      const icon = categoryIcons[cat] || '🛍️';
       const brandDisplay = sug.brand ? `<div class="widget-complete__item-brand">${esc(sug.brand)}</div>` : '';
       const priceDisplay = sug.price ? `<span class="widget-complete__item-price">${esc(sug.price)}</span>` : '';
 
       suggestionsHtml += `
-        <div class="widget-complete__item widget-complete__item--suggestion">
-          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__image-wrap">
-            <img class="widget-complete__image" src="${imageUrl}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-            <div class="widget-complete__suggestion-icon" style="display:none;">Shop</div>
-          </a>
+        <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
+          <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+            <span class="widget-complete__product-icon">${icon}</span>
+          </div>
           ${brandDisplay}
           <div class="widget-complete__item-title">${esc(sug.name)}</div>
           <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Shop Now →</a>
-        </div>`;
+          <span class="widget-complete__shop-link">Shop Now →</span>
+        </a>`;
     }
 
     const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
