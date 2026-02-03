@@ -191,25 +191,6 @@ textarea.input {
   min-height: 80px;
 }
 
-/* API Settings */
-.api-settings {
-  border: var(--border-thin) solid var(--border-subtle);
-  padding: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.api-settings summary {
-  cursor: pointer;
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-widest);
-  color: var(--fg-muted);
-}
-
-.api-settings[open] summary {
-  margin-bottom: var(--space-4);
-}
-
 /* ============================================
    Emoji Picker
    ============================================ */
