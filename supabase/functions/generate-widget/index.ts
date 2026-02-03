@@ -623,15 +623,32 @@ Respond with valid JSON only, no markdown or explanation.`
       )
     }
 
-    // Parse the JSON response
+    // Parse the JSON response - handle cases where AI adds preamble text
     let content: any
     try {
       // Clean up potential markdown code blocks
-      const cleanedText = textContent
+      let cleanedText = textContent
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
         .trim()
-      content = JSON.parse(cleanedText)
+
+      // Try direct parse first
+      try {
+        content = JSON.parse(cleanedText)
+      } catch {
+        // If that fails, try to extract JSON from the text
+        // Look for first { and last }
+        const firstBrace = cleanedText.indexOf('{')
+        const lastBrace = cleanedText.lastIndexOf('}')
+
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonStr = cleanedText.substring(firstBrace, lastBrace + 1)
+          console.log('[generate-widget] Extracted JSON from position', firstBrace, 'to', lastBrace)
+          content = JSON.parse(jsonStr)
+        } else {
+          throw new Error('No valid JSON object found')
+        }
+      }
     } catch (parseError) {
       console.error('[generate-widget] Failed to parse AI response:', textContent)
       return new Response(
