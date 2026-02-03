@@ -14,27 +14,72 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Enrich suggestions with shopping URLs and category images
-function enrichSuggestions(suggestions: any[]): any[] {
-  return suggestions.map((sug) => {
-    const searchQuery = sug.searchQuery || sug.name
-    const imageQuery = sug.imageQuery || sug.category || 'clothing'
+// Scrape product image from Bing Images
+async function scrapeProductImage(query: string): Promise<string | null> {
+  try {
+    const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query + ' product')}&first=1`
 
-    // Create Google Shopping search URL
-    const productUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      }
+    })
 
-    // Use Unsplash Source for category images (no API key needed)
-    // Add random seed to get different images
-    const seed = Math.random().toString(36).substring(7)
-    const productImage = `https://source.unsplash.com/400x400/?${encodeURIComponent(imageQuery)}&sig=${seed}`
-
-    return {
-      ...sug,
-      productUrl,
-      productImage,
-      vendor: sug.brand
+    if (!response.ok) {
+      console.log('[scrape] Bing search failed:', response.status)
+      return null
     }
-  })
+
+    const html = await response.text()
+
+    // Bing embeds image URLs in murl parameter or data attributes
+    const patterns = [
+      /murl&quot;:&quot;(https?:\/\/[^&]+\.(?:jpg|jpeg|png|webp)[^&]*)&quot;/i,
+      /murl":"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i,
+      /data-src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i,
+      /src="(https?:\/\/tse\d+\.mm\.bing\.net\/[^"]+)"/i,
+    ]
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern)
+      if (match && match[1]) {
+        const imageUrl = match[1].replace(/\\u002f/g, '/').replace(/&amp;/g, '&')
+        console.log('[scrape] Found image for:', query)
+        return imageUrl
+      }
+    }
+
+    console.log('[scrape] No image found for:', query)
+    return null
+  } catch (error) {
+    console.error('[scrape] Error:', error)
+    return null
+  }
+}
+
+// Enrich suggestions with shopping URLs and scraped images
+async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
+  const enriched = await Promise.all(
+    suggestions.map(async (sug) => {
+      const searchQuery = sug.searchQuery || sug.name
+
+      // Create Google Shopping search URL
+      const productUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`
+
+      // Scrape actual product image
+      const productImage = await scrapeProductImage(searchQuery)
+
+      return {
+        ...sug,
+        productUrl,
+        productImage,
+        vendor: sug.brand
+      }
+    })
+  )
+  return enriched
 }
 
 // Types for widget generation
@@ -173,9 +218,9 @@ Respond with valid JSON only, no markdown or explanation.`
       )
     }
 
-    // For complete-the-look widget, enrich suggestions with shopping URLs and images
+    // For complete-the-look widget, enrich suggestions with shopping URLs and scraped images
     if (widgetId === 'complete-the-look' && content.suggestions && Array.isArray(content.suggestions)) {
-      content.suggestions = enrichSuggestions(content.suggestions)
+      content.suggestions = await enrichSuggestions(content.suggestions)
     }
 
     // Cache the result
