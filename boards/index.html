@@ -3770,6 +3770,8 @@ Return JSON:
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
+    console.log('[widget] generateWidgets() called, currentFilter:', currentFilter);
+
     const heroSection = $('widgetSection');
     const heroContent = $('widgetContent');
     const footerSection = $('widgetFooter');
@@ -3782,6 +3784,7 @@ Return JSON:
 
     // Only show widgets when filtering to 'wear' category
     if (currentFilter !== 'wear') {
+      console.log('[widget] Not wear category, skipping widgets');
       renderGrid(); // Re-render grid without inline widgets
       return;
     }
