@@ -594,6 +594,7 @@
 
 #### Story: AI Image Generation
 > As a system, I want to generate images when other methods fail.
+> As a system, I want to generate images when other methods fail, following category-specific rules and global visual style guidelines.
 
 **Tasks:**
 - [ ] Integrate DALL-E or Stable Diffusion API
@@ -601,6 +602,26 @@
 - [ ] Apply visual guidelines to prompts
 - [ ] Store generated images in Supabase Storage
 - [ ] Add generation as final pipeline step for appropriate types
+
+**Category-Specific Generation Rules:**
+- [ ] Define image rules per category (products, articles, places, etc.)
+- [ ] Products (wear/home/use): Always show the actual product, clean background, studio-style lighting
+- [ ] Food (eat): Show the dish/restaurant, warm inviting colors
+- [ ] Places (go): Show location/destination, establish atmosphere
+- [ ] Articles (read): Abstract/editorial style, typography-forward
+- [ ] People (follow): Portrait or signature style of creator
+- [ ] Video/Music (watch): Key frame or album art style
+- [ ] Create `category_image_rules` config table
+- [ ] Apply rules to generation prompt construction
+- [ ] Validate generated images against category expectations
+- [ ] Re-generate if validation fails (max 2 retries)
+
+**Global Visual Style Guidelines Integration:**
+- [ ] Pull from `visual_guidelines` config for consistent aesthetic
+- [ ] Apply color palette constraints
+- [ ] Apply composition rules (minimal, editorial, clean)
+- [ ] Apply mood/tone guidelines
+- [ ] Ensure brand consistency across all generated images
 
 #### Story: Manual Image Override
 > As a user, I want to replace any auto-selected image.
@@ -615,6 +636,20 @@
 - [ ] Save override and mark source as 'uploaded'
 
 ### Phase 3: Improvement
+
+> As a developer, I want to track and analyze images that fail to render to improve the resolution system.
+
+**Tasks:**
+- [ ] Create `image_resolution_log` table (url, timestamp, strategy_tried, result, error_reason)
+- [ ] Log all image resolution attempts with outcomes
+- [ ] Track blank/failed images separately with error details
+- [ ] Build diagnostic dashboard showing failure patterns
+- [ ] Categorize failures (CORS, 404, timeout, blocked, invalid format)
+- [ ] Identify domains with high failure rates
+- [ ] Generate weekly failure report for review
+- [ ] Auto-create issues/tasks for recurring failures
+- [ ] Implement retry queue for temporary failures
+- [ ] Add alerting for sudden failure rate spikes
 
 #### Story: Strategy Performance Tracking
 > As a system, I want to track which image strategies work well.

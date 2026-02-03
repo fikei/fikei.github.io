@@ -14,6 +14,7 @@
 
 body {
   font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   background: var(--bg);
@@ -33,6 +34,7 @@ body {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -106,6 +108,7 @@ body {
   width: 100%;
   padding: var(--space-3);
   font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-sm);
   background: var(--bg);
   color: var(--fg);
@@ -167,6 +170,7 @@ body {
   align-items: center;
   padding: var(--space-1) var(--space-3);
   font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
@@ -244,6 +248,7 @@ body {
 .toast {
   padding: var(--space-3) var(--space-4);
   font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   background: var(--fg);
   color: var(--bg);
@@ -293,7 +298,7 @@ body {
   top: var(--space-4);
   left: 50%;
   transform: translateX(-50%);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   color: var(--fg);
   background: var(--bg);
@@ -389,7 +394,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
 }
@@ -427,7 +432,7 @@ body {
 
 .tab {
   padding: var(--space-3) var(--space-4);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -464,7 +469,7 @@ body {
   background: transparent;
   border: var(--border-thin) solid var(--border);
   color: var(--fg);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -512,7 +517,7 @@ body {
 }
 
 .user-menu__header-email {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   color: var(--fg);
   word-break: break-all;
@@ -524,7 +529,7 @@ body {
   padding: 2px 6px;
   background: var(--fg);
   color: var(--bg);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -538,7 +543,7 @@ body {
   border: none;
   border-bottom: var(--border-thin) solid var(--border-subtle);
   color: var(--fg);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -575,7 +580,7 @@ body {
 
 .account-label {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
@@ -590,7 +595,7 @@ body {
 }
 
 .account-value--mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   word-break: break-all;
 }
@@ -620,7 +625,7 @@ body {
 
 .filter-token {
   flex-shrink: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
@@ -670,7 +675,7 @@ body {
 .text-lg { font-size: var(--text-lg); }
 .text-xl { font-size: var(--text-xl); }
 
-.text-mono { font-family: var(--font-mono); }
+.text-mono { font-family: var(--font-primary); }
 .text-serif { font-family: var(--font-serif); }
 .text-sans { font-family: var(--font-sans); }
 
