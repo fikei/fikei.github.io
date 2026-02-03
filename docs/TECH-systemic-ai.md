@@ -571,16 +571,17 @@ POST /functions/v1/systemic-analyze
 
 ## Quick Start Commands
 
+**Production URL:** https://ctrl.rodeo/systemic/
+
 ```bash
 # Start local development
 cd /home/user/fikei.github.io
-# Open systemic/index.html in browser
+python3 -m http.server 8000
+# Open http://localhost:8000/systemic/
 
 # Deploy Supabase functions
 cd supabase
-supabase functions deploy systemic-audit
 supabase functions deploy systemic-analyze
-supabase functions deploy systemic-export
 
 # Run database migrations
 supabase db push
