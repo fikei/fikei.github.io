@@ -4178,6 +4178,10 @@ Return JSON:
     });
     saveWidgetCache();
 
+    // Show loading state immediately by clearing inline widget
+    inlineWidgetHtml = '';
+    renderGrid(); // Clears old widget from grid
+
     // Reset mutex and re-generate widgets
     widgetGenerationInProgress = false;
     await generateWidgets();
