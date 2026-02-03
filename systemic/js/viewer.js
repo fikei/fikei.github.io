@@ -105,8 +105,38 @@ class DesignSystemViewer {
    */
   load(designSystem) {
     this.designSystem = designSystem;
+
+    // Auto-consolidate old design systems that have raw components
+    this.ensureConsolidated();
+
     this.renderNavigation();
     this.showDefaultView();
+  }
+
+  /**
+   * Ensure components are consolidated (for backward compatibility with old data)
+   */
+  ensureConsolidated() {
+    const components = this.designSystem?.components || [];
+    if (components.length === 0) return;
+
+    // Check if already consolidated (consolidated components have 'variants' array)
+    const firstComponent = components[0];
+    if (firstComponent.variants && Array.isArray(firstComponent.variants)) {
+      // Already consolidated
+      return;
+    }
+
+    // Need to consolidate - these are raw components
+    console.log('[Viewer] Consolidating legacy component data...');
+
+    if (typeof ComponentConsolidator !== 'undefined') {
+      const consolidator = new ComponentConsolidator();
+      this.designSystem.components = consolidator.consolidate(components);
+      console.log(`[Viewer] Consolidated ${components.length} raw components into ${this.designSystem.components.length} types`);
+    } else {
+      console.warn('[Viewer] ComponentConsolidator not available, displaying raw components');
+    }
   }
 
   /**
