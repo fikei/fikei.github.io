@@ -809,234 +809,402 @@ validateStyleMatch({ userStyle, suggestion })
 
 ---
 
-## Epic: AI Widget System
+## Epic: Generative Widget Ecosystem
 
-> AI-powered widgets that analyze user collections and generate personalized recommendations.
+> Fully automated widget system that determines what widgets exist, what content populates them, and how they improve over time.
+> **PRD:** [docs/PRD-generative-widget-ecosystem.md](docs/PRD-generative-widget-ecosystem.md)
 > **Tech Spec:** [docs/TECH-ai-widget-system.md](docs/TECH-ai-widget-system.md)
 > **Architecture:** [docs/ARCH-ai-widget-pipeline.md](docs/ARCH-ai-widget-pipeline.md)
 
-### Story: AI Widget Generator ✓ COMPLETE (Foundation)
-> As a user, I want AI-powered widgets that analyze my saved items and suggest complementary products.
+### Phase Overview
+
+| Phase | Name | Automation Level | Status |
+|-------|------|------------------|--------|
+| **0** | Deterministic MVP | Very Low | 🔧 In Progress |
+| **1** | Rule-Driven Automation | Low-Medium | 📋 Planned |
+| **2** | Config-Generated Widgets | Medium-High | 📋 Planned |
+| **3** | Self-Selecting Widgets | High | 📋 Planned |
+| **4** | Self-Optimizing System | Full | 📋 Planned |
+
+---
+
+### Phase 0: Deterministic MVP 🔧 IN PROGRESS
+
+> Establish complete end-to-end pipeline with minimal automation and maximum control.
+> **Goal:** Prove feasibility, validate architecture, establish control baseline.
+
+#### What Phase 0 Delivers
+- `wear` category only
+- 2 widgets: **Complete the Look** (done) + **Style Definition** (not started)
+- Widgets always generate when conditions met
+- Fixed templates and layouts
+- No confidence scoring
+
+#### Story: Widget Infrastructure ✓ COMPLETE
+> Core pipeline for AI-powered widgets.
 
 **What's Built:**
-- Edge Function: `supabase/functions/generate-widget/index.ts`
-- Widget Registry pattern for defining new widgets
-- Multi-zone layout (hero, inline, footer placement)
-- Client-side caching with refresh counter
-- Server-side caching (in-memory)
-- Widget feedback collection (ratings, comments, preferences)
+- [x] Edge Function: `supabase/functions/generate-widget/index.ts`
+- [x] Widget Registry pattern (client-side)
+- [x] Multi-zone layout (hero, inline, footer)
+- [x] Client + server caching
+- [x] Widget feedback collection (basic)
+- [x] Brand validation layer (47+ brands)
+- [x] Brand-category constraints (prevent hallucinations)
+- [x] JSON parsing (handles AI preamble)
+- [x] Per-widget state isolation
 
-**Current Widgets:**
+#### Story: Complete the Look Widget ✓ COMPLETE
+> Suggests complementary clothing/accessories for outfits.
 
-| Widget | Status | Category | Description |
-|--------|--------|----------|-------------|
-| **Complete the Look** | ✅ Active | wear | Suggests complementary clothing/accessories for outfits |
+**Status:** Active but images broken
+- [x] AI generates complementary suggestions (not variants)
+- [x] Prompt engineering for category exclusion
+- [x] Brand replacement for unsupported suggestions
+- [ ] **BLOCKER: Product images not loading**
 
-**Widget Roadmap:**
+#### Story: Fix Image Pipeline ← BLOCKING
+> Images not appearing due to bot protection on brand sites.
 
-| Widget | Priority | Category | Description |
-|--------|----------|----------|-------------|
-| **Style Summary** | P2 | wear | AI-generated outfit analysis and style profile |
-| **Brand Discovery** | P2 | wear/home | Find similar brands to your favorites |
-| **Price Tracker** | P3 | all | Predict sale timing for saved items |
-| **Recipe Pairings** | P3 | eat | Suggest recipes based on saved restaurants/ingredients |
-| **Trip Planner** | P3 | go | Build itineraries from saved places |
+**Investigation:**
+- [ ] Set up Supabase CLI for local debugging
+- [ ] Check Edge Function logs for scraping errors
+- [ ] Test Shopify API endpoints directly
+- [ ] Identify which brands work vs fail
 
-**Completed Tasks:**
-- [x] Edge Function with Claude 3 Haiku integration
-- [x] Brand registry (47+ brands with scraping configs)
-- [x] Brand validation layer (detect & replace unsupported brands)
-- [x] Brand-category constraints (prevent hallucinations like "Bellroy belt")
-- [x] JSON response parsing (handles AI preamble text)
-- [x] Image scraping pipeline (Shopify API → HTML scrape → fallback)
-- [x] Client-side widget registry with criteria matching
-- [x] Per-widget refresh (not global refresh)
-- [x] Widget duplication fix (clear before regenerate)
-- [x] Prompt engineering for complementary suggestions (not variants)
+**Solutions (pick one):**
+- [ ] Add SERP API integration (~$50/month, most reliable)
+- [ ] Use proxy service for scraping
+- [ ] Pre-populate image cache
+- [ ] AI-generated product mockups (last resort)
 
-**Known Issues:**
-- [ ] Product images not loading (scraping blocked by bot protection) ← IN PROGRESS
-- [ ] Need SERP API for reliable image fetching
-
-### Story: Supabase CLI Setup ← HIGH PRIORITY
-> As a developer, I want local Supabase development for faster iteration.
+#### Story: Supabase CLI Setup ← HIGH PRIORITY
+> Local development for faster iteration.
 
 **Tasks:**
-- [ ] Install Supabase CLI: `npm install -g supabase`
+- [ ] Install: `npm install -g supabase`
 - [ ] Login: `supabase login`
-- [ ] Link project: `supabase link --project-ref <ref>`
-- [ ] Serve functions locally: `supabase functions serve`
-- [ ] Set up local environment variables
-- [ ] Test Edge Functions locally before deploy
-- [ ] Add deployment scripts to package.json
+- [ ] Link: `supabase link --project-ref <ref>`
+- [ ] Serve: `supabase functions serve`
+- [ ] Test Edge Functions locally
 
-### Story: Debug Image Scraping Pipeline ← IN PROGRESS
-> As a developer, I want to understand why product images aren't appearing.
-
-**Investigation Steps:**
-- [ ] Check Edge Function logs in Supabase dashboard for `[shopify]` and `[scrape]` messages
-- [ ] Verify `productImage` is being returned in API response (check client console)
-- [ ] Test Shopify API endpoints directly (curl from local machine)
-- [ ] Identify which brands are returning images vs null
-- [ ] Consider SERP API as more reliable alternative
-
-**Potential Root Causes:**
-- Shopify stores may be blocking Edge Function requests (different IP/region)
-- Rate limiting from brand websites
-- Cloudflare/bot protection blocking scraping attempts
-- JSON response structure changed on Shopify endpoints
-
-**Possible Solutions:**
-- [ ] Add SERP API integration (Google Custom Search) for reliable product images
-- [ ] Use a proxy service for scraping requests
-- [ ] Pre-populate image cache with known products
-- [ ] Fall back to AI-generated product mockups
-
-### Story: Brand Intelligence Service
-> As a system, I want centralized brand knowledge and validation.
-> **See:** [ARCH-ai-widget-pipeline.md#layer-4-brand-intelligence-service](docs/ARCH-ai-widget-pipeline.md#layer-4-brand-intelligence-service)
+#### Story: Style Definition Widget
+> AI-generated outfit analysis and style profile.
 
 **Tasks:**
-- [ ] Extract brand logic into dedicated service module
-- [ ] Implement `findBrand()` with keyword matching
-- [ ] Implement `isSupportedBrand()` validation
-- [ ] Implement `getSimilarBrands()` for alternatives
-- [ ] Implement `getBrandsForCategory()` mapping
-- [ ] Add brand health tracking (success rates)
-- [ ] Build admin dashboard for brand management
+- [ ] Define widget in registry
+- [ ] Create prompt for style analysis
+- [ ] Design output schema (style attributes, confidence)
+- [ ] Build renderer component
+- [ ] Test with various board compositions
 
-### Story: Dynamic Brand Discovery
-> As a system, I want to learn brands from user's board and find similar ones.
+#### Phase 0 Exit Criteria
+- [ ] Both widgets render correctly on eligible boards
+- [ ] Images load reliably (>90% success rate)
+- [ ] No console errors in production
+- [ ] Basic feedback collection working
+
+---
+
+### Phase 1: Rule-Driven Automation 📋 PLANNED
+
+> Automate widget eligibility using explicit rules. Widgets must "earn" existence.
+
+#### What Phase 1 Delivers
+- Widgets generate **conditionally**, not by default
+- Confidence thresholds introduced
+- Widgets can fail eligibility and not render
+- Eligibility decisions are logged
+
+#### Story: Widget Eligibility System
+> Widgets only appear when they add value.
 
 **Tasks:**
-- [ ] Extract brands from user's saved URLs (domain analysis)
-- [ ] Find similar brands via embeddings/AI
-- [ ] Validate scrapeability before adding to suggestions
-- [ ] Filter unsupported brands from prompt
-- [ ] Cache discovered brands per user
-- [ ] A/B test personalized vs generic brand lists
+- [ ] Define eligibility rules per widget type
+  - Min/max items
+  - Category match
+  - Content quality signals
+- [ ] Implement eligibility checker
+- [ ] Add "widget skipped" logging with reasons
+- [ ] Show debug info in admin panel
 
-### Story: Image Resolution Pipeline Abstraction
-> As a system, I want a pluggable strategy pattern for image fetching.
-> **See:** [ARCH-ai-widget-pipeline.md#layer-5-image-resolution-pipeline](docs/ARCH-ai-widget-pipeline.md#layer-5-image-resolution-pipeline)
+#### Story: Confidence Scoring
+> AI responses include confidence, used for filtering.
+
+**Tasks:**
+- [ ] Add confidence field to AI response schema
+- [ ] Update prompts to request confidence scores
+- [ ] Implement confidence threshold (default 0.7)
+- [ ] Low-confidence widgets don't render
+- [ ] Track confidence distribution over time
+
+#### Story: Widget Suppression
+> Don't show widgets that would be low quality.
+
+**Tasks:**
+- [ ] Define suppression rules
+- [ ] Implement graceful non-rendering
+- [ ] Log suppression events
+- [ ] Show "no widget" as valid state in UI
+
+#### Phase 1 Exit Criteria
+- [ ] Widgets appear only when relevant
+- [ ] Confidence scores logged for all generations
+- [ ] Suppression rate tracked (target: 10-30%)
+
+---
+
+### Phase 2: Config-Generated Widgets 📋 PLANNED
+
+> Remove hard-coded widget logic. Widgets defined in configuration, not code.
+
+#### What Phase 2 Delivers
+- Widget definitions are **declarative YAML/JSON**
+- Adding new widget = adding config file (no code)
+- Category-agnostic matching
+- Template selection automated
+
+#### Story: Widget Definition Schema
+> Declarative format for widget configuration.
+
+**Schema Design:**
+```yaml
+widget:
+  id: complete-the-look
+  eligibility:
+    min_items: 2
+    categories: [wear]
+    confidence_threshold: 0.7
+  generation:
+    model: claude-3-haiku
+    prompt_template: prompts/complete-the-look.md
+    constraints: [no_same_category, supported_brands_only]
+  enrichment:
+    strategies: [shopify_api, serp_api, placeholder]
+  rendering:
+    zone: inline
+    template: two-column-suggestions
+```
+
+**Tasks:**
+- [ ] Design schema specification
+- [ ] Build schema validator
+- [ ] Create config loader
+- [ ] Migrate existing widgets to config format
+
+#### Story: Category-Agnostic Matching
+> Same widget logic works across categories.
+
+**Tasks:**
+- [ ] Abstract category-specific logic
+- [ ] Build category inference from content
+- [ ] Test Complete the Look on `home` category
+- [ ] Test on `eat` category (recipe pairings)
+
+#### Story: Template Selection Engine
+> System chooses appropriate template based on content.
+
+**Tasks:**
+- [ ] Define template capabilities
+- [ ] Build template matcher
+- [ ] Implement fallback templates
+- [ ] A/B test template selection
+
+#### Phase 2 Exit Criteria
+- [ ] New widget created in <1 hour (config only)
+- [ ] Same widget works across 2+ categories
+- [ ] Zero widget-specific code in main codebase
+
+---
+
+### Phase 3: Self-Selecting Widgets 📋 PLANNED
+
+> System decides which widget types are most relevant without being told.
+
+#### What Phase 3 Delivers
+- Multiple **candidate widgets** generated
+- Widgets compete on confidence × relevance
+- Only strongest widgets render
+- Different boards show different widget mixes
+
+#### Story: Candidate Generation
+> Generate multiple widget options, pick best.
+
+**Tasks:**
+- [ ] Generate N candidate widgets per board
+- [ ] Score each candidate
+- [ ] Select top K for rendering
+- [ ] Log all candidates (rendered + rejected)
+
+#### Story: Ranking System
+> Score widgets on multiple dimensions.
+
+**Scoring Dimensions:**
+- Confidence (AI certainty)
+- Relevance (match to board content)
+- Novelty (not shown recently)
+- Performance (historical engagement)
+
+**Tasks:**
+- [ ] Implement multi-factor scoring
+- [ ] Weight tuning interface
+- [ ] A/B test different weightings
+
+#### Story: Slot Allocation
+> Limited screen real estate, allocate wisely.
+
+**Tasks:**
+- [ ] Define slot inventory per zone
+- [ ] Implement allocation algorithm
+- [ ] Handle ties and edge cases
+- [ ] Respect user preferences (favorites, hidden)
+
+#### Phase 3 Exit Criteria
+- [ ] Widget mix varies by board content
+- [ ] Engagement +20% vs static allocation
+- [ ] No manual widget selection required
+
+---
+
+### Phase 4: Self-Optimizing System 📋 PLANNED
+
+> Continuous improvement without manual tuning.
+
+#### What Phase 4 Delivers
+- System learns which widgets perform well
+- Poor performers degrade/disappear
+- Thresholds auto-adjust
+- New widget forms can emerge
+
+#### Story: Engagement Tracking
+> Measure what users do with widgets.
+
+**Signals:**
+- Clicks (strong positive)
+- Saves (very strong positive)
+- Dismissals (negative)
+- Time visible (passive positive)
+- Scroll past without interaction (weak negative)
+
+**Tasks:**
+- [ ] Implement event tracking
+- [ ] Build engagement dashboard
+- [ ] Calculate per-widget metrics
+- [ ] Historical trend analysis
+
+#### Story: Automated Threshold Tuning
+> System adjusts its own parameters.
+
+**Tasks:**
+- [ ] Define tunable parameters
+- [ ] Implement auto-tuning algorithm
+- [ ] Add guardrails (min/max bounds)
+- [ ] Log all threshold changes
+
+#### Story: Widget Lifecycle Management
+> Widgets have states: emerging → stable → deprecated.
+
+**Tasks:**
+- [ ] Define lifecycle states
+- [ ] Implement state transitions
+- [ ] Auto-deprecate underperformers
+- [ ] Surface emerging winners
+
+#### Phase 4 Exit Criteria
+- [ ] System self-corrects within 24 hours
+- [ ] No manual threshold tuning for 30+ days
+- [ ] Widget quality improves month-over-month
+
+---
+
+### Infrastructure (Spans All Phases)
+
+These systems support the widget ecosystem across all phases.
+
+#### Story: Validation Engine ⚡ P0 - FOUNDATIONAL
+> Generic real-time validation framework. See [Validation Engine Epic](#epic-validation-engine--p0---foundational).
+
+#### Story: Taste Profiling & Discovery Balance ⚡ P1
+> Personalize without filter bubbles. 70/30 familiar:discovery ratio.
+
+**Tasks - Core Profiling:**
+- [ ] Extract brand preferences from saved links
+- [ ] Extract price tier signals
+- [ ] Extract style attributes via AI
+- [ ] Scope profiles by category (never mix wear/eat)
+- [ ] Confidence threshold (min 5 items to personalize)
+
+**Tasks - Filter Bubble Mitigation:**
+- [ ] 70% personalized, 30% discovery default
+- [ ] Diversity requirements (2+ price tiers)
+- [ ] Serendipity injection (1-2 wild cards)
+- [ ] "Surprise Me" discovery mode toggle
+- [ ] Profile transparency (show what we inferred)
+- [ ] Profile editing (user corrections)
+
+**Tasks - Implementation:**
+- [ ] Create `user_taste_profile` table
+- [ ] Build `TasteProfiler` service
+- [ ] Integrate with PromptBuilder
+- [ ] Track personalization effectiveness
+- [ ] A/B test personalized vs generic
+
+#### Story: Brand Intelligence Service
+> Centralized brand knowledge and validation.
+
+**Tasks:**
+- [ ] Extract brand logic into dedicated module
+- [ ] `findBrand()` with keyword matching
+- [ ] `isSupportedBrand()` validation
+- [ ] `getSimilarBrands()` for alternatives
+- [ ] `getBrandsForCategory()` mapping
+- [ ] Brand health tracking (success rates)
+- [ ] Admin dashboard for brand management
+
+#### Story: Image Resolution Pipeline
+> Pluggable strategy pattern for image fetching.
 
 **Tasks:**
 - [ ] Define `ImageStrategy` interface
-- [ ] Implement ShopifyApiStrategy (primary)
-- [ ] Implement HtmlScrapeStrategy (fallback)
-- [ ] Implement GoogleShoppingStrategy (last resort)
-- [ ] Add SerpApiStrategy (new - more reliable)
-- [ ] Implement strategy chain with fallback
-- [ ] Add per-strategy success tracking
+- [ ] ShopifyApiStrategy (primary)
+- [ ] SerpApiStrategy (reliable fallback)
+- [ ] HtmlScrapeStrategy (last resort)
+- [ ] Strategy chain with automatic fallback
+- [ ] Per-strategy success tracking
 - [ ] Auto-disable failing strategies
 
-### Story: Prompt Engineering Framework
-> As a developer, I want structured prompt building with constraints.
-> **See:** [ARCH-ai-widget-pipeline.md#layer-2-prompt-engineering-framework](docs/ARCH-ai-widget-pipeline.md#layer-2-prompt-engineering-framework)
+#### Story: Prompt Engineering Framework
+> Structured prompt building with constraints.
 
 **Tasks:**
-- [ ] Create PromptBuilder class
-- [ ] Implement `.base()` for template
-- [ ] Implement `.addBrandConstraint()`
-- [ ] Implement `.addCategoryConstraint()`
-- [ ] Implement `.addStyleConstraint()`
-- [ ] Implement `.requireJson()` with schema
-- [ ] Add prompt versioning and A/B testing
-- [ ] Track prompt performance metrics
+- [ ] Create `PromptBuilder` class
+- [ ] `.addBrandConstraint()`
+- [ ] `.addCategoryConstraint()`
+- [ ] `.addStyleConstraint()`
+- [ ] `.addTasteConstraints()`
+- [ ] `.requireJson(schema)`
+- [ ] Prompt versioning
+- [ ] Performance tracking
 
-### Story: Response Parser & Validator
-> As a system, I want robust parsing of AI responses.
-> **See:** [ARCH-ai-widget-pipeline.md#layer-3-response-parser--validator](docs/ARCH-ai-widget-pipeline.md#layer-3-response-parser--validator)
+#### Story: Response Parser & Validator
+> Robust parsing of AI responses.
 
 **Tasks:**
 - [ ] Extract JSON from text with preamble
 - [ ] Remove markdown code blocks
 - [ ] Schema validation with Zod
-- [ ] Detailed error messages for debugging
 - [ ] Auto-retry on parse failure
-- [ ] Log malformed responses for analysis
+- [ ] Log malformed responses
 
-### Story: User-Customizable Prompts
-> As a user, I want to personalize AI suggestions.
-
-**Tasks:**
-- [ ] Build preferences UI (budget, brands, style)
-- [ ] Merge user prefs with base prompt
-- [ ] Hide technical prompt details
-- [ ] Preview suggestions with new prefs
-- [ ] A/B test personalized prompts
-
-### Story: Scraping Health Monitor
-> As an admin, I want to track scraping success rates.
+#### Story: Widget A/B Testing Framework
+> Test different widget configurations.
 
 **Tasks:**
-- [ ] Record success/failure per brand
-- [ ] Calculate rolling success rates
-- [ ] Alert on degraded health
-- [ ] Auto-disable brands below threshold
-- [ ] Build admin dashboard for monitoring
-- [ ] Weekly health report emails
-
-### Story: Widget A/B Testing Framework
-> As a product manager, I want to test different widget configurations.
-
-**Tasks:**
-- [ ] Define experiment structure (variants, weights)
-- [ ] Random variant assignment per user
-- [ ] Track engagement metrics per variant
+- [ ] Define experiment structure
+- [ ] Random variant assignment
+- [ ] Track engagement per variant
 - [ ] Statistical significance calculation
 - [ ] Winner auto-promotion
-- [ ] Admin UI for experiment management
-
-### Story: Taste Profiling & Discovery Balance ⚡ P1
-> As a system, I want to personalize AI suggestions based on user preferences while avoiding filter bubbles.
-
-**Why This Matters:**
-Users' saved links reveal preferences: brands, price tiers, aesthetics, categories. Using this to shape AI suggestions improves relevance—but naive personalization creates echo chambers. This story implements taste profiling with built-in diversity and discovery mechanisms.
-
-**Where Taste Profiling Helps:**
-- "Complete the Look" widgets: Suggest brands matching user's existing style
-- Brand Discovery: Find similar brands to user's favorites
-- Search Enhancement: Bias results toward user's aesthetic
-- Category Recommendations: Prioritize price tier/quality level user prefers
-
-**Filter Bubble Risks:**
-- Echo chamber: Only showing familiar brands/styles
-- Category bleeding: Wear taste affecting food suggestions
-- Sparse data: Over-personalizing from few signals
-- Staleness: Preferences change but profile doesn't
-
-**Tasks - Core Profiling:**
-- [ ] Extract brand preferences from user's saved links (domain analysis)
-- [ ] Extract price tier signals (luxury/mid/budget based on brands)
-- [ ] Extract style attributes via AI (minimalist, maximalist, streetwear, etc.)
-- [ ] Scope profiles by category (wear/eat/go/use - never mix)
-- [ ] Set confidence threshold (min 5 items in category to personalize)
-- [ ] Refresh profiles on new saves (incremental, not full recalc)
-
-**Tasks - Filter Bubble Mitigation:**
-- [ ] **Familiar:Discovery ratio**: 70% personalized, 30% discovery by default
-- [ ] **Diversity requirements**: Never suggest same brand twice, require 2+ price tiers
-- [ ] **Serendipity injection**: 1-2 "wild card" suggestions from outside user's profile
-- [ ] **Discovery mode toggle**: User can flip to "Surprise Me" for 100% discovery
-- [ ] **Profile transparency**: Show user what we inferred ("We think you like X, Y, Z")
-- [ ] **Profile editing**: Let user correct/remove inferred preferences
-- [ ] **Recency weighting**: Recent saves weighted higher than old ones
-- [ ] **Anti-staleness**: Decay profile strength over time without new signals
-
-**Tasks - Implementation:**
-- [ ] Create `user_taste_profile` table in Supabase
-- [ ] Build `TasteProfiler` service with `extractProfile()` and `getPersonalizedConstraints()`
-- [ ] Integrate with PromptBuilder: `.addTasteConstraints(profile, discoveryRatio)`
-- [ ] Add "Discovery Mode" toggle to widget settings
-- [ ] Track personalization effectiveness (do personalized suggestions get clicked more?)
-- [ ] A/B test personalized vs generic suggestions
-- [ ] Build profile viewer in user settings
-
-**Validation Engine Integration:**
-- [ ] Use ValidationEngine to track personalization effectiveness
-- [ ] Auto-disable taste profiling for users where it decreases engagement
-- [ ] Track discovery suggestion performance separately
 
 ---
 
