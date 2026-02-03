@@ -747,12 +747,16 @@ const BRANDS = [
 // Find brand config by keyword match
 function findBrandConfig(brandName: string, productName: string): typeof BRANDS[0] | null {
   const searchText = `${brandName} ${productName}`.toLowerCase()
+  console.log(`[findBrand] Looking for brand in: "${searchText}"`)
 
   for (const brand of BRANDS) {
-    if (brand.keywords.some(kw => searchText.includes(kw))) {
+    const matchedKeyword = brand.keywords.find(kw => searchText.includes(kw))
+    if (matchedKeyword) {
+      console.log(`[findBrand] MATCH! Found "${matchedKeyword}" -> ${brand.name}`)
       return brand
     }
   }
+  console.log(`[findBrand] NO MATCH found for: "${searchText}"`)
   return null
 }
 
@@ -761,7 +765,8 @@ async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise
   const searchUrl = brand.searchUrl(query)
 
   try {
-    console.log(`[scrape] Trying ${brand.name}: ${query}`)
+    console.log(`[scrape] Trying ${brand.name}: "${query}"`)
+    console.log(`[scrape] URL: ${searchUrl}`)
 
     const response = await fetch(searchUrl, {
       headers: {
@@ -771,15 +776,25 @@ async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise
       }
     })
 
+    console.log(`[scrape] ${brand.name} response status: ${response.status}`)
+
     if (!response.ok) {
-      console.log(`[scrape] ${brand.name} failed:`, response.status)
+      console.log(`[scrape] ${brand.name} failed with status: ${response.status}`)
       return { image: null, url: searchUrl }
     }
 
     const html = await response.text()
+    console.log(`[scrape] ${brand.name} HTML length: ${html.length} chars`)
+
+    // Check if we got a real page or redirect/block
+    if (html.length < 1000) {
+      console.log(`[scrape] ${brand.name} HTML too short, might be blocked. First 500 chars:`, html.substring(0, 500))
+    }
 
     // Try each pattern
-    for (const pattern of brand.imagePatterns) {
+    for (let i = 0; i < brand.imagePatterns.length; i++) {
+      const pattern = brand.imagePatterns[i]
+      console.log(`[scrape] ${brand.name} trying pattern ${i}: ${pattern.toString().substring(0, 50)}...`)
       const match = html.match(pattern)
       if (match && match[1]) {
         let imageUrl = match[1]
@@ -787,15 +802,21 @@ async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise
           imageUrl = 'https:' + imageUrl
         }
         imageUrl = imageUrl.replace(/&amp;/g, '&')
-        console.log(`[scrape] Found image from ${brand.name}`)
+        console.log(`[scrape] ${brand.name} FOUND IMAGE with pattern ${i}: ${imageUrl.substring(0, 100)}...`)
         return { image: imageUrl, url: searchUrl }
+      } else {
+        console.log(`[scrape] ${brand.name} pattern ${i} no match`)
       }
     }
 
-    console.log(`[scrape] No image found on ${brand.name}`)
+    // Log a sample of src attributes we DID find
+    const srcMatches = html.match(/src="([^"]+)"/gi)?.slice(0, 5) || []
+    console.log(`[scrape] ${brand.name} sample src attributes found:`, srcMatches)
+
+    console.log(`[scrape] ${brand.name} NO IMAGE FOUND after trying all patterns`)
     return { image: null, url: searchUrl }
   } catch (error) {
-    console.error(`[scrape] ${brand.name} error:`, error)
+    console.error(`[scrape] ${brand.name} EXCEPTION:`, error.message || error)
     return { image: null, url: searchUrl }
   }
 }
@@ -820,13 +841,23 @@ async function scrapeProductImage(brandName: string, query: string): Promise<{ i
 
 // Enrich suggestions with scraped images from brand websites
 async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
+  console.log('[enrich] Starting enrichment for', suggestions.length, 'suggestions')
+  console.log('[enrich] Raw AI suggestions:', JSON.stringify(suggestions, null, 2))
+
   const enriched = await Promise.all(
-    suggestions.map(async (sug) => {
+    suggestions.map(async (sug, index) => {
       const searchQuery = sug.searchQuery || sug.name
       const brandName = sug.brand || ''
 
+      console.log(`[enrich ${index}] Processing: "${sug.name}"`)
+      console.log(`[enrich ${index}] - brand from AI: "${brandName}"`)
+      console.log(`[enrich ${index}] - searchQuery from AI: "${searchQuery}"`)
+      console.log(`[enrich ${index}] - AI gave us these fields:`, Object.keys(sug))
+
       // Scrape image from brand website, get product URL
       const result = await scrapeProductImage(brandName, searchQuery)
+
+      console.log(`[enrich ${index}] - scrape result: image=${result.image ? 'YES' : 'NULL'}, url=${result.url}`)
 
       return {
         ...sug,
@@ -836,6 +867,14 @@ async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
       }
     })
   )
+
+  console.log('[enrich] Final enriched suggestions:', JSON.stringify(enriched.map(s => ({
+    name: s.name,
+    brand: s.brand,
+    productImage: s.productImage ? s.productImage.substring(0, 50) + '...' : null,
+    productUrl: s.productUrl
+  })), null, 2))
+
   return enriched
 }
 
