@@ -705,6 +705,117 @@
 
 ---
 
+## Epic: AI Widget System
+
+> AI-powered widgets that analyze user collections and generate personalized recommendations.
+> **Tech Spec:** [docs/TECH-ai-widget-system.md](docs/TECH-ai-widget-system.md)
+
+### Story: Supabase CLI Setup ← HIGH PRIORITY
+> As a developer, I want local Supabase development for faster iteration.
+
+**Tasks:**
+- [ ] Install Supabase CLI: `npm install -g supabase`
+- [ ] Login: `supabase login`
+- [ ] Link project: `supabase link --project-ref <ref>`
+- [ ] Serve functions locally: `supabase functions serve`
+- [ ] Set up local environment variables
+- [ ] Test Edge Functions locally before deploy
+- [ ] Add deployment scripts to package.json
+
+### Story: Brand Intelligence Service
+> As a system, I want centralized brand knowledge and validation.
+
+**Tasks:**
+- [ ] Extract brand logic into dedicated service module
+- [ ] Implement `findBrand()` with keyword matching
+- [ ] Implement `isSupportedBrand()` validation
+- [ ] Implement `getSimilarBrands()` for alternatives
+- [ ] Implement `getBrandsForCategory()` mapping
+- [ ] Add brand health tracking (success rates)
+- [ ] Build admin dashboard for brand management
+
+### Story: Dynamic Brand Discovery
+> As a system, I want to learn brands from user's board and find similar ones.
+
+**Tasks:**
+- [ ] Extract brands from user's saved URLs (domain analysis)
+- [ ] Find similar brands via embeddings/AI
+- [ ] Validate scrapeability before adding to suggestions
+- [ ] Filter unsupported brands from prompt
+- [ ] Cache discovered brands per user
+- [ ] A/B test personalized vs generic brand lists
+
+### Story: Image Resolution Pipeline Abstraction
+> As a system, I want a pluggable strategy pattern for image fetching.
+
+**Tasks:**
+- [ ] Define `ImageStrategy` interface
+- [ ] Implement ShopifyApiStrategy (primary)
+- [ ] Implement HtmlScrapeStrategy (fallback)
+- [ ] Implement GoogleShoppingStrategy (last resort)
+- [ ] Add SerpApiStrategy (new - more reliable)
+- [ ] Implement strategy chain with fallback
+- [ ] Add per-strategy success tracking
+- [ ] Auto-disable failing strategies
+
+### Story: Prompt Engineering Framework
+> As a developer, I want structured prompt building with constraints.
+
+**Tasks:**
+- [ ] Create PromptBuilder class
+- [ ] Implement `.base()` for template
+- [ ] Implement `.addBrandConstraint()`
+- [ ] Implement `.addCategoryConstraint()`
+- [ ] Implement `.addStyleConstraint()`
+- [ ] Implement `.requireJson()` with schema
+- [ ] Add prompt versioning and A/B testing
+- [ ] Track prompt performance metrics
+
+### Story: Response Parser & Validator
+> As a system, I want robust parsing of AI responses.
+
+**Tasks:**
+- [ ] Extract JSON from text with preamble
+- [ ] Remove markdown code blocks
+- [ ] Schema validation with Zod
+- [ ] Detailed error messages for debugging
+- [ ] Auto-retry on parse failure
+- [ ] Log malformed responses for analysis
+
+### Story: User-Customizable Prompts
+> As a user, I want to personalize AI suggestions.
+
+**Tasks:**
+- [ ] Build preferences UI (budget, brands, style)
+- [ ] Merge user prefs with base prompt
+- [ ] Hide technical prompt details
+- [ ] Preview suggestions with new prefs
+- [ ] A/B test personalized prompts
+
+### Story: Scraping Health Monitor
+> As an admin, I want to track scraping success rates.
+
+**Tasks:**
+- [ ] Record success/failure per brand
+- [ ] Calculate rolling success rates
+- [ ] Alert on degraded health
+- [ ] Auto-disable brands below threshold
+- [ ] Build admin dashboard for monitoring
+- [ ] Weekly health report emails
+
+### Story: Widget A/B Testing Framework
+> As a product manager, I want to test different widget configurations.
+
+**Tasks:**
+- [ ] Define experiment structure (variants, weights)
+- [ ] Random variant assignment per user
+- [ ] Track engagement metrics per variant
+- [ ] Statistical significance calculation
+- [ ] Winner auto-promotion
+- [ ] Admin UI for experiment management
+
+---
+
 ## Epic: Generative UI
 
 ### Story: Generative UI Widgets v1
