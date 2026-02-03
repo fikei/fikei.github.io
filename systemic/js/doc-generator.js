@@ -8,6 +8,7 @@ class DocGenerator {
     this.config = {
       aiEnabled: config.aiEnabled !== false,
       supabaseUrl: config.supabaseUrl || '',
+      supabaseKey: config.supabaseKey || '',
       ...config
     };
   }
@@ -491,7 +492,9 @@ Include the design tokens in your project:
       const response = await fetch(`${this.config.supabaseUrl}/functions/v1/systemic-analyze`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'apikey': this.config.supabaseKey,
+          'Authorization': `Bearer ${this.config.supabaseKey}`
         },
         body: JSON.stringify({
           componentType: type,

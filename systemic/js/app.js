@@ -3,28 +3,26 @@
  * Design System Generator powered by AI
  */
 
+// Supabase Configuration
+const SUPABASE_URL = 'https://atdqdfpdeytfuvvpsasz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0ZHFkZnBkZXl0ZnV2dnBzYXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwODQzOTYsImV4cCI6MjA4NTY2MDM5Nn0.NHtQPeXM-xMC6MTTBRh6ETpmnUAsrfb2h7LAi0Y19M4';
+
 class SystemicApp {
   constructor() {
+    this.supabaseUrl = SUPABASE_URL;
+    this.supabaseKey = SUPABASE_ANON_KEY;
     this.crawler = null;
     this.tokenMapper = new TokenMapper();
     this.docGenerator = new DocGenerator({
       aiEnabled: true,
-      supabaseUrl: this.getSupabaseUrl()
+      supabaseUrl: SUPABASE_URL,
+      supabaseKey: SUPABASE_ANON_KEY
     });
     this.viewer = null;
     this.currentAudit = null;
     this.designSystems = [];
 
     this.init();
-  }
-
-  /**
-   * Get Supabase URL from environment
-   */
-  getSupabaseUrl() {
-    // This would typically come from environment variables
-    // For now, return empty to disable AI features
-    return '';
   }
 
   /**
