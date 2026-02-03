@@ -13,6 +13,7 @@ class SystemicApp {
     this.supabaseKey = SUPABASE_ANON_KEY;
     this.crawler = null;
     this.tokenMapper = new TokenMapper();
+    this.componentConsolidator = new ComponentConsolidator();
     this.docGenerator = new DocGenerator({
       aiEnabled: true,
       supabaseUrl: SUPABASE_URL,
@@ -519,14 +520,33 @@ class SystemicApp {
         hasSpacing: !!tokens?.spacing
       });
 
-      // Log components detail
-      this.debugLog('COMPONENTS', `Found ${results.components?.length || 0} components`);
+      // Log raw components detail
+      this.debugLog('COMPONENTS', `Found ${results.components?.length || 0} raw components`);
       if (results.components?.length > 0) {
         const componentTypes = {};
         results.components.forEach(c => {
           componentTypes[c.type] = (componentTypes[c.type] || 0) + 1;
         });
-        this.debugLog('COMPONENTS', 'Component types:', componentTypes);
+        this.debugLog('COMPONENTS', 'Raw component types:', componentTypes);
+
+        // Consolidate components
+        this.auditStatusText.textContent = 'Consolidating components...';
+        this.addLogEntry({ type: 'info', message: 'Consolidating components by type and variant...' });
+
+        const consolidatedComponents = this.componentConsolidator.consolidate(results.components);
+
+        this.debugLog('COMPONENTS', `Consolidated into ${consolidatedComponents.length} component types`);
+        consolidatedComponents.forEach(comp => {
+          this.debugLog('COMPONENTS', `  - ${comp.name}: ${comp.variants.length} variants, ${comp.totalUsage} usages`);
+        });
+
+        // Replace raw components with consolidated ones
+        results.components = consolidatedComponents;
+
+        this.addLogEntry({
+          type: 'success',
+          message: `Consolidated into ${consolidatedComponents.length} component types`
+        });
       } else {
         this.debugLog('COMPONENTS', 'WARNING: No components were detected!');
         this.addLogEntry({ type: 'warning', message: 'No components detected - check console for details' });
