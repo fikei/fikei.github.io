@@ -2370,6 +2370,15 @@ body {
   text-overflow: ellipsis;
 }
 
+.widget-complete__item-brand {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-top: var(--space-1);
+}
+
 .widget-complete__item-reason {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -2378,6 +2387,29 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.widget-complete__item-price {
+  font-weight: 600;
+  color: var(--fg);
+  font-style: normal;
+}
+
+.widget-complete__refresh {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
+}
+
+.widget-complete__refresh:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .widget-complete__shop-link {
@@ -3234,9 +3266,9 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   const WIDGET_REGISTRY = {
     'complete-the-look': {
       id: 'complete-the-look',
-      version: '2.0',
+      version: '3.0',
       name: 'Complete the Look',
-      description: 'Finds items in your collection that work together, then suggests complementary items to purchase.',
+      description: 'Finds items in your collection that work together, then suggests specific products to purchase.',
       status: 'active',
       zone: 'inline', // Appears between cards
       criteria: {
@@ -3245,21 +3277,35 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         maxItems: null,
         itemTypes: ['product']
       },
-      prompt: `You are a fashion stylist. Analyze these clothing/accessory items and:
+      prompt: `You are a fashion stylist and shopping expert. Analyze these clothing/accessory items and:
 1. Find 2-3 items from the list that work well together as a partial outfit
-2. Based on the STYLE, COLORS, and AESTHETIC of those items, suggest 2-3 NEW specific items the user should BUY to complete the look
+2. Based on the STYLE, COLORS, and AESTHETIC of those items, suggest 2-3 SPECIFIC REAL PRODUCTS the user should BUY
 
-Be SPECIFIC with suggestions - include brand style, color, and material that matches their existing items.
-For example: "Navy wool overcoat" not just "coat", "White minimalist leather sneakers" not just "sneakers".
+IMPORTANT: For suggestions, provide REAL product recommendations with:
+- Actual brand names (Nike, Uniqlo, Zara, Common Projects, A.P.C., etc.)
+- Specific product names when possible
+- Color and material details
+- A simple image search term (just the product type, e.g., "white sneakers", "navy chinos", "leather watch")
 
-Consider: color harmony, style consistency (casual/formal/streetwear), outfit composition (tops, bottoms, shoes, accessories).
+Examples of good suggestions:
+- "Common Projects Achilles Low White" with imageQuery "white leather sneakers"
+- "Uniqlo Ultra Light Down Jacket Navy" with imageQuery "navy puffer jacket"
+- "Timex Weekender Watch" with imageQuery "minimalist watch tan strap"
 
 Return JSON:
 {
   "matchedItems": ["item_id1", "item_id2"],
-  "reasoning": "Why these items work together",
+  "reasoning": "Brief explanation of why these items work together",
   "suggestions": [
-    {"name": "Specific item name with color/style", "category": "tops|bottoms|footwear|accessories|outerwear", "searchQuery": "detailed google shopping search query", "reason": "Why this completes the look"}
+    {
+      "name": "Brand + Product Name + Color",
+      "brand": "Brand name",
+      "price": "$XX-$XXX estimate",
+      "category": "tops|bottoms|footwear|accessories|outerwear",
+      "imageQuery": "simple image search term",
+      "searchQuery": "google shopping search query",
+      "reason": "Why this completes the look"
+    }
   ]
 }`,
       template: {
@@ -3565,14 +3611,22 @@ Return JSON:
     let suggestionsHtml = '';
     for (const sug of suggestions.slice(0, 3)) {
       const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
+      // Use Unsplash source for product images based on imageQuery or category
+      const imageQuery = encodeURIComponent(sug.imageQuery || sug.category || 'fashion');
+      const imageUrl = `https://source.unsplash.com/300x300/?${imageQuery}`;
+      const brandDisplay = sug.brand ? `<div class="widget-complete__item-brand">${esc(sug.brand)}</div>` : '';
+      const priceDisplay = sug.price ? `<span class="widget-complete__item-price">${esc(sug.price)}</span>` : '';
+
       suggestionsHtml += `
         <div class="widget-complete__item widget-complete__item--suggestion">
           <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__image-wrap">
-            <div class="widget-complete__suggestion-icon">Shop</div>
+            <img class="widget-complete__image" src="${imageUrl}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="widget-complete__suggestion-icon" style="display:none;">Shop</div>
           </a>
+          ${brandDisplay}
           <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.reason || '')}</div>
-          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Search →</a>
+          <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Shop Now →</a>
         </div>`;
     }
 
@@ -3580,10 +3634,13 @@ Return JSON:
       dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'From your collection';
 
     return `
-      <div class="widget-complete">
+      <div class="widget-complete" data-widget-id="${widget.id}">
         <div class="widget-complete__header">
-          <span class="widget-complete__title">${widget.name}</span>
-          <span class="widget-complete__subtitle">${subtitle}</span>
+          <div>
+            <span class="widget-complete__title">${widget.name}</span>
+            <span class="widget-complete__subtitle">${subtitle}</span>
+          </div>
+          <button class="widget-complete__refresh" onclick="refreshWidget('${widget.id}')" title="Get new suggestions">↻ Refresh</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
@@ -3760,6 +3817,22 @@ Return JSON:
     // Re-render grid to inject inline widgets
     renderGrid();
   }
+
+  // Refresh a specific widget (called from widget refresh button)
+  window.refreshWidget = async function(widgetId) {
+    console.log('[widget] Refreshing widget:', widgetId);
+
+    // Clear cache for this specific widget
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const cacheKey = getCacheKey(widgetId, items.map(i => i.id));
+
+    delete widgetCache[cacheKey];
+    saveWidgetCache();
+
+    // Re-generate widgets
+    await generateWidgets();
+  };
 
   // Widget refresh button handler
   function initWidgetSystem() {
