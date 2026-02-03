@@ -240,6 +240,508 @@ const BRANDS = [
     ],
     keywords: ['seiko', 'presage', 'prospex', 'skx']
   },
+  // Streetwear
+  {
+    name: 'Stüssy',
+    searchUrl: (q: string) => `https://www.stussy.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['stussy', 'stüssy']
+  },
+  {
+    name: 'Palace',
+    searchUrl: (q: string) => `https://www.palaceskateboards.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['palace']
+  },
+  {
+    name: 'BAPE',
+    searchUrl: (q: string) => `https://us.bape.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['bape', 'a bathing ape', 'bathing ape']
+  },
+  {
+    name: 'Kith',
+    searchUrl: (q: string) => `https://kith.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['kith']
+  },
+  {
+    name: 'Noah',
+    searchUrl: (q: string) => `https://noahny.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['noah']
+  },
+  {
+    name: 'Aimé Leon Dore',
+    searchUrl: (q: string) => `https://www.aimeleondore.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['aime leon dore', 'aimé leon dore', 'ald']
+  },
+  {
+    name: 'Awake NY',
+    searchUrl: (q: string) => `https://awakenyclothing.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['awake ny', 'awake']
+  },
+  {
+    name: 'Brain Dead',
+    searchUrl: (q: string) => `https://wearebraindead.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['brain dead', 'braindead']
+  },
+  // Japanese Brands
+  {
+    name: 'WTAPS',
+    searchUrl: (q: string) => `https://www.wtaps.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+wtaps[^"]+\.jpg[^"]*)"/i,
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['wtaps']
+  },
+  {
+    name: 'Neighborhood',
+    searchUrl: (q: string) => `https://www.neighborhood.jp/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+neighborhood[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['neighborhood', 'nbhd']
+  },
+  {
+    name: 'Kapital',
+    searchUrl: (q: string) => `https://www.kapital-webshop.jp/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+kapital[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['kapital']
+  },
+  {
+    name: 'Visvim',
+    searchUrl: (q: string) => `https://www.visvim.tv/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+visvim[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['visvim']
+  },
+  {
+    name: 'Undercover',
+    searchUrl: (q: string) => `https://undercoverism.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+undercover[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['undercover', 'undercoverism']
+  },
+  {
+    name: 'Comme des Garçons',
+    searchUrl: (q: string) => `https://shop.doverstreetmarket.com/search?q=${encodeURIComponent(q + ' comme des garcons')}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['comme des garcons', 'cdg', 'comme des garçons']
+  },
+  {
+    name: 'Sacai',
+    searchUrl: (q: string) => `https://www.sacai.jp/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+sacai[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['sacai']
+  },
+  {
+    name: 'Needles',
+    searchUrl: (q: string) => `https://www.needles.jp/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+needles[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['needles', 'nepenthes']
+  },
+  // Scandinavian / European
+  {
+    name: 'Norse Projects',
+    searchUrl: (q: string) => `https://www.norseprojects.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['norse projects', 'norse']
+  },
+  {
+    name: 'Our Legacy',
+    searchUrl: (q: string) => `https://www.ourlegacy.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['our legacy']
+  },
+  {
+    name: 'Arket',
+    searchUrl: (q: string) => `https://www.arket.com/en_usd/search.html?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+arket[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['arket']
+  },
+  {
+    name: 'GANNI',
+    searchUrl: (q: string) => `https://www.ganni.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+ganni[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['ganni']
+  },
+  // Contemporary Designer
+  {
+    name: 'Lemaire',
+    searchUrl: (q: string) => `https://www.lemaire.fr/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['lemaire']
+  },
+  {
+    name: 'Jil Sander',
+    searchUrl: (q: string) => `https://www.jilsander.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+jilsander[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['jil sander']
+  },
+  {
+    name: 'Maison Margiela',
+    searchUrl: (q: string) => `https://www.maisonmargiela.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+margiela[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['margiela', 'maison margiela', 'mmm']
+  },
+  {
+    name: 'Rick Owens',
+    searchUrl: (q: string) => `https://www.rickowens.eu/en-US/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+rickowens[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['rick owens', 'drkshdw']
+  },
+  {
+    name: 'Ami Paris',
+    searchUrl: (q: string) => `https://www.amiparis.com/us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+amiparis[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['ami', 'ami paris']
+  },
+  // DTC / Modern Basics
+  {
+    name: 'Everlane',
+    searchUrl: (q: string) => `https://www.everlane.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+everlane[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['everlane']
+  },
+  {
+    name: 'Outlier',
+    searchUrl: (q: string) => `https://outlier.nyc/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['outlier']
+  },
+  {
+    name: 'Reigning Champ',
+    searchUrl: (q: string) => `https://reigningchamp.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['reigning champ']
+  },
+  {
+    name: 'Todd Snyder',
+    searchUrl: (q: string) => `https://www.toddsnyder.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['todd snyder']
+  },
+  {
+    name: 'Buck Mason',
+    searchUrl: (q: string) => `https://www.buckmason.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['buck mason']
+  },
+  {
+    name: 'Taylor Stitch',
+    searchUrl: (q: string) => `https://www.taylorstitch.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['taylor stitch']
+  },
+  {
+    name: 'Alex Mill',
+    searchUrl: (q: string) => `https://www.alexmill.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['alex mill']
+  },
+  {
+    name: 'Corridor',
+    searchUrl: (q: string) => `https://corridornyc.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['corridor']
+  },
+  // Specialty Footwear
+  {
+    name: 'Dr. Martens',
+    searchUrl: (q: string) => `https://www.drmartens.com/us/en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+drmartens[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['dr martens', 'dr. martens', 'doc martens', '1460', '1461']
+  },
+  {
+    name: 'Birkenstock',
+    searchUrl: (q: string) => `https://www.birkenstock.com/us/search/?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+birkenstock[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['birkenstock', 'boston', 'arizona']
+  },
+  {
+    name: 'Clarks',
+    searchUrl: (q: string) => `https://www.clarks.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+clarks[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['clarks', 'desert boot', 'wallabee']
+  },
+  {
+    name: 'Paraboot',
+    searchUrl: (q: string) => `https://www.paraboot.com/en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+paraboot[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['paraboot', 'michael', 'chambord']
+  },
+  {
+    name: 'Blundstone',
+    searchUrl: (q: string) => `https://www.blundstone.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+blundstone[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['blundstone']
+  },
+  {
+    name: 'Red Wing',
+    searchUrl: (q: string) => `https://www.redwingshoes.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+redwing[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['red wing', 'iron ranger', 'moc toe']
+  },
+  // Premium Denim
+  {
+    name: 'Naked & Famous',
+    searchUrl: (q: string) => `https://www.nakedandfamousdenim.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['naked and famous', 'naked & famous', 'n&f']
+  },
+  {
+    name: '3sixteen',
+    searchUrl: (q: string) => `https://www.3sixteen.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['3sixteen']
+  },
+  {
+    name: 'Iron Heart',
+    searchUrl: (q: string) => `https://www.ironheartamerica.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['iron heart']
+  },
+  {
+    name: 'Nudie Jeans',
+    searchUrl: (q: string) => `https://www.nudiejeans.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+nudiejeans[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['nudie', 'nudie jeans']
+  },
+  {
+    name: 'orSlow',
+    searchUrl: (q: string) => `https://www.orslow.jp/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+orslow[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['orslow', 'or slow']
+  },
+  // Bags & Accessories
+  {
+    name: 'Porter-Yoshida',
+    searchUrl: (q: string) => `https://www.yoshidakaban.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+yoshida[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['porter', 'porter-yoshida', 'yoshida', 'tanker']
+  },
+  {
+    name: 'Topo Designs',
+    searchUrl: (q: string) => `https://topodesigns.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['topo designs', 'topo']
+  },
+  {
+    name: 'Cotopaxi',
+    searchUrl: (q: string) => `https://www.cotopaxi.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+cotopaxi[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['cotopaxi']
+  },
+  {
+    name: 'Bellroy',
+    searchUrl: (q: string) => `https://bellroy.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+bellroy[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['bellroy']
+  },
+  // Eyewear
+  {
+    name: 'Warby Parker',
+    searchUrl: (q: string) => `https://www.warbyparker.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+warbyparker[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['warby parker', 'warby']
+  },
+  {
+    name: 'Moscot',
+    searchUrl: (q: string) => `https://moscot.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['moscot', 'lemtosh', 'miltzen']
+  },
+  {
+    name: 'Garrett Leight',
+    searchUrl: (q: string) => `https://www.garrettleight.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['garrett leight', 'glco']
+  },
+  // Jewelry / Small Accessories
+  {
+    name: 'Miansai',
+    searchUrl: (q: string) => `https://www.miansai.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['miansai']
+  },
+  {
+    name: 'Vitaly',
+    searchUrl: (q: string) => `https://www.vitalydesign.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['vitaly']
+  },
+  // Athletic / Performance (more niche)
+  {
+    name: 'On Running',
+    searchUrl: (q: string) => `https://www.on-running.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+on-running[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['on running', 'on cloud', 'cloudmonster']
+  },
+  {
+    name: 'Satisfy Running',
+    searchUrl: (q: string) => `https://www.satisfyrunning.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['satisfy', 'satisfy running']
+  },
+  {
+    name: 'District Vision',
+    searchUrl: (q: string) => `https://districtvision.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['district vision']
+  },
+  // More Outdoor / Technical
+  {
+    name: 'Snow Peak',
+    searchUrl: (q: string) => `https://www.snowpeak.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+snowpeak[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['snow peak', 'snowpeak']
+  },
+  {
+    name: 'And Wander',
+    searchUrl: (q: string) => `https://www.andwander.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+andwander[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['and wander']
+  },
+  {
+    name: 'Goldwin',
+    searchUrl: (q: string) => `https://www.goldwin.us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+goldwin[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['goldwin']
+  },
+  // Socks / Underwear DTC
+  {
+    name: 'Anonymous Ism',
+    searchUrl: (q: string) => `https://anonymousism.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['anonymous ism']
+  },
+  {
+    name: 'Stance',
+    searchUrl: (q: string) => `https://www.stance.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+stance[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['stance']
+  },
 ]
 
 // Find brand config by keyword match
