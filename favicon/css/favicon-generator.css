@@ -1,22 +1,6 @@
 /* ============================================
-   Favicon Generator Styles
+   Favicon Generator - CTRL Design System
    ============================================ */
-
-/* Reset & Base */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-primary);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-  min-height: 100vh;
-}
 
 /* App Container */
 .favicon-app {
@@ -44,16 +28,17 @@ body {
 }
 
 .logo {
+  font-family: var(--font-serif);
   font-size: var(--text-xl);
-  font-weight: 600;
+  font-weight: normal;
   letter-spacing: var(--tracking-wide);
   margin: 0;
 }
 
 .tagline {
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--fg-muted);
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-widest);
   text-transform: uppercase;
 }
 
@@ -93,15 +78,16 @@ body {
 }
 
 .section-header h2 {
+  font-family: var(--font-serif);
   font-size: var(--text-2xl);
-  font-weight: 600;
+  font-weight: normal;
   margin: 0 0 var(--space-2) 0;
-  letter-spacing: var(--tracking-wide);
 }
 
 .section-header p {
   color: var(--fg-muted);
   margin: 0;
+  font-size: var(--text-xs);
 }
 
 /* ============================================
@@ -109,32 +95,34 @@ body {
    ============================================ */
 .mode-tabs {
   display: flex;
-  gap: var(--space-1);
+  gap: var(--space-2);
   margin-bottom: var(--space-6);
-  border-bottom: var(--border-thin) solid var(--border-subtle);
-  padding-bottom: var(--space-3);
 }
 
 .mode-tab {
-  background: none;
-  border: none;
-  color: var(--fg-muted);
-  font-family: var(--font-primary);
-  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
   padding: var(--space-2) var(--space-4);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  background: transparent;
+  color: var(--fg-muted);
+  border: var(--border-thin) solid var(--border-subtle);
   cursor: pointer;
-  transition: color var(--duration-fast), border-color var(--duration-fast);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -14px;
+  transition: all var(--duration-normal) var(--ease-default);
 }
 
 .mode-tab:hover {
   color: var(--fg);
+  border-color: var(--border);
 }
 
 .mode-tab.active {
-  color: var(--fg);
-  border-bottom-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
 }
 
 /* ============================================
@@ -164,10 +152,10 @@ body {
 }
 
 .form-group label {
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-widest);
   color: var(--fg-muted);
 }
 
@@ -182,22 +170,7 @@ body {
   gap: var(--space-4);
 }
 
-/* Input overrides */
-.input {
-  background: var(--bg);
-  border: var(--border-thin) solid var(--border-subtle);
-  color: var(--fg);
-  font-family: var(--font-primary);
-  font-size: var(--text-sm);
-  padding: var(--space-2) var(--space-3);
-  transition: border-color var(--duration-fast);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--fg);
-}
-
+/* Input extensions */
 .input-lg {
   font-size: var(--text-xl);
   padding: var(--space-4);
@@ -227,9 +200,9 @@ textarea.input {
 
 .api-settings summary {
   cursor: pointer;
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-widest);
   color: var(--fg-muted);
 }
 
@@ -250,7 +223,7 @@ textarea.input {
 }
 
 .emoji-btn {
-  font-size: 20px;
+  font-size: 18px;
   padding: var(--space-2);
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -286,6 +259,7 @@ textarea.input {
 
 .upload-zone p {
   margin: 0 0 var(--space-2) 0;
+  font-size: var(--text-xs);
 }
 
 .upload-preview {
@@ -328,9 +302,10 @@ textarea.input {
 }
 
 .preview-card h3 {
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-widest);
   color: var(--fg-muted);
   margin: 0 0 var(--space-3) 0;
 }
@@ -342,7 +317,7 @@ textarea.input {
 /* Browser Mock */
 .browser-mock {
   background: var(--gray-300);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -495,12 +470,15 @@ textarea.input {
 }
 
 .empty-state h3 {
+  font-family: var(--font-serif);
+  font-weight: normal;
+  font-size: var(--text-lg);
   margin: 0 0 var(--space-2) 0;
-  font-weight: 500;
 }
 
 .empty-state p {
   margin: 0;
+  font-size: var(--text-xs);
 }
 
 /* ============================================
@@ -531,13 +509,16 @@ textarea.input {
 }
 
 .export-card h3 {
+  font-family: var(--font-serif);
   font-size: var(--text-lg);
+  font-weight: normal;
   margin: 0 0 var(--space-2) 0;
 }
 
 .export-card p {
   color: var(--fg-muted);
   margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-xs);
 }
 
 .file-list {
@@ -549,7 +530,7 @@ textarea.input {
 .file-list li {
   padding: var(--space-2) 0;
   border-bottom: var(--border-thin) solid var(--border-subtle);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
 }
 
 .file-list li:last-child {
@@ -610,12 +591,12 @@ textarea.input {
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--border-subtle);
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border-subtle);
   border-top-color: var(--fg);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
   margin: 0 auto var(--space-4);
 }
 
@@ -626,101 +607,7 @@ textarea.input {
 #loading-text {
   margin: 0;
   color: var(--fg-muted);
-}
-
-/* ============================================
-   Toast Notifications
-   ============================================ */
-.toast-container {
-  position: fixed;
-  bottom: var(--space-6);
-  right: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  z-index: var(--z-toast);
-}
-
-.toast {
-  background: var(--bg-elevated);
-  border: var(--border-thin) solid var(--border);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--text-sm);
-  animation: slideIn var(--duration-normal) ease-out;
-}
-
-.toast.success {
-  border-color: var(--color-success);
-}
-
-.toast.error {
-  border-color: var(--color-error);
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* ============================================
-   Buttons Override
-   ============================================ */
-.btn {
-  font-family: var(--font-primary);
-  font-size: var(--text-sm);
-  padding: var(--space-2) var(--space-4);
-  border: var(--border-thin) solid var(--border);
-  background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-  transition: all var(--duration-fast);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-}
-
-.btn:hover {
-  background: var(--fg);
-  color: var(--bg);
-}
-
-.btn--filled {
-  background: var(--fg);
-  color: var(--bg);
-}
-
-.btn--filled:hover {
-  background: transparent;
-  color: var(--fg);
-}
-
-.btn--ghost {
-  border-color: transparent;
-}
-
-.btn--ghost:hover {
-  border-color: var(--border);
-  background: transparent;
-}
-
-.btn--sm {
-  font-size: var(--text-2xs);
-  padding: var(--space-1) var(--space-2);
-}
-
-.btn--lg {
-  font-size: var(--text-lg);
-  padding: var(--space-3) var(--space-6);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  font-size: var(--text-xs);
 }
 
 /* ============================================
