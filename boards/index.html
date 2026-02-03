@@ -3445,16 +3445,23 @@ Return JSON:
 
   // Render Complete the Look widget
   function renderCompleteTheLookWidget(widget, items, aiResult) {
+    console.log('[widget] renderCompleteTheLookWidget called');
+    console.log('[widget] aiResult:', aiResult);
+
     if (!aiResult) {
-      // Fallback: show random items without AI
+      console.log('[widget] No AI result, using fallback');
       return renderCompleteTheLookFallback(widget, items);
     }
+
+    console.log('[widget] Using AI result');
 
     // Get matched items from user's collection
     const matchedItems = (aiResult.matchedItems || [])
       .map(id => items.find(i => i.id === id))
       .filter(Boolean)
       .slice(0, 3);
+
+    console.log('[widget] AI matched items:', matchedItems.map(i => i?.title));
 
     // If AI didn't return valid matches, pick random 2
     if (matchedItems.length < 2) {
@@ -3463,6 +3470,7 @@ Return JSON:
     }
 
     const suggestions = (aiResult.suggestions || []).slice(0, 3);
+    console.log('[widget] AI suggestions:', suggestions);
 
     // Render user items
     let userItemsHtml = '';
@@ -3559,6 +3567,8 @@ Return JSON:
 
   // Fallback render - match items into outfit, suggest what's missing
   function renderCompleteTheLookFallback(widget, items) {
+    console.log('[widget] renderCompleteTheLookFallback called with', items.length, 'items');
+
     // Enrich items with category, style, brand tier
     const enriched = items.map(item => ({
       ...item,
@@ -3567,12 +3577,21 @@ Return JSON:
       brandTier: getBrandTier(item.domain)
     }));
 
+    console.log('[widget] Enriched items:', enriched.map(i => ({
+      title: i.title,
+      category: i.garmentCat,
+      style: i.style,
+      tier: i.brandTier
+    })));
+
     // Group by category
     const byCategory = {};
     for (const item of enriched) {
       if (!byCategory[item.garmentCat]) byCategory[item.garmentCat] = [];
       byCategory[item.garmentCat].push(item);
     }
+
+    console.log('[widget] Items by category:', Object.keys(byCategory).map(k => `${k}: ${byCategory[k].length}`));
 
     // Build a matching outfit: top + bottom + one more
     const outfit = [];
@@ -3589,12 +3608,15 @@ Return JSON:
     }
 
     const selectedItems = outfit.slice(0, 3);
+    console.log('[widget] Selected outfit:', selectedItems.map(i => i.title));
 
     // Determine dominant style and brand tier
     const styles = selectedItems.map(i => i.style).filter(Boolean);
     const tiers = selectedItems.map(i => i.brandTier);
     const dominantStyle = styles.length ? styles.sort((a,b) => styles.filter(v => v===b).length - styles.filter(v => v===a).length)[0] : '';
     const dominantTier = tiers.sort((a,b) => tiers.filter(v => v===b).length - tiers.filter(v => v===a).length)[0] || 'mainstream';
+
+    console.log('[widget] Dominant style:', dominantStyle, '| Dominant tier:', dominantTier);
 
     // Render user's matched outfit
     let userItemsHtml = '';
