@@ -342,24 +342,18 @@ class FaviconApp {
   }
 
   async generateWithNanobanana(apiKey, prompt) {
-    // Using Google's Imagen via the Generative AI API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`, {
+    // Using Google's Imagen 3 via the Generative Language API
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        instances: [
-          {
-            prompt: prompt
-          }
-        ],
-        parameters: {
-          sampleCount: 1,
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
           aspectRatio: '1:1',
-          outputOptions: {
-            mimeType: 'image/png'
-          }
+          outputMimeType: 'image/png'
         }
       })
     });
@@ -371,11 +365,11 @@ class FaviconApp {
 
     const data = await response.json();
 
-    if (!data.predictions || data.predictions.length === 0) {
+    if (!data.generatedImages || data.generatedImages.length === 0) {
       throw new Error('No image generated');
     }
 
-    const base64Image = data.predictions[0].bytesBase64Encoded;
+    const base64Image = data.generatedImages[0].image.imageBytes;
     return `data:image/png;base64,${base64Image}`;
   }
 
