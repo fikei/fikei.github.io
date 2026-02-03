@@ -435,9 +435,11 @@ class SystemicApp {
     this.auditStatusText.textContent = 'Initializing crawler...';
     this.clearLog();
 
-    // Create crawler
+    // Create crawler with Supabase credentials for edge function fetching
     this.crawler = new AgenticCrawler({
       ...config,
+      supabaseUrl: this.supabaseUrl,
+      supabaseKey: this.supabaseKey,
       onProgress: (progress) => this.updateProgress(progress),
       onPageCrawled: (data) => this.onPageCrawled(data),
       onComponentFound: (component) => this.onComponentFound(component),
