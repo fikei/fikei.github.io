@@ -21,8 +21,176 @@ class SystemicApp {
     this.viewer = null;
     this.currentAudit = null;
     this.designSystems = [];
+    this.debugMode = true; // Enable detailed logging
+    this.debugLogs = []; // Store all debug logs for export
 
     this.init();
+  }
+
+  /**
+   * Debug log - only logs when debugMode is enabled
+   */
+  debugLog(category, message, data = null) {
+    if (!this.debugMode) return;
+
+    const timestamp = new Date().toISOString();
+    const prefix = `[SystemicAI:${category}]`;
+
+    // Store for export
+    this.debugLogs.push({
+      timestamp,
+      category,
+      message,
+      data: data ? JSON.parse(JSON.stringify(data)) : null
+    });
+
+    if (data) {
+      console.log(`${prefix} ${message}`, data);
+    } else {
+      console.log(`${prefix} ${message}`);
+    }
+  }
+
+  /**
+   * Export debug logs as JSON
+   */
+  exportDebugLogs() {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      currentAudit: this.currentAudit,
+      designSystemsCount: this.designSystems.length,
+      designSystemsSummary: this.designSystems.map(ds => ({
+        id: ds.id,
+        name: ds.name,
+        sourceUrl: ds.sourceUrl,
+        stats: ds.stats
+      })),
+      logs: this.debugLogs
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  /**
+   * Copy debug logs to clipboard
+   */
+  async copyDebugLogs() {
+    try {
+      const logs = this.exportDebugLogs();
+      await navigator.clipboard.writeText(logs);
+      this.showToast('Debug logs copied to clipboard!');
+      return true;
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      this.showToast('Failed to copy - check console', 'error');
+      return false;
+    }
+  }
+
+  /**
+   * Download debug logs as file
+   */
+  downloadDebugLogs() {
+    const logs = this.exportDebugLogs();
+    const blob = new Blob([logs], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `systemic-debug-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.showToast('Debug log downloaded!');
+  }
+
+  /**
+   * Clear debug logs
+   */
+  clearDebugLogs() {
+    this.debugLogs = [];
+    this.debugLog('SYSTEM', 'Debug logs cleared');
+  }
+
+  /**
+   * Normalize a URL - handles messy user input
+   */
+  normalizeUrl(input) {
+    if (!input) return null;
+
+    let url = input.trim();
+
+    this.debugLog('URL', `Normalizing input: "${url}"`);
+
+    // Remove leading/trailing whitespace and quotes
+    url = url.replace(/^["'\s]+|["'\s]+$/g, '');
+
+    // Add protocol if missing
+    if (!url.match(/^https?:\/\//i)) {
+      // Check if it starts with www or looks like a domain
+      if (url.match(/^(www\.)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}/i)) {
+        url = 'https://' + url;
+        this.debugLog('URL', 'Added https:// protocol');
+      }
+    }
+
+    // Force HTTPS
+    url = url.replace(/^http:/i, 'https:');
+
+    try {
+      const parsed = new URL(url);
+
+      // Normalize hostname to lowercase
+      parsed.hostname = parsed.hostname.toLowerCase();
+
+      // Remove default ports
+      if ((parsed.protocol === 'https:' && parsed.port === '443') ||
+          (parsed.protocol === 'http:' && parsed.port === '80')) {
+        parsed.port = '';
+      }
+
+      // Remove trailing slash from path (unless it's just "/")
+      if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
+        parsed.pathname = parsed.pathname.slice(0, -1);
+      }
+
+      // Remove empty hash
+      if (parsed.hash === '#') {
+        parsed.hash = '';
+      }
+
+      // Sort query parameters for consistency
+      if (parsed.search) {
+        const params = new URLSearchParams(parsed.search);
+        const sortedParams = new URLSearchParams([...params.entries()].sort());
+        parsed.search = sortedParams.toString();
+      }
+
+      const normalized = parsed.href;
+      this.debugLog('URL', `Normalized to: "${normalized}"`);
+
+      return normalized;
+
+    } catch (e) {
+      this.debugLog('URL', `Failed to parse URL: ${e.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get canonical URL key for comparison (strips www, trailing slash, etc.)
+   */
+  getUrlKey(url) {
+    try {
+      const parsed = new URL(url);
+      // Remove www. prefix for comparison
+      const hostname = parsed.hostname.replace(/^www\./i, '');
+      // Create canonical key
+      return `${hostname}${parsed.pathname}`.toLowerCase();
+    } catch (e) {
+      return url.toLowerCase();
+    }
   }
 
   /**
@@ -88,6 +256,10 @@ class SystemicApp {
     // Cancel audit
     this.cancelAuditBtn?.addEventListener('click', () => this.cancelAudit());
 
+    // Debug log export buttons
+    DOMUtils.$('#copy-debug-log')?.addEventListener('click', () => this.copyDebugLogs());
+    DOMUtils.$('#download-debug-log')?.addEventListener('click', () => this.downloadDebugLogs());
+
     // Auth type change
     this.authTypeSelect?.addEventListener('change', () => {
       const showAuthData = this.authTypeSelect.value !== 'none';
@@ -140,25 +312,45 @@ class SystemicApp {
    */
   async startAudit() {
     const formData = new FormData(this.auditForm);
+    const rawUrl = formData.get('url');
+
+    this.debugLog('AUDIT', '=== Starting New Audit ===');
+    this.debugLog('AUDIT', `Raw URL input: "${rawUrl}"`);
+
+    // Normalize the URL
+    const normalizedUrl = this.normalizeUrl(rawUrl);
+    if (!normalizedUrl) {
+      this.showToast('Please enter a valid URL (e.g., example.com or https://example.com)', 'error');
+      return;
+    }
+
+    // Check for existing design system with this URL
+    const urlKey = this.getUrlKey(normalizedUrl);
+    const existingSystem = this.designSystems.find(ds =>
+      this.getUrlKey(ds.sourceUrl) === urlKey
+    );
+
+    if (existingSystem) {
+      this.debugLog('AUDIT', `Found existing design system for URL key: ${urlKey}`, existingSystem);
+      this.debugLog('AUDIT', `Existing system ID: ${existingSystem.id}, created: ${existingSystem.createdAt}`);
+    } else {
+      this.debugLog('AUDIT', `No existing design system found for URL key: ${urlKey}`);
+    }
+
     const config = {
-      url: formData.get('url'),
-      name: formData.get('name') || new URL(formData.get('url')).hostname,
+      url: normalizedUrl,
+      name: formData.get('name') || new URL(normalizedUrl).hostname,
       maxPages: parseInt(formData.get('maxPages')) || 50,
       crawlDepth: parseInt(formData.get('crawlDepth')) || 3,
       authType: formData.get('authType') || 'none',
       authData: formData.get('authData') || null,
       excludePatterns: (formData.get('excludePatterns') || '')
         .split('\n')
-        .filter(p => p.trim())
+        .filter(p => p.trim()),
+      existingSystemId: existingSystem?.id || null
     };
 
-    // Validate URL
-    try {
-      new URL(config.url);
-    } catch (e) {
-      this.showToast('Please enter a valid URL', 'error');
-      return;
-    }
+    this.debugLog('AUDIT', 'Audit config:', config);
 
     // Show progress section
     this.auditFormSection.hidden = true;
@@ -230,35 +422,84 @@ class SystemicApp {
    * Handle audit completion
    */
   async onAuditComplete(results) {
+    this.debugLog('COMPLETE', '=== Audit Complete ===');
+    this.debugLog('COMPLETE', 'Raw crawl results:', {
+      pagesCrawled: results.pagesCrawled,
+      componentsFound: results.components?.length || 0,
+      tokensFound: results.tokens?.length || 0,
+      pagesData: results.pages?.length || 0
+    });
+
     this.addLogEntry({ type: 'success', message: 'Crawl complete! Processing results...' });
     this.auditStatusText.textContent = 'Processing tokens...';
 
     try {
       // Process tokens
+      this.debugLog('TOKENS', 'Processing extracted tokens...');
       const tokens = this.tokenMapper.processExtractedData(results);
+      this.debugLog('TOKENS', 'Processed tokens:', {
+        hasColors: !!tokens?.colors,
+        colorCount: tokens?.colors ? Object.keys(tokens.colors).length : 0,
+        hasTypography: !!tokens?.typography,
+        hasSpacing: !!tokens?.spacing
+      });
+
+      // Log components detail
+      this.debugLog('COMPONENTS', `Found ${results.components?.length || 0} components`);
+      if (results.components?.length > 0) {
+        const componentTypes = {};
+        results.components.forEach(c => {
+          componentTypes[c.type] = (componentTypes[c.type] || 0) + 1;
+        });
+        this.debugLog('COMPONENTS', 'Component types:', componentTypes);
+      } else {
+        this.debugLog('COMPONENTS', 'WARNING: No components were detected!');
+        this.addLogEntry({ type: 'warning', message: 'No components detected - check console for details' });
+      }
+
+      // Check if we're updating an existing system
+      const existingId = this.currentAudit.config.existingSystemId;
+      const isUpdate = !!existingId;
+
+      this.debugLog('SAVE', isUpdate
+        ? `Updating existing design system: ${existingId}`
+        : 'Creating new design system');
 
       // Generate documentation
       const designSystem = {
-        id: this.currentAudit.id,
+        id: isUpdate ? existingId : this.currentAudit.id,
         name: this.currentAudit.config.name,
         sourceUrl: this.currentAudit.config.url,
         tokens,
         components: results.components,
         pages: results.pages,
-        createdAt: new Date().toISOString()
+        createdAt: isUpdate ? this.getExistingCreatedAt(existingId) : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       this.auditStatusText.textContent = 'Generating documentation...';
       designSystem.documentation = await this.docGenerator.generateDocumentation(designSystem);
 
       // Save design system
-      this.saveDesignSystem(designSystem);
+      this.saveDesignSystem(designSystem, isUpdate);
 
-      this.addLogEntry({ type: 'success', message: 'Design system generated successfully!' });
+      const actionText = isUpdate ? 'updated' : 'generated';
+      this.addLogEntry({ type: 'success', message: `Design system ${actionText} successfully!` });
       this.auditStatusText.textContent = 'Complete!';
 
+      // Log final stats
+      this.debugLog('COMPLETE', 'Final design system:', {
+        id: designSystem.id,
+        name: designSystem.name,
+        sourceUrl: designSystem.sourceUrl,
+        tokenCount: this.countTokens(designSystem.tokens),
+        componentCount: designSystem.components?.length || 0,
+        pageCount: designSystem.pages?.length || 0,
+        isUpdate
+      });
+
       // Show toast
-      this.showToast('Design system generated successfully!');
+      this.showToast(`Design system ${actionText} successfully!`);
 
       // Switch to docs view after delay
       setTimeout(() => {
@@ -268,8 +509,17 @@ class SystemicApp {
       }, 1500);
 
     } catch (error) {
+      this.debugLog('ERROR', 'Audit completion error:', error);
       this.onAuditError(error);
     }
+  }
+
+  /**
+   * Get createdAt from existing system
+   */
+  getExistingCreatedAt(id) {
+    const existing = this.designSystems.find(ds => ds.id === id);
+    return existing?.createdAt || new Date().toISOString();
   }
 
   /**
@@ -335,29 +585,79 @@ class SystemicApp {
   /**
    * Save design system to localStorage
    */
-  saveDesignSystem(designSystem) {
-    this.designSystems.push(designSystem);
+  saveDesignSystem(designSystem, isUpdate = false) {
+    this.debugLog('SAVE', `Saving design system (isUpdate: ${isUpdate})`, {
+      id: designSystem.id,
+      name: designSystem.name,
+      componentCount: designSystem.components?.length || 0
+    });
+
+    if (isUpdate) {
+      // Find and update existing system
+      const index = this.designSystems.findIndex(ds => ds.id === designSystem.id);
+      if (index !== -1) {
+        const oldSystem = this.designSystems[index];
+        this.debugLog('SAVE', 'Replacing existing system at index:', index);
+        this.debugLog('SAVE', 'Old stats:', {
+          components: oldSystem.stats?.components || 0,
+          tokens: oldSystem.stats?.tokens || 0
+        });
+        this.designSystems[index] = {
+          id: designSystem.id,
+          name: designSystem.name,
+          sourceUrl: designSystem.sourceUrl,
+          createdAt: designSystem.createdAt,
+          updatedAt: designSystem.updatedAt,
+          stats: {
+            tokens: this.countTokens(designSystem.tokens),
+            components: designSystem.components?.length || 0,
+            pages: designSystem.pages?.length || 0
+          }
+        };
+        this.debugLog('SAVE', 'New stats:', this.designSystems[index].stats);
+      } else {
+        this.debugLog('SAVE', 'WARNING: Could not find existing system to update, adding as new');
+        this.designSystems.push({
+          id: designSystem.id,
+          name: designSystem.name,
+          sourceUrl: designSystem.sourceUrl,
+          createdAt: designSystem.createdAt,
+          updatedAt: designSystem.updatedAt,
+          stats: {
+            tokens: this.countTokens(designSystem.tokens),
+            components: designSystem.components?.length || 0,
+            pages: designSystem.pages?.length || 0
+          }
+        });
+      }
+    } else {
+      // Add new system
+      this.debugLog('SAVE', 'Adding new design system');
+      this.designSystems.push({
+        id: designSystem.id,
+        name: designSystem.name,
+        sourceUrl: designSystem.sourceUrl,
+        createdAt: designSystem.createdAt,
+        stats: {
+          tokens: this.countTokens(designSystem.tokens),
+          components: designSystem.components?.length || 0,
+          pages: designSystem.pages?.length || 0
+        }
+      });
+    }
 
     try {
-      localStorage.setItem('systemic-design-systems', JSON.stringify(
-        this.designSystems.map(ds => ({
-          id: ds.id,
-          name: ds.name,
-          sourceUrl: ds.sourceUrl,
-          createdAt: ds.createdAt,
-          stats: {
-            tokens: this.countTokens(ds.tokens),
-            components: ds.components?.length || 0,
-            pages: ds.pages?.length || 0
-          }
-        }))
-      ));
+      // Save index
+      localStorage.setItem('systemic-design-systems', JSON.stringify(this.designSystems));
+      this.debugLog('SAVE', 'Saved design systems index to localStorage');
 
       // Store full data separately
       localStorage.setItem(`systemic-ds-${designSystem.id}`, JSON.stringify(designSystem));
+      this.debugLog('SAVE', `Saved full design system data: systemic-ds-${designSystem.id}`);
 
     } catch (error) {
       console.warn('Failed to save to localStorage:', error);
+      this.debugLog('SAVE', 'ERROR saving to localStorage:', error);
     }
   }
 

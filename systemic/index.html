@@ -47,10 +47,10 @@
                 <label for="audit-url">Website URL</label>
                 <div class="input-with-action">
                   <input
-                    type="url"
+                    type="text"
                     id="audit-url"
                     name="url"
-                    placeholder="https://example.com"
+                    placeholder="example.com or https://example.com"
                     required
                     class="input"
                   >
@@ -129,6 +129,8 @@
 
             <div class="progress-actions">
               <button class="btn btn--ghost" id="cancel-audit">Cancel</button>
+              <button class="btn btn--ghost" id="copy-debug-log" title="Copy debug log to clipboard">Copy Debug Log</button>
+              <button class="btn btn--ghost" id="download-debug-log" title="Download debug log as JSON">Download Log</button>
             </div>
           </div>
         </div>

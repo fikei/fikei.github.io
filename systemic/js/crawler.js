@@ -275,6 +275,13 @@ class AgenticCrawler {
    */
   extractComponents(doc) {
     const components = [];
+    let totalElementsChecked = 0;
+    let skippedHidden = 0;
+    let skippedEmpty = 0;
+    let skippedDuplicate = 0;
+
+    this.log(`Extracting components from document...`, 'info');
+
     const componentSelectors = [
       // Buttons
       'button',
@@ -329,16 +336,31 @@ class AgenticCrawler {
 
     componentSelectors.forEach(selector => {
       try {
-        doc.querySelectorAll(selector).forEach(element => {
-          const component = this.analyzeComponent(element);
-          if (component) {
-            // Check for duplicates
-            const hash = component.structureHash;
-            if (!this.discoveredComponents.has(hash)) {
-              this.discoveredComponents.set(hash, component);
-              components.push(component);
-              this.onComponentFound(component);
+        const elements = doc.querySelectorAll(selector);
+        elements.forEach(element => {
+          totalElementsChecked++;
+          const result = this.analyzeComponent(element);
+
+          if (result === null) {
+            // Track why it was skipped (analyzeComponent returns null for hidden/empty)
+            const inlineStyle = element.getAttribute('style') || '';
+            if (inlineStyle.includes('display: none') ||
+                inlineStyle.includes('display:none') ||
+                inlineStyle.includes('visibility: hidden') ||
+                element.hasAttribute('hidden')) {
+              skippedHidden++;
             } else {
+              skippedEmpty++;
+            }
+          } else if (result) {
+            // Check for duplicates
+            const hash = result.structureHash;
+            if (!this.discoveredComponents.has(hash)) {
+              this.discoveredComponents.set(hash, result);
+              components.push(result);
+              this.onComponentFound(result);
+            } else {
+              skippedDuplicate++;
               // Update usage count
               const existing = this.discoveredComponents.get(hash);
               existing.usageCount = (existing.usageCount || 1) + 1;
@@ -346,9 +368,16 @@ class AgenticCrawler {
           }
         });
       } catch (e) {
-        // Invalid selector, skip
+        this.log(`Invalid selector "${selector}": ${e.message}`, 'warning');
       }
     });
+
+    // Log summary
+    this.log(`Component extraction complete: ${components.length} unique components found`, 'info');
+    this.log(`  - Elements checked: ${totalElementsChecked}`, 'info');
+    this.log(`  - Skipped (hidden): ${skippedHidden}`, 'info');
+    this.log(`  - Skipped (empty): ${skippedEmpty}`, 'info');
+    this.log(`  - Skipped (duplicate): ${skippedDuplicate}`, 'info');
 
     return components;
   }
