@@ -3,6 +3,9 @@
  * Main application controller
  */
 
+// CONFIGURATION: Set your Cloudflare Worker URL here
+const IMAGEN_PROXY_URL = 'https://imagen-proxy.YOUR_SUBDOMAIN.workers.dev';
+
 class FaviconApp {
   constructor() {
     this.generator = new FaviconGenerator();
@@ -20,7 +23,6 @@ class FaviconApp {
       aiPrompt: document.getElementById('ai-prompt'),
       aiStyle: document.getElementById('ai-style'),
       aiColor: document.getElementById('ai-color'),
-      aiApiKey: document.getElementById('ai-api-key'),
 
       // Text form
       textForm: document.getElementById('text-form'),
@@ -89,13 +91,6 @@ class FaviconApp {
     if (savedTheme === 'light') {
       document.documentElement.classList.add('light');
     }
-
-    // Load API key
-    const savedKey = localStorage.getItem('favicon-api-key');
-
-    if (savedKey) {
-      this.elements.aiApiKey.value = savedKey;
-    }
   }
 
   bindEvents() {
@@ -147,11 +142,6 @@ class FaviconApp {
     // Live preview for text mode
     ['textContent', 'textBgColor', 'textFgColor', 'textFont', 'textShape'].forEach(key => {
       this.elements[key].addEventListener('input', () => this.updateTextPreview());
-    });
-
-    // API key saving
-    this.elements.aiApiKey.addEventListener('change', () => {
-      localStorage.setItem('favicon-api-key', this.elements.aiApiKey.value);
     });
 
     // Download ZIP
@@ -280,7 +270,6 @@ class FaviconApp {
     e.preventDefault();
 
     const prompt = this.elements.aiPrompt.value.trim();
-    const apiKey = this.elements.aiApiKey.value.trim();
     const style = this.elements.aiStyle.value;
     const color = this.elements.aiColor.value;
 
@@ -289,18 +278,13 @@ class FaviconApp {
       return;
     }
 
-    if (!apiKey) {
-      this.showToast('Please enter your Google AI API key in the settings', 'error');
-      return;
-    }
-
     // Build enhanced prompt for favicon
     const enhancedPrompt = this.buildFaviconPrompt(prompt, style, color);
 
-    this.showLoading('Generating with Google AI...');
+    this.showLoading('Generating with AI...');
 
     try {
-      const imageData = await this.generateWithNanobanana(apiKey, enhancedPrompt);
+      const imageData = await this.generateWithProxy(enhancedPrompt);
       await this.generator.generateFromUrl(imageData);
       this.updatePreviews();
       this.showExportSection();
@@ -341,26 +325,19 @@ class FaviconApp {
     return `Create a favicon/app icon: ${userPrompt}. Style: ${styleDescriptions[style]}. Primary color: ${hexToName(color)}. Square format, centered composition, works well at small sizes (16x16 to 512x512 pixels), simple and recognizable, no text unless specifically requested. High contrast, professional quality.`;
   }
 
-  async generateWithNanobanana(apiKey, prompt) {
-    // Using Google's Imagen 3 via the Generative Language API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${apiKey}`, {
+  async generateWithProxy(prompt) {
+    // Call the Cloudflare Worker proxy (API key is stored server-side)
+    const response = await fetch(IMAGEN_PROXY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          aspectRatio: '1:1',
-          outputMimeType: 'image/png'
-        }
-      })
+      body: JSON.stringify({ prompt })
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || 'Google AI API error');
+      throw new Error(error.error || 'Image generation failed');
     }
 
     const data = await response.json();
