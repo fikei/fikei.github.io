@@ -3,8 +3,8 @@
  * Main application controller
  */
 
-// CONFIGURATION: Set your Cloudflare Worker URL here
-const IMAGEN_PROXY_URL = 'https://imagen-proxy.YOUR_SUBDOMAIN.workers.dev';
+// CONFIGURATION: Cloudflare Worker proxy URL
+const IMAGEN_PROXY_URL = 'https://imagen-proxy.fike101.workers.dev';
 
 class FaviconApp {
   constructor() {
