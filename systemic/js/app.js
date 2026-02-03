@@ -842,7 +842,10 @@ class SystemicApp {
       <div class="system-card" data-id="${ds.id}">
         <div class="system-card-header">
           <h3 class="system-card-title">${ds.name}</h3>
-          <span class="system-card-date">${this.formatDate(ds.createdAt)}</span>
+          <div class="system-card-actions">
+            <span class="system-card-date">${this.formatDate(ds.createdAt)}</span>
+            <button class="system-card-delete" data-delete-id="${ds.id}" title="Delete design system">×</button>
+          </div>
         </div>
         <div class="system-card-url">${ds.sourceUrl}</div>
         <div class="system-card-stats">
@@ -862,9 +865,12 @@ class SystemicApp {
       </div>
     `).join('');
 
-    // Bind click events
+    // Bind click events for opening design system
     DOMUtils.$$('.system-card', this.systemsGrid).forEach(card => {
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        // Don't open if clicking delete button
+        if (e.target.closest('.system-card-delete')) return;
+
         const id = card.dataset.id;
         const fullSystem = this.loadDesignSystem(id);
         if (fullSystem) {
@@ -872,6 +878,20 @@ class SystemicApp {
           this.switchView('docs');
         } else {
           this.showToast('Failed to load design system', 'error');
+        }
+      });
+    });
+
+    // Bind delete button events
+    DOMUtils.$$('.system-card-delete', this.systemsGrid).forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.deleteId;
+        const ds = this.designSystems.find(d => d.id === id);
+        const name = ds?.name || 'this design system';
+
+        if (confirm(`Delete "${name}"? This cannot be undone.`)) {
+          this.deleteDesignSystem(id);
         }
       });
     });
