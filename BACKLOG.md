@@ -412,6 +412,59 @@ validateStyleMatch({ userStyle, suggestion })
 - [ ] Preserve user's manual card positions when possible
 - [ ] Add option to disable auto-reflow in settings
 
+### Story: Smart Clipboard Scan & Bulk Import ⚡ P1
+> As a user, I want to paste links and immediately see previews before adding them to my board.
+
+**Current Behavior:**
+- Paste URL → Immediately added to board
+- No preview, no confirmation
+- Single link at a time
+
+**Desired Behavior:**
+- Paste 1-100 links → Auto-scrape all
+- Show preview cards with title, image, domain
+- Accept/reject individual links or bulk accept
+- Progress indicator for scraping
+- Graceful handling of failed scrapes
+
+**Tasks - Core Flow:**
+- [ ] Detect clipboard paste event (Cmd+V / Ctrl+V)
+- [ ] Parse clipboard for URLs (handle multiple, newline/comma separated)
+- [ ] Open "Import Preview" modal instead of immediate add
+- [ ] Show loading skeleton while scraping
+
+**Tasks - Preview UI:**
+- [ ] Preview card component (compact: image, title, domain)
+- [ ] Checkbox for select/deselect individual links
+- [ ] "Select All" / "Deselect All" toggle
+- [ ] Failed scrape indicator (show URL, allow retry)
+- [ ] Category auto-detection display
+- [ ] Edit category before import
+
+**Tasks - Bulk Operations:**
+- [ ] Parallel scraping with concurrency limit (5 at a time)
+- [ ] Progress bar: "Scanning 15 of 42 links..."
+- [ ] Batch size handling (warn if >50 links)
+- [ ] "Add Selected" button (disabled until scrape complete)
+- [ ] "Cancel" to abort in-progress scrapes
+
+**Tasks - Performance:**
+- [ ] Scrape queue with priority (visible cards first)
+- [ ] Cache recently scraped URLs (don't re-scrape)
+- [ ] Timeout per URL (10 seconds max)
+- [ ] Graceful degradation (add with URL-only if scrape fails)
+
+**Tasks - Edge Cases:**
+- [ ] Duplicate detection (already in board)
+- [ ] Invalid URL handling
+- [ ] Mixed content (URLs + non-URL text)
+- [ ] Very long URLs (truncate display)
+
+**Success Criteria:**
+- 1 link: <2 seconds to preview
+- 10 links: <10 seconds to preview all
+- 100 links: <60 seconds, with streaming previews
+
 ---
 
 ## Epic: Performance
@@ -812,9 +865,14 @@ validateStyleMatch({ userStyle, suggestion })
 ## Epic: Generative Widget Ecosystem
 
 > Fully automated widget system that determines what widgets exist, what content populates them, and how they improve over time.
-> **PRD:** [docs/PRD-generative-widget-ecosystem.md](docs/PRD-generative-widget-ecosystem.md)
-> **Tech Spec:** [docs/TECH-ai-widget-system.md](docs/TECH-ai-widget-system.md)
-> **Architecture:** [docs/ARCH-ai-widget-pipeline.md](docs/ARCH-ai-widget-pipeline.md)
+>
+> **Documentation:**
+> - [PRD: Generative Widget Ecosystem](docs/PRD-generative-widget-ecosystem.md) - Automation phases & vision
+> - [PRD: Widget Design System](docs/PRD-widget-design-system.md) - Component library & templates
+> - [PRD: Widget Instrumentation](docs/PRD-widget-instrumentation.md) - Analytics & model training
+> - [TECH: AI Widget System](docs/TECH-ai-widget-system.md) - Implementation details
+> - [TECH: Widget Architecture](docs/TECH-widget-architecture.md) - Infrastructure & data models
+> - [ARCH: AI Widget Pipeline](docs/ARCH-ai-widget-pipeline.md) - Pipeline design
 
 ### Phase Overview
 
