@@ -3435,34 +3435,42 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         maxItems: null,
         itemTypes: ['product']
       },
-      prompt: `You are a fashion stylist and shopping expert. Analyze these clothing/accessory items and:
-1. Find 2-3 items from the list that work well together as a partial outfit
-2. Based on the STYLE, COLORS, and AESTHETIC of those items, suggest 2-3 SPECIFIC REAL PRODUCTS the user should BUY
+      prompt: `You are a fashion stylist building COMPLETE OUTFITS.
 
-IMPORTANT: For suggestions, provide REAL product recommendations with:
-- Actual brand names (Nike, Uniqlo, Zara, Common Projects, A.P.C., etc.)
-- Specific product names when possible
-- Color and material details
-- A simple image search term (just the product type, e.g., "white sneakers", "navy chinos", "leather watch")
+The user OWNS the items listed below. Your task:
 
-Examples of good suggestions:
-- "Common Projects Achilles Low White" with imageQuery "white leather sneakers"
-- "Uniqlo Ultra Light Down Jacket Navy" with imageQuery "navy puffer jacket"
-- "Timex Weekender Watch" with imageQuery "minimalist watch tan strap"
+1. SELECT 2-3 items from their collection that work together (e.g., a jacket + pants)
+2. IDENTIFY what's MISSING to complete a full outfit (e.g., they have jacket + pants, they need: shoes, shirt, belt)
+3. RECOMMEND specific products to BUY that FILL THE GAPS
+
+CRITICAL - WHAT TO SUGGEST:
+- If user has tops, suggest bottoms/shoes/accessories
+- If user has bottoms, suggest tops/shoes/accessories
+- If user has outerwear, suggest what goes underneath + shoes
+- Build toward a COMPLETE head-to-toe outfit
+
+DO NOT:
+- Never suggest items similar to what they already own
+- Never suggest another jacket if they have jackets
+- Never suggest another pair of pants if they have pants
+- The goal is COMPLEMENTARY items, not alternatives
+
+BRANDS TO USE: Nike, Adidas, New Balance, Common Projects, A.P.C., Acne Studios, COS, Uniqlo, Carhartt WIP, Patagonia, Levi's, Dickies
 
 Return JSON:
 {
-  "matchedItems": ["item_id1", "item_id2"],
-  "reasoning": "Brief explanation of why these items work together",
+  "matchedItems": ["id1", "id2"],
+  "reasoning": "These items form the base of an outfit because...",
+  "missingPieces": "To complete this outfit, user needs: shoes and a basic tee",
   "suggestions": [
     {
-      "name": "Brand + Product Name + Color",
-      "brand": "Brand name",
-      "price": "$XX-$XXX estimate",
-      "category": "tops|bottoms|footwear|accessories|outerwear",
-      "imageQuery": "simple image search term",
-      "searchQuery": "google shopping search query",
-      "reason": "Why this completes the look"
+      "name": "New Balance 550 White Green",
+      "brand": "New Balance",
+      "price": "$130",
+      "category": "footwear",
+      "imageQuery": "new balance 550 sneakers",
+      "searchQuery": "new balance 550 white green",
+      "reason": "Clean sneakers to ground the outfit"
     }
   ]
 }`,
@@ -4174,6 +4182,10 @@ Return JSON:
       if (key.startsWith(widgetId + ':')) delete widgetCache[key];
     });
     saveWidgetCache();
+
+    // Show loading state immediately by clearing inline widget
+    inlineWidgetHtml = '';
+    renderGrid(); // Clears old widget from grid
 
     // Reset mutex and re-generate widgets
     widgetGenerationInProgress = false;
