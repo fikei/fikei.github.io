@@ -114,6 +114,55 @@ class SystemicApp {
   }
 
   /**
+   * Clean up duplicate design systems (keeps the one with most data)
+   * Can be called from console: systemicApp.cleanupDuplicates()
+   */
+  cleanupDuplicates() {
+    this.debugLog('CLEANUP', '=== Starting Duplicate Cleanup ===');
+    const urlMap = new Map();
+
+    // Group systems by URL key
+    this.designSystems.forEach(ds => {
+      const key = this.getUrlKey(ds.sourceUrl);
+      if (!urlMap.has(key)) {
+        urlMap.set(key, []);
+      }
+      urlMap.get(key).push(ds);
+    });
+
+    const newSystems = [];
+    let removedCount = 0;
+
+    urlMap.forEach((systems, urlKey) => {
+      if (systems.length > 1) {
+        // Sort by component count descending, keep the best one
+        systems.sort((a, b) => (b.stats?.components || 0) - (a.stats?.components || 0));
+        const keeper = systems[0];
+        this.debugLog('CLEANUP', `URL "${urlKey}": keeping system ${keeper.id} (${keeper.stats?.components || 0} components), removing ${systems.length - 1} duplicates`);
+
+        // Delete localStorage entries for duplicates
+        systems.slice(1).forEach(dup => {
+          localStorage.removeItem(`systemic-ds-${dup.id}`);
+          removedCount++;
+        });
+
+        newSystems.push(keeper);
+      } else {
+        newSystems.push(systems[0]);
+      }
+    });
+
+    this.designSystems = newSystems;
+    localStorage.setItem('systemic-design-systems', JSON.stringify(this.designSystems));
+
+    this.debugLog('CLEANUP', `Cleanup complete: removed ${removedCount} duplicate(s)`);
+    this.showToast(`Cleaned up ${removedCount} duplicate design system(s)`);
+    this.renderSystemsList();
+
+    return { removed: removedCount, remaining: newSystems.length };
+  }
+
+  /**
    * Normalize a URL - handles messy user input
    */
   normalizeUrl(input) {
@@ -326,13 +375,39 @@ class SystemicApp {
 
     // Check for existing design system with this URL
     const urlKey = this.getUrlKey(normalizedUrl);
-    const existingSystem = this.designSystems.find(ds =>
+
+    // Find all matching systems (there might be duplicates from before the fix)
+    const matchingSystems = this.designSystems.filter(ds =>
       this.getUrlKey(ds.sourceUrl) === urlKey
     );
 
-    if (existingSystem) {
-      this.debugLog('AUDIT', `Found existing design system for URL key: ${urlKey}`, existingSystem);
-      this.debugLog('AUDIT', `Existing system ID: ${existingSystem.id}, created: ${existingSystem.createdAt}`);
+    // Prefer the one with the most data (components > 0), or the most recent
+    let existingSystem = null;
+    if (matchingSystems.length > 0) {
+      this.debugLog('AUDIT', `Found ${matchingSystems.length} existing system(s) for URL key: ${urlKey}`);
+
+      // Sort by: has data (components > 0) first, then by most components
+      matchingSystems.sort((a, b) => {
+        const aComponents = a.stats?.components || 0;
+        const bComponents = b.stats?.components || 0;
+        return bComponents - aComponents; // Descending by component count
+      });
+
+      existingSystem = matchingSystems[0];
+      this.debugLog('AUDIT', `Selected system with most data:`, {
+        id: existingSystem.id,
+        components: existingSystem.stats?.components || 0,
+        tokens: existingSystem.stats?.tokens || 0
+      });
+
+      // If there are duplicates, log a warning
+      if (matchingSystems.length > 1) {
+        this.debugLog('AUDIT', `WARNING: ${matchingSystems.length - 1} duplicate system(s) found for this URL`);
+        this.addLogEntry({
+          type: 'warning',
+          message: `Found ${matchingSystems.length} duplicate entries for this URL - using the one with most data`
+        });
+      }
     } else {
       this.debugLog('AUDIT', `No existing design system found for URL key: ${urlKey}`);
     }
