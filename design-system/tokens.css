@@ -74,21 +74,24 @@
    Typography Tokens
    ============================================ */
 :root {
-  /* Font families */
+  /* Font families - Space Grotesk is primary */
+  --font-primary: "Space Grotesk", sans-serif;
   --font-serif: Georgia, "Times New Roman", Times, serif;
-  --font-mono: "Courier New", Courier, monospace;
-  --font-sans: "Space Grotesk", -apple-system, sans-serif;
-  --font-mono-alt: "IBM Plex Mono", monospace;
+  --font-mono: "Space Grotesk", sans-serif;
+  --font-sans: "Space Grotesk", sans-serif;
 
-  /* Font sizes - modular scale */
+  /* Base font size - 10px standard */
+  --text-base: 10px;
+
+  /* Font sizes - scaled from 10px base */
   --text-2xs: 8px;
   --text-xs: 10px;
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-lg: 18px;
-  --text-xl: 24px;
-  --text-2xl: 32px;
-  --text-3xl: 48px;
+  --text-sm: 10px;
+  --text-md: 10px;
+  --text-lg: 12px;
+  --text-xl: 14px;
+  --text-2xl: 18px;
+  --text-3xl: 24px;
 
   /* Line heights */
   --leading-none: 1;

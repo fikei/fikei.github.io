@@ -39,7 +39,7 @@
 }
 
 .logo {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xl);
   font-weight: 700;
   margin: 0;
@@ -47,7 +47,7 @@
 }
 
 .tagline {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   color: var(--fg-muted);
   text-transform: uppercase;
@@ -64,7 +64,7 @@
   background: transparent;
   border: var(--border-thin) solid transparent;
   color: var(--fg-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -118,14 +118,14 @@
 }
 
 .section-header h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-primary);
   font-size: var(--text-xl);
   font-weight: normal;
   margin: 0 0 var(--space-2);
 }
 
 .section-header p {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-sm);
   color: var(--fg-muted);
   margin: 0;
@@ -150,7 +150,7 @@
 
 .form-group label {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
@@ -175,7 +175,7 @@
 
 .advanced-options summary {
   cursor: pointer;
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
@@ -243,13 +243,13 @@
 }
 
 .stat-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xl);
   font-weight: 600;
 }
 
 .stat-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
@@ -262,7 +262,7 @@
   padding: var(--space-4);
   max-height: 300px;
   overflow-y: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
 }
 
@@ -337,14 +337,14 @@
 }
 
 .system-card-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-primary);
   font-size: var(--text-lg);
   font-weight: normal;
   margin: 0;
 }
 
 .system-card-date {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-2xs);
   color: var(--fg-muted);
   text-transform: uppercase;
@@ -352,7 +352,7 @@
 }
 
 .system-card-url {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   color: var(--fg-muted);
   margin-bottom: var(--space-4);
@@ -370,13 +370,13 @@
 }
 
 .system-stat-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-base);
   font-weight: 600;
 }
 
 .system-stat-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
@@ -397,7 +397,7 @@
 }
 
 .empty-state h3 {
-  font-family: var(--font-serif);
+  font-family: var(--font-primary);
   font-size: var(--text-lg);
   font-weight: normal;
   margin: 0 0 var(--space-2);
@@ -405,7 +405,7 @@
 }
 
 .empty-state p {
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   font-size: var(--text-sm);
   margin: 0 0 var(--space-6);
 }

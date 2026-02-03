@@ -357,13 +357,24 @@ class AgenticCrawler {
    * Analyze a single component
    */
   analyzeComponent(element) {
-    // Skip invisible elements
-    if (!element.offsetParent && element.style.display !== 'none') {
+    // Skip elements that are explicitly hidden via inline styles
+    const inlineStyle = element.getAttribute('style') || '';
+    if (inlineStyle.includes('display: none') ||
+        inlineStyle.includes('display:none') ||
+        inlineStyle.includes('visibility: hidden') ||
+        inlineStyle.includes('visibility:hidden')) {
       return null;
     }
 
-    // Skip very small elements
-    if (element.offsetWidth < 10 || element.offsetHeight < 10) {
+    // Skip elements with hidden attribute
+    if (element.hasAttribute('hidden')) {
+      return null;
+    }
+
+    // Skip empty elements (no content and no children with content)
+    const hasContent = element.textContent.trim().length > 0 ||
+                       element.querySelector('img, svg, input, button') !== null;
+    if (!hasContent && element.children.length === 0) {
       return null;
     }
 
