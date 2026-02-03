@@ -890,6 +890,7 @@ validateStyleMatch({ userStyle, suggestion })
 
 > Establish complete end-to-end pipeline with minimal automation and maximum control.
 > **Goal:** Prove feasibility, validate architecture, establish control baseline.
+> **Implementation Plan:** [docs/PLAN-phase0-implementation.md](docs/PLAN-phase0-implementation.md)
 
 #### What Phase 0 Delivers
 - `wear` category only
