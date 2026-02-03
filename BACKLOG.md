@@ -709,6 +709,7 @@
 
 > AI-powered widgets that analyze user collections and generate personalized recommendations.
 > **Tech Spec:** [docs/TECH-ai-widget-system.md](docs/TECH-ai-widget-system.md)
+> **Architecture:** [docs/ARCH-ai-widget-pipeline.md](docs/ARCH-ai-widget-pipeline.md)
 
 ### Story: Supabase CLI Setup ← HIGH PRIORITY
 > As a developer, I want local Supabase development for faster iteration.
@@ -746,6 +747,7 @@
 
 ### Story: Brand Intelligence Service
 > As a system, I want centralized brand knowledge and validation.
+> **See:** [ARCH-ai-widget-pipeline.md#layer-4-brand-intelligence-service](docs/ARCH-ai-widget-pipeline.md#layer-4-brand-intelligence-service)
 
 **Tasks:**
 - [ ] Extract brand logic into dedicated service module
@@ -769,6 +771,7 @@
 
 ### Story: Image Resolution Pipeline Abstraction
 > As a system, I want a pluggable strategy pattern for image fetching.
+> **See:** [ARCH-ai-widget-pipeline.md#layer-5-image-resolution-pipeline](docs/ARCH-ai-widget-pipeline.md#layer-5-image-resolution-pipeline)
 
 **Tasks:**
 - [ ] Define `ImageStrategy` interface
@@ -782,6 +785,7 @@
 
 ### Story: Prompt Engineering Framework
 > As a developer, I want structured prompt building with constraints.
+> **See:** [ARCH-ai-widget-pipeline.md#layer-2-prompt-engineering-framework](docs/ARCH-ai-widget-pipeline.md#layer-2-prompt-engineering-framework)
 
 **Tasks:**
 - [ ] Create PromptBuilder class
@@ -795,6 +799,7 @@
 
 ### Story: Response Parser & Validator
 > As a system, I want robust parsing of AI responses.
+> **See:** [ARCH-ai-widget-pipeline.md#layer-3-response-parser--validator](docs/ARCH-ai-widget-pipeline.md#layer-3-response-parser--validator)
 
 **Tasks:**
 - [ ] Extract JSON from text with preamble
