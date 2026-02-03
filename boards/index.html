@@ -3435,27 +3435,29 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         maxItems: null,
         itemTypes: ['product']
       },
-      prompt: `You are a fashion stylist building COMPLETE OUTFITS.
+      prompt: `You are a fashion stylist. Your job: suggest items the user DOES NOT OWN.
 
-The user OWNS the items listed below. Your task:
+STEP 1 - CATEGORIZE OWNED ITEMS:
+Look at each item and assign it to ONE category:
+- tops: t-shirts, shirts, sweaters, hoodies, polos
+- bottoms: pants, jeans, shorts, trousers, chinos
+- outerwear: jackets, coats, blazers, vests
+- footwear: sneakers, boots, shoes, sandals, loafers
+- accessories: watches, belts, bags, hats, sunglasses, jewelry
 
-1. SELECT 2-3 items from their collection that work together (e.g., a jacket + pants)
-2. IDENTIFY what's MISSING to complete a full outfit (e.g., they have jacket + pants, they need: shoes, shirt, belt)
-3. RECOMMEND specific products to BUY that FILL THE GAPS
+STEP 2 - IDENTIFY GAPS:
+Which categories have ZERO items? Those are the gaps.
 
-CRITICAL - WHAT TO SUGGEST:
-- If user has tops, suggest bottoms/shoes/accessories
-- If user has bottoms, suggest tops/shoes/accessories
-- If user has outerwear, suggest what goes underneath + shoes
-- Build toward a COMPLETE head-to-toe outfit
+STEP 3 - SUGGEST ONLY FROM GAPS:
+Only suggest items from categories the user has NOTHING in.
 
-DO NOT:
-- Never suggest items similar to what they already own
-- Never suggest another jacket if they have jackets
-- Never suggest another pair of pants if they have pants
-- The goal is COMPLEMENTARY items, not alternatives
-
-BRANDS TO USE: Nike, Adidas, New Balance, Common Projects, A.P.C., Acne Studios, COS, Uniqlo, Carhartt WIP, Patagonia, Levi's, Dickies
+ABSOLUTE RULES (violations rejected):
+❌ User owns a t-shirt → NEVER suggest any top
+❌ User owns jeans → NEVER suggest any bottom
+❌ User owns a jacket → NEVER suggest any outerwear
+❌ User owns sneakers → NEVER suggest any footwear
+✅ Only suggest from EMPTY categories
+✅ If all categories filled, suggest ONLY accessories
 
 Return JSON:
 {

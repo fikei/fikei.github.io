@@ -408,18 +408,69 @@ async function scrapeProductImage(brandName: string, query: string): Promise<{ i
   }
 }
 
+// Check if a brand is in our supported list
+function isSupportedBrand(brandName: string): boolean {
+  const brandLower = brandName.toLowerCase()
+  return BRANDS.some(brand =>
+    brand.keywords.some(kw => brandLower.includes(kw) || kw.includes(brandLower))
+  )
+}
+
+// Get a random supported brand for a category
+function getRandomSupportedBrand(category: string): string {
+  const categoryBrands: Record<string, string[]> = {
+    footwear: ['New Balance', 'Nike', 'Adidas', 'Vans', 'Converse', 'Common Projects', 'Clarks', 'Dr. Martens'],
+    tops: ['Reigning Champ', 'Todd Snyder', 'Buck Mason', 'Taylor Stitch', 'Uniqlo', 'COS', 'Carhartt WIP'],
+    bottoms: ['Naked & Famous', '3sixteen', "Levi's", 'Carhartt WIP', 'Outlier', 'Buck Mason'],
+    outerwear: ['Patagonia', 'The North Face', "Arc'teryx", 'Carhartt WIP', 'Norse Projects'],
+    accessories: ['Timex', 'Casio', 'Seiko', 'Bellroy', 'Moscot', 'Miansai', 'Topo Designs']
+  }
+  const brands = categoryBrands[category] || categoryBrands['accessories']
+  return brands[Math.floor(Math.random() * brands.length)]
+}
+
+// Validate and fix suggestions - filter out unsupported brands
+function validateSuggestions(suggestions: any[]): any[] {
+  console.log('[validate] Checking', suggestions.length, 'suggestions for valid brands')
+
+  const validated = suggestions.map((sug, index) => {
+    const brandName = sug.brand || ''
+    const isValid = isSupportedBrand(brandName)
+
+    console.log(`[validate ${index}] "${sug.name}" - brand: "${brandName}" - valid: ${isValid}`)
+
+    if (!isValid && brandName) {
+      // Replace with a supported brand for this category
+      const newBrand = getRandomSupportedBrand(sug.category || 'accessories')
+      console.log(`[validate ${index}] REPLACING unsupported brand "${brandName}" with "${newBrand}"`)
+      return {
+        ...sug,
+        brand: newBrand,
+        searchQuery: `${newBrand} ${sug.name.replace(brandName, '').trim()}`.trim()
+      }
+    }
+
+    return sug
+  })
+
+  return validated
+}
+
 // Enrich suggestions with scraped images from brand websites
 async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
   console.log('[enrich] Starting enrichment for', suggestions.length, 'suggestions')
   console.log('[enrich] Raw AI suggestions:', JSON.stringify(suggestions, null, 2))
 
+  // First validate brands
+  const validatedSuggestions = validateSuggestions(suggestions)
+
   const enriched = await Promise.all(
-    suggestions.map(async (sug, index) => {
+    validatedSuggestions.map(async (sug, index) => {
       const searchQuery = sug.searchQuery || sug.name
       const brandName = sug.brand || ''
 
       console.log(`[enrich ${index}] Processing: "${sug.name}"`)
-      console.log(`[enrich ${index}] - brand from AI: "${brandName}"`)
+      console.log(`[enrich ${index}] - brand: "${brandName}"`)
       console.log(`[enrich ${index}] - searchQuery: "${searchQuery}"`)
 
       const result = await scrapeProductImage(brandName, searchQuery)
