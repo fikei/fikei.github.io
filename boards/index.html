@@ -3514,7 +3514,7 @@ Return JSON:
       </div>`;
   }
 
-  // Fallback render without AI
+  // Fallback render without AI - generate smart suggestions based on item categories
   function renderCompleteTheLookFallback(widget, items) {
     const selectedItems = [...items].sort(() => Math.random() - 0.5).slice(0, 3);
 
@@ -3535,11 +3535,32 @@ Return JSON:
         </a>`;
     }
 
+    // Generate generic suggestions based on what categories might be missing
+    const fallbackSuggestions = [
+      { name: 'Classic White Sneakers', category: 'footwear', searchQuery: 'white leather sneakers' },
+      { name: 'Minimalist Watch', category: 'accessories', searchQuery: 'minimalist watch' },
+      { name: 'Neutral Tote Bag', category: 'accessories', searchQuery: 'leather tote bag neutral' }
+    ];
+
+    let suggestionsHtml = '';
+    for (const sug of fallbackSuggestions) {
+      const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery)}`;
+      suggestionsHtml += `
+        <div class="widget-complete__item widget-complete__item--suggestion">
+          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__image-wrap">
+            <div class="widget-complete__suggestion-icon">Shop</div>
+          </a>
+          <div class="widget-complete__item-title">${esc(sug.name)}</div>
+          <div class="widget-complete__item-reason">${esc(sug.category)}</div>
+          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Search →</a>
+        </div>`;
+    }
+
     return `
       <div class="widget-complete">
         <div class="widget-complete__header">
           <span class="widget-complete__title">${widget.name}</span>
-          <span class="widget-complete__subtitle">Add ANTHROPIC_API_KEY for AI suggestions</span>
+          <span class="widget-complete__subtitle">Suggested pairings</span>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
@@ -3549,11 +3570,7 @@ Return JSON:
           <div class="widget-complete__divider"></div>
           <div class="widget-complete__section">
             <div class="widget-complete__section-title">Complete With</div>
-            <div class="widget-complete__items">
-              <div class="widget-empty">
-                <div class="widget-empty__text">AI suggestions unavailable</div>
-              </div>
-            </div>
+            <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
         </div>
       </div>`;
