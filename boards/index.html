@@ -1948,6 +1948,265 @@ body {
   letter-spacing: 0.05em;
   margin-left: var(--space-2);
 }
+
+/* ============================================
+   AI Widget System
+   Uses design system tokens from tokens.css
+   ============================================ */
+
+/* Widget Container */
+.widget-section {
+  display: none;
+  padding: var(--space-4) var(--space-4) 0;
+  margin-bottom: var(--space-2);
+}
+
+.widget-section--visible {
+  display: block;
+}
+
+.widget-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.widget-section__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.widget-section__refresh {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  transition: color 0.15s;
+}
+
+.widget-section__refresh:hover {
+  color: var(--fg);
+}
+
+.widget-section__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Outfit Builder Widget - extends .card pattern */
+.widget-outfit {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
+}
+
+.widget-outfit__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.widget-outfit__title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-base);
+  color: var(--fg);
+}
+
+.widget-outfit__subtitle {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.widget-outfit__scroll {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--subtle) transparent;
+}
+
+.widget-outfit__scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.widget-outfit__scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.widget-outfit__scroll::-webkit-scrollbar-thumb {
+  background: var(--subtle);
+}
+
+.widget-outfit__item {
+  flex: 0 0 auto;
+  width: 120px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s;
+}
+
+.widget-outfit__item:hover {
+  transform: translateY(-2px);
+}
+
+.widget-outfit__image-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  background: var(--subtle);
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+}
+
+.widget-outfit__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.widget-outfit__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--muted);
+  background: var(--subtle);
+}
+
+.widget-outfit__item-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.widget-outfit__item-meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Style Summary Widget */
+.widget-style {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
+}
+
+.widget-style__header {
+  margin-bottom: var(--space-3);
+}
+
+.widget-style__label {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  color: var(--fg);
+  margin-bottom: var(--space-1);
+}
+
+.widget-style__sublabel {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.widget-style__traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Style trait uses .token pattern from design system */
+.widget-style__trait {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+}
+
+/* Widget Loading State */
+.widget--loading {
+  position: relative;
+  min-height: 100px;
+}
+
+.widget--loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget__loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+/* Widget Empty State */
+.widget-empty {
+  padding: var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--subtle);
+}
+
+.widget-empty__text {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .widget-outfit__item {
+    width: 100px;
+  }
+
+  .widget-outfit__image-wrap {
+    width: 100px;
+    height: 100px;
+  }
+
+  .widget-style__traits {
+    flex-direction: column;
+  }
+
+  .widget-style__trait {
+    text-align: center;
+  }
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1982,6 +2241,15 @@ body {
   <nav class="filters" id="filters">
     <button class="filter-token filter-token--active" data-category="all">All</button>
   </nav>
+
+  <!-- AI Widget Section -->
+  <section class="widget-section" id="widgetSection">
+    <div class="widget-section__header">
+      <span class="widget-section__title">AI Insights</span>
+      <button class="widget-section__refresh" id="widgetRefresh">Refresh</button>
+    </div>
+    <div class="widget-section__content" id="widgetContent"></div>
+  </section>
 
   <main class="grid" id="grid"></main>
 
@@ -2541,6 +2809,460 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     console.log('[classify]', rulesResult.type, 'via', rulesResult.source, rulesResult.confidence);
     return rulesResult;
   }
+
+  // ============================================
+  // AI Widget System
+  // Generates outfit-builder and style-summary widgets
+  // ============================================
+
+  // Widget Templates (JSON-first design)
+  const WIDGET_TEMPLATES = {
+    'outfit-builder': {
+      widgetType: 'outfit-builder',
+      version: '1.0',
+      layout: 'horizontal_scroll',
+      constraints: {
+        minItems: 3,
+        maxItems: 6
+      },
+      title: 'Complete the Look',
+      subtitle: 'Curated outfit from your collection'
+    },
+    'style-summary': {
+      widgetType: 'style-summary',
+      version: '1.0',
+      layout: 'card',
+      constraints: {
+        minTraits: 2,
+        maxTraits: 4
+      }
+    }
+  };
+
+  // Pre-defined style vocabulary (MVP - will be AI-generated post-MVP)
+  const STYLE_VOCABULARY = {
+    labels: [
+      'Minimal Modern', 'Classic Refined', 'Streetwear Edge', 'Bohemian Spirit',
+      'Athletic Utility', 'Smart Casual', 'Urban Explorer', 'Relaxed Tailored',
+      'Avant-Garde', 'Timeless Elegance', 'Contemporary Mix', 'Rugged Outdoor'
+    ],
+    traits: {
+      color: ['Neutral palette', 'Monochromatic', 'Earth tones', 'Bold colors', 'Muted tones', 'High contrast'],
+      material: ['Natural fabrics', 'Technical materials', 'Luxe textures', 'Mixed textiles', 'Denim-forward'],
+      silhouette: ['Relaxed fit', 'Tailored lines', 'Oversized shapes', 'Slim profile', 'Layered looks'],
+      vibe: ['Understated', 'Statement-making', 'Effortlessly cool', 'Polished', 'Casual', 'Refined']
+    }
+  };
+
+  // Normalize wear items for widget generation
+  function normalizeWearItems(links) {
+    return links
+      .filter(l => l.category === 'wear' && !l.loading)
+      .map(l => ({
+        id: l.id,
+        itemType: l.content_type || 'product',
+        category: 'wear',
+        attributes: {
+          title: l.title || '',
+          description: l.description || '',
+          domain: l.domain || '',
+          // Future AI enrichment fields (stubbed for MVP)
+          brand: null,
+          color: [],
+          material: [],
+          price: null,
+          tags: []
+        },
+        media: {
+          image: l.image || null
+        },
+        source: {
+          system: 'boards',
+          originalId: l.id,
+          url: l.url
+        }
+      }));
+  }
+
+  // Analyze items and determine which widgets to generate
+  function analyzeWidgetIntent(normalizedItems) {
+    const intents = [];
+
+    // Generate outfit-builder if >= 3 wear items
+    if (normalizedItems.length >= WIDGET_TEMPLATES['outfit-builder'].constraints.minItems) {
+      intents.push({
+        widgetType: 'outfit-builder',
+        category: 'wear',
+        items: selectOutfitItems(normalizedItems),
+        priority: 1
+      });
+    }
+
+    // Always generate style-summary when wear items exist
+    if (normalizedItems.length >= 1) {
+      intents.push({
+        widgetType: 'style-summary',
+        category: 'wear',
+        items: normalizedItems,
+        styleData: analyzeStyleFromItems(normalizedItems),
+        priority: 2
+      });
+    }
+
+    return intents.sort((a, b) => a.priority - b.priority);
+  }
+
+  // Select items for outfit (MVP: category diversity heuristic)
+  function selectOutfitItems(items) {
+    const template = WIDGET_TEMPLATES['outfit-builder'];
+    const maxItems = template.constraints.maxItems;
+
+    // For MVP, shuffle and take up to maxItems
+    // Post-MVP: Use AI to select complementary items
+    const shuffled = [...items].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, maxItems);
+  }
+
+  // Analyze style from items (MVP: heuristic-based)
+  function analyzeStyleFromItems(items) {
+    // MVP: Random selection from vocabulary
+    // Post-MVP: AI-driven analysis based on enriched attributes
+    const labelIndex = Math.floor(Math.random() * STYLE_VOCABULARY.labels.length);
+    const label = STYLE_VOCABULARY.labels[labelIndex];
+
+    // Pick random traits from different categories
+    const traitCategories = Object.keys(STYLE_VOCABULARY.traits);
+    const selectedTraits = [];
+    const shuffledCategories = [...traitCategories].sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < Math.min(3, shuffledCategories.length); i++) {
+      const category = shuffledCategories[i];
+      const categoryTraits = STYLE_VOCABULARY.traits[category];
+      const randomTrait = categoryTraits[Math.floor(Math.random() * categoryTraits.length)];
+      selectedTraits.push(randomTrait);
+    }
+
+    return {
+      label,
+      traits: selectedTraits,
+      itemCount: items.length
+    };
+  }
+
+  // Build widget spec from intent + template
+  function buildWidgetSpec(intent) {
+    const template = WIDGET_TEMPLATES[intent.widgetType];
+    if (!template) {
+      console.error('[widget] Unknown widget type:', intent.widgetType);
+      return null;
+    }
+
+    if (intent.widgetType === 'outfit-builder') {
+      // Validate constraints
+      if (intent.items.length < template.constraints.minItems) {
+        console.log('[widget] Not enough items for outfit-builder');
+        return null;
+      }
+
+      return {
+        widgetType: 'outfit-builder',
+        layout: template.layout,
+        title: template.title,
+        subtitle: template.subtitle,
+        items: intent.items.map(item => ({
+          id: item.id,
+          title: item.attributes.title,
+          domain: item.attributes.domain,
+          image: item.media.image,
+          url: item.source.url
+        }))
+      };
+    }
+
+    if (intent.widgetType === 'style-summary') {
+      return {
+        widgetType: 'style-summary',
+        layout: template.layout,
+        label: intent.styleData.label,
+        sublabel: `Based on ${intent.styleData.itemCount} item${intent.styleData.itemCount > 1 ? 's' : ''}`,
+        traits: intent.styleData.traits
+      };
+    }
+
+    return null;
+  }
+
+  // Render outfit-builder widget HTML
+  function renderOutfitWidget(spec) {
+    let itemsHtml = '';
+    for (const item of spec.items) {
+      const hasImage = item.image && item.image.length > 0;
+      const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+
+      itemsHtml += `
+        <a href="${item.url}" target="_blank" rel="noopener" class="widget-outfit__item">
+          <div class="widget-outfit__image-wrap">
+            ${hasImage
+              ? `<img class="widget-outfit__image" src="${secureImg(item.image)}" alt="" loading="lazy">`
+              : `<span class="widget-outfit__placeholder">${initial}</span>`
+            }
+          </div>
+          <div class="widget-outfit__item-title">${esc(item.title)}</div>
+          <div class="widget-outfit__item-meta">${esc(item.domain)}</div>
+        </a>`;
+    }
+
+    return `
+      <div class="widget-outfit">
+        <div class="widget-outfit__header">
+          <span class="widget-outfit__title">${spec.title}</span>
+          <span class="widget-outfit__subtitle">${spec.items.length} items</span>
+        </div>
+        <div class="widget-outfit__scroll">
+          ${itemsHtml}
+        </div>
+      </div>`;
+  }
+
+  // Render style-summary widget HTML
+  function renderStyleWidget(spec) {
+    const traitsHtml = spec.traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
+
+    return `
+      <div class="widget-style">
+        <div class="widget-style__header">
+          <div class="widget-style__label">${esc(spec.label)}</div>
+          <div class="widget-style__sublabel">${esc(spec.sublabel)}</div>
+        </div>
+        <div class="widget-style__traits">
+          ${traitsHtml}
+        </div>
+      </div>`;
+  }
+
+  // Main widget generation function
+  function generateWidgets() {
+    const widgetSection = $('widgetSection');
+    const widgetContent = $('widgetContent');
+
+    // Only show widgets when filtering to 'wear' category
+    if (currentFilter !== 'wear') {
+      widgetSection.classList.remove('widget-section--visible');
+      return;
+    }
+
+    const allLinks = getAllLinks();
+    const normalizedItems = normalizeWearItems(allLinks);
+
+    console.log('[widget] Normalized wear items:', normalizedItems.length);
+
+    // Check if we have enough items
+    if (normalizedItems.length < 1) {
+      widgetSection.classList.remove('widget-section--visible');
+      return;
+    }
+
+    // Analyze and get widget intents
+    const intents = analyzeWidgetIntent(normalizedItems);
+    console.log('[widget] Widget intents:', intents);
+
+    if (intents.length === 0) {
+      widgetSection.classList.remove('widget-section--visible');
+      return;
+    }
+
+    // Build and render widgets
+    let html = '';
+    for (const intent of intents) {
+      const spec = buildWidgetSpec(intent);
+      if (!spec) continue;
+
+      if (spec.widgetType === 'outfit-builder') {
+        html += renderOutfitWidget(spec);
+      } else if (spec.widgetType === 'style-summary') {
+        html += renderStyleWidget(spec);
+      }
+    }
+
+    if (html) {
+      widgetContent.innerHTML = html;
+      widgetSection.classList.add('widget-section--visible');
+    } else {
+      widgetSection.classList.remove('widget-section--visible');
+    }
+  }
+
+  // Widget refresh button handler
+  function initWidgetSystem() {
+    const refreshBtn = $('widgetRefresh');
+    if (refreshBtn) {
+      refreshBtn.onclick = () => {
+        console.log('[widget] Manual refresh triggered');
+        generateWidgets();
+      };
+    }
+  }
+
+  // ============================================
+  // AI Wear Enrichment (Post-MVP Feature)
+  // Calls Supabase Edge Function to extract style attributes
+  // ============================================
+
+  // Cache for enriched wear attributes
+  const WEAR_ENRICHMENT_CACHE_KEY = 'boards_wear_enrichment';
+  let wearEnrichmentCache = {};
+
+  function loadWearEnrichmentCache() {
+    try {
+      wearEnrichmentCache = JSON.parse(localStorage.getItem(WEAR_ENRICHMENT_CACHE_KEY) || '{}');
+    } catch { wearEnrichmentCache = {}; }
+  }
+
+  function saveWearEnrichmentCache() {
+    try {
+      localStorage.setItem(WEAR_ENRICHMENT_CACHE_KEY, JSON.stringify(wearEnrichmentCache));
+    } catch {}
+  }
+
+  // Enrich wear items with AI-extracted attributes
+  async function enrichWearItems(items) {
+    // Filter items that aren't already cached
+    const uncached = items.filter(item => !wearEnrichmentCache[item.id]);
+
+    if (uncached.length === 0) {
+      console.log('[widget] All items already enriched');
+      return items.map(item => ({
+        ...item,
+        enrichedAttributes: wearEnrichmentCache[item.id] || null
+      }));
+    }
+
+    console.log('[widget] Enriching', uncached.length, 'items via AI');
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-wear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          items: uncached.map(item => ({
+            id: item.id,
+            url: item.source.url,
+            title: item.attributes.title,
+            description: item.attributes.description,
+            image: item.media.image
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        console.error('[widget] Enrichment API error:', response.status);
+        return items;
+      }
+
+      const { results } = await response.json();
+
+      // Cache results
+      for (const result of results) {
+        if (result.confidence > 0.3) {
+          wearEnrichmentCache[result.id] = result.attributes;
+        }
+      }
+      saveWearEnrichmentCache();
+
+      console.log('[widget] Enrichment complete:', results.length, 'items');
+
+    } catch (e) {
+      console.error('[widget] Enrichment error:', e);
+    }
+
+    // Return items with enriched attributes
+    return items.map(item => ({
+      ...item,
+      enrichedAttributes: wearEnrichmentCache[item.id] || null
+    }));
+  }
+
+  // Enhanced style analysis using enriched attributes
+  function analyzeStyleFromEnrichedItems(items) {
+    // Check if any items have enriched attributes
+    const enrichedItems = items.filter(item => item.enrichedAttributes);
+
+    if (enrichedItems.length === 0) {
+      // Fall back to heuristic analysis
+      return analyzeStyleFromItems(items);
+    }
+
+    // Aggregate style attributes from enriched items
+    const allStyles = [];
+    const allColors = [];
+    const allMaterials = [];
+
+    for (const item of enrichedItems) {
+      const attrs = item.enrichedAttributes;
+      if (attrs.style) allStyles.push(...attrs.style);
+      if (attrs.colors) allColors.push(...attrs.colors);
+      if (attrs.materials) allMaterials.push(...attrs.materials);
+    }
+
+    // Determine dominant style
+    const styleCounts = {};
+    for (const style of allStyles) {
+      styleCounts[style] = (styleCounts[style] || 0) + 1;
+    }
+    const dominantStyle = Object.entries(styleCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Contemporary';
+
+    // Build traits from actual attributes
+    const traits = [];
+
+    // Color trait
+    const uniqueColors = [...new Set(allColors)].slice(0, 3);
+    if (uniqueColors.length > 0) {
+      traits.push(uniqueColors.length === 1
+        ? `${cap(uniqueColors[0])} focused`
+        : `${uniqueColors.map(cap).join(' & ')} palette`
+      );
+    }
+
+    // Material trait
+    const uniqueMaterials = [...new Set(allMaterials)].slice(0, 2);
+    if (uniqueMaterials.length > 0) {
+      traits.push(`${uniqueMaterials.map(cap).join(' + ')} blend`);
+    }
+
+    // Style trait
+    if (dominantStyle) {
+      traits.push(`${cap(dominantStyle)} aesthetic`);
+    }
+
+    // Fallback to vocabulary if not enough traits
+    while (traits.length < 2) {
+      const fallbackCategories = Object.keys(STYLE_VOCABULARY.traits);
+      const randomCategory = fallbackCategories[Math.floor(Math.random() * fallbackCategories.length)];
+      const randomTrait = STYLE_VOCABULARY.traits[randomCategory][Math.floor(Math.random() * STYLE_VOCABULARY.traits[randomCategory].length)];
+      if (!traits.includes(randomTrait)) {
+        traits.push(randomTrait);
+      }
+    }
+
+    // Generate a more accurate label
+    const label = dominantStyle
+      ? `${cap(dominantStyle)} Style`
+      : STYLE_VOCABULARY.labels[Math.floor(Math.random() * STYLE_VOCABULARY.labels.length)];
+
+    return {
+      label,
+      traits: traits.slice(0, 4),
+      itemCount: items.length,
+      enrichedCount: enrichedItems.length
+    };
+  }
+
+  // Initialize enrichment cache on load
+  loadWearEnrichmentCache();
 
   // ============================================
   // Image Resolution System
@@ -4231,6 +4953,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
       renderGrid();
+      generateWidgets();
       updateShareButton();
     }
   };
@@ -5890,6 +6613,8 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();
     renderGrid();
+    initWidgetSystem();
+    generateWidgets();
     console.log(`[perf] Initial render: ${(performance.now() - initStart).toFixed(0)}ms`);
 
     // Listen for auth changes
@@ -5929,6 +6654,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
         renderFilters();
         renderGrid();
+        generateWidgets();
         console.log('[sync] Updated from cloud');
       } else {
         console.log('[sync] No cloud data returned');
