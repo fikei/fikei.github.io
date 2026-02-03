@@ -3153,12 +3153,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.8.0-product-images';
-  console.log('===========================================');
-  console.log('BOARDS VERSION: ' + VERSION);
-  console.log('===========================================');
-  console.warn('[WARN] BOARDS ' + VERSION + ' LOADED');
-  console.error('[ERROR TEST] BOARDS ' + VERSION + ' - NOT A REAL ERROR, JUST TESTING');
+  const VERSION = '1.9.0';
+  console.log('[boards] v' + VERSION);
 
   // ============================================
   // Supabase Setup
@@ -3505,6 +3501,7 @@ Return JSON:
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
   let widgetCache = {};
+  let widgetRefreshCounter = 0; // Incremented on each refresh to get different results
 
   function loadWidgetCache() {
     try {
@@ -3518,8 +3515,9 @@ Return JSON:
     } catch {}
   }
 
-  function getCacheKey(widgetId, itemIds) {
-    return `${widgetId}:${itemIds.sort().join(',')}`;
+  function getCacheKey(widgetId, itemIds, includeRefresh = false) {
+    const base = `${widgetId}:${itemIds.sort().join(',')}`;
+    return includeRefresh ? `${base}:v${widgetRefreshCounter}` : base;
   }
 
   // Widget status overrides (persisted in localStorage)
@@ -3753,19 +3751,7 @@ Return JSON:
 
   // Get applicable widgets for current context
   function getApplicableWidgets(items, currentCategory) {
-    console.log('[WIDGET] getApplicableWidgets() called');
-    console.log('[WIDGET] items count:', items?.length);
-    console.log('[WIDGET] currentCategory:', currentCategory);
-
     const allWidgets = Object.values(WIDGET_REGISTRY);
-    console.log('[WIDGET] Total widgets in registry:', allWidgets.length);
-
-    for (const w of allWidgets) {
-      const status = getWidgetStatus(w.id);
-      const criteriaOk = checkWidgetCriteria(w, items, currentCategory);
-      console.log(`[WIDGET] Widget "${w.id}": status=${status}, criteriaOk=${criteriaOk}`);
-    }
-
     return allWidgets
       .filter(w => getWidgetStatus(w.id) === 'active') // Use effective status
       .filter(w => shouldShowWidget(w.id)) // Respect user preferences (hidden/dismissed)
@@ -3779,19 +3765,32 @@ Return JSON:
       });
   }
 
+  // Shuffle array randomly (Fisher-Yates)
+  function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   // Call AI to generate widget content via Edge Function
   async function generateWidgetContent(widget, items) {
-    const cacheKey = getCacheKey(widget.id, items.map(i => i.id));
+    // Include refresh counter in cache key so refresh gets different results
+    const cacheKey = getCacheKey(widget.id, items.map(i => i.id), true);
 
     // Check local cache first (valid for 1 hour)
     const cached = widgetCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp) < 3600000) {
-      console.log('[widget] Using cached result for', widget.id);
       return cached.data;
     }
 
+    // Shuffle items so AI sees them in different order each time
+    const shuffledItems = shuffleArray(items);
+
     // Prepare items for the Edge Function
-    const itemsPayload = items.map(i => ({
+    const itemsPayload = shuffledItems.map(i => ({
       id: i.id,
       title: i.title,
       description: i.description || '',
@@ -3799,9 +3798,12 @@ Return JSON:
       url: i.url
     }));
 
-    try {
-      console.log('[widget] Calling generate-widget Edge Function for', widget.id);
+    // Add variation instruction to prompt
+    const variationPrompt = widgetRefreshCounter > 0
+      ? `\n\nIMPORTANT: This is variation #${widgetRefreshCounter}. Choose a DIFFERENT combination of items than before. Pick items you haven't matched yet.`
+      : '';
 
+    try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
         headers: {
@@ -3810,7 +3812,7 @@ Return JSON:
         },
         body: JSON.stringify({
           widgetId: widget.id,
-          prompt: widget.prompt,
+          prompt: widget.prompt + variationPrompt,
           items: itemsPayload
         })
       });
@@ -3870,11 +3872,6 @@ Return JSON:
 
   // Unified Complete the Look widget - single component
   function renderCompleteTheLookWidget(widget, items, aiResult) {
-    console.log('%c[WIDGET] renderCompleteTheLookWidget CALLED', 'background: #ff0; color: #000; font-size: 14px; padding: 4px;');
-    console.log('[WIDGET] widget:', widget);
-    console.log('[WIDGET] items count:', items?.length);
-    console.log('[WIDGET] aiResult:', aiResult);
-
     // Enrich items with category and brand tier
     const enriched = items.map(item => ({
       ...item,
@@ -4057,25 +4054,17 @@ Return JSON:
   // Store inline widgets for grid injection
   let inlineWidgetHtml = '';
   const INLINE_WIDGET_POSITION = 8; // Insert inline widget after this many cards
+  let widgetGenerationInProgress = false; // Mutex to prevent duplicate generation
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
-    console.log('%c========== GENERATE WIDGETS START ==========', 'background: #0f0; color: #000; font-size: 16px; font-weight: bold; padding: 8px;');
-    console.log('%c[WIDGET] generateWidgets() called', 'background: #0f0; color: #000; font-size: 14px; padding: 4px;');
-    console.log('[WIDGET] currentFilter:', currentFilter);
-    console.log('[WIDGET] timestamp:', new Date().toISOString());
-
+    // Prevent duplicate generation
+    if (widgetGenerationInProgress) return;
+    widgetGenerationInProgress = true;
     const heroSection = $('widgetSection');
     const heroContent = $('widgetContent');
     const footerSection = $('widgetFooter');
     const footerContent = $('widgetFooterContent');
-
-    console.log('[WIDGET] DOM elements found:', {
-      heroSection: !!heroSection,
-      heroContent: !!heroContent,
-      footerSection: !!footerSection,
-      footerContent: !!footerContent
-    });
 
     // Reset all zones
     heroSection.classList.remove('widget-section--visible');
@@ -4084,40 +4073,28 @@ Return JSON:
 
     // Only show widgets when filtering to 'wear' category
     if (currentFilter !== 'wear') {
-      console.log('%c[WIDGET] NOT WEAR CATEGORY - SKIPPING', 'background: #f00; color: #fff; font-size: 14px; padding: 4px;');
-      console.log('[WIDGET] currentFilter is:', currentFilter, '(expected: wear)');
-      renderGrid(); // Re-render grid without inline widgets
+      renderGrid();
+      widgetGenerationInProgress = false;
       return;
     }
 
-    console.log('%c[WIDGET] WEAR CATEGORY DETECTED - PROCEEDING', 'background: #0f0; color: #000; font-size: 14px; padding: 4px;');
-
     const allLinks = getAllLinks();
-    console.log('[WIDGET] getAllLinks() returned:', allLinks?.length, 'links');
-
     const items = normalizeWearItems(allLinks);
-    console.log('[WIDGET] normalizeWearItems() returned:', items?.length, 'items');
-    console.log('[WIDGET] First 3 items:', items?.slice(0, 3).map(i => ({ title: i.title, domain: i.domain })));
 
     if (items.length < 1) {
-      console.log('%c[WIDGET] NO ITEMS - EXITING', 'background: #f00; color: #fff; font-size: 14px; padding: 4px;');
       renderGrid();
+      widgetGenerationInProgress = false;
       return;
     }
 
     // Get applicable widgets
     const applicableWidgets = getApplicableWidgets(items, 'wear');
-    console.log('[WIDGET] getApplicableWidgets() returned:', applicableWidgets?.length, 'widgets');
-    console.log('[WIDGET] Applicable widget IDs:', applicableWidgets?.map(w => w.id));
-    console.log('[WIDGET] WIDGET_REGISTRY:', Object.keys(WIDGET_REGISTRY));
 
     if (applicableWidgets.length === 0) {
-      console.log('%c[WIDGET] NO APPLICABLE WIDGETS - EXITING', 'background: #f00; color: #fff; font-size: 14px; padding: 4px;');
       renderGrid();
+      widgetGenerationInProgress = false;
       return;
     }
-
-    console.log('%c[WIDGET] FOUND ' + applicableWidgets.length + ' APPLICABLE WIDGETS', 'background: #0f0; color: #000; font-size: 14px; padding: 4px;');
 
     // Group widgets by zone
     const widgetsByZone = {
@@ -4125,12 +4102,6 @@ Return JSON:
       inline: applicableWidgets.filter(w => w.zone === 'inline'),
       footer: applicableWidgets.filter(w => w.zone === 'footer')
     };
-
-    console.log('[widget] Widgets by zone:', {
-      hero: widgetsByZone.hero.map(w => w.id),
-      inline: widgetsByZone.inline.map(w => w.id),
-      footer: widgetsByZone.footer.map(w => w.id)
-    });
 
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
@@ -4185,40 +4156,35 @@ Return JSON:
 
     // Re-render grid to inject inline widgets
     renderGrid();
+    widgetGenerationInProgress = false;
   }
 
   // Refresh a specific widget (called from widget refresh button)
   window.refreshWidget = async function(widgetId) {
-    console.log('[widget] Refreshing widget:', widgetId);
+    // Increment refresh counter to get different results
+    widgetRefreshCounter++;
 
-    // Clear cache for this specific widget
-    const allLinks = getAllLinks();
-    const items = normalizeWearItems(allLinks);
-    const cacheKey = getCacheKey(widgetId, items.map(i => i.id));
-
-    delete widgetCache[cacheKey];
+    // Clear ALL cache entries for this widget type to force fresh AI call
+    Object.keys(widgetCache).forEach(key => {
+      if (key.startsWith(widgetId + ':')) delete widgetCache[key];
+    });
     saveWidgetCache();
 
-    // Re-generate widgets
+    // Reset mutex and re-generate widgets
+    widgetGenerationInProgress = false;
     await generateWidgets();
   };
 
   // Widget refresh button handler
   function initWidgetSystem() {
-    console.log('%c[WIDGET] initWidgetSystem() CALLED', 'background: #ff0; color: #000; font-size: 14px; padding: 4px;');
     loadWidgetCache();
-    console.log('[WIDGET] widgetCache loaded:', Object.keys(widgetCache).length, 'entries');
     loadWidgetStatus();
-    console.log('[WIDGET] widgetStatusOverrides loaded:', widgetStatusOverrides);
     loadWidgetPrefs();
-    console.log('[WIDGET] widgetPrefs loaded:', widgetPrefs);
     loadWidgetFeedback();
-    console.log('[WIDGET] widgetFeedback loaded:', widgetFeedback);
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
       refreshBtn.onclick = () => {
-        console.log('[widget] Manual refresh triggered');
         // Clear cache for current items to force regeneration
         const allLinks = getAllLinks();
         const items = normalizeWearItems(allLinks);
@@ -7763,13 +7729,9 @@ Return JSON:
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();
     renderGrid();
-    console.log('%c========== WIDGET SYSTEM INITIALIZING ==========', 'background: #00f; color: #fff; font-size: 16px; font-weight: bold; padding: 8px;');
     initWidgetSystem();
-    console.log('[WIDGET] initWidgetSystem() completed');
-    console.log('[WIDGET] About to call generateWidgets()...');
     generateWidgets();
-    console.log('[WIDGET] generateWidgets() call completed');
-    console.log(`[perf] Initial render: ${(performance.now() - initStart).toFixed(0)}ms`);
+    console.log(`[perf] init: ${(performance.now() - initStart).toFixed(0)}ms`);
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange(onAuthStateChange);
