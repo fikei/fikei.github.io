@@ -664,16 +664,36 @@ class DesignSystemViewer {
     // States section
     this.renderStatesSection(component);
 
-    // Variants gallery
+    // Variants gallery with clickable previews
     if (component.variants?.length > 1) {
       this.variantsSection.hidden = false;
       this.variantsGallery.innerHTML = component.variants
         .map((v, i) => `
           <div class="variant-thumb ${i === 0 ? 'active' : ''}" data-index="${i}">
-            ${v.name || 'Variant ' + (i + 1)}
+            <div class="variant-thumb-preview">${v.html || '<span>—</span>'}</div>
+            <span class="variant-thumb-name">${v.name || 'Variant ' + (i + 1)}</span>
           </div>
         `)
         .join('');
+
+      // Bind click events for variant thumbs
+      this.variantsGallery.querySelectorAll('.variant-thumb').forEach(thumb => {
+        thumb.addEventListener('click', () => {
+          const index = parseInt(thumb.dataset.index);
+          // Update active state
+          this.variantsGallery.querySelectorAll('.variant-thumb').forEach(t => t.classList.remove('active'));
+          thumb.classList.add('active');
+          // Update variant select dropdown
+          if (this.variantSelect) this.variantSelect.value = index;
+          // Re-render preview with new variant
+          this.renderComponentPreview(component, index);
+          // Update code blocks
+          const variant = component.variants?.[index];
+          if (variant) {
+            this.updateCodeBlocksForComponent(component, variant);
+          }
+        });
+      });
     } else {
       this.variantsSection.hidden = true;
     }

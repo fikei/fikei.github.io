@@ -321,6 +321,11 @@ class SystemicApp {
     // Theme toggle
     this.themeToggle?.addEventListener('click', () => this.toggleTheme());
 
+    // Run a scan button (top right)
+    DOMUtils.$('#run-scan-btn')?.addEventListener('click', () => {
+      this.switchView('audit');
+    });
+
     // Go to audit button
     DOMUtils.$('[data-action="go-to-audit"]')?.addEventListener('click', () => {
       this.switchView('audit');
