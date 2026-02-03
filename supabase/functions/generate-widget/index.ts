@@ -1,6 +1,6 @@
 // Supabase Edge Function: generate-widget
 // Generates AI content for widgets based on PRD prompts
-// Now includes product search to find actual vendor URLs and images
+// Uses Shopify JSON API (primary) and HTML scraping (fallback) for product images
 //
 // POST /functions/v1/generate-widget
 // Body: { widgetId, prompt, items: Array<{ id, title, description, image, url }> }
@@ -14,745 +14,229 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Direct brand website configurations
-const BRANDS = [
+// Brand configurations with Shopify domains where applicable
+// shopifyDomain = use JSON API (most reliable)
+// searchUrl + imagePatterns = HTML scraping fallback
+const BRANDS: BrandConfig[] = [
+  // === SHOPIFY STORES (most reliable - use JSON API) ===
+  // Streetwear
+  { name: 'Stüssy', shopifyDomain: 'www.stussy.com', keywords: ['stussy', 'stüssy'] },
+  { name: 'Palace', shopifyDomain: 'shop.palaceskateboards.com', keywords: ['palace'] },
+  { name: 'BAPE', shopifyDomain: 'us.bape.com', keywords: ['bape', 'a bathing ape'] },
+  { name: 'Kith', shopifyDomain: 'kith.com', keywords: ['kith'] },
+  { name: 'Noah', shopifyDomain: 'noahny.com', keywords: ['noah'] },
+  { name: 'Aimé Leon Dore', shopifyDomain: 'www.aimeleondore.com', keywords: ['aime leon dore', 'ald'] },
+  { name: 'Awake NY', shopifyDomain: 'awakenyclothing.com', keywords: ['awake ny', 'awake'] },
+  { name: 'Brain Dead', shopifyDomain: 'wearebraindead.com', keywords: ['brain dead', 'braindead'] },
+
+  // Scandinavian / European
+  { name: 'Norse Projects', shopifyDomain: 'www.norseprojects.com', keywords: ['norse projects'] },
+  { name: 'Our Legacy', shopifyDomain: 'www.ourlegacy.com', keywords: ['our legacy'] },
+
+  // Contemporary Designer (Shopify)
+  { name: 'Lemaire', shopifyDomain: 'www.lemaire.fr', keywords: ['lemaire'] },
+  { name: 'Common Projects', shopifyDomain: 'www.commonprojects.com', keywords: ['common projects', 'achilles'] },
+
+  // DTC / Modern Basics
+  { name: 'Outlier', shopifyDomain: 'outlier.nyc', keywords: ['outlier'] },
+  { name: 'Reigning Champ', shopifyDomain: 'reigningchamp.com', keywords: ['reigning champ'] },
+  { name: 'Todd Snyder', shopifyDomain: 'www.toddsnyder.com', keywords: ['todd snyder'] },
+  { name: 'Buck Mason', shopifyDomain: 'www.buckmason.com', keywords: ['buck mason'] },
+  { name: 'Taylor Stitch', shopifyDomain: 'www.taylorstitch.com', keywords: ['taylor stitch'] },
+  { name: 'Alex Mill', shopifyDomain: 'www.alexmill.com', keywords: ['alex mill'] },
+  { name: 'Corridor', shopifyDomain: 'corridornyc.com', keywords: ['corridor'] },
+
+  // Premium Denim
+  { name: 'Naked & Famous', shopifyDomain: 'www.nakedandfamousdenim.com', keywords: ['naked and famous', 'naked & famous'] },
+  { name: '3sixteen', shopifyDomain: 'www.3sixteen.com', keywords: ['3sixteen'] },
+  { name: 'Iron Heart', shopifyDomain: 'www.ironheartamerica.com', keywords: ['iron heart'] },
+
+  // Bags & Accessories
+  { name: 'Topo Designs', shopifyDomain: 'topodesigns.com', keywords: ['topo designs', 'topo'] },
+  { name: 'Bellroy', shopifyDomain: 'bellroy.com', keywords: ['bellroy'] },
+
+  // Eyewear
+  { name: 'Moscot', shopifyDomain: 'moscot.com', keywords: ['moscot', 'lemtosh'] },
+  { name: 'Garrett Leight', shopifyDomain: 'www.garrettleight.com', keywords: ['garrett leight'] },
+
+  // Jewelry
+  { name: 'Miansai', shopifyDomain: 'www.miansai.com', keywords: ['miansai'] },
+  { name: 'Vitaly', shopifyDomain: 'www.vitalydesign.com', keywords: ['vitaly'] },
+
+  // Performance
+  { name: 'Satisfy Running', shopifyDomain: 'www.satisfyrunning.com', keywords: ['satisfy', 'satisfy running'] },
+  { name: 'District Vision', shopifyDomain: 'districtvision.com', keywords: ['district vision'] },
+
+  // Socks
+  { name: 'Anonymous Ism', shopifyDomain: 'anonymousism.com', keywords: ['anonymous ism'] },
+
+  // === NON-SHOPIFY (use search URL + patterns) ===
   // Athletic / Sneakers
   {
     name: 'Nike',
     searchUrl: (q: string) => `https://www.nike.com/w?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/static\.nike\.com\/[^"]+)"/i,
-      /"image":\s*"(https:\/\/static\.nike\.com\/[^"]+)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/static\.nike\.com\/[^"]+)"/i],
     keywords: ['nike', 'jordan', 'air jordan', 'air max', 'dunk', 'air force']
   },
   {
     name: 'Adidas',
     searchUrl: (q: string) => `https://www.adidas.com/us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/assets\.adidas\.com\/[^"]+)"/i,
-    ],
-    keywords: ['adidas', 'yeezy', 'samba', 'gazelle', 'stan smith', 'superstar', 'ultraboost']
+    imagePatterns: [/src="(https:\/\/assets\.adidas\.com\/[^"]+)"/i],
+    keywords: ['adidas', 'samba', 'gazelle', 'stan smith', 'superstar', 'ultraboost']
   },
   {
     name: 'New Balance',
     searchUrl: (q: string) => `https://www.newbalance.com/search/?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/nb\.scene7\.com\/[^"]+)"/i,
-    ],
-    keywords: ['new balance', '990', '550', '2002r', '1906', '574', '327']
-  },
-  {
-    name: 'Puma',
-    searchUrl: (q: string) => `https://us.puma.com/us/en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/images\.puma\.com\/[^"]+)"/i,
-    ],
-    keywords: ['puma', 'suede', 'clyde']
-  },
-  {
-    name: 'Reebok',
-    searchUrl: (q: string) => `https://www.reebok.com/us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/assets\.reebok\.com\/[^"]+)"/i,
-    ],
-    keywords: ['reebok', 'club c', 'classic leather']
+    imagePatterns: [/src="(https:\/\/nb\.scene7\.com\/[^"]+)"/i],
+    keywords: ['new balance', '990', '550', '2002r', '574', '327']
   },
   {
     name: 'Converse',
     searchUrl: (q: string) => `https://www.converse.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/www\.converse\.com\/[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/www\.converse\.com\/[^"]+\.jpg[^"]*)"/i],
     keywords: ['converse', 'chuck taylor', 'all star']
   },
   {
     name: 'Vans',
     searchUrl: (q: string) => `https://www.vans.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/images\.vans\.com\/[^"]+)"/i,
-    ],
-    keywords: ['vans', 'old skool', 'sk8-hi', 'authentic', 'era']
+    imagePatterns: [/src="(https:\/\/images\.vans\.com\/[^"]+)"/i],
+    keywords: ['vans', 'old skool', 'sk8-hi', 'authentic']
   },
   {
     name: 'ASICS',
     searchUrl: (q: string) => `https://www.asics.com/us/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/images\.asics\.com\/[^"]+)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/images\.asics\.com\/[^"]+)"/i],
     keywords: ['asics', 'gel-lyte', 'gel-kayano', 'gel-1130']
   },
   {
     name: 'Hoka',
     searchUrl: (q: string) => `https://www.hoka.com/en/us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+hoka[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+hoka[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['hoka', 'bondi', 'clifton', 'speedgoat']
   },
   {
     name: 'Salomon',
     searchUrl: (q: string) => `https://www.salomon.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+salomon[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+salomon[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['salomon', 'xt-6', 'xt-4', 'speedcross']
   },
-  // Luxury / Designer
-  {
-    name: 'Common Projects',
-    searchUrl: (q: string) => `https://www.commonprojects.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['common projects', 'achilles']
-  },
-  {
-    name: 'A.P.C.',
-    searchUrl: (q: string) => `https://www.apc.fr/wwus/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+apc[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['a.p.c.', 'apc', 'petit new standard', 'petit standard']
-  },
-  {
-    name: 'Acne Studios',
-    searchUrl: (q: string) => `https://www.acnestudios.com/us/en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+acnestudios[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['acne studios', 'acne']
-  },
-  // Fast Fashion / Basics
+
+  // Basics
   {
     name: 'Uniqlo',
     searchUrl: (q: string) => `https://www.uniqlo.com/us/en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/image\.uniqlo\.com\/[^"]+)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/image\.uniqlo\.com\/[^"]+)"/i],
     keywords: ['uniqlo']
   },
   {
     name: 'COS',
     searchUrl: (q: string) => `https://www.cos.com/en_usd/search.html?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+cos[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+cos[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['cos']
   },
-  {
-    name: 'Zara',
-    searchUrl: (q: string) => `https://www.zara.com/us/en/search?searchTerm=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/static\.zara\.net\/[^"]+)"/i,
-    ],
-    keywords: ['zara']
-  },
-  {
-    name: 'H&M',
-    searchUrl: (q: string) => `https://www2.hm.com/en_us/search-results.html?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+hm\.com[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['h&m', 'hm']
-  },
-  {
-    name: 'Gap',
-    searchUrl: (q: string) => `https://www.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+gap[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['gap']
-  },
-  // Workwear / Heritage
+
+  // Workwear
   {
     name: 'Carhartt WIP',
     searchUrl: (q: string) => `https://us.carhartt-wip.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+carhartt[^"]+\.jpg[^"]*)"/i,
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i],
     keywords: ['carhartt', 'carhartt wip']
   },
   {
-    name: 'Dickies',
-    searchUrl: (q: string) => `https://www.dickies.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+dickies[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['dickies', '874']
-  },
-  {
-    name: 'Levi\'s',
+    name: "Levi's",
     searchUrl: (q: string) => `https://www.levi.com/US/en_US/search/${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+levi[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['levi', 'levis', '501', '505', '511', '512']
+    imagePatterns: [/src="(https:\/\/[^"]+levi[^"]+\.(jpg|png|webp)[^"]*)"/i],
+    keywords: ['levi', 'levis', '501', '511', '512']
   },
-  // Outdoor / Technical
+
+  // Outdoor
   {
     name: 'Patagonia',
     searchUrl: (q: string) => `https://www.patagonia.com/search/?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+patagonia[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['patagonia', 'nano puff', 'better sweater', 'retro-x']
+    imagePatterns: [/src="(https:\/\/[^"]+patagonia[^"]+\.(jpg|png|webp)[^"]*)"/i],
+    keywords: ['patagonia', 'nano puff', 'better sweater']
   },
   {
     name: 'The North Face',
     searchUrl: (q: string) => `https://www.thenorthface.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+thenorthface[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+thenorthface[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['north face', 'nuptse', 'denali']
   },
   {
-    name: 'Arc\'teryx',
+    name: "Arc'teryx",
     searchUrl: (q: string) => `https://arcteryx.com/us/en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+arcteryx[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['arcteryx', 'arc\'teryx', 'atom', 'beta', 'alpha']
+    imagePatterns: [/src="(https:\/\/[^"]+arcteryx[^"]+\.(jpg|png|webp)[^"]*)"/i],
+    keywords: ['arcteryx', "arc'teryx", 'atom', 'beta', 'alpha']
   },
-  // Watches / Accessories
-  {
-    name: 'Timex',
-    searchUrl: (q: string) => `https://www.timex.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+timex[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['timex', 'weekender', 'marlin', 'q timex']
-  },
-  {
-    name: 'Casio',
-    searchUrl: (q: string) => `https://www.casio.com/us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+casio[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['casio', 'g-shock', 'f-91w', 'a168']
-  },
-  {
-    name: 'Seiko',
-    searchUrl: (q: string) => `https://www.seikowatches.com/us-en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+seiko[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['seiko', 'presage', 'prospex', 'skx']
-  },
-  // Streetwear
-  {
-    name: 'Stüssy',
-    searchUrl: (q: string) => `https://www.stussy.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['stussy', 'stüssy']
-  },
-  {
-    name: 'Palace',
-    searchUrl: (q: string) => `https://www.palaceskateboards.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['palace']
-  },
-  {
-    name: 'BAPE',
-    searchUrl: (q: string) => `https://us.bape.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['bape', 'a bathing ape', 'bathing ape']
-  },
-  {
-    name: 'Kith',
-    searchUrl: (q: string) => `https://kith.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['kith']
-  },
-  {
-    name: 'Noah',
-    searchUrl: (q: string) => `https://noahny.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['noah']
-  },
-  {
-    name: 'Aimé Leon Dore',
-    searchUrl: (q: string) => `https://www.aimeleondore.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['aime leon dore', 'aimé leon dore', 'ald']
-  },
-  {
-    name: 'Awake NY',
-    searchUrl: (q: string) => `https://awakenyclothing.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['awake ny', 'awake']
-  },
-  {
-    name: 'Brain Dead',
-    searchUrl: (q: string) => `https://wearebraindead.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['brain dead', 'braindead']
-  },
-  // Japanese Brands
-  {
-    name: 'WTAPS',
-    searchUrl: (q: string) => `https://www.wtaps.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+wtaps[^"]+\.jpg[^"]*)"/i,
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['wtaps']
-  },
-  {
-    name: 'Neighborhood',
-    searchUrl: (q: string) => `https://www.neighborhood.jp/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+neighborhood[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['neighborhood', 'nbhd']
-  },
-  {
-    name: 'Kapital',
-    searchUrl: (q: string) => `https://www.kapital-webshop.jp/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+kapital[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['kapital']
-  },
-  {
-    name: 'Visvim',
-    searchUrl: (q: string) => `https://www.visvim.tv/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+visvim[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['visvim']
-  },
-  {
-    name: 'Undercover',
-    searchUrl: (q: string) => `https://undercoverism.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+undercover[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['undercover', 'undercoverism']
-  },
-  {
-    name: 'Comme des Garçons',
-    searchUrl: (q: string) => `https://shop.doverstreetmarket.com/search?q=${encodeURIComponent(q + ' comme des garcons')}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['comme des garcons', 'cdg', 'comme des garçons']
-  },
-  {
-    name: 'Sacai',
-    searchUrl: (q: string) => `https://www.sacai.jp/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+sacai[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['sacai']
-  },
-  {
-    name: 'Needles',
-    searchUrl: (q: string) => `https://www.needles.jp/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+needles[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['needles', 'nepenthes']
-  },
-  // Scandinavian / European
-  {
-    name: 'Norse Projects',
-    searchUrl: (q: string) => `https://www.norseprojects.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['norse projects', 'norse']
-  },
-  {
-    name: 'Our Legacy',
-    searchUrl: (q: string) => `https://www.ourlegacy.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['our legacy']
-  },
-  {
-    name: 'Arket',
-    searchUrl: (q: string) => `https://www.arket.com/en_usd/search.html?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+arket[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['arket']
-  },
-  {
-    name: 'GANNI',
-    searchUrl: (q: string) => `https://www.ganni.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+ganni[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['ganni']
-  },
-  // Contemporary Designer
-  {
-    name: 'Lemaire',
-    searchUrl: (q: string) => `https://www.lemaire.fr/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['lemaire']
-  },
-  {
-    name: 'Jil Sander',
-    searchUrl: (q: string) => `https://www.jilsander.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+jilsander[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['jil sander']
-  },
-  {
-    name: 'Maison Margiela',
-    searchUrl: (q: string) => `https://www.maisonmargiela.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+margiela[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['margiela', 'maison margiela', 'mmm']
-  },
-  {
-    name: 'Rick Owens',
-    searchUrl: (q: string) => `https://www.rickowens.eu/en-US/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+rickowens[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['rick owens', 'drkshdw']
-  },
-  {
-    name: 'Ami Paris',
-    searchUrl: (q: string) => `https://www.amiparis.com/us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+amiparis[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['ami', 'ami paris']
-  },
-  // DTC / Modern Basics
-  {
-    name: 'Everlane',
-    searchUrl: (q: string) => `https://www.everlane.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+everlane[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['everlane']
-  },
-  {
-    name: 'Outlier',
-    searchUrl: (q: string) => `https://outlier.nyc/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['outlier']
-  },
-  {
-    name: 'Reigning Champ',
-    searchUrl: (q: string) => `https://reigningchamp.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['reigning champ']
-  },
-  {
-    name: 'Todd Snyder',
-    searchUrl: (q: string) => `https://www.toddsnyder.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['todd snyder']
-  },
-  {
-    name: 'Buck Mason',
-    searchUrl: (q: string) => `https://www.buckmason.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['buck mason']
-  },
-  {
-    name: 'Taylor Stitch',
-    searchUrl: (q: string) => `https://www.taylorstitch.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['taylor stitch']
-  },
-  {
-    name: 'Alex Mill',
-    searchUrl: (q: string) => `https://www.alexmill.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['alex mill']
-  },
-  {
-    name: 'Corridor',
-    searchUrl: (q: string) => `https://corridornyc.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['corridor']
-  },
-  // Specialty Footwear
+
+  // Footwear
   {
     name: 'Dr. Martens',
     searchUrl: (q: string) => `https://www.drmartens.com/us/en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+drmartens[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+drmartens[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['dr martens', 'dr. martens', 'doc martens', '1460', '1461']
   },
   {
     name: 'Birkenstock',
     searchUrl: (q: string) => `https://www.birkenstock.com/us/search/?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+birkenstock[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+birkenstock[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['birkenstock', 'boston', 'arizona']
   },
   {
     name: 'Clarks',
     searchUrl: (q: string) => `https://www.clarks.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+clarks[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+clarks[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['clarks', 'desert boot', 'wallabee']
-  },
-  {
-    name: 'Paraboot',
-    searchUrl: (q: string) => `https://www.paraboot.com/en/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+paraboot[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['paraboot', 'michael', 'chambord']
-  },
-  {
-    name: 'Blundstone',
-    searchUrl: (q: string) => `https://www.blundstone.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+blundstone[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['blundstone']
   },
   {
     name: 'Red Wing',
     searchUrl: (q: string) => `https://www.redwingshoes.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+redwing[^"]+\.jpg[^"]*)"/i,
-    ],
+    imagePatterns: [/src="(https:\/\/[^"]+redwing[^"]+\.(jpg|png|webp)[^"]*)"/i],
     keywords: ['red wing', 'iron ranger', 'moc toe']
   },
-  // Premium Denim
+
+  // Watches
   {
-    name: 'Naked & Famous',
-    searchUrl: (q: string) => `https://www.nakedandfamousdenim.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['naked and famous', 'naked & famous', 'n&f']
+    name: 'Timex',
+    searchUrl: (q: string) => `https://www.timex.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [/src="(https:\/\/[^"]+timex[^"]+\.(jpg|png|webp)[^"]*)"/i],
+    keywords: ['timex', 'weekender', 'marlin']
   },
   {
-    name: '3sixteen',
-    searchUrl: (q: string) => `https://www.3sixteen.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['3sixteen']
+    name: 'Casio',
+    searchUrl: (q: string) => `https://www.casio.com/us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [/src="(https:\/\/[^"]+casio[^"]+\.(jpg|png|webp)[^"]*)"/i],
+    keywords: ['casio', 'g-shock', 'f-91w']
   },
   {
-    name: 'Iron Heart',
-    searchUrl: (q: string) => `https://www.ironheartamerica.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['iron heart']
-  },
-  {
-    name: 'Nudie Jeans',
-    searchUrl: (q: string) => `https://www.nudiejeans.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+nudiejeans[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['nudie', 'nudie jeans']
-  },
-  {
-    name: 'orSlow',
-    searchUrl: (q: string) => `https://www.orslow.jp/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+orslow[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['orslow', 'or slow']
-  },
-  // Bags & Accessories
-  {
-    name: 'Porter-Yoshida',
-    searchUrl: (q: string) => `https://www.yoshidakaban.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+yoshida[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['porter', 'porter-yoshida', 'yoshida', 'tanker']
-  },
-  {
-    name: 'Topo Designs',
-    searchUrl: (q: string) => `https://topodesigns.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['topo designs', 'topo']
-  },
-  {
-    name: 'Cotopaxi',
-    searchUrl: (q: string) => `https://www.cotopaxi.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+cotopaxi[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['cotopaxi']
-  },
-  {
-    name: 'Bellroy',
-    searchUrl: (q: string) => `https://bellroy.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+bellroy[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['bellroy']
-  },
-  // Eyewear
-  {
-    name: 'Warby Parker',
-    searchUrl: (q: string) => `https://www.warbyparker.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+warbyparker[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['warby parker', 'warby']
-  },
-  {
-    name: 'Moscot',
-    searchUrl: (q: string) => `https://moscot.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['moscot', 'lemtosh', 'miltzen']
-  },
-  {
-    name: 'Garrett Leight',
-    searchUrl: (q: string) => `https://www.garrettleight.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['garrett leight', 'glco']
-  },
-  // Jewelry / Small Accessories
-  {
-    name: 'Miansai',
-    searchUrl: (q: string) => `https://www.miansai.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['miansai']
-  },
-  {
-    name: 'Vitaly',
-    searchUrl: (q: string) => `https://www.vitalydesign.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['vitaly']
-  },
-  // Athletic / Performance (more niche)
-  {
-    name: 'On Running',
-    searchUrl: (q: string) => `https://www.on-running.com/en-us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+on-running[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['on running', 'on cloud', 'cloudmonster']
-  },
-  {
-    name: 'Satisfy Running',
-    searchUrl: (q: string) => `https://www.satisfyrunning.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['satisfy', 'satisfy running']
-  },
-  {
-    name: 'District Vision',
-    searchUrl: (q: string) => `https://districtvision.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['district vision']
-  },
-  // More Outdoor / Technical
-  {
-    name: 'Snow Peak',
-    searchUrl: (q: string) => `https://www.snowpeak.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+snowpeak[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['snow peak', 'snowpeak']
-  },
-  {
-    name: 'And Wander',
-    searchUrl: (q: string) => `https://www.andwander.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+andwander[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['and wander']
-  },
-  {
-    name: 'Goldwin',
-    searchUrl: (q: string) => `https://www.goldwin.us/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+goldwin[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['goldwin']
-  },
-  // Socks / Underwear DTC
-  {
-    name: 'Anonymous Ism',
-    searchUrl: (q: string) => `https://anonymousism.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
-    ],
-    keywords: ['anonymous ism']
-  },
-  {
-    name: 'Stance',
-    searchUrl: (q: string) => `https://www.stance.com/search?q=${encodeURIComponent(q)}`,
-    imagePatterns: [
-      /src="(https:\/\/[^"]+stance[^"]+\.jpg[^"]*)"/i,
-    ],
-    keywords: ['stance']
+    name: 'Seiko',
+    searchUrl: (q: string) => `https://www.seikowatches.com/us-en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [/src="(https:\/\/[^"]+seiko[^"]+\.(jpg|png|webp)[^"]*)"/i],
+    keywords: ['seiko', 'presage', 'prospex']
   },
 ]
 
+// Type for brand configuration
+interface BrandConfig {
+  name: string
+  keywords: string[]
+  shopifyDomain?: string
+  searchUrl?: (q: string) => string
+  imagePatterns?: RegExp[]
+}
+
+// Extract supported brand names for AI prompt
+const SUPPORTED_BRAND_NAMES = BRANDS.map(b => b.name)
+
 // Find brand config by keyword match
-function findBrandConfig(brandName: string, productName: string): typeof BRANDS[0] | null {
+function findBrandConfig(brandName: string, productName: string): BrandConfig | null {
   const searchText = `${brandName} ${productName}`.toLowerCase()
   console.log(`[findBrand] Looking for brand in: "${searchText}"`)
 
   for (const brand of BRANDS) {
     const matchedKeyword = brand.keywords.find(kw => searchText.includes(kw))
     if (matchedKeyword) {
-      console.log(`[findBrand] MATCH! Found "${matchedKeyword}" -> ${brand.name}`)
+      console.log(`[findBrand] MATCH! Found "${matchedKeyword}" -> ${brand.name} (${brand.shopifyDomain ? 'Shopify' : 'HTML scrape'})`)
       return brand
     }
   }
@@ -760,8 +244,89 @@ function findBrandConfig(brandName: string, productName: string): typeof BRANDS[
   return null
 }
 
-// Scrape product image from brand website
-async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise<{ image: string | null, url: string }> {
+// Try Shopify JSON API (most reliable method)
+async function tryShopifyApi(domain: string, query: string): Promise<{ image: string | null, url: string }> {
+  const searchUrl = `https://${domain}/search?q=${encodeURIComponent(query)}`
+
+  // Try multiple Shopify endpoints
+  const endpoints = [
+    `https://${domain}/search/suggest.json?q=${encodeURIComponent(query)}&resources[type]=product&resources[limit]=4`,
+    `https://${domain}/products.json?limit=10`,
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      console.log(`[shopify] Trying: ${endpoint}`)
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        }
+      })
+
+      if (!response.ok) {
+        console.log(`[shopify] ${domain} endpoint returned ${response.status}`)
+        continue
+      }
+
+      const data = await response.json()
+      console.log(`[shopify] ${domain} got JSON response`)
+
+      // Handle suggest endpoint format
+      if (data.resources?.results?.products) {
+        const products = data.resources.results.products
+        console.log(`[shopify] ${domain} found ${products.length} products via suggest`)
+
+        // Find product matching query
+        const queryLower = query.toLowerCase()
+        const match = products.find((p: any) =>
+          p.title?.toLowerCase().includes(queryLower) ||
+          queryLower.includes(p.title?.toLowerCase()?.split(' ')[0])
+        ) || products[0]
+
+        if (match?.image) {
+          console.log(`[shopify] ${domain} SUCCESS - found image: ${match.image.substring(0, 60)}...`)
+          return {
+            image: match.image.startsWith('//') ? 'https:' + match.image : match.image,
+            url: match.url ? `https://${domain}${match.url}` : searchUrl
+          }
+        }
+      }
+
+      // Handle products.json format
+      if (data.products && Array.isArray(data.products)) {
+        console.log(`[shopify] ${domain} found ${data.products.length} products via products.json`)
+
+        const queryLower = query.toLowerCase()
+        const match = data.products.find((p: any) =>
+          p.title?.toLowerCase().includes(queryLower)
+        ) || data.products[0]
+
+        if (match?.images?.[0]?.src) {
+          console.log(`[shopify] ${domain} SUCCESS - found image from products.json`)
+          return {
+            image: match.images[0].src,
+            url: `https://${domain}/products/${match.handle}`
+          }
+        }
+      }
+
+    } catch (error) {
+      console.log(`[shopify] ${domain} error: ${error.message}`)
+    }
+  }
+
+  console.log(`[shopify] ${domain} no image found via API`)
+  return { image: null, url: searchUrl }
+}
+
+// Scrape product image from brand website (fallback)
+async function scrapeHtml(brand: BrandConfig, query: string): Promise<{ image: string | null, url: string }> {
+  if (!brand.searchUrl || !brand.imagePatterns) {
+    return { image: null, url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}` }
+  }
+
   const searchUrl = brand.searchUrl(query)
 
   try {
@@ -779,22 +344,14 @@ async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise
     console.log(`[scrape] ${brand.name} response status: ${response.status}`)
 
     if (!response.ok) {
-      console.log(`[scrape] ${brand.name} failed with status: ${response.status}`)
       return { image: null, url: searchUrl }
     }
 
     const html = await response.text()
     console.log(`[scrape] ${brand.name} HTML length: ${html.length} chars`)
 
-    // Check if we got a real page or redirect/block
-    if (html.length < 1000) {
-      console.log(`[scrape] ${brand.name} HTML too short, might be blocked. First 500 chars:`, html.substring(0, 500))
-    }
-
     // Try each pattern
-    for (let i = 0; i < brand.imagePatterns.length; i++) {
-      const pattern = brand.imagePatterns[i]
-      console.log(`[scrape] ${brand.name} trying pattern ${i}: ${pattern.toString().substring(0, 50)}...`)
+    for (const pattern of brand.imagePatterns) {
       const match = html.match(pattern)
       if (match && match[1]) {
         let imageUrl = match[1]
@@ -802,37 +359,49 @@ async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise
           imageUrl = 'https:' + imageUrl
         }
         imageUrl = imageUrl.replace(/&amp;/g, '&')
-        console.log(`[scrape] ${brand.name} FOUND IMAGE with pattern ${i}: ${imageUrl.substring(0, 100)}...`)
+        console.log(`[scrape] ${brand.name} FOUND IMAGE: ${imageUrl.substring(0, 80)}...`)
         return { image: imageUrl, url: searchUrl }
-      } else {
-        console.log(`[scrape] ${brand.name} pattern ${i} no match`)
       }
     }
 
-    // Log a sample of src attributes we DID find
-    const srcMatches = html.match(/src="([^"]+)"/gi)?.slice(0, 5) || []
-    console.log(`[scrape] ${brand.name} sample src attributes found:`, srcMatches)
-
-    console.log(`[scrape] ${brand.name} NO IMAGE FOUND after trying all patterns`)
+    console.log(`[scrape] ${brand.name} NO IMAGE FOUND`)
     return { image: null, url: searchUrl }
   } catch (error) {
-    console.error(`[scrape] ${brand.name} EXCEPTION:`, error.message || error)
+    console.error(`[scrape] ${brand.name} error:`, error.message)
     return { image: null, url: searchUrl }
   }
 }
 
-// Main scraping function
+// Main function: try Shopify API first, then HTML scraping
 async function scrapeProductImage(brandName: string, query: string): Promise<{ image: string | null, url: string }> {
   const brandConfig = findBrandConfig(brandName, query)
 
-  if (brandConfig) {
-    const result = await scrapeBrandImage(brandConfig, query)
+  if (!brandConfig) {
+    console.log(`[scrape] No brand config for "${brandName}" - falling back to Google Shopping`)
+    return {
+      image: null,
+      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`
+    }
+  }
+
+  // Try Shopify API first (most reliable)
+  if (brandConfig.shopifyDomain) {
+    const result = await tryShopifyApi(brandConfig.shopifyDomain, query)
+    if (result.image) {
+      return result
+    }
+    console.log(`[scrape] Shopify API failed for ${brandConfig.name}, trying HTML scrape...`)
+  }
+
+  // Fallback to HTML scraping
+  if (brandConfig.searchUrl && brandConfig.imagePatterns) {
+    const result = await scrapeHtml(brandConfig, query)
     if (result.image) {
       return result
     }
   }
 
-  // Return Google Shopping as fallback URL (no image)
+  // Ultimate fallback
   return {
     image: null,
     url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`
@@ -851,13 +420,11 @@ async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
 
       console.log(`[enrich ${index}] Processing: "${sug.name}"`)
       console.log(`[enrich ${index}] - brand from AI: "${brandName}"`)
-      console.log(`[enrich ${index}] - searchQuery from AI: "${searchQuery}"`)
-      console.log(`[enrich ${index}] - AI gave us these fields:`, Object.keys(sug))
+      console.log(`[enrich ${index}] - searchQuery: "${searchQuery}"`)
 
-      // Scrape image from brand website, get product URL
       const result = await scrapeProductImage(brandName, searchQuery)
 
-      console.log(`[enrich ${index}] - scrape result: image=${result.image ? 'YES' : 'NULL'}, url=${result.url}`)
+      console.log(`[enrich ${index}] - result: image=${result.image ? 'YES' : 'NULL'}`)
 
       return {
         ...sug,
@@ -868,12 +435,11 @@ async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
     })
   )
 
-  console.log('[enrich] Final enriched suggestions:', JSON.stringify(enriched.map(s => ({
+  console.log('[enrich] Final results:', enriched.map(s => ({
     name: s.name,
     brand: s.brand,
-    productImage: s.productImage ? s.productImage.substring(0, 50) + '...' : null,
-    productUrl: s.productUrl
-  })), null, 2))
+    hasImage: !!s.productImage
+  })))
 
   return enriched
 }
@@ -949,7 +515,15 @@ serve(async (req) => {
    URL: ${item.url}`
     ).join('\n\n')
 
-    const fullPrompt = `${prompt}
+    // Add supported brands constraint to prompt
+    const brandConstraint = `
+
+IMPORTANT - ONLY SUGGEST THESE BRANDS (we can only show images from these):
+${SUPPORTED_BRAND_NAMES.join(', ')}
+
+For each suggestion, you MUST use a brand from this list. Pick the most appropriate brand for the item type.`
+
+    const fullPrompt = `${prompt}${brandConstraint}
 
 Here are the items to analyze:
 
@@ -958,6 +532,7 @@ ${itemsContext}
 Respond with valid JSON only, no markdown or explanation.`
 
     console.log('[generate-widget] Calling Claude API...')
+    console.log('[generate-widget] Supported brands:', SUPPORTED_BRAND_NAMES.length)
 
     // Call Claude API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
