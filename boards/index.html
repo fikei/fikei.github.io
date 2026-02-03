@@ -3517,7 +3517,7 @@ Return JSON:
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
   let widgetCache = {};
-  let widgetRefreshCounter = 0; // Incremented on each refresh to get different results
+  let widgetRefreshCounters = {}; // Per-widget refresh counters for variation
 
   function loadWidgetCache() {
     try {
@@ -3533,7 +3533,8 @@ Return JSON:
 
   function getCacheKey(widgetId, itemIds, includeRefresh = false) {
     const base = `${widgetId}:${itemIds.sort().join(',')}`;
-    return includeRefresh ? `${base}:v${widgetRefreshCounter}` : base;
+    const counter = widgetRefreshCounters[widgetId] || 0;
+    return includeRefresh ? `${base}:v${counter}` : base;
   }
 
   // Widget status overrides (persisted in localStorage)
@@ -3814,9 +3815,10 @@ Return JSON:
       url: i.url
     }));
 
-    // Add variation instruction to prompt
-    const variationPrompt = widgetRefreshCounter > 0
-      ? `\n\nIMPORTANT: This is variation #${widgetRefreshCounter}. Choose a DIFFERENT combination of items than before. Pick items you haven't matched yet.`
+    // Add variation instruction to prompt (using per-widget counter)
+    const counter = widgetRefreshCounters[widget.id] || 0;
+    const variationPrompt = counter > 0
+      ? `\n\nIMPORTANT: This is variation #${counter}. Choose a DIFFERENT combination of items than before. Pick items you haven't matched yet.`
       : '';
 
     try {
@@ -3967,6 +3969,12 @@ Return JSON:
     };
 
     let suggestionsHtml = '';
+    console.log('[widget] Rendering suggestions:', suggestions.slice(0, 3).map(s => ({
+      name: s.name,
+      brand: s.brand,
+      productImage: s.productImage ? s.productImage.substring(0, 50) + '...' : null,
+      productUrl: s.productUrl ? 'present' : null
+    })));
     for (const sug of suggestions.slice(0, 3)) {
       // Use actual product URL if available, otherwise fall back to Google Shopping search
       const shopUrl = sug.productUrl || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
@@ -4177,22 +4185,85 @@ Return JSON:
 
   // Refresh a specific widget (called from widget refresh button)
   window.refreshWidget = async function(widgetId) {
-    // Increment refresh counter to get different results
-    widgetRefreshCounter++;
+    console.log('[widget] Refreshing only:', widgetId);
 
-    // Clear ALL cache entries for this widget type to force fresh AI call
+    // Increment per-widget refresh counter
+    widgetRefreshCounters[widgetId] = (widgetRefreshCounters[widgetId] || 0) + 1;
+
+    // Clear cache entries ONLY for this widget
     Object.keys(widgetCache).forEach(key => {
       if (key.startsWith(widgetId + ':')) delete widgetCache[key];
     });
     saveWidgetCache();
 
-    // Show loading state immediately by clearing inline widget
-    inlineWidgetHtml = '';
-    renderGrid(); // Clears old widget from grid
+    // Get the widget definition
+    const widget = WIDGET_REGISTRY[widgetId];
+    if (!widget) {
+      console.error('[widget] Unknown widget:', widgetId);
+      return;
+    }
 
-    // Reset mutex and re-generate widgets
-    widgetGenerationInProgress = false;
-    await generateWidgets();
+    // Get items for regeneration
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+
+    // Show loading state for this specific widget
+    if (widget.zone === 'inline') {
+      // Replace inline widget with loading state
+      const inlineContainer = document.querySelector('.widget-inline');
+      if (inlineContainer) {
+        inlineContainer.innerHTML = `
+          <div class="widget-inline__header">
+            <span class="widget-inline__title">${esc(widget.name)}</span>
+            <span class="widget-inline__badge">AI</span>
+          </div>
+          <div class="widget__loader">Refreshing suggestions...</div>`;
+      }
+    } else if (widget.zone === 'hero') {
+      const heroContent = $('widgetContent');
+      if (heroContent) {
+        heroContent.innerHTML = '<div class="widget__loader">Refreshing...</div>';
+      }
+    }
+
+    // Generate content for just this widget
+    const aiResult = await generateWidgetContent(widget, items);
+
+    let widgetHtml = '';
+    if (widget.id === 'complete-the-look') {
+      widgetHtml = renderCompleteTheLookWidget(widget, items, aiResult);
+    } else if (widget.id === 'style-summary') {
+      widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
+    }
+
+    // Update only this widget's display
+    if (widget.zone === 'inline') {
+      const inlineContainer = document.querySelector('.widget-inline');
+      if (inlineContainer) {
+        inlineContainer.innerHTML = `
+          <div class="widget-inline__header">
+            <span class="widget-inline__title">${esc(widget.name)}</span>
+            <span class="widget-inline__badge">AI</span>
+          </div>
+          ${widgetHtml}`;
+      }
+      // Also update stored HTML for future grid re-renders
+      inlineWidgetHtml = `
+        <div class="widget-inline">
+          <div class="widget-inline__header">
+            <span class="widget-inline__title">${esc(widget.name)}</span>
+            <span class="widget-inline__badge">AI</span>
+          </div>
+          ${widgetHtml}
+        </div>`;
+    } else if (widget.zone === 'hero') {
+      const heroContent = $('widgetContent');
+      if (heroContent) {
+        heroContent.innerHTML = widgetHtml;
+      }
+    }
+
+    console.log('[widget] Refresh complete for:', widgetId);
   };
 
   // Widget refresh button handler
