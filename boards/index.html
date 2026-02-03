@@ -2395,6 +2395,45 @@ body {
   font-style: normal;
 }
 
+.widget-complete__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.widget-complete__action {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.widget-complete__action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.widget-complete__action--active {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.widget-complete__action--danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.widget-complete--favorite {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
 .widget-complete__refresh {
   background: transparent;
   border: 1px solid var(--border);
@@ -3396,6 +3435,79 @@ Return JSON:
     return next;
   }
 
+  // Widget preferences (favorite, dismiss, hide) - persisted in localStorage
+  const WIDGET_PREFS_KEY = 'boards_widget_prefs';
+  let widgetPrefs = { favorites: {}, dismissed: {}, hidden: {} };
+
+  function loadWidgetPrefs() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(WIDGET_PREFS_KEY) || '{}');
+      widgetPrefs = {
+        favorites: saved.favorites || {},
+        dismissed: saved.dismissed || {},
+        hidden: saved.hidden || {}
+      };
+    } catch {
+      widgetPrefs = { favorites: {}, dismissed: {}, hidden: {} };
+    }
+  }
+
+  function saveWidgetPrefs() {
+    try {
+      localStorage.setItem(WIDGET_PREFS_KEY, JSON.stringify(widgetPrefs));
+    } catch {}
+  }
+
+  // Toggle favorite status
+  window.toggleWidgetFavorite = function(widgetId) {
+    widgetPrefs.favorites[widgetId] = !widgetPrefs.favorites[widgetId];
+    if (!widgetPrefs.favorites[widgetId]) delete widgetPrefs.favorites[widgetId];
+    saveWidgetPrefs();
+    generateWidgets();
+    console.log('[widget] Favorite toggled:', widgetId, widgetPrefs.favorites[widgetId] ? 'on' : 'off');
+  };
+
+  // Dismiss widget (hide until next session or manual restore)
+  window.dismissWidget = function(widgetId) {
+    widgetPrefs.dismissed[widgetId] = Date.now();
+    saveWidgetPrefs();
+    generateWidgets();
+    console.log('[widget] Dismissed:', widgetId);
+  };
+
+  // Permanently hide widget
+  window.hideWidget = function(widgetId) {
+    if (confirm('Hide this widget permanently? You can restore it from Settings.')) {
+      widgetPrefs.hidden[widgetId] = true;
+      saveWidgetPrefs();
+      generateWidgets();
+      console.log('[widget] Hidden:', widgetId);
+    }
+  };
+
+  // Restore a dismissed widget
+  window.restoreDismissedWidget = function(widgetId) {
+    delete widgetPrefs.dismissed[widgetId];
+    saveWidgetPrefs();
+    generateWidgets();
+    console.log('[widget] Restored dismissed:', widgetId);
+  };
+
+  // Unhide a hidden widget
+  window.unhideWidget = function(widgetId) {
+    delete widgetPrefs.hidden[widgetId];
+    saveWidgetPrefs();
+    generateWidgets();
+    console.log('[widget] Unhidden:', widgetId);
+  };
+
+  // Check if widget should be shown
+  function shouldShowWidget(widgetId) {
+    if (widgetPrefs.hidden[widgetId]) return false;
+    if (widgetPrefs.dismissed[widgetId]) return false;
+    return true;
+  }
+
   // Normalize wear items for widget generation
   function normalizeWearItems(links) {
     return links
@@ -3436,8 +3548,15 @@ Return JSON:
 
     return allWidgets
       .filter(w => getWidgetStatus(w.id) === 'active') // Use effective status
+      .filter(w => shouldShowWidget(w.id)) // Respect user preferences (hidden/dismissed)
       .filter(w => checkWidgetCriteria(w, items, currentCategory))
-      .sort((a, b) => a.id.localeCompare(b.id));
+      .sort((a, b) => {
+        // Favorites first, then alphabetical
+        const aFav = widgetPrefs.favorites[a.id] ? 0 : 1;
+        const bFav = widgetPrefs.favorites[b.id] ? 0 : 1;
+        if (aFav !== bFav) return aFav - bFav;
+        return a.id.localeCompare(b.id);
+      });
   }
 
   // Call AI to generate widget content via Edge Function
@@ -3633,14 +3752,23 @@ Return JSON:
     const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
       dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'From your collection';
 
+    const isFavorite = widgetPrefs.favorites[widget.id];
+
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
+      <div class="widget-complete ${isFavorite ? 'widget-complete--favorite' : ''}" data-widget-id="${widget.id}">
         <div class="widget-complete__header">
           <div>
             <span class="widget-complete__title">${widget.name}</span>
             <span class="widget-complete__subtitle">${subtitle}</span>
           </div>
-          <button class="widget-complete__refresh" onclick="refreshWidget('${widget.id}')" title="Get new suggestions">↻ Refresh</button>
+          <div class="widget-complete__actions">
+            <button class="widget-complete__action ${isFavorite ? 'widget-complete__action--active' : ''}" onclick="toggleWidgetFavorite('${widget.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+              ${isFavorite ? '★' : '☆'}
+            </button>
+            <button class="widget-complete__action" onclick="refreshWidget('${widget.id}')" title="Get new suggestions">↻</button>
+            <button class="widget-complete__action" onclick="dismissWidget('${widget.id}')" title="Dismiss for now">✕</button>
+            <button class="widget-complete__action widget-complete__action--danger" onclick="hideWidget('${widget.id}')" title="Hide permanently">🚫</button>
+          </div>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
@@ -3841,6 +3969,8 @@ Return JSON:
     console.log('[WIDGET] widgetCache loaded:', Object.keys(widgetCache).length, 'entries');
     loadWidgetStatus();
     console.log('[WIDGET] widgetStatusOverrides loaded:', widgetStatusOverrides);
+    loadWidgetPrefs();
+    console.log('[WIDGET] widgetPrefs loaded:', widgetPrefs);
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
