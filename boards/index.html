@@ -3085,6 +3085,167 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   }
 
   // ============================================
+  // AI Wear Enrichment (Post-MVP Feature)
+  // Calls Supabase Edge Function to extract style attributes
+  // ============================================
+
+  // Cache for enriched wear attributes
+  const WEAR_ENRICHMENT_CACHE_KEY = 'boards_wear_enrichment';
+  let wearEnrichmentCache = {};
+
+  function loadWearEnrichmentCache() {
+    try {
+      wearEnrichmentCache = JSON.parse(localStorage.getItem(WEAR_ENRICHMENT_CACHE_KEY) || '{}');
+    } catch { wearEnrichmentCache = {}; }
+  }
+
+  function saveWearEnrichmentCache() {
+    try {
+      localStorage.setItem(WEAR_ENRICHMENT_CACHE_KEY, JSON.stringify(wearEnrichmentCache));
+    } catch {}
+  }
+
+  // Enrich wear items with AI-extracted attributes
+  async function enrichWearItems(items) {
+    // Filter items that aren't already cached
+    const uncached = items.filter(item => !wearEnrichmentCache[item.id]);
+
+    if (uncached.length === 0) {
+      console.log('[widget] All items already enriched');
+      return items.map(item => ({
+        ...item,
+        enrichedAttributes: wearEnrichmentCache[item.id] || null
+      }));
+    }
+
+    console.log('[widget] Enriching', uncached.length, 'items via AI');
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-wear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          items: uncached.map(item => ({
+            id: item.id,
+            url: item.source.url,
+            title: item.attributes.title,
+            description: item.attributes.description,
+            image: item.media.image
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        console.error('[widget] Enrichment API error:', response.status);
+        return items;
+      }
+
+      const { results } = await response.json();
+
+      // Cache results
+      for (const result of results) {
+        if (result.confidence > 0.3) {
+          wearEnrichmentCache[result.id] = result.attributes;
+        }
+      }
+      saveWearEnrichmentCache();
+
+      console.log('[widget] Enrichment complete:', results.length, 'items');
+
+    } catch (e) {
+      console.error('[widget] Enrichment error:', e);
+    }
+
+    // Return items with enriched attributes
+    return items.map(item => ({
+      ...item,
+      enrichedAttributes: wearEnrichmentCache[item.id] || null
+    }));
+  }
+
+  // Enhanced style analysis using enriched attributes
+  function analyzeStyleFromEnrichedItems(items) {
+    // Check if any items have enriched attributes
+    const enrichedItems = items.filter(item => item.enrichedAttributes);
+
+    if (enrichedItems.length === 0) {
+      // Fall back to heuristic analysis
+      return analyzeStyleFromItems(items);
+    }
+
+    // Aggregate style attributes from enriched items
+    const allStyles = [];
+    const allColors = [];
+    const allMaterials = [];
+
+    for (const item of enrichedItems) {
+      const attrs = item.enrichedAttributes;
+      if (attrs.style) allStyles.push(...attrs.style);
+      if (attrs.colors) allColors.push(...attrs.colors);
+      if (attrs.materials) allMaterials.push(...attrs.materials);
+    }
+
+    // Determine dominant style
+    const styleCounts = {};
+    for (const style of allStyles) {
+      styleCounts[style] = (styleCounts[style] || 0) + 1;
+    }
+    const dominantStyle = Object.entries(styleCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Contemporary';
+
+    // Build traits from actual attributes
+    const traits = [];
+
+    // Color trait
+    const uniqueColors = [...new Set(allColors)].slice(0, 3);
+    if (uniqueColors.length > 0) {
+      traits.push(uniqueColors.length === 1
+        ? `${cap(uniqueColors[0])} focused`
+        : `${uniqueColors.map(cap).join(' & ')} palette`
+      );
+    }
+
+    // Material trait
+    const uniqueMaterials = [...new Set(allMaterials)].slice(0, 2);
+    if (uniqueMaterials.length > 0) {
+      traits.push(`${uniqueMaterials.map(cap).join(' + ')} blend`);
+    }
+
+    // Style trait
+    if (dominantStyle) {
+      traits.push(`${cap(dominantStyle)} aesthetic`);
+    }
+
+    // Fallback to vocabulary if not enough traits
+    while (traits.length < 2) {
+      const fallbackCategories = Object.keys(STYLE_VOCABULARY.traits);
+      const randomCategory = fallbackCategories[Math.floor(Math.random() * fallbackCategories.length)];
+      const randomTrait = STYLE_VOCABULARY.traits[randomCategory][Math.floor(Math.random() * STYLE_VOCABULARY.traits[randomCategory].length)];
+      if (!traits.includes(randomTrait)) {
+        traits.push(randomTrait);
+      }
+    }
+
+    // Generate a more accurate label
+    const label = dominantStyle
+      ? `${cap(dominantStyle)} Style`
+      : STYLE_VOCABULARY.labels[Math.floor(Math.random() * STYLE_VOCABULARY.labels.length)];
+
+    return {
+      label,
+      traits: traits.slice(0, 4),
+      itemCount: items.length,
+      enrichedCount: enrichedItems.length
+    };
+  }
+
+  // Initialize enrichment cache on load
+  loadWearEnrichmentCache();
+
+  // ============================================
   // Image Resolution System
   // ============================================
   const IMAGE_STRATEGIES = {
