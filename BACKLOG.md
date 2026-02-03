@@ -57,6 +57,110 @@
 
 ---
 
+## Epic: Validation Engine ⚡ P0 - FOUNDATIONAL
+
+> Generic real-time validation framework for AI widget pipelines. Replaces hardcoded exclusion lists with "prove it works" inclusive validation.
+> **Pattern:** Input → Try → Observe → Learn → Decide
+> **Scope:** Widget-agnostic, criteria-agnostic, self-healing
+
+### Why P0?
+Every AI widget needs validation: brand scrapability, product existence, category matching, image validity, URL health, etc. Building this once enables all future widgets to validate anything without maintaining growing exclusion lists.
+
+### Story: Core Validation Engine
+> As a developer, I want a reusable engine that tracks success/failure of any validation type.
+
+**Core Types:**
+```typescript
+interface ValidationResult<T> {
+  success: boolean
+  data?: T
+  error?: string
+  latencyMs: number
+  skipped?: boolean  // true if backed off
+}
+
+interface ValidationStats {
+  attempts: number
+  successes: number
+  successRate: number
+  consecutiveFailures: number
+  avgLatencyMs: number
+  lastAttempt: number | null
+}
+```
+
+**Tasks:**
+- [ ] Create `validation-engine.ts` module in `supabase/functions/_shared/`
+- [ ] Implement `ValidationEngine` class with stats tracking
+- [ ] Implement `createValidator()` factory for wrapping any async function
+- [ ] Implement `shouldAttempt()` with exponential backoff
+- [ ] Implement `record()` for tracking attempts
+- [ ] Implement `getStats()` and `getHealthReport()` for observability
+- [ ] Implement `getHealthyKeys()` for filtering to working items
+- [ ] Add configurable thresholds (backoff, max failures, success threshold)
+- [ ] Write unit tests for engine
+
+### Story: Built-in Validators
+> As a developer, I want pre-built validators for common widget needs.
+
+**Tasks:**
+- [ ] `validateBrandScrape` - Can we get images from this brand?
+- [ ] `validateProductExists` - Does this product exist on the brand's site?
+- [ ] `validateImageUrl` - Is this image URL valid and returning an image?
+- [ ] `validateUrlExists` - Does this URL return 2xx/3xx?
+- [ ] `validateBrandCategory` - Does brand actually make this product type? (real-time via search)
+- [ ] Each validator uses `validationEngine.createValidator()` pattern
+- [ ] Key functions appropriately (by brand, by domain, by brand:category)
+
+### Story: Integration with AI Widget Pipeline
+> As a system, I want widgets to use validation engine instead of hardcoded lists.
+
+**Tasks:**
+- [ ] Replace static `categories` arrays with real-time `validateBrandCategory`
+- [ ] Replace scrape assumptions with `validateBrandScrape`
+- [ ] Filter AI prompt to only include healthy brands (`getHealthyKeys`)
+- [ ] Skip enrichment for brands backing off
+- [ ] Log validation health report on each widget generation
+- [ ] Add validation metrics to response for debugging
+
+### Story: Validation Health Dashboard
+> As an admin, I want to see validation health across all validators.
+
+**Tasks:**
+- [ ] Add "Validation Health" section to admin panel
+- [ ] Show success rates per validator type
+- [ ] Show brands currently backing off
+- [ ] Show recent failures with error reasons
+- [ ] Add "Reset backoff" action for stuck items
+- [ ] Export health data for analysis
+
+### Story: Persistent Health Storage (Stretch)
+> As a system, I want validation health to persist across cold starts.
+
+**Tasks:**
+- [ ] Create `validation_health` table in Supabase
+- [ ] Persist health stats periodically (every 100 attempts)
+- [ ] Load health stats on Edge Function cold start
+- [ ] Aggregate health across multiple Edge Function instances
+- [ ] Add TTL for stale health data (7 days)
+
+### Future Validators (Add as Needed)
+```typescript
+// Price sanity check
+validatePriceReasonable({ price, category })
+
+// Content quality
+validateImageQuality({ imageUrl })  // not placeholder, good resolution
+
+// Complementary validation
+validateComplementary({ existingItems, suggestion })  // not too similar
+
+// Style consistency
+validateStyleMatch({ userStyle, suggestion })
+```
+
+---
+
 ## Epic: Collaborative Boards
 > Allow multiple users to contribute links to a shared board with role-based permissions.
 > **PRD:** [docs/PRD-collaborative-boards.md](docs/PRD-collaborative-boards.md)
