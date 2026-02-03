@@ -120,21 +120,39 @@ class DesignSystemViewer {
       this.componentsList.innerHTML = '';
     }
 
-    // Add component items
+    // Add component items (now consolidated)
     const components = this.designSystem.components || [];
-    components.forEach(component => {
-      const li = DOMUtils.createElement('li', {}, [
-        DOMUtils.createElement('a', {
-          href: '#',
-          data: { section: 'component', id: component.type },
-          onClick: (e) => {
-            e.preventDefault();
-            this.selectComponent(component);
-          }
-        }, [component.name || this.formatName(component.type)])
+
+    if (components.length === 0) {
+      const li = DOMUtils.createElement('li', { className: 'nav-empty' }, [
+        'No components found'
       ]);
       this.componentsList?.appendChild(li);
-    });
+    } else {
+      components.forEach(component => {
+        const variantCount = component.variants?.length || 0;
+        const usageCount = component.totalUsage || 0;
+
+        const li = DOMUtils.createElement('li', {}, [
+          DOMUtils.createElement('a', {
+            href: '#',
+            data: { section: 'component', id: component.type },
+            onClick: (e) => {
+              e.preventDefault();
+              this.selectComponent(component);
+            }
+          }, [
+            DOMUtils.createElement('span', { className: 'nav-item-name' }, [
+              component.name || this.formatName(component.type)
+            ]),
+            DOMUtils.createElement('span', { className: 'nav-item-meta' }, [
+              `${variantCount} variant${variantCount !== 1 ? 's' : ''}`
+            ])
+          ])
+        ]);
+        this.componentsList?.appendChild(li);
+      });
+    }
 
     // Bind foundation links
     this.foundationsList?.querySelectorAll('a').forEach(link => {
@@ -199,18 +217,24 @@ class DesignSystemViewer {
   selectComponent(component) {
     this.currentSection = 'component';
     this.currentComponent = component;
+    this.currentVariantIndex = 0;
 
     // Update navigation active state
     this.updateNavActiveState(component.type);
 
-    // Update breadcrumb
-    this.breadcrumb.innerHTML = `<span>Components</span> / <span>${component.name}</span>`;
+    // Update breadcrumb with stats
+    const variantCount = component.variants?.length || 0;
+    const totalUsage = component.totalUsage || 0;
+    this.breadcrumb.innerHTML = `
+      <span>Components</span> / <span>${component.name}</span>
+      <span class="breadcrumb-meta">${variantCount} variant${variantCount !== 1 ? 's' : ''} · ${totalUsage} usage${totalUsage !== 1 ? 's' : ''}</span>
+    `;
 
     // Show variant controls if multiple variants
     if (component.variants?.length > 1) {
       this.variantControls.hidden = false;
       this.variantSelect.innerHTML = component.variants
-        .map((v, i) => `<option value="${i}">${v.name || 'Variant ' + (i + 1)}</option>`)
+        .map((v, i) => `<option value="${i}">${v.name || 'Variant ' + (i + 1)} (${v.usageCount || 0})</option>`)
         .join('');
     } else {
       this.variantControls.hidden = true;
@@ -454,35 +478,88 @@ class DesignSystemViewer {
   /**
    * Render component preview
    */
-  renderComponentPreview(component) {
-    const variant = component.variants?.[0];
-    if (!variant) {
-      this.componentPreview.innerHTML = '<p>No variant available</p>';
+  renderComponentPreview(component, variantIndex = 0) {
+    const variants = component.variants || [];
+
+    if (variants.length === 0) {
+      this.componentPreview.innerHTML = '<div class="preview-empty"><p>No variants available</p></div>';
+      this.componentSpecs.hidden = true;
       return;
+    }
+
+    const currentVariant = variants[variantIndex] || variants[0];
+
+    // Build variants gallery if multiple
+    let galleryHtml = '';
+    if (variants.length > 1) {
+      galleryHtml = `
+        <div class="variants-preview-gallery">
+          <h4>All Variants (${variants.length})</h4>
+          <div class="variants-grid">
+            ${variants.map((v, i) => `
+              <div class="variant-preview-card ${i === variantIndex ? 'active' : ''}" data-index="${i}">
+                <div class="variant-preview-content">
+                  ${v.html || '<span class="no-preview">No preview</span>'}
+                </div>
+                <div class="variant-preview-label">
+                  <span class="variant-name">${v.name}</span>
+                  <span class="variant-usage">${v.usageCount || 0} uses</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
     }
 
     // Create preview container
     this.componentPreview.innerHTML = `
-      <div class="preview-component">
-        ${variant.html || '<p>No HTML preview available</p>'}
+      <div class="preview-main">
+        <div class="preview-component" data-variant="${variantIndex}">
+          ${currentVariant.html || '<p>No HTML preview available</p>'}
+        </div>
+        <div class="preview-info">
+          <span class="preview-variant-name">${currentVariant.name}</span>
+          <span class="preview-usage">${currentVariant.usageCount || 0} usages found</span>
+        </div>
       </div>
+      ${galleryHtml}
     `;
 
+    // Bind click events for variant cards
+    this.componentPreview.querySelectorAll('.variant-preview-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const index = parseInt(card.dataset.index);
+        this.variantSelect.value = index;
+        this.renderComponentPreview(component, index);
+      });
+    });
+
     // Show specs
-    this.showComponentSpecs(component);
+    this.showComponentSpecs(component, currentVariant);
   }
 
   /**
    * Show component specs
    */
-  showComponentSpecs(component) {
+  showComponentSpecs(component, variant) {
     this.componentSpecs.hidden = false;
 
     const specs = [
-      { label: 'Type', value: component.type },
-      { label: 'Variants', value: component.variants?.length || 0 },
-      { label: 'Usage', value: `${component.variants?.[0]?.usageCount || 0} instances` }
+      { label: 'Type', value: this.formatName(component.type) },
+      { label: 'Variants', value: `${component.variants?.length || 0} detected` },
+      { label: 'Total Usage', value: `${component.totalUsage || 0} instances` },
+      { label: 'Current Variant', value: variant?.name || 'Default' },
+      { label: 'Variant Usage', value: `${variant?.usageCount || 0} instances` }
     ];
+
+    // Add classes info if available
+    if (variant?.classes?.length > 0) {
+      specs.push({
+        label: 'CSS Classes',
+        value: variant.classes.slice(0, 3).join(', ') + (variant.classes.length > 3 ? '...' : '')
+      });
+    }
 
     this.specsGrid.innerHTML = specs.map(s => `
       <div class="spec-item">
@@ -652,11 +729,13 @@ class DesignSystemViewer {
   /**
    * Update code blocks for component
    */
-  updateCodeBlocksForComponent(component) {
+  updateCodeBlocksForComponent(component, variant = null) {
     const code = component.code || {};
+    const currentVariant = variant || component.variants?.[0];
 
+    // Use component-level code if available, otherwise use variant HTML
     this.cssCode.textContent = code.css || '/* No CSS available */';
-    this.htmlCode.textContent = code.html || '<!-- No HTML available -->';
+    this.htmlCode.textContent = currentVariant?.html || code.html || '<!-- No HTML available -->';
     this.reactCode.textContent = code.react || '// No React component available';
   }
 
@@ -729,19 +808,17 @@ class DesignSystemViewer {
   selectVariant(index) {
     if (!this.currentComponent) return;
 
-    const variant = this.currentComponent.variants?.[index];
-    if (!variant) return;
+    const variantIndex = parseInt(index);
+    this.currentVariantIndex = variantIndex;
 
-    this.componentPreview.innerHTML = `
-      <div class="preview-component">
-        ${variant.html || '<p>No HTML preview available</p>'}
-      </div>
-    `;
+    // Re-render the preview with the new variant
+    this.renderComponentPreview(this.currentComponent, variantIndex);
 
-    // Update variants gallery active state
-    DOMUtils.$$('.variant-thumb', this.container).forEach((thumb, i) => {
-      thumb.classList.toggle('active', i === parseInt(index));
-    });
+    // Update code blocks for selected variant
+    const variant = this.currentComponent.variants?.[variantIndex];
+    if (variant) {
+      this.updateCodeBlocksForComponent(this.currentComponent, variant);
+    }
   }
 
   /**
