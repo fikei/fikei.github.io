@@ -815,6 +815,49 @@ validateStyleMatch({ userStyle, suggestion })
 > **Tech Spec:** [docs/TECH-ai-widget-system.md](docs/TECH-ai-widget-system.md)
 > **Architecture:** [docs/ARCH-ai-widget-pipeline.md](docs/ARCH-ai-widget-pipeline.md)
 
+### Story: AI Widget Generator ✓ COMPLETE (Foundation)
+> As a user, I want AI-powered widgets that analyze my saved items and suggest complementary products.
+
+**What's Built:**
+- Edge Function: `supabase/functions/generate-widget/index.ts`
+- Widget Registry pattern for defining new widgets
+- Multi-zone layout (hero, inline, footer placement)
+- Client-side caching with refresh counter
+- Server-side caching (in-memory)
+- Widget feedback collection (ratings, comments, preferences)
+
+**Current Widgets:**
+
+| Widget | Status | Category | Description |
+|--------|--------|----------|-------------|
+| **Complete the Look** | ✅ Active | wear | Suggests complementary clothing/accessories for outfits |
+
+**Widget Roadmap:**
+
+| Widget | Priority | Category | Description |
+|--------|----------|----------|-------------|
+| **Style Summary** | P2 | wear | AI-generated outfit analysis and style profile |
+| **Brand Discovery** | P2 | wear/home | Find similar brands to your favorites |
+| **Price Tracker** | P3 | all | Predict sale timing for saved items |
+| **Recipe Pairings** | P3 | eat | Suggest recipes based on saved restaurants/ingredients |
+| **Trip Planner** | P3 | go | Build itineraries from saved places |
+
+**Completed Tasks:**
+- [x] Edge Function with Claude 3 Haiku integration
+- [x] Brand registry (47+ brands with scraping configs)
+- [x] Brand validation layer (detect & replace unsupported brands)
+- [x] Brand-category constraints (prevent hallucinations like "Bellroy belt")
+- [x] JSON response parsing (handles AI preamble text)
+- [x] Image scraping pipeline (Shopify API → HTML scrape → fallback)
+- [x] Client-side widget registry with criteria matching
+- [x] Per-widget refresh (not global refresh)
+- [x] Widget duplication fix (clear before regenerate)
+- [x] Prompt engineering for complementary suggestions (not variants)
+
+**Known Issues:**
+- [ ] Product images not loading (scraping blocked by bot protection) ← IN PROGRESS
+- [ ] Need SERP API for reliable image fetching
+
 ### Story: Supabase CLI Setup ← HIGH PRIORITY
 > As a developer, I want local Supabase development for faster iteration.
 
