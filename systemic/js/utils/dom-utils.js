@@ -83,6 +83,7 @@ const DOMUtils = {
 
   /**
    * Extract design-relevant styles from an element
+   * Works with both live DOM and DOMParser-parsed documents
    */
   extractDesignStyles(element) {
     const relevantProps = [
@@ -106,7 +107,78 @@ const DOMUtils = {
       'transition'
     ];
 
-    return this.getStyleProperties(element, relevantProps);
+    // Try computed styles first (for live DOM)
+    if (typeof window !== 'undefined' && element.ownerDocument === document) {
+      try {
+        return this.getStyleProperties(element, relevantProps);
+      } catch (e) {
+        // Fall through to inline style extraction
+      }
+    }
+
+    // For parsed documents, extract from inline styles
+    return this.extractInlineStyles(element, relevantProps);
+  },
+
+  /**
+   * Extract styles from inline style attribute
+   */
+  extractInlineStyles(element, properties) {
+    const styles = {};
+    const inlineStyle = element.getAttribute('style') || '';
+
+    properties.forEach(prop => {
+      // Convert property name to regex-safe pattern
+      const propPattern = prop.replace(/-/g, '\\-');
+      const regex = new RegExp(`${propPattern}\\s*:\\s*([^;]+)`, 'i');
+      const match = inlineStyle.match(regex);
+      styles[prop] = match ? match[1].trim() : '';
+    });
+
+    // Also check for class-based hints
+    const classes = Array.from(element.classList);
+    styles._classHints = this.extractClassHints(classes);
+
+    return styles;
+  },
+
+  /**
+   * Extract styling hints from class names
+   */
+  extractClassHints(classes) {
+    const hints = {};
+
+    classes.forEach(cls => {
+      // Color hints
+      if (cls.includes('primary')) hints.colorRole = 'primary';
+      if (cls.includes('secondary')) hints.colorRole = 'secondary';
+      if (cls.includes('error') || cls.includes('danger')) hints.colorRole = 'error';
+      if (cls.includes('success')) hints.colorRole = 'success';
+      if (cls.includes('warning')) hints.colorRole = 'warning';
+
+      // Size hints
+      if (cls.includes('-sm') || cls.includes('small')) hints.size = 'small';
+      if (cls.includes('-md') || cls.includes('medium')) hints.size = 'medium';
+      if (cls.includes('-lg') || cls.includes('large')) hints.size = 'large';
+      if (cls.includes('-xl')) hints.size = 'xlarge';
+
+      // Variant hints
+      if (cls.includes('outlined') || cls.includes('outline')) hints.variant = 'outlined';
+      if (cls.includes('filled')) hints.variant = 'filled';
+      if (cls.includes('text') || cls.includes('ghost')) hints.variant = 'text';
+
+      // Layout hints
+      if (cls.includes('flex')) hints.display = 'flex';
+      if (cls.includes('grid')) hints.display = 'grid';
+      if (cls.includes('block')) hints.display = 'block';
+      if (cls.includes('inline')) hints.display = 'inline';
+
+      // Spacing hints
+      if (cls.match(/[pm][tblrxy]?-\d/)) hints.hasSpacingClass = true;
+      if (cls.match(/gap-\d/)) hints.hasGapClass = true;
+    });
+
+    return hints;
   },
 
   /**
