@@ -3016,8 +3016,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.5.0';
-  console.log(`[boards] v${VERSION}`);
+  const VERSION = '1.6.0-debug';
+  console.log('%c🚀 BOARDS v' + VERSION + ' LOADED 🚀', 'background: #f0f; color: #fff; font-size: 20px; font-weight: bold; padding: 10px;');
+  console.log('%cIf you see this, the NEW code is running!', 'background: #0ff; color: #000; font-size: 16px; padding: 8px;');
+  console.log('Timestamp:', new Date().toISOString());
 
   // ============================================
   // Supabase Setup
@@ -3371,7 +3373,20 @@ Return JSON:
 
   // Get applicable widgets for current context
   function getApplicableWidgets(items, currentCategory) {
-    return Object.values(WIDGET_REGISTRY)
+    console.log('[WIDGET] getApplicableWidgets() called');
+    console.log('[WIDGET] items count:', items?.length);
+    console.log('[WIDGET] currentCategory:', currentCategory);
+
+    const allWidgets = Object.values(WIDGET_REGISTRY);
+    console.log('[WIDGET] Total widgets in registry:', allWidgets.length);
+
+    for (const w of allWidgets) {
+      const status = getWidgetStatus(w.id);
+      const criteriaOk = checkWidgetCriteria(w, items, currentCategory);
+      console.log(`[WIDGET] Widget "${w.id}": status=${status}, criteriaOk=${criteriaOk}`);
+    }
+
+    return allWidgets
       .filter(w => getWidgetStatus(w.id) === 'active') // Use effective status
       .filter(w => checkWidgetCriteria(w, items, currentCategory))
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -3468,6 +3483,11 @@ Return JSON:
 
   // Unified Complete the Look widget - single component
   function renderCompleteTheLookWidget(widget, items, aiResult) {
+    console.log('%c[WIDGET] renderCompleteTheLookWidget CALLED', 'background: #ff0; color: #000; font-size: 14px; padding: 4px;');
+    console.log('[WIDGET] widget:', widget);
+    console.log('[WIDGET] items count:', items?.length);
+    console.log('[WIDGET] aiResult:', aiResult);
+
     // Enrich items with category and brand tier
     const enriched = items.map(item => ({
       ...item,
@@ -3612,12 +3632,22 @@ Return JSON:
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
-    console.log('[widget] generateWidgets() called, currentFilter:', currentFilter);
+    console.log('%c========== GENERATE WIDGETS START ==========', 'background: #0f0; color: #000; font-size: 16px; font-weight: bold; padding: 8px;');
+    console.log('%c[WIDGET] generateWidgets() called', 'background: #0f0; color: #000; font-size: 14px; padding: 4px;');
+    console.log('[WIDGET] currentFilter:', currentFilter);
+    console.log('[WIDGET] timestamp:', new Date().toISOString());
 
     const heroSection = $('widgetSection');
     const heroContent = $('widgetContent');
     const footerSection = $('widgetFooter');
     const footerContent = $('widgetFooterContent');
+
+    console.log('[WIDGET] DOM elements found:', {
+      heroSection: !!heroSection,
+      heroContent: !!heroContent,
+      footerSection: !!footerSection,
+      footerContent: !!footerContent
+    });
 
     // Reset all zones
     heroSection.classList.remove('widget-section--visible');
@@ -3626,29 +3656,40 @@ Return JSON:
 
     // Only show widgets when filtering to 'wear' category
     if (currentFilter !== 'wear') {
-      console.log('[widget] Not wear category, skipping widgets');
+      console.log('%c[WIDGET] NOT WEAR CATEGORY - SKIPPING', 'background: #f00; color: #fff; font-size: 14px; padding: 4px;');
+      console.log('[WIDGET] currentFilter is:', currentFilter, '(expected: wear)');
       renderGrid(); // Re-render grid without inline widgets
       return;
     }
 
-    const allLinks = getAllLinks();
-    const items = normalizeWearItems(allLinks);
+    console.log('%c[WIDGET] WEAR CATEGORY DETECTED - PROCEEDING', 'background: #0f0; color: #000; font-size: 14px; padding: 4px;');
 
-    console.log('[widget] Normalized wear items:', items.length);
+    const allLinks = getAllLinks();
+    console.log('[WIDGET] getAllLinks() returned:', allLinks?.length, 'links');
+
+    const items = normalizeWearItems(allLinks);
+    console.log('[WIDGET] normalizeWearItems() returned:', items?.length, 'items');
+    console.log('[WIDGET] First 3 items:', items?.slice(0, 3).map(i => ({ title: i.title, domain: i.domain })));
 
     if (items.length < 1) {
+      console.log('%c[WIDGET] NO ITEMS - EXITING', 'background: #f00; color: #fff; font-size: 14px; padding: 4px;');
       renderGrid();
       return;
     }
 
     // Get applicable widgets
     const applicableWidgets = getApplicableWidgets(items, 'wear');
-    console.log('[widget] Applicable widgets:', applicableWidgets.map(w => w.id));
+    console.log('[WIDGET] getApplicableWidgets() returned:', applicableWidgets?.length, 'widgets');
+    console.log('[WIDGET] Applicable widget IDs:', applicableWidgets?.map(w => w.id));
+    console.log('[WIDGET] WIDGET_REGISTRY:', Object.keys(WIDGET_REGISTRY));
 
     if (applicableWidgets.length === 0) {
+      console.log('%c[WIDGET] NO APPLICABLE WIDGETS - EXITING', 'background: #f00; color: #fff; font-size: 14px; padding: 4px;');
       renderGrid();
       return;
     }
+
+    console.log('%c[WIDGET] FOUND ' + applicableWidgets.length + ' APPLICABLE WIDGETS', 'background: #0f0; color: #000; font-size: 14px; padding: 4px;');
 
     // Group widgets by zone
     const widgetsByZone = {
@@ -3720,8 +3761,11 @@ Return JSON:
 
   // Widget refresh button handler
   function initWidgetSystem() {
+    console.log('%c[WIDGET] initWidgetSystem() CALLED', 'background: #ff0; color: #000; font-size: 14px; padding: 4px;');
     loadWidgetCache();
+    console.log('[WIDGET] widgetCache loaded:', Object.keys(widgetCache).length, 'entries');
     loadWidgetStatus();
+    console.log('[WIDGET] widgetStatusOverrides loaded:', widgetStatusOverrides);
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
@@ -7271,8 +7315,12 @@ Return JSON:
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();
     renderGrid();
+    console.log('%c========== WIDGET SYSTEM INITIALIZING ==========', 'background: #00f; color: #fff; font-size: 16px; font-weight: bold; padding: 8px;');
     initWidgetSystem();
+    console.log('[WIDGET] initWidgetSystem() completed');
+    console.log('[WIDGET] About to call generateWidgets()...');
     generateWidgets();
+    console.log('[WIDGET] generateWidgets() call completed');
     console.log(`[perf] Initial render: ${(performance.now() - initStart).toFixed(0)}ms`);
 
     // Listen for auth changes
