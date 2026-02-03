@@ -55,6 +55,8 @@ class DesignSystemViewer {
     this.whenNotToUse = DOMUtils.$('#when-not-to-use', this.container);
     this.a11ySection = DOMUtils.$('#a11y-section', this.container);
     this.accessibilityNotes = DOMUtils.$('#accessibility-notes', this.container);
+    this.statesSection = DOMUtils.$('#states-section', this.container);
+    this.statesList = DOMUtils.$('#states-list', this.container);
     this.variantsSection = DOMUtils.$('#variants-section', this.container);
     this.variantsGallery = DOMUtils.$('#variants-gallery', this.container);
 
@@ -659,6 +661,9 @@ class DesignSystemViewer {
       this.a11ySection.hidden = true;
     }
 
+    // States section
+    this.renderStatesSection(component);
+
     // Variants gallery
     if (component.variants?.length > 1) {
       this.variantsSection.hidden = false;
@@ -676,6 +681,42 @@ class DesignSystemViewer {
     // Update code context
     this.updateTokenListForComponent(component);
     this.updateCodeBlocksForComponent(component);
+  }
+
+  /**
+   * Render states section for component
+   */
+  renderStatesSection(component) {
+    if (!this.statesSection || !this.statesList) return;
+
+    const states = component.states || {};
+    const cssStates = component.cssStates || {};
+
+    // Collect all detected states
+    const detectedStates = [];
+
+    // Add HTML/ARIA states
+    if (states.hasDefault) detectedStates.push({ name: 'Default', type: 'base', hasCss: true });
+    if (states.hasHover || cssStates.hover) detectedStates.push({ name: 'Hover', type: 'css', hasCss: !!cssStates.hover });
+    if (states.hasFocus || cssStates.focus) detectedStates.push({ name: 'Focus', type: 'css', hasCss: !!cssStates.focus });
+    if (states.hasFocusVisible || cssStates['focus-visible']) detectedStates.push({ name: 'Focus Visible', type: 'css', hasCss: !!cssStates['focus-visible'] });
+    if (states.hasActive || cssStates.active) detectedStates.push({ name: 'Active', type: 'interactive', hasCss: !!cssStates.active });
+    if (states.hasDisabled) detectedStates.push({ name: 'Disabled', type: 'interactive', hasCss: !!cssStates.disabled });
+    if (states.hasLoading) detectedStates.push({ name: 'Loading', type: 'feedback', hasCss: false });
+    if (states.hasError) detectedStates.push({ name: 'Error', type: 'feedback', hasCss: !!cssStates.error });
+    if (states.hasSuccess) detectedStates.push({ name: 'Success', type: 'feedback', hasCss: !!cssStates.success });
+
+    if (detectedStates.length > 1) { // More than just default
+      this.statesSection.hidden = false;
+      this.statesList.innerHTML = detectedStates.map(state => `
+        <div class="state-tag ${state.type}">
+          <span class="state-name">${state.name}</span>
+          ${state.hasCss ? '<span class="state-indicator css" title="CSS styles detected">CSS</span>' : ''}
+        </div>
+      `).join('');
+    } else {
+      this.statesSection.hidden = true;
+    }
   }
 
   /**

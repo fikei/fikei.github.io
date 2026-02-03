@@ -80,11 +80,19 @@ class ComponentConsolidator {
     const variants = [];
     let totalUsage = 0;
 
+    // Aggregate states and content contexts
+    const aggregatedStates = this.aggregateStates(components);
+    const contentContexts = this.aggregateContentContexts(components);
+    const cssStates = this.aggregateCssStates(components);
+
     variantGroups.forEach((group, signature) => {
       // Pick the best example from the group (highest usage count)
       const example = this.pickBestExample(group);
       const usageCount = group.reduce((sum, c) => sum + (c.usageCount || 1), 0);
       totalUsage += usageCount;
+
+      // Get states for this variant
+      const variantStates = this.getVariantStates(group);
 
       variants.push({
         name: this.generateVariantName(signature, type),
@@ -92,6 +100,7 @@ class ComponentConsolidator {
         html: example.html,
         classes: example.classes,
         styles: example.styles,
+        states: variantStates,
         usageCount,
         exampleCount: group.length
       });
@@ -109,11 +118,115 @@ class ComponentConsolidator {
       variants: topVariants,
       totalUsage,
       totalVariants: variants.length,
+      // State information
+      states: aggregatedStates,
+      cssStates,
+      contentContexts,
       // Generate component metadata
       guidelines: this.generateGuidelines(type, topVariants),
       accessibility: this.generateAccessibilityNotes(type),
       code: this.generateCodeExamples(type, topVariants[0])
     };
+  }
+
+  /**
+   * Aggregate all states found across components of this type
+   */
+  aggregateStates(components) {
+    const states = {
+      hasDefault: true,
+      hasDisabled: false,
+      hasActive: false,
+      hasLoading: false,
+      hasError: false,
+      hasSuccess: false,
+      hasHover: false,
+      hasFocus: false,
+      hasFocusVisible: false
+    };
+
+    components.forEach(comp => {
+      if (comp.states) {
+        if (comp.states.disabled) states.hasDisabled = true;
+        if (comp.states.active) states.hasActive = true;
+        if (comp.states.loading) states.hasLoading = true;
+        if (comp.states.error) states.hasError = true;
+        if (comp.states.success) states.hasSuccess = true;
+        if (comp.states.hover) states.hasHover = true;
+        if (comp.states.focus) states.hasFocus = true;
+        if (comp.states.focusVisible) states.hasFocusVisible = true;
+      }
+    });
+
+    return states;
+  }
+
+  /**
+   * Get states specific to a variant group
+   */
+  getVariantStates(group) {
+    const states = [];
+
+    group.forEach(comp => {
+      if (comp.states) {
+        if (comp.states.disabled && !states.includes('disabled')) states.push('disabled');
+        if (comp.states.active && !states.includes('active')) states.push('active');
+        if (comp.states.loading && !states.includes('loading')) states.push('loading');
+        if (comp.states.error && !states.includes('error')) states.push('error');
+        if (comp.states.success && !states.includes('success')) states.push('success');
+      }
+    });
+
+    return states;
+  }
+
+  /**
+   * Aggregate content contexts
+   */
+  aggregateContentContexts(components) {
+    const contexts = {
+      purposes: {},
+      hasIconOnly: false,
+      hasTextOnly: false,
+      hasIconAndText: false
+    };
+
+    components.forEach(comp => {
+      if (comp.contentContext) {
+        const ctx = comp.contentContext;
+
+        // Track purposes
+        if (ctx.purpose) {
+          contexts.purposes[ctx.purpose] = (contexts.purposes[ctx.purpose] || 0) + 1;
+        }
+
+        // Track icon/text combinations
+        if (ctx.isIconOnly) contexts.hasIconOnly = true;
+        if (ctx.hasText && !ctx.hasIcon) contexts.hasTextOnly = true;
+        if (ctx.hasText && ctx.hasIcon) contexts.hasIconAndText = true;
+      }
+    });
+
+    return contexts;
+  }
+
+  /**
+   * Aggregate CSS state information
+   */
+  aggregateCssStates(components) {
+    const cssStates = {};
+
+    components.forEach(comp => {
+      if (comp.cssStates) {
+        Object.entries(comp.cssStates).forEach(([state, data]) => {
+          if (!cssStates[state]) {
+            cssStates[state] = data;
+          }
+        });
+      }
+    });
+
+    return cssStates;
   }
 
   /**
