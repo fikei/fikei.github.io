@@ -653,6 +653,17 @@ class SystemicApp {
    * Add log entry
    */
   addLogEntry(log) {
+    const timestamp = new Date().toISOString();
+
+    // Add to debug logs for export
+    this.debugLogs.push({
+      timestamp,
+      category: 'CRAWL',
+      message: log.message,
+      data: null
+    });
+
+    // Add to UI
     const entry = DOMUtils.createElement('div', {
       className: `log-entry ${log.type}`
     }, [

@@ -877,15 +877,52 @@ class AgenticCrawler {
    * Check if URL should be excluded
    */
   shouldExclude(url) {
-    const path = new URL(url).pathname;
+    try {
+      const urlObj = new URL(url);
+      const path = urlObj.pathname.toLowerCase();
 
-    return this.config.excludePatterns.some(pattern => {
-      if (pattern.includes('*')) {
-        const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-        return regex.test(path);
+      // Built-in exclusions for resource files
+      const resourceExtensions = [
+        '.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif',
+        '.css', '.js', '.mjs', '.map',
+        '.woff', '.woff2', '.ttf', '.eot', '.otf',
+        '.pdf', '.zip', '.tar', '.gz',
+        '.mp3', '.mp4', '.webm', '.ogg', '.wav',
+        '.xml', '.json', '.rss', '.atom'
+      ];
+
+      // Check file extension
+      for (const ext of resourceExtensions) {
+        if (path.endsWith(ext)) {
+          return true;
+        }
       }
-      return path.includes(pattern);
-    });
+
+      // Built-in path exclusions
+      const excludedPaths = [
+        '/favicon', '/apple-touch-icon', '/android-chrome',
+        '/robots.txt', '/sitemap', '/manifest.json',
+        '/_next/', '/__', '/static/chunks/',
+        '/wp-admin/', '/wp-includes/', '/wp-content/uploads/'
+      ];
+
+      for (const excluded of excludedPaths) {
+        if (path.includes(excluded)) {
+          return true;
+        }
+      }
+
+      // User-provided exclusion patterns
+      return this.config.excludePatterns.some(pattern => {
+        if (pattern.includes('*')) {
+          const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+          return regex.test(path);
+        }
+        return path.includes(pattern);
+      });
+    } catch {
+      return true; // Exclude invalid URLs
+    }
   }
 
   /**
