@@ -3242,17 +3242,20 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         itemTypes: ['product']
       },
       prompt: `You are a fashion stylist. Analyze these clothing/accessory items and:
-1. Find 2-3 items that work well together as a partial outfit
-2. Suggest 2-3 NEW items the user should BUY to complete the look
+1. Find 2-3 items from the list that work well together as a partial outfit
+2. Based on the STYLE, COLORS, and AESTHETIC of those items, suggest 2-3 NEW specific items the user should BUY to complete the look
 
-Consider: color harmony, style consistency, outfit composition (tops, bottoms, shoes, accessories).
+Be SPECIFIC with suggestions - include brand style, color, and material that matches their existing items.
+For example: "Navy wool overcoat" not just "coat", "White minimalist leather sneakers" not just "sneakers".
+
+Consider: color harmony, style consistency (casual/formal/streetwear), outfit composition (tops, bottoms, shoes, accessories).
 
 Return JSON:
 {
   "matchedItems": ["item_id1", "item_id2"],
   "reasoning": "Why these items work together",
   "suggestions": [
-    {"name": "Item name", "category": "tops|bottoms|footwear|accessories|outerwear", "searchQuery": "google shopping search query", "reason": "Why this completes the look"}
+    {"name": "Specific item name with color/style", "category": "tops|bottoms|footwear|accessories|outerwear", "searchQuery": "detailed google shopping search query", "reason": "Why this completes the look"}
   ]
 }`,
       template: {
@@ -3514,7 +3517,7 @@ Return JSON:
       </div>`;
   }
 
-  // Fallback render without AI - generate smart suggestions based on item categories
+  // Fallback render without AI - analyze items and suggest complementary pieces
   function renderCompleteTheLookFallback(widget, items) {
     const selectedItems = [...items].sort(() => Math.random() - 0.5).slice(0, 3);
 
@@ -3535,15 +3538,51 @@ Return JSON:
         </a>`;
     }
 
-    // Generate generic suggestions based on what categories might be missing
-    const fallbackSuggestions = [
-      { name: 'Classic White Sneakers', category: 'footwear', searchQuery: 'white leather sneakers' },
-      { name: 'Minimalist Watch', category: 'accessories', searchQuery: 'minimalist watch' },
-      { name: 'Neutral Tote Bag', category: 'accessories', searchQuery: 'leather tote bag neutral' }
+    // Analyze user's items to make smart suggestions
+    const itemTitles = selectedItems.map(i => (i.title || '').toLowerCase()).join(' ');
+    const hasTop = /shirt|top|blouse|sweater|hoodie|tee|jacket|coat/i.test(itemTitles);
+    const hasBottom = /pants|jeans|shorts|skirt|trousers/i.test(itemTitles);
+    const hasShoes = /shoe|sneaker|boot|sandal|loafer/i.test(itemTitles);
+    const hasAccessory = /watch|bag|belt|hat|sunglasses|jewelry|necklace|bracelet/i.test(itemTitles);
+
+    // Extract style hints from titles
+    const isMinimal = /minimal|clean|simple|basic/i.test(itemTitles);
+    const isStreet = /street|urban|oversized|graphic/i.test(itemTitles);
+    const isClassic = /classic|timeless|tailored|wool|leather/i.test(itemTitles);
+
+    // Build suggestions based on what's missing and detected style
+    const suggestions = [];
+    const style = isMinimal ? 'minimal ' : isStreet ? 'streetwear ' : isClassic ? 'classic ' : '';
+
+    if (!hasBottom) {
+      suggestions.push({ name: `${style}Tailored Trousers`.trim(), category: 'bottoms', searchQuery: `${style}tailored trousers men` });
+    }
+    if (!hasTop) {
+      suggestions.push({ name: `${style}Cotton Oxford Shirt`.trim(), category: 'tops', searchQuery: `${style}oxford shirt` });
+    }
+    if (!hasShoes) {
+      suggestions.push({ name: `${style}Leather Sneakers`.trim(), category: 'footwear', searchQuery: `${style}white leather sneakers` });
+    }
+    if (!hasAccessory) {
+      suggestions.push({ name: `${style}Leather Belt`.trim(), category: 'accessories', searchQuery: `${style}leather belt` });
+    }
+
+    // Always suggest at least 2-3 items
+    const defaultSuggestions = [
+      { name: 'Versatile Outerwear', category: 'outerwear', searchQuery: `${style}lightweight jacket` },
+      { name: 'Quality Sunglasses', category: 'accessories', searchQuery: `${style}sunglasses` },
+      { name: 'Everyday Watch', category: 'accessories', searchQuery: `${style}minimalist watch` }
     ];
 
+    while (suggestions.length < 3) {
+      const next = defaultSuggestions.shift();
+      if (next && !suggestions.find(s => s.category === next.category)) {
+        suggestions.push(next);
+      } else if (!next) break;
+    }
+
     let suggestionsHtml = '';
-    for (const sug of fallbackSuggestions) {
+    for (const sug of suggestions.slice(0, 3)) {
       const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery)}`;
       suggestionsHtml += `
         <div class="widget-complete__item widget-complete__item--suggestion">
@@ -3560,7 +3599,7 @@ Return JSON:
       <div class="widget-complete">
         <div class="widget-complete__header">
           <span class="widget-complete__title">${widget.name}</span>
-          <span class="widget-complete__subtitle">Suggested pairings</span>
+          <span class="widget-complete__subtitle">Based on your collection</span>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
