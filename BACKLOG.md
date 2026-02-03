@@ -945,6 +945,56 @@ validateStyleMatch({ userStyle, suggestion })
 - [ ] Winner auto-promotion
 - [ ] Admin UI for experiment management
 
+### Story: Taste Profiling & Discovery Balance ⚡ P1
+> As a system, I want to personalize AI suggestions based on user preferences while avoiding filter bubbles.
+
+**Why This Matters:**
+Users' saved links reveal preferences: brands, price tiers, aesthetics, categories. Using this to shape AI suggestions improves relevance—but naive personalization creates echo chambers. This story implements taste profiling with built-in diversity and discovery mechanisms.
+
+**Where Taste Profiling Helps:**
+- "Complete the Look" widgets: Suggest brands matching user's existing style
+- Brand Discovery: Find similar brands to user's favorites
+- Search Enhancement: Bias results toward user's aesthetic
+- Category Recommendations: Prioritize price tier/quality level user prefers
+
+**Filter Bubble Risks:**
+- Echo chamber: Only showing familiar brands/styles
+- Category bleeding: Wear taste affecting food suggestions
+- Sparse data: Over-personalizing from few signals
+- Staleness: Preferences change but profile doesn't
+
+**Tasks - Core Profiling:**
+- [ ] Extract brand preferences from user's saved links (domain analysis)
+- [ ] Extract price tier signals (luxury/mid/budget based on brands)
+- [ ] Extract style attributes via AI (minimalist, maximalist, streetwear, etc.)
+- [ ] Scope profiles by category (wear/eat/go/use - never mix)
+- [ ] Set confidence threshold (min 5 items in category to personalize)
+- [ ] Refresh profiles on new saves (incremental, not full recalc)
+
+**Tasks - Filter Bubble Mitigation:**
+- [ ] **Familiar:Discovery ratio**: 70% personalized, 30% discovery by default
+- [ ] **Diversity requirements**: Never suggest same brand twice, require 2+ price tiers
+- [ ] **Serendipity injection**: 1-2 "wild card" suggestions from outside user's profile
+- [ ] **Discovery mode toggle**: User can flip to "Surprise Me" for 100% discovery
+- [ ] **Profile transparency**: Show user what we inferred ("We think you like X, Y, Z")
+- [ ] **Profile editing**: Let user correct/remove inferred preferences
+- [ ] **Recency weighting**: Recent saves weighted higher than old ones
+- [ ] **Anti-staleness**: Decay profile strength over time without new signals
+
+**Tasks - Implementation:**
+- [ ] Create `user_taste_profile` table in Supabase
+- [ ] Build `TasteProfiler` service with `extractProfile()` and `getPersonalizedConstraints()`
+- [ ] Integrate with PromptBuilder: `.addTasteConstraints(profile, discoveryRatio)`
+- [ ] Add "Discovery Mode" toggle to widget settings
+- [ ] Track personalization effectiveness (do personalized suggestions get clicked more?)
+- [ ] A/B test personalized vs generic suggestions
+- [ ] Build profile viewer in user settings
+
+**Validation Engine Integration:**
+- [ ] Use ValidationEngine to track personalization effectiveness
+- [ ] Auto-disable taste profiling for users where it decreases engagement
+- [ ] Track discovery suggestion performance separately
+
 ---
 
 ## Epic: Generative UI
