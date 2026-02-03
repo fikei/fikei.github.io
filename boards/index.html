@@ -2384,6 +2384,13 @@ body {
   line-height: 1;
 }
 
+.widget-complete__product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 .widget-complete__item--suggestion {
   text-decoration: none;
   cursor: pointer;
@@ -3147,7 +3154,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.7.0-plainlog';
+  const VERSION = '1.8.0-product-images';
   console.log('===========================================');
   console.log('BOARDS VERSION: ' + VERSION);
   console.log('===========================================');
@@ -3949,16 +3956,26 @@ Return JSON:
 
     let suggestionsHtml = '';
     for (const sug of suggestions.slice(0, 3)) {
-      const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
+      // Use actual product URL if available, otherwise fall back to Google Shopping search
+      const shopUrl = sug.productUrl || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
       const cat = sug.category || 'unknown';
       const icon = categoryIcons[cat] || '🛍️';
-      const brandDisplay = sug.brand ? `<div class="widget-complete__item-brand">${esc(sug.brand)}</div>` : '';
+
+      // Use vendor from enrichment if available
+      const vendorName = sug.vendor || sug.brand;
+      const brandDisplay = vendorName ? `<div class="widget-complete__item-brand">${esc(vendorName)}</div>` : '';
       const priceDisplay = sug.price ? `<span class="widget-complete__item-price">${esc(sug.price)}</span>` : '';
 
+      // Use actual product image if available, otherwise show category icon
+      const hasProductImage = sug.productImage && sug.productImage.length > 0;
+      const imageContent = hasProductImage
+        ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
+        : `<span class="widget-complete__product-icon">${icon}</span>`;
+
       suggestionsHtml += `
-        <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
+        <a href="${shopUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
           <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
-            <span class="widget-complete__product-icon">${icon}</span>
+            ${imageContent}
           </div>
           ${brandDisplay}
           <div class="widget-complete__item-title">${esc(sug.name)}</div>
