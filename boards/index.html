@@ -3443,88 +3443,6 @@ Return JSON:
     return null;
   }
 
-  // Render Complete the Look widget
-  function renderCompleteTheLookWidget(widget, items, aiResult) {
-    console.log('[widget] renderCompleteTheLookWidget called');
-    console.log('[widget] aiResult:', aiResult);
-
-    if (!aiResult) {
-      console.log('[widget] No AI result, using fallback');
-      return renderCompleteTheLookFallback(widget, items);
-    }
-
-    console.log('[widget] Using AI result');
-
-    // Get matched items from user's collection
-    const matchedItems = (aiResult.matchedItems || [])
-      .map(id => items.find(i => i.id === id))
-      .filter(Boolean)
-      .slice(0, 3);
-
-    console.log('[widget] AI matched items:', matchedItems.map(i => i?.title));
-
-    // If AI didn't return valid matches, pick random 2
-    if (matchedItems.length < 2) {
-      const shuffled = [...items].sort(() => Math.random() - 0.5);
-      matchedItems.push(...shuffled.slice(0, 2 - matchedItems.length));
-    }
-
-    const suggestions = (aiResult.suggestions || []).slice(0, 3);
-    console.log('[widget] AI suggestions:', suggestions);
-
-    // Render user items
-    let userItemsHtml = '';
-    for (const item of matchedItems) {
-      const hasImage = item.image && item.image.length > 0;
-      const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
-      userItemsHtml += `
-        <a href="${item.url}" target="_blank" rel="noopener" class="widget-complete__item">
-          <div class="widget-complete__image-wrap">
-            ${hasImage
-              ? `<img class="widget-complete__image" src="${secureImg(item.image)}" alt="" loading="lazy">`
-              : `<span class="widget-complete__placeholder">${initial}</span>`
-            }
-          </div>
-          <div class="widget-complete__item-title">${esc(item.title)}</div>
-          <div class="widget-complete__item-meta">${esc(item.domain)}</div>
-        </a>`;
-    }
-
-    // Render suggestions
-    let suggestionsHtml = '';
-    for (const sug of suggestions) {
-      const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
-      suggestionsHtml += `
-        <div class="widget-complete__item widget-complete__item--suggestion">
-          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__image-wrap">
-            <div class="widget-complete__suggestion-icon">Shop</div>
-          </a>
-          <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.reason || sug.category)}</div>
-          <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Search →</a>
-        </div>`;
-    }
-
-    return `
-      <div class="widget-complete">
-        <div class="widget-complete__header">
-          <span class="widget-complete__title">${widget.name}</span>
-          <span class="widget-complete__subtitle">${aiResult.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' : ''}</span>
-        </div>
-        <div class="widget-complete__body">
-          <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Your Items</div>
-            <div class="widget-complete__items">${userItemsHtml}</div>
-          </div>
-          <div class="widget-complete__divider"></div>
-          <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Complete With</div>
-            <div class="widget-complete__items">${suggestionsHtml}</div>
-          </div>
-        </div>
-      </div>`;
-  }
-
   // Categorize item by garment type
   function getGarmentCategory(title) {
     const t = (title || '').toLowerCase();
@@ -3540,49 +3458,22 @@ Return JSON:
   // Detect brand tier from domain
   function getBrandTier(domain) {
     const d = (domain || '').toLowerCase();
-    // Luxury/Designer
     if (/gucci|prada|louis\s?vuitton|hermes|chanel|dior|balenciaga|bottega|celine|loewe|saint\s?laurent|valentino|givenchy|fendi|burberry|versace|off-white|amiri|fear\s?of\s?god|rick\s?owens|margiela|acne\s?studios|ssense|farfetch|net-a-porter|mr\s?porter|matchesfashion/i.test(d)) return 'luxury';
-    // Premium/Contemporary
     if (/apc|norse\s?projects|our\s?legacy|ami|sandro|maje|reiss|theory|vince|allsaints|cos|arket|massimo\s?dutti|club\s?monaco|j\.?\s?crew|brooks\s?brothers|bonobos|suitsupply|todd\s?snyder|rag\s?bone/i.test(d)) return 'premium';
-    // Niche/Independent
     if (/need\s?supply|end\s?clothing|haven|bodega|kith|union|concepts|sns|slam\s?jam|tres\s?bien|oi\s?polloi/i.test(d)) return 'niche';
-    // Mainstream
     if (/zara|h&m|uniqlo|gap|old\s?navy|target|walmart|amazon|asos|topshop|forever\s?21|primark|mango|pull\s?bear|bershka|stradivarius/i.test(d)) return 'mainstream';
-    // Athletic
     if (/nike|adidas|puma|reebok|new\s?balance|asics|under\s?armour|lululemon|athleta|gymshark/i.test(d)) return 'athletic';
-    return 'mainstream'; // default
+    return 'mainstream';
   }
 
-  // Detect style from title keywords
-  function getStyleHints(title) {
-    const t = (title || '').toLowerCase();
-    if (/minimal|clean|simple|essential|basic|timeless/i.test(t)) return 'minimal';
-    if (/street|urban|oversized|graphic|skate|hype/i.test(t)) return 'streetwear';
-    if (/classic|tailored|heritage|preppy|traditional/i.test(t)) return 'classic';
-    if (/casual|relaxed|comfort|everyday|easy/i.test(t)) return 'casual';
-    if (/formal|elegant|dressy|luxury|refined/i.test(t)) return 'formal';
-    if (/athletic|sport|active|gym|performance/i.test(t)) return 'athletic';
-    return '';
-  }
-
-  // Fallback render - match items into outfit, suggest what's missing
-  function renderCompleteTheLookFallback(widget, items) {
-    console.log('[widget] renderCompleteTheLookFallback called with', items.length, 'items');
-
-    // Enrich items with category, style, brand tier
+  // Unified Complete the Look widget - single component
+  function renderCompleteTheLookWidget(widget, items, aiResult) {
+    // Enrich items with category and brand tier
     const enriched = items.map(item => ({
       ...item,
       garmentCat: getGarmentCategory(item.title),
-      style: getStyleHints(item.title),
       brandTier: getBrandTier(item.domain)
     }));
-
-    console.log('[widget] Enriched items:', enriched.map(i => ({
-      title: i.title,
-      category: i.garmentCat,
-      style: i.style,
-      tier: i.brandTier
-    })));
 
     // Group by category
     const byCategory = {};
@@ -3591,9 +3482,7 @@ Return JSON:
       byCategory[item.garmentCat].push(item);
     }
 
-    console.log('[widget] Items by category:', Object.keys(byCategory).map(k => `${k}: ${byCategory[k].length}`));
-
-    // Build a matching outfit: top + bottom + one more
+    // Build outfit: prioritize top + bottom + accessory
     const outfit = [];
     if (byCategory.tops?.length) outfit.push(byCategory.tops[Math.floor(Math.random() * byCategory.tops.length)]);
     if (byCategory.bottoms?.length) outfit.push(byCategory.bottoms[Math.floor(Math.random() * byCategory.bottoms.length)]);
@@ -3601,24 +3490,20 @@ Return JSON:
     if (outfit.length < 3 && byCategory.footwear?.length) outfit.push(byCategory.footwear[0]);
     if (outfit.length < 3 && byCategory.accessories?.length) outfit.push(byCategory.accessories[0]);
 
-    // Fallback if not enough items
+    // Fallback if not enough categorized items
     while (outfit.length < 2 && enriched.length > outfit.length) {
       const remaining = enriched.filter(e => !outfit.includes(e));
       if (remaining.length) outfit.push(remaining[0]);
     }
 
     const selectedItems = outfit.slice(0, 3);
-    console.log('[widget] Selected outfit:', selectedItems.map(i => i.title));
+    const outfitCats = new Set(selectedItems.map(i => i.garmentCat));
 
-    // Determine dominant style and brand tier
-    const styles = selectedItems.map(i => i.style).filter(Boolean);
+    // Determine dominant brand tier
     const tiers = selectedItems.map(i => i.brandTier);
-    const dominantStyle = styles.length ? styles.sort((a,b) => styles.filter(v => v===b).length - styles.filter(v => v===a).length)[0] : '';
     const dominantTier = tiers.sort((a,b) => tiers.filter(v => v===b).length - tiers.filter(v => v===a).length)[0] || 'mainstream';
 
-    console.log('[widget] Dominant style:', dominantStyle, '| Dominant tier:', dominantTier);
-
-    // Render user's matched outfit
+    // Render user's outfit
     let userItemsHtml = '';
     for (const item of selectedItems) {
       const hasImage = item.image && item.image.length > 0;
@@ -3636,84 +3521,41 @@ Return JSON:
         </a>`;
     }
 
-    // What categories are in the outfit?
-    const outfitCats = new Set(selectedItems.map(i => i.garmentCat));
-
-    // Brand-tier specific search modifiers
-    const tierKeywords = {
-      luxury: 'designer luxury',
-      premium: 'premium quality',
-      niche: 'independent brand',
-      mainstream: '',
-      athletic: 'performance'
-    };
-    const tierMod = tierKeywords[dominantTier] || '';
-    const styleMod = dominantStyle ? dominantStyle + ' ' : '';
-
-    // Build suggestions for MISSING categories
-    const suggestions = [];
-
-    if (!outfitCats.has('footwear')) {
-      suggestions.push({
-        name: dominantTier === 'luxury' ? 'Designer Leather Sneakers' : `${styleMod}Leather Sneakers`.trim(),
-        reason: 'Ground the look',
-        searchQuery: `${tierMod} ${styleMod}leather sneakers`.trim()
-      });
-    }
-    if (!outfitCats.has('outerwear')) {
-      suggestions.push({
-        name: dominantTier === 'luxury' ? 'Tailored Wool Coat' : `${styleMod}Lightweight Jacket`.trim(),
-        reason: 'Add a layer',
-        searchQuery: `${tierMod} ${styleMod}jacket coat`.trim()
-      });
-    }
-    if (!outfitCats.has('accessories')) {
-      suggestions.push({
-        name: dominantTier === 'luxury' ? 'Statement Watch' : `${styleMod}Minimalist Watch`.trim(),
-        reason: 'Finishing touch',
-        searchQuery: `${tierMod} ${styleMod}watch`.trim()
-      });
-    }
-    if (!outfitCats.has('bottoms')) {
-      suggestions.push({
-        name: dominantTier === 'luxury' ? 'Tailored Wool Trousers' : `${styleMod}Chinos`.trim(),
-        reason: 'Complete the base',
-        searchQuery: `${tierMod} ${styleMod}trousers pants`.trim()
-      });
-    }
-    if (!outfitCats.has('tops')) {
-      suggestions.push({
-        name: dominantTier === 'luxury' ? 'Premium Cotton Shirt' : `${styleMod}Oxford Shirt`.trim(),
-        reason: 'Versatile essential',
-        searchQuery: `${tierMod} ${styleMod}shirt`.trim()
-      });
-    }
-
-    // Fill to 3 if needed
-    const extras = [
-      { name: `${styleMod}Leather Belt`.trim(), reason: 'Tie it together', searchQuery: `${tierMod} ${styleMod}leather belt`.trim() },
-      { name: `${styleMod}Sunglasses`.trim(), reason: 'Elevate any outfit', searchQuery: `${tierMod} ${styleMod}sunglasses`.trim() },
-      { name: `${styleMod}Canvas Bag`.trim(), reason: 'Everyday carry', searchQuery: `${tierMod} ${styleMod}tote bag`.trim() }
-    ];
-    while (suggestions.length < 3 && extras.length) {
-      suggestions.push(extras.shift());
+    // Use AI suggestions if available, otherwise generate based on missing categories
+    let suggestions = [];
+    if (aiResult?.suggestions?.length) {
+      suggestions = aiResult.suggestions.slice(0, 3);
+    } else {
+      const tierMod = dominantTier === 'luxury' ? 'designer luxury' : dominantTier === 'premium' ? 'premium' : '';
+      if (!outfitCats.has('footwear')) suggestions.push({ name: 'Leather Sneakers', reason: 'Ground the look', searchQuery: `${tierMod} leather sneakers`.trim() });
+      if (!outfitCats.has('outerwear')) suggestions.push({ name: 'Lightweight Jacket', reason: 'Add a layer', searchQuery: `${tierMod} jacket`.trim() });
+      if (!outfitCats.has('accessories')) suggestions.push({ name: 'Minimalist Watch', reason: 'Finishing touch', searchQuery: `${tierMod} watch`.trim() });
+      if (!outfitCats.has('bottoms')) suggestions.push({ name: 'Chinos', reason: 'Complete the base', searchQuery: `${tierMod} chinos`.trim() });
+      if (!outfitCats.has('tops')) suggestions.push({ name: 'Oxford Shirt', reason: 'Versatile essential', searchQuery: `${tierMod} oxford shirt`.trim() });
+      // Fill to 3
+      const extras = [
+        { name: 'Leather Belt', reason: 'Tie it together', searchQuery: `${tierMod} leather belt`.trim() },
+        { name: 'Sunglasses', reason: 'Elevate any outfit', searchQuery: `${tierMod} sunglasses`.trim() }
+      ];
+      while (suggestions.length < 3 && extras.length) suggestions.push(extras.shift());
     }
 
     let suggestionsHtml = '';
     for (const sug of suggestions.slice(0, 3)) {
-      const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery)}`;
+      const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
       suggestionsHtml += `
         <div class="widget-complete__item widget-complete__item--suggestion">
           <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__image-wrap">
             <div class="widget-complete__suggestion-icon">Shop</div>
           </a>
           <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.reason)}</div>
+          <div class="widget-complete__item-reason">${esc(sug.reason || '')}</div>
           <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Search →</a>
         </div>`;
     }
 
-    const subtitle = dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'Outfit from your collection';
+    const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
+      dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'From your collection';
 
     return `
       <div class="widget-complete">
@@ -3723,12 +3565,12 @@ Return JSON:
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">TEST - Your Outfit</div>
+            <div class="widget-complete__section-title">Your Outfit</div>
             <div class="widget-complete__items">${userItemsHtml}</div>
           </div>
           <div class="widget-complete__divider"></div>
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">TEST - Buy These</div>
+            <div class="widget-complete__section-title">Complete With</div>
             <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
         </div>
