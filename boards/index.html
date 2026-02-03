@@ -3390,17 +3390,23 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       ],
       inProgress: [
         'User feedback collection (👍/👎)',
-        'Custom user prompt input'
+        'Shopify JSON API for product images',
+        'Brand validation layer'
       ],
       planned: [
-        'Actual product images from shopping APIs',
+        // HIGH PRIORITY - Brand Intelligence
+        'Dynamic brand list from user board - analyze links to extract brands user likes, find similar brands, validate scrapeability, filter unsupported',
+        'User-customizable prompt - simplified prompt editor (hides technical steps), lets users set tone/style/preferences in plain language',
+        // MEDIUM PRIORITY
         'Price range filtering based on user budget',
-        'Brand preference learning',
-        'Style preference learning',
-        'Exclude items already owned',
+        'Brand preference learning from interactions',
+        'Style preference learning from favorites',
+        'Exclude items already owned (category-aware)',
+        // LOWER PRIORITY
         'Movable/reorderable widgets',
-        'Multiple outfit suggestions',
-        'Season/occasion filtering'
+        'Multiple outfit suggestions per refresh',
+        'Season/occasion filtering',
+        'Outfit history and versioning'
       ],
       learnings: [
         'Users want SPECIFIC brand recommendations, not generic items',
