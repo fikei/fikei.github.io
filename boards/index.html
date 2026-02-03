@@ -3016,10 +3016,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.6.0-debug';
-  console.log('%c🚀 BOARDS v' + VERSION + ' LOADED 🚀', 'background: #f0f; color: #fff; font-size: 20px; font-weight: bold; padding: 10px;');
-  console.log('%cIf you see this, the NEW code is running!', 'background: #0ff; color: #000; font-size: 16px; padding: 8px;');
-  console.log('Timestamp:', new Date().toISOString());
+  const VERSION = '1.7.0-plainlog';
+  console.log('===========================================');
+  console.log('BOARDS VERSION: ' + VERSION);
+  console.log('===========================================');
+  console.warn('[WARN] BOARDS ' + VERSION + ' LOADED');
+  console.error('[ERROR TEST] BOARDS ' + VERSION + ' - NOT A REAL ERROR, JUST TESTING');
 
   // ============================================
   // Supabase Setup
