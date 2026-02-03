@@ -2479,6 +2479,37 @@ body {
   color: var(--accent);
 }
 
+.widget-complete__feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-3);
+}
+
+.widget-complete__feedback-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: auto;
+}
+
+.widget-complete__feedback-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.widget-complete__feedback-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
 .widget-complete__shop-link {
   display: inline-flex;
   align-items: center;
@@ -3324,8 +3355,60 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   }
 
   // ============================================
-  // AI Widget System v2 - PRD-Driven Pipeline
+  // AI Widget System v3 - PRD-Driven Pipeline with Feedback Loop
   // ============================================
+  //
+  // FEEDBACK LOOP PROCESS:
+  // 1. User interacts with widget (view, favorite, dismiss, hide)
+  // 2. User can provide explicit feedback (👍/👎) and text suggestions
+  // 3. Feedback is stored locally and can be exported for PRD updates
+  // 4. User preferences (style, brands, budget) influence AI prompts
+  // 5. Widget backlog tracks feature requests and improvements
+  //
+  // PRD ITERATION CYCLE:
+  // - v1: Basic functionality (shipped)
+  // - v2: Add user feedback collection (current)
+  // - v3: Personalization based on feedback
+  // - v4: A/B testing different prompts
+  // ============================================
+
+  // Widget Backlog - Feature requests and improvements from user feedback
+  const WIDGET_BACKLOG = {
+    'complete-the-look': {
+      version: '3.0',
+      shipped: [
+        'Basic outfit matching',
+        'AI-powered suggestions',
+        'Brand and price display',
+        'Category icons for suggestions',
+        'Favorite/dismiss/hide actions',
+        'Refresh button to regenerate',
+        'Cache persistence'
+      ],
+      inProgress: [
+        'User feedback collection (👍/👎)',
+        'Custom user prompt input'
+      ],
+      planned: [
+        'Actual product images from shopping APIs',
+        'Price range filtering based on user budget',
+        'Brand preference learning',
+        'Style preference learning',
+        'Exclude items already owned',
+        'Movable/reorderable widgets',
+        'Multiple outfit suggestions',
+        'Season/occasion filtering'
+      ],
+      learnings: [
+        'Users want SPECIFIC brand recommendations, not generic items',
+        'Empty placeholder boxes look broken - need visual content',
+        'Suggestions should NOT overlap with items user already owns',
+        'Users want control: favorite, dismiss, hide, refresh',
+        'Cache is important but users need ability to force refresh',
+        'Product images significantly improve engagement'
+      ]
+    }
+  };
 
   // Widget Registry - Full PRD definitions for each widget
   // status: 'active' | 'beta' | 'draft' (only active shown to users, beta for testers, draft admin-only)
@@ -3511,6 +3594,108 @@ Return JSON:
       generateWidgets();
       console.log('[widget] Hidden:', widgetId);
     }
+  };
+
+  // ============================================
+  // Widget Feedback System - Collects user input for PRD improvements
+  // ============================================
+  const WIDGET_FEEDBACK_KEY = 'boards_widget_feedback';
+  let widgetFeedback = { ratings: {}, comments: [], userPrefs: {} };
+
+  function loadWidgetFeedback() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(WIDGET_FEEDBACK_KEY) || '{}');
+      widgetFeedback = {
+        ratings: saved.ratings || {},      // { widgetId: { up: count, down: count } }
+        comments: saved.comments || [],     // [{ widgetId, text, timestamp }]
+        userPrefs: saved.userPrefs || {}    // { budgetRange, preferredBrands, stylePrefs, customPrompt }
+      };
+    } catch {
+      widgetFeedback = { ratings: {}, comments: [], userPrefs: {} };
+    }
+  }
+
+  function saveWidgetFeedback() {
+    try {
+      localStorage.setItem(WIDGET_FEEDBACK_KEY, JSON.stringify(widgetFeedback));
+    } catch {}
+  }
+
+  // Rate a widget result (thumbs up/down)
+  window.rateWidget = function(widgetId, isPositive) {
+    if (!widgetFeedback.ratings[widgetId]) {
+      widgetFeedback.ratings[widgetId] = { up: 0, down: 0 };
+    }
+    if (isPositive) {
+      widgetFeedback.ratings[widgetId].up++;
+    } else {
+      widgetFeedback.ratings[widgetId].down++;
+    }
+    saveWidgetFeedback();
+    toast(isPositive ? 'Thanks for the feedback!' : 'We\'ll try to do better');
+    console.log('[widget] Feedback:', widgetId, isPositive ? '👍' : '👎', widgetFeedback.ratings[widgetId]);
+  };
+
+  // Submit text feedback for a widget
+  window.submitWidgetFeedback = function(widgetId) {
+    const text = prompt('How can we improve this widget? What would you like to see?');
+    if (text && text.trim()) {
+      widgetFeedback.comments.push({
+        widgetId,
+        text: text.trim(),
+        timestamp: Date.now()
+      });
+      saveWidgetFeedback();
+      toast('Feedback saved - thank you!');
+      console.log('[widget] Comment saved:', widgetId, text);
+    }
+  };
+
+  // Set user preferences for widget personalization
+  window.setWidgetPreferences = function() {
+    const currentPrefs = widgetFeedback.userPrefs;
+    const budget = prompt('What\'s your typical budget per item? (e.g., "$50-150", "under $100", "luxury")', currentPrefs.budgetRange || '');
+    const brands = prompt('Any favorite brands? (comma-separated, e.g., "Uniqlo, Nike, COS")', currentPrefs.preferredBrands || '');
+    const style = prompt('Describe your style in a few words (e.g., "minimal, monochrome", "streetwear, bold")', currentPrefs.stylePrefs || '');
+    const customPrompt = prompt('Any specific instructions for suggestions? (e.g., "only suggest sustainable brands")', currentPrefs.customPrompt || '');
+
+    widgetFeedback.userPrefs = {
+      budgetRange: budget || currentPrefs.budgetRange,
+      preferredBrands: brands || currentPrefs.preferredBrands,
+      stylePrefs: style || currentPrefs.stylePrefs,
+      customPrompt: customPrompt || currentPrefs.customPrompt
+    };
+    saveWidgetFeedback();
+    toast('Preferences saved!');
+
+    // Clear cache to regenerate with new prefs
+    Object.keys(widgetCache).forEach(key => {
+      if (key.startsWith('complete-the-look')) delete widgetCache[key];
+    });
+    saveWidgetCache();
+    generateWidgets();
+  };
+
+  // Get user preferences string to append to AI prompt
+  function getUserPrefsPromptAddition() {
+    const prefs = widgetFeedback.userPrefs;
+    if (!prefs || Object.keys(prefs).length === 0) return '';
+
+    let addition = '\n\nUSER PREFERENCES:';
+    if (prefs.budgetRange) addition += `\n- Budget: ${prefs.budgetRange}`;
+    if (prefs.preferredBrands) addition += `\n- Preferred brands: ${prefs.preferredBrands}`;
+    if (prefs.stylePrefs) addition += `\n- Style: ${prefs.stylePrefs}`;
+    if (prefs.customPrompt) addition += `\n- Special instructions: ${prefs.customPrompt}`;
+    return addition;
+  }
+
+  // Export feedback for PRD analysis
+  window.exportWidgetFeedback = function() {
+    const data = JSON.stringify(widgetFeedback, null, 2);
+    console.log('[widget] Feedback export:\n', data);
+    navigator.clipboard?.writeText(data);
+    toast('Feedback copied to clipboard');
+    return widgetFeedback;
   };
 
   // Restore a dismissed widget
@@ -3813,6 +3998,13 @@ Return JSON:
             <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
         </div>
+        <div class="widget-complete__feedback">
+          <span class="widget-complete__feedback-label">Was this helpful?</span>
+          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', true)" title="Good suggestions">👍</button>
+          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', false)" title="Not helpful">👎</button>
+          <button class="widget-complete__feedback-btn" onclick="submitWidgetFeedback('${widget.id}')" title="Share feedback">💬</button>
+          <button class="widget-complete__feedback-btn" onclick="setWidgetPreferences()" title="Set your preferences">⚙️</button>
+        </div>
       </div>`;
   }
 
@@ -4003,6 +4195,8 @@ Return JSON:
     console.log('[WIDGET] widgetStatusOverrides loaded:', widgetStatusOverrides);
     loadWidgetPrefs();
     console.log('[WIDGET] widgetPrefs loaded:', widgetPrefs);
+    loadWidgetFeedback();
+    console.log('[WIDGET] widgetFeedback loaded:', widgetFeedback);
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
