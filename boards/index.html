@@ -3430,34 +3430,35 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         maxItems: null,
         itemTypes: ['product']
       },
-      prompt: `You are a fashion stylist and shopping expert. Analyze these clothing/accessory items and:
-1. Find 2-3 items from the list that work well together as a partial outfit
-2. Based on the STYLE, COLORS, and AESTHETIC of those items, suggest 2-3 SPECIFIC REAL PRODUCTS the user should BUY
+      prompt: `You are a fashion stylist. The user owns these items. Your job:
 
-IMPORTANT: For suggestions, provide REAL product recommendations with:
-- Actual brand names (Nike, Uniqlo, Zara, Common Projects, A.P.C., etc.)
-- Specific product names when possible
-- Color and material details
-- A simple image search term (just the product type, e.g., "white sneakers", "navy chinos", "leather watch")
+STEP 1: Pick 2-3 items from their collection that form a good partial outfit.
+STEP 2: Suggest 2-3 NEW products they should BUY to complete the look.
 
-Examples of good suggestions:
-- "Common Projects Achilles Low White" with imageQuery "white leather sneakers"
-- "Uniqlo Ultra Light Down Jacket Navy" with imageQuery "navy puffer jacket"
-- "Timex Weekender Watch" with imageQuery "minimalist watch tan strap"
+CRITICAL RULES FOR SUGGESTIONS:
+- Suggestions must be DIFFERENT products the user does NOT already own
+- NEVER suggest items from the provided list - those are items they ALREADY HAVE
+- Suggest products from well-known brands: Common Projects, A.P.C., Acne Studios, COS, Uniqlo, Nike, New Balance, Carhartt WIP, etc.
+- Include specific product names, colors, and estimated prices
+
+Example good suggestions (products user should BUY):
+- "Common Projects Achilles Low White Leather Sneakers" - $450
+- "A.P.C. Petit New Standard Raw Selvedge Jeans" - $220
+- "Uniqlo U Crew Neck T-Shirt White" - $20
 
 Return JSON:
 {
-  "matchedItems": ["item_id1", "item_id2"],
-  "reasoning": "Brief explanation of why these items work together",
+  "matchedItems": ["id1", "id2"],
+  "reasoning": "Why these items work together",
   "suggestions": [
     {
-      "name": "Brand + Product Name + Color",
-      "brand": "Brand name",
-      "price": "$XX-$XXX estimate",
+      "name": "Brand + Specific Product + Color",
+      "brand": "Brand",
+      "price": "$XXX",
       "category": "tops|bottoms|footwear|accessories|outerwear",
-      "imageQuery": "simple image search term",
-      "searchQuery": "google shopping search query",
-      "reason": "Why this completes the look"
+      "imageQuery": "product type for image search",
+      "searchQuery": "brand product name for shopping",
+      "reason": "How this completes the outfit"
     }
   ]
 }`,
