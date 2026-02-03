@@ -722,6 +722,28 @@
 - [ ] Test Edge Functions locally before deploy
 - [ ] Add deployment scripts to package.json
 
+### Story: Debug Image Scraping Pipeline ← IN PROGRESS
+> As a developer, I want to understand why product images aren't appearing.
+
+**Investigation Steps:**
+- [ ] Check Edge Function logs in Supabase dashboard for `[shopify]` and `[scrape]` messages
+- [ ] Verify `productImage` is being returned in API response (check client console)
+- [ ] Test Shopify API endpoints directly (curl from local machine)
+- [ ] Identify which brands are returning images vs null
+- [ ] Consider SERP API as more reliable alternative
+
+**Potential Root Causes:**
+- Shopify stores may be blocking Edge Function requests (different IP/region)
+- Rate limiting from brand websites
+- Cloudflare/bot protection blocking scraping attempts
+- JSON response structure changed on Shopify endpoints
+
+**Possible Solutions:**
+- [ ] Add SERP API integration (Google Custom Search) for reliable product images
+- [ ] Use a proxy service for scraping requests
+- [ ] Pre-populate image cache with known products
+- [ ] Fall back to AI-generated product mockups
+
 ### Story: Brand Intelligence Service
 > As a system, I want centralized brand knowledge and validation.
 
