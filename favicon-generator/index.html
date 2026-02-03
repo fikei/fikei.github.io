@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Favicon Generator - AI-Powered Favicon Creator</title>
+  <link rel="stylesheet" href="../design-system/tokens.css">
+  <link rel="stylesheet" href="../design-system/components.css">
+  <link rel="stylesheet" href="css/favicon-generator.css">
+  <link rel="icon" type="image/png" href="../images/icons/favicon.ico"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="favicon-app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <h1 class="logo">Favicon Generator</h1>
+        <span class="tagline">AI-Powered Favicon Creator</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn--ghost" id="theme-toggle" title="Toggle theme">
+          <span class="icon">*</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <div class="generator-container">
+        <!-- Input Section -->
+        <section class="input-section">
+          <div class="section-header">
+            <h2>Create Your Favicon</h2>
+            <p>Generate deployment-ready favicons from a text prompt, emoji, or custom design.</p>
+          </div>
+
+          <!-- Generation Mode Tabs -->
+          <div class="mode-tabs">
+            <button class="mode-tab active" data-mode="ai">AI Generate</button>
+            <button class="mode-tab" data-mode="text">Text/Emoji</button>
+            <button class="mode-tab" data-mode="upload">Upload Image</button>
+          </div>
+
+          <!-- AI Generation Mode -->
+          <div class="mode-panel active" id="ai-mode">
+            <form class="generator-form" id="ai-form">
+              <div class="form-group">
+                <label for="ai-prompt">Describe your favicon</label>
+                <textarea
+                  id="ai-prompt"
+                  class="input"
+                  placeholder="A minimalist geometric logo with a lightning bolt, dark background, flat design style..."
+                  rows="3"
+                ></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="ai-style">Style</label>
+                  <select id="ai-style" class="input">
+                    <option value="flat">Flat Design</option>
+                    <option value="3d">3D Rendered</option>
+                    <option value="pixel">Pixel Art</option>
+                    <option value="minimal">Minimalist</option>
+                    <option value="gradient">Gradient</option>
+                    <option value="outline">Outline/Line Art</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="ai-color">Primary Color</label>
+                  <input type="color" id="ai-color" class="input input-color" value="#ffffff">
+                </div>
+              </div>
+
+              <details class="api-settings">
+                <summary>API Settings</summary>
+                <div class="form-group">
+                  <label for="ai-provider">Provider</label>
+                  <select id="ai-provider" class="input">
+                    <option value="openai">OpenAI DALL-E 3</option>
+                    <option value="stability">Stability AI</option>
+                    <option value="replicate">Replicate</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="ai-api-key">API Key</label>
+                  <input type="password" id="ai-api-key" class="input" placeholder="Enter your API key">
+                  <span class="form-hint">Your key is stored locally and never sent to our servers.</span>
+                </div>
+              </details>
+
+              <button type="submit" class="btn btn--filled btn--lg">Generate with AI</button>
+            </form>
+          </div>
+
+          <!-- Text/Emoji Mode -->
+          <div class="mode-panel" id="text-mode">
+            <form class="generator-form" id="text-form">
+              <div class="form-group">
+                <label for="text-content">Text or Emoji</label>
+                <input
+                  type="text"
+                  id="text-content"
+                  class="input input-lg text-center"
+                  placeholder="F"
+                  maxlength="3"
+                >
+                <span class="form-hint">Enter 1-3 characters or an emoji</span>
+              </div>
+
+              <div class="emoji-picker">
+                <span class="emoji-btn" data-emoji="⚡">⚡</span>
+                <span class="emoji-btn" data-emoji="🚀">🚀</span>
+                <span class="emoji-btn" data-emoji="💎">💎</span>
+                <span class="emoji-btn" data-emoji="🔥">🔥</span>
+                <span class="emoji-btn" data-emoji="✨">✨</span>
+                <span class="emoji-btn" data-emoji="🎯">🎯</span>
+                <span class="emoji-btn" data-emoji="💡">💡</span>
+                <span class="emoji-btn" data-emoji="🛡️">🛡️</span>
+                <span class="emoji-btn" data-emoji="⭐">⭐</span>
+                <span class="emoji-btn" data-emoji="🔮">🔮</span>
+                <span class="emoji-btn" data-emoji="🎨">🎨</span>
+                <span class="emoji-btn" data-emoji="📦">📦</span>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="text-bg-color">Background</label>
+                  <input type="color" id="text-bg-color" class="input input-color" value="#000000">
+                </div>
+                <div class="form-group">
+                  <label for="text-fg-color">Foreground</label>
+                  <input type="color" id="text-fg-color" class="input input-color" value="#ffffff">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="text-font">Font</label>
+                  <select id="text-font" class="input">
+                    <option value="Space Grotesk">Space Grotesk</option>
+                    <option value="Arial Black">Arial Black</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Impact">Impact</option>
+                    <option value="system-ui">System UI</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="text-shape">Shape</label>
+                  <select id="text-shape" class="input">
+                    <option value="square">Square</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn--filled btn--lg">Generate Favicon</button>
+            </form>
+          </div>
+
+          <!-- Upload Mode -->
+          <div class="mode-panel" id="upload-mode">
+            <form class="generator-form" id="upload-form">
+              <div class="upload-zone" id="upload-zone">
+                <div class="upload-content">
+                  <div class="upload-icon">+</div>
+                  <p>Drop an image here or click to upload</p>
+                  <span class="form-hint">PNG, JPG, SVG, or WebP (min 512x512 recommended)</span>
+                </div>
+                <input type="file" id="upload-input" accept="image/*" hidden>
+              </div>
+
+              <div class="upload-preview" id="upload-preview" hidden>
+                <img id="preview-image" src="" alt="Preview">
+                <button type="button" class="btn btn--ghost btn--sm" id="clear-upload">Clear</button>
+              </div>
+
+              <button type="submit" class="btn btn--filled btn--lg" disabled id="upload-submit">Generate from Image</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- Preview Section -->
+        <section class="preview-section">
+          <div class="section-header">
+            <h2>Preview</h2>
+            <p>See how your favicon will appear across different contexts.</p>
+          </div>
+
+          <div class="preview-grid">
+            <!-- Browser Tab Preview -->
+            <div class="preview-card">
+              <h3>Browser Tab</h3>
+              <div class="browser-mock">
+                <div class="browser-tab">
+                  <div class="tab-favicon" id="preview-tab-favicon"></div>
+                  <span class="tab-title">Your Website</span>
+                  <span class="tab-close">×</span>
+                </div>
+                <div class="browser-bar">
+                  <span class="browser-url">yoursite.com</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bookmark Preview -->
+            <div class="preview-card">
+              <h3>Bookmark Bar</h3>
+              <div class="bookmark-mock">
+                <div class="bookmark-item">
+                  <div class="bookmark-favicon" id="preview-bookmark-favicon"></div>
+                  <span>Your Site</span>
+                </div>
+                <div class="bookmark-item muted">
+                  <div class="bookmark-favicon placeholder"></div>
+                  <span>Other Site</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mobile Home Screen -->
+            <div class="preview-card">
+              <h3>iOS Home Screen</h3>
+              <div class="mobile-mock">
+                <div class="mobile-grid">
+                  <div class="mobile-icon placeholder"></div>
+                  <div class="mobile-icon" id="preview-mobile-icon"></div>
+                  <div class="mobile-icon placeholder"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- All Sizes -->
+            <div class="preview-card preview-sizes">
+              <h3>All Sizes</h3>
+              <div class="sizes-grid">
+                <div class="size-item">
+                  <canvas id="preview-16" width="16" height="16"></canvas>
+                  <span>16×16</span>
+                </div>
+                <div class="size-item">
+                  <canvas id="preview-32" width="32" height="32"></canvas>
+                  <span>32×32</span>
+                </div>
+                <div class="size-item">
+                  <canvas id="preview-48" width="48" height="48"></canvas>
+                  <span>48×48</span>
+                </div>
+                <div class="size-item">
+                  <canvas id="preview-180" width="180" height="180"></canvas>
+                  <span>180×180</span>
+                </div>
+                <div class="size-item">
+                  <canvas id="preview-192" width="192" height="192"></canvas>
+                  <span>192×192</span>
+                </div>
+                <div class="size-item">
+                  <canvas id="preview-512" width="512" height="512"></canvas>
+                  <span>512×512</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div class="empty-state" id="preview-empty">
+            <div class="empty-icon">◇</div>
+            <h3>No favicon generated yet</h3>
+            <p>Use the form on the left to create your favicon.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- Export Section (shown after generation) -->
+      <section class="export-section" id="export-section" hidden>
+        <div class="section-header">
+          <h2>Export & Deploy</h2>
+          <p>Download your favicon package with all required files and HTML code.</p>
+        </div>
+
+        <div class="export-grid">
+          <!-- Download Options -->
+          <div class="export-card">
+            <h3>Download Package</h3>
+            <p>Get all favicon files in a single ZIP:</p>
+            <ul class="file-list">
+              <li><code>favicon.ico</code> - Legacy browsers (16×16, 32×32, 48×48)</li>
+              <li><code>favicon-16x16.png</code> - Standard favicon</li>
+              <li><code>favicon-32x32.png</code> - Retina displays</li>
+              <li><code>apple-touch-icon.png</code> - iOS devices (180×180)</li>
+              <li><code>android-chrome-192x192.png</code> - Android</li>
+              <li><code>android-chrome-512x512.png</code> - Android splash</li>
+              <li><code>site.webmanifest</code> - PWA manifest</li>
+            </ul>
+            <button class="btn btn--filled" id="download-zip">
+              Download ZIP
+            </button>
+          </div>
+
+          <!-- HTML Code -->
+          <div class="export-card">
+            <h3>HTML Code</h3>
+            <p>Add this to your <code>&lt;head&gt;</code> section:</p>
+            <div class="code-block">
+              <pre id="html-code"></pre>
+              <button class="btn btn--ghost btn--sm copy-btn" data-target="html-code">Copy</button>
+            </div>
+          </div>
+
+          <!-- Web Manifest -->
+          <div class="export-card">
+            <h3>Web Manifest</h3>
+            <p>Contents of <code>site.webmanifest</code>:</p>
+            <div class="code-block">
+              <pre id="manifest-code"></pre>
+              <button class="btn btn--ghost btn--sm copy-btn" data-target="manifest-code">Copy</button>
+            </div>
+          </div>
+
+          <!-- Individual Downloads -->
+          <div class="export-card">
+            <h3>Individual Files</h3>
+            <p>Download specific sizes:</p>
+            <div class="download-buttons" id="individual-downloads">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay" hidden>
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <p id="loading-text">Generating favicon...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/favicon-generator.js"></script>
+  <script src="js/ico-encoder.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
