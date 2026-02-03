@@ -718,6 +718,21 @@
 - [ ] Quick actions based on link type
 - [ ] Widget customization options
 
+### Story: AI-Powered Content Discovery
+> As a user, I want AI to find and suggest similar content to populate my board.
+
+**Tasks:**
+- [ ] Add "Find More Like This" action to link cards
+- [ ] Add "Add N Similar" button to category view
+- [ ] Implement AI search using link context (title, description, category, domain)
+- [ ] Integrate web search API (Google Custom Search, Bing, or Tavily)
+- [ ] AI filters results for relevance and quality
+- [ ] Preview suggested links before adding
+- [ ] Batch add multiple suggestions at once
+- [ ] De-duplicate against existing board links
+- [ ] Learn from user accepts/rejects to improve suggestions
+- [ ] Rate limit to prevent abuse (X discoveries per day)
+
 ---
 
 ## Epic: Mobile App MVP
