@@ -372,17 +372,35 @@ async function scrapeHtml(brand: BrandConfig, query: string): Promise<{ image: s
   }
 }
 
+// Get the official brand URL (for when scraping fails)
+function getBrandUrl(brandConfig: BrandConfig, query: string): string {
+  // If Shopify, link to their search
+  if (brandConfig.shopifyDomain) {
+    return `https://${brandConfig.shopifyDomain}/search?q=${encodeURIComponent(query)}`
+  }
+  // If we have a searchUrl function, use it
+  if (brandConfig.searchUrl) {
+    return brandConfig.searchUrl(query)
+  }
+  // Fallback to brand homepage (extract from first keyword)
+  return `https://www.${brandConfig.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
+}
+
 // Main function: try Shopify API first, then HTML scraping
+// NEVER returns Google Shopping URLs - only official brand URLs
 async function scrapeProductImage(brandName: string, query: string): Promise<{ image: string | null, url: string }> {
   const brandConfig = findBrandConfig(brandName, query)
 
   if (!brandConfig) {
-    console.log(`[scrape] No brand config for "${brandName}" - falling back to Google Shopping`)
+    console.log(`[scrape] No brand config for "${brandName}" - returning null (no Google Shopping)`)
     return {
       image: null,
-      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`
+      url: '' // Empty URL - client will handle
     }
   }
+
+  // Get the official brand URL to use as fallback
+  const brandUrl = getBrandUrl(brandConfig, query)
 
   // Try Shopify API first (most reliable)
   if (brandConfig.shopifyDomain) {
@@ -401,10 +419,11 @@ async function scrapeProductImage(brandName: string, query: string): Promise<{ i
     }
   }
 
-  // Ultimate fallback
+  // Return official brand URL (NOT Google Shopping)
+  console.log(`[scrape] No image found for "${brandName}" - returning brand URL: ${brandUrl}`)
   return {
     image: null,
-    url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`
+    url: brandUrl
   }
 }
 

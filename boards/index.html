@@ -3976,8 +3976,8 @@ Return JSON:
       productUrl: s.productUrl ? 'present' : null
     })));
     for (const sug of suggestions.slice(0, 3)) {
-      // Use actual product URL if available, otherwise fall back to Google Shopping search
-      const shopUrl = sug.productUrl || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
+      // Use productUrl from server - NEVER fall back to Google Shopping
+      const hasUrl = sug.productUrl && sug.productUrl.length > 0 && !sug.productUrl.includes('google.com');
       const cat = sug.category || 'unknown';
       const icon = categoryIcons[cat] || '🛍️';
 
@@ -3992,16 +3992,31 @@ Return JSON:
         ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
         : `<span class="widget-complete__product-icon">${icon}</span>`;
 
-      suggestionsHtml += `
-        <a href="${shopUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
-          <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
-            ${imageContent}
-          </div>
-          ${brandDisplay}
-          <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-          <span class="widget-complete__shop-link">Shop Now →</span>
-        </a>`;
+      // Render as link only if we have a valid URL, otherwise render as non-clickable card
+      if (hasUrl) {
+        suggestionsHtml += `
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+              ${imageContent}
+            </div>
+            ${brandDisplay}
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link">Shop Now →</span>
+          </a>`;
+      } else {
+        // No valid URL - render as non-clickable suggestion
+        suggestionsHtml += `
+          <div class="widget-complete__item widget-complete__item--suggestion widget-complete__item--no-link">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+              ${imageContent}
+            </div>
+            ${brandDisplay}
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link" style="opacity: 0.5">Search for this item</span>
+          </div>`;
+      }
     }
 
     const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
