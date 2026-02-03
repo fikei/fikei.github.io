@@ -20,7 +20,6 @@ class FaviconApp {
       aiPrompt: document.getElementById('ai-prompt'),
       aiStyle: document.getElementById('ai-style'),
       aiColor: document.getElementById('ai-color'),
-      aiProvider: document.getElementById('ai-provider'),
       aiApiKey: document.getElementById('ai-api-key'),
 
       // Text form
@@ -93,13 +92,9 @@ class FaviconApp {
 
     // Load API key
     const savedKey = localStorage.getItem('favicon-api-key');
-    const savedProvider = localStorage.getItem('favicon-api-provider');
 
     if (savedKey) {
       this.elements.aiApiKey.value = savedKey;
-    }
-    if (savedProvider) {
-      this.elements.aiProvider.value = savedProvider;
     }
   }
 
@@ -157,9 +152,6 @@ class FaviconApp {
     // API key saving
     this.elements.aiApiKey.addEventListener('change', () => {
       localStorage.setItem('favicon-api-key', this.elements.aiApiKey.value);
-    });
-    this.elements.aiProvider.addEventListener('change', () => {
-      localStorage.setItem('favicon-api-provider', this.elements.aiProvider.value);
     });
 
     // Download ZIP
@@ -289,7 +281,6 @@ class FaviconApp {
 
     const prompt = this.elements.aiPrompt.value.trim();
     const apiKey = this.elements.aiApiKey.value.trim();
-    const provider = this.elements.aiProvider.value;
     const style = this.elements.aiStyle.value;
     const color = this.elements.aiColor.value;
 
@@ -299,33 +290,18 @@ class FaviconApp {
     }
 
     if (!apiKey) {
-      this.showToast('Please enter your API key in the settings', 'error');
+      this.showToast('Please enter your Google AI API key in the settings', 'error');
       return;
     }
 
     // Build enhanced prompt for favicon
     const enhancedPrompt = this.buildFaviconPrompt(prompt, style, color);
 
-    this.showLoading('Generating with AI...');
+    this.showLoading('Generating with Google AI...');
 
     try {
-      let imageUrl;
-
-      switch (provider) {
-        case 'openai':
-          imageUrl = await this.generateWithOpenAI(apiKey, enhancedPrompt);
-          break;
-        case 'stability':
-          imageUrl = await this.generateWithStability(apiKey, enhancedPrompt);
-          break;
-        case 'replicate':
-          imageUrl = await this.generateWithReplicate(apiKey, enhancedPrompt);
-          break;
-        default:
-          throw new Error('Unknown provider');
-      }
-
-      await this.generator.generateFromUrl(imageUrl);
+      const imageData = await this.generateWithNanobanana(apiKey, enhancedPrompt);
+      await this.generator.generateFromUrl(imageData);
       this.updatePreviews();
       this.showExportSection();
       this.showToast('AI favicon generated successfully!', 'success');
@@ -365,103 +341,42 @@ class FaviconApp {
     return `Create a favicon/app icon: ${userPrompt}. Style: ${styleDescriptions[style]}. Primary color: ${hexToName(color)}. Square format, centered composition, works well at small sizes (16x16 to 512x512 pixels), simple and recognizable, no text unless specifically requested. High contrast, professional quality.`;
   }
 
-  async generateWithOpenAI(apiKey, prompt) {
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+  async generateWithNanobanana(apiKey, prompt) {
+    // Using Google's Imagen via the Generative AI API
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard',
-        response_format: 'url'
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'OpenAI API error');
-    }
-
-    const data = await response.json();
-    return data.data[0].url;
-  }
-
-  async generateWithStability(apiKey, prompt) {
-    const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        text_prompts: [{ text: prompt, weight: 1 }],
-        cfg_scale: 7,
-        height: 1024,
-        width: 1024,
-        samples: 1,
-        steps: 30
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Stability AI API error');
-    }
-
-    const data = await response.json();
-    const base64 = data.artifacts[0].base64;
-    return `data:image/png;base64,${base64}`;
-  }
-
-  async generateWithReplicate(apiKey, prompt) {
-    // Start prediction
-    const startResponse = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Token ${apiKey}`
-      },
-      body: JSON.stringify({
-        version: 'ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4', // SDXL
-        input: {
-          prompt: prompt,
-          width: 1024,
-          height: 1024,
-          num_outputs: 1
+        instances: [
+          {
+            prompt: prompt
+          }
+        ],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: '1:1',
+          outputOptions: {
+            mimeType: 'image/png'
+          }
         }
       })
     });
 
-    if (!startResponse.ok) {
-      const error = await startResponse.json();
-      throw new Error(error.detail || 'Replicate API error');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Google AI API error');
     }
 
-    const prediction = await startResponse.json();
+    const data = await response.json();
 
-    // Poll for completion
-    let result = prediction;
-    while (result.status !== 'succeeded' && result.status !== 'failed') {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const pollResponse = await fetch(result.urls.get, {
-        headers: { 'Authorization': `Token ${apiKey}` }
-      });
-
-      result = await pollResponse.json();
+    if (!data.predictions || data.predictions.length === 0) {
+      throw new Error('No image generated');
     }
 
-    if (result.status === 'failed') {
-      throw new Error(result.error || 'Generation failed');
-    }
-
-    return result.output[0];
+    const base64Image = data.predictions[0].bytesBase64Encoded;
+    return `data:image/png;base64,${base64Image}`;
   }
 
   // ============================================
