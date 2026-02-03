@@ -3242,17 +3242,20 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
         itemTypes: ['product']
       },
       prompt: `You are a fashion stylist. Analyze these clothing/accessory items and:
-1. Find 2-3 items that work well together as a partial outfit
-2. Suggest 2-3 NEW items the user should BUY to complete the look
+1. Find 2-3 items from the list that work well together as a partial outfit
+2. Based on the STYLE, COLORS, and AESTHETIC of those items, suggest 2-3 NEW specific items the user should BUY to complete the look
 
-Consider: color harmony, style consistency, outfit composition (tops, bottoms, shoes, accessories).
+Be SPECIFIC with suggestions - include brand style, color, and material that matches their existing items.
+For example: "Navy wool overcoat" not just "coat", "White minimalist leather sneakers" not just "sneakers".
+
+Consider: color harmony, style consistency (casual/formal/streetwear), outfit composition (tops, bottoms, shoes, accessories).
 
 Return JSON:
 {
   "matchedItems": ["item_id1", "item_id2"],
   "reasoning": "Why these items work together",
   "suggestions": [
-    {"name": "Item name", "category": "tops|bottoms|footwear|accessories|outerwear", "searchQuery": "google shopping search query", "reason": "Why this completes the look"}
+    {"name": "Specific item name with color/style", "category": "tops|bottoms|footwear|accessories|outerwear", "searchQuery": "detailed google shopping search query", "reason": "Why this completes the look"}
   ]
 }`,
       template: {
@@ -3514,10 +3517,86 @@ Return JSON:
       </div>`;
   }
 
-  // Fallback render without AI - generate smart suggestions based on item categories
-  function renderCompleteTheLookFallback(widget, items) {
-    const selectedItems = [...items].sort(() => Math.random() - 0.5).slice(0, 3);
+  // Categorize item by garment type
+  function getGarmentCategory(title) {
+    const t = (title || '').toLowerCase();
+    if (/shirt|top|blouse|sweater|hoodie|tee|polo|tank|cardigan|henley|crewneck/i.test(t)) return 'tops';
+    if (/jacket|coat|blazer|parka|bomber|windbreaker|vest|outerwear/i.test(t)) return 'outerwear';
+    if (/pants|jeans|shorts|skirt|trousers|chinos|joggers|slacks/i.test(t)) return 'bottoms';
+    if (/shoe|sneaker|boot|sandal|loafer|oxford|derby|heel|flat|slip-on|trainer/i.test(t)) return 'footwear';
+    if (/watch|bag|belt|hat|cap|sunglasses|glasses|jewelry|necklace|bracelet|ring|scarf|tie|wallet|backpack/i.test(t)) return 'accessories';
+    if (/dress|jumpsuit|romper|gown/i.test(t)) return 'dresses';
+    return 'unknown';
+  }
 
+  // Detect brand tier from domain
+  function getBrandTier(domain) {
+    const d = (domain || '').toLowerCase();
+    // Luxury/Designer
+    if (/gucci|prada|louis\s?vuitton|hermes|chanel|dior|balenciaga|bottega|celine|loewe|saint\s?laurent|valentino|givenchy|fendi|burberry|versace|off-white|amiri|fear\s?of\s?god|rick\s?owens|margiela|acne\s?studios|ssense|farfetch|net-a-porter|mr\s?porter|matchesfashion/i.test(d)) return 'luxury';
+    // Premium/Contemporary
+    if (/apc|norse\s?projects|our\s?legacy|ami|sandro|maje|reiss|theory|vince|allsaints|cos|arket|massimo\s?dutti|club\s?monaco|j\.?\s?crew|brooks\s?brothers|bonobos|suitsupply|todd\s?snyder|rag\s?bone/i.test(d)) return 'premium';
+    // Niche/Independent
+    if (/need\s?supply|end\s?clothing|haven|bodega|kith|union|concepts|sns|slam\s?jam|tres\s?bien|oi\s?polloi/i.test(d)) return 'niche';
+    // Mainstream
+    if (/zara|h&m|uniqlo|gap|old\s?navy|target|walmart|amazon|asos|topshop|forever\s?21|primark|mango|pull\s?bear|bershka|stradivarius/i.test(d)) return 'mainstream';
+    // Athletic
+    if (/nike|adidas|puma|reebok|new\s?balance|asics|under\s?armour|lululemon|athleta|gymshark/i.test(d)) return 'athletic';
+    return 'mainstream'; // default
+  }
+
+  // Detect style from title keywords
+  function getStyleHints(title) {
+    const t = (title || '').toLowerCase();
+    if (/minimal|clean|simple|essential|basic|timeless/i.test(t)) return 'minimal';
+    if (/street|urban|oversized|graphic|skate|hype/i.test(t)) return 'streetwear';
+    if (/classic|tailored|heritage|preppy|traditional/i.test(t)) return 'classic';
+    if (/casual|relaxed|comfort|everyday|easy/i.test(t)) return 'casual';
+    if (/formal|elegant|dressy|luxury|refined/i.test(t)) return 'formal';
+    if (/athletic|sport|active|gym|performance/i.test(t)) return 'athletic';
+    return '';
+  }
+
+  // Fallback render - match items into outfit, suggest what's missing
+  function renderCompleteTheLookFallback(widget, items) {
+    // Enrich items with category, style, brand tier
+    const enriched = items.map(item => ({
+      ...item,
+      garmentCat: getGarmentCategory(item.title),
+      style: getStyleHints(item.title),
+      brandTier: getBrandTier(item.domain)
+    }));
+
+    // Group by category
+    const byCategory = {};
+    for (const item of enriched) {
+      if (!byCategory[item.garmentCat]) byCategory[item.garmentCat] = [];
+      byCategory[item.garmentCat].push(item);
+    }
+
+    // Build a matching outfit: top + bottom + one more
+    const outfit = [];
+    if (byCategory.tops?.length) outfit.push(byCategory.tops[Math.floor(Math.random() * byCategory.tops.length)]);
+    if (byCategory.bottoms?.length) outfit.push(byCategory.bottoms[Math.floor(Math.random() * byCategory.bottoms.length)]);
+    if (outfit.length < 3 && byCategory.outerwear?.length) outfit.push(byCategory.outerwear[0]);
+    if (outfit.length < 3 && byCategory.footwear?.length) outfit.push(byCategory.footwear[0]);
+    if (outfit.length < 3 && byCategory.accessories?.length) outfit.push(byCategory.accessories[0]);
+
+    // Fallback if not enough items
+    while (outfit.length < 2 && enriched.length > outfit.length) {
+      const remaining = enriched.filter(e => !outfit.includes(e));
+      if (remaining.length) outfit.push(remaining[0]);
+    }
+
+    const selectedItems = outfit.slice(0, 3);
+
+    // Determine dominant style and brand tier
+    const styles = selectedItems.map(i => i.style).filter(Boolean);
+    const tiers = selectedItems.map(i => i.brandTier);
+    const dominantStyle = styles.length ? styles.sort((a,b) => styles.filter(v => v===b).length - styles.filter(v => v===a).length)[0] : '';
+    const dominantTier = tiers.sort((a,b) => tiers.filter(v => v===b).length - tiers.filter(v => v===a).length)[0] || 'mainstream';
+
+    // Render user's matched outfit
     let userItemsHtml = '';
     for (const item of selectedItems) {
       const hasImage = item.image && item.image.length > 0;
@@ -3535,15 +3614,71 @@ Return JSON:
         </a>`;
     }
 
-    // Generate generic suggestions based on what categories might be missing
-    const fallbackSuggestions = [
-      { name: 'Classic White Sneakers', category: 'footwear', searchQuery: 'white leather sneakers' },
-      { name: 'Minimalist Watch', category: 'accessories', searchQuery: 'minimalist watch' },
-      { name: 'Neutral Tote Bag', category: 'accessories', searchQuery: 'leather tote bag neutral' }
+    // What categories are in the outfit?
+    const outfitCats = new Set(selectedItems.map(i => i.garmentCat));
+
+    // Brand-tier specific search modifiers
+    const tierKeywords = {
+      luxury: 'designer luxury',
+      premium: 'premium quality',
+      niche: 'independent brand',
+      mainstream: '',
+      athletic: 'performance'
+    };
+    const tierMod = tierKeywords[dominantTier] || '';
+    const styleMod = dominantStyle ? dominantStyle + ' ' : '';
+
+    // Build suggestions for MISSING categories
+    const suggestions = [];
+
+    if (!outfitCats.has('footwear')) {
+      suggestions.push({
+        name: dominantTier === 'luxury' ? 'Designer Leather Sneakers' : `${styleMod}Leather Sneakers`.trim(),
+        reason: 'Ground the look',
+        searchQuery: `${tierMod} ${styleMod}leather sneakers`.trim()
+      });
+    }
+    if (!outfitCats.has('outerwear')) {
+      suggestions.push({
+        name: dominantTier === 'luxury' ? 'Tailored Wool Coat' : `${styleMod}Lightweight Jacket`.trim(),
+        reason: 'Add a layer',
+        searchQuery: `${tierMod} ${styleMod}jacket coat`.trim()
+      });
+    }
+    if (!outfitCats.has('accessories')) {
+      suggestions.push({
+        name: dominantTier === 'luxury' ? 'Statement Watch' : `${styleMod}Minimalist Watch`.trim(),
+        reason: 'Finishing touch',
+        searchQuery: `${tierMod} ${styleMod}watch`.trim()
+      });
+    }
+    if (!outfitCats.has('bottoms')) {
+      suggestions.push({
+        name: dominantTier === 'luxury' ? 'Tailored Wool Trousers' : `${styleMod}Chinos`.trim(),
+        reason: 'Complete the base',
+        searchQuery: `${tierMod} ${styleMod}trousers pants`.trim()
+      });
+    }
+    if (!outfitCats.has('tops')) {
+      suggestions.push({
+        name: dominantTier === 'luxury' ? 'Premium Cotton Shirt' : `${styleMod}Oxford Shirt`.trim(),
+        reason: 'Versatile essential',
+        searchQuery: `${tierMod} ${styleMod}shirt`.trim()
+      });
+    }
+
+    // Fill to 3 if needed
+    const extras = [
+      { name: `${styleMod}Leather Belt`.trim(), reason: 'Tie it together', searchQuery: `${tierMod} ${styleMod}leather belt`.trim() },
+      { name: `${styleMod}Sunglasses`.trim(), reason: 'Elevate any outfit', searchQuery: `${tierMod} ${styleMod}sunglasses`.trim() },
+      { name: `${styleMod}Canvas Bag`.trim(), reason: 'Everyday carry', searchQuery: `${tierMod} ${styleMod}tote bag`.trim() }
     ];
+    while (suggestions.length < 3 && extras.length) {
+      suggestions.push(extras.shift());
+    }
 
     let suggestionsHtml = '';
-    for (const sug of fallbackSuggestions) {
+    for (const sug of suggestions.slice(0, 3)) {
       const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery)}`;
       suggestionsHtml += `
         <div class="widget-complete__item widget-complete__item--suggestion">
@@ -3551,25 +3686,27 @@ Return JSON:
             <div class="widget-complete__suggestion-icon">Shop</div>
           </a>
           <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.category)}</div>
+          <div class="widget-complete__item-reason">${esc(sug.reason)}</div>
           <a href="${searchUrl}" target="_blank" rel="noopener" class="widget-complete__shop-link">Search →</a>
         </div>`;
     }
+
+    const subtitle = dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'Outfit from your collection';
 
     return `
       <div class="widget-complete">
         <div class="widget-complete__header">
           <span class="widget-complete__title">${widget.name}</span>
-          <span class="widget-complete__subtitle">Suggested pairings</span>
+          <span class="widget-complete__subtitle">${subtitle}</span>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Your Items</div>
+            <div class="widget-complete__section-title">Your Outfit</div>
             <div class="widget-complete__items">${userItemsHtml}</div>
           </div>
           <div class="widget-complete__divider"></div>
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Complete With</div>
+            <div class="widget-complete__section-title">Add To Complete</div>
             <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
         </div>
