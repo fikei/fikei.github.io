@@ -14,67 +14,322 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Scrape product image from Bing Images
-async function scrapeProductImage(query: string): Promise<string | null> {
+// Direct brand website configurations
+const BRANDS = [
+  // Athletic / Sneakers
+  {
+    name: 'Nike',
+    searchUrl: (q: string) => `https://www.nike.com/w?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/static\.nike\.com\/[^"]+)"/i,
+      /"image":\s*"(https:\/\/static\.nike\.com\/[^"]+)"/i,
+    ],
+    keywords: ['nike', 'jordan', 'air jordan', 'air max', 'dunk', 'air force']
+  },
+  {
+    name: 'Adidas',
+    searchUrl: (q: string) => `https://www.adidas.com/us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/assets\.adidas\.com\/[^"]+)"/i,
+    ],
+    keywords: ['adidas', 'yeezy', 'samba', 'gazelle', 'stan smith', 'superstar', 'ultraboost']
+  },
+  {
+    name: 'New Balance',
+    searchUrl: (q: string) => `https://www.newbalance.com/search/?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/nb\.scene7\.com\/[^"]+)"/i,
+    ],
+    keywords: ['new balance', '990', '550', '2002r', '1906', '574', '327']
+  },
+  {
+    name: 'Puma',
+    searchUrl: (q: string) => `https://us.puma.com/us/en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/images\.puma\.com\/[^"]+)"/i,
+    ],
+    keywords: ['puma', 'suede', 'clyde']
+  },
+  {
+    name: 'Reebok',
+    searchUrl: (q: string) => `https://www.reebok.com/us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/assets\.reebok\.com\/[^"]+)"/i,
+    ],
+    keywords: ['reebok', 'club c', 'classic leather']
+  },
+  {
+    name: 'Converse',
+    searchUrl: (q: string) => `https://www.converse.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/www\.converse\.com\/[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['converse', 'chuck taylor', 'all star']
+  },
+  {
+    name: 'Vans',
+    searchUrl: (q: string) => `https://www.vans.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/images\.vans\.com\/[^"]+)"/i,
+    ],
+    keywords: ['vans', 'old skool', 'sk8-hi', 'authentic', 'era']
+  },
+  {
+    name: 'ASICS',
+    searchUrl: (q: string) => `https://www.asics.com/us/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/images\.asics\.com\/[^"]+)"/i,
+    ],
+    keywords: ['asics', 'gel-lyte', 'gel-kayano', 'gel-1130']
+  },
+  {
+    name: 'Hoka',
+    searchUrl: (q: string) => `https://www.hoka.com/en/us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+hoka[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['hoka', 'bondi', 'clifton', 'speedgoat']
+  },
+  {
+    name: 'Salomon',
+    searchUrl: (q: string) => `https://www.salomon.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+salomon[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['salomon', 'xt-6', 'xt-4', 'speedcross']
+  },
+  // Luxury / Designer
+  {
+    name: 'Common Projects',
+    searchUrl: (q: string) => `https://www.commonprojects.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['common projects', 'achilles']
+  },
+  {
+    name: 'A.P.C.',
+    searchUrl: (q: string) => `https://www.apc.fr/wwus/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+apc[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['a.p.c.', 'apc', 'petit new standard', 'petit standard']
+  },
+  {
+    name: 'Acne Studios',
+    searchUrl: (q: string) => `https://www.acnestudios.com/us/en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+acnestudios[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['acne studios', 'acne']
+  },
+  // Fast Fashion / Basics
+  {
+    name: 'Uniqlo',
+    searchUrl: (q: string) => `https://www.uniqlo.com/us/en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/image\.uniqlo\.com\/[^"]+)"/i,
+    ],
+    keywords: ['uniqlo']
+  },
+  {
+    name: 'COS',
+    searchUrl: (q: string) => `https://www.cos.com/en_usd/search.html?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+cos[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['cos']
+  },
+  {
+    name: 'Zara',
+    searchUrl: (q: string) => `https://www.zara.com/us/en/search?searchTerm=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/static\.zara\.net\/[^"]+)"/i,
+    ],
+    keywords: ['zara']
+  },
+  {
+    name: 'H&M',
+    searchUrl: (q: string) => `https://www2.hm.com/en_us/search-results.html?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+hm\.com[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['h&m', 'hm']
+  },
+  {
+    name: 'Gap',
+    searchUrl: (q: string) => `https://www.gap.com/browse/search.do?searchText=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+gap[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['gap']
+  },
+  // Workwear / Heritage
+  {
+    name: 'Carhartt WIP',
+    searchUrl: (q: string) => `https://us.carhartt-wip.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+carhartt[^"]+\.jpg[^"]*)"/i,
+      /src="(https:\/\/cdn\.shopify\.com\/[^"]+)"/i,
+    ],
+    keywords: ['carhartt', 'carhartt wip']
+  },
+  {
+    name: 'Dickies',
+    searchUrl: (q: string) => `https://www.dickies.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+dickies[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['dickies', '874']
+  },
+  {
+    name: 'Levi\'s',
+    searchUrl: (q: string) => `https://www.levi.com/US/en_US/search/${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+levi[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['levi', 'levis', '501', '505', '511', '512']
+  },
+  // Outdoor / Technical
+  {
+    name: 'Patagonia',
+    searchUrl: (q: string) => `https://www.patagonia.com/search/?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+patagonia[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['patagonia', 'nano puff', 'better sweater', 'retro-x']
+  },
+  {
+    name: 'The North Face',
+    searchUrl: (q: string) => `https://www.thenorthface.com/en-us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+thenorthface[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['north face', 'nuptse', 'denali']
+  },
+  {
+    name: 'Arc\'teryx',
+    searchUrl: (q: string) => `https://arcteryx.com/us/en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+arcteryx[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['arcteryx', 'arc\'teryx', 'atom', 'beta', 'alpha']
+  },
+  // Watches / Accessories
+  {
+    name: 'Timex',
+    searchUrl: (q: string) => `https://www.timex.com/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+timex[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['timex', 'weekender', 'marlin', 'q timex']
+  },
+  {
+    name: 'Casio',
+    searchUrl: (q: string) => `https://www.casio.com/us/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+casio[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['casio', 'g-shock', 'f-91w', 'a168']
+  },
+  {
+    name: 'Seiko',
+    searchUrl: (q: string) => `https://www.seikowatches.com/us-en/search?q=${encodeURIComponent(q)}`,
+    imagePatterns: [
+      /src="(https:\/\/[^"]+seiko[^"]+\.jpg[^"]*)"/i,
+    ],
+    keywords: ['seiko', 'presage', 'prospex', 'skx']
+  },
+]
+
+// Find brand config by keyword match
+function findBrandConfig(brandName: string, productName: string): typeof BRANDS[0] | null {
+  const searchText = `${brandName} ${productName}`.toLowerCase()
+
+  for (const brand of BRANDS) {
+    if (brand.keywords.some(kw => searchText.includes(kw))) {
+      return brand
+    }
+  }
+  return null
+}
+
+// Scrape product image from brand website
+async function scrapeBrandImage(brand: typeof BRANDS[0], query: string): Promise<{ image: string | null, url: string }> {
+  const searchUrl = brand.searchUrl(query)
+
   try {
-    const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query + ' product')}&first=1`
+    console.log(`[scrape] Trying ${brand.name}: ${query}`)
 
     const response = await fetch(searchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Language': 'en-US,en;q=0.9',
       }
     })
 
     if (!response.ok) {
-      console.log('[scrape] Bing search failed:', response.status)
-      return null
+      console.log(`[scrape] ${brand.name} failed:`, response.status)
+      return { image: null, url: searchUrl }
     }
 
     const html = await response.text()
 
-    // Bing embeds image URLs in murl parameter or data attributes
-    const patterns = [
-      /murl&quot;:&quot;(https?:\/\/[^&]+\.(?:jpg|jpeg|png|webp)[^&]*)&quot;/i,
-      /murl":"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i,
-      /data-src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i,
-      /src="(https?:\/\/tse\d+\.mm\.bing\.net\/[^"]+)"/i,
-    ]
-
-    for (const pattern of patterns) {
+    // Try each pattern
+    for (const pattern of brand.imagePatterns) {
       const match = html.match(pattern)
       if (match && match[1]) {
-        const imageUrl = match[1].replace(/\\u002f/g, '/').replace(/&amp;/g, '&')
-        console.log('[scrape] Found image for:', query)
-        return imageUrl
+        let imageUrl = match[1]
+        if (imageUrl.startsWith('//')) {
+          imageUrl = 'https:' + imageUrl
+        }
+        imageUrl = imageUrl.replace(/&amp;/g, '&')
+        console.log(`[scrape] Found image from ${brand.name}`)
+        return { image: imageUrl, url: searchUrl }
       }
     }
 
-    console.log('[scrape] No image found for:', query)
-    return null
+    console.log(`[scrape] No image found on ${brand.name}`)
+    return { image: null, url: searchUrl }
   } catch (error) {
-    console.error('[scrape] Error:', error)
-    return null
+    console.error(`[scrape] ${brand.name} error:`, error)
+    return { image: null, url: searchUrl }
   }
 }
 
-// Enrich suggestions with shopping URLs and scraped images
+// Main scraping function
+async function scrapeProductImage(brandName: string, query: string): Promise<{ image: string | null, url: string }> {
+  const brandConfig = findBrandConfig(brandName, query)
+
+  if (brandConfig) {
+    const result = await scrapeBrandImage(brandConfig, query)
+    if (result.image) {
+      return result
+    }
+  }
+
+  // Return Google Shopping as fallback URL (no image)
+  return {
+    image: null,
+    url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`
+  }
+}
+
+// Enrich suggestions with scraped images from brand websites
 async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
   const enriched = await Promise.all(
     suggestions.map(async (sug) => {
       const searchQuery = sug.searchQuery || sug.name
+      const brandName = sug.brand || ''
 
-      // Create Google Shopping search URL
-      const productUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`
-
-      // Scrape actual product image
-      const productImage = await scrapeProductImage(searchQuery)
+      // Scrape image from brand website, get product URL
+      const result = await scrapeProductImage(brandName, searchQuery)
 
       return {
         ...sug,
-        productUrl,
-        productImage,
+        productUrl: result.url,
+        productImage: result.image,
         vendor: sug.brand
       }
     })
