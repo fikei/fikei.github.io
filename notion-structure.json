@@ -28,16 +28,21 @@
       "icon": "🎨",
       "children": [
         { "title": "CTRL Design System", "icon": "🎨", "file": "design-system/README.md" },
-        { "title": "Grid Layout", "icon": "📐" },
-        { "title": "Authentication", "icon": "🔐" },
+        { "title": "Grid Layout & Display", "icon": "📐" },
+        { "title": "Authentication & Accounts", "icon": "🔐" },
         { "title": "Add Links", "icon": "➕" },
         { "title": "Link Management", "icon": "🔗" },
         { "title": "Categories & Filtering", "icon": "🏷️" },
-        { "title": "Content Types", "icon": "📦" },
+        { "title": "Content Type System", "icon": "📦" },
         { "title": "AI Widgets", "icon": "🤖" },
-        { "title": "Sharing", "icon": "🔗" },
-        { "title": "Settings", "icon": "⚙️" },
-        { "title": "Admin Tools", "icon": "🛠️" }
+        { "title": "Link Enrichment", "icon": "✨" },
+        { "title": "Sharing & Collaboration", "icon": "👥" },
+        { "title": "Data Sync", "icon": "🔄" },
+        { "title": "Settings & Preferences", "icon": "⚙️" },
+        { "title": "Admin Panel", "icon": "🛠️" },
+        { "title": "Keyboard Shortcuts", "icon": "⌨️" },
+        { "title": "Mobile Experience", "icon": "📱" },
+        { "title": "Error Handling", "icon": "⚠️" }
       ]
     },
     {
@@ -90,20 +95,13 @@
       "title": "AI Agents",
       "icon": "🤖",
       "children": [
-        { "title": "Overview", "icon": "📄" },
-        {
-          "title": "Agents",
-          "icon": "🤖",
-          "children": [
-            { "title": "Chief of Staff", "icon": "👔", "file": ".claude/agents/chief-of-staff-agent.md" },
-            { "title": "Documentation Sync", "icon": "📚", "file": ".claude/agents/documentation-sync-agent.md" },
-            { "title": "Organizational", "icon": "📋", "file": ".claude/agents/organizational-agent.md" },
-            { "title": "Project Management", "icon": "📅", "file": ".claude/agents/project-management-agent.md" },
-            { "title": "Status Update", "icon": "📊", "file": ".claude/agents/status-update-agent.md" },
-            { "title": "Security & Compliance", "icon": "🔒", "file": ".claude/agents/security-compliance-agent.md" },
-            { "title": "Continuous Improvement", "icon": "📈", "file": ".claude/agents/continuous-improvement-agent.md" }
-          ]
-        }
+        { "title": "Chief of Staff", "icon": "👔", "file": ".claude/agents/chief-of-staff-agent.md" },
+        { "title": "Documentation Sync", "icon": "📚", "file": ".claude/agents/documentation-sync-agent.md" },
+        { "title": "Organizational", "icon": "📋", "file": ".claude/agents/organizational-agent.md" },
+        { "title": "Project Management", "icon": "📅", "file": ".claude/agents/project-management-agent.md" },
+        { "title": "Status Update", "icon": "📊", "file": ".claude/agents/status-update-agent.md" },
+        { "title": "Security & Compliance", "icon": "🔒", "file": ".claude/agents/security-compliance-agent.md" },
+        { "title": "Continuous Improvement", "icon": "📈", "file": ".claude/agents/continuous-improvement-agent.md" }
       ]
     },
     {
@@ -114,18 +112,11 @@
           "title": "Soundscape",
           "icon": "🎵",
           "children": [
-            { "title": "Overview", "icon": "📄" },
             { "title": "Project Plan", "icon": "📋", "file": "soundscape/PROJECT_PLAN.md" },
             { "title": "Technical Design", "icon": "📐", "file": "soundscape/CONTROL_SYSTEM_DESIGN.md" }
           ]
         },
-        {
-          "title": "Systemic",
-          "icon": "🔄",
-          "children": [
-            { "title": "Overview", "icon": "📄" }
-          ]
-        }
+        { "title": "Systemic", "icon": "🔄" }
       ]
     },
     {
