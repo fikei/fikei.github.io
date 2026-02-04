@@ -34,9 +34,10 @@ interface PageUpdate {
 }
 
 interface SyncRequest {
-  action: 'sync-structure' | 'update-page' | 'create-structure'
+  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup'
   structure?: Structure
   page?: PageUpdate
+  dryRun?: boolean  // For cleanup: preview without deleting
 }
 
 interface SyncResult {
@@ -44,6 +45,7 @@ interface SyncResult {
   created: string[]
   updated: string[]
   skipped: string[]
+  deleted: string[]
   errors: string[]
   timestamp: string
 }
@@ -180,6 +182,13 @@ class NotionClient {
         body: JSON.stringify({ children: blocks.slice(0, 100) }),
       })
     }
+  }
+
+  async archivePage(pageId: string): Promise<void> {
+    await this.request(`/pages/${pageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archived: true }),
+    })
   }
 
   private parseRichText(text: string): any[] {
@@ -704,6 +713,75 @@ const DEFAULT_STRUCTURE: Structure = {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CLEANUP LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+function getExpectedTitles(pages: PageDef[]): Set<string> {
+  const titles = new Set<string>()
+  for (const page of pages) {
+    titles.add(page.title)
+    if (page.children) {
+      for (const child of page.children) {
+        titles.add(child.title)
+        if (child.children) {
+          for (const grandchild of child.children) {
+            titles.add(grandchild.title)
+          }
+        }
+      }
+    }
+  }
+  return titles
+}
+
+async function cleanupLegacyPages(
+  client: NotionClient,
+  structure: Structure,
+  result: SyncResult,
+  dryRun: boolean
+): Promise<void> {
+  const rootId = await client.findPageByTitle(structure.root)
+  if (!rootId) {
+    result.errors.push(`Root page '${structure.root}' not found.`)
+    return
+  }
+
+  const expectedTitles = getExpectedTitles(structure.sections)
+
+  async function cleanupChildren(parentId: string, expectedForParent: PageDef[], parentPath = '') {
+    const existingChildren = await client.getChildPages(parentId)
+    const expectedTitlesForParent = new Set(expectedForParent.map(p => p.title))
+
+    for (const [title, pageId] of existingChildren) {
+      const pagePath = parentPath ? `${parentPath} > ${title}` : title
+
+      if (!expectedTitlesForParent.has(title)) {
+        // This page is not in the expected structure - mark for deletion
+        if (dryRun) {
+          result.deleted.push(`[DRY RUN] ${pagePath}`)
+        } else {
+          try {
+            await client.archivePage(pageId)
+            result.deleted.push(pagePath)
+            await new Promise(resolve => setTimeout(resolve, 150))
+          } catch (error) {
+            result.errors.push(`Failed to archive '${pagePath}': ${error.message}`)
+          }
+        }
+      } else {
+        // Page exists and is expected - check its children
+        const pageDef = expectedForParent.find(p => p.title === title)
+        if (pageDef?.children) {
+          await cleanupChildren(pageId, pageDef.children, pagePath)
+        }
+      }
+    }
+  }
+
+  await cleanupChildren(rootId, structure.sections)
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════════
 
@@ -729,6 +807,7 @@ serve(async (req) => {
       created: [],
       updated: [],
       skipped: [],
+      deleted: [],
       errors: [],
       timestamp: new Date().toISOString(),
     }
@@ -758,6 +837,12 @@ serve(async (req) => {
             result.errors.push(`Page '${request.page.pageTitle}' not found`)
           }
         }
+        break
+
+      case 'cleanup':
+        // Remove pages not in the expected structure
+        const cleanupStructure = request.structure || DEFAULT_STRUCTURE
+        await cleanupLegacyPages(client, cleanupStructure, result, request.dryRun || false)
         break
 
       default:
