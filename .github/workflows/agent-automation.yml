@@ -67,7 +67,6 @@ jobs:
         run: |
           echo "🔄 Step 2: Updating page contents..."
 
-          # Function to update a single page
           update_page() {
             local title="$1"
             local file="$2"
@@ -79,16 +78,21 @@ jobs:
 
             echo "📄 Updating: $title"
 
-            # Read and escape content, then build JSON with Python
-            response=$(head -c 40000 "$file" | python3 -c "
-import json, sys
-content = sys.stdin.read()
-payload = {'action': 'update-page', 'page': {'pageTitle': '$title', 'content': content}}
+            # Save content to temp file, build JSON with Python
+            head -c 40000 "$file" > /tmp/content.txt
+            python3 << 'PYEOF' > /tmp/payload.json
+import json
+with open('/tmp/content.txt', 'r') as f:
+    content = f.read()
+payload = {"action": "update-page", "page": {"pageTitle": "TITLE_PLACEHOLDER", "content": content}}
 print(json.dumps(payload))
-" | curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+PYEOF
+            sed -i "s/TITLE_PLACEHOLDER/$title/" /tmp/payload.json
+
+            response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
               -H "Content-Type: application/json" \
-              -d @-)
+              -d @/tmp/payload.json)
 
             if echo "$response" | grep -q '"success":true'; then
               echo "  ✅ Updated $title"
@@ -96,26 +100,19 @@ print(json.dumps(payload))
               echo "  ⚠️ Issue with $title: $response"
             fi
 
-            # Small delay to avoid rate limits
             sleep 1
           }
 
-          # Update key pages (most important first)
           update_page "Vision & Roadmap" "docs/VISION-AND-ROADMAP.md"
           update_page "Global Backlog" "BACKLOG.md"
           update_page "Current Sprint" "docs/EXECUTION-SPRINT.md"
           update_page "Recently Shipped" "docs/EXECUTION-SHIPPED.md"
           update_page "Blocked/Waiting" "docs/EXECUTION-BLOCKED.md"
-
-          # PRDs
           update_page "Things I Like (Boards)" "docs/PRD-things-i-like.md"
           update_page "Collaborative Boards" "docs/PRD-collaborative-boards.md"
           update_page "Content Type System" "docs/PRD-content-type-and-image-systems.md"
-
-          # Infrastructure
           update_page "System Overview" "docs/INFRA-ARCHITECTURE.md"
 
-          echo ""
           echo "📊 Content sync complete!"
 
   # Triggered on every push - quick status and security check
