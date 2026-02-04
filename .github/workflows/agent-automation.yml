@@ -43,38 +43,194 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Sync Structure to Notion
+      - name: Sync Full Structure with Content
         if: env.SUPABASE_URL != ''
         run: |
-          echo "🔄 Syncing to Notion..."
+          echo "🔄 Syncing to Notion with file contents..."
 
+          # Function to read file and escape for JSON
+          read_file() {
+            if [ -f "$1" ]; then
+              # Read first 80 lines, escape for JSON
+              head -80 "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+            else
+              echo '""'
+            fi
+          }
+
+          # Build the structure with content
+          VISION=$(read_file "docs/VISION-AND-ROADMAP.md")
+          DECISION_LOG=$(read_file "docs/DECISION-LOG.md")
+          PRD_THINGS=$(read_file "docs/PRD-things-i-like.md")
+          PRD_COLLAB=$(read_file "docs/PRD-collaborative-boards.md")
+          PRD_CONTENT=$(read_file "docs/PRD-content-type-and-image-systems.md")
+          PRD_CORP=$(read_file "docs/PRD-unified-corporate-management.md")
+          BOARDS_README=$(read_file "boards/README.md")
+          SOUNDSCAPE_README=$(read_file "soundscape/README.md")
+          SYSTEMIC_README=$(read_file "systemic/README.md")
+          FAVICON_README=$(read_file "favicon/README.md")
+          DESIGN_README=$(read_file "design-system/README.md")
+          BACKLOG=$(read_file "BACKLOG.md")
+          SPRINT=$(read_file "docs/EXECUTION-SPRINT.md")
+          SHIPPED=$(read_file "docs/EXECUTION-SHIPPED.md")
+          BLOCKED=$(read_file "docs/EXECUTION-BLOCKED.md")
+          ARCHITECTURE=$(read_file "docs/INFRA-ARCHITECTURE.md")
+          DEPLOYMENT=$(read_file "docs/INFRA-DEPLOYMENT.md")
+          SECURITY=$(read_file "docs/INFRA-SECURITY.md")
+          COSTS=$(read_file "COSTS.md")
+
+          # Create the structure JSON
+          cat > /tmp/structure.json << STRUCTURE_EOF
+          {
+            "action": "sync-structure",
+            "structure": {
+              "root": "Ctrl Rodeo",
+              "sections": [
+                {
+                  "title": "Strategy",
+                  "icon": "🎯",
+                  "children": [
+                    {"title": "Vision & Roadmap", "icon": "📄", "content": $VISION},
+                    {
+                      "title": "PRDs",
+                      "icon": "📄",
+                      "children": [
+                        {"title": "Things I Like (Boards)", "icon": "📋", "content": $PRD_THINGS},
+                        {"title": "Collaborative Boards", "icon": "📋", "content": $PRD_COLLAB},
+                        {"title": "Content Type System", "icon": "📋", "content": $PRD_CONTENT},
+                        {"title": "Corporate Management", "icon": "📋", "content": $PRD_CORP}
+                      ]
+                    },
+                    {"title": "Decision Log (ADRs)", "icon": "📄", "content": $DECISION_LOG}
+                  ]
+                },
+                {
+                  "title": "Products",
+                  "icon": "📦",
+                  "children": [
+                    {
+                      "title": "Boards",
+                      "icon": "📋",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $BOARDS_README},
+                        {"title": "Human TODOs", "icon": "👤"}
+                      ]
+                    },
+                    {
+                      "title": "Design System",
+                      "icon": "🎨",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $DESIGN_README},
+                        {"title": "Human TODOs", "icon": "👤"}
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "title": "Playground",
+                  "icon": "🧪",
+                  "children": [
+                    {
+                      "title": "Soundscape",
+                      "icon": "🎵",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $SOUNDSCAPE_README},
+                        {"title": "Ideas", "icon": "💡"}
+                      ]
+                    },
+                    {
+                      "title": "Systemic",
+                      "icon": "🔧",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $SYSTEMIC_README},
+                        {"title": "Ideas", "icon": "💡"}
+                      ]
+                    },
+                    {
+                      "title": "Favicon Generator",
+                      "icon": "🎨",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $FAVICON_README},
+                        {"title": "Ideas", "icon": "💡"}
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "title": "Execution",
+                  "icon": "🔨",
+                  "children": [
+                    {"title": "Global Backlog", "icon": "📊", "content": $BACKLOG},
+                    {"title": "Current Sprint", "icon": "🏃", "content": $SPRINT},
+                    {"title": "Recently Shipped", "icon": "✅", "content": $SHIPPED},
+                    {"title": "Blocked/Waiting", "icon": "🚧", "content": $BLOCKED}
+                  ]
+                },
+                {
+                  "title": "Infrastructure",
+                  "icon": "🏗",
+                  "children": [
+                    {
+                      "title": "Architecture",
+                      "icon": "📐",
+                      "children": [
+                        {"title": "System Overview", "icon": "🗺️", "content": $ARCHITECTURE}
+                      ]
+                    },
+                    {
+                      "title": "Deployment",
+                      "icon": "🚀",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $DEPLOYMENT}
+                      ]
+                    },
+                    {"title": "Security", "icon": "🔒", "content": $SECURITY},
+                    {"title": "Monitoring", "icon": "📈"}
+                  ]
+                },
+                {
+                  "title": "AI Agents",
+                  "icon": "🤖",
+                  "children": [
+                    {"title": "Agent Definitions", "icon": "📋"},
+                    {"title": "Workflows", "icon": "🔄"},
+                    {"title": "Logs/Reports", "icon": "📊"}
+                  ]
+                },
+                {
+                  "title": "Operations",
+                  "icon": "📅",
+                  "children": [
+                    {"title": "Costs", "icon": "💰", "content": $COSTS},
+                    {"title": "Calendar", "icon": "📆"},
+                    {"title": "Meeting Notes", "icon": "📝"},
+                    {"title": "Admin", "icon": "⚙️"}
+                  ]
+                }
+              ]
+            }
+          }
+          STRUCTURE_EOF
+
+          # Send to Supabase
           response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"action": "create-structure"}')
+            -d @/tmp/structure.json)
 
           echo "Response: $response"
 
-          # Check for success
+          # Parse results
+          created=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('created',[])))" 2>/dev/null || echo "?")
+          updated=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('updated',[])))" 2>/dev/null || echo "?")
+          skipped=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('skipped',[])))" 2>/dev/null || echo "?")
+
+          echo "📊 Results: Created=$created, Updated=$updated, Skipped=$skipped"
+
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Notion sync successful"
           else
-            echo "⚠️ Notion sync had errors (structure may already exist)"
-          fi
-
-      - name: Sync Changed Docs
-        if: env.SUPABASE_URL != ''
-        run: |
-          echo "📄 Checking for doc changes to sync..."
-
-          # Get list of changed markdown files
-          changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep '\.md$' || echo "")
-
-          if [ -n "$changed_files" ]; then
-            echo "Changed docs: $changed_files"
-            # Future: sync individual pages that changed
-          else
-            echo "No markdown files changed"
+            echo "⚠️ Notion sync completed with some errors"
           fi
 
   # Triggered on every push - quick status and security check

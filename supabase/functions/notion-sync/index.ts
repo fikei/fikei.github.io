@@ -306,7 +306,16 @@ const DEFAULT_STRUCTURE: Structure = {
       icon: '🎯',
       children: [
         { title: 'Vision & Roadmap', icon: '📄' },
-        { title: 'PRDs', icon: '📄' },
+        {
+          title: 'PRDs',
+          icon: '📄',
+          children: [
+            { title: 'Things I Like (Boards)', icon: '📋' },
+            { title: 'Collaborative Boards', icon: '📋' },
+            { title: 'Content Type System', icon: '📋' },
+            { title: 'Corporate Management', icon: '📋' },
+          ],
+        },
         { title: 'Decision Log (ADRs)', icon: '📄' },
       ],
     },
@@ -323,11 +332,25 @@ const DEFAULT_STRUCTURE: Structure = {
           ],
         },
         {
+          title: 'Design System',
+          icon: '🎨',
+          children: [
+            { title: 'Overview', icon: '📄' },
+            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'Playground',
+      icon: '🧪',
+      children: [
+        {
           title: 'Soundscape',
           icon: '🎵',
           children: [
             { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
+            { title: 'Ideas', icon: '💡' },
           ],
         },
         {
@@ -335,7 +358,7 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '🔧',
           children: [
             { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
+            { title: 'Ideas', icon: '💡' },
           ],
         },
         {
@@ -343,15 +366,7 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '🎨',
           children: [
             { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
-          ],
-        },
-        {
-          title: 'Design System',
-          icon: '🎨',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
+            { title: 'Ideas', icon: '💡' },
           ],
         },
       ],
