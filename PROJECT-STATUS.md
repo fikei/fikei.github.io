@@ -36,13 +36,13 @@ This file tracks all tasks requested and their current status. Updated by Claude
 | | Set Supabase secrets | ✅ Complete |
 
 ### Epic: GitHub Automation
-**Status**: In Progress
+**Status**: Complete
 
 | Story | Tasks | Status |
 |-------|-------|--------|
 | Agent automation workflow | Create `.github/workflows/agent-automation.yml` | ✅ Complete |
 | | Add GitHub secrets (NOTION_API_KEY, ANTHROPIC_API_KEY) | ✅ Complete |
-| | Enable GitHub Actions | 🔄 Pending |
+| | Enable GitHub Actions | ✅ Complete |
 | Deploy agent handler | Deploy `agent-handler` edge function | ✅ Complete |
 
 ---
@@ -52,7 +52,7 @@ This file tracks all tasks requested and their current status. Updated by Claude
 ### Epic: Full System Integration
 | Story | Tasks | Status |
 |-------|-------|--------|
-| End-to-end testing | Test Claude Code context loading | 🔄 Pending |
+| End-to-end testing | Test Claude Code context loading | ✅ Complete |
 | | Test Notion sync | 🔄 Pending |
 | | Test GitHub Actions triggers | 🔄 Pending |
 | | Verify agent responses | 🔄 Pending |
@@ -84,3 +84,5 @@ This file tracks all tasks requested and their current status. Updated by Claude
 - Ran Notion setup script - created page structure
 - Deployed Supabase edge functions (agent-handler, notion-sync)
 - Set Supabase secrets (NOTION_API_KEY, ANTHROPIC_API_KEY)
+- Installed Claude Code CLI locally
+- Verified Claude Code loads project context
