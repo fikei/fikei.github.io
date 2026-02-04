@@ -175,13 +175,22 @@ class NotionClient {
       }
     }
 
-    // Add new blocks
+    // Add new blocks in batches of 100 (Notion API limit)
     const blocks = this.markdownToBlocks(content)
-    if (blocks.length > 0) {
-      await this.request(`/blocks/${pageId}/children`, {
-        method: 'PATCH',
-        body: JSON.stringify({ children: blocks.slice(0, 100) }),
-      })
+    const BATCH_SIZE = 100
+
+    for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
+      const batch = blocks.slice(i, i + BATCH_SIZE)
+      if (batch.length > 0) {
+        await this.request(`/blocks/${pageId}/children`, {
+          method: 'PATCH',
+          body: JSON.stringify({ children: batch }),
+        })
+        // Small delay between batches to avoid rate limits
+        if (i + BATCH_SIZE < blocks.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
     }
   }
 
