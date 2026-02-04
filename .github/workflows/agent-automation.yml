@@ -96,16 +96,47 @@ jobs:
             sleep 1
           }
 
+          # Strategy
           update_page "Vision & Roadmap" "docs/VISION-AND-ROADMAP.md"
+          update_page "Decision Log" "docs/DECISION-LOG.md"
+          update_page "Boards MVP" "docs/PRD-things-i-like.md"
+          update_page "Collaborative Boards" "docs/PRD-collaborative-boards.md"
+          update_page "Content Type System" "docs/PRD-content-type-and-image-systems.md"
+          update_page "Corporate Management" "docs/PRD-unified-corporate-management.md"
+
+          # User Experience
+          update_page "Overview" "design-system/README.md"
+          update_page "Features" "design-system/FEATURES.md"
+          update_page "Changelog" "design-system/CHANGELOG.md"
+
+          # Execution
           update_page "Global Backlog" "BACKLOG.md"
           update_page "Current Sprint" "docs/EXECUTION-SPRINT.md"
           update_page "Recently Shipped" "docs/EXECUTION-SHIPPED.md"
           update_page "Blocked/Waiting" "docs/EXECUTION-BLOCKED.md"
-          update_page "Boards MVP" "docs/PRD-things-i-like.md"
-          update_page "Collaborative Boards" "docs/PRD-collaborative-boards.md"
-          update_page "Content Type System" "docs/PRD-content-type-and-image-systems.md"
+          update_page "Boards" "docs/PROJECT-PLAN-things-i-like.md"
+
+          # Infrastructure
           update_page "System Overview" "docs/INFRA-ARCHITECTURE.md"
+          update_page "Deployment" "docs/INFRA-DEPLOYMENT.md"
+          update_page "Security" "docs/INFRA-SECURITY.md"
+          update_page "Monitoring" "docs/INFRA-MONITORING.md"
           update_page "AI Widget System" "docs/TECH-ai-widget-system.md"
+
+          # AI Agents
+          update_page "Chief of Staff" ".claude/agents/chief-of-staff-agent.md"
+          update_page "Organizational" ".claude/agents/organizational-agent.md"
+          update_page "Project Management" ".claude/agents/project-management-agent.md"
+          update_page "Status Update" ".claude/agents/status-update-agent.md"
+          update_page "Security & Compliance" ".claude/agents/security-compliance-agent.md"
+          update_page "Continuous Improvement" ".claude/agents/continuous-improvement-agent.md"
+
+          # Playground
+          update_page "Project Plan" "soundscape/PROJECT_PLAN.md"
+          update_page "Technical Design" "soundscape/CONTROL_SYSTEM_DESIGN.md"
+
+          # Operations
+          update_page "Costs" "COSTS.md"
 
           echo "📊 Content sync complete!"
 

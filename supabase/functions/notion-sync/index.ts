@@ -624,7 +624,8 @@ const DEFAULT_STRUCTURE: Structure = {
       title: 'Strategy',
       icon: '🎯',
       children: [
-        { title: 'Vision & Roadmap', icon: '📄' },
+        { title: 'Vision & Roadmap', icon: '🗺️' },
+        { title: 'Decision Log', icon: '📋' },
         {
           title: 'PRDs',
           icon: '📄',
@@ -635,23 +636,12 @@ const DEFAULT_STRUCTURE: Structure = {
             { title: 'Corporate Management', icon: '📋' },
           ],
         },
-        { title: 'Decision Log (ADRs)', icon: '📄' },
       ],
     },
     {
-      title: 'Product',
-      icon: '📦',
+      title: 'User Experience',
+      icon: '🎨',
       children: [
-        {
-          title: 'Boards',
-          icon: '📋',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Features', icon: '⭐' },
-            { title: 'Changelog', icon: '📝' },
-            { title: 'Human TODOs', icon: '👤' },
-          ],
-        },
         {
           title: 'Design System',
           icon: '🎨',
@@ -659,7 +649,14 @@ const DEFAULT_STRUCTURE: Structure = {
             { title: 'Overview', icon: '📄' },
             { title: 'Features', icon: '⭐' },
             { title: 'Changelog', icon: '📝' },
-            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+        {
+          title: 'Boards',
+          icon: '📋',
+          children: [
+            { title: 'Features', icon: '⭐' },
+            { title: 'Changelog', icon: '📝' },
           ],
         },
       ],
@@ -672,6 +669,13 @@ const DEFAULT_STRUCTURE: Structure = {
         { title: 'Current Sprint', icon: '🏃' },
         { title: 'Recently Shipped', icon: '✅' },
         { title: 'Blocked/Waiting', icon: '🚧' },
+        {
+          title: 'Project Plans',
+          icon: '📋',
+          children: [
+            { title: 'Boards', icon: '📄' },
+          ],
+        },
       ],
     },
     {
@@ -683,27 +687,38 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '📐',
           children: [
             { title: 'System Overview', icon: '🗺️' },
-            { title: 'AI Widget System', icon: '🤖' },
+            { title: 'Deployment', icon: '🚀' },
+            { title: 'Security', icon: '🔒' },
+            { title: 'Monitoring', icon: '📈' },
           ],
         },
         {
-          title: 'Deployment',
-          icon: '🚀',
+          title: 'Technical Design',
+          icon: '📐',
           children: [
-            { title: 'Overview', icon: '📄' },
+            { title: 'AI Widget System', icon: '🤖' },
+            { title: 'Content Type System', icon: '📄' },
           ],
         },
-        { title: 'Security', icon: '🔒' },
-        { title: 'Monitoring', icon: '📈' },
       ],
     },
     {
       title: 'AI Agents',
       icon: '🤖',
       children: [
-        { title: 'Agent Definitions', icon: '📋' },
-        { title: 'Workflows', icon: '🔄' },
-        { title: 'Logs/Reports', icon: '📊' },
+        { title: 'Overview', icon: '📄' },
+        {
+          title: 'Agents',
+          icon: '🤖',
+          children: [
+            { title: 'Chief of Staff', icon: '👔' },
+            { title: 'Organizational', icon: '📋' },
+            { title: 'Project Management', icon: '📅' },
+            { title: 'Status Update', icon: '📊' },
+            { title: 'Security & Compliance', icon: '🔒' },
+            { title: 'Continuous Improvement', icon: '📈' },
+          ],
+        },
       ],
     },
     {
@@ -715,6 +730,8 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '🎵',
           children: [
             { title: 'Overview', icon: '📄' },
+            { title: 'Project Plan', icon: '📋' },
+            { title: 'Technical Design', icon: '📐' },
           ],
         },
         {
@@ -738,9 +755,6 @@ const DEFAULT_STRUCTURE: Structure = {
       icon: '📅',
       children: [
         { title: 'Costs', icon: '💰' },
-        { title: 'Calendar', icon: '📆' },
-        { title: 'Meeting Notes', icon: '📝' },
-        { title: 'Admin', icon: '⚙️' },
       ],
     },
   ],
