@@ -90,6 +90,46 @@ When working on this project, always follow these guidelines:
 - **Database**: Supabase PostgreSQL
 - **Hosting**: GitHub Pages at ctrl.rodeo
 
+### Supabase Configuration
+```bash
+# Project URLs
+SUPABASE_URL=https://ycilriwjnmcelkspmfmg.supabase.co
+SUPABASE_PROJECT_REF=ycilriwjnmcelkspmfmg
+
+# Get anon key and service key from Supabase Dashboard → Settings → API
+# Service key: click "Reveal" on service_role
+# DO NOT commit the service key to git
+
+# Deploy functions
+supabase functions deploy notion-sync
+supabase functions deploy enrich-link
+supabase functions deploy generate-widget
+
+# View function logs
+supabase functions logs notion-sync --tail
+```
+
+### Notion Sync Commands
+```bash
+# Sync all content to Notion
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "sync-structure"}'
+
+# Preview cleanup (dry run)
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "cleanup", "dryRun": true}'
+
+# Delete legacy pages
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "cleanup"}'
+```
+
 ---
 
 ## Development Guidelines
