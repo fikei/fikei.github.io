@@ -416,7 +416,7 @@ Collaborative Board:
 
 ## Related Documents
 
-- [PRD: Boards](./PRD-things-i-like.md) - Core personal board functionality
+- [PRD: Boards MVP](./PRD-things-i-like.md) - Core personal board functionality
 - [PRD: Content Type System](./PRD-content-type-and-image-systems.md) - Automatic content classification
 - [TECH: AI Widget System](./TECH-ai-widget-system.md) - Product recommendations
 - [Design System](../design-system/README.md) - UI components and tokens
