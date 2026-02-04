@@ -34,11 +34,18 @@ interface PageUpdate {
 }
 
 interface SyncRequest {
-  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup'
+  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves'
   structure?: Structure
   page?: PageUpdate
   dryRun?: boolean  // For cleanup: preview without deleting
   skipContent?: boolean  // For sync-structure: only create pages, skip content updates
+}
+
+interface MovedPage {
+  title: string
+  file?: string
+  expectedParent: string
+  actualParent: string
 }
 
 interface SyncResult {
@@ -47,6 +54,7 @@ interface SyncResult {
   updated: string[]
   skipped: string[]
   deleted: string[]
+  moved: MovedPage[]  // Pages that were moved in Notion
   errors: string[]
   timestamp: string
 }
@@ -199,6 +207,94 @@ class NotionClient {
       method: 'PATCH',
       body: JSON.stringify({ archived: true }),
     })
+  }
+
+  async movePage(pageId: string, newParentId: string): Promise<void> {
+    await this.request(`/pages/${pageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        parent: { page_id: newParentId },
+      }),
+    })
+  }
+
+  async findOrCreateArchiveFolder(rootId: string): Promise<string> {
+    // Look for existing Archive folder under root
+    const children = await this.getChildPages(rootId)
+    const archiveId = children.get('Archive')
+
+    if (archiveId) {
+      return archiveId
+    }
+
+    // Create Archive folder
+    return await this.createPage(rootId, 'Archive', '🗄️')
+  }
+
+  async getPageInfo(pageId: string): Promise<{ id: string; title: string; parentId: string | null; parentTitle: string | null }> {
+    const page = await this.request(`/pages/${pageId}`)
+
+    const titleProp = Object.values(page.properties).find(
+      (prop: any) => prop.type === 'title'
+    ) as any
+    const title = titleProp?.title?.[0]?.plain_text || ''
+
+    let parentId: string | null = null
+    let parentTitle: string | null = null
+
+    if (page.parent?.type === 'page_id') {
+      parentId = page.parent.page_id
+      // Get parent's title
+      try {
+        const parentPage = await this.request(`/pages/${parentId}`)
+        const parentTitleProp = Object.values(parentPage.properties).find(
+          (prop: any) => prop.type === 'title'
+        ) as any
+        parentTitle = parentTitleProp?.title?.[0]?.plain_text || null
+      } catch (e) {
+        // Ignore - parent might not be accessible
+      }
+    }
+
+    return { id: pageId, title, parentId, parentTitle }
+  }
+
+  async findPageWithParent(title: string): Promise<{ id: string; parentTitle: string | null } | null> {
+    const results = await this.request('/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        query: title,
+        filter: { property: 'object', value: 'page' },
+        page_size: 10,
+      }),
+    })
+
+    for (const page of results.results) {
+      const titleProp = Object.values(page.properties).find(
+        (prop: any) => prop.type === 'title'
+      ) as any
+      const pageTitle = titleProp?.title?.[0]?.plain_text
+
+      if (pageTitle === title) {
+        let parentTitle: string | null = null
+
+        if (page.parent?.type === 'page_id') {
+          try {
+            const parentPage = await this.request(`/pages/${page.parent.page_id}`)
+            const parentTitleProp = Object.values(parentPage.properties).find(
+              (prop: any) => prop.type === 'title'
+            ) as any
+            parentTitle = parentTitleProp?.title?.[0]?.plain_text || null
+          } catch (e) {
+            // Ignore
+          }
+        }
+
+        return { id: page.id, parentTitle }
+      }
+    }
+
+    return null
   }
 
   private parseRichText(text: string): any[] {
@@ -804,26 +900,38 @@ async function cleanupLegacyPages(
     return
   }
 
+  // Get or create Archive folder
+  let archiveFolderId: string | null = null
+  if (!dryRun) {
+    archiveFolderId = await client.findOrCreateArchiveFolder(rootId)
+  }
+
   const expectedTitles = getExpectedTitles(structure.sections)
+  // Add Archive to expected titles so we don't try to archive it
+  expectedTitles.add('Archive')
 
   async function cleanupChildren(parentId: string, expectedForParent: PageDef[], parentPath = '') {
     const existingChildren = await client.getChildPages(parentId)
     const expectedTitlesForParent = new Set(expectedForParent.map(p => p.title))
+    // Always expect Archive folder at root level
+    if (parentId === rootId) {
+      expectedTitlesForParent.add('Archive')
+    }
 
     for (const [title, pageId] of existingChildren) {
       const pagePath = parentPath ? `${parentPath} > ${title}` : title
 
       if (!expectedTitlesForParent.has(title)) {
-        // This page is not in the expected structure - mark for deletion
+        // This page is not in the expected structure - move to Archive
         if (dryRun) {
-          result.deleted.push(`[DRY RUN] ${pagePath}`)
+          result.deleted.push(`[DRY RUN] Would move to Archive: ${pagePath}`)
         } else {
           try {
-            await client.archivePage(pageId)
-            result.deleted.push(pagePath)
+            await client.movePage(pageId, archiveFolderId!)
+            result.deleted.push(`Moved to Archive: ${pagePath}`)
             await new Promise(resolve => setTimeout(resolve, 150))
           } catch (error) {
-            result.errors.push(`Failed to archive '${pagePath}': ${error.message}`)
+            result.errors.push(`Failed to move '${pagePath}' to Archive: ${error.message}`)
           }
         }
       } else {
@@ -837,6 +945,61 @@ async function cleanupLegacyPages(
   }
 
   await cleanupChildren(rootId, structure.sections)
+}
+
+// Detect pages that were moved in Notion (different parent than expected)
+async function detectMovedPages(
+  client: NotionClient,
+  structure: Structure,
+  result: SyncResult
+): Promise<void> {
+  // Build expected parent mapping from structure
+  interface PageMapping {
+    title: string
+    file?: string
+    expectedParent: string
+  }
+
+  function buildMapping(sections: PageDef[], parentTitle: string, mappings: PageMapping[] = []): PageMapping[] {
+    for (const section of sections) {
+      // Only track pages that have a file mapping (actual content pages)
+      if ((section as any).file) {
+        mappings.push({
+          title: section.title,
+          file: (section as any).file,
+          expectedParent: parentTitle,
+        })
+      }
+      if (section.children) {
+        buildMapping(section.children, section.title, mappings)
+      }
+    }
+    return mappings
+  }
+
+  const mappings = buildMapping(structure.sections, structure.root)
+
+  // Check each mapped page's actual parent in Notion
+  for (const mapping of mappings) {
+    try {
+      const pageInfo = await client.findPageWithParent(mapping.title)
+
+      if (pageInfo && pageInfo.parentTitle && pageInfo.parentTitle !== mapping.expectedParent) {
+        result.moved.push({
+          title: mapping.title,
+          file: mapping.file,
+          expectedParent: mapping.expectedParent,
+          actualParent: pageInfo.parentTitle,
+        })
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      // Ignore errors for individual pages
+      console.error(`Error checking page '${mapping.title}':`, error)
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -866,6 +1029,7 @@ serve(async (req) => {
       updated: [],
       skipped: [],
       deleted: [],
+      moved: [],
       errors: [],
       timestamp: new Date().toISOString(),
     }
@@ -899,9 +1063,15 @@ serve(async (req) => {
         break
 
       case 'cleanup':
-        // Remove pages not in the expected structure
+        // Move pages not in expected structure to Archive folder
         const cleanupStructure = request.structure || DEFAULT_STRUCTURE
         await cleanupLegacyPages(client, cleanupStructure, result, request.dryRun || false)
+        break
+
+      case 'detect-moves':
+        // Detect pages that were moved in Notion
+        const detectStructure = request.structure || DEFAULT_STRUCTURE
+        await detectMovedPages(client, detectStructure, result)
         break
 
       default:

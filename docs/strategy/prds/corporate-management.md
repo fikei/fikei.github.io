@@ -353,9 +353,9 @@ Notion Workspace
 ## Appendix
 
 ### Related Documents
-- [CLAUDE.md](../CLAUDE.md) - Claude Code context file
-- [Agent Specifications](../.claude/agents/) - Detailed agent docs
-- [BACKLOG.md](../BACKLOG.md) - Product roadmap
+- `CLAUDE.md` - Claude Code context file
+- `.claude/agents/` - Detailed agent specifications
+- `BACKLOG.md` - Product roadmap
 
 ### Glossary
 - **Vibe Coding**: Intuitive, AI-assisted development workflow

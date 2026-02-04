@@ -16,7 +16,7 @@ on:
     inputs:
       agent:
         description: 'Agent to run'
-        required: true
+        required: false
         default: 'status-update'
         type: choice
         options:
@@ -27,6 +27,11 @@ on:
           - security-compliance
           - continuous-improvement
           - all
+      force_full_sync:
+        description: 'Force full Notion sync (all pages)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -37,22 +42,134 @@ env:
 jobs:
   # Sync to Notion on every push
   notion-sync:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force_full_sync == true)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
 
-      - name: Sync Structure (Pages Only)
-        if: env.SUPABASE_URL != ''
+      - name: Detect Changed Files
+        id: changes
+        env:
+          FORCE_SYNC: ${{ inputs.force_full_sync }}
         run: |
-          echo "🔄 Step 1: Creating/verifying page structure..."
+          echo "🔍 Detecting changed files..."
 
-          # First, sync structure without content (fast)
+          # Check for force sync (manual trigger)
+          if [ "$FORCE_SYNC" = "true" ]; then
+            echo "🔄 Force full sync requested - will sync all pages"
+            echo "structure_changed=true" >> $GITHUB_OUTPUT
+            git ls-files > /tmp/changed_files.txt
+            exit 0
+          fi
+
+          # Get list of changed files
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          else
+            # First commit - treat all files as changed
+            CHANGED=$(git ls-files)
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Check if structure config changed
+          if echo "$CHANGED" | grep -q "notion-structure.json"; then
+            echo "structure_changed=true" >> $GITHUB_OUTPUT
+            echo "📋 Structure config changed - will sync all pages"
+          else
+            echo "structure_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Save changed files for later
+          echo "$CHANGED" > /tmp/changed_files.txt
+
+      - name: Detect Moved Pages in Notion
+        if: env.SUPABASE_URL != ''
+        id: detect-moves
+        run: |
+          echo "🔍 Checking for pages moved in Notion..."
+
+          if [ ! -f "notion-structure.json" ]; then
+            echo "moves_detected=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          structure=$(cat notion-structure.json)
+          payload=$(python3 -c "import json; s=json.loads('''$structure'''); print(json.dumps({'action': 'detect-moves', 'structure': s}))")
+
           response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync-structure", "skipContent": true}')
+            -d "$payload")
+
+          echo "Detect moves response: $response"
+
+          # Check if any pages were moved
+          moved_count=$(echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print(len(r.get('moved', [])))" 2>/dev/null || echo "0")
+
+          if [ "$moved_count" -gt "0" ]; then
+            echo "📦 Found $moved_count pages moved in Notion"
+            echo "moves_detected=true" >> $GITHUB_OUTPUT
+            echo "$response" > /tmp/moved_pages.json
+          else
+            echo "✅ No moved pages detected"
+            echo "moves_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Config for Moved Pages
+        if: steps.detect-moves.outputs.moves_detected == 'true'
+        run: |
+          echo "📝 Updating notion-structure.json to reflect Notion changes..."
+
+          python3 << 'PYEOF'
+          import json
+
+          # Load moved pages info
+          with open('/tmp/moved_pages.json') as f:
+              response = json.load(f)
+
+          moved = response.get('moved', [])
+          if not moved:
+              print("No moves to process")
+              exit(0)
+
+          # Load current structure
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+
+          # For now, just log the moves - full restructure is complex
+          # In the future, we could auto-update the structure
+          print("Pages moved in Notion:")
+          for m in moved:
+              print(f"  - {m['title']}: {m['expectedParent']} → {m['actualParent']}")
+
+          print("\n⚠️ Manual update needed: Please update notion-structure.json to match Notion")
+          print("Or move the pages back in Notion to match the expected structure")
+          PYEOF
+
+      - name: Sync Structure (Pages Only)
+        if: env.SUPABASE_URL != '' && (steps.changes.outputs.structure_changed == 'true' || inputs.force_full_sync == true)
+        run: |
+          echo "🔄 Step 1: Creating/verifying page structure..."
+
+          # Read structure from config file and pass to API
+          if [ -f "notion-structure.json" ]; then
+            echo "📁 Using notion-structure.json config"
+            structure=$(cat notion-structure.json)
+            payload=$(python3 -c "import json; s=json.loads('''$structure'''); print(json.dumps({'action': 'sync-structure', 'skipContent': True, 'structure': s}))")
+          else
+            echo "📁 Using default structure from function"
+            payload='{"action": "sync-structure", "skipContent": true}'
+          fi
+
+          response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload")
 
           echo "Structure sync response: $response"
 
@@ -66,20 +183,21 @@ jobs:
           echo "⏳ Waiting 30s for Notion to process..."
           sleep 30
 
-      - name: Update Page Contents
+      - name: Update Page Contents (Changed Only)
         if: env.SUPABASE_URL != ''
         env:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
         run: |
-          echo "🔄 Step 2: Updating page contents..."
+          echo "🔄 Step 2: Updating page contents (diff-aware)..."
 
           update_page() {
             local title="$1"
             local file="$2"
 
             if [ ! -f "$file" ]; then
-              echo "⏭️ Skipping $title (file not found)"
+              echo "⏭️ Skipping $title (file not found: $file)"
               return
             fi
 
@@ -100,57 +218,68 @@ jobs:
             sleep 3
           }
 
-          # Strategy
-          update_page "Vision & Roadmap" "docs/strategy/vision-and-roadmap.md"
-          update_page "Decision Log" "docs/strategy/decision-log.md"
-          update_page "Boards MVP" "docs/strategy/prds/boards-mvp.md"
-          update_page "Collaborative Boards" "docs/strategy/prds/collaborative-boards.md"
-          update_page "Content Type System" "docs/strategy/prds/content-type-system.md"
-          update_page "Corporate Management" "docs/strategy/prds/corporate-management.md"
-          update_page "Generative Widget Ecosystem" "docs/strategy/prds/generative-widget-ecosystem.md"
-          update_page "Widget Design System" "docs/strategy/prds/widget-design-system.md"
-          update_page "Widget Instrumentation" "docs/strategy/prds/widget-instrumentation.md"
-          update_page "Content Type and Image Systems" "docs/strategy/prds/content-type-and-image-systems.md"
+          if [ ! -f "notion-structure.json" ]; then
+            echo "⚠️ notion-structure.json not found, skipping content sync"
+            exit 0
+          fi
 
-          # User Experience
-          update_page "Overview" "design-system/README.md"
-          update_page "Features" "design-system/FEATURES.md"
-          update_page "Changelog" "design-system/CHANGELOG.md"
+          # Build file-to-title mapping and determine which to sync
+          python3 << 'PYEOF'
+          import json
+          import os
 
-          # Execution
-          update_page "Global Backlog" "BACKLOG.md"
-          update_page "Current Sprint" "docs/execution/sprint.md"
-          update_page "Recently Shipped" "docs/execution/shipped.md"
-          update_page "Blocked/Waiting" "docs/execution/blocked.md"
-          update_page "Boards" "docs/execution/project-plans/boards.md"
-          update_page "Phase 0 Implementation" "docs/execution/project-plans/phase0-implementation.md"
-          update_page "Boards Original Plan" "docs/execution/project-plans/boards-original.md"
+          def extract_pages(obj, pages=[]):
+              if isinstance(obj, dict):
+                  if 'title' in obj and 'file' in obj:
+                      pages.append((obj['title'], obj['file']))
+                  if 'children' in obj:
+                      for child in obj['children']:
+                          extract_pages(child, pages)
+              elif isinstance(obj, list):
+                  for item in obj:
+                      extract_pages(item, pages)
+              return pages
 
-          # Infrastructure
-          update_page "System Overview" "docs/infrastructure/architecture.md"
-          update_page "Deployment" "docs/infrastructure/deployment.md"
-          update_page "Security" "docs/infrastructure/security.md"
-          update_page "Monitoring" "docs/infrastructure/monitoring.md"
-          update_page "AI Widget System" "docs/infrastructure/technical-design/ai-widget-system.md"
-          update_page "Widget Architecture" "docs/infrastructure/technical-design/widget-architecture.md"
-          update_page "AI Widget Pipeline" "docs/infrastructure/technical-design/ai-widget-pipeline.md"
-          update_page "Content Type and Image Systems Tech" "docs/infrastructure/technical-design/content-type-and-image-systems.md"
+          with open('notion-structure.json') as f:
+              config = json.load(f)
 
-          # AI Agents
-          update_page "Chief of Staff" ".claude/agents/chief-of-staff-agent.md"
-          update_page "Documentation Sync" ".claude/agents/documentation-sync-agent.md"
-          update_page "Organizational" ".claude/agents/organizational-agent.md"
-          update_page "Project Management" ".claude/agents/project-management-agent.md"
-          update_page "Status Update" ".claude/agents/status-update-agent.md"
-          update_page "Security & Compliance" ".claude/agents/security-compliance-agent.md"
-          update_page "Continuous Improvement" ".claude/agents/continuous-improvement-agent.md"
+          pages = extract_pages(config)
 
-          # Playground
-          update_page "Project Plan" "soundscape/PROJECT_PLAN.md"
-          update_page "Technical Design" "soundscape/CONTROL_SYSTEM_DESIGN.md"
+          # Read changed files
+          changed_files = set()
+          if os.path.exists('/tmp/changed_files.txt'):
+              with open('/tmp/changed_files.txt') as f:
+                  changed_files = set(line.strip() for line in f if line.strip())
 
-          # Operations
-          update_page "Costs" "COSTS.md"
+          # If structure changed, sync all. Otherwise, only changed files.
+          structure_changed = os.environ.get('STRUCTURE_CHANGED', 'false') == 'true'
+
+          pages_to_sync = []
+          for title, filepath in pages:
+              if structure_changed or filepath in changed_files:
+                  pages_to_sync.append((title, filepath))
+
+          with open('/tmp/pages_to_sync.txt', 'w') as f:
+              for title, filepath in pages_to_sync:
+                  f.write(f"{title}\t{filepath}\n")
+
+          if structure_changed:
+              print(f"📋 Structure changed - syncing all {len(pages_to_sync)} pages")
+          else:
+              print(f"📋 Syncing {len(pages_to_sync)} changed pages (of {len(pages)} total)")
+
+          if not pages_to_sync:
+              print("✨ No content changes detected - nothing to sync!")
+          PYEOF
+
+          # Read and process only changed pages
+          if [ -s /tmp/pages_to_sync.txt ]; then
+            while IFS=$'\t' read -r title filepath; do
+              update_page "$title" "$filepath"
+            done < /tmp/pages_to_sync.txt
+          else
+            echo "✨ No pages need updating"
+          fi
 
           echo "📊 Content sync complete!"
 
