@@ -320,7 +320,7 @@ const DEFAULT_STRUCTURE: Structure = {
       ],
     },
     {
-      title: 'Products',
+      title: 'Product',
       icon: '📦',
       children: [
         {
@@ -328,6 +328,8 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '📋',
           children: [
             { title: 'Overview', icon: '📄' },
+            { title: 'Features', icon: '⭐' },
+            { title: 'Changelog', icon: '📝' },
             { title: 'Human TODOs', icon: '👤' },
           ],
         },
@@ -336,37 +338,9 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '🎨',
           children: [
             { title: 'Overview', icon: '📄' },
+            { title: 'Features', icon: '⭐' },
+            { title: 'Changelog', icon: '📝' },
             { title: 'Human TODOs', icon: '👤' },
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Playground',
-      icon: '🧪',
-      children: [
-        {
-          title: 'Soundscape',
-          icon: '🎵',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Ideas', icon: '💡' },
-          ],
-        },
-        {
-          title: 'Systemic',
-          icon: '🔧',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Ideas', icon: '💡' },
-          ],
-        },
-        {
-          title: 'Favicon Generator',
-          icon: '🎨',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Ideas', icon: '💡' },
           ],
         },
       ],
@@ -410,6 +384,33 @@ const DEFAULT_STRUCTURE: Structure = {
         { title: 'Agent Definitions', icon: '📋' },
         { title: 'Workflows', icon: '🔄' },
         { title: 'Logs/Reports', icon: '📊' },
+      ],
+    },
+    {
+      title: 'Playground',
+      icon: '🧪',
+      children: [
+        {
+          title: 'Soundscape',
+          icon: '🎵',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
+        {
+          title: 'Systemic',
+          icon: '🔧',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
+        {
+          title: 'Favicon',
+          icon: '🎨',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
       ],
     },
     {

@@ -105,7 +105,7 @@ jobs:
                   ]
                 },
                 {
-                  "title": "Products",
+                  "title": "Product",
                   "icon": "📦",
                   "children": [
                     {
@@ -113,6 +113,8 @@ jobs:
                       "icon": "📋",
                       "children": [
                         {"title": "Overview", "icon": "📄", "content": $BOARDS_README},
+                        {"title": "Features", "icon": "⭐"},
+                        {"title": "Changelog", "icon": "📝"},
                         {"title": "Human TODOs", "icon": "👤"}
                       ]
                     },
@@ -121,37 +123,9 @@ jobs:
                       "icon": "🎨",
                       "children": [
                         {"title": "Overview", "icon": "📄", "content": $DESIGN_README},
+                        {"title": "Features", "icon": "⭐"},
+                        {"title": "Changelog", "icon": "📝"},
                         {"title": "Human TODOs", "icon": "👤"}
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "title": "Playground",
-                  "icon": "🧪",
-                  "children": [
-                    {
-                      "title": "Soundscape",
-                      "icon": "🎵",
-                      "children": [
-                        {"title": "Overview", "icon": "📄", "content": $SOUNDSCAPE_README},
-                        {"title": "Ideas", "icon": "💡"}
-                      ]
-                    },
-                    {
-                      "title": "Systemic",
-                      "icon": "🔧",
-                      "children": [
-                        {"title": "Overview", "icon": "📄", "content": $SYSTEMIC_README},
-                        {"title": "Ideas", "icon": "💡"}
-                      ]
-                    },
-                    {
-                      "title": "Favicon Generator",
-                      "icon": "🎨",
-                      "children": [
-                        {"title": "Overview", "icon": "📄", "content": $FAVICON_README},
-                        {"title": "Ideas", "icon": "💡"}
                       ]
                     }
                   ]
@@ -195,6 +169,33 @@ jobs:
                     {"title": "Agent Definitions", "icon": "📋"},
                     {"title": "Workflows", "icon": "🔄"},
                     {"title": "Logs/Reports", "icon": "📊"}
+                  ]
+                },
+                {
+                  "title": "Playground",
+                  "icon": "🧪",
+                  "children": [
+                    {
+                      "title": "Soundscape",
+                      "icon": "🎵",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $SOUNDSCAPE_README}
+                      ]
+                    },
+                    {
+                      "title": "Systemic",
+                      "icon": "🔧",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $SYSTEMIC_README}
+                      ]
+                    },
+                    {
+                      "title": "Favicon",
+                      "icon": "🎨",
+                      "children": [
+                        {"title": "Overview", "icon": "📄", "content": $FAVICON_README}
+                      ]
+                    }
                   ]
                 },
                 {
