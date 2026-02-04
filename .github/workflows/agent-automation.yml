@@ -101,7 +101,7 @@ jobs:
           update_page "Current Sprint" "docs/EXECUTION-SPRINT.md"
           update_page "Recently Shipped" "docs/EXECUTION-SHIPPED.md"
           update_page "Blocked/Waiting" "docs/EXECUTION-BLOCKED.md"
-          update_page "Things I Like (Boards)" "docs/PRD-things-i-like.md"
+          update_page "Boards MVP" "docs/PRD-things-i-like.md"
           update_page "Collaborative Boards" "docs/PRD-collaborative-boards.md"
           update_page "Content Type System" "docs/PRD-content-type-and-image-systems.md"
           update_page "System Overview" "docs/INFRA-ARCHITECTURE.md"

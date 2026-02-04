@@ -214,12 +214,12 @@ done
 echo ""
 echo -e "${BLUE}Syncing Project Plans...${NC}"
 
-# Things I Like Project Plan
+# Boards Project Plan
 if [ -f "docs/PROJECT-PLAN-things-i-like.md" ]; then
-  echo -n "  📋 Things I Like Project Plan... "
-  existing_id=$(find_page_by_title "Things I Like Project Plan")
+  echo -n "  📋 Boards Project Plan... "
+  existing_id=$(find_page_by_title "Boards Project Plan")
   if [ -z "$existing_id" ]; then
-    new_id=$(create_page "$DEVELOPMENT_ID" "Things I Like Project Plan" "📋")
+    new_id=$(create_page "$DEVELOPMENT_ID" "Boards Project Plan" "📋")
     if [ -n "$new_id" ]; then
       add_content_to_page "$new_id" "docs/PROJECT-PLAN-things-i-like.md"
       echo -e "${GREEN}created${NC}"
