@@ -35,6 +35,18 @@ When working on this project, always follow these guidelines:
    - List commands to run in order
    - Remind me about secrets, deployments, or verification steps
 
+4. **Maintain unified project plan tracking**
+   - All tasks requested in chat should be added to `PROJECT-STATUS.md`
+   - Update task status (pending/in-progress/complete) as work progresses
+   - Keep the project plan as single source of truth for what's been requested and done
+   - Reference the project plan when resuming work or starting new sessions
+
+5. **Maintain an explicit changelog**
+   - Update `CHANGELOG.md` after completing significant work
+   - Log what was changed, added, or fixed
+   - Include date and brief description
+   - Group changes by session or feature
+
 ---
 
 ## Quick Reference
@@ -180,6 +192,8 @@ Check `BACKLOG.md` for current priorities and sprint planning.
 ---
 
 ## Related Documents
+- [PROJECT-STATUS.md](./PROJECT-STATUS.md) - Current task tracking (single source of truth)
+- [CHANGELOG.md](./CHANGELOG.md) - History of all changes
 - [BACKLOG.md](./BACKLOG.md) - Product roadmap
 - [docs/TECH-ai-widget-system.md](./docs/TECH-ai-widget-system.md) - AI architecture
 - [design-system/README.md](./design-system/README.md) - Design system guide
