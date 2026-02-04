@@ -1,78 +1,74 @@
 # Current Sprint
 
-> Active work for this sprint period
+> Active work for Boards and platform development
 
 **Sprint**: 2026-02-04 to 2026-02-18
-**Focus**: Foundation & Integration
-
----
-
-## Status Legend
-
-| Icon | Meaning |
-|------|---------|
-| ✅ | Complete |
-| 🔄 | In Progress |
-| ⏳ | Not Started |
-| ❌ | Blocked |
-| 👤 | Needs Human |
+**Focus**: Collaborative Boards MVP
 
 ---
 
 ## Sprint Goals
 
-1. ✅ Complete Claude Code context system
-2. ✅ Set up Notion integration
-3. ✅ Create full Notion sync automation
-4. 🔄 Deploy and validate sync
-5. ⏳ Begin collaborative boards feature
+1. Complete collaborative board sharing UI
+2. Implement role-based access control
+3. Deploy and test real-time sync
+4. Improve AI categorization accuracy
 
 ---
 
 ## Active Tasks
 
-### ✅ Completed This Sprint
+### Boards: Collaborative Sharing
 
-| Task | Product | Notes |
-|------|---------|-------|
-| CLAUDE.md context file | All | AI development context |
-| 6 AI agent definitions | Agents | Organizational, PM, Status, CoS, Security, CI |
-| Supabase notion-sync function | Infra | Full hierarchy sync |
-| GitHub Actions automation | Infra | Auto-sync on push |
-| Products/Playground separation | Docs | Clear structure |
-| Product Features & Changelog | Boards, DS | Full documentation |
+| Task | Status | Notes |
+|------|--------|-------|
+| Board switcher dropdown in header | In Progress | Display personal + collaborative boards |
+| Create `collab_boards` table migration | Pending | Schema defined in PRD |
+| Create `collab_board_members` table | Pending | owner/editor/viewer roles |
+| Build "Create Board" modal | Pending | Name, description, default role |
+| Generate unique invite codes | Pending | 8-char alphanumeric |
 
-### 🔄 In Progress
+### Boards: Link Management
 
-| Task | Product | Owner | Notes |
-|------|---------|-------|-------|
-| Deploy notion-sync function | Infra | Human | Run `supabase functions deploy` |
-| Validate full sync | Infra | Human | Check Notion pages |
-| Set GitHub secrets | Infra | Human | SUPABASE_URL, SERVICE_KEY |
+| Task | Status | Notes |
+|------|--------|-------|
+| Add links to collaborative boards | Pending | Include `added_by` field |
+| Display contributor avatar on cards | Pending | Show who added each link |
+| Real-time link updates via Supabase | Pending | Subscribe to `collab_links` |
 
-### ⏳ Up Next
+### AI Improvements
 
-| Task | Product | Priority |
-|------|---------|----------|
-| Collaborative boards UI | Boards | High |
-| Public board sharing | Boards | High |
-| Production monitoring | Infra | Medium |
+| Task | Status | Notes |
+|------|--------|-------|
+| Refine category suggestion prompts | Pending | Reduce new category creation |
+| Add semantic similarity check | Pending | Compare against existing categories |
+| Improve domain learning | Pending | Better multi-type domain handling |
 
-### ❌ Blocked
+### Infrastructure
 
-| Task | Product | Blocker |
-|------|---------|---------|
-| *None currently* | | |
+| Task | Status | Notes |
+|------|--------|-------|
+| Deploy notion-sync function | Complete | Full hierarchy working |
+| Set up GitHub secrets | Complete | SUPABASE_URL, SERVICE_KEY |
+| Fix markdown-to-Notion formatting | Complete | Tables, code blocks, links |
 
 ---
 
-## Sprint Metrics
+## Blocked
 
-| Metric | Target | Actual |
-|--------|--------|--------|
-| Tasks completed | 10 | 8 |
-| Story points | 20 | 16 |
-| Bugs fixed | 3 | 2 |
+| Task | Blocker | Owner |
+|------|---------|-------|
+| Email invitations | Need Resend API setup | Human |
+| Push notifications | Need FCM/APNs setup | Human |
+
+---
+
+## Completed This Sprint
+
+- Notion sync automation
+- Full workspace structure
+- Markdown formatting improvements
+- Product documentation updates
 
 ---
 

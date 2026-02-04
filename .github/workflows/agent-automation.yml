@@ -51,8 +51,8 @@ jobs:
           # Function to read file and escape for JSON
           read_file() {
             if [ -f "$1" ]; then
-              # Read first 80 lines, escape for JSON
-              head -80 "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+              # Read full file (up to 50KB to stay under Notion limits), escape for JSON
+              head -c 50000 "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
             else
               echo '""'
             fi
