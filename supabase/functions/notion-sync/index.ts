@@ -1,10 +1,9 @@
 // Supabase Edge Function: notion-sync
-// Bidirectional sync between GitHub docs and Notion workspace
-// Supports PRDs, technical plans, and status updates
+// Automatic sync from GitHub to Notion workspace
+// Triggered by GitHub Actions on push
 //
 // POST /functions/v1/notion-sync
-// Body: { action: 'push' | 'pull' | 'sync', type?: 'prd' | 'tech' | 'status', path?: string }
-// Returns: { success, synced, timestamp }
+// Body: { action: 'sync-structure' | 'update-page', structure?: Structure, page?: PageUpdate }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -13,33 +12,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface NotionPage {
-  id: string
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+
+interface PageDef {
   title: string
+  icon: string
+  content?: string  // Markdown content
+  children?: PageDef[]
+}
+
+interface Structure {
+  root: string  // Root page title to find/create under
+  sections: PageDef[]
+}
+
+interface PageUpdate {
+  pageTitle: string
   content: string
-  lastEdited: string
-  type: 'prd' | 'tech' | 'status' | 'other'
 }
 
 interface SyncRequest {
-  action: 'push' | 'pull' | 'sync'
-  type?: 'prd' | 'tech' | 'status' | 'all'
-  path?: string
-  pageId?: string
+  action: 'sync-structure' | 'update-page' | 'create-structure'
+  structure?: Structure
+  page?: PageUpdate
 }
 
 interface SyncResult {
   success: boolean
-  synced: Array<{
-    source: 'github' | 'notion'
-    destination: 'github' | 'notion'
-    title: string
-    path?: string
-    pageId?: string
-  }>
+  created: string[]
+  updated: string[]
+  skipped: string[]
   errors: string[]
   timestamp: string
 }
+
+// ═══════════════════════════════════════════════════════════════
+// NOTION CLIENT
+// ═══════════════════════════════════════════════════════════════
 
 class NotionClient {
   private apiKey: string
@@ -68,128 +79,71 @@ class NotionClient {
     return response.json()
   }
 
-  async getPage(pageId: string): Promise<NotionPage> {
-    const page = await this.request(`/pages/${pageId}`)
-    const blocks = await this.request(`/blocks/${pageId}/children`)
-
-    // Extract title from page properties
-    const titleProp = Object.values(page.properties).find(
-      (prop: any) => prop.type === 'title'
-    ) as any
-    const title = titleProp?.title?.[0]?.plain_text || 'Untitled'
-
-    // Convert blocks to markdown
-    const content = this.blocksToMarkdown(blocks.results)
-
-    return {
-      id: pageId,
-      title,
-      content,
-      lastEdited: page.last_edited_time,
-      type: this.inferType(title),
-    }
-  }
-
-  async searchPages(query: string, pageSize = 10): Promise<NotionPage[]> {
+  async findPageByTitle(title: string): Promise<string | null> {
     const results = await this.request('/search', {
       method: 'POST',
       body: JSON.stringify({
-        query,
+        query: title,
         filter: { property: 'object', value: 'page' },
-        page_size: pageSize,
+        page_size: 10,
       }),
     })
 
-    return Promise.all(
-      results.results.map((page: any) => this.getPage(page.id))
-    )
+    // Find exact match
+    for (const page of results.results) {
+      const titleProp = Object.values(page.properties).find(
+        (prop: any) => prop.type === 'title'
+      ) as any
+      const pageTitle = titleProp?.title?.[0]?.plain_text
+      if (pageTitle === title) {
+        return page.id
+      }
+    }
+
+    return null
   }
 
-  async createPage(parentId: string, title: string, content: string): Promise<string> {
-    const blocks = this.markdownToBlocks(content)
+  async createPage(parentId: string, title: string, icon: string, content?: string): Promise<string> {
+    const children = content ? this.markdownToBlocks(content) : []
 
     const page = await this.request('/pages', {
       method: 'POST',
       body: JSON.stringify({
         parent: { page_id: parentId },
+        icon: { type: 'emoji', emoji: icon },
         properties: {
           title: {
             title: [{ text: { content: title } }],
           },
         },
-        children: blocks,
+        children: children.slice(0, 100), // Notion limit
       }),
     })
 
     return page.id
   }
 
-  async updatePage(pageId: string, content: string): Promise<void> {
-    // Delete existing blocks
+  async updatePageContent(pageId: string, content: string): Promise<void> {
+    // Get existing blocks
     const existingBlocks = await this.request(`/blocks/${pageId}/children`)
+
+    // Delete existing blocks (in batches to avoid rate limits)
     for (const block of existingBlocks.results) {
-      await this.request(`/blocks/${block.id}`, { method: 'DELETE' })
+      try {
+        await this.request(`/blocks/${block.id}`, { method: 'DELETE' })
+      } catch (e) {
+        // Ignore deletion errors
+      }
     }
 
     // Add new blocks
     const blocks = this.markdownToBlocks(content)
-    await this.request(`/blocks/${pageId}/children`, {
-      method: 'PATCH',
-      body: JSON.stringify({ children: blocks }),
-    })
-  }
-
-  private inferType(title: string): NotionPage['type'] {
-    const lower = title.toLowerCase()
-    if (lower.includes('prd') || lower.includes('product requirement')) return 'prd'
-    if (lower.includes('tech') || lower.includes('architecture')) return 'tech'
-    if (lower.includes('status') || lower.includes('update')) return 'status'
-    return 'other'
-  }
-
-  private blocksToMarkdown(blocks: any[]): string {
-    return blocks
-      .map((block) => {
-        const type = block.type
-        const content = block[type]
-
-        switch (type) {
-          case 'paragraph':
-            return this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'heading_1':
-            return '# ' + this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'heading_2':
-            return '## ' + this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'heading_3':
-            return '### ' + this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'bulleted_list_item':
-            return '- ' + this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'numbered_list_item':
-            return '1. ' + this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'code':
-            return '```' + (content.language || '') + '\n' + this.richTextToMarkdown(content.rich_text) + '\n```\n'
-          case 'quote':
-            return '> ' + this.richTextToMarkdown(content.rich_text) + '\n'
-          case 'divider':
-            return '---\n'
-          default:
-            return ''
-        }
+    if (blocks.length > 0) {
+      await this.request(`/blocks/${pageId}/children`, {
+        method: 'PATCH',
+        body: JSON.stringify({ children: blocks.slice(0, 100) }),
       })
-      .join('')
-  }
-
-  private richTextToMarkdown(richText: any[]): string {
-    return richText
-      .map((text) => {
-        let result = text.plain_text
-        if (text.annotations.bold) result = `**${result}**`
-        if (text.annotations.italic) result = `*${result}*`
-        if (text.annotations.code) result = `\`${result}\``
-        if (text.href) result = `[${result}](${text.href})`
-        return result
-      })
-      .join('')
+    }
   }
 
   private markdownToBlocks(markdown: string): any[] {
@@ -244,6 +198,178 @@ class NotionClient {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SYNC LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+async function syncStructure(
+  client: NotionClient,
+  structure: Structure,
+  result: SyncResult
+): Promise<void> {
+  // Find root page
+  const rootId = await client.findPageByTitle(structure.root)
+  if (!rootId) {
+    result.errors.push(`Root page '${structure.root}' not found. Create it in Notion first.`)
+    return
+  }
+
+  // Recursively create/sync pages
+  async function syncPages(parentId: string, pages: PageDef[], depth = 0) {
+    for (const page of pages) {
+      try {
+        let pageId = await client.findPageByTitle(page.title)
+
+        if (pageId) {
+          // Page exists
+          if (page.content) {
+            await client.updatePageContent(pageId, page.content)
+            result.updated.push(page.title)
+          } else {
+            result.skipped.push(page.title)
+          }
+        } else {
+          // Create new page
+          pageId = await client.createPage(parentId, page.title, page.icon, page.content)
+          result.created.push(page.title)
+        }
+
+        // Sync children
+        if (page.children && pageId) {
+          await syncPages(pageId, page.children, depth + 1)
+        }
+
+        // Rate limiting - wait between operations
+        await new Promise(resolve => setTimeout(resolve, 100))
+      } catch (error) {
+        result.errors.push(`Failed to sync '${page.title}': ${error.message}`)
+      }
+    }
+  }
+
+  await syncPages(rootId, structure.sections)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DEFAULT STRUCTURE
+// ═══════════════════════════════════════════════════════════════
+
+const DEFAULT_STRUCTURE: Structure = {
+  root: 'Ctrl Rodeo',
+  sections: [
+    {
+      title: 'Strategy',
+      icon: '🎯',
+      children: [
+        { title: 'Vision & Roadmap', icon: '📄' },
+        { title: 'PRDs', icon: '📄' },
+        { title: 'Decision Log (ADRs)', icon: '📄' },
+      ],
+    },
+    {
+      title: 'Products',
+      icon: '📦',
+      children: [
+        {
+          title: 'Boards',
+          icon: '📋',
+          children: [
+            { title: 'Overview', icon: '📄' },
+            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+        {
+          title: 'Soundscape',
+          icon: '🎵',
+          children: [
+            { title: 'Overview', icon: '📄' },
+            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+        {
+          title: 'Systemic',
+          icon: '🔧',
+          children: [
+            { title: 'Overview', icon: '📄' },
+            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+        {
+          title: 'Favicon Generator',
+          icon: '🎨',
+          children: [
+            { title: 'Overview', icon: '📄' },
+            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+        {
+          title: 'Design System',
+          icon: '🎨',
+          children: [
+            { title: 'Overview', icon: '📄' },
+            { title: 'Human TODOs', icon: '👤' },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'Execution',
+      icon: '🔨',
+      children: [
+        { title: 'Global Backlog', icon: '📊' },
+        { title: 'Current Sprint', icon: '🏃' },
+        { title: 'Recently Shipped', icon: '✅' },
+        { title: 'Blocked/Waiting', icon: '🚧' },
+      ],
+    },
+    {
+      title: 'Infrastructure',
+      icon: '🏗',
+      children: [
+        {
+          title: 'Architecture',
+          icon: '📐',
+          children: [
+            { title: 'System Overview', icon: '🗺️' },
+          ],
+        },
+        {
+          title: 'Deployment',
+          icon: '🚀',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
+        { title: 'Security', icon: '🔒' },
+        { title: 'Monitoring', icon: '📈' },
+      ],
+    },
+    {
+      title: 'AI Agents',
+      icon: '🤖',
+      children: [
+        { title: 'Agent Definitions', icon: '📋' },
+        { title: 'Workflows', icon: '🔄' },
+        { title: 'Logs/Reports', icon: '📊' },
+      ],
+    },
+    {
+      title: 'Operations',
+      icon: '📅',
+      children: [
+        { title: 'Costs', icon: '💰' },
+        { title: 'Calendar', icon: '📆' },
+        { title: 'Meeting Notes', icon: '📝' },
+        { title: 'Admin', icon: '⚙️' },
+      ],
+    },
+  ],
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -263,50 +389,38 @@ serve(async (req) => {
 
     const result: SyncResult = {
       success: true,
-      synced: [],
+      created: [],
+      updated: [],
+      skipped: [],
       errors: [],
       timestamp: new Date().toISOString(),
     }
 
     switch (request.action) {
-      case 'pull':
-        // Pull from Notion to GitHub format
-        if (request.pageId) {
-          try {
-            const page = await client.getPage(request.pageId)
-            result.synced.push({
-              source: 'notion',
-              destination: 'github',
-              title: page.title,
-              pageId: page.id,
-              path: `docs/${page.type.toUpperCase()}-${page.title.toLowerCase().replace(/\s+/g, '-')}.md`,
-            })
-          } catch (error) {
-            result.errors.push(`Failed to pull page ${request.pageId}: ${error.message}`)
+      case 'create-structure':
+        // Create the default structure
+        await syncStructure(client, DEFAULT_STRUCTURE, result)
+        break
+
+      case 'sync-structure':
+        // Sync with provided or default structure
+        const structure = request.structure || DEFAULT_STRUCTURE
+        await syncStructure(client, structure, result)
+        break
+
+      case 'update-page':
+        // Update a single page's content
+        if (!request.page) {
+          result.errors.push('Missing page data for update-page action')
+        } else {
+          const pageId = await client.findPageByTitle(request.page.pageTitle)
+          if (pageId) {
+            await client.updatePageContent(pageId, request.page.content)
+            result.updated.push(request.page.pageTitle)
+          } else {
+            result.errors.push(`Page '${request.page.pageTitle}' not found`)
           }
         }
-        break
-
-      case 'push':
-        // Push from GitHub to Notion
-        // This would read local files and create/update Notion pages
-        // In production, this would use GitHub API to read files
-        result.synced.push({
-          source: 'github',
-          destination: 'notion',
-          title: 'Push placeholder',
-          path: request.path,
-        })
-        break
-
-      case 'sync':
-        // Bidirectional sync - compare timestamps and sync newer
-        // This is the most complex operation
-        result.synced.push({
-          source: 'github',
-          destination: 'notion',
-          title: 'Bidirectional sync placeholder',
-        })
         break
 
       default:
@@ -316,9 +430,7 @@ serve(async (req) => {
         )
     }
 
-    if (result.errors.length > 0) {
-      result.success = false
-    }
+    result.success = result.errors.length === 0
 
     return new Response(
       JSON.stringify(result),
