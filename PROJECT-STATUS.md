@@ -41,7 +41,7 @@ This file tracks all tasks requested and their current status. Updated by Claude
 | Story | Tasks | Status |
 |-------|-------|--------|
 | Agent automation workflow | Create `.github/workflows/agent-automation.yml` | ✅ Complete |
-| | Add GitHub secrets (NOTION_API_KEY, ANTHROPIC_API_KEY) | 🔄 Pending |
+| | Add GitHub secrets (NOTION_API_KEY, ANTHROPIC_API_KEY) | ✅ Complete |
 | | Enable GitHub Actions | 🔄 Pending |
 | Deploy agent handler | Deploy `agent-handler` edge function | 🔄 Pending |
 
@@ -80,3 +80,4 @@ This file tracks all tasks requested and their current status. Updated by Claude
 - Added user preferences to CLAUDE.md
 - Added project tracking requirements
 - Added design system requirement to CLAUDE.md
+- Added GitHub secrets (NOTION_API_KEY, ANTHROPIC_API_KEY) and rotated keys
