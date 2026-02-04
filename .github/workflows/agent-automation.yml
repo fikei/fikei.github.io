@@ -125,6 +125,7 @@ jobs:
 
           # AI Agents
           update_page "Chief of Staff" ".claude/agents/chief-of-staff-agent.md"
+          update_page "Documentation Sync" ".claude/agents/documentation-sync-agent.md"
           update_page "Organizational" ".claude/agents/organizational-agent.md"
           update_page "Project Management" ".claude/agents/project-management-agent.md"
           update_page "Status Update" ".claude/agents/status-update-agent.md"

@@ -712,6 +712,7 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '🤖',
           children: [
             { title: 'Chief of Staff', icon: '👔' },
+            { title: 'Documentation Sync', icon: '📚' },
             { title: 'Organizational', icon: '📋' },
             { title: 'Project Management', icon: '📅' },
             { title: 'Status Update', icon: '📊' },
