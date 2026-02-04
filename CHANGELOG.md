@@ -50,6 +50,7 @@ All notable changes to ctrl.rodeo will be documented in this file.
 3. Provide step-by-step next actions after tasks
 4. Maintain unified project plan tracking
 5. Maintain explicit changelog
+6. Use and extend the design system (check components, reuse tokens, extend when needed)
 
 ---
 

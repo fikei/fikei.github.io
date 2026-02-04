@@ -79,3 +79,4 @@ This file tracks all tasks requested and their current status. Updated by Claude
 - Created Supabase edge functions (agent-handler, notion-sync)
 - Added user preferences to CLAUDE.md
 - Added project tracking requirements
+- Added design system requirement to CLAUDE.md
