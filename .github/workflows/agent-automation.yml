@@ -16,7 +16,7 @@ on:
     inputs:
       agent:
         description: 'Agent to run'
-        required: true
+        required: false
         default: 'status-update'
         type: choice
         options:
@@ -27,6 +27,11 @@ on:
           - security-compliance
           - continuous-improvement
           - all
+      force_full_sync:
+        description: 'Force full Notion sync (all pages)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -37,13 +42,53 @@ env:
 jobs:
   # Sync to Notion on every push
   notion-sync:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force_full_sync == true)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
+
+      - name: Detect Changed Files
+        id: changes
+        env:
+          FORCE_SYNC: ${{ inputs.force_full_sync }}
+        run: |
+          echo "🔍 Detecting changed files..."
+
+          # Check for force sync (manual trigger)
+          if [ "$FORCE_SYNC" = "true" ]; then
+            echo "🔄 Force full sync requested - will sync all pages"
+            echo "structure_changed=true" >> $GITHUB_OUTPUT
+            git ls-files > /tmp/changed_files.txt
+            exit 0
+          fi
+
+          # Get list of changed files
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          else
+            # First commit - treat all files as changed
+            CHANGED=$(git ls-files)
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Check if structure config changed
+          if echo "$CHANGED" | grep -q "notion-structure.json"; then
+            echo "structure_changed=true" >> $GITHUB_OUTPUT
+            echo "📋 Structure config changed - will sync all pages"
+          else
+            echo "structure_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Save changed files for later
+          echo "$CHANGED" > /tmp/changed_files.txt
 
       - name: Sync Structure (Pages Only)
+        if: env.SUPABASE_URL != '' && (steps.changes.outputs.structure_changed == 'true' || inputs.force_full_sync == true)
         if: env.SUPABASE_URL != ''
         run: |
           echo "🔄 Step 1: Creating/verifying page structure..."
@@ -75,13 +120,14 @@ jobs:
           echo "⏳ Waiting 30s for Notion to process..."
           sleep 30
 
-      - name: Update Page Contents
+      - name: Update Page Contents (Changed Only)
         if: env.SUPABASE_URL != ''
         env:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
         run: |
-          echo "🔄 Step 2: Updating page contents from config..."
+          echo "🔄 Step 2: Updating page contents (diff-aware)..."
 
           update_page() {
             local title="$1"
@@ -109,12 +155,13 @@ jobs:
             sleep 3
           }
 
-          # Auto-generate update calls from notion-structure.json
-          if [ -f "notion-structure.json" ]; then
-            echo "📁 Reading pages from notion-structure.json..."
+          if [ ! -f "notion-structure.json" ]; then
+            echo "⚠️ notion-structure.json not found, skipping content sync"
+            exit 0
+          fi
 
-            # Extract all title/file pairs from config using Python
-            python3 << 'PYEOF'
+          # Build file-to-title mapping and determine which to sync
+          python3 << 'PYEOF'
           import json
           import os
 
@@ -135,20 +182,40 @@ jobs:
 
           pages = extract_pages(config)
 
-          # Write to a temp file for bash to read
+          # Read changed files
+          changed_files = set()
+          if os.path.exists('/tmp/changed_files.txt'):
+              with open('/tmp/changed_files.txt') as f:
+                  changed_files = set(line.strip() for line in f if line.strip())
+
+          # If structure changed, sync all. Otherwise, only changed files.
+          structure_changed = os.environ.get('STRUCTURE_CHANGED', 'false') == 'true'
+
+          pages_to_sync = []
+          for title, filepath in pages:
+              if structure_changed or filepath in changed_files:
+                  pages_to_sync.append((title, filepath))
+
           with open('/tmp/pages_to_sync.txt', 'w') as f:
-              for title, filepath in pages:
+              for title, filepath in pages_to_sync:
                   f.write(f"{title}\t{filepath}\n")
 
-          print(f"Found {len(pages)} pages with file mappings")
+          if structure_changed:
+              print(f"📋 Structure changed - syncing all {len(pages_to_sync)} pages")
+          else:
+              print(f"📋 Syncing {len(pages_to_sync)} changed pages (of {len(pages)} total)")
+
+          if not pages_to_sync:
+              print("✨ No content changes detected - nothing to sync!")
           PYEOF
 
-            # Read and process each page
+          # Read and process only changed pages
+          if [ -s /tmp/pages_to_sync.txt ]; then
             while IFS=$'\t' read -r title filepath; do
               update_page "$title" "$filepath"
             done < /tmp/pages_to_sync.txt
           else
-            echo "⚠️ notion-structure.json not found, skipping content sync"
+            echo "✨ No pages need updating"
           fi
 
           echo "📊 Content sync complete!"
