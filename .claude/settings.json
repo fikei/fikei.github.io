@@ -1,0 +1,142 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "ctrl.rodeo",
+    "domain": "ctrl.rodeo",
+    "type": "multi-app-platform",
+    "repository": "fikei/fikei.github.io"
+  },
+  "context": {
+    "primaryFile": "../CLAUDE.md",
+    "documentation": "../docs/",
+    "agents": "./agents/"
+  },
+  "agents": {
+    "enabled": [
+      "organizational",
+      "project-management",
+      "status-update",
+      "chief-of-staff",
+      "security-compliance",
+      "continuous-improvement"
+    ],
+    "definitions": {
+      "organizational": {
+        "file": "./agents/organizational-agent.md",
+        "triggers": ["file_change", "pr_event", "merge", "manual"],
+        "priority": 2
+      },
+      "project-management": {
+        "file": "./agents/project-management-agent.md",
+        "triggers": ["prd_change", "backlog_update", "notion_sync", "manual"],
+        "priority": 2
+      },
+      "status-update": {
+        "file": "./agents/status-update-agent.md",
+        "triggers": ["continuous", "commit", "status_change", "deadline", "manual"],
+        "priority": 1
+      },
+      "chief-of-staff": {
+        "file": "./agents/chief-of-staff-agent.md",
+        "triggers": ["escalation", "alert", "planning", "scheduled", "manual"],
+        "priority": 1
+      },
+      "security-compliance": {
+        "file": "./agents/security-compliance-agent.md",
+        "triggers": ["code_change", "dependency_update", "config_change", "scheduled", "alert", "manual"],
+        "priority": 1
+      },
+      "continuous-improvement": {
+        "file": "./agents/continuous-improvement-agent.md",
+        "triggers": ["scheduled", "sprint_end", "metric_change", "incident", "manual"],
+        "priority": 3
+      }
+    }
+  },
+  "integrations": {
+    "notion": {
+      "enabled": false,
+      "workspaceId": null,
+      "syncEnabled": false,
+      "comment": "Configure with Notion API key when ready"
+    },
+    "github": {
+      "enabled": true,
+      "repository": "fikei/fikei.github.io",
+      "webhooksEnabled": false
+    },
+    "supabase": {
+      "enabled": true,
+      "project": "ctrl-rodeo",
+      "functionsPath": "../supabase/functions/"
+    }
+  },
+  "workflows": {
+    "onFileChange": {
+      "agents": ["organizational", "security-compliance"],
+      "async": true
+    },
+    "onPRDChange": {
+      "agents": ["project-management", "organizational"],
+      "notify": ["chief-of-staff"],
+      "async": true
+    },
+    "onCommit": {
+      "agents": ["status-update", "security-compliance"],
+      "async": true
+    },
+    "dailySynthesis": {
+      "schedule": "09:00",
+      "agents": ["chief-of-staff"],
+      "inputs": ["status-update", "organizational"]
+    },
+    "weeklyReview": {
+      "schedule": "Friday 16:00",
+      "agents": ["continuous-improvement", "chief-of-staff"],
+      "inputs": ["status-update", "project-management"]
+    }
+  },
+  "commands": {
+    "/audit": {
+      "agent": "organizational",
+      "description": "Run documentation and standards audit"
+    },
+    "/plan": {
+      "agent": "project-management",
+      "description": "Generate task breakdown from PRD"
+    },
+    "/status": {
+      "agent": "status-update",
+      "description": "Get current project status"
+    },
+    "/cos": {
+      "agent": "chief-of-staff",
+      "description": "Invoke Chief of Staff for synthesis or decision"
+    },
+    "/security": {
+      "agent": "security-compliance",
+      "description": "Run security scan"
+    },
+    "/improve": {
+      "agent": "continuous-improvement",
+      "description": "Analyze for improvement opportunities"
+    }
+  },
+  "preferences": {
+    "codeStyle": {
+      "minimal": true,
+      "frameworks": false,
+      "darkModeFirst": true
+    },
+    "documentation": {
+      "location": "../docs/",
+      "prdPrefix": "PRD-",
+      "techPrefix": "TECH-",
+      "projectPlanPrefix": "PROJECT-PLAN-"
+    },
+    "aiModels": {
+      "primary": "claude-3-haiku",
+      "fallback": "gpt-4o-mini"
+    }
+  }
+}
