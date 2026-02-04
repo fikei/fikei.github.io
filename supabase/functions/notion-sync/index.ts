@@ -103,6 +103,42 @@ class NotionClient {
     return null
   }
 
+  async getChildPages(parentId: string): Promise<Map<string, string>> {
+    const children = new Map<string, string>()
+
+    try {
+      const results = await this.request(`/blocks/${parentId}/children?page_size=100`)
+
+      for (const block of results.results) {
+        if (block.type === 'child_page') {
+          children.set(block.child_page.title, block.id)
+        }
+      }
+    } catch (e) {
+      // Ignore errors - parent might be new
+    }
+
+    return children
+  }
+
+  async findOrCreateChildPage(
+    parentId: string,
+    title: string,
+    icon: string,
+    existingChildren: Map<string, string>,
+    content?: string
+  ): Promise<{ id: string; created: boolean }> {
+    // Check if already exists under this parent
+    const existingId = existingChildren.get(title)
+    if (existingId) {
+      return { id: existingId, created: false }
+    }
+
+    // Create new page under parent
+    const id = await this.createPage(parentId, title, icon, content)
+    return { id, created: true }
+  }
+
   async createPage(parentId: string, title: string, icon: string, content?: string): Promise<string> {
     const children = content ? this.markdownToBlocks(content) : []
 
@@ -214,35 +250,43 @@ async function syncStructure(
     return
   }
 
-  // Recursively create/sync pages
-  async function syncPages(parentId: string, pages: PageDef[], depth = 0) {
-    for (const page of pages) {
-      try {
-        let pageId = await client.findPageByTitle(page.title)
+  // Recursively create/sync pages under their correct parents
+  async function syncPages(parentId: string, pages: PageDef[], depth = 0, parentPath = '') {
+    // Get existing children of this parent
+    const existingChildren = await client.getChildPages(parentId)
 
-        if (pageId) {
-          // Page exists
-          if (page.content) {
-            await client.updatePageContent(pageId, page.content)
-            result.updated.push(page.title)
-          } else {
-            result.skipped.push(page.title)
-          }
+    for (const page of pages) {
+      const pagePath = parentPath ? `${parentPath} > ${page.title}` : page.title
+
+      try {
+        // Find or create under the correct parent
+        const { id: pageId, created } = await client.findOrCreateChildPage(
+          parentId,
+          page.title,
+          page.icon,
+          existingChildren,
+          page.content
+        )
+
+        if (created) {
+          result.created.push(pagePath)
+        } else if (page.content) {
+          // Update existing page content
+          await client.updatePageContent(pageId, page.content)
+          result.updated.push(pagePath)
         } else {
-          // Create new page
-          pageId = await client.createPage(parentId, page.title, page.icon, page.content)
-          result.created.push(page.title)
+          result.skipped.push(pagePath)
         }
 
-        // Sync children
+        // Sync children recursively
         if (page.children && pageId) {
-          await syncPages(pageId, page.children, depth + 1)
+          await syncPages(pageId, page.children, depth + 1, pagePath)
         }
 
         // Rate limiting - wait between operations
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 150))
       } catch (error) {
-        result.errors.push(`Failed to sync '${page.title}': ${error.message}`)
+        result.errors.push(`Failed to sync '${pagePath}': ${error.message}`)
       }
     }
   }
@@ -262,12 +306,21 @@ const DEFAULT_STRUCTURE: Structure = {
       icon: '🎯',
       children: [
         { title: 'Vision & Roadmap', icon: '📄' },
-        { title: 'PRDs', icon: '📄' },
+        {
+          title: 'PRDs',
+          icon: '📄',
+          children: [
+            { title: 'Things I Like (Boards)', icon: '📋' },
+            { title: 'Collaborative Boards', icon: '📋' },
+            { title: 'Content Type System', icon: '📋' },
+            { title: 'Corporate Management', icon: '📋' },
+          ],
+        },
         { title: 'Decision Log (ADRs)', icon: '📄' },
       ],
     },
     {
-      title: 'Products',
+      title: 'Product',
       icon: '📦',
       children: [
         {
@@ -275,30 +328,8 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '📋',
           children: [
             { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
-          ],
-        },
-        {
-          title: 'Soundscape',
-          icon: '🎵',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
-          ],
-        },
-        {
-          title: 'Systemic',
-          icon: '🔧',
-          children: [
-            { title: 'Overview', icon: '📄' },
-            { title: 'Human TODOs', icon: '👤' },
-          ],
-        },
-        {
-          title: 'Favicon Generator',
-          icon: '🎨',
-          children: [
-            { title: 'Overview', icon: '📄' },
+            { title: 'Features', icon: '⭐' },
+            { title: 'Changelog', icon: '📝' },
             { title: 'Human TODOs', icon: '👤' },
           ],
         },
@@ -307,6 +338,8 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '🎨',
           children: [
             { title: 'Overview', icon: '📄' },
+            { title: 'Features', icon: '⭐' },
+            { title: 'Changelog', icon: '📝' },
             { title: 'Human TODOs', icon: '👤' },
           ],
         },
@@ -351,6 +384,33 @@ const DEFAULT_STRUCTURE: Structure = {
         { title: 'Agent Definitions', icon: '📋' },
         { title: 'Workflows', icon: '🔄' },
         { title: 'Logs/Reports', icon: '📊' },
+      ],
+    },
+    {
+      title: 'Playground',
+      icon: '🧪',
+      children: [
+        {
+          title: 'Soundscape',
+          icon: '🎵',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
+        {
+          title: 'Systemic',
+          icon: '🔧',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
+        {
+          title: 'Favicon',
+          icon: '🎨',
+          children: [
+            { title: 'Overview', icon: '📄' },
+          ],
+        },
       ],
     },
     {
