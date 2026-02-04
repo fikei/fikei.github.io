@@ -290,14 +290,33 @@ class NotionClient {
           i++
         }
         i++ // Skip closing ```
-        blocks.push({
-          object: 'block',
-          type: 'code',
-          code: {
-            rich_text: [{ type: 'text', text: { content: codeLines.join('\n') } }],
-            language: language === 'js' ? 'javascript' : language === 'ts' ? 'typescript' : language,
-          },
-        })
+
+        const codeContent = codeLines.join('\n')
+        const langNormalized = language === 'js' ? 'javascript' : language === 'ts' ? 'typescript' : language
+
+        // Notion limits code block text to 2000 chars - split if needed
+        if (codeContent.length <= 2000) {
+          blocks.push({
+            object: 'block',
+            type: 'code',
+            code: {
+              rich_text: [{ type: 'text', text: { content: codeContent } }],
+              language: langNormalized,
+            },
+          })
+        } else {
+          // Split into chunks of 2000 chars
+          for (let start = 0; start < codeContent.length; start += 2000) {
+            blocks.push({
+              object: 'block',
+              type: 'code',
+              code: {
+                rich_text: [{ type: 'text', text: { content: codeContent.slice(start, start + 2000) } }],
+                language: langNormalized,
+              },
+            })
+          }
+        }
         continue
       }
 
