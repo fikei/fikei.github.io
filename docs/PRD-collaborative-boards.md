@@ -411,3 +411,13 @@ Collaborative Board:
 - **Sections/folders** - Organize within a board
 - **Board templates** - Start with pre-defined categories
 - **Public collaborative boards** - Open contribution with moderation
+
+---
+
+## Related Documents
+
+- [PRD: Things I Like](./PRD-things-i-like.md) - Core personal board functionality
+- [PRD: Content Type System](./PRD-content-type-and-image-systems.md) - Automatic content classification
+- [TECH: AI Widget System](./TECH-ai-widget-system.md) - Product recommendations
+- [Design System](../design-system/README.md) - UI components and tokens
+- [Vision & Roadmap](./VISION-AND-ROADMAP.md) - Product strategy

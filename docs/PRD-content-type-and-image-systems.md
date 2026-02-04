@@ -417,3 +417,13 @@ A/B test → Promote winner
 - Image search API (Unsplash, Google Custom Search)
 - Supabase Storage (uploaded images)
 - Background job runner (for async resolution)
+
+---
+
+## Related Documents
+
+- [PRD: Things I Like](./PRD-things-i-like.md) - Core board functionality
+- [PRD: Collaborative Boards](./PRD-collaborative-boards.md) - Multi-user boards
+- [TECH: AI Widget System](./TECH-ai-widget-system.md) - Product recommendations
+- [Design System](../design-system/README.md) - UI components and tokens
+- [Vision & Roadmap](./VISION-AND-ROADMAP.md) - Product strategy
