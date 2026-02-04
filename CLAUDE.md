@@ -90,6 +90,45 @@ When working on this project, always follow these guidelines:
 - **Database**: Supabase PostgreSQL
 - **Hosting**: GitHub Pages at ctrl.rodeo
 
+### Supabase Configuration
+```bash
+# Project URLs
+SUPABASE_URL=https://lravdqpxrxrqxdxuzovm.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyYXZkcXB4cnhycXhkeHV6b3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTk4NzQ0NzcsImV4cCI6MjAzNTQ1MDQ3N30.dYl1XKk1rtyVb3OJrm8b_Hd_DFi-E5KuGJxJxKzGp8E
+
+# Service key is in Supabase Dashboard → Settings → API → service_role (click Reveal)
+# DO NOT commit the service key to git
+
+# Deploy functions
+supabase functions deploy notion-sync
+supabase functions deploy enrich-link
+supabase functions deploy generate-widget
+
+# View function logs
+supabase functions logs notion-sync --tail
+```
+
+### Notion Sync Commands
+```bash
+# Sync all content to Notion
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "sync-structure"}'
+
+# Preview cleanup (dry run)
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "cleanup", "dryRun": true}'
+
+# Delete legacy pages
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "cleanup"}'
+```
+
 ---
 
 ## Development Guidelines
