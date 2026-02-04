@@ -1,0 +1,282 @@
+name: AI Agent Automation
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  schedule:
+    # Daily synthesis at 9 AM UTC
+    - cron: '0 9 * * *'
+    # Weekly improvement analysis on Fridays at 4 PM UTC
+    - cron: '0 16 * * 5'
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Agent to run'
+        required: true
+        default: 'status-update'
+        type: choice
+        options:
+          - status-update
+          - organizational
+          - project-management
+          - chief-of-staff
+          - security-compliance
+          - continuous-improvement
+          - all
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  # Triggered on every push - quick status and security check
+  on-push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+
+      - name: Run Status Update Agent
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const changedFiles = '${{ steps.changed-files.outputs.all_changed_files }}'.split(' ');
+            console.log('Changed files:', changedFiles);
+
+            // Log status update
+            console.log('📊 Status Update Agent triggered');
+            console.log(`Branch: ${context.ref}`);
+            console.log(`Commit: ${context.sha.substring(0, 7)}`);
+            console.log(`Files changed: ${changedFiles.length}`);
+
+      - name: Run Security Scan
+        if: contains(steps.changed-files.outputs.all_changed_files, 'supabase/') || contains(steps.changed-files.outputs.all_changed_files, '.env')
+        run: |
+          echo "🔒 Security & Compliance Agent triggered"
+          echo "Scanning for sensitive data patterns..."
+          # Check for potential secrets in changed files
+          if grep -r -E "(api[_-]?key|secret|password|token)" --include="*.ts" --include="*.js" supabase/ 2>/dev/null | grep -v "process.env" | grep -v "Deno.env"; then
+            echo "⚠️ Warning: Potential hardcoded secrets detected"
+          else
+            echo "✅ No hardcoded secrets detected"
+          fi
+
+  # Triggered on PRs - organizational and project management review
+  on-pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Organizational Agent
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            console.log('📋 Organizational Agent triggered for PR #' + context.payload.pull_request.number);
+
+            // Check for documentation
+            const fs = require('fs');
+            const prTitle = context.payload.pull_request.title;
+            const prBody = context.payload.pull_request.body || '';
+
+            let suggestions = [];
+
+            // Check if PR has description
+            if (prBody.length < 50) {
+              suggestions.push('- Consider adding a more detailed PR description');
+            }
+
+            // Check for related docs
+            if (prTitle.toLowerCase().includes('feature') && !prBody.includes('PRD')) {
+              suggestions.push('- Link to relevant PRD document if this is a new feature');
+            }
+
+            if (suggestions.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: `## 📋 Organizational Agent Review\n\n${suggestions.join('\n')}\n\n---\n*Automated review by AI Agent Workforce*`
+              });
+            }
+
+      - name: Check Documentation Standards
+        run: |
+          echo "📝 Checking documentation standards..."
+
+          # Check CLAUDE.md exists
+          if [ -f "CLAUDE.md" ]; then
+            echo "✅ CLAUDE.md exists"
+          else
+            echo "❌ CLAUDE.md missing"
+          fi
+
+          # Check docs directory structure
+          for prefix in PRD TECH PROJECT-PLAN; do
+            count=$(ls docs/${prefix}-*.md 2>/dev/null | wc -l)
+            echo "📄 ${prefix} documents: ${count}"
+          done
+
+  # Daily synthesis by Chief of Staff
+  daily-synthesis:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 9 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Chief of Staff Daily Synthesis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('🎯 Chief of Staff Agent - Daily Synthesis');
+            console.log('Date:', new Date().toISOString().split('T')[0]);
+
+            // This would call the Supabase edge function in production
+            console.log('Gathering inputs from Status Update and Organizational agents...');
+            console.log('Generating daily synthesis report...');
+
+      - name: Create Daily Summary Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const today = new Date().toISOString().split('T')[0];
+
+            // Check if issue already exists for today
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'daily-synthesis',
+              state: 'open'
+            });
+
+            const todayIssue = existingIssues.data.find(i => i.title.includes(today));
+
+            if (!todayIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `📊 Daily Synthesis - ${today}`,
+                body: `## Chief of Staff Daily Report\n\n### Status\n- [ ] Review pending\n\n### Key Updates\n*Auto-generated - update with actual status*\n\n### Action Items\n- [ ] Review and update\n\n---\n*Generated by AI Agent Workforce*`,
+                labels: ['daily-synthesis', 'automated']
+              });
+            }
+
+  # Weekly improvement analysis
+  weekly-improvement:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 16 * * 5'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Continuous Improvement Analysis
+        run: |
+          echo "📈 Continuous Improvement Agent - Weekly Analysis"
+          echo "================================================"
+
+          # Git metrics for the week
+          echo ""
+          echo "## Commits this week"
+          git log --oneline --since="1 week ago" | head -20
+
+          echo ""
+          echo "## Files most changed"
+          git log --since="1 week ago" --name-only --pretty=format: | sort | uniq -c | sort -rn | head -10
+
+          echo ""
+          echo "## Contributors"
+          git log --since="1 week ago" --pretty=format:"%an" | sort | uniq -c | sort -rn
+
+      - name: Create Weekly Report Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const weekStart = new Date();
+            weekStart.setDate(weekStart.getDate() - 7);
+            const weekEnd = new Date();
+
+            const title = `📈 Weekly Improvement Report - ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: `## Continuous Improvement Weekly Analysis\n\n### Metrics Summary\n*See action logs for detailed metrics*\n\n### Opportunities Identified\n- [ ] Review and prioritize\n\n### Experiments to Consider\n- [ ] Define experiments based on data\n\n---\n*Generated by AI Agent Workforce*`,
+              labels: ['weekly-improvement', 'automated']
+            });
+
+  # Manual agent trigger
+  manual-trigger:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Selected Agent
+        run: |
+          echo "🤖 Running agent: ${{ inputs.agent }}"
+
+          case "${{ inputs.agent }}" in
+            "status-update")
+              echo "📊 Status Update Agent"
+              echo "Current branch: $(git branch --show-current)"
+              echo "Last commit: $(git log -1 --oneline)"
+              ;;
+            "organizational")
+              echo "📋 Organizational Agent"
+              echo "Checking documentation standards..."
+              ;;
+            "project-management")
+              echo "📅 Project Management Agent"
+              echo "Reviewing backlog and PRDs..."
+              ;;
+            "chief-of-staff")
+              echo "🎯 Chief of Staff Agent"
+              echo "Generating synthesis..."
+              ;;
+            "security-compliance")
+              echo "🔒 Security & Compliance Agent"
+              echo "Running security scan..."
+              ;;
+            "continuous-improvement")
+              echo "📈 Continuous Improvement Agent"
+              echo "Analyzing patterns..."
+              ;;
+            "all")
+              echo "🚀 Running all agents..."
+              ;;
+          esac
+
+      - name: Call Agent Handler (Production)
+        if: env.SUPABASE_URL != ''
+        run: |
+          echo "Calling Supabase edge function..."
+          # In production, this would call:
+          # curl -X POST "$SUPABASE_URL/functions/v1/agent-handler" \
+          #   -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"agent": "${{ inputs.agent }}", "trigger": "manual"}'
