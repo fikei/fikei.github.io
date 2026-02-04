@@ -674,6 +674,7 @@ const DEFAULT_STRUCTURE: Structure = {
           icon: '📐',
           children: [
             { title: 'System Overview', icon: '🗺️' },
+            { title: 'AI Widget System', icon: '🤖' },
           ],
         },
         {
