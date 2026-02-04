@@ -103,6 +103,10 @@ jobs:
           update_page "Collaborative Boards" "docs/strategy/prds/collaborative-boards.md"
           update_page "Content Type System" "docs/strategy/prds/content-type-system.md"
           update_page "Corporate Management" "docs/strategy/prds/corporate-management.md"
+          update_page "Generative Widget Ecosystem" "docs/strategy/prds/generative-widget-ecosystem.md"
+          update_page "Widget Design System" "docs/strategy/prds/widget-design-system.md"
+          update_page "Widget Instrumentation" "docs/strategy/prds/widget-instrumentation.md"
+          update_page "Content Type and Image Systems" "docs/strategy/prds/content-type-and-image-systems.md"
 
           # User Experience
           update_page "Overview" "design-system/README.md"
@@ -115,6 +119,8 @@ jobs:
           update_page "Recently Shipped" "docs/execution/shipped.md"
           update_page "Blocked/Waiting" "docs/execution/blocked.md"
           update_page "Boards" "docs/execution/project-plans/boards.md"
+          update_page "Phase 0 Implementation" "docs/execution/project-plans/phase0-implementation.md"
+          update_page "Boards Original Plan" "docs/execution/project-plans/boards-original.md"
 
           # Infrastructure
           update_page "System Overview" "docs/infrastructure/architecture.md"
@@ -122,6 +128,9 @@ jobs:
           update_page "Security" "docs/infrastructure/security.md"
           update_page "Monitoring" "docs/infrastructure/monitoring.md"
           update_page "AI Widget System" "docs/infrastructure/technical-design/ai-widget-system.md"
+          update_page "Widget Architecture" "docs/infrastructure/technical-design/widget-architecture.md"
+          update_page "AI Widget Pipeline" "docs/infrastructure/technical-design/ai-widget-pipeline.md"
+          update_page "Content Type and Image Systems Tech" "docs/infrastructure/technical-design/content-type-and-image-systems.md"
 
           # AI Agents
           update_page "Chief of Staff" ".claude/agents/chief-of-staff-agent.md"
