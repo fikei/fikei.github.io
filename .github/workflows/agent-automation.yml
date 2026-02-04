@@ -66,10 +66,15 @@ jobs:
           PRD_CONTENT=$(read_file "docs/PRD-content-type-and-image-systems.md")
           PRD_CORP=$(read_file "docs/PRD-unified-corporate-management.md")
           BOARDS_README=$(read_file "boards/README.md")
+          BOARDS_FEATURES=$(read_file "boards/FEATURES.md")
+          BOARDS_CHANGELOG=$(read_file "boards/CHANGELOG.md")
           SOUNDSCAPE_README=$(read_file "soundscape/README.md")
           SYSTEMIC_README=$(read_file "systemic/README.md")
           FAVICON_README=$(read_file "favicon/README.md")
           DESIGN_README=$(read_file "design-system/README.md")
+          DESIGN_FEATURES=$(read_file "design-system/FEATURES.md")
+          DESIGN_CHANGELOG=$(read_file "design-system/CHANGELOG.md")
+          MONITORING=$(read_file "docs/INFRA-MONITORING.md")
           BACKLOG=$(read_file "BACKLOG.md")
           SPRINT=$(read_file "docs/EXECUTION-SPRINT.md")
           SHIPPED=$(read_file "docs/EXECUTION-SHIPPED.md")
@@ -113,8 +118,8 @@ jobs:
                       "icon": "📋",
                       "children": [
                         {"title": "Overview", "icon": "📄", "content": $BOARDS_README},
-                        {"title": "Features", "icon": "⭐"},
-                        {"title": "Changelog", "icon": "📝"},
+                        {"title": "Features", "icon": "⭐", "content": $BOARDS_FEATURES},
+                        {"title": "Changelog", "icon": "📝", "content": $BOARDS_CHANGELOG},
                         {"title": "Human TODOs", "icon": "👤"}
                       ]
                     },
@@ -123,8 +128,8 @@ jobs:
                       "icon": "🎨",
                       "children": [
                         {"title": "Overview", "icon": "📄", "content": $DESIGN_README},
-                        {"title": "Features", "icon": "⭐"},
-                        {"title": "Changelog", "icon": "📝"},
+                        {"title": "Features", "icon": "⭐", "content": $DESIGN_FEATURES},
+                        {"title": "Changelog", "icon": "📝", "content": $DESIGN_CHANGELOG},
                         {"title": "Human TODOs", "icon": "👤"}
                       ]
                     }
@@ -159,7 +164,7 @@ jobs:
                       ]
                     },
                     {"title": "Security", "icon": "🔒", "content": $SECURITY},
-                    {"title": "Monitoring", "icon": "📈"}
+                    {"title": "Monitoring", "icon": "📈", "content": $MONITORING}
                   ]
                 },
                 {

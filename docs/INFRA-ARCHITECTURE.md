@@ -106,10 +106,19 @@ ctrl.rodeo/
 
 | Table | Purpose | Status |
 |-------|---------|--------|
-| `boards` | User boards | ✅ |
-| `links` | Saved links | ✅ |
-| `categories` | AI-generated categories | ✅ |
-| `users` | Authentication | ✅ |
+| `links` | Core link storage | ✅ |
+| `shared_boards` | Board sharing config | ✅ |
+| `board_views` | View analytics | ✅ |
+| `board_invites` | Access invitations | ✅ |
+| `domain_profiles` | Domain type caching | ✅ |
+| `content_types` | 9 content types | ✅ |
+| `classification_log` | Type discovery | ✅ |
+| `image_strategies` | Resolution pipelines | ✅ |
+| `strategy_performance` | Performance metrics | ✅ |
+| `audit_jobs` | Systemic crawl tasks | ✅ |
+| `design_systems` | Generated output | ✅ |
+| `design_tokens` | Token extraction | ✅ |
+| `design_components` | Component analysis | ✅ |
 
 ### AI Services
 
