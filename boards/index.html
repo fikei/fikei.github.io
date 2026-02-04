@@ -531,12 +531,36 @@ body {
 }
 
 /* ============================================
-   Floating Add Button
+   Bottom Navigation - Unified Floating Structure
    ============================================ */
-.fab {
+.bottom-nav {
   position: fixed;
-  bottom: var(--space-6);
-  right: var(--space-6);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 50;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: var(--space-4);
+}
+
+.bottom-nav__left,
+.bottom-nav__right {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.bottom-nav__right {
+  align-items: flex-end;
+}
+
+/* Floating Button Base */
+.float-btn {
   width: 24px;
   height: 24px;
   font-family: var(--font-mono);
@@ -545,15 +569,129 @@ body {
   color: var(--bg);
   border: none;
   cursor: pointer;
-  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s ease;
 }
 
-.fab:hover {
+.float-btn:hover {
   outline: 2px solid var(--fg);
   outline-offset: 2px;
+}
+
+/* FAB Menu Container */
+.fab-menu {
+  position: relative;
+}
+
+.fab-menu__trigger {
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--fg);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.fab-menu__trigger:hover {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.fab-menu--open .fab-menu__trigger {
+  transform: rotate(45deg);
+}
+
+/* FAB Menu Dropdown */
+.fab-menu__dropdown {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+
+.fab-menu--open .fab-menu__dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.fab-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fab-menu__item:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.fab-menu__item-icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* Theme toggle in bottom nav */
+.bottom-nav .theme-toggle {
+  width: 32px;
+  height: 18px;
+  background: transparent;
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  padding: 2px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.bottom-nav .theme-toggle__knob {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+:root.light .bottom-nav .theme-toggle {
+  background: var(--fg);
+}
+
+:root.light .bottom-nav .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
+}
+
+/* Hidden file inputs for uploads */
+.hidden-input {
+  display: none;
 }
 
 /* ============================================
@@ -564,6 +702,7 @@ body {
   flex-wrap: nowrap;
   gap: var(--space-2);
   padding: var(--space-4);
+  padding-right: 140px; /* Space for auth bar - clips filters before profile button */
   border-bottom: 1px solid var(--subtle);
   position: sticky;
   top: 0;
@@ -573,10 +712,20 @@ body {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
+  /* Fade effect on right edge to indicate more content */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
 }
 
 .filters::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* Mobile adjustment for filter padding */
+@media (max-width: 480px) {
+  .filters {
+    padding-right: 100px;
+  }
 }
 
 .filter-token {
@@ -611,6 +760,7 @@ body {
   grid-template-columns: repeat(2, 1fr);
   gap: var(--grid-gap);
   padding: var(--space-4);
+  padding-bottom: 80px; /* Space for bottom navigation */
 }
 
 @media (min-width: 600px) {
@@ -2795,7 +2945,37 @@ body {
     <div class="widget-section__content" id="widgetFooterContent"></div>
   </section>
 
-  <button class="fab" id="addBtn">+</button>
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav" id="bottomNav">
+    <div class="bottom-nav__left">
+      <button class="float-btn theme-toggle" id="bottomThemeToggle" aria-label="Toggle theme">
+        <div class="theme-toggle__knob"></div>
+      </button>
+    </div>
+    <div class="bottom-nav__right">
+      <div class="fab-menu" id="fabMenu" style="display:none;">
+        <div class="fab-menu__dropdown">
+          <button class="fab-menu__item" id="fabShareLink">
+            <span class="fab-menu__item-icon">+</span>
+            Share Link
+          </button>
+          <button class="fab-menu__item" id="fabPhotoUpload">
+            <span class="fab-menu__item-icon">◻</span>
+            Photo
+          </button>
+          <button class="fab-menu__item" id="fabVideoUpload">
+            <span class="fab-menu__item-icon">▶</span>
+            Video
+          </button>
+        </div>
+        <button class="fab-menu__trigger" id="fabTrigger" aria-label="Add content">+</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hidden file inputs for uploads -->
+  <input type="file" id="photoInput" class="hidden-input" accept="image/*" multiple>
+  <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple>
 
   <!-- Add Modal -->
   <div class="modal" id="addModal">
@@ -3158,8 +3338,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.9.0';
-  console.log('[boards] v' + VERSION);
+  const VERSION = '2.0.0';
+  console.log('[boards] v' + VERSION + ' - Navigation Redesign');
 
   // ============================================
   // Supabase Setup
@@ -3981,8 +4161,8 @@ Return JSON:
       productUrl: s.productUrl ? 'present' : null
     })));
     for (const sug of suggestions.slice(0, 3)) {
-      // Use actual product URL if available, otherwise fall back to Google Shopping search
-      const shopUrl = sug.productUrl || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
+      // Use productUrl from server - NEVER fall back to Google Shopping
+      const hasUrl = sug.productUrl && sug.productUrl.length > 0 && !sug.productUrl.includes('google.com');
       const cat = sug.category || 'unknown';
       const icon = categoryIcons[cat] || '🛍️';
 
@@ -3997,16 +4177,31 @@ Return JSON:
         ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
         : `<span class="widget-complete__product-icon">${icon}</span>`;
 
-      suggestionsHtml += `
-        <a href="${shopUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
-          <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
-            ${imageContent}
-          </div>
-          ${brandDisplay}
-          <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-          <span class="widget-complete__shop-link">Shop Now →</span>
-        </a>`;
+      // Render as link only if we have a valid URL, otherwise render as non-clickable card
+      if (hasUrl) {
+        suggestionsHtml += `
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+              ${imageContent}
+            </div>
+            ${brandDisplay}
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link">Shop Now →</span>
+          </a>`;
+      } else {
+        // No valid URL - render as non-clickable suggestion
+        suggestionsHtml += `
+          <div class="widget-complete__item widget-complete__item--suggestion widget-complete__item--no-link">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+              ${imageContent}
+            </div>
+            ${brandDisplay}
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link" style="opacity: 0.5">Search for this item</span>
+          </div>`;
+      }
     }
 
     const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
@@ -5838,6 +6033,17 @@ Return JSON:
   const settingsModal = $('settingsModal');
   const userMenuSettings = $('userMenuSettings');
 
+  // Bottom Navigation DOM
+  const bottomNav = $('bottomNav');
+  const fabMenu = $('fabMenu');
+  const fabTrigger = $('fabTrigger');
+  const fabShareLink = $('fabShareLink');
+  const fabPhotoUpload = $('fabPhotoUpload');
+  const fabVideoUpload = $('fabVideoUpload');
+  const photoInput = $('photoInput');
+  const videoInput = $('videoInput');
+  const bottomThemeToggle = $('bottomThemeToggle');
+
   // Progress DOM
   const progressBar = $('progressBar');
   const progressFill = $('progressFill');
@@ -6007,7 +6213,124 @@ Return JSON:
   // ============================================
   // Events
   // ============================================
-  $('addBtn').onclick = () => openModal(addModal);
+
+  // FAB Menu - Toggle open/close
+  fabTrigger.onclick = () => {
+    fabMenu.classList.toggle('fab-menu--open');
+  };
+
+  // Close FAB menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!fabMenu.contains(e.target)) {
+      fabMenu.classList.remove('fab-menu--open');
+    }
+  });
+
+  // FAB Menu Actions
+  fabShareLink.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    openModal(addModal);
+  };
+
+  fabPhotoUpload.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    photoInput.click();
+  };
+
+  fabVideoUpload.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    videoInput.click();
+  };
+
+  // Photo upload handler
+  photoInput.onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    toast(`Uploading ${files.length} photo${files.length > 1 ? 's' : ''}...`);
+
+    for (const file of files) {
+      try {
+        // Create a local object URL for preview
+        const objectUrl = URL.createObjectURL(file);
+        const id = 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        const photoLink = {
+          id,
+          url: objectUrl,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          description: `Photo uploaded: ${new Date().toLocaleDateString()}`,
+          image: objectUrl,
+          domain: 'Photo',
+          category: 'uncategorized',
+          confidence: 1,
+          content_type: 'image',
+          type_confidence: 1,
+          isLocalFile: true,
+          fileType: file.type,
+          fileName: file.name
+        };
+
+        addLink(photoLink);
+      } catch (err) {
+        console.error('Photo upload error:', err);
+        toast(`Failed to add ${file.name}`, true);
+      }
+    }
+
+    renderFilters();
+    renderGrid();
+    photoInput.value = '';
+    toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
+  };
+
+  // Video upload handler
+  videoInput.onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    toast(`Uploading ${files.length} video${files.length > 1 ? 's' : ''}...`);
+
+    for (const file of files) {
+      try {
+        // Create a local object URL for preview
+        const objectUrl = URL.createObjectURL(file);
+        const id = 'video_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        const videoLink = {
+          id,
+          url: objectUrl,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          description: `Video uploaded: ${new Date().toLocaleDateString()}`,
+          image: null,
+          domain: 'Video',
+          category: 'uncategorized',
+          confidence: 1,
+          content_type: 'video',
+          type_confidence: 1,
+          isLocalFile: true,
+          fileType: file.type,
+          fileName: file.name
+        };
+
+        addLink(videoLink);
+      } catch (err) {
+        console.error('Video upload error:', err);
+        toast(`Failed to add ${file.name}`, true);
+      }
+    }
+
+    renderFilters();
+    renderGrid();
+    videoInput.value = '';
+    toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
+  };
+
+  // Bottom theme toggle
+  bottomThemeToggle.onclick = () => {
+    document.documentElement.classList.toggle('light');
+    localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
+  };
 
   addForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -6947,6 +7270,8 @@ Return JSON:
       authBtn.style.display = 'none';
       userMenu.style.display = '';
       shareBtn.style.display = '';
+      // Show FAB menu for logged in users
+      fabMenu.style.display = '';
 
       // Update user menu content - show @username or first name
       userMenuEmail.textContent = getDisplayName();
@@ -6966,6 +7291,8 @@ Return JSON:
       userMenu.style.display = 'none';
       shareBtn.style.display = 'none';
       adminBtn.style.display = 'none';
+      // Hide FAB menu for logged out users
+      fabMenu.style.display = 'none';
     }
   }
 
