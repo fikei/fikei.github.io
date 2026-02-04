@@ -75,7 +75,7 @@ When working on this project, always follow these guidelines:
 │   ├── PRD-*.md            # Product requirement documents
 │   ├── TECH-*.md           # Technical architecture docs
 │   └── PROJECT-PLAN-*.md   # Implementation roadmaps
-├── boards/                 # Link curation app ("Things I Like")
+├── boards/                 # Link curation app (Boards)
 ├── soundscape/             # Audio-reactive visualization
 ├── systemic/               # Design system analyzer
 ├── supabase/functions/     # Edge functions (TypeScript)

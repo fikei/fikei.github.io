@@ -1,4 +1,4 @@
-# PRD: Things I Like
+# PRD: Boards
 
 **Version:** 1.0
 **Date:** 2026-01-30
@@ -8,7 +8,7 @@
 
 ## Overview
 
-"Things I Like" is a personal link curation tool that automatically categorizes URLs into emergent, evolving categories. Users submit links via unstructured text input, and the system fetches metadata, selects hero images, and organizes content into a visually minimal grid following Swiss design principles blended with Web 1.0 aesthetics. Categories are not predefined—they emerge organically from the content you save and evolve as your collection grows.
+Boards is a personal link curation tool that automatically categorizes URLs into emergent, evolving categories. Users submit links via unstructured text input, and the system fetches metadata, selects hero images, and organizes content into a visually minimal grid following Swiss design principles blended with Web 1.0 aesthetics. Categories are not predefined—they emerge organically from the content you save and evolve as your collection grows.
 
 ---
 

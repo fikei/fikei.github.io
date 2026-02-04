@@ -620,7 +620,7 @@ const DEFAULT_STRUCTURE: Structure = {
           title: 'PRDs',
           icon: '📄',
           children: [
-            { title: 'Things I Like (Boards)', icon: '📋' },
+            { title: 'Boards', icon: '📋' },
             { title: 'Collaborative Boards', icon: '📋' },
             { title: 'Content Type System', icon: '📋' },
             { title: 'Corporate Management', icon: '📋' },

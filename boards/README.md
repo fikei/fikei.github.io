@@ -111,7 +111,7 @@ The ultimate personal curation tool - a place to save, organize, and rediscover 
 
 ## Technical Documentation
 
-- [PRD: Things I Like](../docs/PRD-things-i-like.md)
+- [PRD: Boards](../docs/PRD-things-i-like.md)
 - [PRD: Collaborative Boards](../docs/PRD-collaborative-boards.md)
 - [PRD: Content Type System](../docs/PRD-content-type-and-image-systems.md)
 - [TECH: AI Widget System](../docs/TECH-ai-widget-system.md)
