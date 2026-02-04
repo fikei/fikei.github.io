@@ -277,6 +277,125 @@ if [ -f "PROJECT-STATUS.md" ]; then
   fi
 fi
 
+# Sync Product Pages (READMEs)
+echo ""
+echo -e "${BLUE}Syncing Product Pages...${NC}"
+
+# Root README
+if [ -f "README.md" ]; then
+  echo -n "  🏠 ctrl.rodeo Overview... "
+  existing_id=$(find_page_by_title "ctrl.rodeo Overview")
+  if [ -z "$existing_id" ]; then
+    CROSS_ID=$(find_page_by_title "Cross-Functional")
+    parent=${CROSS_ID:-$DEVELOPMENT_ID}
+    new_id=$(create_page "$parent" "ctrl.rodeo Overview" "🏠")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Boards Product Page
+if [ -f "boards/README.md" ]; then
+  echo -n "  📋 Boards Product... "
+  existing_id=$(find_page_by_title "Boards Product")
+  if [ -z "$existing_id" ]; then
+    new_id=$(create_page "$DEVELOPMENT_ID" "Boards Product" "📋")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "boards/README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Soundscape Product Page
+if [ -f "soundscape/README.md" ]; then
+  echo -n "  🎵 Soundscape Product... "
+  existing_id=$(find_page_by_title "Soundscape Product")
+  if [ -z "$existing_id" ]; then
+    new_id=$(create_page "$DEVELOPMENT_ID" "Soundscape Product" "🎵")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "soundscape/README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Systemic Product Page
+if [ -f "systemic/README.md" ]; then
+  echo -n "  🔧 Systemic Product... "
+  existing_id=$(find_page_by_title "Systemic Product")
+  if [ -z "$existing_id" ]; then
+    new_id=$(create_page "$DEVELOPMENT_ID" "Systemic Product" "🔧")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "systemic/README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Design System Product Page
+if [ -f "design-system/README.md" ]; then
+  echo -n "  🎨 Design System... "
+  existing_id=$(find_page_by_title "Design System")
+  if [ -z "$existing_id" ]; then
+    new_id=$(create_page "$DEVELOPMENT_ID" "Design System" "🎨")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "design-system/README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Favicon Product Page (Playground)
+if [ -f "favicon/README.md" ]; then
+  echo -n "  🎨 Favicon Generator... "
+  existing_id=$(find_page_by_title "Favicon Generator")
+  if [ -z "$existing_id" ]; then
+    new_id=$(create_page "$DEVELOPMENT_ID" "Favicon Generator" "🎨")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "favicon/README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Sync Operations Documents
+echo ""
+echo -e "${BLUE}Syncing Operations...${NC}"
+
+# Find Operations page
+OPERATIONS_ID=$(find_page_by_title "Operations")
+
+# Costs tracking
+if [ -f "COSTS.md" ]; then
+  echo -n "  💰 Costs... "
+  existing_id=$(find_page_by_title "Costs")
+  if [ -z "$existing_id" ]; then
+    parent=${OPERATIONS_ID:-$STRATEGIC_ID}
+    new_id=$(create_page "$parent" "Costs" "💰")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "COSTS.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
 echo ""
 echo -e "${GREEN}✅ Sync complete!${NC}"
 echo ""

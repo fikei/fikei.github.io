@@ -9,12 +9,24 @@
 
 ## Products
 
+Production-quality applications with full documentation, testing, and support.
+
 | Product | Description | Status | Docs |
 |---------|-------------|--------|------|
 | [**Boards**](./boards/) | Link curation with AI categorization | 🟢 Active | [README](./boards/README.md) |
-| [**Soundscape**](./soundscape/) | Audio-reactive visualization controls | 🟡 81% | [README](./soundscape/README.md) |
-| [**Systemic**](./systemic/) | AI design system generator | 🟢 Active | [README](./systemic/README.md) |
 | [**Design System**](./design-system/) | CTRL component library | 🟢 Active | [README](./design-system/README.md) |
+
+---
+
+## Playground
+
+Experimental projects for learning, prototyping, and fun. Lighter documentation, may be incomplete.
+
+| Project | Description | Status | Docs |
+|---------|-------------|--------|------|
+| [**Soundscape**](./soundscape/) | Audio-reactive visualization | 🟡 Experimental | [README](./soundscape/README.md) |
+| [**Systemic**](./systemic/) | Design system reverse-engineering | 🟡 Experimental | [README](./systemic/README.md) |
+| [**Favicon**](./favicon/) | Favicon generator tool | 🟡 Experimental | [README](./favicon/README.md) |
 
 ---
 
@@ -64,21 +76,32 @@ See [PROJECT-STATUS.md](./PROJECT-STATUS.md) for current work tracking.
 
 ```
 ctrl.rodeo/
-├── boards/           # Link curation app
-├── soundscape/       # Audio visualization
-├── systemic/         # Design system generator
-├── design-system/    # Shared components
-├── supabase/         # Backend edge functions
-│   └── functions/
-│       ├── agent-handler/    # AI agent orchestration
-│       ├── notion-sync/      # Notion integration
-│       ├── enrich-link/      # Content enrichment
-│       ├── generate-widget/  # AI recommendations
-│       └── ...
-├── docs/             # Documentation
-│   ├── PRD-*.md      # Product requirements
-│   └── TECH-*.md     # Technical specs
-└── .claude/          # AI agent definitions
+│
+├── 📦 PRODUCTS
+│   ├── boards/           # Link curation app
+│   └── design-system/    # Shared components
+│
+├── 🧪 PLAYGROUND
+│   ├── soundscape/       # Audio visualization experiment
+│   ├── systemic/         # Design system reverse-engineering
+│   └── favicon/          # Favicon generator
+│
+├── 🏗 INFRASTRUCTURE
+│   ├── supabase/functions/
+│   │   ├── agent-handler/    # AI agent orchestration
+│   │   ├── notion-sync/      # Notion integration
+│   │   ├── enrich-link/      # Content enrichment
+│   │   └── generate-widget/  # AI recommendations
+│   └── .github/workflows/    # CI/CD automation
+│
+├── 📚 DOCUMENTATION
+│   ├── docs/             # PRDs, TECH specs, setup guides
+│   └── .claude/          # AI agent definitions
+│
+└── 🎨 ASSETS
+    ├── css/              # Global styles
+    ├── js/               # Global scripts
+    └── images/           # Icons, favicons
 ```
 
 ---
@@ -104,6 +127,11 @@ ctrl.rodeo/
 |----------|-------------|
 | [SETUP-ai-agent-system.md](./docs/SETUP-ai-agent-system.md) | Agent system setup |
 | [SETUP-content-type-and-image-systems.md](./docs/SETUP-content-type-and-image-systems.md) | Content system setup |
+
+### Operations
+| Document | Description |
+|----------|-------------|
+| [COSTS.md](./COSTS.md) | Service costs and billing tracking |
 
 ---
 

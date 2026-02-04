@@ -5,9 +5,6 @@ on:
     branches:
       - main
       - 'claude/**'
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
   pull_request:
     types: [opened, synchronize, ready_for_review]
   schedule:
@@ -38,6 +35,48 @@ env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
 jobs:
+  # Sync to Notion on every push
+  notion-sync:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync Structure to Notion
+        if: env.SUPABASE_URL != ''
+        run: |
+          echo "🔄 Syncing to Notion..."
+
+          response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action": "create-structure"}')
+
+          echo "Response: $response"
+
+          # Check for success
+          if echo "$response" | grep -q '"success":true'; then
+            echo "✅ Notion sync successful"
+          else
+            echo "⚠️ Notion sync had errors (structure may already exist)"
+          fi
+
+      - name: Sync Changed Docs
+        if: env.SUPABASE_URL != ''
+        run: |
+          echo "📄 Checking for doc changes to sync..."
+
+          # Get list of changed markdown files
+          changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep '\.md$' || echo "")
+
+          if [ -n "$changed_files" ]; then
+            echo "Changed docs: $changed_files"
+            # Future: sync individual pages that changed
+          else
+            echo "No markdown files changed"
+          fi
+
   # Triggered on every push - quick status and security check
   on-push:
     if: github.event_name == 'push'
