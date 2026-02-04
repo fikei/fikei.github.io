@@ -14,6 +14,29 @@ This file provides context to Claude Code and other AI development tools for wor
 
 ---
 
+## Working With Me (User Preferences)
+
+When working on this project, always follow these guidelines:
+
+1. **Structure project plans as Phases → Epics → Stories → Tasks**
+   - Phases: Major milestones or releases
+   - Epics: Large features or initiatives
+   - Stories: User-facing functionality
+   - Tasks: Specific implementation steps
+
+2. **Always show content I need to copy and paste**
+   - Provide complete code blocks, commands, or configuration
+   - Don't summarize when exact text is needed
+   - Format for easy copying (code blocks, terminal commands)
+
+3. **Always provide next steps at the end of completing a task**
+   - Give step-by-step instructions for what I need to do
+   - Include any manual steps (browser actions, external services)
+   - List commands to run in order
+   - Remind me about secrets, deployments, or verification steps
+
+---
+
 ## Quick Reference
 
 ### Directory Structure
