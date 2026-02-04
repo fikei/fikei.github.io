@@ -64,9 +64,9 @@ supabase functions deploy generate-widget
 ### Set Secrets
 
 ```bash
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-supabase secrets set NOTION_API_KEY=ntn_...
-supabase secrets set OPENAI_API_KEY=sk-...
+supabase secrets set ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY
+supabase secrets set NOTION_API_KEY=YOUR_NOTION_API_KEY
+supabase secrets set OPENAI_API_KEY=YOUR_OPENAI_API_KEY
 ```
 
 ### Function Status
