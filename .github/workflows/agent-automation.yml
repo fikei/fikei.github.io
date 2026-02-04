@@ -79,19 +79,16 @@ jobs:
 
             echo "📄 Updating: $title"
 
-            # Read and escape content
-            content=$(head -c 40000 "$file" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-
-            # Build JSON payload
-            payload=$(cat <<PAYLOAD_EOF
-{"action": "update-page", "page": {"pageTitle": "$title", "content": $content}}
-PAYLOAD_EOF
-)
-
-            response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            # Read and escape content, then build JSON with Python
+            response=$(head -c 40000 "$file" | python3 -c "
+import json, sys
+content = sys.stdin.read()
+payload = {'action': 'update-page', 'page': {'pageTitle': '$title', 'content': content}}
+print(json.dumps(payload))
+" | curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
               -H "Content-Type: application/json" \
-              -d "$payload")
+              -d @-)
 
             if echo "$response" | grep -q '"success":true'; then
               echo "  ✅ Updated $title"
