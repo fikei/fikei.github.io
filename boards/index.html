@@ -544,8 +544,6 @@ body {
   justify-content: space-between;
   align-items: flex-end;
   padding: var(--space-4);
-  /* DEBUG: Remove after testing */
-  background: rgba(255,0,0,0.2);
 }
 
 .bottom-nav__left,
@@ -559,6 +557,30 @@ body {
 
 .bottom-nav__right {
   align-items: flex-end;
+}
+
+/* Share button in bottom nav */
+.bottom-nav__share-btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bottom-nav__share-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.bottom-nav__share-btn--active {
+  background: var(--fg);
+  color: var(--bg);
 }
 
 /* Floating Button Base */
@@ -704,7 +726,8 @@ body {
   flex-wrap: nowrap;
   gap: var(--space-2);
   padding: var(--space-4);
-  padding-right: 140px; /* Space for auth bar - clips filters before profile button */
+  padding-top: 48px; /* Space for auth bar above */
+  padding-right: 120px; /* Space for auth bar - clips filters before profile button */
   border-bottom: 1px solid var(--subtle);
   position: sticky;
   top: 0;
@@ -715,8 +738,8 @@ body {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
   /* Fade effect on right edge to indicate more content */
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
-  mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
 }
 
 .filters::-webkit-scrollbar {
@@ -724,9 +747,15 @@ body {
 }
 
 /* Mobile adjustment for filter padding */
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .filters {
-    padding-right: 100px;
+    padding-top: 52px; /* More space on mobile for auth bar */
+    padding-right: 80px; /* Tighter on mobile but still clipped */
+  }
+
+  .auth-bar {
+    top: var(--space-2);
+    right: var(--space-2);
   }
 }
 
@@ -2907,7 +2936,6 @@ body {
 
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
-    <button class="share-btn" id="shareBtn" style="display:none;">Share</button>
     <!-- Logged out state -->
     <button class="auth-bar__btn" id="authBtn">Login</button>
     <!-- Logged in state -->
@@ -2950,6 +2978,7 @@ body {
   <!-- Bottom Navigation -->
   <nav class="bottom-nav" id="bottomNav">
     <div class="bottom-nav__left">
+      <button class="bottom-nav__share-btn" id="shareBtn" style="display:none;">Share</button>
       <button class="float-btn theme-toggle" id="bottomThemeToggle" aria-label="Toggle theme">
         <div class="theme-toggle__knob"></div>
       </button>
@@ -3340,8 +3369,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.0.1';
-  console.log('[boards] v' + VERSION + ' - Navigation Redesign DEBUG');
+  const VERSION = '2.1.0';
+  console.log('[boards] v' + VERSION + ' - Navigation Redesign');
 
   // ============================================
   // Supabase Setup
@@ -7338,10 +7367,10 @@ Return JSON:
 
     if (isShared) {
       shareBtn.textContent = 'Shared ✓';
-      shareBtn.classList.add('share-btn--active');
+      shareBtn.classList.add('bottom-nav__share-btn--active');
     } else {
       shareBtn.textContent = 'Share';
-      shareBtn.classList.remove('share-btn--active');
+      shareBtn.classList.remove('bottom-nav__share-btn--active');
     }
   }
 
