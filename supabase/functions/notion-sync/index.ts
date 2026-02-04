@@ -38,6 +38,7 @@ interface SyncRequest {
   structure?: Structure
   page?: PageUpdate
   dryRun?: boolean  // For cleanup: preview without deleting
+  skipContent?: boolean  // For sync-structure: only create pages, skip content updates
 }
 
 interface SyncResult {
@@ -527,7 +528,8 @@ class NotionClient {
 async function syncStructure(
   client: NotionClient,
   structure: Structure,
-  result: SyncResult
+  result: SyncResult,
+  skipContent = false
 ): Promise<void> {
   // Find root page
   const rootId = await client.findPageByTitle(structure.root)
@@ -545,19 +547,22 @@ async function syncStructure(
       const pagePath = parentPath ? `${parentPath} > ${page.title}` : page.title
 
       try {
+        // When skipContent is true, don't pass content to create (structure only)
+        const contentToUse = skipContent ? undefined : page.content
+
         // Find or create under the correct parent
         const { id: pageId, created } = await client.findOrCreateChildPage(
           parentId,
           page.title,
           page.icon,
           existingChildren,
-          page.content
+          contentToUse
         )
 
         if (created) {
           result.created.push(pagePath)
-        } else if (page.content) {
-          // Update existing page content
+        } else if (!skipContent && page.content) {
+          // Update existing page content (only if not skipping content)
           await client.updatePageContent(pageId, page.content)
           result.updated.push(pagePath)
         } else {
@@ -570,7 +575,7 @@ async function syncStructure(
         }
 
         // Rate limiting - wait between operations
-        await new Promise(resolve => setTimeout(resolve, 150))
+        await new Promise(resolve => setTimeout(resolve, 100))
       } catch (error) {
         result.errors.push(`Failed to sync '${pagePath}': ${error.message}`)
       }
@@ -814,14 +819,15 @@ serve(async (req) => {
 
     switch (request.action) {
       case 'create-structure':
-        // Create the default structure
-        await syncStructure(client, DEFAULT_STRUCTURE, result)
+        // Create the default structure (structure only, no content)
+        await syncStructure(client, DEFAULT_STRUCTURE, result, true)
         break
 
       case 'sync-structure':
         // Sync with provided or default structure
+        // Use skipContent flag if provided (for faster structure-only sync)
         const structure = request.structure || DEFAULT_STRUCTURE
-        await syncStructure(client, structure, result)
+        await syncStructure(client, structure, result, request.skipContent || false)
         break
 
       case 'update-page':
