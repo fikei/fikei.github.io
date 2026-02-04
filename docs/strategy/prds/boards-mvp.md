@@ -454,8 +454,8 @@ Swiss design sensibility.
 
 ## Related Documents
 
-- [PRD: Collaborative Boards](./PRD-collaborative-boards.md) - Multi-user board sharing
-- [PRD: Content Type System](./PRD-content-type-and-image-systems.md) - Automatic content classification
-- [TECH: AI Widget System](./TECH-ai-widget-system.md) - Product recommendations
-- [Design System](../design-system/README.md) - UI components and tokens
-- [Vision & Roadmap](./VISION-AND-ROADMAP.md) - Product strategy
+- [PRD: Collaborative Boards](./collaborative-boards.md) - Multi-user board sharing
+- [PRD: Content Type System](./content-type-system.md) - Automatic content classification
+- [TECH: AI Widget System](../../infrastructure/technical-design/ai-widget-system.md) - Product recommendations
+- [Design System](../../../design-system/README.md) - UI components and tokens
+- [Vision & Roadmap](../vision-and-roadmap.md) - Product strategy

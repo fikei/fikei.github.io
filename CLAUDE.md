@@ -72,9 +72,10 @@ When working on this project, always follow these guidelines:
 │   ├── agents/             # AI agent definitions
 │   └── settings.json       # Claude Code settings
 ├── docs/                   # Technical & product documentation
-│   ├── PRD-*.md            # Product requirement documents
-│   ├── TECH-*.md           # Technical architecture docs
-│   └── PROJECT-PLAN-*.md   # Implementation roadmaps
+│   ├── strategy/           # PRDs, vision, decision log
+│   ├── execution/          # Sprints, shipped, blocked, project plans
+│   ├── infrastructure/     # Architecture, deployment, technical design
+│   └── setup/              # Setup guides
 ├── boards/                 # Link curation app (Boards)
 ├── soundscape/             # Audio-reactive visualization
 ├── systemic/               # Design system analyzer
@@ -159,7 +160,7 @@ curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
 **Key Files**:
 - `boards/index.html` - Main application (256KB)
 - `supabase/functions/enrich-link/` - Content enrichment
-- `docs/PRD-things-i-like.md` - Product requirements
+- `docs/strategy/prds/boards-mvp.md` - Product requirements
 
 **AI Integration**: Automatic content type detection, category suggestion
 
@@ -167,7 +168,7 @@ curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
 **Purpose**: Intelligent product recommendations
 **Key Files**:
 - `supabase/functions/generate-widget/` - Widget generation
-- `docs/TECH-ai-widget-system.md` - Architecture details
+- `docs/infrastructure/technical-design/ai-widget-system.md` - Architecture details
 
 **AI Integration**: Claude Haiku for product recommendations, 47+ brand integrations
 
@@ -218,9 +219,9 @@ This project implements a multi-agent system for automated management. See `.cla
 ## Common Tasks
 
 ### Adding a New Feature
-1. Create PRD in `/docs/PRD-feature-name.md`
+1. Create PRD in `/docs/strategy/prds/feature-name.md`
 2. Review with AI agent (Project Management)
-3. Create technical spec in `/docs/TECH-feature-name.md`
+3. Create technical spec in `/docs/infrastructure/technical-design/feature-name.md`
 4. Implement with continuous commits
 5. Update relevant documentation
 
@@ -248,5 +249,5 @@ Check `BACKLOG.md` for current priorities and sprint planning.
 - [PROJECT-STATUS.md](./PROJECT-STATUS.md) - Current task tracking (single source of truth)
 - [CHANGELOG.md](./CHANGELOG.md) - History of all changes
 - [BACKLOG.md](./BACKLOG.md) - Product roadmap
-- [docs/TECH-ai-widget-system.md](./docs/TECH-ai-widget-system.md) - AI architecture
+- [docs/infrastructure/technical-design/ai-widget-system.md](./docs/infrastructure/technical-design/ai-widget-system.md) - AI architecture
 - [design-system/README.md](./design-system/README.md) - Design system guide

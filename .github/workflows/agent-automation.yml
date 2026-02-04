@@ -96,16 +96,57 @@ jobs:
             sleep 1
           }
 
-          update_page "Vision & Roadmap" "docs/VISION-AND-ROADMAP.md"
+          # Strategy
+          update_page "Vision & Roadmap" "docs/strategy/vision-and-roadmap.md"
+          update_page "Decision Log" "docs/strategy/decision-log.md"
+          update_page "Boards MVP" "docs/strategy/prds/boards-mvp.md"
+          update_page "Collaborative Boards" "docs/strategy/prds/collaborative-boards.md"
+          update_page "Content Type System" "docs/strategy/prds/content-type-system.md"
+          update_page "Corporate Management" "docs/strategy/prds/corporate-management.md"
+          update_page "Generative Widget Ecosystem" "docs/strategy/prds/generative-widget-ecosystem.md"
+          update_page "Widget Design System" "docs/strategy/prds/widget-design-system.md"
+          update_page "Widget Instrumentation" "docs/strategy/prds/widget-instrumentation.md"
+          update_page "Content Type and Image Systems" "docs/strategy/prds/content-type-and-image-systems.md"
+
+          # User Experience
+          update_page "Overview" "design-system/README.md"
+          update_page "Features" "design-system/FEATURES.md"
+          update_page "Changelog" "design-system/CHANGELOG.md"
+
+          # Execution
           update_page "Global Backlog" "BACKLOG.md"
-          update_page "Current Sprint" "docs/EXECUTION-SPRINT.md"
-          update_page "Recently Shipped" "docs/EXECUTION-SHIPPED.md"
-          update_page "Blocked/Waiting" "docs/EXECUTION-BLOCKED.md"
-          update_page "Boards MVP" "docs/PRD-things-i-like.md"
-          update_page "Collaborative Boards" "docs/PRD-collaborative-boards.md"
-          update_page "Content Type System" "docs/PRD-content-type-and-image-systems.md"
-          update_page "System Overview" "docs/INFRA-ARCHITECTURE.md"
-          update_page "AI Widget System" "docs/TECH-ai-widget-system.md"
+          update_page "Current Sprint" "docs/execution/sprint.md"
+          update_page "Recently Shipped" "docs/execution/shipped.md"
+          update_page "Blocked/Waiting" "docs/execution/blocked.md"
+          update_page "Boards" "docs/execution/project-plans/boards.md"
+          update_page "Phase 0 Implementation" "docs/execution/project-plans/phase0-implementation.md"
+          update_page "Boards Original Plan" "docs/execution/project-plans/boards-original.md"
+
+          # Infrastructure
+          update_page "System Overview" "docs/infrastructure/architecture.md"
+          update_page "Deployment" "docs/infrastructure/deployment.md"
+          update_page "Security" "docs/infrastructure/security.md"
+          update_page "Monitoring" "docs/infrastructure/monitoring.md"
+          update_page "AI Widget System" "docs/infrastructure/technical-design/ai-widget-system.md"
+          update_page "Widget Architecture" "docs/infrastructure/technical-design/widget-architecture.md"
+          update_page "AI Widget Pipeline" "docs/infrastructure/technical-design/ai-widget-pipeline.md"
+          update_page "Content Type and Image Systems Tech" "docs/infrastructure/technical-design/content-type-and-image-systems.md"
+
+          # AI Agents
+          update_page "Chief of Staff" ".claude/agents/chief-of-staff-agent.md"
+          update_page "Documentation Sync" ".claude/agents/documentation-sync-agent.md"
+          update_page "Organizational" ".claude/agents/organizational-agent.md"
+          update_page "Project Management" ".claude/agents/project-management-agent.md"
+          update_page "Status Update" ".claude/agents/status-update-agent.md"
+          update_page "Security & Compliance" ".claude/agents/security-compliance-agent.md"
+          update_page "Continuous Improvement" ".claude/agents/continuous-improvement-agent.md"
+
+          # Playground
+          update_page "Project Plan" "soundscape/PROJECT_PLAN.md"
+          update_page "Technical Design" "soundscape/CONTROL_SYSTEM_DESIGN.md"
+
+          # Operations
+          update_page "Costs" "COSTS.md"
 
           echo "📊 Content sync complete!"
 
