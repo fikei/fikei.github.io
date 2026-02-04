@@ -1,6 +1,32 @@
 # CTRL Design System
 
-A minimal, high-contrast design system for ctrl.rodeo projects.
+> Minimal, high-contrast design system powering all ctrl.rodeo products.
+
+**Status**: 🟢 Active
+**Last Updated**: 2026-02-04
+
+---
+
+## Product Overview
+
+The CTRL Design System provides a unified visual language across all ctrl.rodeo applications. It emphasizes clarity, speed, and a distinctive code-like aesthetic.
+
+### Used By
+- **Boards** - Link curation app
+- **Soundscape** - Audio visualization
+- **Systemic** - Design system generator
+
+### Human TODO
+
+> Tasks that require manual attention or decisions
+
+- [ ] Add responsive breakpoint documentation
+- [ ] Create accessibility audit checklist
+- [ ] Design additional icon set
+- [ ] Document animation principles
+- [ ] Create Figma component library
+
+---
 
 ## Philosophy
 
