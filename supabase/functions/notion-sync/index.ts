@@ -182,52 +182,329 @@ class NotionClient {
     }
   }
 
+  private parseRichText(text: string): any[] {
+    const segments: any[] = []
+    let remaining = text
+
+    while (remaining.length > 0) {
+      // Link: [text](url)
+      const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/)
+      if (linkMatch) {
+        segments.push({
+          type: 'text',
+          text: { content: linkMatch[1], link: { url: linkMatch[2] } },
+        })
+        remaining = remaining.slice(linkMatch[0].length)
+        continue
+      }
+
+      // Bold: **text** or __text__
+      const boldMatch = remaining.match(/^\*\*([^*]+)\*\*/) || remaining.match(/^__([^_]+)__/)
+      if (boldMatch) {
+        segments.push({
+          type: 'text',
+          text: { content: boldMatch[1] },
+          annotations: { bold: true },
+        })
+        remaining = remaining.slice(boldMatch[0].length)
+        continue
+      }
+
+      // Italic: *text* or _text_
+      const italicMatch = remaining.match(/^\*([^*]+)\*/) || remaining.match(/^_([^_]+)_/)
+      if (italicMatch) {
+        segments.push({
+          type: 'text',
+          text: { content: italicMatch[1] },
+          annotations: { italic: true },
+        })
+        remaining = remaining.slice(italicMatch[0].length)
+        continue
+      }
+
+      // Inline code: `text`
+      const codeMatch = remaining.match(/^`([^`]+)`/)
+      if (codeMatch) {
+        segments.push({
+          type: 'text',
+          text: { content: codeMatch[1] },
+          annotations: { code: true },
+        })
+        remaining = remaining.slice(codeMatch[0].length)
+        continue
+      }
+
+      // Plain text until next special character
+      const plainMatch = remaining.match(/^[^[*_`]+/)
+      if (plainMatch) {
+        segments.push({
+          type: 'text',
+          text: { content: plainMatch[0] },
+        })
+        remaining = remaining.slice(plainMatch[0].length)
+        continue
+      }
+
+      // Single special character (no match found)
+      segments.push({
+        type: 'text',
+        text: { content: remaining[0] },
+      })
+      remaining = remaining.slice(1)
+    }
+
+    return segments.length > 0 ? segments : [{ type: 'text', text: { content: text } }]
+  }
+
   private markdownToBlocks(markdown: string): any[] {
     const lines = markdown.split('\n')
     const blocks: any[] = []
+    let i = 0
 
-    for (const line of lines) {
-      if (!line.trim()) continue
+    while (i < lines.length) {
+      const line = lines[i]
 
+      // Skip empty lines
+      if (!line.trim()) {
+        i++
+        continue
+      }
+
+      // Code block: ```language
+      if (line.startsWith('```')) {
+        const language = line.slice(3).trim() || 'plain text'
+        const codeLines: string[] = []
+        i++
+        while (i < lines.length && !lines[i].startsWith('```')) {
+          codeLines.push(lines[i])
+          i++
+        }
+        i++ // Skip closing ```
+        blocks.push({
+          object: 'block',
+          type: 'code',
+          code: {
+            rich_text: [{ type: 'text', text: { content: codeLines.join('\n') } }],
+            language: language === 'js' ? 'javascript' : language === 'ts' ? 'typescript' : language,
+          },
+        })
+        continue
+      }
+
+      // Table: line contains | characters (detect table rows)
+      const trimmedLine = line.trim()
+      if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
+        const tableLines: string[] = []
+        const dataRows: string[][] = []
+        let headerRow: string[] | null = null
+
+        while (i < lines.length) {
+          const currentLine = lines[i].trim()
+
+          // Stop if not a table row
+          if (!currentLine.startsWith('|') || !currentLine.endsWith('|')) {
+            break
+          }
+
+          tableLines.push(currentLine)
+
+          // Check if separator row (|---|---|)
+          if (/^\|[\s\-:|]+\|$/.test(currentLine)) {
+            i++
+            continue
+          }
+
+          // Parse cells
+          const cells = currentLine.split('|').slice(1, -1).map(c => c.trim())
+          if (cells.length > 0) {
+            if (headerRow === null) {
+              headerRow = cells
+            } else {
+              dataRows.push(cells)
+            }
+          }
+          i++
+        }
+
+        // Render table as formatted text blocks for reliable display
+        if (headerRow && headerRow.length > 0) {
+          // Calculate column widths
+          const allRows = [headerRow, ...dataRows]
+          const colWidths = headerRow.map((_, colIdx) =>
+            Math.max(...allRows.map(row => (row[colIdx] || '').length))
+          )
+
+          // Create header as bold paragraph
+          const headerText = headerRow.map((cell, idx) =>
+            cell.padEnd(colWidths[idx])
+          ).join(' | ')
+
+          blocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+              rich_text: [{
+                type: 'text',
+                text: { content: headerText },
+                annotations: { bold: true },
+              }],
+            },
+          })
+
+          // Create separator
+          const separator = colWidths.map(w => '-'.repeat(w)).join('-+-')
+          blocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+              rich_text: [{
+                type: 'text',
+                text: { content: separator },
+                annotations: { code: true },
+              }],
+            },
+          })
+
+          // Create data rows
+          for (const row of dataRows) {
+            const rowText = headerRow.map((_, idx) =>
+              (row[idx] || '').padEnd(colWidths[idx])
+            ).join(' | ')
+
+            blocks.push({
+              object: 'block',
+              type: 'paragraph',
+              paragraph: { rich_text: this.parseRichText(rowText) },
+            })
+          }
+
+          // Add spacing after table
+          blocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: { rich_text: [{ type: 'text', text: { content: '' } }] },
+          })
+        }
+        continue
+      }
+
+      // Heading 1: #
       if (line.startsWith('# ')) {
         blocks.push({
           object: 'block',
           type: 'heading_1',
-          heading_1: { rich_text: [{ type: 'text', text: { content: line.slice(2) } }] },
+          heading_1: { rich_text: this.parseRichText(line.slice(2)) },
         })
-      } else if (line.startsWith('## ')) {
+        i++
+        continue
+      }
+
+      // Heading 2: ##
+      if (line.startsWith('## ')) {
         blocks.push({
           object: 'block',
           type: 'heading_2',
-          heading_2: { rich_text: [{ type: 'text', text: { content: line.slice(3) } }] },
+          heading_2: { rich_text: this.parseRichText(line.slice(3)) },
         })
-      } else if (line.startsWith('### ')) {
+        i++
+        continue
+      }
+
+      // Heading 3: ###
+      if (line.startsWith('### ')) {
         blocks.push({
           object: 'block',
           type: 'heading_3',
-          heading_3: { rich_text: [{ type: 'text', text: { content: line.slice(4) } }] },
+          heading_3: { rich_text: this.parseRichText(line.slice(4)) },
         })
-      } else if (line.startsWith('- ')) {
+        i++
+        continue
+      }
+
+      // Numbered list: 1. or 1)
+      const numberedMatch = line.match(/^(\d+)[.)]\s+(.*)/)
+      if (numberedMatch) {
+        blocks.push({
+          object: 'block',
+          type: 'numbered_list_item',
+          numbered_list_item: { rich_text: this.parseRichText(numberedMatch[2]) },
+        })
+        i++
+        continue
+      }
+
+      // Bullet list: - or *
+      if (line.startsWith('- ') || line.startsWith('* ')) {
         blocks.push({
           object: 'block',
           type: 'bulleted_list_item',
-          bulleted_list_item: { rich_text: [{ type: 'text', text: { content: line.slice(2) } }] },
+          bulleted_list_item: { rich_text: this.parseRichText(line.slice(2)) },
         })
-      } else if (line.startsWith('> ')) {
+        i++
+        continue
+      }
+
+      // Checkbox: - [ ] or - [x]
+      const checkboxMatch = line.match(/^- \[([ x])\]\s+(.*)/)
+      if (checkboxMatch) {
+        blocks.push({
+          object: 'block',
+          type: 'to_do',
+          to_do: {
+            rich_text: this.parseRichText(checkboxMatch[2]),
+            checked: checkboxMatch[1] === 'x',
+          },
+        })
+        i++
+        continue
+      }
+
+      // Quote: >
+      if (line.startsWith('> ')) {
         blocks.push({
           object: 'block',
           type: 'quote',
-          quote: { rich_text: [{ type: 'text', text: { content: line.slice(2) } }] },
+          quote: { rich_text: this.parseRichText(line.slice(2)) },
         })
-      } else if (line === '---') {
+        i++
+        continue
+      }
+
+      // Divider: ---
+      if (line === '---' || line === '***' || line === '___') {
         blocks.push({ object: 'block', type: 'divider', divider: {} })
-      } else {
+        i++
+        continue
+      }
+
+      // Callout: > [!NOTE] or > [!TIP] etc.
+      const calloutMatch = line.match(/^>\s*\[!(NOTE|TIP|WARNING|IMPORTANT)\]\s*(.*)/)
+      if (calloutMatch) {
+        const icons: Record<string, string> = {
+          NOTE: 'ℹ️',
+          TIP: '💡',
+          WARNING: '⚠️',
+          IMPORTANT: '❗',
+        }
         blocks.push({
           object: 'block',
-          type: 'paragraph',
-          paragraph: { rich_text: [{ type: 'text', text: { content: line } }] },
+          type: 'callout',
+          callout: {
+            rich_text: this.parseRichText(calloutMatch[2] || calloutMatch[1]),
+            icon: { type: 'emoji', emoji: icons[calloutMatch[1]] || 'ℹ️' },
+          },
         })
+        i++
+        continue
       }
+
+      // Default: paragraph
+      blocks.push({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: this.parseRichText(line) },
+      })
+      i++
     }
 
     return blocks
