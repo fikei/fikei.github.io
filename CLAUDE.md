@@ -47,6 +47,14 @@ When working on this project, always follow these guidelines:
    - Include date and brief description
    - Group changes by session or feature
 
+6. **Use and extend the design system**
+   - Check `design-system/` before creating any UI
+   - Reuse existing components from `design-system/components.css`
+   - Use tokens from `design-system/tokens.css` (colors, spacing, typography)
+   - When adding new UI concepts, extend the design system first
+   - Document new components in `design-system/README.md`
+   - Run systemic analyzer after design system changes
+
 ---
 
 ## Quick Reference
