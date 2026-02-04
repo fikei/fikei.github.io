@@ -16,6 +16,10 @@ This file provides context to Claude Code and other AI development tools for wor
 
 ## Working With Me (User Preferences)
 
+**Local Environment:**
+- GitHub repositories: `/Users/ian/Documents/GitHub/`
+- This repo: `/Users/ian/Documents/GitHub/fikei.github.io`
+
 When working on this project, always follow these guidelines:
 
 1. **Structure project plans as Phases → Epics → Stories → Tasks**
@@ -28,6 +32,7 @@ When working on this project, always follow these guidelines:
    - Provide complete code blocks, commands, or configuration
    - Don't summarize when exact text is needed
    - Format for easy copying (code blocks, terminal commands)
+   - **Always use full paths** in terminal commands (e.g., `/Users/ian/Documents/GitHub/fikei.github.io`)
 
 3. **Always provide next steps at the end of completing a task**
    - Give step-by-step instructions for what I need to do
