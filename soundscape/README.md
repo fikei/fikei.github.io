@@ -1,124 +1,60 @@
 # Soundscape
 
-> Audio-reactive visualization controls for immersive visual experiences.
+> 🧪 **Playground Project** - Audio-reactive visualization controls
 
-**Status**: 🟡 81% Complete
-**Last Updated**: 2026-02-04
-
----
-
-## Description
-
-Soundscape is an audio visualization control system that transforms music into visual parameters. It analyzes audio in real-time and maps frequencies, beats, and loudness to visual controls that can drive any compatible visualization.
-
-- **Real-time Audio Analysis** - Frequency bands, beat detection, RMS loudness
-- **WebSocket Server** - Streams control data to visualization clients
-- **48 Visual Controls** - Extensive parameter mapping
-- **25 Audio Sources** - Multiple input types supported
-- **Theme System** - Customizable visual presets
+**Status**: 🟡 Experimental (81% complete)
 
 ---
 
-## Product Status
+## What Is This?
 
-| Component | Progress | Status |
-|-----------|----------|--------|
-| Visual Controls | 48/59 | 🟡 81% |
-| Audio Sources | 5/25 | 🟡 20% |
-| Beat Detection | Complete | ✅ |
-| Frequency Analysis | Complete | ✅ |
-| WebSocket Server | Complete | ✅ |
-| Theme Controls | Complete | ✅ |
-| Companion App | Complete | ✅ |
+An experiment in real-time audio analysis and visualization control. Transforms music into visual parameters that can drive any compatible visualization.
+
+**Key Features:**
+- Real-time frequency band analysis (7 bands)
+- Beat detection and BPM estimation
+- WebSocket server for streaming control data
+- 48/59 visual controls implemented
 
 ---
 
-## Active Work
+## Quick Status
 
-### Current Sprint
-- [ ] Additional audio source integrations
-- [ ] Advanced beat detection algorithms
-- [ ] Performance optimization for real-time processing
-
-### Recently Completed
-- [x] Core frequency band analysis (7 bands)
-- [x] Beat detection system
-- [x] RMS loudness measurement
-- [x] WebSocket communication layer
-- [x] Theme control reference system
+| Component | Progress |
+|-----------|----------|
+| Visual Controls | 48/59 (81%) |
+| Audio Sources | 5/25 (20%) |
+| Beat Detection | ✅ Complete |
+| WebSocket Server | ✅ Complete |
 
 ---
 
-## Recent Features
+## Try It
 
-### Frequency Band Analysis
-- 7-band analysis: sub-bass, bass, low-mids, mids, high-mids, presence, brilliance
-- Real-time FFT processing
-- Smoothing and normalization
-
-### Beat Detection
-- Onset detection algorithm
-- BPM estimation
-- Beat phase tracking
-
-### Control System
-- Modular control architecture
-- Parameter interpolation
-- Preset management
+```bash
+cd /Users/ian/Documents/GitHub/fikei.github.io/soundscape
+npm install
+node server.js
+# Open http://localhost:3000
+```
 
 ---
 
-## Human TODO
+## Detailed Documentation
 
-> Tasks that require manual attention or decisions
+This is a playground project, but it has extensive docs from active development:
 
-- [ ] Test with various music genres for accuracy
-- [ ] Design visual presets for different moods
-- [ ] Decide on standalone app vs. integration approach
-- [ ] Create demo videos showcasing capabilities
-- [ ] Evaluate hardware requirements for optimal performance
-
----
-
-## Strategy
-
-### Vision
-Make any visual experience reactive to music - from VJ performances to ambient room lighting.
-
-### Target Users
-- VJs and live visual artists
-- Music producers wanting visual feedback
-- Ambient installation creators
-- Hobbyists exploring audio-visual art
-
-### Differentiation
-- Comprehensive control mapping (48+ parameters)
-- WebSocket-based architecture (works with any client)
-- Real-time performance optimized
-
-### Success Metrics
-- Latency (target: <50ms audio-to-visual)
-- CPU usage during analysis
-- Control parameter accuracy
-- User-created presets
+- [PROJECT_PLAN.md](./PROJECT_PLAN.md) - Full specification
+- [PROJECT_TRACKER.md](./PROJECT_TRACKER.md) - Implementation status
+- [CONTROL_SYSTEM_DESIGN.md](./CONTROL_SYSTEM_DESIGN.md) - Architecture
+- [THEME_CONTROLS_REFERENCE.md](./THEME_CONTROLS_REFERENCE.md) - Control parameters
+- [AUDIO_SOURCES_STATUS.md](./AUDIO_SOURCES_STATUS.md) - Input sources
 
 ---
 
-## Technical Documentation
+## Ideas / TODO
 
-- [Project Plan](./PROJECT_PLAN.md) - Full specification
-- [Project Tracker](./PROJECT_TRACKER.md) - Detailed implementation status
-- [Control System Design](./CONTROL_SYSTEM_DESIGN.md) - Architecture
-- [Theme Controls Reference](./THEME_CONTROLS_REFERENCE.md) - Control parameters
-- [Audio Sources Status](./AUDIO_SOURCES_STATUS.md) - Input sources
-- [WebSocket Setup](./WEBSOCKET_SETUP.md) - Server configuration
-- [Meyda Integration](./MEYDA_INTEGRATION_PLAN.md) - Audio library
-
----
-
-## Quick Links
-
-| Resource | Link |
-|----------|------|
-| Project Tracker | [PROJECT_TRACKER.md](./PROJECT_TRACKER.md) |
-| Control Reference | [THEME_CONTROLS_REFERENCE.md](./THEME_CONTROLS_REFERENCE.md) |
+- [ ] More audio source integrations
+- [ ] Better beat detection algorithms
+- [ ] WebGL visualizations
+- [ ] Mobile companion app

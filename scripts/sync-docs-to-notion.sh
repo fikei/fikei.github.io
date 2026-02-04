@@ -358,6 +358,44 @@ if [ -f "design-system/README.md" ]; then
   fi
 fi
 
+# Favicon Product Page (Playground)
+if [ -f "favicon/README.md" ]; then
+  echo -n "  🎨 Favicon Generator... "
+  existing_id=$(find_page_by_title "Favicon Generator")
+  if [ -z "$existing_id" ]; then
+    new_id=$(create_page "$DEVELOPMENT_ID" "Favicon Generator" "🎨")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "favicon/README.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
+# Sync Operations Documents
+echo ""
+echo -e "${BLUE}Syncing Operations...${NC}"
+
+# Find Operations page
+OPERATIONS_ID=$(find_page_by_title "Operations")
+
+# Costs tracking
+if [ -f "COSTS.md" ]; then
+  echo -n "  💰 Costs... "
+  existing_id=$(find_page_by_title "Costs")
+  if [ -z "$existing_id" ]; then
+    parent=${OPERATIONS_ID:-$STRATEGIC_ID}
+    new_id=$(create_page "$parent" "Costs" "💰")
+    if [ -n "$new_id" ]; then
+      add_content_to_page "$new_id" "COSTS.md"
+      echo -e "${GREEN}created${NC}"
+    fi
+  else
+    echo -e "${YELLOW}exists${NC}"
+  fi
+fi
+
 echo ""
 echo -e "${GREEN}✅ Sync complete!${NC}"
 echo ""
