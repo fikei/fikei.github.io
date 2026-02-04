@@ -48,11 +48,20 @@ jobs:
         run: |
           echo "🔄 Step 1: Creating/verifying page structure..."
 
-          # First, sync structure without content (fast)
+          # Read structure from config file and pass to API
+          if [ -f "notion-structure.json" ]; then
+            echo "📁 Using notion-structure.json config"
+            structure=$(cat notion-structure.json)
+            payload=$(python3 -c "import json; s=json.loads('''$structure'''); print(json.dumps({'action': 'sync-structure', 'skipContent': True, 'structure': s}))")
+          else
+            echo "📁 Using default structure from function"
+            payload='{"action": "sync-structure", "skipContent": true}'
+          fi
+
           response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync-structure", "skipContent": true}')
+            -d "$payload")
 
           echo "Structure sync response: $response"
 
@@ -72,14 +81,14 @@ jobs:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          echo "🔄 Step 2: Updating page contents..."
+          echo "🔄 Step 2: Updating page contents from config..."
 
           update_page() {
             local title="$1"
             local file="$2"
 
             if [ ! -f "$file" ]; then
-              echo "⏭️ Skipping $title (file not found)"
+              echo "⏭️ Skipping $title (file not found: $file)"
               return
             fi
 
@@ -100,57 +109,47 @@ jobs:
             sleep 3
           }
 
-          # Strategy
-          update_page "Vision & Roadmap" "docs/strategy/vision-and-roadmap.md"
-          update_page "Decision Log" "docs/strategy/decision-log.md"
-          update_page "Boards MVP" "docs/strategy/prds/boards-mvp.md"
-          update_page "Collaborative Boards" "docs/strategy/prds/collaborative-boards.md"
-          update_page "Content Type System" "docs/strategy/prds/content-type-system.md"
-          update_page "Corporate Management" "docs/strategy/prds/corporate-management.md"
-          update_page "Generative Widget Ecosystem" "docs/strategy/prds/generative-widget-ecosystem.md"
-          update_page "Widget Design System" "docs/strategy/prds/widget-design-system.md"
-          update_page "Widget Instrumentation" "docs/strategy/prds/widget-instrumentation.md"
-          update_page "Content Type and Image Systems" "docs/strategy/prds/content-type-and-image-systems.md"
+          # Auto-generate update calls from notion-structure.json
+          if [ -f "notion-structure.json" ]; then
+            echo "📁 Reading pages from notion-structure.json..."
 
-          # User Experience
-          update_page "Overview" "design-system/README.md"
-          update_page "Features" "design-system/FEATURES.md"
-          update_page "Changelog" "design-system/CHANGELOG.md"
+            # Extract all title/file pairs from config using Python
+            python3 << 'PYEOF'
+          import json
+          import os
 
-          # Execution
-          update_page "Global Backlog" "BACKLOG.md"
-          update_page "Current Sprint" "docs/execution/sprint.md"
-          update_page "Recently Shipped" "docs/execution/shipped.md"
-          update_page "Blocked/Waiting" "docs/execution/blocked.md"
-          update_page "Boards" "docs/execution/project-plans/boards.md"
-          update_page "Phase 0 Implementation" "docs/execution/project-plans/phase0-implementation.md"
-          update_page "Boards Original Plan" "docs/execution/project-plans/boards-original.md"
+          def extract_pages(obj, pages=[]):
+              if isinstance(obj, dict):
+                  if 'title' in obj and 'file' in obj:
+                      pages.append((obj['title'], obj['file']))
+                  if 'children' in obj:
+                      for child in obj['children']:
+                          extract_pages(child, pages)
+              elif isinstance(obj, list):
+                  for item in obj:
+                      extract_pages(item, pages)
+              return pages
 
-          # Infrastructure
-          update_page "System Overview" "docs/infrastructure/architecture.md"
-          update_page "Deployment" "docs/infrastructure/deployment.md"
-          update_page "Security" "docs/infrastructure/security.md"
-          update_page "Monitoring" "docs/infrastructure/monitoring.md"
-          update_page "AI Widget System" "docs/infrastructure/technical-design/ai-widget-system.md"
-          update_page "Widget Architecture" "docs/infrastructure/technical-design/widget-architecture.md"
-          update_page "AI Widget Pipeline" "docs/infrastructure/technical-design/ai-widget-pipeline.md"
-          update_page "Content Type and Image Systems Tech" "docs/infrastructure/technical-design/content-type-and-image-systems.md"
+          with open('notion-structure.json') as f:
+              config = json.load(f)
 
-          # AI Agents
-          update_page "Chief of Staff" ".claude/agents/chief-of-staff-agent.md"
-          update_page "Documentation Sync" ".claude/agents/documentation-sync-agent.md"
-          update_page "Organizational" ".claude/agents/organizational-agent.md"
-          update_page "Project Management" ".claude/agents/project-management-agent.md"
-          update_page "Status Update" ".claude/agents/status-update-agent.md"
-          update_page "Security & Compliance" ".claude/agents/security-compliance-agent.md"
-          update_page "Continuous Improvement" ".claude/agents/continuous-improvement-agent.md"
+          pages = extract_pages(config)
 
-          # Playground
-          update_page "Project Plan" "soundscape/PROJECT_PLAN.md"
-          update_page "Technical Design" "soundscape/CONTROL_SYSTEM_DESIGN.md"
+          # Write to a temp file for bash to read
+          with open('/tmp/pages_to_sync.txt', 'w') as f:
+              for title, filepath in pages:
+                  f.write(f"{title}\t{filepath}\n")
 
-          # Operations
-          update_page "Costs" "COSTS.md"
+          print(f"Found {len(pages)} pages with file mappings")
+          PYEOF
+
+            # Read and process each page
+            while IFS=$'\t' read -r title filepath; do
+              update_page "$title" "$filepath"
+            done < /tmp/pages_to_sync.txt
+          else
+            echo "⚠️ notion-structure.json not found, skipping content sync"
+          fi
 
           echo "📊 Content sync complete!"
 
