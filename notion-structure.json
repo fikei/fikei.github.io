@@ -27,23 +27,17 @@
       "title": "User Experience",
       "icon": "🎨",
       "children": [
-        {
-          "title": "Design System",
-          "icon": "🎨",
-          "children": [
-            { "title": "Overview", "icon": "📄", "file": "design-system/README.md" },
-            { "title": "Features", "icon": "⭐", "file": "design-system/FEATURES.md" },
-            { "title": "Changelog", "icon": "📝", "file": "design-system/CHANGELOG.md" }
-          ]
-        },
-        {
-          "title": "Boards",
-          "icon": "📋",
-          "children": [
-            { "title": "Features", "icon": "⭐" },
-            { "title": "Changelog", "icon": "📝" }
-          ]
-        }
+        { "title": "CTRL Design System", "icon": "🎨", "file": "design-system/README.md" },
+        { "title": "Grid Layout", "icon": "📐" },
+        { "title": "Authentication", "icon": "🔐" },
+        { "title": "Add Links", "icon": "➕" },
+        { "title": "Link Management", "icon": "🔗" },
+        { "title": "Categories & Filtering", "icon": "🏷️" },
+        { "title": "Content Types", "icon": "📦" },
+        { "title": "AI Widgets", "icon": "🤖" },
+        { "title": "Sharing", "icon": "🔗" },
+        { "title": "Settings", "icon": "⚙️" },
+        { "title": "Admin Tools", "icon": "🛠️" }
       ]
     },
     {
