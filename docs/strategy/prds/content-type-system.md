@@ -422,8 +422,8 @@ A/B test → Promote winner
 
 ## Related Documents
 
-- [PRD: Boards MVP](./PRD-things-i-like.md) - Core board functionality
-- [PRD: Collaborative Boards](./PRD-collaborative-boards.md) - Multi-user boards
-- [TECH: AI Widget System](./TECH-ai-widget-system.md) - Product recommendations
-- [Design System](../design-system/README.md) - UI components and tokens
-- [Vision & Roadmap](./VISION-AND-ROADMAP.md) - Product strategy
+- [PRD: Boards MVP](./boards-mvp.md) - Core board functionality
+- [PRD: Collaborative Boards](./collaborative-boards.md) - Multi-user boards
+- [TECH: AI Widget System](../../infrastructure/technical-design/ai-widget-system.md) - Product recommendations
+- [Design System](../../../design-system/README.md) - UI components and tokens
+- [Vision & Roadmap](../vision-and-roadmap.md) - Product strategy
