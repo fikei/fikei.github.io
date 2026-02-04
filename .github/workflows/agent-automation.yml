@@ -64,6 +64,9 @@ jobs:
 
       - name: Update Page Contents
         if: env.SUPABASE_URL != ''
+        env:
+          SB_URL: ${{ secrets.SUPABASE_URL }}
+          SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           echo "🔄 Step 2: Updating page contents..."
 
@@ -72,34 +75,24 @@ jobs:
             local file="$2"
 
             if [ ! -f "$file" ]; then
-              echo "⏭️ Skipping $title (file not found: $file)"
+              echo "⏭️ Skipping $title (file not found)"
               return
             fi
 
             echo "📄 Updating: $title"
+            content=$(head -c 40000 "$file" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+            payload="{\"action\":\"update-page\",\"page\":{\"pageTitle\":\"$title\",\"content\":$content}}"
 
-            # Save content to temp file, build JSON with Python
-            head -c 40000 "$file" > /tmp/content.txt
-            python3 << 'PYEOF' > /tmp/payload.json
-import json
-with open('/tmp/content.txt', 'r') as f:
-    content = f.read()
-payload = {"action": "update-page", "page": {"pageTitle": "TITLE_PLACEHOLDER", "content": content}}
-print(json.dumps(payload))
-PYEOF
-            sed -i "s/TITLE_PLACEHOLDER/$title/" /tmp/payload.json
-
-            response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
+              -H "Authorization: Bearer $SB_KEY" \
               -H "Content-Type: application/json" \
-              -d @/tmp/payload.json)
+              -d "$payload")
 
             if echo "$response" | grep -q '"success":true'; then
-              echo "  ✅ Updated $title"
+              echo "  ✅ Updated"
             else
-              echo "  ⚠️ Issue with $title: $response"
+              echo "  ⚠️ Issue: $response"
             fi
-
             sleep 1
           }
 
