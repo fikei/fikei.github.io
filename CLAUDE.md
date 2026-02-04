@@ -93,10 +93,11 @@ When working on this project, always follow these guidelines:
 ### Supabase Configuration
 ```bash
 # Project URLs
-SUPABASE_URL=https://lravdqpxrxrqxdxuzovm.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyYXZkcXB4cnhycXhkeHV6b3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTk4NzQ0NzcsImV4cCI6MjAzNTQ1MDQ3N30.dYl1XKk1rtyVb3OJrm8b_Hd_DFi-E5KuGJxJxKzGp8E
+SUPABASE_URL=https://ycilriwjnmcelkspmfmg.supabase.co
+SUPABASE_PROJECT_REF=ycilriwjnmcelkspmfmg
 
-# Service key is in Supabase Dashboard → Settings → API → service_role (click Reveal)
+# Get anon key and service key from Supabase Dashboard → Settings → API
+# Service key: click "Reveal" on service_role
 # DO NOT commit the service key to git
 
 # Deploy functions
