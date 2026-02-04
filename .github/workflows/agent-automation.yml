@@ -87,9 +87,72 @@ jobs:
           # Save changed files for later
           echo "$CHANGED" > /tmp/changed_files.txt
 
+      - name: Detect Moved Pages in Notion
+        if: env.SUPABASE_URL != ''
+        id: detect-moves
+        run: |
+          echo "🔍 Checking for pages moved in Notion..."
+
+          if [ ! -f "notion-structure.json" ]; then
+            echo "moves_detected=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          structure=$(cat notion-structure.json)
+          payload=$(python3 -c "import json; s=json.loads('''$structure'''); print(json.dumps({'action': 'detect-moves', 'structure': s}))")
+
+          response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload")
+
+          echo "Detect moves response: $response"
+
+          # Check if any pages were moved
+          moved_count=$(echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print(len(r.get('moved', [])))" 2>/dev/null || echo "0")
+
+          if [ "$moved_count" -gt "0" ]; then
+            echo "📦 Found $moved_count pages moved in Notion"
+            echo "moves_detected=true" >> $GITHUB_OUTPUT
+            echo "$response" > /tmp/moved_pages.json
+          else
+            echo "✅ No moved pages detected"
+            echo "moves_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Config for Moved Pages
+        if: steps.detect-moves.outputs.moves_detected == 'true'
+        run: |
+          echo "📝 Updating notion-structure.json to reflect Notion changes..."
+
+          python3 << 'PYEOF'
+          import json
+
+          # Load moved pages info
+          with open('/tmp/moved_pages.json') as f:
+              response = json.load(f)
+
+          moved = response.get('moved', [])
+          if not moved:
+              print("No moves to process")
+              exit(0)
+
+          # Load current structure
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+
+          # For now, just log the moves - full restructure is complex
+          # In the future, we could auto-update the structure
+          print("Pages moved in Notion:")
+          for m in moved:
+              print(f"  - {m['title']}: {m['expectedParent']} → {m['actualParent']}")
+
+          print("\n⚠️ Manual update needed: Please update notion-structure.json to match Notion")
+          print("Or move the pages back in Notion to match the expected structure")
+          PYEOF
+
       - name: Sync Structure (Pages Only)
         if: env.SUPABASE_URL != '' && (steps.changes.outputs.structure_changed == 'true' || inputs.force_full_sync == true)
-        if: env.SUPABASE_URL != ''
         run: |
           echo "🔄 Step 1: Creating/verifying page structure..."
 
