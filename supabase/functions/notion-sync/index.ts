@@ -60,6 +60,11 @@ interface SyncResult {
   moved: MovedPage[]  // Pages that were moved in Notion
   errors: string[]
   timestamp: string
+  debug?: {
+    totalBlocks: number
+    failedBlocks: number
+    blockTypes: Record<string, number>
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -205,7 +210,12 @@ class NotionClient {
     return page.id
   }
 
-  async updatePageContent(pageId: string, content: string): Promise<void> {
+  async updatePageContent(pageId: string, content: string): Promise<{
+    total: number
+    failed: number
+    types: Record<string, number>
+    failedTypes: Record<string, number>
+  }> {
     // Get existing blocks
     const existingBlocks = await this.request(`/blocks/${pageId}/children`)
 
@@ -220,10 +230,16 @@ class NotionClient {
 
     // Add new blocks in batches of 100 (Notion API limit)
     const blocks = this.markdownToBlocks(content)
-    await this.addBlocksWithRetry(pageId, blocks)
+    console.log(`Updating page with ${blocks.length} blocks`)
+    return await this.addBlocksWithRetry(pageId, blocks)
   }
 
-  async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<void> {
+  async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<{
+    total: number
+    failed: number
+    types: Record<string, number>
+    failedTypes: Record<string, number>
+  }> {
     // Get existing blocks
     const existingBlocks = await this.request(`/blocks/${pageId}/children`)
 
@@ -236,13 +252,27 @@ class NotionClient {
       }
     }
 
-    await this.addBlocksWithRetry(pageId, blocks)
+    console.log(`Updating page with ${blocks.length} blocks`)
+    return await this.addBlocksWithRetry(pageId, blocks)
   }
 
   // Add blocks with resilient error handling - if batch fails, try individual blocks
-  private async addBlocksWithRetry(pageId: string, blocks: any[]): Promise<void> {
+  // Returns stats about what was added/failed
+  private async addBlocksWithRetry(pageId: string, blocks: any[]): Promise<{
+    total: number
+    failed: number
+    types: Record<string, number>
+    failedTypes: Record<string, number>
+  }> {
     const BATCH_SIZE = 100
     let failedBlocks = 0
+    const blockTypes: Record<string, number> = {}
+    const failedTypes: Record<string, number> = {}
+
+    // Count block types
+    for (const block of blocks) {
+      blockTypes[block.type] = (blockTypes[block.type] || 0) + 1
+    }
 
     for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
       const batch = blocks.slice(i, i + BATCH_SIZE)
@@ -253,9 +283,9 @@ class NotionClient {
           method: 'PATCH',
           body: JSON.stringify({ children: batch }),
         })
-      } catch (batchError) {
+      } catch (batchError: any) {
         // Batch failed - try adding blocks one by one
-        console.error(`Batch ${i / BATCH_SIZE + 1} failed, trying individual blocks:`, batchError.message)
+        console.error(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError.message)
 
         for (const block of batch) {
           try {
@@ -263,10 +293,11 @@ class NotionClient {
               method: 'PATCH',
               body: JSON.stringify({ children: [block] }),
             })
-          } catch (blockError) {
-            // Log which block type failed and continue
+          } catch (blockError: any) {
+            // Track which block types are failing
             console.error(`Block failed (type: ${block.type}):`, blockError.message)
             failedBlocks++
+            failedTypes[block.type] = (failedTypes[block.type] || 0) + 1
           }
           // Small delay between individual block adds
           await new Promise(resolve => setTimeout(resolve, 50))
@@ -281,7 +312,10 @@ class NotionClient {
 
     if (failedBlocks > 0) {
       console.error(`Total blocks failed: ${failedBlocks} of ${blocks.length}`)
+      console.error(`Failed types:`, failedTypes)
     }
+
+    return { total: blocks.length, failed: failedBlocks, types: blockTypes, failedTypes }
   }
 
   async archivePage(pageId: string): Promise<void> {
@@ -968,8 +1002,16 @@ async function syncStructure(
           result.created.push(pagePath)
         } else if (!skipContent && contentToUse) {
           // Update existing content page
-          await client.updatePageContent(pageId, contentToUse)
-          result.updated.push(pagePath)
+          const stats = await client.updatePageContent(pageId, contentToUse)
+          result.updated.push(`${pagePath} (${stats.total} blocks, ${stats.failed} failed)`)
+          // Accumulate debug stats
+          if (result.debug) {
+            result.debug.totalBlocks += stats.total
+            result.debug.failedBlocks += stats.failed
+            for (const [type, count] of Object.entries(stats.types)) {
+              result.debug.blockTypes[type] = (result.debug.blockTypes[type] || 0) + count
+            }
+          }
         } else if (!isSectionPage) {
           result.skipped.push(pagePath)
         }
@@ -986,9 +1028,17 @@ async function syncStructure(
           // Now update section page with linked TOC
           if (!skipContent && isSectionPage) {
             const tocBlocks = generateLinkedTocBlocks(page.title, page.children, childIds)
-            await client.updatePageWithBlocks(pageId, tocBlocks)
+            const stats = await client.updatePageWithBlocks(pageId, tocBlocks)
             if (!created) {
-              result.updated.push(pagePath)
+              result.updated.push(`${pagePath} (${stats.total} blocks, ${stats.failed} failed)`)
+            }
+            // Accumulate debug stats
+            if (result.debug) {
+              result.debug.totalBlocks += stats.total
+              result.debug.failedBlocks += stats.failed
+              for (const [type, count] of Object.entries(stats.types)) {
+                result.debug.blockTypes[type] = (result.debug.blockTypes[type] || 0) + count
+              }
             }
           }
         }
@@ -1361,6 +1411,11 @@ serve(async (req) => {
       moved: [],
       errors: [],
       timestamp: new Date().toISOString(),
+      debug: {
+        totalBlocks: 0,
+        failedBlocks: 0,
+        blockTypes: {},
+      },
     }
 
     switch (request.action) {
@@ -1383,8 +1438,13 @@ serve(async (req) => {
         } else {
           const pageId = await client.findPageByTitle(request.page.pageTitle)
           if (pageId) {
-            await client.updatePageContent(pageId, request.page.content)
-            result.updated.push(request.page.pageTitle)
+            const stats = await client.updatePageContent(pageId, request.page.content)
+            result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
+            if (result.debug) {
+              result.debug.totalBlocks = stats.total
+              result.debug.failedBlocks = stats.failed
+              result.debug.blockTypes = stats.types
+            }
           } else {
             result.errors.push(`Page '${request.page.pageTitle}' not found`)
           }
