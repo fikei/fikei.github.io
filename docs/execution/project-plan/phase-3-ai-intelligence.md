@@ -119,30 +119,31 @@
 | | What do users save? | Pending |
 | | Aggregate feedback informs confidence | Pending |
 
-### Widget Phase 2: Config-Generated Widgets (Pending)
+### Widget Phase 2: Config-Generated Widgets (IN PROGRESS)
 
 **Automation Level**: Medium → High
+**Started**: 2026-02-05
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Widget Definition Schema** | | Pending |
-| | Define YAML/JSON schema for widget definitions | Pending |
-| | Eligibility rules as config (not code) | Pending |
-| | Generation config (model, prompt template, constraints) | Pending |
-| | Enrichment config (strategies, timeout, fallback) | Pending |
-| | Rendering config (zone, template, fallback) | Pending |
-| **Category-Agnostic Matching** | | Pending |
-| | Remove hard-coded category logic | Pending |
+| **Widget Definition Schema** | | In Progress |
+| | Define TypeScript schema for widget definitions | Complete |
+| | Eligibility rules as config (not code) | Complete |
+| | Generation config (model, prompt template, constraints) | Complete |
+| | Enrichment config (strategies, timeout, fallback) | Complete |
+| | Rendering config (zone, template, fallback) | Complete |
+| **Category-Agnostic Matching** | | In Progress |
+| | Remove hard-coded category logic | In Progress |
 | | Widgets match ANY category meeting criteria | Pending |
 | | Same system supports multiple categories without branching | Pending |
 | **Template Selection Engine** | | Pending |
 | | Define template library | Pending |
 | | Auto-select template based on content type | Pending |
 | | Template versioning | Pending |
-| **Widget Registry as Data** | | Pending |
-| | Registry loaded from config files | Pending |
+| **Widget Registry as Data** | | In Progress |
+| | Registry loaded from config files | Complete |
 | | Hot-reload widget definitions | Pending |
-| | Adding new widget = adding config file (no code changes) | Pending |
+| | Adding new widget = adding config file (no code changes) | Complete |
 
 ### Widget Phase 3: Self-Selecting Widgets (Pending)
 
