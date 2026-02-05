@@ -1,10 +1,15 @@
 // Supabase Edge Function: generate-widget
 // Generates AI content for widgets based on PRD prompts
-// Uses Shopify JSON API (primary) and HTML scraping (fallback) for product images
+// Uses Shopify JSON API (primary), SERP API (secondary), and HTML scraping (fallback) for product images
 //
 // POST /functions/v1/generate-widget
 // Body: { widgetId, prompt, items: Array<{ id, title, description, image, url }> }
-// Returns: { content: object, cached: boolean }
+// Returns: { content: object, cached: boolean, meta: { confidence, eligibility, timing } }
+//
+// Phase 1 Features:
+// - Confidence scoring (AI returns confidence 0.0-1.0)
+// - Eligibility engine (widgets must earn existence)
+// - Instrumentation (track success/failure for validation)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -492,36 +497,74 @@ function getBrandUrl(brandConfig: BrandConfig, query: string): string {
   return `https://www.${brandConfig.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
 }
 
-// Main function: try Shopify API first, then HTML scraping
+// Image resolution result with strategy tracking
+interface ImageResolutionResult {
+  image: string | null
+  url: string
+  strategy: 'shopify' | 'serp' | 'scrape' | 'none'
+}
+
+// Main function: try strategies in order of reliability
+// Strategy order: Shopify API → SERP API → HTML scraping
 // NEVER returns Google Shopping URLs - only official brand URLs
-async function scrapeProductImage(brandName: string, query: string): Promise<{ image: string | null, url: string }> {
+async function scrapeProductImage(brandName: string, query: string): Promise<ImageResolutionResult> {
   const brandConfig = findBrandConfig(brandName, query)
 
   if (!brandConfig) {
-    console.log(`[scrape] No brand config for "${brandName}" - returning null (no Google Shopping)`)
+    console.log(`[scrape] No brand config for "${brandName}" - trying SERP API`)
+
+    // Even without brand config, try SERP API
+    recordImageStrategyResult('serp', false) // Will update if successful
+    const serpResult = await trySerpApi(brandName, query)
+    if (serpResult.image) {
+      recordImageStrategyResult('serp', true)
+      return { ...serpResult, strategy: 'serp' }
+    }
+
     return {
       image: null,
-      url: '' // Empty URL - client will handle
+      url: '',
+      strategy: 'none'
     }
   }
 
   // Get the official brand URL to use as fallback
   const brandUrl = getBrandUrl(brandConfig, query)
 
-  // Try Shopify API first (most reliable)
+  // Strategy 1: Shopify API (most reliable for Shopify stores)
   if (brandConfig.shopifyDomain) {
+    recordImageStrategyResult('shopify', false)
     const result = await tryShopifyApi(brandConfig.shopifyDomain, query)
     if (result.image) {
-      return result
+      recordImageStrategyResult('shopify', true)
+      return { ...result, strategy: 'shopify' }
     }
-    console.log(`[scrape] Shopify API failed for ${brandConfig.name}, trying HTML scrape...`)
+    console.log(`[scrape] Shopify API failed for ${brandConfig.name}, trying SERP API...`)
   }
 
-  // Fallback to HTML scraping
+  // Strategy 2: SERP API (reliable but costs money)
+  const serpApiKey = Deno.env.get('SERP_API_KEY')
+  if (serpApiKey) {
+    recordImageStrategyResult('serp', false)
+    const serpResult = await trySerpApi(brandConfig.name, query)
+    if (serpResult.image) {
+      recordImageStrategyResult('serp', true)
+      return {
+        image: serpResult.image,
+        url: serpResult.url || brandUrl,
+        strategy: 'serp'
+      }
+    }
+    console.log(`[scrape] SERP API failed for ${brandConfig.name}, trying HTML scrape...`)
+  }
+
+  // Strategy 3: HTML scraping (unreliable but free)
   if (brandConfig.searchUrl && brandConfig.imagePatterns) {
+    recordImageStrategyResult('scrape', false)
     const result = await scrapeHtml(brandConfig, query)
     if (result.image) {
-      return result
+      recordImageStrategyResult('scrape', true)
+      return { ...result, strategy: 'scrape' }
     }
   }
 
@@ -529,7 +572,8 @@ async function scrapeProductImage(brandName: string, query: string): Promise<{ i
   console.log(`[scrape] No image found for "${brandName}" - returning brand URL: ${brandUrl}`)
   return {
     image: null,
-    url: brandUrl
+    url: brandUrl,
+    strategy: 'none'
   }
 }
 
@@ -739,13 +783,38 @@ function validateSuggestions(suggestions: any[]): any[] {
   return validated
 }
 
+// Enrichment result with stats for instrumentation
+interface EnrichmentResult {
+  suggestions: any[]
+  stats: {
+    requested: number
+    found: number
+    strategies: Record<string, number>
+  }
+  brandsReplaced: number
+  categoryCorrected: number
+}
+
 // Enrich suggestions with scraped images from brand websites
-async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
+async function enrichSuggestions(suggestions: any[]): Promise<EnrichmentResult> {
   console.log('[enrich] Starting enrichment for', suggestions.length, 'suggestions')
   console.log('[enrich] Raw AI suggestions:', JSON.stringify(suggestions, null, 2))
 
-  // First validate brands
+  // First validate brands and track corrections
+  const originalBrands = suggestions.map(s => s.brand)
   const validatedSuggestions = validateSuggestions(suggestions)
+  const brandsReplaced = validatedSuggestions.filter((s, i) =>
+    s.brand !== originalBrands[i]
+  ).length
+
+  // Track strategy usage
+  const strategyStats: Record<string, number> = {
+    shopify: 0,
+    serp: 0,
+    scrape: 0,
+    none: 0
+  }
+  let imagesFound = 0
 
   const enriched = await Promise.all(
     validatedSuggestions.map(async (sug, index) => {
@@ -758,13 +827,18 @@ async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
 
       const result = await scrapeProductImage(brandName, searchQuery)
 
-      console.log(`[enrich ${index}] - result: image=${result.image ? 'YES' : 'NULL'}`)
+      // Track stats
+      strategyStats[result.strategy]++
+      if (result.image) imagesFound++
+
+      console.log(`[enrich ${index}] - result: image=${result.image ? 'YES' : 'NULL'}, strategy=${result.strategy}`)
 
       return {
         ...sug,
         productUrl: result.url,
         productImage: result.image,
-        vendor: sug.brand
+        vendor: sug.brand,
+        _imageStrategy: result.strategy // Internal tracking
       }
     })
   )
@@ -772,10 +846,20 @@ async function enrichSuggestions(suggestions: any[]): Promise<any[]> {
   console.log('[enrich] Final results:', enriched.map(s => ({
     name: s.name,
     brand: s.brand,
-    hasImage: !!s.productImage
+    hasImage: !!s.productImage,
+    strategy: s._imageStrategy
   })))
 
-  return enriched
+  return {
+    suggestions: enriched,
+    stats: {
+      requested: suggestions.length,
+      found: imagesFound,
+      strategies: strategyStats
+    },
+    brandsReplaced,
+    categoryCorrected: 0 // TODO: track category corrections
+  }
 }
 
 // Types for widget generation
@@ -794,12 +878,337 @@ interface WidgetRequest {
 }
 
 // Simple in-memory cache (per-instance, resets on cold start)
-const cache = new Map<string, { content: object; timestamp: number }>()
+const cache = new Map<string, { content: object; timestamp: number; meta?: WidgetMeta }>()
 const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
 function getCacheKey(widgetId: string, items: WearItem[]): string {
   const itemIds = items.map(i => i.id).sort().join(',')
   return `${widgetId}:${itemIds}`
+}
+
+// =============================================================================
+// PHASE 1: ELIGIBILITY ENGINE
+// Widgets must "earn" existence through eligibility rules
+// =============================================================================
+
+interface EligibilityRule {
+  name: string
+  check: (context: EligibilityContext) => EligibilityResult
+  weight: number // 0-1, how much this rule affects overall score
+}
+
+interface EligibilityContext {
+  widgetId: string
+  items: WearItem[]
+  category?: string
+  userPrefs?: Record<string, any>
+}
+
+interface EligibilityResult {
+  passed: boolean
+  reason: string
+  score: number // 0-1
+}
+
+interface EligibilityDecision {
+  eligible: boolean
+  score: number
+  rules: Array<{ name: string; passed: boolean; reason: string; score: number }>
+  timestamp: number
+}
+
+// Widget eligibility rules
+const ELIGIBILITY_RULES: Record<string, EligibilityRule[]> = {
+  'complete-the-look': [
+    {
+      name: 'min_items',
+      weight: 1.0,
+      check: (ctx) => {
+        const minItems = 2
+        const passed = ctx.items.length >= minItems
+        return {
+          passed,
+          reason: passed ? `Has ${ctx.items.length} items (≥${minItems})` : `Only ${ctx.items.length} items (need ≥${minItems})`,
+          score: passed ? 1 : 0
+        }
+      }
+    },
+    {
+      name: 'category_match',
+      weight: 0.8,
+      check: (ctx) => {
+        const wearCategories = ['wear', 'clothing', 'fashion']
+        const categoryMatch = ctx.category && wearCategories.some(c =>
+          ctx.category!.toLowerCase().includes(c)
+        )
+        // Also check if items seem to be clothing based on URLs/titles
+        const itemsLookLikeClothing = ctx.items.some(item => {
+          const text = `${item.title} ${item.url}`.toLowerCase()
+          return /shoe|sneaker|jacket|shirt|pants|jeans|hoodie|sweater|coat|boot|wear|fashion/.test(text)
+        })
+        const passed = categoryMatch || itemsLookLikeClothing
+        return {
+          passed,
+          reason: passed ? 'Content matches wear/fashion category' : 'Content does not appear to be clothing',
+          score: categoryMatch ? 1 : (itemsLookLikeClothing ? 0.7 : 0)
+        }
+      }
+    },
+    {
+      name: 'content_quality',
+      weight: 0.6,
+      check: (ctx) => {
+        // Check if items have sufficient metadata
+        const qualityScores = ctx.items.map(item => {
+          let score = 0
+          if (item.title && item.title.length > 5) score += 0.4
+          if (item.description && item.description.length > 10) score += 0.3
+          if (item.image) score += 0.2
+          if (item.url) score += 0.1
+          return score
+        })
+        const avgQuality = qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length
+        const passed = avgQuality >= 0.5
+        return {
+          passed,
+          reason: `Average content quality: ${(avgQuality * 100).toFixed(0)}%`,
+          score: avgQuality
+        }
+      }
+    }
+  ],
+  'style-summary': [
+    {
+      name: 'min_items',
+      weight: 1.0,
+      check: (ctx) => {
+        const minItems = 3
+        const passed = ctx.items.length >= minItems
+        return {
+          passed,
+          reason: passed ? `Has ${ctx.items.length} items (≥${minItems})` : `Only ${ctx.items.length} items (need ≥${minItems})`,
+          score: passed ? 1 : ctx.items.length / minItems
+        }
+      }
+    },
+    {
+      name: 'variety',
+      weight: 0.7,
+      check: (ctx) => {
+        // Check for variety in items (different domains, different types)
+        const domains = new Set(ctx.items.map(i => new URL(i.url).hostname).filter(Boolean))
+        const varietyScore = Math.min(domains.size / 3, 1) // Max score at 3+ unique domains
+        const passed = domains.size >= 2
+        return {
+          passed,
+          reason: `${domains.size} unique sources`,
+          score: varietyScore
+        }
+      }
+    }
+  ]
+}
+
+// Default rules for unknown widgets
+const DEFAULT_ELIGIBILITY_RULES: EligibilityRule[] = [
+  {
+    name: 'min_items',
+    weight: 1.0,
+    check: (ctx) => {
+      const passed = ctx.items.length >= 1
+      return {
+        passed,
+        reason: passed ? 'Has items to analyze' : 'No items provided',
+        score: passed ? 1 : 0
+      }
+    }
+  }
+]
+
+function checkEligibility(context: EligibilityContext): EligibilityDecision {
+  const rules = ELIGIBILITY_RULES[context.widgetId] || DEFAULT_ELIGIBILITY_RULES
+  const results: EligibilityDecision['rules'] = []
+  let totalWeight = 0
+  let weightedScore = 0
+
+  for (const rule of rules) {
+    const result = rule.check(context)
+    results.push({
+      name: rule.name,
+      passed: result.passed,
+      reason: result.reason,
+      score: result.score
+    })
+    totalWeight += rule.weight
+    weightedScore += result.score * rule.weight
+  }
+
+  const overallScore = totalWeight > 0 ? weightedScore / totalWeight : 0
+  const criticalRulesFailed = results.some(r =>
+    rules.find(rule => rule.name === r.name)?.weight === 1.0 && !r.passed
+  )
+
+  return {
+    eligible: !criticalRulesFailed && overallScore >= 0.5,
+    score: overallScore,
+    rules: results,
+    timestamp: Date.now()
+  }
+}
+
+// =============================================================================
+// PHASE 1: CONFIDENCE SCORING
+// AI returns confidence score, threshold gates rendering
+// =============================================================================
+
+interface ConfidenceConfig {
+  threshold: number // 0-1, minimum confidence to render
+  fallbackBehavior: 'suppress' | 'degrade' | 'retry'
+}
+
+const CONFIDENCE_THRESHOLDS: Record<string, ConfidenceConfig> = {
+  'complete-the-look': { threshold: 0.6, fallbackBehavior: 'degrade' },
+  'style-summary': { threshold: 0.5, fallbackBehavior: 'suppress' },
+  'default': { threshold: 0.4, fallbackBehavior: 'suppress' }
+}
+
+function getConfidenceConfig(widgetId: string): ConfidenceConfig {
+  return CONFIDENCE_THRESHOLDS[widgetId] || CONFIDENCE_THRESHOLDS['default']
+}
+
+// =============================================================================
+// PHASE 1: INSTRUMENTATION & VALIDATION
+// Track what works, what fails, feed back into system
+// =============================================================================
+
+interface WidgetMeta {
+  widgetId: string
+  eligibility: EligibilityDecision
+  confidence: number
+  timing: {
+    total: number
+    ai: number
+    enrichment: number
+  }
+  imageStats: {
+    requested: number
+    found: number
+    strategies: Record<string, number> // shopify: 2, serp: 1, scrape: 0
+  }
+  validation: {
+    brandsReplaced: number
+    categoryCorrected: number
+  }
+}
+
+// In-memory instrumentation log (would be persisted to Supabase in production)
+const instrumentationLog: Array<{
+  timestamp: number
+  widgetId: string
+  success: boolean
+  meta: Partial<WidgetMeta>
+  error?: string
+}> = []
+
+function logInstrumentation(entry: typeof instrumentationLog[0]) {
+  instrumentationLog.push(entry)
+  // Keep last 100 entries in memory
+  if (instrumentationLog.length > 100) {
+    instrumentationLog.shift()
+  }
+  console.log('[instrumentation]', JSON.stringify(entry))
+}
+
+// =============================================================================
+// PHASE 0: SERP API INTEGRATION
+// More reliable image source than HTML scraping
+// =============================================================================
+
+async function trySerpApi(brandName: string, productName: string): Promise<{ image: string | null, url: string }> {
+  const serpApiKey = Deno.env.get('SERP_API_KEY')
+
+  if (!serpApiKey) {
+    console.log('[serp] SERP_API_KEY not configured, skipping')
+    return { image: null, url: '' }
+  }
+
+  const searchQuery = `${brandName} ${productName} product`
+
+  try {
+    console.log(`[serp] Searching for: "${searchQuery}"`)
+
+    // Use SerpApi Google Shopping endpoint
+    const params = new URLSearchParams({
+      api_key: serpApiKey,
+      engine: 'google_shopping',
+      q: searchQuery,
+      num: '5'
+    })
+
+    const response = await fetch(`https://serpapi.com/search?${params}`)
+
+    if (!response.ok) {
+      console.log(`[serp] API returned ${response.status}`)
+      return { image: null, url: '' }
+    }
+
+    const data = await response.json()
+
+    // Try shopping_results first
+    if (data.shopping_results && data.shopping_results.length > 0) {
+      const result = data.shopping_results[0]
+      console.log(`[serp] Found shopping result: ${result.title}`)
+      return {
+        image: result.thumbnail || null,
+        url: result.link || ''
+      }
+    }
+
+    // Fallback to inline_shopping_results
+    if (data.inline_shopping_results && data.inline_shopping_results.length > 0) {
+      const result = data.inline_shopping_results[0]
+      console.log(`[serp] Found inline shopping result: ${result.title}`)
+      return {
+        image: result.thumbnail || null,
+        url: result.link || ''
+      }
+    }
+
+    console.log('[serp] No shopping results found')
+    return { image: null, url: '' }
+
+  } catch (error) {
+    console.error('[serp] Error:', error.message)
+    return { image: null, url: '' }
+  }
+}
+
+// Image strategy health tracking
+const imageStrategyHealth: Record<string, { attempts: number; successes: number }> = {
+  shopify: { attempts: 0, successes: 0 },
+  serp: { attempts: 0, successes: 0 },
+  scrape: { attempts: 0, successes: 0 }
+}
+
+function recordImageStrategyResult(strategy: string, success: boolean) {
+  if (!imageStrategyHealth[strategy]) {
+    imageStrategyHealth[strategy] = { attempts: 0, successes: 0 }
+  }
+  imageStrategyHealth[strategy].attempts++
+  if (success) imageStrategyHealth[strategy].successes++
+}
+
+function getImageStrategySuccessRate(strategy: string): number {
+  const health = imageStrategyHealth[strategy]
+  if (!health || health.attempts === 0) return 0.5 // Assume 50% for unknown
+  return health.successes / health.attempts
+}
+
+// Extended request with Phase 1 options
+interface ExtendedWidgetRequest extends WidgetRequest {
+  category?: string
+  userPrefs?: Record<string, any>
+  skipEligibility?: boolean // For testing
 }
 
 serve(async (req) => {
@@ -808,8 +1217,13 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const startTime = Date.now()
+  let aiTime = 0
+  let enrichmentTime = 0
+
   try {
-    const { widgetId, prompt, items } = await req.json() as WidgetRequest
+    const requestBody = await req.json() as ExtendedWidgetRequest
+    const { widgetId, prompt, items, category, userPrefs, skipEligibility } = requestBody
 
     if (!widgetId || !prompt || !items || items.length === 0) {
       return new Response(
@@ -820,13 +1234,64 @@ serve(async (req) => {
 
     console.log('[generate-widget]', widgetId, '- Processing', items.length, 'items')
 
+    // ==========================================================================
+    // PHASE 1: ELIGIBILITY CHECK
+    // Widget must "earn" existence through eligibility rules
+    // ==========================================================================
+    const eligibilityContext: EligibilityContext = {
+      widgetId,
+      items,
+      category,
+      userPrefs
+    }
+    const eligibility = checkEligibility(eligibilityContext)
+
+    console.log('[generate-widget] Eligibility check:', {
+      eligible: eligibility.eligible,
+      score: eligibility.score.toFixed(2),
+      rules: eligibility.rules.map(r => `${r.name}:${r.passed ? '✓' : '✗'}`)
+    })
+
+    // If not eligible and not skipping, return early
+    if (!eligibility.eligible && !skipEligibility) {
+      console.log('[generate-widget] Widget not eligible, suppressing')
+
+      logInstrumentation({
+        timestamp: Date.now(),
+        widgetId,
+        success: false,
+        meta: { eligibility },
+        error: 'Not eligible'
+      })
+
+      return new Response(
+        JSON.stringify({
+          content: null,
+          cached: false,
+          suppressed: true,
+          reason: 'eligibility_failed',
+          meta: {
+            widgetId,
+            eligibility,
+            confidence: 0,
+            timing: { total: Date.now() - startTime, ai: 0, enrichment: 0 }
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Check cache
     const cacheKey = getCacheKey(widgetId, items)
     const cached = cache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       console.log('[generate-widget] Cache hit for', cacheKey)
       return new Response(
-        JSON.stringify({ content: cached.content, cached: true }),
+        JSON.stringify({
+          content: cached.content,
+          cached: true,
+          meta: cached.meta || { eligibility }
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -864,7 +1329,20 @@ RULES:
 5. If suggesting a wallet or bag, consider Bellroy, Topo Designs, or Lemaire
 6. If a brand doesn't make a product type, DO NOT suggest it - pick a different brand that does make it`
 
-    const fullPrompt = `${prompt}${brandConstraint}
+    // ==========================================================================
+    // PHASE 1: CONFIDENCE SCORING
+    // Ask AI to include confidence in response
+    // ==========================================================================
+    const confidenceInstruction = `
+
+IMPORTANT: Include a "confidence" field (0.0 to 1.0) in your response indicating how confident you are in your suggestions based on:
+- How well you understand the items
+- How relevant your suggestions are
+- Whether you have enough context
+
+Example: "confidence": 0.85`
+
+    const fullPrompt = `${prompt}${brandConstraint}${confidenceInstruction}
 
 Here are the items to analyze:
 
@@ -874,6 +1352,8 @@ Respond with valid JSON only, no markdown or explanation.`
 
     console.log('[generate-widget] Calling Claude API...')
     console.log('[generate-widget] Supported brands:', SUPPORTED_BRAND_NAMES.length)
+
+    const aiStartTime = Date.now()
 
     // Call Claude API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -893,9 +1373,20 @@ Respond with valid JSON only, no markdown or explanation.`
       })
     })
 
+    aiTime = Date.now() - aiStartTime
+
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[generate-widget] Claude API error:', response.status, errorText)
+
+      logInstrumentation({
+        timestamp: Date.now(),
+        widgetId,
+        success: false,
+        meta: { eligibility },
+        error: `API error: ${response.status}`
+      })
+
       return new Response(
         JSON.stringify({ error: 'AI generation failed', details: response.status }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -907,6 +1398,15 @@ Respond with valid JSON only, no markdown or explanation.`
 
     if (!textContent) {
       console.error('[generate-widget] No content in AI response')
+
+      logInstrumentation({
+        timestamp: Date.now(),
+        widgetId,
+        success: false,
+        meta: { eligibility },
+        error: 'No content in response'
+      })
+
       return new Response(
         JSON.stringify({ error: 'No content generated' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -941,28 +1441,119 @@ Respond with valid JSON only, no markdown or explanation.`
       }
     } catch (parseError) {
       console.error('[generate-widget] Failed to parse AI response:', textContent)
+
+      logInstrumentation({
+        timestamp: Date.now(),
+        widgetId,
+        success: false,
+        meta: { eligibility },
+        error: 'JSON parse error'
+      })
+
       return new Response(
         JSON.stringify({ error: 'Invalid AI response format', raw: textContent }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // For complete-the-look widget, enrich suggestions with shopping URLs and scraped images
-    if (widgetId === 'complete-the-look' && content.suggestions && Array.isArray(content.suggestions)) {
-      content.suggestions = await enrichSuggestions(content.suggestions)
+    // ==========================================================================
+    // PHASE 1: CONFIDENCE THRESHOLD CHECK
+    // ==========================================================================
+    const confidence = typeof content.confidence === 'number' ? content.confidence : 0.7 // Default if not provided
+    const confidenceConfig = getConfidenceConfig(widgetId)
+
+    console.log('[generate-widget] Confidence:', confidence.toFixed(2), 'threshold:', confidenceConfig.threshold)
+
+    if (confidence < confidenceConfig.threshold && !skipEligibility) {
+      console.log('[generate-widget] Confidence below threshold, behavior:', confidenceConfig.fallbackBehavior)
+
+      if (confidenceConfig.fallbackBehavior === 'suppress') {
+        logInstrumentation({
+          timestamp: Date.now(),
+          widgetId,
+          success: false,
+          meta: { eligibility, confidence },
+          error: 'Low confidence'
+        })
+
+        return new Response(
+          JSON.stringify({
+            content: null,
+            cached: false,
+            suppressed: true,
+            reason: 'low_confidence',
+            meta: {
+              widgetId,
+              eligibility,
+              confidence,
+              timing: { total: Date.now() - startTime, ai: aiTime, enrichment: 0 }
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      // 'degrade' behavior: continue but mark as low confidence
     }
 
-    // Cache the result
-    cache.set(cacheKey, { content, timestamp: Date.now() })
+    // Initialize meta for tracking
+    let meta: WidgetMeta = {
+      widgetId,
+      eligibility,
+      confidence,
+      timing: { total: 0, ai: aiTime, enrichment: 0 },
+      imageStats: { requested: 0, found: 0, strategies: {} },
+      validation: { brandsReplaced: 0, categoryCorrected: 0 }
+    }
+
+    // For complete-the-look widget, enrich suggestions with shopping URLs and scraped images
+    if (widgetId === 'complete-the-look' && content.suggestions && Array.isArray(content.suggestions)) {
+      const enrichmentStart = Date.now()
+      const enrichmentResult = await enrichSuggestions(content.suggestions)
+      enrichmentTime = Date.now() - enrichmentStart
+
+      content.suggestions = enrichmentResult.suggestions
+      meta.imageStats = enrichmentResult.stats
+      meta.validation = {
+        brandsReplaced: enrichmentResult.brandsReplaced,
+        categoryCorrected: enrichmentResult.categoryCorrected
+      }
+    }
+
+    // Finalize timing
+    meta.timing = {
+      total: Date.now() - startTime,
+      ai: aiTime,
+      enrichment: enrichmentTime
+    }
+
+    // Cache the result with meta
+    cache.set(cacheKey, { content, timestamp: Date.now(), meta })
     console.log('[generate-widget] Success, cached result for', cacheKey)
 
+    // Log successful generation
+    logInstrumentation({
+      timestamp: Date.now(),
+      widgetId,
+      success: true,
+      meta
+    })
+
     return new Response(
-      JSON.stringify({ content, cached: false }),
+      JSON.stringify({ content, cached: false, meta }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('[generate-widget] Error:', error)
+
+    logInstrumentation({
+      timestamp: Date.now(),
+      widgetId: 'unknown',
+      success: false,
+      meta: {},
+      error: error.message
+    })
+
     return new Response(
       JSON.stringify({ error: 'Internal server error', message: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

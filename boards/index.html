@@ -4110,14 +4110,93 @@ Return JSON:
     return a;
   }
 
+  // =============================================================================
+  // PHASE 1: CLIENT-SIDE INSTRUMENTATION
+  // Track widget events for validation engine
+  // =============================================================================
+
+  // Widget event types for instrumentation
+  const WIDGET_EVENTS = {
+    VIEW: 'view',           // Widget rendered
+    CLICK: 'click',         // User clicked a suggestion
+    SAVE: 'save',           // User saved suggestion to board
+    DISMISS: 'dismiss',     // User dismissed widget
+    REFRESH: 'refresh',     // User refreshed widget
+    SUPPRESSED: 'suppressed' // Widget was suppressed by eligibility/confidence
+  };
+
+  // In-memory event buffer (persisted to localStorage)
+  let widgetEventBuffer = [];
+  const WIDGET_EVENTS_KEY = 'boards_widget_events';
+
+  function loadWidgetEvents() {
+    try {
+      widgetEventBuffer = JSON.parse(localStorage.getItem(WIDGET_EVENTS_KEY) || '[]');
+    } catch (e) {
+      widgetEventBuffer = [];
+    }
+  }
+
+  function saveWidgetEvents() {
+    try {
+      // Keep last 500 events
+      if (widgetEventBuffer.length > 500) {
+        widgetEventBuffer = widgetEventBuffer.slice(-500);
+      }
+      localStorage.setItem(WIDGET_EVENTS_KEY, JSON.stringify(widgetEventBuffer));
+    } catch (e) {
+      console.warn('[instrumentation] Failed to save events:', e);
+    }
+  }
+
+  function trackWidgetEvent(eventType, widgetId, data = {}) {
+    const event = {
+      type: eventType,
+      widgetId,
+      timestamp: Date.now(),
+      data
+    };
+    widgetEventBuffer.push(event);
+    saveWidgetEvents();
+    console.log('[instrumentation]', eventType, widgetId, data);
+  }
+
+  // Export widget events for analysis
+  function exportWidgetEvents() {
+    return {
+      events: widgetEventBuffer,
+      summary: {
+        total: widgetEventBuffer.length,
+        byType: widgetEventBuffer.reduce((acc, e) => {
+          acc[e.type] = (acc[e.type] || 0) + 1;
+          return acc;
+        }, {}),
+        byWidget: widgetEventBuffer.reduce((acc, e) => {
+          acc[e.widgetId] = (acc[e.widgetId] || 0) + 1;
+          return acc;
+        }, {})
+      }
+    };
+  }
+
+  // Initialize instrumentation on load
+  loadWidgetEvents();
+
+  // =============================================================================
+  // WIDGET CONTENT GENERATION (PHASE 1 ENHANCED)
+  // =============================================================================
+
   // Call AI to generate widget content via Edge Function
-  async function generateWidgetContent(widget, items) {
+  // Phase 1: Now includes eligibility, confidence, and instrumentation
+  async function generateWidgetContent(widget, items, category = null) {
     // Include refresh counter in cache key so refresh gets different results
     const cacheKey = getCacheKey(widget.id, items.map(i => i.id), true);
 
     // Check local cache first (valid for 1 hour)
     const cached = widgetCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp) < 3600000) {
+      // Track view from cache
+      trackWidgetEvent(WIDGET_EVENTS.VIEW, widget.id, { cached: true });
       return cached.data;
     }
 
@@ -4139,6 +4218,12 @@ Return JSON:
       ? `\n\nIMPORTANT: This is variation #${counter}. Choose a DIFFERENT combination of items than before. Pick items you haven't matched yet.`
       : '';
 
+    // Get current category if not provided
+    const currentCategory = category || currentFilter || 'all';
+
+    // Get user preferences for personalization
+    const userPrefs = widgetFeedback.userPrefs || {};
+
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
@@ -4149,35 +4234,71 @@ Return JSON:
         body: JSON.stringify({
           widgetId: widget.id,
           prompt: widget.prompt + variationPrompt,
-          items: itemsPayload
+          items: itemsPayload,
+          category: currentCategory,  // Phase 1: For eligibility engine
+          userPrefs: userPrefs        // Phase 1: For personalization
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[widget] Edge Function error:', response.status, errorData);
+        trackWidgetEvent('error', widget.id, { status: response.status });
         return null;
       }
 
       const data = await response.json();
 
+      // Phase 1: Handle suppressed widgets
+      if (data.suppressed) {
+        console.log('[widget] Widget suppressed:', data.reason, data.meta);
+        trackWidgetEvent(WIDGET_EVENTS.SUPPRESSED, widget.id, {
+          reason: data.reason,
+          eligibility: data.meta?.eligibility,
+          confidence: data.meta?.confidence
+        });
+        return { _suppressed: true, reason: data.reason, meta: data.meta };
+      }
+
       if (data.error) {
         console.error('[widget] Edge Function returned error:', data.error);
+        trackWidgetEvent('error', widget.id, { error: data.error });
         return null;
       }
 
       const result = data.content;
       const wasCached = data.cached;
+      const meta = data.meta;
 
       console.log('[widget] Got result for', widget.id, wasCached ? '(server cached)' : '(fresh)');
 
-      // Cache the result locally too
-      widgetCache[cacheKey] = { data: result, timestamp: Date.now() };
+      // Phase 1: Log meta information
+      if (meta) {
+        console.log('[widget] Meta:', {
+          confidence: meta.confidence?.toFixed(2),
+          eligibility: meta.eligibility?.score?.toFixed(2),
+          timing: meta.timing,
+          imageStats: meta.imageStats
+        });
+      }
+
+      // Track successful view
+      trackWidgetEvent(WIDGET_EVENTS.VIEW, widget.id, {
+        cached: wasCached,
+        confidence: meta?.confidence,
+        eligibility: meta?.eligibility?.score,
+        imagesFound: meta?.imageStats?.found,
+        imagesRequested: meta?.imageStats?.requested
+      });
+
+      // Cache the result locally (include meta)
+      widgetCache[cacheKey] = { data: result, timestamp: Date.now(), meta };
       saveWidgetCache();
 
       return result;
     } catch (e) {
       console.error('[widget] AI error:', e);
+      trackWidgetEvent('error', widget.id, { error: e.message });
     }
 
     return null;
@@ -4312,8 +4433,10 @@ Return JSON:
 
       // Render as link only if we have a valid URL, otherwise render as non-clickable card
       if (hasUrl) {
+        // Phase 1: Track click for instrumentation
+        const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion" onclick="${trackClick}">
             <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
               ${imageContent}
             </div>
@@ -4472,13 +4595,26 @@ Return JSON:
 
     for (const widget of applicableWidgets) {
       // Get AI content via Edge Function (handles API key server-side)
-      const aiResult = await generateWidgetContent(widget, items);
+      // Phase 1: Pass category for eligibility checking
+      const aiResult = await generateWidgetContent(widget, items, currentFilter);
+
+      // Phase 1: Handle suppressed widgets
+      if (aiResult && aiResult._suppressed) {
+        console.log('[widget] Widget suppressed by server:', widget.id, aiResult.reason);
+        // Skip rendering this widget entirely
+        continue;
+      }
 
       let widgetHtml = '';
       if (widget.id === 'complete-the-look') {
         widgetHtml = renderCompleteTheLookWidget(widget, items, aiResult);
       } else if (widget.id === 'style-summary') {
         widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
+      }
+
+      // Skip if no HTML was generated
+      if (!widgetHtml) {
+        continue;
       }
 
       // Route to appropriate zone
@@ -4520,6 +4656,11 @@ Return JSON:
   window.refreshWidget = async function(widgetId) {
     console.log('[widget] Refreshing only:', widgetId);
 
+    // Phase 1: Track refresh event
+    trackWidgetEvent(WIDGET_EVENTS.REFRESH, widgetId, {
+      counter: (widgetRefreshCounters[widgetId] || 0) + 1
+    });
+
     // Increment per-widget refresh counter
     widgetRefreshCounters[widgetId] = (widgetRefreshCounters[widgetId] || 0) + 1;
 
@@ -4560,7 +4701,26 @@ Return JSON:
     }
 
     // Generate content for just this widget
-    const aiResult = await generateWidgetContent(widget, items);
+    const aiResult = await generateWidgetContent(widget, items, currentFilter);
+
+    // Phase 1: Handle suppressed widgets
+    if (aiResult && aiResult._suppressed) {
+      console.log('[widget] Widget suppressed on refresh:', widgetId, aiResult.reason);
+      // Hide the widget since it's no longer eligible
+      if (widget.zone === 'inline') {
+        const inlineContainer = document.querySelector('.widget-inline');
+        if (inlineContainer) {
+          inlineContainer.style.display = 'none';
+        }
+        inlineWidgetHtml = '';
+      } else if (widget.zone === 'hero') {
+        const heroSection = $('widgetSection');
+        if (heroSection) {
+          heroSection.classList.remove('widget-section--visible');
+        }
+      }
+      return;
+    }
 
     let widgetHtml = '';
     if (widget.id === 'complete-the-look') {
@@ -4573,6 +4733,7 @@ Return JSON:
     if (widget.zone === 'inline') {
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
+        inlineContainer.style.display = ''; // Ensure visible
         inlineContainer.innerHTML = `
           <div class="widget-inline__header">
             <span class="widget-inline__title">${esc(widget.name)}</span>
