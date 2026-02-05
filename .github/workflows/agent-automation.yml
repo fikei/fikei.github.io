@@ -315,14 +315,34 @@ jobs:
             exit 0
           fi
 
-          # Build cleanup payload
+          # Build cleanup payload with source-aware logic
+          # Only deletes AI-generated pages; human pages are protected
           python3 << 'PYEOF' > /tmp/cleanup_payload.json
           import json
+
           with open('notion-structure.json') as f:
               structure = json.load(f)
+
+          # Extract all page titles and their sources
+          def extract_sources(obj, sources=None):
+              if sources is None:
+                  sources = {}
+              if isinstance(obj, dict):
+                  if 'title' in obj:
+                      sources[obj['title']] = obj.get('source', 'human')  # Default to human (protected)
+                  for key in ['children', 'sections']:
+                      if key in obj:
+                          for child in obj[key]:
+                              extract_sources(child, sources)
+              return sources
+
+          page_sources = extract_sources(structure)
+
           payload = {
               'action': 'cleanup',
-              'structure': structure
+              'structure': structure,
+              'pageSources': page_sources,  # Pass source info to function
+              'protectHuman': True  # Flag to protect human-created pages
           }
           print(json.dumps(payload))
           PYEOF
@@ -336,7 +356,7 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Cleanup complete"
-            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Archived:', r.get('archived', []))" 2>/dev/null || true
+            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Archived:', r.get('archived', [])); print('Protected:', r.get('protected', []))" 2>/dev/null || true
           else
             echo "⚠️ Cleanup had issues: $response"
           fi

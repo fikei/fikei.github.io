@@ -39,6 +39,8 @@ interface SyncRequest {
   page?: PageUpdate
   dryRun?: boolean  // For cleanup: preview without deleting
   skipContent?: boolean  // For sync-structure: only create pages, skip content updates
+  pageSources?: Record<string, 'ai' | 'human'>  // For cleanup: track page origins
+  protectHuman?: boolean  // For cleanup: protect human-created pages from deletion
 }
 
 interface MovedPage {
@@ -54,6 +56,7 @@ interface SyncResult {
   updated: string[]
   skipped: string[]
   deleted: string[]
+  protected: string[]  // Human-created pages that were protected from deletion
   moved: MovedPage[]  // Pages that were moved in Notion
   errors: string[]
   timestamp: string
@@ -892,7 +895,9 @@ async function cleanupLegacyPages(
   client: NotionClient,
   structure: Structure,
   result: SyncResult,
-  dryRun: boolean
+  dryRun: boolean,
+  pageSources: Record<string, 'ai' | 'human'> = {},
+  protectHuman: boolean = false
 ): Promise<void> {
   const rootId = await client.findPageByTitle(structure.root)
   if (!rootId) {
@@ -922,7 +927,17 @@ async function cleanupLegacyPages(
       const pagePath = parentPath ? `${parentPath} > ${title}` : title
 
       if (!expectedTitlesForParent.has(title)) {
-        // This page is not in the expected structure - move to Archive
+        // This page is not in the expected structure
+        // Check if it's a human-created page that should be protected
+        const pageSource = pageSources[title] || 'human'  // Default to human (protected)
+
+        if (protectHuman && pageSource === 'human') {
+          // Human-created page - protect from deletion
+          result.protected.push(`Protected (human-created): ${pagePath}`)
+          continue
+        }
+
+        // AI-created page or protection disabled - move to Archive
         if (dryRun) {
           result.deleted.push(`[DRY RUN] Would move to Archive: ${pagePath}`)
         } else {
@@ -1029,6 +1044,7 @@ serve(async (req) => {
       updated: [],
       skipped: [],
       deleted: [],
+      protected: [],
       moved: [],
       errors: [],
       timestamp: new Date().toISOString(),
@@ -1064,8 +1080,16 @@ serve(async (req) => {
 
       case 'cleanup':
         // Move pages not in expected structure to Archive folder
+        // Respects source field: human-created pages are protected
         const cleanupStructure = request.structure || DEFAULT_STRUCTURE
-        await cleanupLegacyPages(client, cleanupStructure, result, request.dryRun || false)
+        await cleanupLegacyPages(
+          client,
+          cleanupStructure,
+          result,
+          request.dryRun || false,
+          request.pageSources || {},
+          request.protectHuman || false
+        )
         break
 
       case 'detect-moves':
