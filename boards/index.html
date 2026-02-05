@@ -585,23 +585,23 @@ body {
 
 /* Floating Button Base */
 .float-btn {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg);
+  font-size: var(--font-size-sm);
+  background: var(--fg);
+  color: var(--bg);
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition: transform 0.15s ease;
 }
 
 .float-btn:hover {
-  background: var(--fg);
-  color: var(--bg);
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
 }
 
 /* FAB Menu Container */
@@ -610,25 +610,23 @@ body {
 }
 
 .fab-menu__trigger {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
-  font-weight: 300;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg);
+  font-size: var(--font-size-sm);
+  background: var(--fg);
+  color: var(--bg);
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s, transform 0.2s ease;
-  line-height: 1;
+  transition: transform 0.2s ease;
 }
 
 .fab-menu__trigger:hover {
-  background: var(--fg);
-  color: var(--bg);
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
 }
 
 .fab-menu--open .fab-menu__trigger {
@@ -2248,6 +2246,64 @@ body {
   margin: var(--space-2) 0;
 }
 
+.widget-inline__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.widget-inline__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.widget-inline__badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: var(--subtle);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.widget-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.widget-section__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.widget-section__refresh {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  transition: color 0.15s;
+}
+
+.widget-section__refresh:hover {
+  color: var(--fg);
+}
+
 .widget-section__content {
   display: flex;
   flex-direction: column;
@@ -2358,9 +2414,15 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Style Summary Widget - inner content (now nested in widget-complete) */
-.widget-style__content {
-  /* No border/background - handled by widget-complete outer wrapper */
+/* Style Summary Widget */
+.widget-style {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
+}
+
+.widget-style__header {
+  margin-bottom: var(--space-3);
 }
 
 .widget-style__label {
@@ -2374,7 +2436,6 @@ body {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--muted);
-  margin-bottom: var(--space-3);
 }
 
 .widget-style__traits {
@@ -2434,73 +2495,37 @@ body {
   color: var(--muted);
 }
 
-/* Complete the Look v2 - Nested Card Layout */
+/* Complete the Look v2 - Two Column Layout */
 .widget-complete {
-  /* Outer wrapper - no border, contains header + content box */
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
 }
 
 .widget-complete__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.widget-complete__header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .widget-complete__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.widget-complete__badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 2px 6px;
-  background: transparent;
-  border: 1px solid var(--muted);
-  color: var(--muted);
-}
-
-.widget-complete__refresh-btn {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--muted);
-  transition: color 0.15s;
-  line-height: 1;
-}
-
-.widget-complete__refresh-btn:hover {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-base);
   color: var(--fg);
 }
 
+.widget-complete__subtitle {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
 .widget-complete__body {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
   align-items: start;
-}
-
-.widget-complete__body--loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80px;
 }
 
 .widget-complete__section {
@@ -2509,6 +2534,14 @@ body {
   gap: var(--space-3);
 }
 
+.widget-complete__section-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
 
 .widget-complete__divider {
   width: 1px;
@@ -2675,6 +2708,92 @@ body {
   font-style: normal;
 }
 
+.widget-complete__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.widget-complete__action {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.widget-complete__action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.widget-complete__action--active {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.widget-complete__action--danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.widget-complete--favorite {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+.widget-complete__refresh {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
+}
+
+.widget-complete__refresh:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.widget-complete__feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-3);
+}
+
+.widget-complete__feedback-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: auto;
+}
+
+.widget-complete__feedback-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.widget-complete__feedback-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
 
 .widget-complete__shop-link {
   display: inline-flex;
@@ -2935,6 +3054,10 @@ body {
 
   <!-- AI Widget Section - Hero Zone -->
   <section class="widget-section widget-zone widget-zone--hero" id="widgetSection" data-zone="hero">
+    <div class="widget-section__header">
+      <span class="widget-section__title">AI Insights</span>
+      <button class="widget-section__refresh" id="widgetRefresh">Refresh</button>
+    </div>
     <div class="widget-section__content" id="widgetContent"></div>
   </section>
 
@@ -2949,6 +3072,9 @@ body {
   <nav class="bottom-nav" id="bottomNav">
     <div class="bottom-nav__left">
       <button class="bottom-nav__share-btn" id="shareBtn" style="display:none;">Share</button>
+      <button class="float-btn theme-toggle" id="bottomThemeToggle" aria-label="Toggle theme">
+        <div class="theme-toggle__knob"></div>
+      </button>
     </div>
     <div class="bottom-nav__right">
       <div class="fab-menu" id="fabMenu" style="display:none;">
@@ -3173,15 +3299,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             <span class="settings-row__description">Switch to light theme</span>
           </div>
           <button class="theme-toggle" id="themeToggle">
-            <div class="theme-toggle__knob"></div>
-          </button>
-        </div>
-        <div class="settings-row">
-          <div class="settings-row__label">
-            <span class="settings-row__title">Prioritize Grid Flow</span>
-            <span class="settings-row__description">Fill gaps over strict order</span>
-          </div>
-          <button class="theme-toggle" id="gridFlowToggle">
             <div class="theme-toggle__knob"></div>
           </button>
         </div>
@@ -3792,8 +3909,35 @@ Return JSON:
     } catch {}
   }
 
+  // Toggle favorite status
+  window.toggleWidgetFavorite = function(widgetId) {
+    widgetPrefs.favorites[widgetId] = !widgetPrefs.favorites[widgetId];
+    if (!widgetPrefs.favorites[widgetId]) delete widgetPrefs.favorites[widgetId];
+    saveWidgetPrefs();
+    generateWidgets();
+    console.log('[widget] Favorite toggled:', widgetId, widgetPrefs.favorites[widgetId] ? 'on' : 'off');
+  };
+
+  // Dismiss widget (hide until next session or manual restore)
+  window.dismissWidget = function(widgetId) {
+    widgetPrefs.dismissed[widgetId] = Date.now();
+    saveWidgetPrefs();
+    generateWidgets();
+    console.log('[widget] Dismissed:', widgetId);
+  };
+
+  // Permanently hide widget
+  window.hideWidget = function(widgetId) {
+    if (confirm('Hide this widget permanently? You can restore it from Settings.')) {
+      widgetPrefs.hidden[widgetId] = true;
+      saveWidgetPrefs();
+      generateWidgets();
+      console.log('[widget] Hidden:', widgetId);
+    }
+  };
+
   // ============================================
-  // Widget Feedback System - User preferences for personalization
+  // Widget Feedback System - Collects user input for PRD improvements
   // ============================================
   const WIDGET_FEEDBACK_KEY = 'boards_widget_feedback';
   let widgetFeedback = { ratings: {}, comments: [], userPrefs: {} };
@@ -3816,6 +3960,36 @@ Return JSON:
       localStorage.setItem(WIDGET_FEEDBACK_KEY, JSON.stringify(widgetFeedback));
     } catch {}
   }
+
+  // Rate a widget result (thumbs up/down)
+  window.rateWidget = function(widgetId, isPositive) {
+    if (!widgetFeedback.ratings[widgetId]) {
+      widgetFeedback.ratings[widgetId] = { up: 0, down: 0 };
+    }
+    if (isPositive) {
+      widgetFeedback.ratings[widgetId].up++;
+    } else {
+      widgetFeedback.ratings[widgetId].down++;
+    }
+    saveWidgetFeedback();
+    toast(isPositive ? 'Thanks for the feedback!' : 'We\'ll try to do better');
+    console.log('[widget] Feedback:', widgetId, isPositive ? '👍' : '👎', widgetFeedback.ratings[widgetId]);
+  };
+
+  // Submit text feedback for a widget
+  window.submitWidgetFeedback = function(widgetId) {
+    const text = prompt('How can we improve this widget? What would you like to see?');
+    if (text && text.trim()) {
+      widgetFeedback.comments.push({
+        widgetId,
+        text: text.trim(),
+        timestamp: Date.now()
+      });
+      saveWidgetFeedback();
+      toast('Feedback saved - thank you!');
+      console.log('[widget] Comment saved:', widgetId, text);
+    }
+  };
 
   // Set user preferences for widget personalization
   window.setWidgetPreferences = function() {
@@ -3936,14 +4110,93 @@ Return JSON:
     return a;
   }
 
+  // =============================================================================
+  // PHASE 1: CLIENT-SIDE INSTRUMENTATION
+  // Track widget events for validation engine
+  // =============================================================================
+
+  // Widget event types for instrumentation
+  const WIDGET_EVENTS = {
+    VIEW: 'view',           // Widget rendered
+    CLICK: 'click',         // User clicked a suggestion
+    SAVE: 'save',           // User saved suggestion to board
+    DISMISS: 'dismiss',     // User dismissed widget
+    REFRESH: 'refresh',     // User refreshed widget
+    SUPPRESSED: 'suppressed' // Widget was suppressed by eligibility/confidence
+  };
+
+  // In-memory event buffer (persisted to localStorage)
+  let widgetEventBuffer = [];
+  const WIDGET_EVENTS_KEY = 'boards_widget_events';
+
+  function loadWidgetEvents() {
+    try {
+      widgetEventBuffer = JSON.parse(localStorage.getItem(WIDGET_EVENTS_KEY) || '[]');
+    } catch (e) {
+      widgetEventBuffer = [];
+    }
+  }
+
+  function saveWidgetEvents() {
+    try {
+      // Keep last 500 events
+      if (widgetEventBuffer.length > 500) {
+        widgetEventBuffer = widgetEventBuffer.slice(-500);
+      }
+      localStorage.setItem(WIDGET_EVENTS_KEY, JSON.stringify(widgetEventBuffer));
+    } catch (e) {
+      console.warn('[instrumentation] Failed to save events:', e);
+    }
+  }
+
+  function trackWidgetEvent(eventType, widgetId, data = {}) {
+    const event = {
+      type: eventType,
+      widgetId,
+      timestamp: Date.now(),
+      data
+    };
+    widgetEventBuffer.push(event);
+    saveWidgetEvents();
+    console.log('[instrumentation]', eventType, widgetId, data);
+  }
+
+  // Export widget events for analysis
+  function exportWidgetEvents() {
+    return {
+      events: widgetEventBuffer,
+      summary: {
+        total: widgetEventBuffer.length,
+        byType: widgetEventBuffer.reduce((acc, e) => {
+          acc[e.type] = (acc[e.type] || 0) + 1;
+          return acc;
+        }, {}),
+        byWidget: widgetEventBuffer.reduce((acc, e) => {
+          acc[e.widgetId] = (acc[e.widgetId] || 0) + 1;
+          return acc;
+        }, {})
+      }
+    };
+  }
+
+  // Initialize instrumentation on load
+  loadWidgetEvents();
+
+  // =============================================================================
+  // WIDGET CONTENT GENERATION (PHASE 1 ENHANCED)
+  // =============================================================================
+
   // Call AI to generate widget content via Edge Function
-  async function generateWidgetContent(widget, items) {
+  // Phase 1: Now includes eligibility, confidence, and instrumentation
+  async function generateWidgetContent(widget, items, category = null) {
     // Include refresh counter in cache key so refresh gets different results
     const cacheKey = getCacheKey(widget.id, items.map(i => i.id), true);
 
     // Check local cache first (valid for 1 hour)
     const cached = widgetCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp) < 3600000) {
+      // Track view from cache
+      trackWidgetEvent(WIDGET_EVENTS.VIEW, widget.id, { cached: true });
       return cached.data;
     }
 
@@ -3965,6 +4218,12 @@ Return JSON:
       ? `\n\nIMPORTANT: This is variation #${counter}. Choose a DIFFERENT combination of items than before. Pick items you haven't matched yet.`
       : '';
 
+    // Get current category if not provided
+    const currentCategory = category || currentFilter || 'all';
+
+    // Get user preferences for personalization
+    const userPrefs = widgetFeedback.userPrefs || {};
+
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
@@ -3975,35 +4234,71 @@ Return JSON:
         body: JSON.stringify({
           widgetId: widget.id,
           prompt: widget.prompt + variationPrompt,
-          items: itemsPayload
+          items: itemsPayload,
+          category: currentCategory,  // Phase 1: For eligibility engine
+          userPrefs: userPrefs        // Phase 1: For personalization
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[widget] Edge Function error:', response.status, errorData);
+        trackWidgetEvent('error', widget.id, { status: response.status });
         return null;
       }
 
       const data = await response.json();
 
+      // Phase 1: Handle suppressed widgets
+      if (data.suppressed) {
+        console.log('[widget] Widget suppressed:', data.reason, data.meta);
+        trackWidgetEvent(WIDGET_EVENTS.SUPPRESSED, widget.id, {
+          reason: data.reason,
+          eligibility: data.meta?.eligibility,
+          confidence: data.meta?.confidence
+        });
+        return { _suppressed: true, reason: data.reason, meta: data.meta };
+      }
+
       if (data.error) {
         console.error('[widget] Edge Function returned error:', data.error);
+        trackWidgetEvent('error', widget.id, { error: data.error });
         return null;
       }
 
       const result = data.content;
       const wasCached = data.cached;
+      const meta = data.meta;
 
       console.log('[widget] Got result for', widget.id, wasCached ? '(server cached)' : '(fresh)');
 
-      // Cache the result locally too
-      widgetCache[cacheKey] = { data: result, timestamp: Date.now() };
+      // Phase 1: Log meta information
+      if (meta) {
+        console.log('[widget] Meta:', {
+          confidence: meta.confidence?.toFixed(2),
+          eligibility: meta.eligibility?.score?.toFixed(2),
+          timing: meta.timing,
+          imageStats: meta.imageStats
+        });
+      }
+
+      // Track successful view
+      trackWidgetEvent(WIDGET_EVENTS.VIEW, widget.id, {
+        cached: wasCached,
+        confidence: meta?.confidence,
+        eligibility: meta?.eligibility?.score,
+        imagesFound: meta?.imageStats?.found,
+        imagesRequested: meta?.imageStats?.requested
+      });
+
+      // Cache the result locally (include meta)
+      widgetCache[cacheKey] = { data: result, timestamp: Date.now(), meta };
       saveWidgetCache();
 
       return result;
     } catch (e) {
       console.error('[widget] AI error:', e);
+      trackWidgetEvent('error', widget.id, { error: e.message });
     }
 
     return null;
@@ -4138,8 +4433,10 @@ Return JSON:
 
       // Render as link only if we have a valid URL, otherwise render as non-clickable card
       if (hasUrl) {
+        // Phase 1: Track click for instrumentation
+        const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion" onclick="${trackClick}">
             <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
               ${imageContent}
             </div>
@@ -4163,23 +4460,44 @@ Return JSON:
       }
     }
 
+    const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
+      dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'From your collection';
+
+    const isFavorite = widgetPrefs.favorites[widget.id];
+
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
+      <div class="widget-complete ${isFavorite ? 'widget-complete--favorite' : ''}" data-widget-id="${widget.id}">
         <div class="widget-complete__header">
-          <div class="widget-complete__header-left">
+          <div>
             <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__badge">AI</span>
+            <span class="widget-complete__subtitle">${subtitle}</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
+          <div class="widget-complete__actions">
+            <button class="widget-complete__action ${isFavorite ? 'widget-complete__action--active' : ''}" onclick="toggleWidgetFavorite('${widget.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+              ${isFavorite ? '★' : '☆'}
+            </button>
+            <button class="widget-complete__action" onclick="refreshWidget('${widget.id}')" title="Get new suggestions">↻</button>
+            <button class="widget-complete__action" onclick="dismissWidget('${widget.id}')" title="Dismiss for now">✕</button>
+            <button class="widget-complete__action widget-complete__action--danger" onclick="hideWidget('${widget.id}')" title="Hide permanently">🚫</button>
+          </div>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
+            <div class="widget-complete__section-title">Your Outfit</div>
             <div class="widget-complete__items">${userItemsHtml}</div>
           </div>
           <div class="widget-complete__divider"></div>
           <div class="widget-complete__section">
+            <div class="widget-complete__section-title">Complete With</div>
             <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
+        </div>
+        <div class="widget-complete__feedback">
+          <span class="widget-complete__feedback-label">Was this helpful?</span>
+          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', true)" title="Good suggestions">👍</button>
+          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', false)" title="Not helpful">👎</button>
+          <button class="widget-complete__feedback-btn" onclick="submitWidgetFeedback('${widget.id}')" title="Share feedback">💬</button>
+          <button class="widget-complete__feedback-btn" onclick="setWidgetPreferences()" title="Set your preferences">⚙️</button>
         </div>
       </div>`;
   }
@@ -4204,21 +4522,12 @@ Return JSON:
     const traitsHtml = traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
 
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
-        <div class="widget-complete__header">
-          <div class="widget-complete__header-left">
-            <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__badge">AI</span>
-          </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
+      <div class="widget-style">
+        <div class="widget-style__header">
+          <div class="widget-style__label">${esc(label)}</div>
+          <div class="widget-style__sublabel">${esc(sublabel)}</div>
         </div>
-        <div class="widget-complete__body">
-          <div class="widget-style__content">
-            <div class="widget-style__label">${esc(label)}</div>
-            <div class="widget-style__sublabel">${esc(sublabel)}</div>
-            <div class="widget-style__traits">${traitsHtml}</div>
-          </div>
-        </div>
+        <div class="widget-style__traits">${traitsHtml}</div>
       </div>`;
   }
 
@@ -4277,19 +4586,7 @@ Return JSON:
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
       heroSection.classList.add('widget-section--visible');
-      const heroWidget = widgetsByZone.hero[0];
-      heroContent.innerHTML = `
-        <div class="widget-complete" data-widget-id="${heroWidget.id}">
-          <div class="widget-complete__header">
-            <div class="widget-complete__header-left">
-              <span class="widget-complete__title">${heroWidget.name}</span>
-              <span class="widget-complete__badge">AI</span>
-            </div>
-          </div>
-          <div class="widget-complete__body widget-complete__body--loading">
-            <div class="widget__loader">Generating insights...</div>
-          </div>
-        </div>`;
+      heroContent.innerHTML = '<div class="widget__loader">Generating insights...</div>';
     }
 
     // Generate content for each zone
@@ -4298,7 +4595,15 @@ Return JSON:
 
     for (const widget of applicableWidgets) {
       // Get AI content via Edge Function (handles API key server-side)
-      const aiResult = await generateWidgetContent(widget, items);
+      // Phase 1: Pass category for eligibility checking
+      const aiResult = await generateWidgetContent(widget, items, currentFilter);
+
+      // Phase 1: Handle suppressed widgets
+      if (aiResult && aiResult._suppressed) {
+        console.log('[widget] Widget suppressed by server:', widget.id, aiResult.reason);
+        // Skip rendering this widget entirely
+        continue;
+      }
 
       let widgetHtml = '';
       if (widget.id === 'complete-the-look') {
@@ -4307,12 +4612,21 @@ Return JSON:
         widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
       }
 
+      // Skip if no HTML was generated
+      if (!widgetHtml) {
+        continue;
+      }
+
       // Route to appropriate zone
       if (widget.zone === 'hero') {
         heroHtml += widgetHtml;
       } else if (widget.zone === 'inline') {
         inlineWidgetHtml += `
           <div class="widget-inline">
+            <div class="widget-inline__header">
+              <span class="widget-inline__title">${esc(widget.name)}</span>
+              <span class="widget-inline__badge">AI</span>
+            </div>
             ${widgetHtml}
           </div>`;
       } else if (widget.zone === 'footer') {
@@ -4342,6 +4656,11 @@ Return JSON:
   window.refreshWidget = async function(widgetId) {
     console.log('[widget] Refreshing only:', widgetId);
 
+    // Phase 1: Track refresh event
+    trackWidgetEvent(WIDGET_EVENTS.REFRESH, widgetId, {
+      counter: (widgetRefreshCounters[widgetId] || 0) + 1
+    });
+
     // Increment per-widget refresh counter
     widgetRefreshCounters[widgetId] = (widgetRefreshCounters[widgetId] || 0) + 1;
 
@@ -4368,38 +4687,40 @@ Return JSON:
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${widget.name}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-            </div>
-            <div class="widget-complete__body">
-              <div class="widget__loader">Refreshing suggestions...</div>
-            </div>
-          </div>`;
+          <div class="widget-inline__header">
+            <span class="widget-inline__title">${esc(widget.name)}</span>
+            <span class="widget-inline__badge">AI</span>
+          </div>
+          <div class="widget__loader">Refreshing suggestions...</div>`;
       }
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
       if (heroContent) {
-        heroContent.innerHTML = `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${widget.name}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-            </div>
-            <div class="widget-complete__body widget-complete__body--loading">
-              <div class="widget__loader">Refreshing...</div>
-            </div>
-          </div>`;
+        heroContent.innerHTML = '<div class="widget__loader">Refreshing...</div>';
       }
     }
 
     // Generate content for just this widget
-    const aiResult = await generateWidgetContent(widget, items);
+    const aiResult = await generateWidgetContent(widget, items, currentFilter);
+
+    // Phase 1: Handle suppressed widgets
+    if (aiResult && aiResult._suppressed) {
+      console.log('[widget] Widget suppressed on refresh:', widgetId, aiResult.reason);
+      // Hide the widget since it's no longer eligible
+      if (widget.zone === 'inline') {
+        const inlineContainer = document.querySelector('.widget-inline');
+        if (inlineContainer) {
+          inlineContainer.style.display = 'none';
+        }
+        inlineWidgetHtml = '';
+      } else if (widget.zone === 'hero') {
+        const heroSection = $('widgetSection');
+        if (heroSection) {
+          heroSection.classList.remove('widget-section--visible');
+        }
+      }
+      return;
+    }
 
     let widgetHtml = '';
     if (widget.id === 'complete-the-look') {
@@ -4412,11 +4733,21 @@ Return JSON:
     if (widget.zone === 'inline') {
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
-        inlineContainer.innerHTML = widgetHtml;
+        inlineContainer.style.display = ''; // Ensure visible
+        inlineContainer.innerHTML = `
+          <div class="widget-inline__header">
+            <span class="widget-inline__title">${esc(widget.name)}</span>
+            <span class="widget-inline__badge">AI</span>
+          </div>
+          ${widgetHtml}`;
       }
       // Also update stored HTML for future grid re-renders
       inlineWidgetHtml = `
         <div class="widget-inline">
+          <div class="widget-inline__header">
+            <span class="widget-inline__title">${esc(widget.name)}</span>
+            <span class="widget-inline__badge">AI</span>
+          </div>
           ${widgetHtml}
         </div>`;
     } else if (widget.zone === 'hero') {
@@ -4435,6 +4766,21 @@ Return JSON:
     loadWidgetStatus();
     loadWidgetPrefs();
     loadWidgetFeedback();
+
+    const refreshBtn = $('widgetRefresh');
+    if (refreshBtn) {
+      refreshBtn.onclick = () => {
+        // Clear cache for current items to force regeneration
+        const allLinks = getAllLinks();
+        const items = normalizeWearItems(allLinks);
+        const itemIds = items.map(i => i.id).sort().join(',');
+        Object.keys(widgetCache).forEach(key => {
+          if (key.includes(itemIds)) delete widgetCache[key];
+        });
+        saveWidgetCache();
+        generateWidgets();
+      };
+    }
   }
 
   // Render admin widgets panel
@@ -5928,7 +6274,6 @@ Return JSON:
   const FILTER_KEY = 'boards-filter';
   const PENDING_SAVES_KEY = 'boards_pending_saves';
   let currentFilter = localStorage.getItem(FILTER_KEY) || 'all';
-  let gridFlowPriority = localStorage.getItem('boards-grid-flow') === 'true';
   let searchQuery = '';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
@@ -5992,6 +6337,7 @@ Return JSON:
   const fabVideoUpload = $('fabVideoUpload');
   const photoInput = $('photoInput');
   const videoInput = $('videoInput');
+  const bottomThemeToggle = $('bottomThemeToggle');
 
   // Progress DOM
   const progressBar = $('progressBar');
@@ -6146,7 +6492,7 @@ Return JSON:
     // Sort by saved order, fallback to date
     const data = load();
     const order = data.linkOrder || [];
-    let sorted = [...links].sort((a, b) => {
+    const sorted = [...links].sort((a, b) => {
       const aIdx = order.indexOf(a.id);
       const bIdx = order.indexOf(b.id);
       if (aIdx === -1 && bIdx === -1) return new Date(b.addedAt) - new Date(a.addedAt);
@@ -6154,14 +6500,6 @@ Return JSON:
       if (bIdx === -1) return -1;
       return aIdx - bIdx;
     });
-
-    // When grid flow priority is enabled, move expanded cards to front
-    // This allows 1x1 cards to fill gaps left by expanded cards
-    if (gridFlowPriority) {
-      const expanded = sorted.filter(l => expandedCards[l.id]);
-      const normal = sorted.filter(l => !expandedCards[l.id]);
-      sorted = [...expanded, ...normal];
-    }
 
     let html = '';
     let cardCount = 0;
@@ -6365,6 +6703,12 @@ Return JSON:
     renderGrid();
     videoInput.value = '';
     toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
+  };
+
+  // Bottom theme toggle
+  bottomThemeToggle.onclick = () => {
+    document.documentElement.classList.toggle('light');
+    localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
   };
 
   addForm.onsubmit = async (e) => {
@@ -7321,18 +7665,6 @@ Return JSON:
   themeToggle.onclick = () => {
     const isLight = document.documentElement.classList.toggle('light');
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  };
-
-  // Grid flow toggle
-  const gridFlowToggle = $('gridFlowToggle');
-  if (gridFlowPriority) gridFlowToggle.classList.add('theme-toggle--active');
-
-  gridFlowToggle.onclick = () => {
-    gridFlowPriority = !gridFlowPriority;
-    gridFlowToggle.classList.toggle('theme-toggle--active', gridFlowPriority);
-    localStorage.setItem('boards-grid-flow', gridFlowPriority);
-    renderGrid();
-    toast(gridFlowPriority ? 'Grid flow priority enabled' : 'Grid flow priority disabled');
   };
 
   // ============================================

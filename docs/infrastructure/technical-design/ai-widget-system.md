@@ -1,8 +1,16 @@
 # AI Widget System - Technical Documentation
 
-**Version:** 3.0
-**Last Updated:** 2026-02-03
+**Version:** 4.0
+**Last Updated:** 2026-02-05
 **Status:** Active
+
+## Recent Updates (v4.0)
+
+- **SERP API Integration**: Added as fallback image strategy after Shopify API
+- **Eligibility Engine**: Widgets must pass eligibility rules to render
+- **Confidence Scoring**: AI returns confidence (0.0-1.0), low confidence widgets suppressed
+- **Validation Engine**: Server-side tracking of success/failure for optimization
+- **Client Instrumentation**: Event tracking for views, clicks, dismissals, refreshes
 
 ## Table of Contents
 
@@ -518,6 +526,154 @@ const jsonStr = text.substring(firstBrace, lastBrace + 1)
 ```javascript
 document.getElementById('widgetInline').innerHTML = ''
 generateWidgets()
+```
+
+---
+
+## Phase 1 Features (Implemented)
+
+### Eligibility Engine
+
+Widgets must "earn" existence through eligibility rules. Each widget has configurable rules that determine if it should render.
+
+```typescript
+interface EligibilityRule {
+  name: string
+  check: (context: EligibilityContext) => EligibilityResult
+  weight: number // 0-1, how much this rule affects overall score
+}
+
+// Rules for complete-the-look widget:
+// - min_items: At least 2 items required (weight: 1.0)
+// - category_match: Content must be wear/fashion (weight: 0.8)
+// - content_quality: Items need metadata (weight: 0.6)
+```
+
+**Response when not eligible:**
+```json
+{
+  "content": null,
+  "suppressed": true,
+  "reason": "eligibility_failed",
+  "meta": {
+    "eligibility": {
+      "eligible": false,
+      "score": 0.45,
+      "rules": [
+        { "name": "min_items", "passed": true, "score": 1.0 },
+        { "name": "category_match", "passed": false, "score": 0 }
+      ]
+    }
+  }
+}
+```
+
+### Confidence Scoring
+
+AI returns a confidence score (0.0-1.0) with each response. Widgets with confidence below threshold are suppressed or degraded.
+
+```typescript
+const CONFIDENCE_THRESHOLDS = {
+  'complete-the-look': { threshold: 0.6, fallbackBehavior: 'degrade' },
+  'style-summary': { threshold: 0.5, fallbackBehavior: 'suppress' }
+}
+```
+
+**Prompt addition for confidence:**
+```
+IMPORTANT: Include a "confidence" field (0.0 to 1.0) in your response indicating how confident you are in your suggestions based on:
+- How well you understand the items
+- How relevant your suggestions are
+- Whether you have enough context
+```
+
+### Image Strategy Pipeline
+
+Three strategies tried in order:
+
+1. **Shopify JSON API** (primary) - Most reliable for Shopify stores
+2. **SERP API** (secondary) - Google Shopping results, costs money but reliable
+3. **HTML Scraping** (fallback) - Pattern matching on brand websites
+
+```typescript
+async function scrapeProductImage(brandName, query): ImageResolutionResult {
+  // Strategy 1: Shopify API
+  if (brandConfig.shopifyDomain) {
+    const result = await tryShopifyApi(...)
+    if (result.image) return { ...result, strategy: 'shopify' }
+  }
+
+  // Strategy 2: SERP API
+  if (serpApiKey) {
+    const result = await trySerpApi(...)
+    if (result.image) return { ...result, strategy: 'serp' }
+  }
+
+  // Strategy 3: HTML scraping
+  if (brandConfig.searchUrl) {
+    const result = await scrapeHtml(...)
+    if (result.image) return { ...result, strategy: 'scrape' }
+  }
+
+  return { image: null, url: brandUrl, strategy: 'none' }
+}
+```
+
+### Client-Side Instrumentation
+
+Events tracked for validation and optimization:
+
+| Event | Data Captured |
+|-------|--------------|
+| `view` | widgetId, cached, confidence, eligibility score, images found/requested |
+| `click` | widgetId, brand, product name, hasImage |
+| `refresh` | widgetId, refresh counter |
+| `dismiss` | widgetId |
+| `suppressed` | widgetId, reason, eligibility, confidence |
+
+```javascript
+// Event buffer persisted to localStorage
+const WIDGET_EVENTS_KEY = 'boards_widget_events'
+
+function trackWidgetEvent(eventType, widgetId, data) {
+  widgetEventBuffer.push({
+    type: eventType,
+    widgetId,
+    timestamp: Date.now(),
+    data
+  })
+  saveWidgetEvents()
+}
+```
+
+### Response Meta Object
+
+All widget responses now include a `meta` object for observability:
+
+```typescript
+interface WidgetMeta {
+  widgetId: string
+  eligibility: {
+    eligible: boolean
+    score: number
+    rules: Array<{ name: string; passed: boolean; reason: string; score: number }>
+  }
+  confidence: number
+  timing: {
+    total: number   // Total request time
+    ai: number      // Claude API time
+    enrichment: number  // Image scraping time
+  }
+  imageStats: {
+    requested: number
+    found: number
+    strategies: { shopify: number; serp: number; scrape: number; none: number }
+  }
+  validation: {
+    brandsReplaced: number      // AI suggested unsupported brands
+    categoryCorrected: number   // Brand didn't make that category
+  }
+}
 ```
 
 ---
