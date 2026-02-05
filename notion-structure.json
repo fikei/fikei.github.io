@@ -217,57 +217,57 @@
       "source": "ai",
       "children": [
         {
-          "title": "Unified Project Plan",
+          "title": "Project Plan",
           "icon": "📊",
-          "file": "docs/execution/unified-project-plan/index.md",
+          "file": "docs/execution/project-plan/index.md",
           "source": "ai",
           "children": [
             {
               "title": "Phase 1: Foundation",
               "icon": "🏗️",
-              "file": "docs/execution/unified-project-plan/phase-1-foundation.md",
+              "file": "docs/execution/project-plan/phase-1-foundation.md",
               "source": "ai"
             },
             {
               "title": "Phase 2: Core Experience",
               "icon": "🎯",
-              "file": "docs/execution/unified-project-plan/phase-2-core-experience.md",
+              "file": "docs/execution/project-plan/phase-2-core-experience.md",
               "source": "ai"
             },
             {
               "title": "Phase 3: AI Intelligence",
               "icon": "🤖",
-              "file": "docs/execution/unified-project-plan/phase-3-ai-intelligence.md",
+              "file": "docs/execution/project-plan/phase-3-ai-intelligence.md",
               "source": "ai"
             },
             {
               "title": "Phase 4: Sharing & Collaboration",
               "icon": "👥",
-              "file": "docs/execution/unified-project-plan/phase-4-sharing-collaboration.md",
+              "file": "docs/execution/project-plan/phase-4-sharing-collaboration.md",
               "source": "ai"
             },
             {
               "title": "Phase 5: UX Polish",
               "icon": "✨",
-              "file": "docs/execution/unified-project-plan/phase-5-ux-polish.md",
+              "file": "docs/execution/project-plan/phase-5-ux-polish.md",
               "source": "ai"
             },
             {
               "title": "Phase 6: Performance & Scale",
               "icon": "⚡",
-              "file": "docs/execution/unified-project-plan/phase-6-performance.md",
+              "file": "docs/execution/project-plan/phase-6-performance.md",
               "source": "ai"
             },
             {
               "title": "Phase 7: Platform Expansion",
               "icon": "🚀",
-              "file": "docs/execution/unified-project-plan/phase-7-platform-expansion.md",
+              "file": "docs/execution/project-plan/phase-7-platform-expansion.md",
               "source": "ai"
             },
             {
               "title": "Backlog",
               "icon": "📝",
-              "file": "docs/execution/unified-project-plan/backlog.md",
+              "file": "docs/execution/project-plan/backlog.md",
               "source": "ai"
             }
           ]
@@ -282,12 +282,6 @@
           "title": "Bugs",
           "icon": "🐛",
           "file": "docs/execution/BUGS.md",
-          "source": "ai"
-        },
-        {
-          "title": "Status Snapshot",
-          "icon": "📸",
-          "file": "docs/execution/STATUS-SNAPSHOT.md",
           "source": "ai"
         }
       ]

@@ -1,8 +1,8 @@
 # Archived Execution Documents
 
-These files have been consolidated into the **Unified Project Plan**.
+These files have been consolidated into the **Project Plan**.
 
-**New Location:** `docs/execution/unified-project-plan/` (split into phase sub-pages)
+**New Location:** `docs/execution/project-plan/` (split into phase sub-pages)
 
 ---
 

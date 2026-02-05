@@ -1,6 +1,6 @@
 # Phase 5: User Experience Polish
 
-> Back to [Unified Project Plan](./index.md)
+> Back to [Project Plan](./index.md)
 
 ---
 

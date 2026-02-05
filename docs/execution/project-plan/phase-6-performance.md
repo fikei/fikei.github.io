@@ -1,6 +1,6 @@
 # Phase 6: Performance & Scale
 
-> Back to [Unified Project Plan](./index.md)
+> Back to [Project Plan](./index.md)
 
 ---
 

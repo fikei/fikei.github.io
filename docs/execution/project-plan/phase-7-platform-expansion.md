@@ -1,6 +1,6 @@
 # Phase 7: Platform Expansion
 
-> Back to [Unified Project Plan](./index.md)
+> Back to [Project Plan](./index.md)
 
 ---
 

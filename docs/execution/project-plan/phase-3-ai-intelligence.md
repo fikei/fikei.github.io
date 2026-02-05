@@ -1,6 +1,6 @@
 # Phase 3: AI Intelligence (MOSTLY COMPLETE)
 
-> Back to [Unified Project Plan](./index.md)
+> Back to [Project Plan](./index.md)
 
 ---
 

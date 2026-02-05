@@ -1,4 +1,4 @@
-# Unified Project Plan - Boards
+# Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
 > **Last Updated**: 2026-02-05
