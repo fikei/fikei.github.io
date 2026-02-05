@@ -13,6 +13,15 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
+// Phase 2: Config-driven widget system
+import {
+  checkEligibility as checkEligibilityFromConfig,
+  getConfidenceConfig,
+  getWidget,
+  buildPrompt,
+} from './config/registry.ts'
+import type { EligibilityContext, EligibilityDecision } from './config/schema.ts'
+
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -887,194 +896,34 @@ function getCacheKey(widgetId: string, items: WearItem[]): string {
 }
 
 // =============================================================================
-// PHASE 1: ELIGIBILITY ENGINE
-// Widgets must "earn" existence through eligibility rules
+// PHASE 2: CONFIG-DRIVEN ELIGIBILITY ENGINE
+// Eligibility rules are now defined in config/widgets/*.ts
 // =============================================================================
 
-interface EligibilityRule {
-  name: string
-  check: (context: EligibilityContext) => EligibilityResult
-  weight: number // 0-1, how much this rule affects overall score
-}
-
-interface EligibilityContext {
-  widgetId: string
-  items: WearItem[]
-  category?: string
-  userPrefs?: Record<string, any>
-}
-
-interface EligibilityResult {
-  passed: boolean
-  reason: string
-  score: number // 0-1
-}
-
-interface EligibilityDecision {
-  eligible: boolean
-  score: number
-  rules: Array<{ name: string; passed: boolean; reason: string; score: number }>
-  timestamp: number
-}
-
-// Widget eligibility rules
-const ELIGIBILITY_RULES: Record<string, EligibilityRule[]> = {
-  'complete-the-look': [
-    {
-      name: 'min_items',
-      weight: 1.0,
-      check: (ctx) => {
-        const minItems = 2
-        const passed = ctx.items.length >= minItems
-        return {
-          passed,
-          reason: passed ? `Has ${ctx.items.length} items (≥${minItems})` : `Only ${ctx.items.length} items (need ≥${minItems})`,
-          score: passed ? 1 : 0
-        }
-      }
-    },
-    {
-      name: 'category_match',
-      weight: 0.8,
-      check: (ctx) => {
-        const wearCategories = ['wear', 'clothing', 'fashion']
-        const categoryMatch = ctx.category && wearCategories.some(c =>
-          ctx.category!.toLowerCase().includes(c)
-        )
-        // Also check if items seem to be clothing based on URLs/titles
-        const itemsLookLikeClothing = ctx.items.some(item => {
-          const text = `${item.title} ${item.url}`.toLowerCase()
-          return /shoe|sneaker|jacket|shirt|pants|jeans|hoodie|sweater|coat|boot|wear|fashion/.test(text)
-        })
-        const passed = categoryMatch || itemsLookLikeClothing
-        return {
-          passed,
-          reason: passed ? 'Content matches wear/fashion category' : 'Content does not appear to be clothing',
-          score: categoryMatch ? 1 : (itemsLookLikeClothing ? 0.7 : 0)
-        }
-      }
-    },
-    {
-      name: 'content_quality',
-      weight: 0.6,
-      check: (ctx) => {
-        // Check if items have sufficient metadata
-        const qualityScores = ctx.items.map(item => {
-          let score = 0
-          if (item.title && item.title.length > 5) score += 0.4
-          if (item.description && item.description.length > 10) score += 0.3
-          if (item.image) score += 0.2
-          if (item.url) score += 0.1
-          return score
-        })
-        const avgQuality = qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length
-        const passed = avgQuality >= 0.5
-        return {
-          passed,
-          reason: `Average content quality: ${(avgQuality * 100).toFixed(0)}%`,
-          score: avgQuality
-        }
-      }
-    }
-  ],
-  'style-summary': [
-    {
-      name: 'min_items',
-      weight: 1.0,
-      check: (ctx) => {
-        const minItems = 3
-        const passed = ctx.items.length >= minItems
-        return {
-          passed,
-          reason: passed ? `Has ${ctx.items.length} items (≥${minItems})` : `Only ${ctx.items.length} items (need ≥${minItems})`,
-          score: passed ? 1 : ctx.items.length / minItems
-        }
-      }
-    },
-    {
-      name: 'variety',
-      weight: 0.7,
-      check: (ctx) => {
-        // Check for variety in items (different domains, different types)
-        const domains = new Set(ctx.items.map(i => new URL(i.url).hostname).filter(Boolean))
-        const varietyScore = Math.min(domains.size / 3, 1) // Max score at 3+ unique domains
-        const passed = domains.size >= 2
-        return {
-          passed,
-          reason: `${domains.size} unique sources`,
-          score: varietyScore
-        }
-      }
-    }
-  ]
-}
-
-// Default rules for unknown widgets
-const DEFAULT_ELIGIBILITY_RULES: EligibilityRule[] = [
-  {
-    name: 'min_items',
-    weight: 1.0,
-    check: (ctx) => {
-      const passed = ctx.items.length >= 1
-      return {
-        passed,
-        reason: passed ? 'Has items to analyze' : 'No items provided',
-        score: passed ? 1 : 0
-      }
-    }
-  }
-]
-
-function checkEligibility(context: EligibilityContext): EligibilityDecision {
-  const rules = ELIGIBILITY_RULES[context.widgetId] || DEFAULT_ELIGIBILITY_RULES
-  const results: EligibilityDecision['rules'] = []
-  let totalWeight = 0
-  let weightedScore = 0
-
-  for (const rule of rules) {
-    const result = rule.check(context)
-    results.push({
-      name: rule.name,
-      passed: result.passed,
-      reason: result.reason,
-      score: result.score
-    })
-    totalWeight += rule.weight
-    weightedScore += result.score * rule.weight
+// Wrapper to use config-driven eligibility with local types
+function checkEligibility(context: { widgetId: string; items: WearItem[]; category?: string; userPrefs?: Record<string, any> }): EligibilityDecision {
+  // Convert local WearItem[] to config EligibilityContext format
+  const configContext: EligibilityContext = {
+    widgetId: context.widgetId,
+    items: context.items.map(item => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      image: item.image,
+      url: item.url
+    })),
+    category: context.category,
+    userPrefs: context.userPrefs
   }
 
-  const overallScore = totalWeight > 0 ? weightedScore / totalWeight : 0
-  const criticalRulesFailed = results.some(r =>
-    rules.find(rule => rule.name === r.name)?.weight === 1.0 && !r.passed
-  )
-
-  return {
-    eligible: !criticalRulesFailed && overallScore >= 0.5,
-    score: overallScore,
-    rules: results,
-    timestamp: Date.now()
-  }
+  return checkEligibilityFromConfig(context.widgetId, configContext)
 }
 
 // =============================================================================
-// PHASE 1: CONFIDENCE SCORING
-// AI returns confidence score, threshold gates rendering
+// PHASE 2: CONFIG-DRIVEN CONFIDENCE SCORING
+// Confidence thresholds are now defined in config/widgets/*.ts
+// getConfidenceConfig is imported from ./config/registry.ts
 // =============================================================================
-
-interface ConfidenceConfig {
-  threshold: number // 0-1, minimum confidence to render
-  fallbackBehavior: 'suppress' | 'degrade' | 'retry'
-}
-
-const CONFIDENCE_THRESHOLDS: Record<string, ConfidenceConfig> = {
-  'complete-the-look': { threshold: 0.6, fallbackBehavior: 'degrade' },
-  'style-summary': { threshold: 0.5, fallbackBehavior: 'suppress' },
-  'default': { threshold: 0.4, fallbackBehavior: 'suppress' }
-}
-
-function getConfidenceConfig(widgetId: string): ConfidenceConfig {
-  return CONFIDENCE_THRESHOLDS[widgetId] || CONFIDENCE_THRESHOLDS['default']
-}
 
 // =============================================================================
 // PHASE 1: INSTRUMENTATION & VALIDATION
