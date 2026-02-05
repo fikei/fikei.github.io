@@ -332,6 +332,17 @@ class NotionClient {
     return null
   }
 
+  // Check if a URL is valid for Notion (must be absolute http/https URL)
+  private isValidNotionUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+      // Relative URLs or malformed URLs will throw
+      return false
+    }
+  }
+
   private parseRichText(text: string): any[] {
     const segments: any[] = []
     let remaining = text
@@ -340,10 +351,22 @@ class NotionClient {
       // Link: [text](url)
       const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/)
       if (linkMatch) {
-        segments.push({
-          type: 'text',
-          text: { content: linkMatch[1], link: { url: linkMatch[2] } },
-        })
+        const linkText = linkMatch[1]
+        const linkUrl = linkMatch[2]
+
+        // Only create a link if the URL is valid for Notion
+        if (this.isValidNotionUrl(linkUrl)) {
+          segments.push({
+            type: 'text',
+            text: { content: linkText, link: { url: linkUrl } },
+          })
+        } else {
+          // Invalid URL - render as plain text with the link text only
+          segments.push({
+            type: 'text',
+            text: { content: linkText },
+          })
+        }
         remaining = remaining.slice(linkMatch[0].length)
         continue
       }
@@ -432,7 +455,52 @@ class NotionClient {
         i++ // Skip closing ```
 
         const codeContent = codeLines.join('\n')
-        const langNormalized = language === 'js' ? 'javascript' : language === 'ts' ? 'typescript' : language
+
+        // Notion supported languages
+        const validLanguages = new Set([
+          'abap', 'arduino', 'bash', 'basic', 'c', 'clojure', 'coffeescript',
+          'cpp', 'csharp', 'css', 'dart', 'diff', 'docker', 'elixir', 'elm',
+          'erlang', 'flow', 'fortran', 'fsharp', 'gherkin', 'glsl', 'go',
+          'graphql', 'groovy', 'haskell', 'html', 'java', 'javascript', 'json',
+          'julia', 'kotlin', 'latex', 'less', 'lisp', 'livescript', 'lua',
+          'makefile', 'markdown', 'markup', 'matlab', 'mermaid', 'nix',
+          'objective-c', 'ocaml', 'pascal', 'perl', 'php', 'plain text',
+          'powershell', 'prolog', 'protobuf', 'python', 'r', 'reason', 'ruby',
+          'rust', 'sass', 'scala', 'scheme', 'scss', 'shell', 'sql', 'swift',
+          'typescript', 'vb.net', 'verilog', 'vhdl', 'visual basic',
+          'webassembly', 'xml', 'yaml'
+        ])
+
+        // Language aliases
+        const languageAliases: Record<string, string> = {
+          'js': 'javascript',
+          'ts': 'typescript',
+          'sh': 'shell',
+          'zsh': 'shell',
+          'yml': 'yaml',
+          'dockerfile': 'docker',
+          'objc': 'objective-c',
+          'objective-c': 'objective-c',
+          'objectivec': 'objective-c',
+          'c++': 'cpp',
+          'c#': 'csharp',
+          'cs': 'csharp',
+          'f#': 'fsharp',
+          'vb': 'visual basic',
+          'vbnet': 'vb.net',
+          'tex': 'latex',
+          'console': 'shell',
+          'terminal': 'shell',
+          'text': 'plain text',
+          'txt': 'plain text',
+          'plaintext': 'plain text',
+        }
+
+        // Normalize language: check aliases first, then validate
+        let langNormalized = languageAliases[language.toLowerCase()] || language.toLowerCase()
+        if (!validLanguages.has(langNormalized)) {
+          langNormalized = 'plain text'
+        }
 
         // Notion limits code block text to 2000 chars - split if needed
         if (codeContent.length <= 2000) {
