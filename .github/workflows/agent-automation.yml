@@ -84,13 +84,17 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
 
-          # Check if structure config changed
+          # Check if structure config changed (affects page organization, not content)
           if echo "$CHANGED" | grep -q "notion-structure.json"; then
             echo "structure_changed=true" >> $GITHUB_OUTPUT
-            echo "📋 Structure config changed - will sync all pages"
+            echo "📁 Structure config changed - will update page organization"
           else
             echo "structure_changed=false" >> $GITHUB_OUTPUT
           fi
+
+          # Count markdown files changed
+          MD_COUNT=$(echo "$CHANGED" | grep -c '\.md$' || echo "0")
+          echo "📄 $MD_COUNT markdown files changed"
 
           # Save changed files for later
           echo "$CHANGED" > /tmp/changed_files.txt
@@ -251,8 +255,11 @@ jobs:
       - name: Sync Page Structure
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
-          echo "📁 Syncing page structure to Notion..."
-          echo "   (Creates pages/folders, no content yet)"
+          echo "═══════════════════════════════════════════"
+          echo "📁 STRUCTURE SYNC: Create/move pages"
+          echo "═══════════════════════════════════════════"
+          echo "Creates page hierarchy, no content yet"
+          echo ""
 
           # Sync structure ONLY (no content) - content synced individually in next step
           if [ -f "notion-structure.json" ]; then
@@ -307,8 +314,11 @@ jobs:
       - name: Cleanup Orphaned Pages
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
-          echo "🧹 Cleaning up orphaned Notion pages..."
-          echo "   (Archives pages not in notion-structure.json)"
+          echo "═══════════════════════════════════════════"
+          echo "🧹 CLEANUP: Archive orphaned pages"
+          echo "═══════════════════════════════════════════"
+          echo "Archives pages not in notion-structure.json"
+          echo ""
 
           if [ ! -f "notion-structure.json" ]; then
             echo "⚠️ notion-structure.json not found, skipping cleanup"
@@ -374,9 +384,13 @@ jobs:
           STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
           FORCE_FULL_SYNC: ${{ github.event.inputs.force_full_sync }}
         run: |
-          echo "📝 Syncing page content to Notion..."
+          echo "═══════════════════════════════════════════"
+          echo "📝 CONTENT SYNC: GitHub → Notion"
+          echo "═══════════════════════════════════════════"
+          echo "Mode: Incremental (only changed .md files)"
+          echo ""
 
-          # Wait for Notion to index any newly created pages from Step 1
+          # Wait for Notion to index any newly created pages from structure sync
           if [ "$STRUCTURE_CHANGED" = "true" ]; then
             echo "⏳ Waiting 10s for Notion to index new pages..."
             sleep 10
@@ -443,26 +457,25 @@ jobs:
 
           pages = extract_pages(config)
 
-          # Check if we need to do a full sync
-          structure_changed = os.environ.get('STRUCTURE_CHANGED', 'false') == 'true'
+          # Check if we need to do a full sync (only on explicit request)
           force_full_sync = os.environ.get('FORCE_FULL_SYNC', 'false') == 'true'
-          do_full_sync = structure_changed or force_full_sync
 
-          if do_full_sync:
-              # Sync ALL pages with content
+          # Read changed files from git diff
+          changed_files = set()
+          if os.path.exists('/tmp/changed_files.txt'):
+              with open('/tmp/changed_files.txt') as f:
+                  changed_files = set(line.strip() for line in f if line.strip())
+
+          if force_full_sync:
+              # Sync ALL pages with content (manual trigger only)
               pages_to_sync = [(title, filepath) for title, filepath in pages if filepath]
-              reason = "structure changed" if structure_changed else "force full sync requested"
-              print(f"📋 Full sync ({reason}): syncing ALL {len(pages_to_sync)} pages with content")
+              print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages with content")
           else:
-              # Read changed files
-              changed_files = set()
-              if os.path.exists('/tmp/changed_files.txt'):
-                  with open('/tmp/changed_files.txt') as f:
-                      changed_files = set(line.strip() for line in f if line.strip())
-
-              # Only sync pages whose files changed
+              # Only sync pages whose files actually changed in this commit
               pages_to_sync = [(title, filepath) for title, filepath in pages if filepath in changed_files]
-              print(f"📋 Incremental sync: {len(pages_to_sync)} changed pages (of {len(pages)} total)")
+              print(f"📋 Incremental sync: {len(pages_to_sync)} changed files (of {len(pages)} total pages)")
+              if changed_files:
+                  print(f"   Changed files: {', '.join(sorted(changed_files)[:10])}{'...' if len(changed_files) > 10 else ''}")
 
           with open('/tmp/pages_to_sync.txt', 'w') as f:
               for title, filepath in pages_to_sync:
@@ -508,10 +521,13 @@ jobs:
               echo "These will be retried on next workflow run."
             fi
           else
-            echo "✨ No pages need updating"
+            echo "✨ No markdown files changed - skipping content sync"
           fi
 
-          echo "📊 Content sync complete!"
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "✅ SYNC COMPLETE"
+          echo "═══════════════════════════════════════════"
 
   # Triggered on every push - quick status and security check
   on-push:
