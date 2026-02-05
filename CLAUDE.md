@@ -64,6 +64,18 @@ When working on this project, always follow these guidelines:
      4. Add `archive/README.md` listing what was archived and why
      5. On next sync, old Notion pages are automatically deleted
    - **GitHub is always the source of truth** - Notion structure matches `notion-structure.json`
+   - **Page source tracking** - Each entry in `notion-structure.json` has a `source` field:
+     - `"source": "ai"` - AI-generated page (can be freely deleted/reorganized)
+     - `"source": "human"` - Human-created page (protected)
+     - When adding new pages, always set `"source": "ai"` for AI-generated content
+   - **Deletion rules based on source:**
+     - AI pages (`source: ai`): Can delete, archive, or reorganize freely
+     - Human pages (`source: human`): Can edit content, but only delete/archive if ALL content has been consolidated elsewhere first
+     - When consolidating human pages: Verify all content is preserved before archiving
+   - **When moving content:**
+     - ~~Strike through~~ the old content in the original location
+     - Add a link to the new location: "→ Moved to [New Page Name](path/to/new-file.md)"
+     - This preserves traceability and helps users find relocated content
    - Documentation locations:
      - PRDs → `docs/strategy/prds/`
      - Tech specs → `docs/infrastructure/technical-design/`
