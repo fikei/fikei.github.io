@@ -2509,9 +2509,9 @@ body {
 .widget-complete__refresh-btn {
   background: none;
   border: none;
-  padding: 0;
+  padding: 4px;
   cursor: pointer;
-  font-size: var(--font-size-base);
+  font-size: 16px;
   color: var(--muted);
   transition: color 0.15s;
   line-height: 1;
@@ -4199,7 +4199,7 @@ Return JSON:
             <span class="widget-complete__title">${widget.name}</span>
             <span class="widget-complete__badge">AI</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">↻</button>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
@@ -4239,7 +4239,7 @@ Return JSON:
             <span class="widget-complete__title">${widget.name}</span>
             <span class="widget-complete__badge">AI</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">↻</button>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-style__content">
