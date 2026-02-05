@@ -116,6 +116,18 @@ When working on this project, always follow these guidelines:
     - This is REQUIRED for any new `.class-name` added to stylesheets
     - Keep documentation consistent with existing component format
 
+11. **Update UX documentation when changing the UI**
+    - After implementing any user-facing feature, update/create docs in `docs/ux/`
+    - Follow existing format: User Goals, JTBD table, Wireframes, Technical Notes
+    - Mark features as ✅ Shipped with implementation details
+    - Add ASCII wireframes showing current implementation
+    - Include file paths and function references
+    - UX doc locations:
+      - Boards features → `docs/ux/boards/`
+      - User features → `docs/ux/users/`
+      - Widget features → `docs/ux/widgets/`
+      - Pin features → `docs/ux/pins/`
+
 ---
 
 ## Quick Reference

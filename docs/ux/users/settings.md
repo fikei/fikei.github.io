@@ -2,6 +2,17 @@
 
 User-configurable options for customizing the Boards experience.
 
+**Implementation Status**: 🔄 Partially Implemented
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Theme Toggle | ✅ Shipped | Dark/Light mode |
+| Export JSON | ✅ Shipped | In Admin Panel |
+| Export CSV | ✅ Shipped | In Admin Panel |
+| Widget Preferences | ⏳ Planned | Favorite/hide widgets |
+| Clear Cache | ⏳ Planned | Remove cached data |
+| Reset Settings | ⏳ Planned | Return to defaults |
+
 ---
 
 ## User Goals
@@ -81,36 +92,35 @@ Dark Mode (Default):              Light Mode:
 └───────────────────┘             └───────────────────┘
 ```
 
-### Export Data Format
+### Export Data ✅ IMPLEMENTED
+
+Export is available in the **Admin Panel** (Ctrl+Shift+A → Admin Panel).
 
 ```
 ┌─────────────────────────────────────────┐
-│  Export Data                      [X]   │
+│  Admin Panel                      [X]   │
 ├─────────────────────────────────────────┤
 │                                         │
-│  Your export includes:                  │
-│  • 156 pins                             │
-│  • 8 categories                         │
-│  • Widget preferences                   │
-│  • Account settings                     │
-│                                         │
-│  Format:                                │
-│  [ ● JSON ]  [ ○ CSV ]                  │
-│                                         │
+│  DATA EXPORT                            │
 │  ─────────────────────────────────────  │
 │                                         │
-│  Preview:                               │
-│  ┌─────────────────────────────────┐    │
-│  │ {                               │    │
-│  │   "pins": [...],                │    │
-│  │   "categories": [...],          │    │
-│  │   "settings": {...}             │    │
-│  │ }                               │    │
-│  └─────────────────────────────────┘    │
+│  [Export JSON]  [Export CSV]            │
 │                                         │
-│           [ Cancel ]  [ Download ]      │
+│  JSON: Full data backup including       │
+│        links, categories, settings      │
+│                                         │
+│  CSV:  Spreadsheet format with          │
+│        title, url, domain, category,    │
+│        content_type, description, date  │
+│                                         │
 └─────────────────────────────────────────┘
 ```
+
+**Implementation details:**
+- Location: Admin Panel → Data Export section
+- JSON: Full backup via `exportAsJson()`
+- CSV: Spreadsheet format via `exportAsCsv()`
+- File: `boards/index.html:7005-7055`
 
 ### Clear Cache Confirmation
 

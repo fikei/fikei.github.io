@@ -2,6 +2,16 @@
 
 The visual presentation of pins in a responsive, masonry-style grid inspired by Swiss design principles.
 
+**Implementation Status**: ✅ Shipped
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Responsive Grid | ✅ Shipped | 2-5 columns based on viewport |
+| Card Expansion | ✅ Shipped | Medium (2x2) and Large (3x2) |
+| Grid Reflow | ✅ Shipped | Auto gap-filling via `grid-auto-flow: dense` |
+| List View | ⏳ Planned | Alternative dense view |
+| Sort Options | ⏳ Planned | Date, name, domain |
+
 ---
 
 ## User Goals
@@ -160,6 +170,41 @@ Loading:                   No Image:                  Error:
 
 ---
 
+## Grid Reflow ✅ IMPLEMENTED
+
+When cards expand to 2x2 or 3x2 sizes, smaller cards automatically fill gaps.
+
+### Before Reflow (gaps visible)
+```
+┌──────┐  ┌───────────────┐  ┌──────┐
+│  1   │  │               │  │  3   │
+└──────┘  │    2 (2x2)    │  └──────┘
+          │               │  [ GAP ]
+          └───────────────┘
+┌──────┐  ┌──────┐  ┌──────┐
+│  4   │  │  5   │  │  6   │
+└──────┘  └──────┘  └──────┘
+```
+
+### After Reflow (gaps filled)
+```
+┌──────┐  ┌───────────────┐  ┌──────┐
+│  1   │  │               │  │  3   │
+└──────┘  │    2 (2x2)    │  ├──────┤
+┌──────┐  │               │  │  4   │ ← fills gap
+└──────┘  └───────────────┘  └──────┘
+┌──────┐  ┌──────┐  ┌──────┐
+│  5   │  │  6   │  │  7   │
+└──────┘  └──────┘  └──────┘
+```
+
+**Implementation details:**
+- CSS property: `grid-auto-flow: dense`
+- File: `boards/index.html:814-820`
+- Behavior: Grid auto-placement fills available gaps with smaller items
+
+---
+
 ## Known Extensions / Future States
 
 ### Short-term
@@ -182,7 +227,9 @@ Loading:                   No Image:                  Error:
 ## Technical Notes
 
 - Grid uses CSS Grid with `auto-fill` and `minmax()`
+- **Grid reflow via `grid-auto-flow: dense`** - fills gaps automatically
 - Images lazy-loaded with `loading="lazy"`
 - Expanded state toggles via `openDetail()` / `closeAll()`
 - Grayscale via CSS filter, removed on hover/expand
 - Card expansion preserved in localStorage via `saveExpandedCards()`
+- Responsive breakpoints: 2 cols (mobile) → 3 → 4 → 5 (1200px+)
