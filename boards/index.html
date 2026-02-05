@@ -785,6 +785,52 @@ body {
   color: var(--bg);
 }
 
+/* Sub-tag filter bar */
+.sub-tags {
+  display: none;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--subtle);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sub-tags--visible {
+  display: flex;
+}
+
+.sub-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sub-tag:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.sub-tag--active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.sub-tag__count {
+  opacity: 0.6;
+  margin-left: 4px;
+}
+
 /* Search input */
 .search-input {
   font-family: var(--font-mono);
@@ -2932,6 +2978,8 @@ body {
     <input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off">
     <button class="filter-token filter-token--active" data-category="all">All</button>
   </nav>
+
+  <nav class="sub-tags" id="subTags"></nav>
 
   <!-- AI Widget Section - Hero Zone -->
   <section class="widget-section widget-zone widget-zone--hero" id="widgetSection" data-zone="hero">
@@ -5290,6 +5338,70 @@ Return JSON:
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
   const CATEGORIES = ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read'];
 
+  // Sub-tags for each category - shown when filtering by category
+  const SUB_TAGS = {
+    wear: {
+      tags: ['tops', 'bottoms', 'outerwear', 'footwear', 'accessories', 'bags'],
+      keywords: {
+        tops: ['shirt', 'tee', 't-shirt', 'polo', 'sweater', 'hoodie', 'sweatshirt', 'jersey', 'tank', 'blouse', 'top', 'knit', 'cardigan', 'vest'],
+        bottoms: ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'joggers', 'chinos', 'cargo', 'denim', 'leggings'],
+        outerwear: ['jacket', 'coat', 'blazer', 'parka', 'bomber', 'windbreaker', 'anorak', 'fleece', 'puffer', 'down', 'overcoat', 'raincoat'],
+        footwear: ['shoe', 'sneaker', 'boot', 'sandal', 'loafer', 'oxford', 'trainer', 'runner', 'slipper', 'heel', 'flat', 'mule', 'clog'],
+        accessories: ['hat', 'cap', 'beanie', 'scarf', 'glove', 'belt', 'watch', 'sunglasses', 'glasses', 'jewelry', 'ring', 'necklace', 'bracelet', 'earring', 'tie', 'sock', 'wallet'],
+        bags: ['bag', 'backpack', 'tote', 'messenger', 'duffel', 'crossbody', 'clutch', 'purse', 'satchel', 'briefcase']
+      }
+    },
+    home: {
+      tags: ['furniture', 'lighting', 'decor', 'kitchen', 'bedding', 'storage'],
+      keywords: {
+        furniture: ['chair', 'sofa', 'couch', 'table', 'desk', 'bed', 'shelf', 'cabinet', 'dresser', 'bench', 'stool', 'ottoman'],
+        lighting: ['lamp', 'light', 'chandelier', 'sconce', 'pendant', 'lantern', 'candle'],
+        decor: ['art', 'print', 'poster', 'rug', 'carpet', 'mirror', 'vase', 'plant', 'frame', 'pillow', 'cushion', 'throw'],
+        kitchen: ['cookware', 'pan', 'pot', 'knife', 'utensil', 'appliance', 'blender', 'mixer', 'dish', 'plate', 'bowl', 'mug', 'glass'],
+        bedding: ['sheet', 'duvet', 'comforter', 'blanket', 'mattress', 'pillow'],
+        storage: ['basket', 'bin', 'box', 'organizer', 'rack', 'hook', 'hanger']
+      }
+    },
+    use: {
+      tags: ['tech', 'tools', 'fitness', 'outdoor', 'office', 'travel'],
+      keywords: {
+        tech: ['phone', 'laptop', 'tablet', 'headphone', 'speaker', 'camera', 'charger', 'cable', 'keyboard', 'mouse', 'monitor', 'gadget'],
+        tools: ['tool', 'drill', 'hammer', 'screwdriver', 'wrench', 'saw', 'knife', 'multi-tool'],
+        fitness: ['weight', 'dumbbell', 'yoga', 'mat', 'band', 'roller', 'gym', 'workout', 'exercise'],
+        outdoor: ['tent', 'camping', 'hiking', 'bike', 'bicycle', 'kayak', 'ski', 'snowboard', 'fishing'],
+        office: ['pen', 'notebook', 'planner', 'stapler', 'organizer', 'desk', 'stationery'],
+        travel: ['luggage', 'suitcase', 'carry-on', 'passport', 'adapter', 'toiletry', 'packing']
+      }
+    }
+  };
+
+  let currentSubTag = null; // Current sub-tag filter
+
+  // Detect sub-tag from link title/description
+  function detectSubTag(link) {
+    const category = link.category;
+    if (!SUB_TAGS[category]) return null;
+
+    const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
+    const { keywords } = SUB_TAGS[category];
+
+    for (const [tag, words] of Object.entries(keywords)) {
+      for (const word of words) {
+        if (text.includes(word)) {
+          return tag;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Get sub-tag for a link (cached on link object)
+  function getSubTag(link) {
+    if (link.subTag !== undefined) return link.subTag;
+    link.subTag = detectSubTag(link);
+    return link.subTag;
+  }
+
   // Load domain->category cache from localStorage
   function loadCategoryCache() {
     try {
@@ -6051,6 +6163,64 @@ Return JSON:
         }
       });
     }
+
+    // Render sub-tags if applicable
+    renderSubTags();
+  }
+
+  function renderSubTags() {
+    const subTagsEl = $('subTags');
+    if (!subTagsEl) return;
+
+    // Hide if "all" or no sub-tags for this category
+    if (currentFilter === 'all' || !SUB_TAGS[currentFilter]) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      currentSubTag = null;
+      return;
+    }
+
+    const categoryConfig = SUB_TAGS[currentFilter];
+    const links = getAllLinks().filter(l => l.category === currentFilter);
+
+    // Count items per sub-tag
+    const counts = {};
+    let untaggedCount = 0;
+    for (const link of links) {
+      const tag = getSubTag(link);
+      if (tag) {
+        counts[tag] = (counts[tag] || 0) + 1;
+      } else {
+        untaggedCount++;
+      }
+    }
+
+    // Only show sub-tags bar if we have tagged items
+    const hasTaggedItems = Object.keys(counts).length > 0;
+    if (!hasTaggedItems) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      currentSubTag = null;
+      return;
+    }
+
+    // Build sub-tags HTML
+    let html = `<button class="sub-tag ${!currentSubTag ? 'sub-tag--active' : ''}" data-subtag="">All<span class="sub-tag__count">${links.length}</span></button>`;
+
+    for (const tag of categoryConfig.tags) {
+      const count = counts[tag] || 0;
+      if (count > 0) {
+        const active = currentSubTag === tag ? 'sub-tag--active' : '';
+        html += `<button class="sub-tag ${active}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
+      }
+    }
+
+    // Add "Other" for untagged items
+    if (untaggedCount > 0) {
+      const active = currentSubTag === 'other' ? 'sub-tag--active' : '';
+      html += `<button class="sub-tag ${active}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
+    }
+
+    subTagsEl.innerHTML = html;
+    subTagsEl.classList.add('sub-tags--visible');
   }
 
   function handleSearch(e) {
@@ -6077,6 +6247,18 @@ Return JSON:
     let links = currentFilter === 'all'
       ? allLinks
       : allLinks.filter(l => l.category === currentFilter || l.loading);
+
+    // Apply sub-tag filter
+    if (currentSubTag && currentFilter !== 'all') {
+      links = links.filter(l => {
+        if (l.loading) return true;
+        const tag = getSubTag(l);
+        if (currentSubTag === 'other') {
+          return tag === null;
+        }
+        return tag === currentSubTag;
+      });
+    }
 
     // Apply search filter
     if (searchQuery) {
@@ -6512,6 +6694,7 @@ Return JSON:
     const t = e.target.closest('.filter-token');
     if (t) {
       currentFilter = t.dataset.category;
+      currentSubTag = null; // Reset sub-tag when changing category
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
       renderGrid();
@@ -6519,6 +6702,20 @@ Return JSON:
       updateShareButton();
     }
   };
+
+  // Sub-tag filter click handler
+  const subTagsEl = $('subTags');
+  if (subTagsEl) {
+    subTagsEl.onclick = (e) => {
+      const t = e.target.closest('.sub-tag');
+      if (t) {
+        const tag = t.dataset.subtag;
+        currentSubTag = tag === '' ? null : tag;
+        renderSubTags();
+        renderGrid();
+      }
+    };
+  }
 
   // Close any open menus when clicking outside
   document.addEventListener('click', (e) => {
