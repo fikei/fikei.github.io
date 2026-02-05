@@ -221,6 +221,12 @@
           "icon": "\ud83d\udc1b",
           "file": "docs/execution/BUGS.md",
           "source": "ai"
+        },
+        {
+          "title": "Notion Bidirectional Sync",
+          "icon": "\ud83d\udd04",
+          "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
+          "source": "ai"
         }
       ]
     },
@@ -294,12 +300,6 @@
               "icon": "\ud83d\udcc4",
               "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
               "source": "human"
-            },
-            {
-              "title": "Notion Bidirectional Sync",
-              "icon": "\ud83d\udd04",
-              "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
-              "source": "ai"
             }
           ]
         }
