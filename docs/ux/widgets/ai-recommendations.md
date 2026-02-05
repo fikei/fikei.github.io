@@ -6,11 +6,13 @@ AI-powered widgets that analyze your pins and suggest complementary products, st
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Standardized Widget Card | ✅ Shipped | Title + AI badge + refresh icon |
-| Complete the Look | ✅ Shipped | Hero zone, user items + suggestions |
-| Style Summary | ✅ Shipped | Footer zone, style label + traits |
-| Refresh Widget | ✅ Shipped | Regenerate AI content on demand |
+| Standardized Widget Card | ✅ Shipped | Header outside bordered content box |
+| Complete the Look | ✅ Shipped | Inline zone, user items + suggestions |
+| Style Summary | ✅ Shipped | Hero zone, style label + traits |
+| Refresh Widget | ✅ Shipped | ⟳ icon in header, per-widget refresh |
+| Loading State | ✅ Shipped | Shows inside widget content box |
 | Widget Zones | ✅ Shipped | Hero, inline, footer positioning |
+| AI Insights Banner | ❌ Removed | Each widget has its own header |
 | Widget Feedback | ❌ Removed | Simplified UI |
 | Widget Favorites | ❌ Removed | Simplified UI |
 
@@ -41,30 +43,39 @@ AI-powered widgets that analyze your pins and suggest complementary products, st
 
 ### Standardized Widget Card Structure ✅ IMPLEMENTED
 
-All AI widgets use the same outer card structure for consistency:
+All AI widgets use the same structure: header OUTSIDE the bordered content box.
 
 ```
+WIDGET TITLE   [AI]                                   ⟳   ← Header (no border)
 ┌─────────────────────────────────────────────────────────┐
-│  WIDGET TITLE   [AI]                              [↻]   │
-├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  Widget-specific content here                           │
+│  Widget-specific content here                           │  ← Body (bordered box)
 │  (no section headlines)                                 │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 
 Header Elements:
-- Title: Uppercase, monospace, left-aligned
+- Title: Uppercase xs monospace, muted color
 - AI badge: Outline style (muted border), inline with title
-- Refresh: Icon button, no border, floating right
+- Refresh: ⟳ icon (16px), no border, floating right
+```
+
+### Loading State ✅ IMPLEMENTED
+
+```
+STYLE SUMMARY   [AI]
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│                 Generating insights...                  │  ← Loader inside body
+│                                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### Complete the Look Widget ✅ IMPLEMENTED
 
 ```
+COMPLETE THE LOOK   [AI]                              ⟳
 ┌─────────────────────────────────────────────────────────┐
-│  COMPLETE THE LOOK   [AI]                         [↻]   │
-├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐                   │
 │  │ [your]  │ │ [your]  │ │ [your]  │  ← Your items     │
@@ -83,9 +94,8 @@ Header Elements:
 ### Style Summary Widget ✅ IMPLEMENTED
 
 ```
+STYLE SUMMARY   [AI]                                  ⟳
 ┌─────────────────────────────────────────────────────────┐
-│  STYLE SUMMARY   [AI]                             [↻]   │
-├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Minimal Modern                   ← Style label         │
 │  Based on 12 items                ← Sublabel            │
@@ -102,7 +112,8 @@ Header Elements:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  [Hero Zone]    Complete the Look widget appears here   │
+│  [Hero Zone]    Style Summary widget appears here       │
+│  (No separate banner - widget has its own header)       │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
@@ -112,7 +123,7 @@ Header Elements:
 │                                                         │
 │  ┌─────┐ ┌──────────────────────────────┐ ┌─────┐      │
 │  │     │ │  [Inline Zone]               │ │     │      │
-│  │     │ │   Future widget position     │ │     │      │
+│  │     │ │   Complete the Look widget   │ │     │      │
 │  └─────┘ └──────────────────────────────┘ └─────┘      │
 │                                                         │
 │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
@@ -120,7 +131,7 @@ Header Elements:
 │  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘              │
 │                                                         │
 ├─────────────────────────────────────────────────────────┤
-│  [Footer Zone]  Style Summary widget appears here       │
+│  [Footer Zone]  Reserved for future widgets             │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -210,26 +221,29 @@ User's Saved Pins
 - 5-minute client cache, branded Shopify API integration
 
 ### Widget Card Structure
-- Outer wrapper: `.widget-complete` with `data-widget-id`
-- Header: `.widget-complete__header` with title, AI badge, refresh button
-- Body: `.widget-complete__body` holds widget-specific content
+- Outer wrapper: `.widget-complete` (no border) with `data-widget-id`
+- Header: `.widget-complete__header` - sits OUTSIDE the content box
+- Body: `.widget-complete__body` - bordered box (--subtle border, --surface bg)
+- Loading: `.widget-complete__body--loading` centers loader inside body
 - File: `boards/index.html` - `renderCompleteTheLookWidget()`, `renderStyleSummaryWidget()`
 
 ### CSS Classes
 ```css
-.widget-complete         /* Outer card container */
-.widget-complete__header /* Header with title + badge + refresh */
-.widget-complete__header-left  /* Title and badge group */
-.widget-complete__title  /* Widget name, uppercase mono */
-.widget-complete__badge  /* "AI" tag, outline style */
-.widget-complete__refresh-btn  /* Refresh icon, no border */
-.widget-complete__body   /* Content area */
-.widget-complete__section /* Content section */
-.widget-complete__divider /* Horizontal separator */
-.widget-complete__items  /* Item grid container */
+.widget-complete              /* Outer wrapper (no border) */
+.widget-complete__header      /* Header row (outside box) */
+.widget-complete__header-left /* Title and badge group */
+.widget-complete__title       /* Widget name, xs muted mono */
+.widget-complete__badge       /* "AI" tag, outline style */
+.widget-complete__refresh-btn /* ⟳ icon (16px), no border */
+.widget-complete__body        /* Bordered content box */
+.widget-complete__body--loading /* Centered loader modifier */
+.widget-complete__section     /* Content section */
+.widget-complete__divider     /* Horizontal separator */
+.widget-complete__items       /* Item grid container */
 ```
 
 ### Removed Features
+- ~~AI Insights banner (widget-section__header)~~
 - ~~Widget feedback (rateWidget, submitWidgetFeedback)~~
 - ~~Widget favorites (toggleWidgetFavorite)~~
 - ~~Widget dismiss/hide (dismissWidget, hideWidget)~~
