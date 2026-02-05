@@ -585,23 +585,23 @@ body {
 
 /* Floating Button Base */
 .float-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  background: var(--fg);
-  color: var(--bg);
-  border: none;
+  font-size: var(--font-size-lg);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s ease;
+  transition: background 0.15s, color 0.15s;
 }
 
 .float-btn:hover {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  background: var(--fg);
+  color: var(--bg);
 }
 
 /* FAB Menu Container */
@@ -610,23 +610,25 @@ body {
 }
 
 .fab-menu__trigger {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  background: var(--fg);
-  color: var(--bg);
-  border: none;
+  font-size: var(--font-size-lg);
+  font-weight: 300;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
+  transition: background 0.15s, color 0.15s, transform 0.2s ease;
+  line-height: 1;
 }
 
 .fab-menu__trigger:hover {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .fab-menu--open .fab-menu__trigger {
