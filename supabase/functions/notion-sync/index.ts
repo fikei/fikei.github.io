@@ -681,6 +681,33 @@ class NotionClient {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TABLE OF CONTENTS GENERATOR
+// ═══════════════════════════════════════════════════════════════
+
+// Generate a table of contents markdown for section pages
+function generateTableOfContents(children: PageDef[], depth = 0): string {
+  if (!children || children.length === 0) return ''
+
+  const lines: string[] = []
+
+  for (const child of children) {
+    const indent = '  '.repeat(depth)
+    const icon = child.icon || '📄'
+    lines.push(`${indent}- ${icon} **${child.title}**`)
+
+    // Add nested children
+    if (child.children && child.children.length > 0) {
+      const nestedContent = generateTableOfContents(child.children, depth + 1)
+      if (nestedContent) {
+        lines.push(nestedContent)
+      }
+    }
+  }
+
+  return lines.join('\n')
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SYNC LOGIC
 // ═══════════════════════════════════════════════════════════════
 
@@ -706,8 +733,18 @@ async function syncStructure(
       const pagePath = parentPath ? `${parentPath} > ${page.title}` : page.title
 
       try {
-        // When skipContent is true, don't pass content to create (structure only)
-        const contentToUse = skipContent ? undefined : page.content
+        // Determine content: file content, or generate TOC for section pages
+        let contentToUse: string | undefined = undefined
+        if (!skipContent) {
+          if (page.content) {
+            // Page has file content
+            contentToUse = page.content
+          } else if (page.children && page.children.length > 0) {
+            // Section page with children - generate table of contents
+            const toc = generateTableOfContents(page.children)
+            contentToUse = `# ${page.title}\n\n## Contents\n\n${toc}`
+          }
+        }
 
         // Find or create under the correct parent
         const { id: pageId, created } = await client.findOrCreateChildPage(
@@ -720,9 +757,9 @@ async function syncStructure(
 
         if (created) {
           result.created.push(pagePath)
-        } else if (!skipContent && page.content) {
+        } else if (!skipContent && contentToUse) {
           // Update existing page content (only if not skipping content)
-          await client.updatePageContent(pageId, page.content)
+          await client.updatePageContent(pageId, contentToUse)
           result.updated.push(pagePath)
         } else {
           result.skipped.push(pagePath)
@@ -969,16 +1006,16 @@ async function cleanupLegacyPages(
           const isEmpty = await client.isPageEmpty(pageId)
 
           if (isEmpty) {
-            // Human-created but empty (title only) - delete it
+            // Human-created but empty (title only) - archive it
             if (dryRun) {
-              result.deleted.push(`[DRY RUN] Would delete empty human page: ${pagePath}`)
+              result.deleted.push(`[DRY RUN] Would archive empty human page: ${pagePath}`)
             } else {
               try {
-                await client.movePage(pageId, archiveFolderId!)
-                result.deleted.push(`Deleted empty human page: ${pagePath}`)
+                await client.archivePage(pageId)
+                result.deleted.push(`Archived empty human page: ${pagePath}`)
                 await new Promise(resolve => setTimeout(resolve, 150))
               } catch (error) {
-                result.errors.push(`Failed to delete '${pagePath}': ${error.message}`)
+                result.errors.push(`Failed to archive '${pagePath}': ${error.message}`)
               }
             }
           } else {
@@ -988,16 +1025,16 @@ async function cleanupLegacyPages(
           continue
         }
 
-        // Bot/AI-created page or protection disabled - move to Archive
+        // Bot/AI-created page or protection disabled - archive it
         if (dryRun) {
-          result.deleted.push(`[DRY RUN] Would move to Archive: ${pagePath}`)
+          result.deleted.push(`[DRY RUN] Would archive: ${pagePath}`)
         } else {
           try {
-            await client.movePage(pageId, archiveFolderId!)
-            result.deleted.push(`Moved to Archive (bot-created): ${pagePath}`)
+            await client.archivePage(pageId)
+            result.deleted.push(`Archived (bot-created): ${pagePath}`)
             await new Promise(resolve => setTimeout(resolve, 150))
           } catch (error) {
-            result.errors.push(`Failed to move '${pagePath}' to Archive: ${error.message}`)
+            result.errors.push(`Failed to archive '${pagePath}': ${error.message}`)
           }
         }
       } else {
