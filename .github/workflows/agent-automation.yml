@@ -551,11 +551,16 @@ jobs:
           PYEOF
 
           # Step 2: Sync pages that need updating (using JSON format with parent/icon info)
-          python3 << 'SYNC_PYEOF'
+          python3 -u << 'SYNC_PYEOF'
           import json
           import os
           import subprocess
           import time
+          import sys
+
+          def log(msg):
+              """Print with immediate flush for GitHub Actions"""
+              print(msg, flush=True)
 
           # Load pages to sync
           try:
@@ -565,13 +570,15 @@ jobs:
               pages_to_sync = []
 
           if not pages_to_sync:
-              print("✨ No pages need syncing")
+              log("✨ No pages need syncing")
               exit(0)
 
-          print(f"\nSyncing {len(pages_to_sync)} pages...")
+          log(f"\n───────────────────────────────────────────")
+          log(f"📤 SYNCING {len(pages_to_sync)} PAGES")
+          log(f"───────────────────────────────────────────")
           failed_pages = []
 
-          def sync_page(page, is_retry=False):
+          def sync_page(page, index, total, is_retry=False):
               """Sync a single page, returns True on success"""
               filepath = page['filepath']
               title = page['title']
@@ -580,7 +587,7 @@ jobs:
               parent = page.get('parent')
 
               if not os.path.exists(filepath):
-                  print(f"⏭️ {title} — file not found: {filepath}")
+                  log(f"[{index}/{total}] ⏭️ {title} — file not found")
                   return True  # Don't retry missing files
 
               # Read content
@@ -588,8 +595,8 @@ jobs:
                   content = f.read()[:40000]
 
               word_count = len(content.split())
-              action = "retrying" if is_retry else f"syncing {word_count} words"
-              print(f"📄 {title} — {action}")
+              prefix = f"[{index}/{total}]" if not is_retry else "[retry]"
+              log(f"{prefix} 📄 {title} ({word_count} words)...")
 
               # Build payload with parent info for auto-creation
               payload = {
@@ -620,25 +627,26 @@ jobs:
                       created = response.get('created', [])
                       updated = response.get('updated', [])
                       if created:
-                          print(f"   ✅ Created: {created[0]}")
+                          log(f"        ✅ Created")
                       elif updated:
                           # Extract block count from update message
                           blocks = updated[0].split('(')[1].split(' ')[0] if '(' in updated[0] else '?'
-                          print(f"   ✅ Done ({blocks} blocks)")
+                          log(f"        ✅ Done ({blocks} blocks)")
                       else:
-                          print(f"   ✅ Done")
+                          log(f"        ✅ Done")
                       return True
                   else:
                       errors = response.get('errors', [])
-                      print(f"   ⚠️ Failed: {errors[0] if errors else 'unknown error'}")
+                      log(f"        ⚠️ Failed: {errors[0] if errors else 'unknown error'}")
                       return False
               except json.JSONDecodeError:
-                  print(f"   ⚠️ Failed: invalid response")
+                  log(f"        ⚠️ Failed: invalid response")
                   return False
 
           # First pass
-          for page in pages_to_sync:
-              if not sync_page(page):
+          total = len(pages_to_sync)
+          for i, page in enumerate(pages_to_sync, 1):
+              if not sync_page(page, i, total):
                   failed_pages.append(page)
               time.sleep(2)
 
@@ -646,22 +654,22 @@ jobs:
           for retry in range(1, 4):
               if not failed_pages:
                   break
-              print(f"\n🔄 Retry {retry}: {len(failed_pages)} failed pages (waiting {retry * 10}s...)")
+              log(f"\n🔄 Retry {retry}: {len(failed_pages)} failed pages (waiting {retry * 10}s...)")
               time.sleep(retry * 10)
 
               retry_pages = failed_pages
               failed_pages = []
               for page in retry_pages:
-                  if not sync_page(page, is_retry=True):
+                  if not sync_page(page, 0, 0, is_retry=True):
                       failed_pages.append(page)
                   time.sleep(3)
 
           # Report any remaining failures
           if failed_pages:
-              print(f"\n⚠️ Some pages still failed after 3 retries:")
+              log(f"\n⚠️ Some pages still failed after 3 retries:")
               for page in failed_pages:
-                  print(f"   - {page['title']}")
-              print("State NOT updated for these - will retry next run.")
+                  log(f"   - {page['title']}")
+              log("State NOT updated for these - will retry next run.")
           SYNC_PYEOF
 
           echo ""
