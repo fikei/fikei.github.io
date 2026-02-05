@@ -38,6 +38,7 @@
             {
               "title": "Pins",
               "icon": "📌",
+              "file": "docs/ux/pins/index.md",
               "source": "ai",
               "children": [
                 { "title": "Content Types", "icon": "📦", "file": "docs/ux/pins/content-types.md", "source": "ai" },
@@ -49,6 +50,7 @@
             {
               "title": "Widgets",
               "icon": "🤖",
+              "file": "docs/ux/widgets/index.md",
               "source": "ai",
               "children": [
                 { "title": "AI Recommendations", "icon": "💡", "file": "docs/ux/widgets/ai-recommendations.md", "source": "ai" },
@@ -58,6 +60,7 @@
             {
               "title": "Boards",
               "icon": "📋",
+              "file": "docs/ux/boards/index.md",
               "source": "ai",
               "children": [
                 { "title": "Categories & Filtering", "icon": "🏷️", "file": "docs/ux/boards/categories-filtering.md", "source": "ai" },
