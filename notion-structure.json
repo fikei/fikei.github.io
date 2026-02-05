@@ -83,19 +83,7 @@
       "title": "Execution",
       "icon": "🔨",
       "children": [
-        { "title": "Global Backlog", "icon": "📊", "file": "BACKLOG.md" },
-        { "title": "Current Sprint", "icon": "🏃", "file": "docs/execution/sprint.md" },
-        { "title": "Recently Shipped", "icon": "✅", "file": "docs/execution/shipped.md" },
-        { "title": "Blocked/Waiting", "icon": "🚧", "file": "docs/execution/blocked.md" },
-        {
-          "title": "Project Plans",
-          "icon": "📋",
-          "children": [
-            { "title": "Boards", "icon": "📄", "file": "docs/execution/project-plans/boards.md" },
-            { "title": "Phase 0 Implementation", "icon": "📄", "file": "docs/execution/project-plans/phase0-implementation.md" },
-            { "title": "Boards Original Plan", "icon": "📄", "file": "docs/execution/project-plans/boards-original.md" }
-          ]
-        }
+        { "title": "Unified Project Plan", "icon": "📊", "file": "docs/execution/UNIFIED-PROJECT-PLAN.md" }
       ]
     },
     {
