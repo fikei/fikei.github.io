@@ -55,7 +55,7 @@ All AI widgets use the same outer card structure for consistency:
 
 Header Elements:
 - Title: Uppercase, monospace, left-aligned
-- AI badge: Inverted tag inline with title
+- AI badge: Outline style (muted border), inline with title
 - Refresh: Icon button, no border, floating right
 ```
 
@@ -221,7 +221,7 @@ User's Saved Pins
 .widget-complete__header /* Header with title + badge + refresh */
 .widget-complete__header-left  /* Title and badge group */
 .widget-complete__title  /* Widget name, uppercase mono */
-.widget-complete__badge  /* "AI" tag, inverted colors */
+.widget-complete__badge  /* "AI" tag, outline style */
 .widget-complete__refresh-btn  /* Refresh icon, no border */
 .widget-complete__body   /* Content area */
 .widget-complete__section /* Content section */

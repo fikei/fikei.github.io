@@ -378,7 +378,7 @@ Standardized container for AI-powered recommendation widgets.
 **AI Widget Card behavior:**
 - Outer border with padding, no inner section borders
 - Header: Title (left) + AI badge (inline) + Refresh button (floating right)
-- AI badge: inverted colors (white on black), 9px uppercase
+- AI badge: outline style (transparent bg, muted border), 9px uppercase
 - Refresh button: icon only, no border, muted color, hover effect
 - Body: holds widget-specific content (items, sections, etc.)
 - All AI widgets use this same outer structure for consistency
