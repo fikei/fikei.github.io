@@ -64,14 +64,14 @@ When working on this project, always follow these guidelines:
      4. Add `archive/README.md` listing what was archived and why
      5. On next sync, old Notion pages are automatically deleted
    - **GitHub is always the source of truth** - Notion structure matches `notion-structure.json`
-   - **Page source tracking** - Each entry in `notion-structure.json` has a `source` field:
-     - `"source": "ai"` - AI-generated page (can be freely deleted/reorganized)
-     - `"source": "human"` - Human-created page (protected)
-     - When adding new pages, always set `"source": "ai"` for AI-generated content
+   - **Page source detection** - Inferred from Notion's `created_by` metadata:
+     - `created_by.type = "bot"` → AI/integration-created (deletable)
+     - `created_by.type = "person"` → Human-created (protected)
+     - No manual tagging needed - automatically detected from Notion
    - **Automatic cleanup rules** (pages NOT in `notion-structure.json`):
-     1. AI pages (`source: ai`) → **DELETE** (move to Archive)
-     2. Human pages (`source: human`) that are empty (title only, no content) → **DELETE**
-     3. Human pages (`source: human`) with content → **PROTECT** (do not delete)
+     1. Bot-created pages → **DELETE** (move to Archive)
+     2. Human-created pages that are empty (title only) → **DELETE**
+     3. Human-created pages with content → **PROTECT** (do not delete)
    - **Manual deletion rules:**
      - AI pages: Can delete, archive, or reorganize freely anytime
      - Human pages: Only delete/archive if ALL content has been consolidated elsewhere first

@@ -152,6 +152,21 @@ class NotionClient {
     }
   }
 
+  // Check if a page was created by a human (person) vs bot (integration/AI)
+  async isHumanCreated(pageId: string): Promise<boolean> {
+    try {
+      const page = await this.request(`/pages/${pageId}`)
+
+      // Check created_by type: "person" = human, "bot" = integration/AI
+      const createdByType = page.created_by?.type
+
+      return createdByType === 'person'
+    } catch (e) {
+      // If we can't read it, assume it's human-created (safer)
+      return true
+    }
+  }
+
   async findOrCreateChildPage(
     parentId: string,
     title: string,
@@ -945,12 +960,12 @@ async function cleanupLegacyPages(
 
       if (!expectedTitlesForParent.has(title)) {
         // This page is not in the expected structure
-        // Check if it's a human-created page that should be protected
-        // Orphans (not in pageSources) default to 'ai' (deletable)
-        const pageSource = pageSources[title] || 'ai'  // Default to ai (deletable)
+        // Check Notion's created_by to determine if human or bot created
+        const isHuman = protectHuman ? await client.isHumanCreated(pageId) : false
 
-        if (protectHuman && pageSource === 'human') {
-          // Human-created page - check if it's empty before protecting
+        if (isHuman) {
+          // Human-created page (created by person, not bot/integration)
+          // Check if it's empty before protecting
           const isEmpty = await client.isPageEmpty(pageId)
 
           if (isEmpty) {
@@ -968,18 +983,18 @@ async function cleanupLegacyPages(
             }
           } else {
             // Human-created with content - protect from deletion
-            result.protected.push(`Protected (human-created with content): ${pagePath}`)
+            result.protected.push(`Protected (created by human with content): ${pagePath}`)
           }
           continue
         }
 
-        // AI-created page or protection disabled - move to Archive
+        // Bot/AI-created page or protection disabled - move to Archive
         if (dryRun) {
           result.deleted.push(`[DRY RUN] Would move to Archive: ${pagePath}`)
         } else {
           try {
             await client.movePage(pageId, archiveFolderId!)
-            result.deleted.push(`Moved to Archive: ${pagePath}`)
+            result.deleted.push(`Moved to Archive (bot-created): ${pagePath}`)
             await new Promise(resolve => setTimeout(resolve, 150))
           } catch (error) {
             result.errors.push(`Failed to move '${pagePath}' to Archive: ${error.message}`)
