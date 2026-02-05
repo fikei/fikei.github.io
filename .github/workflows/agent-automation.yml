@@ -305,6 +305,42 @@ jobs:
 
           echo "📊 Content sync complete!"
 
+      - name: Cleanup Orphaned Pages
+        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+        run: |
+          echo "🧹 Step 3: Cleaning up orphaned Notion pages..."
+
+          if [ ! -f "notion-structure.json" ]; then
+            echo "⚠️ notion-structure.json not found, skipping cleanup"
+            exit 0
+          fi
+
+          # Build cleanup payload
+          python3 << 'PYEOF' > /tmp/cleanup_payload.json
+          import json
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+          payload = {
+              'action': 'cleanup',
+              'structure': structure
+          }
+          print(json.dumps(payload))
+          PYEOF
+
+          response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/cleanup_payload.json)
+
+          echo "Cleanup response: $response"
+
+          if echo "$response" | grep -q '"success":true'; then
+            echo "✅ Cleanup complete"
+            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Archived:', r.get('archived', []))" 2>/dev/null || true
+          else
+            echo "⚠️ Cleanup had issues: $response"
+          fi
+
   # Triggered on every push - quick status and security check
   on-push:
     if: github.event_name == 'push'
