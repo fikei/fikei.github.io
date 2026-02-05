@@ -101,6 +101,16 @@ When working on this project, always follow these guidelines:
    - Document new components in `design-system/README.md`
    - Run systemic analyzer after design system changes
 
+8. **Notify when updating documentation**
+   - When creating, updating, or deleting any documentation file, explicitly tell me what was changed
+   - Include the file path and a brief summary of changes
+   - This applies to: PRDs, tech specs, project plans, READMEs, and any markdown files in `/docs/`
+
+9. **Update project plan when completing user-facing tasks**
+   - After finishing a user-facing feature, update the story status in `docs/execution/UNIFIED-PROJECT-PLAN.md`
+   - Add implementation details if relevant (e.g., key files, functions, components)
+   - If new UI components were added, document them in `design-system/README.md`
+
 ---
 
 ## Quick Reference
