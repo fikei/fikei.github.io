@@ -41,9 +41,9 @@ env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
 jobs:
-  # Sync to Notion on every push
+  # Sync to Notion on every push or manual trigger
   notion-sync:
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force_full_sync == true)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,12 +55,13 @@ jobs:
         id: changes
         env:
           FORCE_SYNC: ${{ inputs.force_full_sync }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           echo "🔍 Detecting changed files..."
 
-          # Check for force sync (manual trigger)
-          if [ "$FORCE_SYNC" = "true" ]; then
-            echo "🔄 Force full sync requested - will sync all pages"
+          # Manual trigger always does full sync
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "🔄 Manual trigger - will sync all pages"
             echo "structure_changed=true" >> $GITHUB_OUTPUT
             git ls-files > /tmp/changed_files.txt
             exit 0
@@ -153,7 +154,7 @@ jobs:
           PYEOF
 
       - name: Sync Structure (Pages Only)
-        if: env.SUPABASE_URL != '' && (steps.changes.outputs.structure_changed == 'true' || inputs.force_full_sync == true)
+        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
           echo "🔄 Step 1: Creating/verifying page structure..."
 
