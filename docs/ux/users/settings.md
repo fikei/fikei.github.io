@@ -2,6 +2,18 @@
 
 User-configurable options for customizing the Boards experience.
 
+**Implementation Status**: 🔄 Partially Implemented
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Theme Toggle | ✅ Shipped | Dark/Light mode |
+| Grid Flow Priority | ✅ Shipped | Fill gaps over order |
+| Export JSON | ✅ Shipped | In Admin Panel |
+| Export CSV | ✅ Shipped | In Admin Panel |
+| Widget Preferences | ⏳ Planned | Favorite/hide widgets |
+| Clear Cache | ⏳ Planned | Remove cached data |
+| Reset Settings | ⏳ Planned | Return to defaults |
+
 ---
 
 ## User Goals
@@ -81,36 +93,60 @@ Dark Mode (Default):              Light Mode:
 └───────────────────┘             └───────────────────┘
 ```
 
-### Export Data Format
+### Grid Flow Priority ✅ IMPLEMENTED
 
 ```
 ┌─────────────────────────────────────────┐
-│  Export Data                      [X]   │
+│  Settings                         [X]   │
 ├─────────────────────────────────────────┤
 │                                         │
-│  Your export includes:                  │
-│  • 156 pins                             │
-│  • 8 categories                         │
-│  • Widget preferences                   │
-│  • Account settings                     │
+│  Light Mode              [ ○──── ]      │
+│  Switch to light theme                  │
 │                                         │
-│  Format:                                │
-│  [ ● JSON ]  [ ○ CSV ]                  │
+│  Prioritize Grid Flow    [ ────● ]      │
+│  Fill gaps over strict order            │
 │                                         │
-│  ─────────────────────────────────────  │
-│                                         │
-│  Preview:                               │
-│  ┌─────────────────────────────────┐    │
-│  │ {                               │    │
-│  │   "pins": [...],                │    │
-│  │   "categories": [...],          │    │
-│  │   "settings": {...}             │    │
-│  │ }                               │    │
-│  └─────────────────────────────────┘    │
-│                                         │
-│           [ Cancel ]  [ Download ]      │
 └─────────────────────────────────────────┘
 ```
+
+**How it works:**
+- **OFF (default)**: Cards display in saved order; gaps may appear
+- **ON**: Expanded cards render first, 1x1 cards fill remaining gaps
+
+**Implementation details:**
+- Setting: `boards-grid-flow` in localStorage
+- File: `boards/index.html:6340-6346` (sort logic)
+- Toggle: `gridFlowToggle` element
+
+### Export Data ✅ IMPLEMENTED
+
+Export is available in the **Admin Panel** (Ctrl+Shift+A → Admin Panel).
+
+```
+┌─────────────────────────────────────────┐
+│  Admin Panel                      [X]   │
+├─────────────────────────────────────────┤
+│                                         │
+│  DATA EXPORT                            │
+│  ─────────────────────────────────────  │
+│                                         │
+│  [Export JSON]  [Export CSV]            │
+│                                         │
+│  JSON: Full data backup including       │
+│        links, categories, settings      │
+│                                         │
+│  CSV:  Spreadsheet format with          │
+│        title, url, domain, category,    │
+│        content_type, description, date  │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Implementation details:**
+- Location: Admin Panel → Data Export section
+- JSON: Full backup via `exportAsJson()`
+- CSV: Spreadsheet format via `exportAsCsv()`
+- File: `boards/index.html:7005-7055`
 
 ### Clear Cache Confirmation
 

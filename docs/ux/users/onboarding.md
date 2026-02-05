@@ -2,6 +2,15 @@
 
 The first-time user experience that introduces Boards features and helps users get started quickly.
 
+**Implementation Status**: 🔄 Partially Implemented
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Empty State | ✅ Shipped | Welcome message, CTA, paste hint |
+| First Pin Celebration | ⏳ Planned | Animation + tips |
+| Progressive Disclosure | ⏳ Planned | Feature unlocking |
+| Onboarding Checklist | ⏳ Planned | Dismissible widget |
+
 ---
 
 ## User Goals
@@ -28,7 +37,7 @@ The first-time user experience that introduces Boards features and helps users g
 
 ## Wireframes
 
-### Landing State (No Pins)
+### Landing State (No Pins) ✅ IMPLEMENTED
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -36,22 +45,56 @@ The first-time user experience that introduces Boards features and helps users g
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │                                                             │
-│                         📌                                  │
-│                                                             │
-│              Welcome to Boards                              │
-│                                                             │
-│       Save links, organize with AI, discover                │
-│              what goes with what.                           │
-│                                                             │
 │              ┌─────────────────────┐                        │
-│              │   + Add Your First  │                        │
-│              │        Link         │                        │
+│              │                     │                        │
+│              │  WELCOME TO BOARDS  │                        │
+│              │                     │                        │
+│              │  Collect and        │                        │
+│              │  organize links     │                        │
+│              │  you love.          │                        │
+│              │                     │                        │
+│              │ [Add Your First Link]                        │
+│              │                     │                        │
+│              │  Tip: Paste any URL │                        │
+│              │  directly on this   │                        │
+│              │  page               │                        │
+│              │                     │                        │
 │              └─────────────────────┘                        │
-│                                                             │
-│                 or paste a URL anywhere                     │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Implementation details:**
+- Component: `.empty-state`, `.empty-state__box`, `.empty-state__title`
+- CTA button: `.empty-state__cta` - inverts on hover
+- Hint text: `.empty-state__hint` - muted color
+- File: `boards/index.html:6195-6250`
+
+### Empty Search Results ✅ IMPLEMENTED
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [Search: "query"]  [ All ] [ Clothing ] [ Tech ]           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│              ┌─────────────────────┐                        │
+│              │                     │                        │
+│              │  No links match     │                        │
+│              │  "query"            │                        │
+│              │                     │                        │
+│              │  [Clear Search]     │                        │
+│              │                     │                        │
+│              └─────────────────────┘                        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Implementation details:**
+- Component: `.empty-state__clear` button
+- Shown when search returns no results
+- Clear button resets search and shows all links
+
+---
 
 ### First Pin Added Celebration
 

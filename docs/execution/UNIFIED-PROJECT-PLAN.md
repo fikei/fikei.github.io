@@ -404,8 +404,8 @@
 | **Grid Reflow** | | ✅ |
 | | Detect card resize | ✅ |
 | | Fill gaps algorithm (CSS grid-auto-flow: dense) | ✅ |
+| | Prioritize grid flow setting (reorder expanded cards) | ✅ |
 | | Animate card movements | ⏳ |
-| | Option to disable auto-reflow | ⏳ |
 | **Image Carousel** | | ⏳ |
 | | Fetch multiple images | ⏳ |
 | | Carousel in expanded view | ⏳ |
