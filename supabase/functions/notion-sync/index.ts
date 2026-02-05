@@ -41,6 +41,7 @@ interface SyncRequest {
   skipContent?: boolean  // For sync-structure: only create pages, skip content updates
   pageSources?: Record<string, 'ai' | 'human'>  // For cleanup: track page origins
   protectHuman?: boolean  // For cleanup: protect human-created pages from deletion
+  targetSection?: string  // For sync-structure: only sync this section and its children (e.g., "User Experience" or "User Experience/Components/Pins")
 }
 
 interface MovedPage {
@@ -950,6 +951,48 @@ function collectPageIds(
 // SYNC LOGIC
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Filter structure to only include a target section and its children
+ * @param structure Full structure
+ * @param targetPath Section path like "User Experience" or "User Experience/Components/Pins"
+ * @returns Filtered structure with only the target section, or original if not found
+ */
+function filterStructureBySection(structure: Structure, targetPath: string): Structure {
+  const pathParts = targetPath.split('/').map(p => p.trim())
+
+  function findSection(pages: PageDef[], remainingPath: string[]): PageDef | null {
+    if (remainingPath.length === 0) return null
+
+    const targetTitle = remainingPath[0]
+    for (const page of pages) {
+      if (page.title.toLowerCase() === targetTitle.toLowerCase()) {
+        if (remainingPath.length === 1) {
+          // Found the target section
+          return page
+        }
+        // Need to go deeper
+        if (page.children) {
+          return findSection(page.children, remainingPath.slice(1))
+        }
+      }
+    }
+    return null
+  }
+
+  const targetSection = findSection(structure.sections, pathParts)
+
+  if (!targetSection) {
+    console.log(`Target section '${targetPath}' not found, syncing full structure`)
+    return structure
+  }
+
+  console.log(`Filtering to section: ${targetSection.title}`)
+  return {
+    root: structure.root,
+    sections: [targetSection]
+  }
+}
+
 async function syncStructure(
   client: NotionClient,
   structure: Structure,
@@ -1427,7 +1470,11 @@ serve(async (req) => {
       case 'sync-structure':
         // Sync with provided or default structure
         // Use skipContent flag if provided (for faster structure-only sync)
-        const structure = request.structure || DEFAULT_STRUCTURE
+        // Use targetSection to filter to a specific section (e.g., "User Experience" or "User Experience/Components/Pins")
+        let structure = request.structure || DEFAULT_STRUCTURE
+        if (request.targetSection) {
+          structure = filterStructureBySection(structure, request.targetSection)
+        }
         await syncStructure(client, structure, result, request.skipContent || false)
         break
 
