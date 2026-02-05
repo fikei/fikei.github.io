@@ -4,6 +4,23 @@
 
 ---
 
+## Pin Type Abstraction (Pre-requisite for new pin types)
+
+| Story | Status |
+|-------|--------|
+| **Introduce `Pin` base type** — Abstract `Link` into a `Pin` with `pin_type` discriminator field | Pending |
+| **Refactor `addLink()` → `addPin()`** — Generalize creation flow to dispatch by pin type | Pending |
+| **Refactor `syncLinkToSupabase()` → `syncPinToSupabase()`** — Type-agnostic persistence | Pending |
+| **Enrichment strategy registry** — Map `pin_type` → `{ clientEnrich(), serverEnrich() }` | Pending |
+| **Rename `enrich-link` edge function → `enrich-pin`** — Accept any pin type, route to type-specific handler | Pending |
+| **Database migration: `links` → `pins`** — Add `pin_type` column, backfill existing rows as `link` | Pending |
+| **Update widget eligibility** — Widgets declare which pin types they operate on | Pending |
+
+> Trigger: Start this epic when implementing the first non-link pin type (notes, photos, or files).
+> See: [Core Systems Architecture](../../infrastructure/technical-design/core-systems-architecture.md) for the extensibility model.
+
+---
+
 ## Rich Media Support
 
 | Story | Status |

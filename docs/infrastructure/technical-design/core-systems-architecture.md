@@ -1,6 +1,6 @@
 # Core Systems Architecture
 
-> How pin creation, link enrichment, and AI widgets work together
+> How pin creation, pin enrichment, and AI widgets work together
 
 ---
 
@@ -27,10 +27,15 @@ Three core systems form the backbone of the product:
               ▼                         ▼
 ┌──────────────────────┐  ┌──────────────────────┐
 │  CLIENT ENRICHMENT   │  │  SERVER ENRICHMENT   │
-│  CORS proxy scrape   │  │  enrich-link fn      │
-│  OG tags, images     │  │  AI classification   │
-│  Rule-based category │  │  Domain profiling    │
-│  Rule-based type     │  │  Image strategies    │
+│  (per pin type)      │  │  (per pin type)      │
+│                      │  │                      │
+│  Links: CORS scrape, │  │  Links: enrich-link  │
+│  OG tags, images,    │  │  fn, AI classify,    │
+│  rule-based category │  │  domain profiling,   │
+│  & content type      │  │  image strategies    │
+│                      │  │                      │
+│  Future: note parse, │  │  Future: image AI,   │
+│  file extract, etc.  │  │  NLP, etc.           │
 └──────────┬───────────┘  └──────────┬───────────┘
            │                         │
            └────────────┬────────────┘
@@ -119,11 +124,15 @@ The `smartCategorize()` function (`boards/index.html` ~line 5935) tries AI first
 
 ---
 
-## 2. Scraping & Link Enrichment
+## 2. Pin Enrichment
+
+Enrichment is the process of turning a raw pin into a rich object with metadata, images, classification, and categorization. Today this pipeline handles URL-based pins (links), but it's designed to accommodate future pin types (notes, images, files) by treating enrichment as a generic transform that any pin passes through.
 
 Enrichment happens in two tiers. The client handles fast, lightweight metadata extraction. The server handles AI-powered classification and multi-strategy image resolution.
 
-### Tier 1: Client-Side Scraping
+### Tier 1: Client-Side Enrichment (Link Scraping)
+
+For URL-based pins, the client enriches by scraping the target page for OG metadata.
 
 **Function**: `fetchMetadata(url)` (`boards/index.html` ~line 5645)
 
@@ -153,7 +162,7 @@ Images are filtered through a logo detector that rejects URLs containing `logo`,
 
 **Function**: `enrich-link` edge function (`supabase/functions/enrich-link/index.ts`)
 
-The server enrichment runs asynchronously after client scraping completes. It provides two services that the client can't do well: AI classification and authenticated image resolution.
+The server enrichment runs asynchronously after client enrichment completes. It provides two services that the client can't do well: AI classification and authenticated image resolution. Future pin types would add their own server enrichment strategies (e.g., image analysis for photo pins, NLP for text/note pins).
 
 #### Content Type Classification
 
@@ -173,7 +182,7 @@ Three-tier classification pipeline:
    └─ After 5+ samples, domain gets reliable classification
 ```
 
-The domain profile cache is the key optimization here. After classifying a few links from `nike.com`, the system learns that nike.com is primarily `product` content and skips the AI call for future nike.com links. The `domain_profiles` table stores:
+The domain profile cache is the key optimization here. After classifying a few pins from `nike.com`, the system learns that nike.com is primarily `product` content and skips the AI call for future nike.com pins. The `domain_profiles` table stores:
 
 ```sql
 domain_profiles {
@@ -217,9 +226,9 @@ Unsplash API for generic images when all else fails.
 **Strategy: Favicon**
 Google's favicon service at 128px as a last resort for tools/apps.
 
-### Client-Side Queue
+### Enrichment Queue
 
-The client manages enrichment requests through a queue with retry logic (`boards/index.html` ~line 5358):
+The client manages server-side enrichment requests through a queue with retry logic (`boards/index.html` ~line 5358):
 
 ```
 enrichmentQueue[] → process one at a time
@@ -230,6 +239,19 @@ enrichmentQueue[] → process one at a time
 ```
 
 Before making a server call, the client checks its local `domainProfileCache`. If it already knows the domain's content type with high confidence, it sends `skipClassification: true` to avoid unnecessary AI calls.
+
+### Extensibility: Future Pin Types
+
+The two-tier enrichment model is designed to generalize beyond URL pins. Each new pin type would provide:
+
+| Pin Type | Client Enrichment | Server Enrichment |
+|----------|------------------|-------------------|
+| **Link** (current) | CORS scrape for OG tags, images | AI classification, domain profiling, image strategies |
+| **Note** (planned) | Markdown parse, extract inline URLs | NLP: topic extraction, entity recognition, auto-categorize |
+| **Image** (planned) | Read EXIF data, generate thumbnail | Vision AI: describe content, suggest category, detect objects |
+| **File** (planned) | File type detection, size/format | Content extraction (PDF text, CSV preview), summarize |
+
+The enrichment queue, confidence scoring, category assignment, and Supabase sync are pin-type-agnostic — only the enrichment strategies change per type.
 
 ---
 
@@ -401,7 +423,7 @@ The three systems form a pipeline where each stage feeds the next:
 
 1. **Pin Creation** gives us the raw material — a URL, parsed and stored instantly.
 
-2. **Scraping & Enrichment** transforms raw URLs into rich objects with titles, images, categories, and content types. The dual client/server approach means the user gets fast feedback (client scrape in ~2s) followed by higher-quality data (server enrichment with AI classification and better images).
+2. **Pin Enrichment** transforms raw pins into rich objects with titles, images, categories, and content types. For links, the dual client/server approach means the user gets fast feedback (client scrape in ~2s) followed by higher-quality data (server enrichment with AI classification and better images). Future pin types will plug into the same two-tier pattern with their own enrichment strategies.
 
 3. **AI Widgets** consume the enriched pins. The richer the pin metadata (good titles, accurate categories, real images), the better the widget recommendations. The eligibility engine specifically checks `content_quality` — pins with poor metadata reduce a widget's eligibility score.
 
@@ -436,9 +458,9 @@ All three systems share:
 | Pin Creation | `boards/index.html` (~L7020) | Add links modal, URL extraction, skeleton creation |
 | Pin Creation | `boards/index.html` (~L6393) | `addLink()` — localStorage write + Supabase sync |
 | Pin Creation | `boards/index.html` (~L5935) | `smartCategorize()` — AI/rules category assignment |
-| Scraping | `boards/index.html` (~L5645) | `fetchMetadata()` — client-side CORS proxy scraping |
-| Scraping | `boards/index.html` (~L5358) | Enrichment queue with retry logic |
-| Scraping | `supabase/functions/enrich-link/index.ts` | Server-side AI classification + image resolution |
+| Pin Enrichment | `boards/index.html` (~L5645) | `fetchMetadata()` — client-side CORS proxy scraping |
+| Pin Enrichment | `boards/index.html` (~L5358) | Enrichment queue with retry logic |
+| Pin Enrichment | `supabase/functions/enrich-link/index.ts` | Server-side AI classification + image resolution |
 | Widgets | `supabase/functions/generate-widget/index.ts` | Main edge function (AI call, validation, enrichment) |
 | Widgets | `supabase/functions/generate-widget/config/schema.ts` | Widget definition types |
 | Widgets | `supabase/functions/generate-widget/config/registry.ts` | Widget loader, eligibility evaluator, prompt builder |
