@@ -159,44 +159,75 @@ When working on this project, always follow these guidelines:
 - **Database**: Supabase PostgreSQL
 - **Hosting**: GitHub Pages at ctrl.rodeo
 
+### Supabase Projects
+
+| Project | Reference ID | Purpose | Functions |
+|---------|--------------|---------|-----------|
+| **Boards** | `yfhudwakpgzswiylhfbh` | Main app backend | `generate-widget`, `enrich-link` |
+| **Ops** | `ycilriwjnmcelkspmfmg` | Operations/automation | `notion-sync` |
+| **Systemic** | `atdqdfpdeytfuvvpsasz` | Design system tools | - |
+
 ### Supabase Configuration
+
 ```bash
-# Project URLs
-SUPABASE_URL=https://ycilriwjnmcelkspmfmg.supabase.co
-SUPABASE_PROJECT_REF=ycilriwjnmcelkspmfmg
+# Boards Project (main app)
+SUPABASE_BOARDS_URL=https://yfhudwakpgzswiylhfbh.supabase.co
+SUPABASE_BOARDS_REF=yfhudwakpgzswiylhfbh
+
+# Ops Project (automation)
+SUPABASE_OPS_URL=https://ycilriwjnmcelkspmfmg.supabase.co
+SUPABASE_OPS_REF=ycilriwjnmcelkspmfmg
 
 # Get anon key and service key from Supabase Dashboard → Settings → API
 # Service key: click "Reveal" on service_role
 # DO NOT commit the service key to git
 
-# Deploy functions
-supabase functions deploy notion-sync
-supabase functions deploy enrich-link
+# Deploy Boards functions
+supabase link --project-ref yfhudwakpgzswiylhfbh
 supabase functions deploy generate-widget
+supabase functions deploy enrich-link
+
+# Deploy Ops functions
+supabase link --project-ref ycilriwjnmcelkspmfmg
+supabase functions deploy notion-sync
 
 # View function logs
+supabase functions logs generate-widget --tail
 supabase functions logs notion-sync --tail
 ```
 
-### Notion Sync Commands
+### Notion Sync Commands (Ops Project)
 ```bash
+SUPABASE_OPS_URL=https://ycilriwjnmcelkspmfmg.supabase.co
+
 # Sync all content to Notion
-curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+curl -X POST "$SUPABASE_OPS_URL/functions/v1/notion-sync" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
   -H "Content-Type: application/json" \
   -d '{"action": "sync-structure"}'
 
 # Preview cleanup (dry run)
-curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+curl -X POST "$SUPABASE_OPS_URL/functions/v1/notion-sync" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
   -H "Content-Type: application/json" \
   -d '{"action": "cleanup", "dryRun": true}'
 
 # Delete legacy pages
-curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+curl -X POST "$SUPABASE_OPS_URL/functions/v1/notion-sync" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
   -H "Content-Type: application/json" \
   -d '{"action": "cleanup"}'
+```
+
+### Widget Testing (Boards Project)
+```bash
+SUPABASE_BOARDS_URL=https://yfhudwakpgzswiylhfbh.supabase.co
+
+# Test generate-widget
+curl -X POST "$SUPABASE_BOARDS_URL/functions/v1/generate-widget" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"widgetId": "complete-the-look", "prompt": "test", "items": [{"id": "1", "title": "Nike shoes", "url": "https://nike.com"}, {"id": "2", "title": "Jacket", "url": "https://example.com"}]}'
 ```
 
 ---

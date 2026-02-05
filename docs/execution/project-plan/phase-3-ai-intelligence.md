@@ -126,14 +126,16 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Widget Definition Schema** | | In Progress |
+| **Widget Definition Schema** | | Complete |
 | | Define TypeScript schema for widget definitions | Complete |
 | | Eligibility rules as config (not code) | Complete |
 | | Generation config (model, prompt template, constraints) | Complete |
 | | Enrichment config (strategies, timeout, fallback) | Complete |
 | | Rendering config (zone, template, fallback) | Complete |
+| | Refactor index.ts to use config registry | Complete |
 | **Category-Agnostic Matching** | | In Progress |
-| | Remove hard-coded category logic | In Progress |
+| | Remove hard-coded category logic from eligibility | Complete |
+| | Category rules now in config files | Complete |
 | | Widgets match ANY category meeting criteria | Pending |
 | | Same system supports multiple categories without branching | Pending |
 | **Template Selection Engine** | | Pending |
