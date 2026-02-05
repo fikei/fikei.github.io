@@ -4,12 +4,13 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
-## [2026-02-05] - Core Systems Architecture Documentation
+## [2026-02-05] - Core Systems Architecture & Pin Expansion Backlog
 
 ### Added
-- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Architecture document covering the three core systems: Pin Creation, Scraping & Link Enrichment, and AI Widget Pipeline. Documents how these systems connect, their data flows, key architectural decisions, and shared infrastructure.
+- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Architecture document covering the three core systems: Pin Creation, Pin Enrichment, and AI Widget Pipeline. Documents how they connect, data flows, key architectural decisions, and shared infrastructure. Enrichment model generalized for future pin types.
 
 ### Changed
+- **`docs/execution/project-plan/backlog.md`** — Consolidated Rich Media Support, Content Reader, and Pin Type Abstraction into a structured **Pin Expansion** section with 5 epics: Pin Type Abstraction (prerequisite), Link Pin Enhancements, Note Pins, Image Pins, File Pins.
 - **`notion-structure.json`** — Added Core Systems Architecture to Technical Design section
 
 ---
