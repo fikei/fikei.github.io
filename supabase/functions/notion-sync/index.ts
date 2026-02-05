@@ -7,7 +7,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts'
+// Using built-in Web Crypto API (no import needed)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,11 +95,11 @@ class SyncStateManager {
     this.supabase = createClient(supabaseUrl, supabaseKey)
   }
 
-  // Compute MD5 hash of content
+  // Compute SHA-256 hash of content (Web Crypto API)
   async computeHash(content: string): Promise<string> {
     const encoder = new TextEncoder()
     const data = encoder.encode(content)
-    const hashBuffer = await crypto.subtle.digest('MD5', data)
+    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
   }
