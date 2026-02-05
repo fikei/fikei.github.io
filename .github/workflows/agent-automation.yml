@@ -153,32 +153,62 @@ jobs:
           print("Or move the pages back in Notion to match the expected structure")
           PYEOF
 
-      - name: Sync Structure (Pages Only)
+      - name: Sync Structure with Content
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
-          echo "🔄 Step 1: Creating/verifying page structure..."
+          echo "🔄 Step 1: Syncing page structure WITH content..."
 
-          # Read structure from config file and pass to API
+          # Read structure from config file and inject file contents
           if [ -f "notion-structure.json" ]; then
             echo "📁 Using notion-structure.json config"
 
-            # Build payload using Python to handle JSON properly
+            # Build payload with file contents injected into structure
             python3 << 'PYEOF' > /tmp/sync_payload.json
           import json
+          import os
+
+          def inject_content(obj):
+              """Recursively inject file contents into structure nodes that have 'file' property"""
+              if isinstance(obj, dict):
+                  if 'file' in obj:
+                      filepath = obj['file']
+                      if os.path.exists(filepath):
+                          try:
+                              with open(filepath, 'r', encoding='utf-8') as f:
+                                  # Limit content to 40KB to avoid API limits
+                                  content = f.read(40000)
+                                  obj['content'] = content
+                                  print(f"  ✓ Loaded: {filepath} ({len(content)} chars)")
+                          except Exception as e:
+                              print(f"  ✗ Error reading {filepath}: {e}")
+                      else:
+                          print(f"  ⏭ File not found: {filepath}")
+
+                  # Process children recursively
+                  for key in ['children', 'sections']:
+                      if key in obj:
+                          for child in obj[key]:
+                              inject_content(child)
+              return obj
+
           with open('notion-structure.json') as f:
               structure = json.load(f)
+
+          print("📄 Loading file contents into structure...")
+          inject_content(structure)
+
           payload = {
               'action': 'sync-structure',
-              'skipContent': True,
+              'skipContent': False,  # Include content!
               'structure': structure
           }
           print(json.dumps(payload))
           PYEOF
 
-            echo "Payload built successfully"
+            echo "Payload built with content"
           else
             echo "📁 Using default structure from function"
-            echo '{"action": "sync-structure", "skipContent": true}' > /tmp/sync_payload.json
+            echo '{"action": "sync-structure", "skipContent": false}' > /tmp/sync_payload.json
           fi
 
           response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
@@ -190,15 +220,15 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Structure sync successful"
-            # Show what was created
-            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Created:', r.get('created', [])); print('Errors:', r.get('errors', []))"
+            # Show what was created/updated
+            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Created:', r.get('created', [])); print('Updated:', r.get('updated', [])); print('Errors:', r.get('errors', []))"
           else
-            echo "⚠️ Structure sync had issues, continuing with content updates..."
+            echo "⚠️ Structure sync had issues"
           fi
 
-          # Wait for Notion to process all page creations
-          echo "⏳ Waiting 30s for Notion to process..."
-          sleep 30
+          # Small delay before cleanup
+          echo "⏳ Waiting 5s..."
+          sleep 5
 
       - name: Cleanup Orphaned Pages
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
@@ -261,14 +291,16 @@ jobs:
           # Small delay before content sync
           sleep 5
 
-      - name: Update Page Contents (Changed Only)
-        if: env.SUPABASE_URL != ''
+      - name: Update Individual Pages (Changed Files Only)
+        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'false'
         env:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
         run: |
-          echo "🔄 Step 3: Updating page contents (diff-aware)..."
+          echo "🔄 Step 3: Updating individual changed pages..."
+
+          # If structure changed, all content was already synced in Step 1
+          # This step only runs for incremental file changes
 
           update_page() {
             local title="$1"
@@ -301,7 +333,7 @@ jobs:
             exit 0
           fi
 
-          # Build file-to-title mapping and determine which to sync
+          # Build file-to-title mapping for changed files only
           python3 << 'PYEOF'
           import json
           import os
@@ -312,7 +344,6 @@ jobs:
               if isinstance(obj, dict):
                   if 'title' in obj and 'file' in obj:
                       pages.append((obj['title'], obj['file']))
-                  # Check both 'children' and 'sections' (root level uses sections)
                   for key in ['children', 'sections']:
                       if key in obj:
                           for child in obj[key]:
@@ -326,7 +357,6 @@ jobs:
               config = json.load(f)
 
           pages = extract_pages(config)
-          print(f"DEBUG: Found {len(pages)} pages with file mappings")
 
           # Read changed files
           changed_files = set()
@@ -334,22 +364,14 @@ jobs:
               with open('/tmp/changed_files.txt') as f:
                   changed_files = set(line.strip() for line in f if line.strip())
 
-          # If structure changed, sync all. Otherwise, only changed files.
-          structure_changed = os.environ.get('STRUCTURE_CHANGED', 'false') == 'true'
-
-          pages_to_sync = []
-          for title, filepath in pages:
-              if structure_changed or filepath in changed_files:
-                  pages_to_sync.append((title, filepath))
+          # Only sync pages whose files changed
+          pages_to_sync = [(title, filepath) for title, filepath in pages if filepath in changed_files]
 
           with open('/tmp/pages_to_sync.txt', 'w') as f:
               for title, filepath in pages_to_sync:
                   f.write(f"{title}\t{filepath}\n")
 
-          if structure_changed:
-              print(f"📋 Structure changed - syncing all {len(pages_to_sync)} pages")
-          else:
-              print(f"📋 Syncing {len(pages_to_sync)} changed pages (of {len(pages)} total)")
+          print(f"📋 Syncing {len(pages_to_sync)} changed pages (of {len(pages)} total)")
 
           if not pages_to_sync:
               print("✨ No content changes detected - nothing to sync!")
