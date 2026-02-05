@@ -301,10 +301,12 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Structure sync successful"
-            # Show what was created/updated and save for content sync
-            echo "$response" | python3 << 'PYEOF'
-          import json,sys
-          r=json.load(sys.stdin)
+            # Save response and parse it
+            echo "$response" > /tmp/structure_response.json
+            python3 << 'PYEOF'
+          import json
+          with open('/tmp/structure_response.json') as f:
+              r = json.load(f)
           created = r.get('created', [])
           print('Created:', created)
           print('Updated:', r.get('updated', []))
