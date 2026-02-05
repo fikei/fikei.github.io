@@ -50,13 +50,13 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 18 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 12 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 40 | 4 | 56 | 0 |
+| Phase 3: AI Intelligence | 46 | 8 | 46 | 0 |
 | Phase 4: Sharing & Collaboration | 8 | 8 | 72 | 2 |
 | Phase 5: UX Polish | 3 | 0 | 67 | 0 |
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
 | Phase 7: Platform Expansion | 0 | 0 | 50 | 0 |
 | Backlog | 0 | 0 | 40 | 0 |
-| **TOTAL** | **82** | **12** | **294** | **2** |
+| **TOTAL** | **88** | **16** | **284** | **2** |
 
 ---
 
@@ -66,7 +66,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |-------|------|------------|--------|
 | 0 | Deterministic MVP | Very Low | ~95% Complete |
 | 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
-| 2 | Config-Generated Widgets | Medium→High | Pending |
+| 2 | Config-Generated Widgets | Medium→High | **IN PROGRESS** |
 | 3 | Self-Selecting Widgets | High | Pending |
 | 4 | Self-Optimizing System | Full | Pending |
 
