@@ -217,12 +217,6 @@
       "source": "ai",
       "children": [
         {
-          "title": "Notion Bidirectional Sync",
-          "icon": "\ud83d\udd04",
-          "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
-          "source": "ai"
-        },
-        {
           "title": "Bugs",
           "icon": "\ud83d\udc1b",
           "file": "docs/execution/BUGS.md",
@@ -300,57 +294,14 @@
               "icon": "\ud83d\udcc4",
               "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
               "source": "human"
+            },
+            {
+              "title": "Notion Bidirectional Sync",
+              "icon": "\ud83d\udd04",
+              "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
+              "source": "ai"
             }
           ]
-        }
-      ]
-    },
-    {
-      "title": "AI Agents",
-      "icon": "\ud83e\udd16",
-      "source": "ai",
-      "children": [
-        {
-          "title": "Chief of Staff",
-          "icon": "\ud83d\udc54",
-          "file": ".claude/agents/chief-of-staff-agent.md",
-          "source": "ai"
-        },
-        {
-          "title": "Documentation Sync",
-          "icon": "\ud83d\udcda",
-          "file": ".claude/agents/documentation-sync-agent.md",
-          "source": "ai"
-        },
-        {
-          "title": "Organizational",
-          "icon": "\ud83d\udccb",
-          "file": ".claude/agents/organizational-agent.md",
-          "source": "ai"
-        },
-        {
-          "title": "Project Management",
-          "icon": "\ud83d\udcc5",
-          "file": ".claude/agents/project-management-agent.md",
-          "source": "ai"
-        },
-        {
-          "title": "Status Update",
-          "icon": "\ud83d\udcca",
-          "file": ".claude/agents/status-update-agent.md",
-          "source": "ai"
-        },
-        {
-          "title": "Security & Compliance",
-          "icon": "\ud83d\udd12",
-          "file": ".claude/agents/security-compliance-agent.md",
-          "source": "ai"
-        },
-        {
-          "title": "Continuous Improvement",
-          "icon": "\ud83d\udcc8",
-          "file": ".claude/agents/continuous-improvement-agent.md",
-          "source": "ai"
         }
       ]
     },
@@ -451,6 +402,55 @@
           "icon": "\ud83d\udcb0",
           "file": "COSTS.md",
           "source": "human"
+        },
+        {
+          "title": "AI Agents",
+          "icon": "\ud83e\udd16",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Chief of Staff",
+              "icon": "\ud83d\udc54",
+              "file": ".claude/agents/chief-of-staff-agent.md",
+              "source": "ai"
+            },
+            {
+              "title": "Documentation Sync",
+              "icon": "\ud83d\udcda",
+              "file": ".claude/agents/documentation-sync-agent.md",
+              "source": "ai"
+            },
+            {
+              "title": "Organizational",
+              "icon": "\ud83d\udccb",
+              "file": ".claude/agents/organizational-agent.md",
+              "source": "ai"
+            },
+            {
+              "title": "Project Management",
+              "icon": "\ud83d\udcc5",
+              "file": ".claude/agents/project-management-agent.md",
+              "source": "ai"
+            },
+            {
+              "title": "Status Update",
+              "icon": "\ud83d\udcca",
+              "file": ".claude/agents/status-update-agent.md",
+              "source": "ai"
+            },
+            {
+              "title": "Security & Compliance",
+              "icon": "\ud83d\udd12",
+              "file": ".claude/agents/security-compliance-agent.md",
+              "source": "ai"
+            },
+            {
+              "title": "Continuous Improvement",
+              "icon": "\ud83d\udcc8",
+              "file": ".claude/agents/continuous-improvement-agent.md",
+              "source": "ai"
+            }
+          ]
         }
       ]
     }
