@@ -3,169 +3,393 @@
   "sections": [
     {
       "title": "Strategy",
-      "icon": "🎯",
+      "icon": "\ud83c\udfaf",
       "source": "human",
       "children": [
-        { "title": "Vision & Roadmap", "icon": "🗺️", "file": "docs/strategy/vision-and-roadmap.md", "source": "human" },
-        { "title": "Decision Log", "icon": "📋", "file": "docs/strategy/decision-log.md", "source": "human" },
+        {
+          "title": "Vision & Roadmap",
+          "icon": "\ud83d\uddfa\ufe0f",
+          "file": "docs/strategy/vision-and-roadmap.md",
+          "source": "human"
+        },
+        {
+          "title": "Decision Log",
+          "icon": "\ud83d\udccb",
+          "file": "docs/strategy/decision-log.md",
+          "source": "human"
+        },
         {
           "title": "PRDs",
-          "icon": "📄",
+          "icon": "\ud83d\udcc4",
           "source": "human",
           "children": [
-            { "title": "Boards MVP", "icon": "📋", "file": "docs/strategy/prds/boards-mvp.md", "source": "human" },
-            { "title": "Collaborative Boards", "icon": "📋", "file": "docs/strategy/prds/collaborative-boards.md", "source": "human" },
-            { "title": "Content Type System", "icon": "📋", "file": "docs/strategy/prds/content-type-system.md", "source": "human" },
-            { "title": "Corporate Management", "icon": "📋", "file": "docs/strategy/prds/corporate-management.md", "source": "human" },
-            { "title": "Generative Widget Ecosystem", "icon": "📋", "file": "docs/strategy/prds/generative-widget-ecosystem.md", "source": "human" },
-            { "title": "Widget Design System", "icon": "📋", "file": "docs/strategy/prds/widget-design-system.md", "source": "human" },
-            { "title": "Widget Instrumentation", "icon": "📋", "file": "docs/strategy/prds/widget-instrumentation.md", "source": "human" },
-            { "title": "Content Type and Image Systems", "icon": "📋", "file": "docs/strategy/prds/content-type-and-image-systems.md", "source": "human" }
+            {
+              "title": "Boards MVP",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/boards-mvp.md",
+              "source": "human"
+            },
+            {
+              "title": "Collaborative Boards",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/collaborative-boards.md",
+              "source": "human"
+            },
+            {
+              "title": "Corporate Management",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/corporate-management.md",
+              "source": "human"
+            },
+            {
+              "title": "Generative Widget Ecosystem",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/generative-widget-ecosystem.md",
+              "source": "human"
+            },
+            {
+              "title": "Widget Design System",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/widget-design-system.md",
+              "source": "human"
+            },
+            {
+              "title": "Widget Instrumentation",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/widget-instrumentation.md",
+              "source": "human"
+            },
+            {
+              "title": "Content Type and Image Systems",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/content-type-and-image-systems.md",
+              "source": "human"
+            }
           ]
         }
       ]
     },
     {
       "title": "User Experience",
-      "icon": "🎨",
+      "icon": "\ud83c\udfa8",
       "source": "ai",
       "children": [
         {
           "title": "Components",
-          "icon": "🧩",
+          "icon": "\ud83e\udde9",
           "source": "ai",
           "children": [
             {
               "title": "Pins",
-              "icon": "📌",
+              "icon": "\ud83d\udccc",
               "file": "docs/ux/pins/index.md",
               "source": "ai",
               "children": [
-                { "title": "Content Types", "icon": "📦", "file": "docs/ux/pins/content-types.md", "source": "ai" },
-                { "title": "Link Enrichment", "icon": "✨", "file": "docs/ux/pins/link-enrichment.md", "source": "ai" },
-                { "title": "Add Links", "icon": "➕", "file": "docs/ux/pins/add-links.md", "source": "ai" },
-                { "title": "Link Management", "icon": "🔗", "file": "docs/ux/pins/link-management.md", "source": "ai" }
+                {
+                  "title": "Content Types",
+                  "icon": "\ud83d\udce6",
+                  "file": "docs/ux/pins/content-types.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Link Enrichment",
+                  "icon": "\u2728",
+                  "file": "docs/ux/pins/link-enrichment.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Add Links",
+                  "icon": "\u2795",
+                  "file": "docs/ux/pins/add-links.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Link Management",
+                  "icon": "\ud83d\udd17",
+                  "file": "docs/ux/pins/link-management.md",
+                  "source": "ai"
+                }
               ]
             },
             {
               "title": "Widgets",
-              "icon": "🤖",
+              "icon": "\ud83e\udd16",
               "file": "docs/ux/widgets/index.md",
               "source": "ai",
               "children": [
-                { "title": "AI Recommendations", "icon": "💡", "file": "docs/ux/widgets/ai-recommendations.md", "source": "ai" },
-                { "title": "Widget Preferences", "icon": "⚙️", "file": "docs/ux/widgets/widget-preferences.md", "source": "ai" }
+                {
+                  "title": "AI Recommendations",
+                  "icon": "\ud83d\udca1",
+                  "file": "docs/ux/widgets/ai-recommendations.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Widget Preferences",
+                  "icon": "\u2699\ufe0f",
+                  "file": "docs/ux/widgets/widget-preferences.md",
+                  "source": "ai"
+                }
               ]
             },
             {
               "title": "Boards",
-              "icon": "📋",
+              "icon": "\ud83d\udccb",
               "file": "docs/ux/boards/index.md",
               "source": "ai",
               "children": [
-                { "title": "Categories & Filtering", "icon": "🏷️", "file": "docs/ux/boards/categories-filtering.md", "source": "ai" },
-                { "title": "Grid Layout & Display", "icon": "📐", "file": "docs/ux/boards/grid-layout.md", "source": "ai" },
-                { "title": "Sharing & Collaboration", "icon": "👥", "file": "docs/ux/boards/sharing.md", "source": "ai" }
+                {
+                  "title": "Categories & Filtering",
+                  "icon": "\ud83c\udff7\ufe0f",
+                  "file": "docs/ux/boards/categories-filtering.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Grid Layout & Display",
+                  "icon": "\ud83d\udcd0",
+                  "file": "docs/ux/boards/grid-layout.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Sharing & Collaboration",
+                  "icon": "\ud83d\udc65",
+                  "file": "docs/ux/boards/sharing.md",
+                  "source": "ai"
+                }
               ]
             }
           ]
         },
         {
           "title": "Actions",
-          "icon": "⚡",
+          "icon": "\u26a1",
           "source": "ai",
           "children": [
             {
               "title": "User Profiles & Roles",
-              "icon": "👤",
+              "icon": "\ud83d\udc64",
               "source": "ai",
               "children": [
-                { "title": "Authentication", "icon": "🔐", "file": "docs/ux/users/authentication.md", "source": "ai" },
-                { "title": "Onboarding", "icon": "🚀", "file": "docs/ux/users/onboarding.md", "source": "ai" },
-                { "title": "Settings & Preferences", "icon": "⚙️", "file": "docs/ux/users/settings.md", "source": "ai" }
+                {
+                  "title": "Authentication",
+                  "icon": "\ud83d\udd10",
+                  "file": "docs/ux/users/authentication.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Onboarding",
+                  "icon": "\ud83d\ude80",
+                  "file": "docs/ux/users/onboarding.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Settings & Preferences",
+                  "icon": "\u2699\ufe0f",
+                  "file": "docs/ux/users/settings.md",
+                  "source": "ai"
+                }
               ]
             },
-            { "title": "Admin Panel", "icon": "🛠️", "file": "docs/ux/admin-panel.md", "source": "ai" }
+            {
+              "title": "Admin Panel",
+              "icon": "\ud83d\udee0\ufe0f",
+              "file": "docs/ux/admin-panel.md",
+              "source": "ai"
+            }
           ]
         },
-        { "title": "CTRL Design System", "icon": "🎨", "file": "design-system/README.md", "source": "human" }
+        {
+          "title": "CTRL Design System",
+          "icon": "\ud83c\udfa8",
+          "file": "design-system/README.md",
+          "source": "human"
+        }
       ]
     },
     {
       "title": "Execution",
-      "icon": "🔨",
+      "icon": "\ud83d\udd28",
       "source": "ai",
       "children": [
-        { "title": "Unified Project Plan", "icon": "📊", "file": "docs/execution/UNIFIED-PROJECT-PLAN.md", "source": "ai" }
+        {
+          "title": "Unified Project Plan",
+          "icon": "\ud83d\udcca",
+          "file": "docs/execution/UNIFIED-PROJECT-PLAN.md",
+          "source": "ai"
+        }
       ]
     },
     {
       "title": "Infrastructure",
-      "icon": "🏗",
+      "icon": "\ud83c\udfd7",
       "source": "human",
       "children": [
         {
           "title": "Architecture",
-          "icon": "📐",
+          "icon": "\ud83d\udcd0",
           "source": "human",
           "children": [
-            { "title": "System Overview", "icon": "🗺️", "file": "docs/infrastructure/architecture.md", "source": "human" },
-            { "title": "Deployment", "icon": "🚀", "file": "docs/infrastructure/deployment.md", "source": "human" },
-            { "title": "Security", "icon": "🔒", "file": "docs/infrastructure/security.md", "source": "human" },
-            { "title": "Monitoring", "icon": "📈", "file": "docs/infrastructure/monitoring.md", "source": "human" }
+            {
+              "title": "System Overview",
+              "icon": "\ud83d\uddfa\ufe0f",
+              "file": "docs/infrastructure/architecture.md",
+              "source": "human"
+            },
+            {
+              "title": "Deployment",
+              "icon": "\ud83d\ude80",
+              "file": "docs/infrastructure/deployment.md",
+              "source": "human"
+            },
+            {
+              "title": "Security",
+              "icon": "\ud83d\udd12",
+              "file": "docs/infrastructure/security.md",
+              "source": "human"
+            },
+            {
+              "title": "Monitoring",
+              "icon": "\ud83d\udcc8",
+              "file": "docs/infrastructure/monitoring.md",
+              "source": "human"
+            }
           ]
         },
         {
           "title": "Technical Design",
-          "icon": "📐",
+          "icon": "\ud83d\udcd0",
           "source": "human",
           "children": [
-            { "title": "AI Widget System", "icon": "🤖", "file": "docs/infrastructure/technical-design/ai-widget-system.md", "source": "human" },
-            { "title": "Content Type System", "icon": "📄", "file": "docs/infrastructure/technical-design/content-type-system.md", "source": "human" },
-            { "title": "Widget Architecture", "icon": "📐", "file": "docs/infrastructure/technical-design/widget-architecture.md", "source": "human" },
-            { "title": "AI Widget Pipeline", "icon": "🔄", "file": "docs/infrastructure/technical-design/ai-widget-pipeline.md", "source": "human" },
-            { "title": "Content Type and Image Systems Tech", "icon": "📄", "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md", "source": "human" }
+            {
+              "title": "AI Widget System",
+              "icon": "\ud83e\udd16",
+              "file": "docs/infrastructure/technical-design/ai-widget-system.md",
+              "source": "human"
+            },
+            {
+              "title": "Content Type System",
+              "icon": "\ud83d\udcc4",
+              "file": "docs/infrastructure/technical-design/content-type-system.md",
+              "source": "human"
+            },
+            {
+              "title": "Widget Architecture",
+              "icon": "\ud83d\udcd0",
+              "file": "docs/infrastructure/technical-design/widget-architecture.md",
+              "source": "human"
+            },
+            {
+              "title": "AI Widget Pipeline",
+              "icon": "\ud83d\udd04",
+              "file": "docs/infrastructure/technical-design/ai-widget-pipeline.md",
+              "source": "human"
+            },
+            {
+              "title": "Content Type and Image Systems Tech",
+              "icon": "\ud83d\udcc4",
+              "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
+              "source": "human"
+            },
+            {
+              "title": "Content Type System",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/content-type-system.md",
+              "source": "human"
+            }
           ]
         }
       ]
     },
     {
       "title": "AI Agents",
-      "icon": "🤖",
+      "icon": "\ud83e\udd16",
       "source": "ai",
       "children": [
-        { "title": "Chief of Staff", "icon": "👔", "file": ".claude/agents/chief-of-staff-agent.md", "source": "ai" },
-        { "title": "Documentation Sync", "icon": "📚", "file": ".claude/agents/documentation-sync-agent.md", "source": "ai" },
-        { "title": "Organizational", "icon": "📋", "file": ".claude/agents/organizational-agent.md", "source": "ai" },
-        { "title": "Project Management", "icon": "📅", "file": ".claude/agents/project-management-agent.md", "source": "ai" },
-        { "title": "Status Update", "icon": "📊", "file": ".claude/agents/status-update-agent.md", "source": "ai" },
-        { "title": "Security & Compliance", "icon": "🔒", "file": ".claude/agents/security-compliance-agent.md", "source": "ai" },
-        { "title": "Continuous Improvement", "icon": "📈", "file": ".claude/agents/continuous-improvement-agent.md", "source": "ai" }
+        {
+          "title": "Chief of Staff",
+          "icon": "\ud83d\udc54",
+          "file": ".claude/agents/chief-of-staff-agent.md",
+          "source": "ai"
+        },
+        {
+          "title": "Documentation Sync",
+          "icon": "\ud83d\udcda",
+          "file": ".claude/agents/documentation-sync-agent.md",
+          "source": "ai"
+        },
+        {
+          "title": "Organizational",
+          "icon": "\ud83d\udccb",
+          "file": ".claude/agents/organizational-agent.md",
+          "source": "ai"
+        },
+        {
+          "title": "Project Management",
+          "icon": "\ud83d\udcc5",
+          "file": ".claude/agents/project-management-agent.md",
+          "source": "ai"
+        },
+        {
+          "title": "Status Update",
+          "icon": "\ud83d\udcca",
+          "file": ".claude/agents/status-update-agent.md",
+          "source": "ai"
+        },
+        {
+          "title": "Security & Compliance",
+          "icon": "\ud83d\udd12",
+          "file": ".claude/agents/security-compliance-agent.md",
+          "source": "ai"
+        },
+        {
+          "title": "Continuous Improvement",
+          "icon": "\ud83d\udcc8",
+          "file": ".claude/agents/continuous-improvement-agent.md",
+          "source": "ai"
+        }
       ]
     },
     {
       "title": "Playground",
-      "icon": "🧪",
+      "icon": "\ud83e\uddea",
       "source": "human",
       "children": [
         {
           "title": "Soundscape",
-          "icon": "🎵",
+          "icon": "\ud83c\udfb5",
           "source": "human",
           "children": [
-            { "title": "Project Plan", "icon": "📋", "file": "soundscape/PROJECT_PLAN.md", "source": "human" },
-            { "title": "Technical Design", "icon": "📐", "file": "soundscape/CONTROL_SYSTEM_DESIGN.md", "source": "human" }
+            {
+              "title": "Project Plan",
+              "icon": "\ud83d\udccb",
+              "file": "soundscape/PROJECT_PLAN.md",
+              "source": "human"
+            },
+            {
+              "title": "Technical Design",
+              "icon": "\ud83d\udcd0",
+              "file": "soundscape/CONTROL_SYSTEM_DESIGN.md",
+              "source": "human"
+            }
           ]
         },
-        { "title": "Systemic", "icon": "🔄", "source": "human" }
+        {
+          "title": "Systemic",
+          "icon": "\ud83d\udd04",
+          "source": "human"
+        }
       ]
     },
     {
       "title": "Operations",
-      "icon": "📅",
+      "icon": "\ud83d\udcc5",
       "source": "human",
       "children": [
-        { "title": "Costs", "icon": "💰", "file": "COSTS.md", "source": "human" }
+        {
+          "title": "Costs",
+          "icon": "\ud83d\udcb0",
+          "file": "COSTS.md",
+          "source": "human"
+        }
       ]
     }
   ]
