@@ -1,24 +1,25 @@
 # Archived Execution Documents
 
-These files have been consolidated into the **Unified Project Plan**.
+These files have been consolidated into the **Project Plan**.
 
-**New Location:** `docs/execution/UNIFIED-PROJECT-PLAN.md`
+**New Location:** `docs/execution/project-plan/` (split into phase sub-pages)
 
 ---
 
 ## Archived Files
 
-| File | Reason |
-|------|--------|
-| `BACKLOG.md` | Merged into unified plan |
-| `PROJECT-STATUS.md` | Merged into unified plan |
-| `sprint.md` | Merged into unified plan |
-| `shipped.md` | Merged into unified plan |
-| `blocked.md` | Merged into unified plan |
-| `boards.md` | Merged into unified plan |
-| `boards-original.md` | Merged into unified plan |
-| `phase0-implementation.md` | Merged into unified plan |
+| File | Reason | Date |
+|------|--------|------|
+| `UNIFIED-PROJECT-PLAN-LEGACY.md` | Split into phase sub-pages (Notion was crashing with ~500 blocks) | 2026-02-05 |
+| `BACKLOG.md` | Merged into unified plan | 2026-02-05 |
+| `PROJECT-STATUS.md` | Merged into unified plan | 2026-02-05 |
+| `sprint.md` | Merged into unified plan | 2026-02-05 |
+| `shipped.md` | Merged into unified plan | 2026-02-05 |
+| `blocked.md` | Merged into unified plan | 2026-02-05 |
+| `boards.md` | Merged into unified plan | 2026-02-05 |
+| `boards-original.md` | Merged into unified plan | 2026-02-05 |
+| `phase0-implementation.md` | Merged into unified plan | 2026-02-05 |
 
 ---
 
-*Archived: 2026-02-05*
+*Last Updated: 2026-02-05*

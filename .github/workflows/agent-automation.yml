@@ -131,7 +131,7 @@ jobs:
       - name: Update Config for Moved Pages
         if: steps.detect-moves.outputs.moves_detected == 'true'
         run: |
-          echo "📝 Updating notion-structure.json to reflect Notion changes..."
+          echo "📝 Auto-updating notion-structure.json to reflect Notion changes..."
 
           python3 << 'PYEOF'
           import json
@@ -149,82 +149,137 @@ jobs:
           with open('notion-structure.json') as f:
               structure = json.load(f)
 
-          # For now, just log the moves - full restructure is complex
-          # In the future, we could auto-update the structure
-          print("Pages moved in Notion:")
-          for m in moved:
-              print(f"  - {m['title']}: {m['expectedParent']} → {m['actualParent']}")
+          def find_and_remove_page(obj, title, parent_list=None, parent_key=None):
+              """Find a page by title and remove it from its parent. Returns the removed page."""
+              if isinstance(obj, dict):
+                  for key in ['children', 'sections']:
+                      if key in obj and isinstance(obj[key], list):
+                          for i, child in enumerate(obj[key]):
+                              if isinstance(child, dict) and child.get('title') == title:
+                                  return obj[key].pop(i)
+                              result = find_and_remove_page(child, title, obj[key], key)
+                              if result:
+                                  return result
+              return None
 
-          print("\n⚠️ Manual update needed: Please update notion-structure.json to match Notion")
-          print("Or move the pages back in Notion to match the expected structure")
+          def find_parent(obj, parent_title):
+              """Find a parent page/section by title. Returns the 'children' list to append to."""
+              if isinstance(obj, dict):
+                  if obj.get('title') == parent_title:
+                      if 'children' not in obj:
+                          obj['children'] = []
+                      return obj['children']
+                  for key in ['children', 'sections']:
+                      if key in obj and isinstance(obj[key], list):
+                          for child in obj[key]:
+                              result = find_parent(child, parent_title)
+                              if result is not None:
+                                  return result
+              return None
+
+          changes_made = []
+          for m in moved:
+              title = m['title']
+              old_parent = m['expectedParent']
+              new_parent = m['actualParent']
+
+              print(f"Moving '{title}': {old_parent} → {new_parent}")
+
+              # Remove page from old location
+              page_data = find_and_remove_page(structure, title)
+              if not page_data:
+                  print(f"  ⚠️ Could not find '{title}' in structure")
+                  continue
+
+              # Find new parent and add page there
+              new_parent_children = find_parent(structure, new_parent)
+              if new_parent_children is None:
+                  # Try finding in sections at root level
+                  for section in structure.get('sections', []):
+                      if section.get('title') == new_parent:
+                          if 'children' not in section:
+                              section['children'] = []
+                          new_parent_children = section['children']
+                          break
+
+              if new_parent_children is not None:
+                  new_parent_children.append(page_data)
+                  changes_made.append(f"{title}: {old_parent} → {new_parent}")
+                  print(f"  ✅ Moved successfully")
+              else:
+                  print(f"  ⚠️ Could not find parent '{new_parent}' - skipping")
+                  # Put it back where it was
+                  old_parent_children = find_parent(structure, old_parent)
+                  if old_parent_children is not None:
+                      old_parent_children.append(page_data)
+
+          if changes_made:
+              # Save updated structure
+              with open('notion-structure.json', 'w') as f:
+                  json.dump(structure, f, indent=2)
+
+              print(f"\n✅ Updated notion-structure.json with {len(changes_made)} moves:")
+              for c in changes_made:
+                  print(f"  • {c}")
+
+              # Signal that we need to commit
+              with open('/tmp/structure_updated', 'w') as f:
+                  f.write('true')
+          else:
+              print("\n⚠️ No changes could be applied automatically")
           PYEOF
+
+      - name: Commit Structure Changes
+        if: steps.detect-moves.outputs.moves_detected == 'true'
+        run: |
+          if [ -f /tmp/structure_updated ]; then
+            echo "📤 Committing structure changes..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add notion-structure.json
+            git commit -m "Auto-update structure to match Notion page moves
+
+            Pages were reorganized in Notion and structure was updated to match.
+            " || echo "No changes to commit"
+            git push || echo "Push failed - may need manual intervention"
+          else
+            echo "No structure changes to commit"
+          fi
 
       - name: Sync Structure with Content
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
           echo "🔄 Step 1: Syncing page structure WITH content..."
 
-          # Read structure from config file and inject file contents
+          # Sync structure ONLY (no content) - content synced individually in Step 3
           if [ -f "notion-structure.json" ]; then
-            # Build payload with file contents injected into structure
+            # Build payload WITHOUT file contents - just structure
             python3 << 'PYEOF'
           import json
-          import os
           import sys
 
           def log(msg):
               print(msg, file=sys.stderr)
 
-          pages_with_content = []
-
-          def inject_content(obj, parent_path=''):
-              """Recursively inject file contents into structure nodes that have 'file' property"""
-              if isinstance(obj, dict):
-                  title = obj.get('title', '')
-                  path = f"{parent_path} > {title}" if parent_path else title
-
-                  if 'file' in obj:
-                      filepath = obj['file']
-                      if os.path.exists(filepath):
-                          try:
-                              with open(filepath, 'r', encoding='utf-8') as f:
-                                  content = f.read(40000)
-                                  obj['content'] = content
-                                  pages_with_content.append((path, len(content)))
-                          except Exception as e:
-                              log(f"⚠️ Error reading {filepath}: {e}")
-
-                  for key in ['children', 'sections']:
-                      if key in obj:
-                          for child in obj[key]:
-                              inject_content(child, path)
-              return obj
-
           with open('notion-structure.json') as f:
               structure = json.load(f)
 
-          inject_content(structure)
-
-          # Log summary of pages to sync
-          log(f"📄 Loaded {len(pages_with_content)} pages with content:")
-          for path, chars in pages_with_content:
-              log(f"   • {path} ({chars:,} chars)")
-
+          # Structure-only sync (skipContent: true)
           payload = {
               'action': 'sync-structure',
-              'skipContent': False,
+              'skipContent': True,
               'structure': structure
           }
 
           with open('/tmp/sync_payload.json', 'w') as f:
               json.dump(payload, f)
 
-          log(f"✅ Payload ready ({os.path.getsize('/tmp/sync_payload.json'):,} bytes)")
+          log(f"✅ Structure payload ready ({len(json.dumps(payload)):,} bytes)")
           PYEOF
 
           else
             echo "📁 Using default structure from function"
-            echo '{"action": "sync-structure", "skipContent": false}' > /tmp/sync_payload.json
+            echo '{"action": "sync-structure", "skipContent": true}' > /tmp/sync_payload.json
           fi
 
           response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
@@ -313,14 +368,18 @@ jobs:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
+          FORCE_FULL_SYNC: ${{ github.event.inputs.force_full_sync }}
         run: |
-          echo "🔄 Step 3: Updating individual changed pages..."
+          echo "🔄 Step 3: Updating page content..."
 
-          # If structure changed, Step 1 already synced all content - skip
+          # Wait for Notion to index any newly created pages from Step 1
           if [ "$STRUCTURE_CHANGED" = "true" ]; then
-            echo "✅ Structure sync already updated all pages - skipping individual updates"
-            exit 0
+            echo "⏳ Waiting 10s for Notion to index new pages..."
+            sleep 10
           fi
+
+          # Track failed pages for retry
+          > /tmp/failed_pages.txt
 
           update_page() {
             local title="$1"
@@ -328,7 +387,7 @@ jobs:
 
             if [ ! -f "$file" ]; then
               echo "⏭️ Skipping $title (file not found: $file)"
-              return
+              return 0
             fi
 
             echo "📄 Updating: $title"
@@ -342,10 +401,12 @@ jobs:
 
             if echo "$response" | grep -q '"success":true'; then
               echo "  ✅ Updated"
+              return 0
             else
-              echo "  ⚠️ Issue: $response"
+              echo "  ⚠️ Failed (will retry): $title"
+              echo -e "$title\t$file" >> /tmp/failed_pages.txt
+              return 1
             fi
-            sleep 3
           }
 
           if [ ! -f "notion-structure.json" ]; then
@@ -353,7 +414,7 @@ jobs:
             exit 0
           fi
 
-          # Build file-to-title mapping for changed files only
+          # Build file-to-title mapping - sync all or just changed files
           python3 << 'PYEOF'
           import json
           import os
@@ -378,30 +439,70 @@ jobs:
 
           pages = extract_pages(config)
 
-          # Read changed files
-          changed_files = set()
-          if os.path.exists('/tmp/changed_files.txt'):
-              with open('/tmp/changed_files.txt') as f:
-                  changed_files = set(line.strip() for line in f if line.strip())
+          # Check if we need to do a full sync
+          structure_changed = os.environ.get('STRUCTURE_CHANGED', 'false') == 'true'
+          force_full_sync = os.environ.get('FORCE_FULL_SYNC', 'false') == 'true'
+          do_full_sync = structure_changed or force_full_sync
 
-          # Only sync pages whose files changed
-          pages_to_sync = [(title, filepath) for title, filepath in pages if filepath in changed_files]
+          if do_full_sync:
+              # Sync ALL pages with content
+              pages_to_sync = [(title, filepath) for title, filepath in pages if filepath]
+              reason = "structure changed" if structure_changed else "force full sync requested"
+              print(f"📋 Full sync ({reason}): syncing ALL {len(pages_to_sync)} pages with content")
+          else:
+              # Read changed files
+              changed_files = set()
+              if os.path.exists('/tmp/changed_files.txt'):
+                  with open('/tmp/changed_files.txt') as f:
+                      changed_files = set(line.strip() for line in f if line.strip())
+
+              # Only sync pages whose files changed
+              pages_to_sync = [(title, filepath) for title, filepath in pages if filepath in changed_files]
+              print(f"📋 Incremental sync: {len(pages_to_sync)} changed pages (of {len(pages)} total)")
 
           with open('/tmp/pages_to_sync.txt', 'w') as f:
               for title, filepath in pages_to_sync:
                   f.write(f"{title}\t{filepath}\n")
 
-          print(f"📋 Syncing {len(pages_to_sync)} changed pages (of {len(pages)} total)")
-
           if not pages_to_sync:
-              print("✨ No content changes detected - nothing to sync!")
+              print("✨ No pages need content updates")
           PYEOF
 
-          # Read and process only changed pages
+          # Read and process pages
           if [ -s /tmp/pages_to_sync.txt ]; then
             while IFS=$'\t' read -r title filepath; do
               update_page "$title" "$filepath"
+              sleep 2
             done < /tmp/pages_to_sync.txt
+
+            # Retry failed pages up to 3 times with increasing delays
+            for retry in 1 2 3; do
+              if [ -s /tmp/failed_pages.txt ]; then
+                failed_count=$(wc -l < /tmp/failed_pages.txt)
+                echo ""
+                echo "🔄 Retry $retry: $failed_count failed pages (waiting ${retry}0s for Notion to index...)"
+                sleep $((retry * 10))
+
+                # Move failed to retry queue
+                mv /tmp/failed_pages.txt /tmp/retry_pages.txt
+                > /tmp/failed_pages.txt
+
+                while IFS=$'\t' read -r title filepath; do
+                  update_page "$title" "$filepath"
+                  sleep 3
+                done < /tmp/retry_pages.txt
+              else
+                break
+              fi
+            done
+
+            # Report any remaining failures
+            if [ -s /tmp/failed_pages.txt ]; then
+              echo ""
+              echo "⚠️ Some pages still failed after 3 retries:"
+              cat /tmp/failed_pages.txt | cut -f1
+              echo "These will be retried on next workflow run."
+            fi
           else
             echo "✨ No pages need updating"
           fi
