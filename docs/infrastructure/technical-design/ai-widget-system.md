@@ -1,10 +1,18 @@
 # AI Widget System - Technical Documentation
 
-**Version:** 4.0
+**Version:** 5.0
 **Last Updated:** 2026-02-05
 **Status:** Active
 
-## Recent Updates (v4.0)
+## Recent Updates (v5.0 - Phase 2: Config-Generated Widgets)
+
+- **Config-Driven Widget Definitions**: Widgets defined in TypeScript config files, not hard-coded
+- **Widget Definition Schema**: Type-safe schema for eligibility, confidence, generation, enrichment, rendering
+- **Config-Based Eligibility**: Rules moved from code to `config/widgets/*.ts` files
+- **Registry Loader**: Centralized registry with runtime evaluation functions
+- **Adding New Widgets**: Now just requires creating a config file (no code changes)
+
+## Previous Updates (v4.0)
 
 - **SERP API Integration**: Added as fallback image strategy after Shopify API
 - **Eligibility Engine**: Widgets must pass eligibility rules to render
@@ -678,6 +686,190 @@ interface WidgetMeta {
 
 ---
 
+## Phase 2 Features (Implemented)
+
+### Config-Driven Widget System
+
+Widgets are now defined as TypeScript configuration files rather than hard-coded logic. This allows adding new widgets without modifying core code.
+
+#### File Structure
+
+```
+supabase/functions/generate-widget/
+├── index.ts                    # Main function (uses config registry)
+└── config/
+    ├── schema.ts               # TypeScript type definitions
+    ├── registry.ts             # Loader and runtime evaluation
+    └── widgets/
+        ├── complete-the-look.ts  # Widget definition
+        └── style-summary.ts      # Widget definition
+```
+
+### Widget Definition Schema
+
+Each widget is defined with a complete configuration:
+
+```typescript
+interface WidgetDefinition {
+  // Identity
+  id: string
+  name: string
+  description: string
+  version: string
+
+  // Eligibility rules (config-driven)
+  eligibility: {
+    rules: EligibilityRuleConfig[]
+    requireAllCritical: boolean
+    minOverallScore: number
+  }
+
+  // Confidence thresholds
+  confidence: {
+    threshold: number           // 0-1
+    fallbackBehavior: 'suppress' | 'degrade' | 'retry'
+  }
+
+  // AI generation settings
+  generation: {
+    model: string               // e.g., 'claude-3-haiku-20240307'
+    maxTokens: number
+    promptTemplate: string      // Template with {{variables}}
+    constraints?: string[]
+  }
+
+  // Image enrichment settings
+  enrichment: {
+    enabled: boolean
+    strategies: ('shopify' | 'serp' | 'scrape')[]
+    timeout: number
+    brandsEnabled: boolean
+  }
+
+  // UI rendering settings
+  rendering: {
+    zone: 'hero' | 'inline' | 'footer' | 'sidebar'
+    template: string
+    priority: number
+  }
+
+  // Metadata
+  categories: string[]
+  tags: string[]
+  enabled: boolean
+}
+```
+
+### Eligibility Rule Types
+
+Rules are now declarative configurations:
+
+```typescript
+type EligibilityRuleType =
+  | 'min_items'           // Minimum number of items
+  | 'max_items'           // Maximum items
+  | 'category_match'      // Content matches categories
+  | 'content_quality'     // Items have metadata
+  | 'variety'             // Different sources/domains
+  | 'recency'             // Recently added items
+
+interface EligibilityRuleConfig {
+  type: EligibilityRuleType
+  weight: number              // 0-1
+  params: Record<string, any> // Rule-specific parameters
+}
+```
+
+### Example Widget Config
+
+```typescript
+// config/widgets/complete-the-look.ts
+export const completeTheLook: WidgetDefinition = {
+  id: 'complete-the-look',
+  name: 'Complete the Look',
+  version: '2.0.0',
+
+  eligibility: {
+    rules: [
+      { type: 'min_items', weight: 1.0, params: { min: 2 } },
+      { type: 'category_match', weight: 0.8, params: {
+        categories: ['wear', 'fashion'],
+        fallbackToContent: true
+      }},
+      { type: 'content_quality', weight: 0.6, params: {
+        minScore: 0.5,
+        weights: { title: 0.4, description: 0.3, image: 0.2, url: 0.1 }
+      }}
+    ],
+    requireAllCritical: true,
+    minOverallScore: 0.5
+  },
+
+  confidence: {
+    threshold: 0.6,
+    fallbackBehavior: 'degrade'
+  },
+
+  generation: {
+    model: 'claude-3-haiku-20240307',
+    maxTokens: 1024,
+    promptTemplate: `You are a fashion stylist AI...`,
+    constraints: ['Only suggest from supported brands']
+  },
+
+  enrichment: {
+    enabled: true,
+    strategies: ['shopify', 'serp', 'scrape'],
+    timeout: 5000,
+    brandsEnabled: true
+  },
+
+  rendering: {
+    zone: 'inline',
+    template: 'product-grid',
+    priority: 10
+  },
+
+  categories: ['wear', 'fashion'],
+  tags: ['shopping', 'recommendations'],
+  enabled: true
+}
+```
+
+### Registry API
+
+The registry provides runtime access to widget configurations:
+
+```typescript
+// Get a widget definition
+const widget = getWidget('complete-the-look')
+
+// Get all enabled widgets
+const widgets = getEnabledWidgets()
+
+// Get widgets for a category
+const categoryWidgets = getWidgetsForCategory('wear')
+
+// Check eligibility using config rules
+const eligibility = checkEligibility(widgetId, context)
+
+// Get confidence config
+const config = getConfidenceConfig(widgetId)
+```
+
+### Adding a New Widget
+
+To add a new widget:
+
+1. Create config file: `config/widgets/my-widget.ts`
+2. Export widget definition matching `WidgetDefinition` type
+3. Import and add to registry in `config/registry.ts`
+4. Deploy: `supabase functions deploy generate-widget`
+
+No changes to core logic required.
+
+---
+
 ## Proposed Infrastructure Layers
 
 Based on the issues encountered, here are recommended abstractions:
@@ -905,8 +1097,11 @@ interface ScrapingMonitor {
 | File | Purpose |
 |------|---------|
 | `supabase/functions/generate-widget/index.ts` | Edge Function - AI generation + scraping |
+| `supabase/functions/generate-widget/config/schema.ts` | TypeScript types for widget definitions |
+| `supabase/functions/generate-widget/config/registry.ts` | Widget loader and runtime evaluation |
+| `supabase/functions/generate-widget/config/widgets/*.ts` | Individual widget configurations |
 | `boards/index.html` | Client app - Widget registry, rendering, feedback |
-| `docs/TECH-ai-widget-system.md` | This documentation |
+| `docs/infrastructure/technical-design/ai-widget-system.md` | This documentation |
 
 ---
 
