@@ -64,6 +64,12 @@
               "icon": "📋",
               "file": "docs/strategy/prds/content-type-and-image-systems.md",
               "source": "human"
+            },
+            {
+              "title": "NotionSync Platform",
+              "icon": "🔄",
+              "file": "docs/strategy/prds/notion-sync-platform.md",
+              "source": "ai"
             }
           ]
         }
@@ -294,12 +300,6 @@
               "icon": "📄",
               "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
               "source": "human"
-            },
-            {
-              "title": "Content Type System",
-              "icon": "📋",
-              "file": "docs/strategy/prds/content-type-system.md",
-              "source": "human"
             }
           ]
         }
@@ -371,7 +371,7 @@
               "source": "human"
             },
             {
-              "title": "Technical Design",
+              "title": "Control System Design",
               "icon": "📐",
               "file": "soundscape/CONTROL_SYSTEM_DESIGN.md",
               "source": "human"
