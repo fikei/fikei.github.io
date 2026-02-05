@@ -211,8 +211,8 @@ jobs:
           fi
 
           # Build cleanup payload with source-aware logic
-          # Deletes: AI pages, empty human pages
-          # Protects: Human pages with content
+          # Deletes: AI pages, orphan pages (not in structure), empty human pages
+          # Protects: Only explicitly marked human pages with content
           python3 << 'PYEOF' > /tmp/cleanup_payload.json
           import json
 
@@ -220,12 +220,13 @@ jobs:
               structure = json.load(f)
 
           # Extract all page titles and their sources
+          # Only pages IN the structure get a source; orphans default to deletable
           def extract_sources(obj, sources=None):
               if sources is None:
                   sources = {}
               if isinstance(obj, dict):
                   if 'title' in obj:
-                      sources[obj['title']] = obj.get('source', 'human')  # Default to human (protected)
+                      sources[obj['title']] = obj.get('source', 'ai')  # Default to ai (deletable)
                   for key in ['children', 'sections']:
                       if key in obj:
                           for child in obj[key]:

@@ -946,7 +946,8 @@ async function cleanupLegacyPages(
       if (!expectedTitlesForParent.has(title)) {
         // This page is not in the expected structure
         // Check if it's a human-created page that should be protected
-        const pageSource = pageSources[title] || 'human'  // Default to human (protected)
+        // Orphans (not in pageSources) default to 'ai' (deletable)
+        const pageSource = pageSources[title] || 'ai'  // Default to ai (deletable)
 
         if (protectHuman && pageSource === 'human') {
           // Human-created page - check if it's empty before protecting
