@@ -883,10 +883,10 @@ These foundational systems support all phases:
 
 | Story | Status |
 |-------|--------|
-| Show sub-category tags when filtering (e.g., "Wear" → tops, bottoms, outerwear, footwear, accessories, bags) | ✅ |
+| Sub-tags displayed on cards when filtered into category | ✅ |
 | Keyword-based sub-tag detection from title/description | ✅ |
-| Sub-tag filter bar (click tag to filter within category) | ✅ |
 | Tag hierarchy per category (wear, home, use) | ✅ |
+| Sub-tag filter bar (click tag to filter within category) | 🧪 Beta |
 | Manual tag editing on pins | ⏳ |
 | AI image-based sub-tag detection | ⏳ |
 

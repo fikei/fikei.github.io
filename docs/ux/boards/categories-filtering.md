@@ -8,7 +8,8 @@ Organization system that lets users group pins into categories and filter their 
 |---------|--------|-------|
 | Category Filter Bar | ✅ Shipped | Horizontal scrollable tokens |
 | AI Category Assignment | ✅ Shipped | Auto-categorize on add |
-| Sub-Tags | ✅ Shipped | Secondary filter when category selected |
+| Sub-Tags on Cards | ✅ Shipped | Shows sub-tag when filtered into category |
+| Sub-Tags Bar | 🧪 Beta | Enable via `window.enableSubTagsBar()` |
 | Category Counts | ✅ Shipped | Shows count per category |
 
 ---
@@ -64,25 +65,48 @@ Active state (inverted colors):
         ← swipe to see more →
 ```
 
-### Sub-Tags Bar ✅ IMPLEMENTED
+### Sub-Tags on Cards ✅ IMPLEMENTED
 
-When a category is selected, sub-tags appear below the main filter bar:
+When filtered into a category, cards show their sub-tag instead of the category:
 
 ```
-Category Bar:
-┌──────────────────────────────────────────────────────────────┐
-│  [ All ] [ Wear ✓ ] [ Home ] [ Use ] [ Watch ] [ Go ]        │
-└──────────────────────────────────────────────────────────────┘
+"All" View - shows category:
+┌─────────────────┐
+│  [WEAR]         │  ← Category shown
+│  ┌───────────┐  │
+│  │   image   │  │
+│  └───────────┘  │
+│  Title...       │
+└─────────────────┘
 
+"Wear" View - shows sub-tag:
+┌─────────────────┐
+│  [OUTERWEAR]    │  ← Sub-tag shown (detected from title/description)
+│  ┌───────────┐  │
+│  │   image   │  │
+│  └───────────┘  │
+│  Puffer Jacket  │
+└─────────────────┘
+```
+
+Sub-tag detection:
+- Keyword matching from title/description
+- Falls back to category if no sub-tag detected
+- Cached on link object for performance
+
+### Sub-Tags Bar 🧪 BETA
+
+Enable via console: `window.enableSubTagsBar()`
+
+```
 Sub-Tags Bar (appears when Wear selected):
 ┌──────────────────────────────────────────────────────────────┐
 │  [ All 47 ] [ Tops 12 ] [ Bottoms 8 ] [ Outerwear 6 ]        │
 │  [ Footwear 15 ] [ Accessories 4 ] [ Bags 2 ]                │
 └──────────────────────────────────────────────────────────────┘
-       ↑ muted style, smaller tokens
 ```
 
-Sub-tag styling:
+Sub-tag bar styling:
 - Smaller than category tokens (9px vs 10px)
 - Muted color by default (--muted)
 - Outline border (--subtle)
@@ -263,13 +287,14 @@ Multiple filters: Not supported (single select per level)
 - Sub-tag definitions in `SUB_TAGS` constant per category
 - Detection via `detectSubTag()` using keyword matching
 - Cached on link object via `getSubTag()` for performance
-- State tracked in `currentSubTag` variable
-- UI rendered by `renderSubTags()` function
+- Card display: shows sub-tag when filtered into category, category when in "All"
+- Beta bar feature: `showSubTagsBar` flag, enable via `window.enableSubTagsBar()`
 - File: `boards/index.html`
 
 ### CSS Classes
 ```css
-.sub-tags              /* Container bar */
+.grid-item__category   /* Tag display on cards */
+.sub-tags              /* Container bar (beta) */
 .sub-tags--visible     /* Show state modifier */
 .sub-tag               /* Individual tag button */
 .sub-tag--active       /* Selected state */
