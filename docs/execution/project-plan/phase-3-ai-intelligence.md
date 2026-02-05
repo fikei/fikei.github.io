@@ -142,10 +142,10 @@
 | | Discovery endpoint returns eligible widgets for any category | Complete |
 | | Frontend delegates category matching to server config | Complete |
 | **Template Selection Engine** | | Complete |
-| | Define template library (product-grid, style-card, simple-list, text-summary) | Complete |
+| | Define template library (grid-split, hero-card, list, text-block) | Complete |
 | | Auto-select template based on widget config `template.name` | Complete |
 | | Template versioning (each template has version field) | Complete |
-| | Fallback template chain (primary → fallback → simple-list) | Complete |
+| | Fallback template chain (primary → fallback → list) | Complete |
 | **Widget Registry as Data** | | Complete |
 | | Registry loaded from config files | Complete |
 | | Hot-reload via registerWidget() / unregisterWidget() / reloadWidget() | Complete |

@@ -35,7 +35,7 @@
 **Completed: 2026-02-05**
 
 - **Category-Agnostic Matching**: Widgets discovered by category via config, no hard-coded category logic
-- **Template Selection Engine**: 4 templates (product-grid, style-card, simple-list, text-summary) with fallback chains
+- **Template Selection Engine**: 4 UX-pattern templates (grid-split, hero-card, list, text-block) with fallback chains
 - **Hot-Reload Registry**: registerWidget() / unregisterWidget() / reloadWidget() for dynamic management
 - **Discovery Endpoint**: POST { action: 'discover' } returns eligible widgets for any category
 - **Config-Driven Enrichment**: Enrichment triggered by widget config, not hard-coded widget ID

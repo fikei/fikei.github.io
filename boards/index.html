@@ -3812,8 +3812,8 @@ Return JSON:
   ]
 }`,
       template: {
-        name: 'product-grid',
-        fallback: 'simple-list',
+        name: 'grid-split',
+        fallback: 'list',
         layout: 'two-column',
         sections: ['your-items', 'suggestions']
       },
@@ -3842,8 +3842,8 @@ Return JSON:
   "summary": "One sentence describing the overall aesthetic"
 }`,
       template: {
-        name: 'style-card',
-        fallback: 'text-summary',
+        name: 'hero-card',
+        fallback: 'text-block',
         layout: 'card',
         sections: ['label', 'traits']
       },
@@ -4551,32 +4551,30 @@ Return JSON:
   // ===========================================================================
 
   const WIDGET_TEMPLATES = {
-    // Template: product-grid
-    // Used by: complete-the-look
-    // Layout: user items on top, AI suggestions below, separated by divider
-    'product-grid': {
-      name: 'product-grid',
+    // Template: grid-split
+    // Two groups of thumbnail cards separated by a divider
+    'grid-split': {
+      name: 'grid-split',
       version: '1.0',
       render: function(widget, items, aiResult) {
         return renderCompleteTheLookWidget(widget, items, aiResult);
       }
     },
 
-    // Template: style-card
-    // Used by: style-summary
-    // Layout: style label + sublabel + trait pills
-    'style-card': {
-      name: 'style-card',
+    // Template: hero-card
+    // Centered headline + subtitle + tag pills
+    'hero-card': {
+      name: 'hero-card',
       version: '1.0',
       render: function(widget, items, aiResult) {
         return renderStyleSummaryWidget(widget, items, aiResult);
       }
     },
 
-    // Template: simple-list (fallback)
-    // Generic list rendering for any widget with suggestions
-    'simple-list': {
-      name: 'simple-list',
+    // Template: list (fallback)
+    // Stacked rows with separators
+    'list': {
+      name: 'list',
       version: '1.0',
       render: function(widget, items, aiResult) {
         if (!aiResult) return '';
@@ -4602,10 +4600,10 @@ Return JSON:
       }
     },
 
-    // Template: text-summary (fallback for style-card)
-    // Plain text rendering of style analysis
-    'text-summary': {
-      name: 'text-summary',
+    // Template: text-block (fallback for hero-card)
+    // Single prose block in a card
+    'text-block': {
+      name: 'text-block',
       version: '1.0',
       render: function(widget, items, aiResult) {
         const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
@@ -4641,8 +4639,8 @@ Return JSON:
 
     // Map legacy layout names to template names
     const templateAliases = {
-      'two-column': 'product-grid',
-      'card': 'style-card'
+      'two-column': 'grid-split',
+      'card': 'hero-card'
     };
 
     const resolvedName = templateAliases[templateName] || templateName;
@@ -4664,8 +4662,8 @@ Return JSON:
       }
     }
 
-    // Last resort: simple-list
-    return WIDGET_TEMPLATES['simple-list'].render(widget, items, aiResult);
+    // Last resort: list
+    return WIDGET_TEMPLATES['list'].render(widget, items, aiResult);
   }
 
   // Store inline widgets for grid injection

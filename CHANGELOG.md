@@ -29,9 +29,9 @@ All notable changes to ctrl.rodeo will be documented in this file.
   - Frontend no longer hard-codes 'wear' — works with any category that has widgets
 
 - **Template Selection Engine**
-  - `WIDGET_TEMPLATES` registry with 4 templates: `product-grid`, `style-card`, `simple-list`, `text-summary`
+  - `WIDGET_TEMPLATES` registry with 4 UX-pattern templates: `grid-split`, `hero-card`, `list`, `text-block`
   - `renderWidgetWithTemplate(widget, items, aiResult)` - Selects template via widget config
-  - Fallback chain: primary template → fallback template → `simple-list`
+  - Fallback chain: primary template → fallback template → `list`
   - Each template has `name`, `version`, and `render()` function
   - Removed all hard-coded `if (widget.id === 'complete-the-look')` rendering branches
 

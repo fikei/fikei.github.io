@@ -224,13 +224,14 @@ User's Saved Pins
 
 #### Template Selection Engine
 Widgets are rendered via a template registry, not hard-coded per widget ID.
+Template names describe the UX layout pattern, not the content.
 
 ```
 WIDGET_TEMPLATES = {
-  'product-grid'  → renderCompleteTheLookWidget()   (v1.0)
-  'style-card'    → renderStyleSummaryWidget()       (v1.0)
-  'simple-list'   → Generic list fallback            (v1.0)
-  'text-summary'  → Plain text fallback              (v1.0)
+  'grid-split'  → Two groups of cards with a divider     (v1.0)
+  'hero-card'   → Centered headline + subtitle + tags    (v1.0)
+  'list'        → Stacked rows with separators           (v1.0)
+  'text-block'  → Single prose block in a card           (v1.0)
 }
 ```
 
@@ -240,7 +241,7 @@ widget.template.name → WIDGET_TEMPLATES[name] → render()
                     ↓ (if fails)
 widget.template.fallback → WIDGET_TEMPLATES[fallback] → render()
                     ↓ (if fails)
-'simple-list' → WIDGET_TEMPLATES['simple-list'] → render()
+'list' → WIDGET_TEMPLATES['list'] → render()
 ```
 
 - File: `boards/index.html` - `renderWidgetWithTemplate()`, `WIDGET_TEMPLATES`
