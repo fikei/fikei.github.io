@@ -2248,32 +2248,6 @@ body {
   margin: var(--space-2) 0;
 }
 
-.widget-inline__header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.widget-inline__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.widget-inline__badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  background: var(--subtle);
-  padding: 2px 6px;
-  border-radius: 2px;
-}
-
 .widget-section__header {
   display: flex;
   align-items: center;
@@ -4356,10 +4330,6 @@ Return JSON:
       } else if (widget.zone === 'inline') {
         inlineWidgetHtml += `
           <div class="widget-inline">
-            <div class="widget-inline__header">
-              <span class="widget-inline__title">${esc(widget.name)}</span>
-              <span class="widget-inline__badge">AI</span>
-            </div>
             ${widgetHtml}
           </div>`;
       } else if (widget.zone === 'footer') {
@@ -4415,11 +4385,17 @@ Return JSON:
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
-          <div class="widget-inline__header">
-            <span class="widget-inline__title">${esc(widget.name)}</span>
-            <span class="widget-inline__badge">AI</span>
-          </div>
-          <div class="widget__loader">Refreshing suggestions...</div>`;
+          <div class="widget-complete" data-widget-id="${widget.id}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${widget.name}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+            </div>
+            <div class="widget-complete__body">
+              <div class="widget__loader">Refreshing suggestions...</div>
+            </div>
+          </div>`;
       }
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
@@ -4442,20 +4418,11 @@ Return JSON:
     if (widget.zone === 'inline') {
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
-        inlineContainer.innerHTML = `
-          <div class="widget-inline__header">
-            <span class="widget-inline__title">${esc(widget.name)}</span>
-            <span class="widget-inline__badge">AI</span>
-          </div>
-          ${widgetHtml}`;
+        inlineContainer.innerHTML = widgetHtml;
       }
       // Also update stored HTML for future grid re-renders
       inlineWidgetHtml = `
         <div class="widget-inline">
-          <div class="widget-inline__header">
-            <span class="widget-inline__title">${esc(widget.name)}</span>
-            <span class="widget-inline__badge">AI</span>
-          </div>
           ${widgetHtml}
         </div>`;
     } else if (widget.zone === 'hero') {
