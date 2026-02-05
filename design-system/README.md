@@ -303,6 +303,28 @@ Form-like display sections for account information.
 - Responsive columns: 2 (mobile) → 3 → 4 → 5 (large screens)
 - Expanded items (2x2 or 3x2) trigger reflow of smaller items
 
+### Sub-Tags
+
+Secondary filter bar that appears when a category is selected.
+
+```html
+<nav class="sub-tags sub-tags--visible">
+  <button class="sub-tag sub-tag--active" data-subtag="">All<span class="sub-tag__count">47</span></button>
+  <button class="sub-tag" data-subtag="tops">Tops<span class="sub-tag__count">12</span></button>
+  <button class="sub-tag" data-subtag="bottoms">Bottoms<span class="sub-tag__count">8</span></button>
+  <button class="sub-tag" data-subtag="footwear">Footwear<span class="sub-tag__count">15</span></button>
+  <button class="sub-tag" data-subtag="other">Other<span class="sub-tag__count">4</span></button>
+</nav>
+```
+
+**Sub-tags behavior:**
+- Hidden by default, shown when category selected
+- Smaller than filter tokens (9px vs 10px)
+- Muted color with subtle border (--muted, --subtle)
+- Active state inverts like filter tokens
+- Count shown inline with reduced opacity
+- Horizontally scrollable on overflow
+
 ### Empty State
 
 Full-page centered state for empty views with optional CTA.
