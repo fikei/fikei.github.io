@@ -166,8 +166,6 @@ jobs:
 
           # Read structure from config file and inject file contents
           if [ -f "notion-structure.json" ]; then
-            echo "📁 Using notion-structure.json config"
-
             # Build payload with file contents injected into structure
             python3 << 'PYEOF'
           import json
@@ -177,11 +175,14 @@ jobs:
           def log(msg):
               print(msg, file=sys.stderr)
 
-          stats = {'loaded': 0, 'missing': 0, 'errors': 0}
+          pages_with_content = []
 
-          def inject_content(obj):
+          def inject_content(obj, parent_path=''):
               """Recursively inject file contents into structure nodes that have 'file' property"""
               if isinstance(obj, dict):
+                  title = obj.get('title', '')
+                  path = f"{parent_path} > {title}" if parent_path else title
+
                   if 'file' in obj:
                       filepath = obj['file']
                       if os.path.exists(filepath):
@@ -189,27 +190,25 @@ jobs:
                               with open(filepath, 'r', encoding='utf-8') as f:
                                   content = f.read(40000)
                                   obj['content'] = content
-                                  stats['loaded'] += 1
-                                  log(f"  ✓ {filepath} ({len(content)} chars)")
+                                  pages_with_content.append((path, len(content)))
                           except Exception as e:
-                              stats['errors'] += 1
-                              log(f"  ✗ {filepath}: {e}")
-                      else:
-                          stats['missing'] += 1
-                          log(f"  ⏭ {filepath} (not found)")
+                              log(f"⚠️ Error reading {filepath}: {e}")
 
                   for key in ['children', 'sections']:
                       if key in obj:
                           for child in obj[key]:
-                              inject_content(child)
+                              inject_content(child, path)
               return obj
 
           with open('notion-structure.json') as f:
               structure = json.load(f)
 
-          log("📄 Loading file contents...")
           inject_content(structure)
-          log(f"📊 Summary: {stats['loaded']} loaded, {stats['missing']} missing, {stats['errors']} errors")
+
+          # Log summary of pages to sync
+          log(f"📄 Loaded {len(pages_with_content)} pages with content:")
+          for path, chars in pages_with_content:
+              log(f"   • {path} ({chars:,} chars)")
 
           payload = {
               'action': 'sync-structure',
@@ -220,10 +219,9 @@ jobs:
           with open('/tmp/sync_payload.json', 'w') as f:
               json.dump(payload, f)
 
-          log(f"✅ Payload ready ({os.path.getsize('/tmp/sync_payload.json')} bytes)")
+          log(f"✅ Payload ready ({os.path.getsize('/tmp/sync_payload.json'):,} bytes)")
           PYEOF
 
-            echo "Payload built with content"
           else
             echo "📁 Using default structure from function"
             echo '{"action": "sync-structure", "skipContent": false}' > /tmp/sync_payload.json
