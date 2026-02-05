@@ -1,7 +1,7 @@
 # Unified Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-05 (Major expansion: Multiple Boards, AI Pin Generation, Bulk Operations, Mobile iOS, Content Reader)
+> **Last Updated**: 2026-02-05 (Restructured: Generative Widget Ecosystem with 5-phase automation roadmap, Multiple Boards, Bulk Operations, Mobile iOS, Content Reader)
 
 ---
 
@@ -21,31 +21,34 @@
 3. [Phase 3: AI Intelligence](#phase-3-ai-intelligence-mostly-complete)
    - Epic 3.1: Content Type System ✅
    - Epic 3.2: Image Resolution Pipeline ✅
-   - Epic 3.3: AI Widget System - Phase 1 (Core) ✅
-   - Epic 3.4: AI Widget System - Phase 2 (Intelligence) ⏳
-   - Epic 3.5: AI Widget System - Phase 3 (Advanced) ⏳
-   - Epic 3.6: AI Pin Generation ⏳
+   - **Epic 3.3: Generative Widget Ecosystem** ← Core AI initiative
+     - Widget Phase 0: Deterministic MVP 🔄 (~75% complete)
+     - Widget Phase 1: Rule-Driven Automation ⏳
+     - Widget Phase 2: Config-Generated Widgets ⏳
+     - Widget Phase 3: Self-Selecting Widgets ⏳
+     - Widget Phase 4: Self-Optimizing System ⏳
+   - Epic 3.4: AI Pin Generation ⏳
 4. [Phase 4: Sharing & Collaboration](#phase-4-sharing--collaboration-in-progress)
    - Epic 4.1: Basic Sharing ✅
    - Epic 4.2: Username System ⏳
-   - Epic 4.3: Multiple Boards ⏳ **NEW**
+   - Epic 4.3: Multiple Boards ⏳
    - Epic 4.4: Collaborative Boards 🔄
 5. [Phase 5: User Experience Polish](#phase-5-user-experience-polish)
    - Epic 5.1: Onboarding 🔄
    - Epic 5.2: Settings & Preferences ⏳
    - Epic 5.3: Search & Navigation 🔄
    - Epic 5.4: Grid Improvements 🔄
-   - Epic 5.5: Bulk Operations ⏳ **NEW**
+   - Epic 5.5: Bulk Operations ⏳
    - Epic 5.6: Authentication Enhancements ⏳
 6. [Phase 6: Performance & Scale](#phase-6-performance--scale)
 7. [Phase 7: Platform Expansion](#phase-7-platform-expansion)
    - Epic 7.1: Browser Extension ⏳
    - Epic 7.2: Import/Export ⏳
-   - Epic 7.3: Mobile App (iOS First) ⏳ **EXPANDED**
-   - Epic 7.4: Android App ⏳ **NEW**
+   - Epic 7.3: Mobile App (iOS First) ⏳
+   - Epic 7.4: Android App ⏳
 8. [Backlog: Future Considerations](#backlog-future-considerations)
-   - Rich Media Support ⏳ **EXPANDED**
-   - Content Reader ⏳ **NEW**
+   - Rich Media Support ⏳
+   - Content Reader ⏳
    - Advanced AI Features ⏳
    - Admin Enhancements ⏳
    - Sharing Enhancements ⏳
@@ -194,97 +197,211 @@
 | | "Edit image" button on cards | ⏳ |
 | | Re-fetch, search, upload options | ⏳ |
 
-### Epic 3.3: AI Widget System - Phase 1 (Core) ✅
-**Released: 2026-02-03**
+### Epic 3.3: Generative Widget Ecosystem
+
+> **Vision**: A fully automated system that autonomously determines which widgets should exist, what content populates them, how they're structured, and how they improve over time. Category-agnostic, content-type-agnostic, and self-optimizing.
+>
+> **Reference**: [PRD: Generative Widget Ecosystem](/docs/strategy/prds/generative-widget-ecosystem.md)
+
+---
+
+#### Widget Phase 0: Deterministic MVP 🔄
+**Status**: ~75% Complete | **Automation Level**: Very Low
+
+**Purpose**: Prove feasibility with maximum control, minimal automation.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Complete the Look Widget** | | ✅ |
+| **Complete the Look Widget** | | ✅ SHIPPED |
 | | Widget registry architecture | ✅ |
 | | 47+ brand integrations | ✅ |
 | | Shopify JSON API integration | ✅ |
 | | HTML scraping fallback | ✅ |
-| | Client caching (5 min) | ✅ |
-| | Server caching (Supabase) | ✅ |
-| | Per-widget refresh | ✅ |
-| | Widget feedback (basic) | ✅ |
-
-| Story | Tasks | Status |
-|-------|-------|--------|
-| **Fix Product Images** | | ⏳ HIGH PRIORITY |
-| | SERP API integration | ⏳ |
-| | Bot protection bypass | ⏳ |
-| | Image validation | ⏳ |
+| | Client + server caching | ✅ |
+| | Per-widget refresh (isolated state) | ✅ |
+| | Brand validation (prevent hallucinations) | ✅ |
+| | JSON parsing (handle AI preamble) | ✅ |
 | **Style Definition Widget** | | ⏳ |
 | | Extract style attributes from board | ⏳ |
 | | Generate style summary | ⏳ |
+| | Define output schema | ⏳ |
+| **Image Pipeline Fix** | | ⏳ HIGH PRIORITY |
+| | SERP API integration (reliable source) | ⏳ |
+| | Pluggable strategy pattern | ⏳ |
+| | Health tracking per strategy | ⏳ |
+| | Graceful fallback chain | ⏳ |
 | **Widget Instrumentation** | | ⏳ |
 | | Track widget views | ⏳ |
 | | Track product clicks | ⏳ |
 | | Track saves to board | ⏳ |
+| | Basic feedback collection | ✅ |
 
-### Epic 3.4: AI Widget System - Phase 2 (Intelligence) ⏳
+**Phase 0 Constraints (by design)**:
+- Only `wear` category supported
+- Exactly 2 widgets (Complete the Look, Style Definition)
+- Widgets always generated when criteria met
+- Templates and layouts explicitly chosen
+- No confidence scoring
 
-| Story | Tasks | Status |
-|-------|-------|--------|
-| **Dynamic Brand Discovery** | | ⏳ |
-| | Analyze URLs for brand keywords | ⏳ |
-| | Extract brands from user's existing board | ⏳ |
-| | Find similar brands via embeddings | ⏳ |
-| | Validate scrapeability before suggesting | ⏳ |
-| | Auto-add new brands to registry | ⏳ |
-| **User-Customizable Prompts** | | ⏳ |
-| | Simple UI for tone/style preferences | ⏳ |
-| | Budget range selector ($, $$, $$$, $$$$) | ⏳ |
-| | Preferred brands input | ⏳ |
-| | Style preferences (minimal, bold, classic, etc.) | ⏳ |
-| | Custom prompt additions field | ⏳ |
-| | Merge user prefs with base prompt | ⏳ |
-| **SERP API Integration** | | ⏳ |
-| | Google Custom Search API setup | ⏳ |
-| | Bing Image Search API fallback | ⏳ |
-| | Integrate as primary image source | ⏳ |
-| | Replace HTML scraping where unreliable | ⏳ |
-| | Cost monitoring and rate limiting | ⏳ |
-| **Brand Health Dashboard** | | ⏳ |
-| | Per-brand success rate tracking | ⏳ |
-| | Failure reason categorization | ⏳ |
-| | Automatic alerting on degradation | ⏳ |
-| | One-click brand disable | ⏳ |
-| | Admin UI for brand management | ⏳ |
+---
 
-### Epic 3.5: AI Widget System - Phase 3 (Advanced) ⏳
+#### Widget Phase 1: Rule-Driven Automation ⏳
+**Status**: Not Started | **Automation Level**: Low → Medium
+
+**Purpose**: Widgets must "earn" existence through eligibility rules.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
+| **Eligibility Engine** | | ⏳ |
+| | Define eligibility rules (min items, category match, content quality) | ⏳ |
+| | Widgets can fail eligibility and not render | ⏳ |
+| | Eligibility logging (why did widget appear/not appear?) | ⏳ |
+| **Confidence Scoring** | | ⏳ |
+| | AI returns confidence score (0.0-1.0) with each response | ⏳ |
+| | Configurable confidence thresholds per widget | ⏳ |
+| | Low-confidence widgets suppressed | ⏳ |
+| **Validation Engine** | | ⏳ |
+| | Track what works (successful renders, user engagement) | ⏳ |
+| | Track what fails (parse errors, low engagement) | ⏳ |
+| | Feed validation data back into eligibility rules | ⏳ |
+| **Widget Feedback (Enhanced)** | | ⏳ |
+| | What do users click? | ⏳ |
+| | What do users dismiss? | ⏳ |
+| | What do users save? | ⏳ |
+| | Aggregate feedback informs confidence | ⏳ |
+
+**Phase 1 Milestone**: System begins making decisions within narrow boundaries.
+
+---
+
+#### Widget Phase 2: Config-Generated Widgets ⏳
+**Status**: Not Started | **Automation Level**: Medium → High
+
+**Purpose**: Remove hard-coded widget logic. Widgets defined declaratively, not in code.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Widget Definition Schema** | | ⏳ |
+| | Define YAML/JSON schema for widget definitions | ⏳ |
+| | Eligibility rules as config (not code) | ⏳ |
+| | Generation config (model, prompt template, constraints) | ⏳ |
+| | Enrichment config (strategies, timeout, fallback) | ⏳ |
+| | Rendering config (zone, template, fallback) | ⏳ |
+| **Category-Agnostic Matching** | | ⏳ |
+| | Remove hard-coded category logic | ⏳ |
+| | Widgets match ANY category meeting criteria | ⏳ |
+| | Same system supports multiple categories without branching | ⏳ |
+| **Template Selection Engine** | | ⏳ |
+| | Define template library | ⏳ |
+| | Auto-select template based on content type | ⏳ |
+| | Template versioning | ⏳ |
+| **Widget Registry as Data** | | ⏳ |
+| | Registry loaded from config files | ⏳ |
+| | Hot-reload widget definitions | ⏳ |
+| | Adding new widget = adding config file (no code changes) | ⏳ |
+
+**Phase 2 Target**: New widget creation time < 1 hour (config only).
+
+**Example Widget Definition (Target Format)**:
+```yaml
+widget:
+  id: complete-the-look
+  version: 2.0
+  eligibility:
+    min_items: 2
+    categories: [wear]  # Later: inferred
+    confidence_threshold: 0.7
+  generation:
+    model: claude-3-haiku
+    prompt_template: prompts/complete-the-look.md
+    constraints:
+      - no_same_category_as_input
+      - supported_brands_only
+  enrichment:
+    strategies: [shopify_api, serp_api, placeholder]
+    timeout_ms: 5000
+  rendering:
+    zone: inline
+    template: two-column-suggestions
+```
+
+---
+
+#### Widget Phase 3: Self-Selecting Widgets ⏳
+**Status**: Not Started | **Automation Level**: High
+
+**Purpose**: System decides which widget types are most relevant without being told.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Widget Candidate Generation** | | ⏳ |
+| | System proposes N candidate widgets for any board | ⏳ |
+| | Candidates evaluated in parallel | ⏳ |
+| | Candidates scored before rendering | ⏳ |
+| **Ranking System** | | ⏳ |
+| | Score = confidence × relevance × novelty | ⏳ |
+| | Relevance based on board content analysis | ⏳ |
+| | Novelty prevents showing same widget repeatedly | ⏳ |
+| **Slot Allocation** | | ⏳ |
+| | Define widget slots per zone (hero: 1, inline: 3, footer: 2) | ⏳ |
+| | Only top-ranked widgets fill slots | ⏳ |
+| | Empty slots = meaningful signal (no good widgets) | ⏳ |
 | **A/B Testing Framework** | | ⏳ |
-| | Split traffic between prompt variants | ⏳ |
-| | Track engagement metrics per variant | ⏳ |
+| | Split traffic between widget selection strategies | ⏳ |
+| | Track engagement per variant | ⏳ |
 | | Statistical significance calculation | ⏳ |
 | | Automatic winner selection | ⏳ |
-| | Prompt version history | ⏳ |
-| **Price Range Filtering** | | ⏳ |
-| | User budget preference setting | ⏳ |
-| | Filter suggestions by price range | ⏳ |
-| | Price-aware brand selection | ⏳ |
-| | "Similar but cheaper" suggestions | ⏳ |
-| **Seasonal/Occasion Filters** | | ⏳ |
-| | Season detection (current weather/date) | ⏳ |
-| | Occasion selector (casual, work, formal, etc.) | ⏳ |
-| | Context-aware prompt adjustments | ⏳ |
-| | Holiday/event themed suggestions | ⏳ |
-| **Multiple Outfit Options** | | ⏳ |
-| | Generate 3 alternative outfit combinations | ⏳ |
-| | Carousel/tabs for outfit switching | ⏳ |
-| | "More like this" / "Less like this" feedback | ⏳ |
-| | Style comparison view | ⏳ |
-| **Outfit History** | | ⏳ |
-| | Track past widget generations | ⏳ |
-| | Save favorite suggestions | ⏳ |
-| | "You might also like" based on history | ⏳ |
-| | Suggestion deduplication | ⏳ |
 
-### Epic 3.6: AI Pin Generation ⏳
+**Phase 3 Milestone**: System behaves like a curator, not just a renderer. Absence becomes meaningful.
+
+---
+
+#### Widget Phase 4: Self-Optimizing System ⏳
+**Status**: Not Started | **Automation Level**: Full
+
+**Purpose**: Continuous improvement without manual tuning. The widget ecosystem becomes adaptive.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Engagement Tracking** | | ⏳ |
+| | Clicks, saves, dismissals per widget | ⏳ |
+| | Time-on-widget metrics | ⏳ |
+| | Conversion tracking (suggestion → purchase) | ⏳ |
+| **Automated Threshold Tuning** | | ⏳ |
+| | Confidence thresholds adjust based on outcomes | ⏳ |
+| | Eligibility rules tighten/loosen automatically | ⏳ |
+| | Learning rate controls for stability | ⏳ |
+| **Widget Lifecycle Management** | | ⏳ |
+| | States: emerging → stable → deprecated | ⏳ |
+| | Poor-performing widgets degrade gracefully | ⏳ |
+| | Strong widget patterns reinforce themselves | ⏳ |
+| | New widget forms can emerge within constraints | ⏳ |
+| **Anomaly Detection** | | ⏳ |
+| | Detect sudden performance drops | ⏳ |
+| | Auto-disable failing widgets | ⏳ |
+| | Alert on unusual patterns | ⏳ |
+| | Self-healing when issues resolve | ⏳ |
+
+**Phase 4 End State**: Humans design the system, not the widgets. The system is a **generative presentation layer for meaning**.
+
+---
+
+#### Widget Infrastructure (Cross-Phase) ⏳
+
+These foundational systems support all phases:
+
+| System | Purpose | Status |
+|--------|---------|--------|
+| **Brand Intelligence Service** | Centralized brand knowledge, validation | ⏳ |
+| **Image Resolution Pipeline** | Pluggable strategies with health tracking | ⏳ |
+| **Prompt Engineering Framework** | Structured prompt building with constraints | ⏳ |
+| **Response Parser & Validator** | Robust AI response handling | ✅ (basic) |
+| **Widget State Manager** | Per-widget isolated state | ✅ |
+| **Taste Profiling** | Personalize without filter bubbles | ⏳ |
+
+---
+
+### Epic 3.4: AI Pin Generation ⏳
 
 | Story | Tasks | Status |
 |-------|-------|--------|
