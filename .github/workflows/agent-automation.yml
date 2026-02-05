@@ -59,11 +59,17 @@ jobs:
         run: |
           echo "🔍 Detecting changed files..."
 
-          # Manual trigger always does full sync
+          # Manual trigger - only full sync if force_full_sync is true
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "🔄 Manual trigger - will sync all pages"
-            echo "structure_changed=true" >> $GITHUB_OUTPUT
-            git ls-files > /tmp/changed_files.txt
+            if [ "$FORCE_SYNC" = "true" ]; then
+              echo "🔄 Manual trigger with force_full_sync - will sync all pages"
+              echo "structure_changed=true" >> $GITHUB_OUTPUT
+              git ls-files > /tmp/changed_files.txt
+            else
+              echo "📋 Manual trigger (no force) - no files changed"
+              echo "structure_changed=false" >> $GITHUB_OUTPUT
+              echo "" > /tmp/changed_files.txt
+            fi
             exit 0
           fi
 
@@ -163,9 +169,15 @@ jobs:
             echo "📁 Using notion-structure.json config"
 
             # Build payload with file contents injected into structure
-            python3 << 'PYEOF' > /tmp/sync_payload.json
+            python3 << 'PYEOF'
           import json
           import os
+          import sys
+
+          def log(msg):
+              print(msg, file=sys.stderr)
+
+          stats = {'loaded': 0, 'missing': 0, 'errors': 0}
 
           def inject_content(obj):
               """Recursively inject file contents into structure nodes that have 'file' property"""
@@ -175,16 +187,17 @@ jobs:
                       if os.path.exists(filepath):
                           try:
                               with open(filepath, 'r', encoding='utf-8') as f:
-                                  # Limit content to 40KB to avoid API limits
                                   content = f.read(40000)
                                   obj['content'] = content
-                                  print(f"  ✓ Loaded: {filepath} ({len(content)} chars)")
+                                  stats['loaded'] += 1
+                                  log(f"  ✓ {filepath} ({len(content)} chars)")
                           except Exception as e:
-                              print(f"  ✗ Error reading {filepath}: {e}")
+                              stats['errors'] += 1
+                              log(f"  ✗ {filepath}: {e}")
                       else:
-                          print(f"  ⏭ File not found: {filepath}")
+                          stats['missing'] += 1
+                          log(f"  ⏭ {filepath} (not found)")
 
-                  # Process children recursively
                   for key in ['children', 'sections']:
                       if key in obj:
                           for child in obj[key]:
@@ -194,15 +207,20 @@ jobs:
           with open('notion-structure.json') as f:
               structure = json.load(f)
 
-          print("📄 Loading file contents into structure...")
+          log("📄 Loading file contents...")
           inject_content(structure)
+          log(f"📊 Summary: {stats['loaded']} loaded, {stats['missing']} missing, {stats['errors']} errors")
 
           payload = {
               'action': 'sync-structure',
-              'skipContent': False,  # Include content!
+              'skipContent': False,
               'structure': structure
           }
-          print(json.dumps(payload))
+
+          with open('/tmp/sync_payload.json', 'w') as f:
+              json.dump(payload, f)
+
+          log(f"✅ Payload ready ({os.path.getsize('/tmp/sync_payload.json')} bytes)")
           PYEOF
 
             echo "Payload built with content"
