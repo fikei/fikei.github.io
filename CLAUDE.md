@@ -109,7 +109,12 @@ When working on this project, always follow these guidelines:
 9. **Update project plan when completing user-facing tasks**
    - After finishing a user-facing feature, update the story status in `docs/execution/UNIFIED-PROJECT-PLAN.md`
    - Add implementation details if relevant (e.g., key files, functions, components)
-   - If new UI components were added, document them in `design-system/README.md`
+
+10. **Update design system documentation when adding UI components**
+    - When adding new CSS classes or UI patterns, document them in `design-system/README.md`
+    - Include: component name, HTML example, behavior notes
+    - This is REQUIRED for any new `.class-name` added to stylesheets
+    - Keep documentation consistent with existing component format
 
 ---
 

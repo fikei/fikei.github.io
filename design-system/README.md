@@ -3,7 +3,7 @@
 > Minimal, high-contrast design system powering all ctrl.rodeo products.
 
 **Status**: 🟢 Active
-**Last Updated**: 2026-02-04
+**Last Updated**: 2026-02-05
 
 ---
 
@@ -138,6 +138,7 @@ Horizontally scrollable navigation for category/filter selection.
 
 ```html
 <nav class="filters">
+  <input type="text" class="search-input" placeholder="Search...">
   <button class="filter-token filter-token--active" data-category="all">All</button>
   <button class="filter-token" data-category="home">Home</button>
   <button class="filter-token" data-category="wear">Wear</button>
@@ -152,6 +153,21 @@ Horizontally scrollable navigation for category/filter selection.
 - Tokens don't shrink (flex-shrink: 0)
 - Active state inverts colors (filled)
 - Touch-friendly with momentum scrolling on mobile
+
+### Search Input
+
+Inline search input styled to match filter tokens.
+
+```html
+<input type="text" class="search-input" placeholder="Search..." autocomplete="off">
+```
+
+**Search input behavior:**
+- 10px uppercase monospace text
+- Matches filter token height and border style
+- Muted placeholder color
+- Focus: subtle background change, no outline
+- Min-width: 120px, max-width: 200px
 
 ### Modal
 
@@ -281,6 +297,64 @@ Form-like display sections for account information.
   <div>Item 3</div>
 </div>
 ```
+
+**Grid behavior:**
+- Uses CSS Grid with `grid-auto-flow: dense` for automatic gap filling
+- Responsive columns: 2 (mobile) → 3 → 4 → 5 (large screens)
+- Expanded items (2x2 or 3x2) trigger reflow of smaller items
+
+### Empty State
+
+Full-page centered state for empty views with optional CTA.
+
+```html
+<!-- New user welcome -->
+<div class="empty-state">
+  <div class="empty-state__box">
+    <h2 class="empty-state__title">Welcome to Boards</h2>
+    <p class="empty-state__text">Collect and organize links you love.</p>
+    <div class="empty-state__actions">
+      <button class="empty-state__cta">Add Your First Link</button>
+    </div>
+    <p class="empty-state__hint">Tip: Paste any URL directly on this page</p>
+  </div>
+</div>
+
+<!-- No search results -->
+<div class="empty-state">
+  <div class="empty-state__box">
+    <p class="empty-state__text">No links match "query"</p>
+    <button class="empty-state__clear">Clear Search</button>
+  </div>
+</div>
+```
+
+**Empty state behavior:**
+- Centered vertically and horizontally in grid
+- Box: bordered, max-width 320px, centered text
+- Title: 18px uppercase with letter-spacing
+- CTA button: filled style, inverts on hover
+- Hint text: muted, smaller font
+- Clear button: outline style, inverts on hover
+
+### Admin Panel Actions
+
+Button group for admin panel sections.
+
+```html
+<div class="admin-panel__section">
+  <div class="admin-panel__section-title">Data Export</div>
+  <div class="admin-panel__actions">
+    <button class="admin-panel__btn">Export JSON</button>
+    <button class="admin-panel__btn">Export CSV</button>
+  </div>
+</div>
+```
+
+**Admin actions behavior:**
+- Flexbox with gap spacing
+- Wraps on narrow screens
+- Buttons match admin panel style
 
 ## Light Mode
 
