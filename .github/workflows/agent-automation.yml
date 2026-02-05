@@ -3,6 +3,7 @@ name: AI Agent Automation
 on:
   push:
     branches:
+      - master
       - main
       - 'claude/**'
   pull_request:
