@@ -220,21 +220,7 @@ class NotionClient {
 
     // Add new blocks in batches of 100 (Notion API limit)
     const blocks = this.markdownToBlocks(content)
-    const BATCH_SIZE = 100
-
-    for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
-      const batch = blocks.slice(i, i + BATCH_SIZE)
-      if (batch.length > 0) {
-        await this.request(`/blocks/${pageId}/children`, {
-          method: 'PATCH',
-          body: JSON.stringify({ children: batch }),
-        })
-        // Small delay between batches to avoid rate limits
-        if (i + BATCH_SIZE < blocks.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-      }
-    }
+    await this.addBlocksWithRetry(pageId, blocks)
   }
 
   async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<void> {
@@ -250,20 +236,51 @@ class NotionClient {
       }
     }
 
-    // Add new blocks in batches of 100
+    await this.addBlocksWithRetry(pageId, blocks)
+  }
+
+  // Add blocks with resilient error handling - if batch fails, try individual blocks
+  private async addBlocksWithRetry(pageId: string, blocks: any[]): Promise<void> {
     const BATCH_SIZE = 100
+    let failedBlocks = 0
 
     for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
       const batch = blocks.slice(i, i + BATCH_SIZE)
-      if (batch.length > 0) {
+      if (batch.length === 0) continue
+
+      try {
         await this.request(`/blocks/${pageId}/children`, {
           method: 'PATCH',
           body: JSON.stringify({ children: batch }),
         })
-        if (i + BATCH_SIZE < blocks.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+      } catch (batchError) {
+        // Batch failed - try adding blocks one by one
+        console.error(`Batch ${i / BATCH_SIZE + 1} failed, trying individual blocks:`, batchError.message)
+
+        for (const block of batch) {
+          try {
+            await this.request(`/blocks/${pageId}/children`, {
+              method: 'PATCH',
+              body: JSON.stringify({ children: [block] }),
+            })
+          } catch (blockError) {
+            // Log which block type failed and continue
+            console.error(`Block failed (type: ${block.type}):`, blockError.message)
+            failedBlocks++
+          }
+          // Small delay between individual block adds
+          await new Promise(resolve => setTimeout(resolve, 50))
         }
       }
+
+      // Small delay between batches to avoid rate limits
+      if (i + BATCH_SIZE < blocks.length) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+
+    if (failedBlocks > 0) {
+      console.error(`Total blocks failed: ${failedBlocks} of ${blocks.length}`)
     }
   }
 
@@ -561,7 +578,6 @@ class NotionClient {
       // Table: line contains | characters (detect table rows)
       const trimmedLine = line.trim()
       if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
-        const tableLines: string[] = []
         const dataRows: string[][] = []
         let headerRow: string[] | null = null
 
@@ -572,8 +588,6 @@ class NotionClient {
           if (!currentLine.startsWith('|') || !currentLine.endsWith('|')) {
             break
           }
-
-          tableLines.push(currentLine)
 
           // Check if separator row (|---|---|)
           if (/^\|[\s\-:|]+\|$/.test(currentLine)) {
@@ -593,63 +607,44 @@ class NotionClient {
           i++
         }
 
-        // Render table as formatted text blocks for reliable display
+        // Create Notion table block
         if (headerRow && headerRow.length > 0) {
-          // Calculate column widths
-          const allRows = [headerRow, ...dataRows]
-          const colWidths = headerRow.map((_, colIdx) =>
-            Math.max(...allRows.map(row => (row[colIdx] || '').length))
-          )
+          const tableWidth = headerRow.length
 
-          // Create header as bold paragraph
-          const headerText = headerRow.map((cell, idx) =>
-            cell.padEnd(colWidths[idx])
-          ).join(' | ')
+          // Build table rows (header + data rows)
+          const tableRows: any[] = []
 
-          blocks.push({
-            object: 'block',
-            type: 'paragraph',
-            paragraph: {
-              rich_text: [{
-                type: 'text',
-                text: { content: headerText },
-                annotations: { bold: true },
-              }],
+          // Header row
+          tableRows.push({
+            type: 'table_row',
+            table_row: {
+              cells: headerRow.map(cell => this.parseRichText(cell)),
             },
           })
 
-          // Create separator
-          const separator = colWidths.map(w => '-'.repeat(w)).join('-+-')
-          blocks.push({
-            object: 'block',
-            type: 'paragraph',
-            paragraph: {
-              rich_text: [{
-                type: 'text',
-                text: { content: separator },
-                annotations: { code: true },
-              }],
-            },
-          })
-
-          // Create data rows
+          // Data rows
           for (const row of dataRows) {
-            const rowText = headerRow.map((_, idx) =>
-              (row[idx] || '').padEnd(colWidths[idx])
-            ).join(' | ')
-
-            blocks.push({
-              object: 'block',
-              type: 'paragraph',
-              paragraph: { rich_text: this.parseRichText(rowText) },
+            // Ensure row has same number of cells as header
+            const cells: any[][] = []
+            for (let col = 0; col < tableWidth; col++) {
+              const cellContent = row[col] || ''
+              cells.push(this.parseRichText(cellContent))
+            }
+            tableRows.push({
+              type: 'table_row',
+              table_row: { cells },
             })
           }
 
-          // Add spacing after table
           blocks.push({
             object: 'block',
-            type: 'paragraph',
-            paragraph: { rich_text: [{ type: 'text', text: { content: '' } }] },
+            type: 'table',
+            table: {
+              table_width: tableWidth,
+              has_column_header: true,
+              has_row_header: false,
+              children: tableRows,
+            },
           })
         }
         continue
