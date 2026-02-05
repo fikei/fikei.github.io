@@ -1145,22 +1145,8 @@ async function syncStructure(
             syncedIds.set(title, id)
           }
 
-          // Now update section page with linked TOC
-          if (!skipContent && isSectionPage) {
-            const tocBlocks = generateLinkedTocBlocks(page.title, page.children, childIds)
-            const stats = await client.updatePageWithBlocks(pageId, tocBlocks)
-            if (!created) {
-              result.updated.push(`${pagePath} (${stats.total} blocks, ${stats.failed} failed)`)
-            }
-            // Accumulate debug stats
-            if (result.debug) {
-              result.debug.totalBlocks += stats.total
-              result.debug.failedBlocks += stats.failed
-              for (const [type, count] of Object.entries(stats.types)) {
-                result.debug.blockTypes[type] = (result.debug.blockTypes[type] || 0) + count
-              }
-            }
-          }
+          // TOC generation disabled - section pages are just containers
+          // Child pages appear naturally in Notion's sidebar
         }
 
         // Rate limiting - wait between operations
