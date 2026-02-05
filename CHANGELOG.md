@@ -4,6 +4,16 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-05] - Core Systems Architecture Documentation
+
+### Added
+- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Architecture document covering the three core systems: Pin Creation, Scraping & Link Enrichment, and AI Widget Pipeline. Documents how these systems connect, their data flows, key architectural decisions, and shared infrastructure.
+
+### Changed
+- **`notion-structure.json`** — Added Core Systems Architecture to Technical Design section
+
+---
+
 ## [2026-02-05] - Widget Phase 2: Config-Generated Widgets (COMPLETE)
 
 ### Added

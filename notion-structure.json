@@ -346,6 +346,12 @@
               "source": "human"
             },
             {
+              "title": "Core Systems Architecture",
+              "icon": "\ud83d\udd27",
+              "file": "docs/infrastructure/technical-design/core-systems-architecture.md",
+              "source": "ai"
+            },
+            {
               "title": "Content Type and Image Systems Tech",
               "icon": "\ud83d\udcc4",
               "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
