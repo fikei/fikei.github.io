@@ -301,10 +301,25 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Structure sync successful"
-            # Show what was created/updated
-            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Created:', r.get('created', [])); print('Updated:', r.get('updated', [])); print('Errors:', r.get('errors', []))"
+            # Show what was created/updated and save for content sync
+            echo "$response" | python3 -c "
+import json,sys
+r=json.load(sys.stdin)
+created = r.get('created', [])
+print('Created:', created)
+print('Updated:', r.get('updated', []))
+print('Errors:', r.get('errors', []))
+# Save created page titles for content sync
+with open('/tmp/created_pages.txt', 'w') as f:
+    for page_path in created:
+        # Extract page title from path like 'Execution > Project Plan > Phase 1'
+        title = page_path.split(' > ')[-1] if ' > ' in page_path else page_path
+        f.write(title + '\n')
+print(f'📝 {len(created)} new pages will have content synced')
+"
           else
             echo "⚠️ Structure sync had issues"
+            > /tmp/created_pages.txt
           fi
 
           # Small delay before cleanup
@@ -396,6 +411,9 @@ jobs:
             sleep 10
           fi
 
+          # Initialize created pages file if it doesn't exist (structure sync may not have run)
+          touch /tmp/created_pages.txt
+
           # Track failed pages for retry
           > /tmp/failed_pages.txt
 
@@ -466,16 +484,31 @@ jobs:
               with open('/tmp/changed_files.txt') as f:
                   changed_files = set(line.strip() for line in f if line.strip())
 
+          # Read newly created pages (from structure sync)
+          created_page_titles = set()
+          if os.path.exists('/tmp/created_pages.txt'):
+              with open('/tmp/created_pages.txt') as f:
+                  created_page_titles = set(line.strip() for line in f if line.strip())
+
           if force_full_sync:
               # Sync ALL pages with content (manual trigger only)
               pages_to_sync = [(title, filepath) for title, filepath in pages if filepath]
               print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages with content")
           else:
-              # Only sync pages whose files actually changed in this commit
-              pages_to_sync = [(title, filepath) for title, filepath in pages if filepath in changed_files]
-              print(f"📋 Incremental sync: {len(pages_to_sync)} changed files (of {len(pages)} total pages)")
-              if changed_files:
-                  print(f"   Changed files: {', '.join(sorted(changed_files)[:10])}{'...' if len(changed_files) > 10 else ''}")
+              # Sync pages that: 1) file changed in commit, OR 2) page was just created
+              pages_to_sync = []
+              for title, filepath in pages:
+                  if filepath in changed_files:
+                      pages_to_sync.append((title, filepath))
+                  elif title in created_page_titles and filepath:
+                      pages_to_sync.append((title, filepath))
+
+              changed_count = len([p for p in pages_to_sync if p[1] in changed_files])
+              new_count = len(pages_to_sync) - changed_count
+
+              print(f"📋 Incremental sync: {len(pages_to_sync)} pages ({changed_count} changed, {new_count} new)")
+              if created_page_titles:
+                  print(f"   New pages: {', '.join(sorted(created_page_titles)[:5])}{'...' if len(created_page_titles) > 5 else ''}")
 
           with open('/tmp/pages_to_sync.txt', 'w') as f:
               for title, filepath in pages_to_sync:
