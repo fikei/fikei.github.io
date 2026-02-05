@@ -1,7 +1,7 @@
 # Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-05
+> **Last Updated**: 2026-02-05 (Widget Phase 0 ~95%, Phase 1 COMPLETE, Phase 2 IN PROGRESS)
 
 ---
 
@@ -20,12 +20,38 @@
 |-------|--------|----------|
 | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 18/18 |
 | [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 12/12 |
-| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | MOSTLY COMPLETE | 28/40 |
-| [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 8/70 |
-| [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/55 |
+| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 40/100+ |
+| [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 8/90 |
+| [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/10 |
-| [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/22 |
-| [Backlog](./backlog.md) | Future | 0/30 |
+| [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/50 |
+| [Backlog](./backlog.md) | Future | 0/40 |
+
+---
+
+## Recent Milestones
+
+### Widget Phase 2: Config-Generated Widgets 🔄
+**Started: 2026-02-05**
+
+- **Widget Definition Schema**: TypeScript types in `config/schema.ts`
+- **Config-Driven Eligibility**: Rules defined declaratively, not in code
+- **Registry as Data**: `config/registry.ts` with runtime evaluators
+- **Two Widgets Migrated**: `complete-the-look`, `style-summary`
+- **180+ lines removed**: Hard-coded eligibility logic replaced with config
+
+**Remaining**: Category-agnostic matching, template selection engine, hot-reload
+
+### Widget Phase 1: Rule-Driven Automation ✅
+**Completed: 2026-02-05**
+
+- **Eligibility Engine**: Widgets must pass rules to render
+- **Confidence Scoring**: AI returns 0.0-1.0 confidence, threshold gates rendering
+- **Validation Engine**: Track success/failure for optimization
+- **SERP API Integration**: Reliable image fallback strategy
+- **Client Instrumentation**: Event tracking for views, clicks, dismissals
+
+See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-widget-ecosystem) for full details.
 
 ---
 
@@ -35,13 +61,25 @@
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 18 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 12 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 28 | 0 | 12 | 0 |
-| Phase 4: Sharing & Collaboration | 8 | 8 | 52 | 2 |
-| Phase 5: UX Polish | 3 | 0 | 52 | 0 |
+| Phase 3: AI Intelligence | 46 | 8 | 46 | 0 |
+| Phase 4: Sharing & Collaboration | 8 | 8 | 72 | 2 |
+| Phase 5: UX Polish | 3 | 0 | 67 | 0 |
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
-| Phase 7: Platform Expansion | 0 | 0 | 22 | 0 |
-| Backlog | 0 | 0 | 30 | 0 |
-| **TOTAL** | **70** | **8** | **177** | **2** |
+| Phase 7: Platform Expansion | 0 | 0 | 50 | 0 |
+| Backlog | 0 | 0 | 40 | 0 |
+| **TOTAL** | **88** | **16** | **284** | **2** |
+
+---
+
+## Generative Widget Ecosystem Roadmap
+
+| Phase | Name | Automation | Status |
+|-------|------|------------|--------|
+| 0 | Deterministic MVP | Very Low | ~95% Complete |
+| 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
+| 2 | Config-Generated Widgets | Medium→High | **IN PROGRESS** |
+| 3 | Self-Selecting Widgets | High | Pending |
+| 4 | Self-Optimizing System | Full | Pending |
 
 ---
 
@@ -61,6 +99,7 @@
 | Collaborative pricing model | Free vs premium tiers | Revenue, feature gating |
 | Mobile app platform | iOS first vs cross-platform | Development timeline |
 | Analytics provider | Privacy-friendly options | User trust, compliance |
+| SERP API key | SerpApi vs alternatives | Cost, reliability |
 
 ---
 

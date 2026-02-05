@@ -1,4 +1,4 @@
-# Phase 3: AI Intelligence (MOSTLY COMPLETE)
+# Phase 3: AI Intelligence (IN PROGRESS)
 
 > Back to [Project Plan](./index.md)
 
@@ -59,9 +59,15 @@
 
 ---
 
-## Epic 3.3: AI Widget System
+## Epic 3.3: Generative Widget Ecosystem
 
-**Released: 2026-02-03**
+> **Vision**: A fully automated system that autonomously determines which widgets should exist, what content populates them, how they're structured, and how they improve over time.
+>
+> **Reference**: [PRD: Generative Widget Ecosystem](/docs/strategy/prds/generative-widget-ecosystem.md)
+
+### Widget Phase 0: Deterministic MVP (~95% Complete)
+
+**Automation Level**: Very Low
 
 | Story | Tasks | Status |
 |-------|-------|--------|
@@ -70,21 +76,152 @@
 | | 47+ brand integrations | Complete |
 | | Shopify JSON API integration | Complete |
 | | HTML scraping fallback | Complete |
-| | Client caching (5 min) | Complete |
-| | Server caching (Supabase) | Complete |
-| | Per-widget refresh | Complete |
-| | Widget feedback (basic) | Complete |
-
-| Story | Tasks | Status |
-|-------|-------|--------|
-| **Fix Product Images** | | Pending (HIGH PRIORITY) |
-| | SERP API integration | Pending |
-| | Bot protection bypass | Pending |
-| | Image validation | Pending |
+| | Client + server caching | Complete |
+| | Per-widget refresh (isolated state) | Complete |
+| | Brand validation (prevent hallucinations) | Complete |
+| | JSON parsing (handle AI preamble) | Complete |
 | **Style Definition Widget** | | Pending |
 | | Extract style attributes from board | Pending |
 | | Generate style summary | Pending |
-| **Widget Instrumentation** | | Pending |
-| | Track widget views | Pending |
-| | Track product clicks | Pending |
+| | Define output schema | Pending |
+| **Image Pipeline Fix** | | Complete |
+| | SERP API integration (reliable source) | Complete |
+| | Pluggable strategy pattern | Complete |
+| | Health tracking per strategy | Complete |
+| | Graceful fallback chain | Complete |
+| **Widget Instrumentation** | | Complete |
+| | Track widget views | Complete |
+| | Track product clicks | Complete |
 | | Track saves to board | Pending |
+| | Basic feedback collection | Complete |
+
+### Widget Phase 1: Rule-Driven Automation (COMPLETE)
+
+**Automation Level**: Low → Medium
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Eligibility Engine** | | Complete |
+| | Define eligibility rules (min items, category match, content quality) | Complete |
+| | Widgets can fail eligibility and not render | Complete |
+| | Eligibility logging (why did widget appear/not appear?) | Complete |
+| **Confidence Scoring** | | Complete |
+| | AI returns confidence score (0.0-1.0) with each response | Complete |
+| | Configurable confidence thresholds per widget | Complete |
+| | Low-confidence widgets suppressed | Complete |
+| **Validation Engine** | | Complete |
+| | Track what works (successful renders, user engagement) | Complete |
+| | Track what fails (parse errors, low engagement) | Complete |
+| | Feed validation data back into eligibility rules | Pending |
+| **Widget Feedback (Enhanced)** | | In Progress |
+| | What do users click? | Complete |
+| | What do users dismiss? | Complete |
+| | What do users save? | Pending |
+| | Aggregate feedback informs confidence | Pending |
+
+### Widget Phase 2: Config-Generated Widgets (IN PROGRESS)
+
+**Automation Level**: Medium → High
+**Started**: 2026-02-05
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Widget Definition Schema** | | Complete |
+| | Define TypeScript schema for widget definitions | Complete |
+| | Eligibility rules as config (not code) | Complete |
+| | Generation config (model, prompt template, constraints) | Complete |
+| | Enrichment config (strategies, timeout, fallback) | Complete |
+| | Rendering config (zone, template, fallback) | Complete |
+| | Refactor index.ts to use config registry | Complete |
+| **Category-Agnostic Matching** | | In Progress |
+| | Remove hard-coded category logic from eligibility | Complete |
+| | Category rules now in config files | Complete |
+| | Widgets match ANY category meeting criteria | Pending |
+| | Same system supports multiple categories without branching | Pending |
+| **Template Selection Engine** | | Pending |
+| | Define template library | Pending |
+| | Auto-select template based on content type | Pending |
+| | Template versioning | Pending |
+| **Widget Registry as Data** | | In Progress |
+| | Registry loaded from config files | Complete |
+| | Hot-reload widget definitions | Pending |
+| | Adding new widget = adding config file (no code changes) | Complete |
+
+### Widget Phase 3: Self-Selecting Widgets (Pending)
+
+**Automation Level**: High
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Widget Candidate Generation** | | Pending |
+| | System proposes N candidate widgets for any board | Pending |
+| | Candidates evaluated in parallel | Pending |
+| | Candidates scored before rendering | Pending |
+| **Ranking System** | | Pending |
+| | Score = confidence × relevance × novelty | Pending |
+| | Relevance based on board content analysis | Pending |
+| | Novelty prevents showing same widget repeatedly | Pending |
+| **Slot Allocation** | | Pending |
+| | Define widget slots per zone (hero: 1, inline: 3, footer: 2) | Pending |
+| | Only top-ranked widgets fill slots | Pending |
+| | Empty slots = meaningful signal (no good widgets) | Pending |
+| **A/B Testing Framework** | | Pending |
+| | Split traffic between widget selection strategies | Pending |
+| | Track engagement metrics per variant | Pending |
+| | Statistical significance calculation | Pending |
+| | Automatic winner selection | Pending |
+
+### Widget Phase 4: Self-Optimizing System (Pending)
+
+**Automation Level**: Full
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Engagement Tracking** | | Pending |
+| | Clicks, saves, dismissals per widget | Pending |
+| | Time-on-widget metrics | Pending |
+| | Conversion tracking (suggestion → purchase) | Pending |
+| **Automated Threshold Tuning** | | Pending |
+| | Confidence thresholds adjust based on outcomes | Pending |
+| | Eligibility rules tighten/loosen automatically | Pending |
+| | Learning rate controls for stability | Pending |
+| **Widget Lifecycle Management** | | Pending |
+| | States: emerging → stable → deprecated | Pending |
+| | Poor-performing widgets degrade gracefully | Pending |
+| | Strong widget patterns reinforce themselves | Pending |
+| | New widget forms can emerge within constraints | Pending |
+| **Anomaly Detection** | | Pending |
+| | Detect sudden performance drops | Pending |
+| | Auto-disable failing widgets | Pending |
+| | Alert on unusual patterns | Pending |
+| | Self-healing when issues resolve | Pending |
+
+---
+
+## Epic 3.4: AI Pin Generation (Pending)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Search-Based Pin Generation** | | Pending |
+| | Search input modal with query field | Pending |
+| | AI-powered web search for relevant content | Pending |
+| | Preview search results before adding | Pending |
+| | Bulk add from search results | Pending |
+| | AI auto-categorization on add | Pending |
+| **Category-Based Generation** | | Pending |
+| | "Suggest pins for this category" action | Pending |
+| | AI analyzes existing category content | Pending |
+| | Generate complementary suggestions | Pending |
+| | Source from curated databases/APIs | Pending |
+| | One-click add suggested pins | Pending |
+| **Prompt-Based Generation** | | Pending |
+| | Free-form prompt input field | Pending |
+| | AI interprets intent and finds content | Pending |
+| | Natural language queries ("find minimalist furniture") | Pending |
+| | Generate pins matching prompt criteria | Pending |
+| | Refine results with follow-up prompts | Pending |
+| **Content-Based Generation** | | Pending |
+| | "More like this" action on any pin | Pending |
+| | AI finds similar content across web | Pending |
+| | Style/aesthetic matching algorithm | Pending |
+| | Generate variations based on pin attributes | Pending |

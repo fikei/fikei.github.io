@@ -531,12 +531,60 @@ body {
 }
 
 /* ============================================
-   Floating Add Button
+   Bottom Navigation - Unified Floating Structure
    ============================================ */
-.fab {
+.bottom-nav {
   position: fixed;
-  bottom: var(--space-6);
-  right: var(--space-6);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 50;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: var(--space-4);
+}
+
+.bottom-nav__left,
+.bottom-nav__right {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.bottom-nav__right {
+  align-items: flex-end;
+}
+
+/* Share button in bottom nav */
+.bottom-nav__share-btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bottom-nav__share-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.bottom-nav__share-btn--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* Floating Button Base */
+.float-btn {
   width: 24px;
   height: 24px;
   font-family: var(--font-mono);
@@ -545,15 +593,129 @@ body {
   color: var(--bg);
   border: none;
   cursor: pointer;
-  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s ease;
 }
 
-.fab:hover {
+.float-btn:hover {
   outline: 2px solid var(--fg);
   outline-offset: 2px;
+}
+
+/* FAB Menu Container */
+.fab-menu {
+  position: relative;
+}
+
+.fab-menu__trigger {
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--fg);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.fab-menu__trigger:hover {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.fab-menu--open .fab-menu__trigger {
+  transform: rotate(45deg);
+}
+
+/* FAB Menu Dropdown */
+.fab-menu__dropdown {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+
+.fab-menu--open .fab-menu__dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.fab-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fab-menu__item:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.fab-menu__item-icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* Theme toggle in bottom nav */
+.bottom-nav .theme-toggle {
+  width: 32px;
+  height: 18px;
+  background: transparent;
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  padding: 2px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.bottom-nav .theme-toggle__knob {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+:root.light .bottom-nav .theme-toggle {
+  background: var(--fg);
+}
+
+:root.light .bottom-nav .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
+}
+
+/* Hidden file inputs for uploads */
+.hidden-input {
+  display: none;
 }
 
 /* ============================================
@@ -564,6 +726,8 @@ body {
   flex-wrap: nowrap;
   gap: var(--space-2);
   padding: var(--space-4);
+  padding-top: 48px; /* Space for auth bar above */
+  padding-right: 120px; /* Space for auth bar - clips filters before profile button */
   border-bottom: 1px solid var(--subtle);
   position: sticky;
   top: 0;
@@ -573,10 +737,26 @@ body {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
+  /* Fade effect on right edge to indicate more content */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 60px), transparent 100%);
 }
 
 .filters::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* Mobile adjustment for filter padding */
+@media (max-width: 600px) {
+  .filters {
+    padding-top: 52px; /* More space on mobile for auth bar */
+    padding-right: 80px; /* Tighter on mobile but still clipped */
+  }
+
+  .auth-bar {
+    top: var(--space-2);
+    right: var(--space-2);
+  }
 }
 
 .filter-token {
@@ -603,14 +783,87 @@ body {
   color: var(--bg);
 }
 
+/* Sub-tag filter bar */
+.sub-tags {
+  display: none;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--subtle);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sub-tags--visible {
+  display: flex;
+}
+
+.sub-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sub-tag:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.sub-tag--active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.sub-tag__count {
+  opacity: 0.6;
+  margin-left: 4px;
+}
+
+/* Search input */
+.search-input {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  min-width: 120px;
+  max-width: 200px;
+  flex-shrink: 0;
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.search-input:focus {
+  outline: none;
+  background: var(--surface);
+}
+
 /* ============================================
    Grid
    ============================================ */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  grid-auto-flow: dense; /* Fill gaps when cards expand */
   gap: var(--grid-gap);
   padding: var(--space-4);
+  padding-bottom: 80px; /* Space for bottom navigation */
 }
 
 @media (min-width: 600px) {
@@ -1186,11 +1439,71 @@ body {
   text-align: center;
 }
 
+.empty-state__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 var(--space-3) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .empty-state__text {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--fg);
   line-height: var(--line-height-normal);
+  margin: 0;
+}
+
+.empty-state__actions {
+  margin-top: var(--space-4);
+}
+
+.empty-state__cta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-2) var(--space-4);
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.empty-state__cta:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.empty-state__hint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-top: var(--space-4);
+  margin-bottom: 0;
+}
+
+.empty-state__clear {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  margin-top: var(--space-3);
+  transition: background 0.15s, color 0.15s;
+}
+
+.empty-state__clear:hover {
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .loader {
@@ -1917,6 +2230,12 @@ body {
   cursor: not-allowed;
 }
 
+.admin-panel__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .admin-panel__placeholder {
   padding: var(--space-4);
   background: var(--subtle);
@@ -1967,69 +2286,10 @@ body {
 /* Inline widget (injected into grid) */
 .widget-inline {
   grid-column: 1 / -1;
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
   margin: var(--space-2) 0;
+  /* No border/background - handled by inner widget-complete__body */
 }
 
-.widget-inline__header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.widget-inline__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.widget-inline__badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  background: var(--subtle);
-  padding: 2px 6px;
-  border-radius: 2px;
-}
-
-.widget-section__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.widget-section__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.widget-section__refresh {
-  background: none;
-  border: none;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  transition: color 0.15s;
-}
-
-.widget-section__refresh:hover {
-  color: var(--fg);
-}
 
 .widget-section__content {
   display: flex;
@@ -2141,15 +2401,9 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Style Summary Widget */
-.widget-style {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
-}
-
-.widget-style__header {
-  margin-bottom: var(--space-3);
+/* Style Summary Widget - inner content (now nested in widget-complete) */
+.widget-style__content {
+  /* No border/background - handled by widget-complete outer wrapper */
 }
 
 .widget-style__label {
@@ -2163,6 +2417,7 @@ body {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--muted);
+  margin-bottom: var(--space-3);
 }
 
 .widget-style__traits {
@@ -2222,37 +2477,73 @@ body {
   color: var(--muted);
 }
 
-/* Complete the Look v2 - Two Column Layout */
+/* Complete the Look v2 - Nested Card Layout */
 .widget-complete {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
+  /* Outer wrapper - no border, contains header + content box */
 }
 
 .widget-complete__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.widget-complete__header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .widget-complete__title {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-base);
-  color: var(--fg);
-}
-
-.widget-complete__subtitle {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--muted);
 }
 
+.widget-complete__badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+}
+
+.widget-complete__refresh-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--muted);
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.widget-complete__refresh-btn:hover {
+  color: var(--fg);
+}
+
 .widget-complete__body {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
   align-items: start;
+}
+
+.widget-complete__body--loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80px;
 }
 
 .widget-complete__section {
@@ -2755,7 +3046,6 @@ body {
 
   <!-- Auth UI -->
   <div class="auth-bar" id="authBar">
-    <button class="share-btn" id="shareBtn" style="display:none;">Share</button>
     <!-- Logged out state -->
     <button class="auth-bar__btn" id="authBtn">Login</button>
     <!-- Logged in state -->
@@ -2776,15 +3066,14 @@ body {
   </div>
 
   <nav class="filters" id="filters">
+    <input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off">
     <button class="filter-token filter-token--active" data-category="all">All</button>
   </nav>
 
+  <nav class="sub-tags" id="subTags"></nav>
+
   <!-- AI Widget Section - Hero Zone -->
   <section class="widget-section widget-zone widget-zone--hero" id="widgetSection" data-zone="hero">
-    <div class="widget-section__header">
-      <span class="widget-section__title">AI Insights</span>
-      <button class="widget-section__refresh" id="widgetRefresh">Refresh</button>
-    </div>
     <div class="widget-section__content" id="widgetContent"></div>
   </section>
 
@@ -2795,7 +3084,38 @@ body {
     <div class="widget-section__content" id="widgetFooterContent"></div>
   </section>
 
-  <button class="fab" id="addBtn">+</button>
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav" id="bottomNav">
+    <div class="bottom-nav__left">
+      <button class="bottom-nav__share-btn" id="shareBtn" style="display:none;">Share</button>
+      <button class="float-btn theme-toggle" id="bottomThemeToggle" aria-label="Toggle theme">
+        <div class="theme-toggle__knob"></div>
+      </button>
+    </div>
+    <div class="bottom-nav__right">
+      <div class="fab-menu" id="fabMenu" style="display:none;">
+        <div class="fab-menu__dropdown">
+          <button class="fab-menu__item" id="fabShareLink">
+            <span class="fab-menu__item-icon">+</span>
+            Share Link
+          </button>
+          <button class="fab-menu__item" id="fabPhotoUpload">
+            <span class="fab-menu__item-icon">◻</span>
+            Photo
+          </button>
+          <button class="fab-menu__item" id="fabVideoUpload">
+            <span class="fab-menu__item-icon">▶</span>
+            Video
+          </button>
+        </div>
+        <button class="fab-menu__trigger" id="fabTrigger" aria-label="Add content">+</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hidden file inputs for uploads -->
+  <input type="file" id="photoInput" class="hidden-input" accept="image/*" multiple>
+  <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple>
 
   <!-- Add Modal -->
   <div class="modal" id="addModal">
@@ -3112,6 +3432,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           </div>
         </div>
 
+        <!-- Data Export -->
+        <div class="admin-panel__section">
+          <div class="admin-panel__section-title">Data Export</div>
+          <div class="admin-panel__actions">
+            <button class="admin-panel__btn" id="adminExportJson">Export JSON</button>
+            <button class="admin-panel__btn" id="adminExportCsv">Export CSV</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -3158,8 +3487,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '1.9.0';
-  console.log('[boards] v' + VERSION);
+  const VERSION = '2.1.0';
+  console.log('[boards] v' + VERSION + ' - Navigation Redesign');
 
   // ============================================
   // Supabase Setup
@@ -3797,14 +4126,93 @@ Return JSON:
     return a;
   }
 
+  // =============================================================================
+  // PHASE 1: CLIENT-SIDE INSTRUMENTATION
+  // Track widget events for validation engine
+  // =============================================================================
+
+  // Widget event types for instrumentation
+  const WIDGET_EVENTS = {
+    VIEW: 'view',           // Widget rendered
+    CLICK: 'click',         // User clicked a suggestion
+    SAVE: 'save',           // User saved suggestion to board
+    DISMISS: 'dismiss',     // User dismissed widget
+    REFRESH: 'refresh',     // User refreshed widget
+    SUPPRESSED: 'suppressed' // Widget was suppressed by eligibility/confidence
+  };
+
+  // In-memory event buffer (persisted to localStorage)
+  let widgetEventBuffer = [];
+  const WIDGET_EVENTS_KEY = 'boards_widget_events';
+
+  function loadWidgetEvents() {
+    try {
+      widgetEventBuffer = JSON.parse(localStorage.getItem(WIDGET_EVENTS_KEY) || '[]');
+    } catch (e) {
+      widgetEventBuffer = [];
+    }
+  }
+
+  function saveWidgetEvents() {
+    try {
+      // Keep last 500 events
+      if (widgetEventBuffer.length > 500) {
+        widgetEventBuffer = widgetEventBuffer.slice(-500);
+      }
+      localStorage.setItem(WIDGET_EVENTS_KEY, JSON.stringify(widgetEventBuffer));
+    } catch (e) {
+      console.warn('[instrumentation] Failed to save events:', e);
+    }
+  }
+
+  function trackWidgetEvent(eventType, widgetId, data = {}) {
+    const event = {
+      type: eventType,
+      widgetId,
+      timestamp: Date.now(),
+      data
+    };
+    widgetEventBuffer.push(event);
+    saveWidgetEvents();
+    console.log('[instrumentation]', eventType, widgetId, data);
+  }
+
+  // Export widget events for analysis
+  function exportWidgetEvents() {
+    return {
+      events: widgetEventBuffer,
+      summary: {
+        total: widgetEventBuffer.length,
+        byType: widgetEventBuffer.reduce((acc, e) => {
+          acc[e.type] = (acc[e.type] || 0) + 1;
+          return acc;
+        }, {}),
+        byWidget: widgetEventBuffer.reduce((acc, e) => {
+          acc[e.widgetId] = (acc[e.widgetId] || 0) + 1;
+          return acc;
+        }, {})
+      }
+    };
+  }
+
+  // Initialize instrumentation on load
+  loadWidgetEvents();
+
+  // =============================================================================
+  // WIDGET CONTENT GENERATION (PHASE 1 ENHANCED)
+  // =============================================================================
+
   // Call AI to generate widget content via Edge Function
-  async function generateWidgetContent(widget, items) {
+  // Phase 1: Now includes eligibility, confidence, and instrumentation
+  async function generateWidgetContent(widget, items, category = null) {
     // Include refresh counter in cache key so refresh gets different results
     const cacheKey = getCacheKey(widget.id, items.map(i => i.id), true);
 
     // Check local cache first (valid for 1 hour)
     const cached = widgetCache[cacheKey];
     if (cached && (Date.now() - cached.timestamp) < 3600000) {
+      // Track view from cache
+      trackWidgetEvent(WIDGET_EVENTS.VIEW, widget.id, { cached: true });
       return cached.data;
     }
 
@@ -3826,6 +4234,12 @@ Return JSON:
       ? `\n\nIMPORTANT: This is variation #${counter}. Choose a DIFFERENT combination of items than before. Pick items you haven't matched yet.`
       : '';
 
+    // Get current category if not provided
+    const currentCategory = category || currentFilter || 'all';
+
+    // Get user preferences for personalization
+    const userPrefs = widgetFeedback.userPrefs || {};
+
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
@@ -3836,35 +4250,71 @@ Return JSON:
         body: JSON.stringify({
           widgetId: widget.id,
           prompt: widget.prompt + variationPrompt,
-          items: itemsPayload
+          items: itemsPayload,
+          category: currentCategory,  // Phase 1: For eligibility engine
+          userPrefs: userPrefs        // Phase 1: For personalization
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[widget] Edge Function error:', response.status, errorData);
+        trackWidgetEvent('error', widget.id, { status: response.status });
         return null;
       }
 
       const data = await response.json();
 
+      // Phase 1: Handle suppressed widgets
+      if (data.suppressed) {
+        console.log('[widget] Widget suppressed:', data.reason, data.meta);
+        trackWidgetEvent(WIDGET_EVENTS.SUPPRESSED, widget.id, {
+          reason: data.reason,
+          eligibility: data.meta?.eligibility,
+          confidence: data.meta?.confidence
+        });
+        return { _suppressed: true, reason: data.reason, meta: data.meta };
+      }
+
       if (data.error) {
         console.error('[widget] Edge Function returned error:', data.error);
+        trackWidgetEvent('error', widget.id, { error: data.error });
         return null;
       }
 
       const result = data.content;
       const wasCached = data.cached;
+      const meta = data.meta;
 
       console.log('[widget] Got result for', widget.id, wasCached ? '(server cached)' : '(fresh)');
 
-      // Cache the result locally too
-      widgetCache[cacheKey] = { data: result, timestamp: Date.now() };
+      // Phase 1: Log meta information
+      if (meta) {
+        console.log('[widget] Meta:', {
+          confidence: meta.confidence?.toFixed(2),
+          eligibility: meta.eligibility?.score?.toFixed(2),
+          timing: meta.timing,
+          imageStats: meta.imageStats
+        });
+      }
+
+      // Track successful view
+      trackWidgetEvent(WIDGET_EVENTS.VIEW, widget.id, {
+        cached: wasCached,
+        confidence: meta?.confidence,
+        eligibility: meta?.eligibility?.score,
+        imagesFound: meta?.imageStats?.found,
+        imagesRequested: meta?.imageStats?.requested
+      });
+
+      // Cache the result locally (include meta)
+      widgetCache[cacheKey] = { data: result, timestamp: Date.now(), meta };
       saveWidgetCache();
 
       return result;
     } catch (e) {
       console.error('[widget] AI error:', e);
+      trackWidgetEvent('error', widget.id, { error: e.message });
     }
 
     return null;
@@ -3981,8 +4431,8 @@ Return JSON:
       productUrl: s.productUrl ? 'present' : null
     })));
     for (const sug of suggestions.slice(0, 3)) {
-      // Use actual product URL if available, otherwise fall back to Google Shopping search
-      const shopUrl = sug.productUrl || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sug.searchQuery || sug.name)}`;
+      // Use productUrl from server - NEVER fall back to Google Shopping
+      const hasUrl = sug.productUrl && sug.productUrl.length > 0 && !sug.productUrl.includes('google.com');
       const cat = sug.category || 'unknown';
       const icon = categoryIcons[cat] || '🛍️';
 
@@ -3997,56 +4447,52 @@ Return JSON:
         ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
         : `<span class="widget-complete__product-icon">${icon}</span>`;
 
-      suggestionsHtml += `
-        <a href="${shopUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion">
-          <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
-            ${imageContent}
-          </div>
-          ${brandDisplay}
-          <div class="widget-complete__item-title">${esc(sug.name)}</div>
-          <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-          <span class="widget-complete__shop-link">Shop Now →</span>
-        </a>`;
+      // Render as link only if we have a valid URL, otherwise render as non-clickable card
+      if (hasUrl) {
+        // Phase 1: Track click for instrumentation
+        const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
+        suggestionsHtml += `
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion" onclick="${trackClick}">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+              ${imageContent}
+            </div>
+            ${brandDisplay}
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link">Shop Now →</span>
+          </a>`;
+      } else {
+        // No valid URL - render as non-clickable suggestion
+        suggestionsHtml += `
+          <div class="widget-complete__item widget-complete__item--suggestion widget-complete__item--no-link">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+              ${imageContent}
+            </div>
+            ${brandDisplay}
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link" style="opacity: 0.5">Search for this item</span>
+          </div>`;
+      }
     }
 
-    const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
-      dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'From your collection';
-
-    const isFavorite = widgetPrefs.favorites[widget.id];
-
     return `
-      <div class="widget-complete ${isFavorite ? 'widget-complete--favorite' : ''}" data-widget-id="${widget.id}">
+      <div class="widget-complete" data-widget-id="${widget.id}">
         <div class="widget-complete__header">
-          <div>
+          <div class="widget-complete__header-left">
             <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__subtitle">${subtitle}</span>
+            <span class="widget-complete__badge">AI</span>
           </div>
-          <div class="widget-complete__actions">
-            <button class="widget-complete__action ${isFavorite ? 'widget-complete__action--active' : ''}" onclick="toggleWidgetFavorite('${widget.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-              ${isFavorite ? '★' : '☆'}
-            </button>
-            <button class="widget-complete__action" onclick="refreshWidget('${widget.id}')" title="Get new suggestions">↻</button>
-            <button class="widget-complete__action" onclick="dismissWidget('${widget.id}')" title="Dismiss for now">✕</button>
-            <button class="widget-complete__action widget-complete__action--danger" onclick="hideWidget('${widget.id}')" title="Hide permanently">🚫</button>
-          </div>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Your Outfit</div>
             <div class="widget-complete__items">${userItemsHtml}</div>
           </div>
           <div class="widget-complete__divider"></div>
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Complete With</div>
             <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
-        </div>
-        <div class="widget-complete__feedback">
-          <span class="widget-complete__feedback-label">Was this helpful?</span>
-          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', true)" title="Good suggestions">👍</button>
-          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', false)" title="Not helpful">👎</button>
-          <button class="widget-complete__feedback-btn" onclick="submitWidgetFeedback('${widget.id}')" title="Share feedback">💬</button>
-          <button class="widget-complete__feedback-btn" onclick="setWidgetPreferences()" title="Set your preferences">⚙️</button>
         </div>
       </div>`;
   }
@@ -4071,12 +4517,21 @@ Return JSON:
     const traitsHtml = traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
 
     return `
-      <div class="widget-style">
-        <div class="widget-style__header">
-          <div class="widget-style__label">${esc(label)}</div>
-          <div class="widget-style__sublabel">${esc(sublabel)}</div>
+      <div class="widget-complete" data-widget-id="${widget.id}">
+        <div class="widget-complete__header">
+          <div class="widget-complete__header-left">
+            <span class="widget-complete__title">${widget.name}</span>
+            <span class="widget-complete__badge">AI</span>
+          </div>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
-        <div class="widget-style__traits">${traitsHtml}</div>
+        <div class="widget-complete__body">
+          <div class="widget-style__content">
+            <div class="widget-style__label">${esc(label)}</div>
+            <div class="widget-style__sublabel">${esc(sublabel)}</div>
+            <div class="widget-style__traits">${traitsHtml}</div>
+          </div>
+        </div>
       </div>`;
   }
 
@@ -4135,7 +4590,18 @@ Return JSON:
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
       heroSection.classList.add('widget-section--visible');
-      heroContent.innerHTML = '<div class="widget__loader">Generating insights...</div>';
+      heroContent.innerHTML = `
+        <div class="widget-complete">
+          <div class="widget-complete__header">
+            <div class="widget-complete__header-left">
+              <span class="widget-complete__title">Style Summary</span>
+              <span class="widget-complete__badge">AI</span>
+            </div>
+          </div>
+          <div class="widget-complete__body widget-complete__body--loading">
+            Generating insights...
+          </div>
+        </div>`;
     }
 
     // Generate content for each zone
@@ -4144,7 +4610,15 @@ Return JSON:
 
     for (const widget of applicableWidgets) {
       // Get AI content via Edge Function (handles API key server-side)
-      const aiResult = await generateWidgetContent(widget, items);
+      // Phase 1: Pass category for eligibility checking
+      const aiResult = await generateWidgetContent(widget, items, currentFilter);
+
+      // Phase 1: Handle suppressed widgets
+      if (aiResult && aiResult._suppressed) {
+        console.log('[widget] Widget suppressed by server:', widget.id, aiResult.reason);
+        // Skip rendering this widget entirely
+        continue;
+      }
 
       let widgetHtml = '';
       if (widget.id === 'complete-the-look') {
@@ -4153,16 +4627,17 @@ Return JSON:
         widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
       }
 
+      // Skip if no HTML was generated
+      if (!widgetHtml) {
+        continue;
+      }
+
       // Route to appropriate zone
       if (widget.zone === 'hero') {
         heroHtml += widgetHtml;
       } else if (widget.zone === 'inline') {
         inlineWidgetHtml += `
           <div class="widget-inline">
-            <div class="widget-inline__header">
-              <span class="widget-inline__title">${esc(widget.name)}</span>
-              <span class="widget-inline__badge">AI</span>
-            </div>
             ${widgetHtml}
           </div>`;
       } else if (widget.zone === 'footer') {
@@ -4192,6 +4667,11 @@ Return JSON:
   window.refreshWidget = async function(widgetId) {
     console.log('[widget] Refreshing only:', widgetId);
 
+    // Phase 1: Track refresh event
+    trackWidgetEvent(WIDGET_EVENTS.REFRESH, widgetId, {
+      counter: (widgetRefreshCounters[widgetId] || 0) + 1
+    });
+
     // Increment per-widget refresh counter
     widgetRefreshCounters[widgetId] = (widgetRefreshCounters[widgetId] || 0) + 1;
 
@@ -4218,21 +4698,57 @@ Return JSON:
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
-          <div class="widget-inline__header">
-            <span class="widget-inline__title">${esc(widget.name)}</span>
-            <span class="widget-inline__badge">AI</span>
-          </div>
-          <div class="widget__loader">Refreshing suggestions...</div>`;
+          <div class="widget-complete">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+            </div>
+            <div class="widget-complete__body widget-complete__body--loading">
+              Refreshing suggestions...
+            </div>
+          </div>`;
       }
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
       if (heroContent) {
-        heroContent.innerHTML = '<div class="widget__loader">Refreshing...</div>';
+        heroContent.innerHTML = `
+          <div class="widget-complete">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+            </div>
+            <div class="widget-complete__body widget-complete__body--loading">
+              Refreshing...
+            </div>
+          </div>`;
       }
     }
 
     // Generate content for just this widget
-    const aiResult = await generateWidgetContent(widget, items);
+    const aiResult = await generateWidgetContent(widget, items, currentFilter);
+
+    // Phase 1: Handle suppressed widgets
+    if (aiResult && aiResult._suppressed) {
+      console.log('[widget] Widget suppressed on refresh:', widgetId, aiResult.reason);
+      // Hide the widget since it's no longer eligible
+      if (widget.zone === 'inline') {
+        const inlineContainer = document.querySelector('.widget-inline');
+        if (inlineContainer) {
+          inlineContainer.style.display = 'none';
+        }
+        inlineWidgetHtml = '';
+      } else if (widget.zone === 'hero') {
+        const heroSection = $('widgetSection');
+        if (heroSection) {
+          heroSection.classList.remove('widget-section--visible');
+        }
+      }
+      return;
+    }
 
     let widgetHtml = '';
     if (widget.id === 'complete-the-look') {
@@ -4245,20 +4761,12 @@ Return JSON:
     if (widget.zone === 'inline') {
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
-        inlineContainer.innerHTML = `
-          <div class="widget-inline__header">
-            <span class="widget-inline__title">${esc(widget.name)}</span>
-            <span class="widget-inline__badge">AI</span>
-          </div>
-          ${widgetHtml}`;
+        inlineContainer.style.display = ''; // Ensure visible
+        inlineContainer.innerHTML = widgetHtml;
       }
       // Also update stored HTML for future grid re-renders
       inlineWidgetHtml = `
         <div class="widget-inline">
-          <div class="widget-inline__header">
-            <span class="widget-inline__title">${esc(widget.name)}</span>
-            <span class="widget-inline__badge">AI</span>
-          </div>
           ${widgetHtml}
         </div>`;
     } else if (widget.zone === 'hero') {
@@ -4453,6 +4961,22 @@ Return JSON:
 
   // Make openWidgetPrdModal available globally
   window.openWidgetPrdModal = openWidgetPrdModal;
+
+  // Beta feature: enable sub-tags filter bar
+  // Usage: window.enableSubTagsBar() in console
+  window.enableSubTagsBar = function() {
+    showSubTagsBar = true;
+    renderSubTags();
+    console.log('[beta] Sub-tags bar enabled');
+  };
+
+  window.disableSubTagsBar = function() {
+    showSubTagsBar = false;
+    currentSubTag = null;
+    renderSubTags();
+    renderGrid();
+    console.log('[beta] Sub-tags bar disabled');
+  };
 
   // ============================================
   // Image Resolution System
@@ -5147,6 +5671,71 @@ Return JSON:
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
   const CATEGORIES = ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read'];
 
+  // Sub-tags for each category - shown when filtering by category
+  const SUB_TAGS = {
+    wear: {
+      tags: ['tops', 'bottoms', 'outerwear', 'footwear', 'accessories', 'bags'],
+      keywords: {
+        tops: ['shirt', 'tee', 't-shirt', 'polo', 'sweater', 'hoodie', 'sweatshirt', 'jersey', 'tank', 'blouse', 'top', 'knit', 'cardigan', 'vest'],
+        bottoms: ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'joggers', 'chinos', 'cargo', 'denim', 'leggings'],
+        outerwear: ['jacket', 'coat', 'blazer', 'parka', 'bomber', 'windbreaker', 'anorak', 'fleece', 'puffer', 'down', 'overcoat', 'raincoat'],
+        footwear: ['shoe', 'sneaker', 'boot', 'sandal', 'loafer', 'oxford', 'trainer', 'runner', 'slipper', 'heel', 'flat', 'mule', 'clog'],
+        accessories: ['hat', 'cap', 'beanie', 'scarf', 'glove', 'belt', 'watch', 'sunglasses', 'glasses', 'jewelry', 'ring', 'necklace', 'bracelet', 'earring', 'tie', 'sock', 'wallet'],
+        bags: ['bag', 'backpack', 'tote', 'messenger', 'duffel', 'crossbody', 'clutch', 'purse', 'satchel', 'briefcase']
+      }
+    },
+    home: {
+      tags: ['furniture', 'lighting', 'decor', 'kitchen', 'bedding', 'storage'],
+      keywords: {
+        furniture: ['chair', 'sofa', 'couch', 'table', 'desk', 'bed', 'shelf', 'cabinet', 'dresser', 'bench', 'stool', 'ottoman'],
+        lighting: ['lamp', 'light', 'chandelier', 'sconce', 'pendant', 'lantern', 'candle'],
+        decor: ['art', 'print', 'poster', 'rug', 'carpet', 'mirror', 'vase', 'plant', 'frame', 'pillow', 'cushion', 'throw'],
+        kitchen: ['cookware', 'pan', 'pot', 'knife', 'utensil', 'appliance', 'blender', 'mixer', 'dish', 'plate', 'bowl', 'mug', 'glass'],
+        bedding: ['sheet', 'duvet', 'comforter', 'blanket', 'mattress', 'pillow'],
+        storage: ['basket', 'bin', 'box', 'organizer', 'rack', 'hook', 'hanger']
+      }
+    },
+    use: {
+      tags: ['tech', 'tools', 'fitness', 'outdoor', 'office', 'travel'],
+      keywords: {
+        tech: ['phone', 'laptop', 'tablet', 'headphone', 'speaker', 'camera', 'charger', 'cable', 'keyboard', 'mouse', 'monitor', 'gadget'],
+        tools: ['tool', 'drill', 'hammer', 'screwdriver', 'wrench', 'saw', 'knife', 'multi-tool'],
+        fitness: ['weight', 'dumbbell', 'yoga', 'mat', 'band', 'roller', 'gym', 'workout', 'exercise'],
+        outdoor: ['tent', 'camping', 'hiking', 'bike', 'bicycle', 'kayak', 'ski', 'snowboard', 'fishing'],
+        office: ['pen', 'notebook', 'planner', 'stapler', 'organizer', 'desk', 'stationery'],
+        travel: ['luggage', 'suitcase', 'carry-on', 'passport', 'adapter', 'toiletry', 'packing']
+      }
+    }
+  };
+
+  let currentSubTag = null; // Current sub-tag filter
+  let showSubTagsBar = false; // Beta feature - enable via: window.enableSubTagsBar()
+
+  // Detect sub-tag from link title/description
+  function detectSubTag(link) {
+    const category = link.category;
+    if (!SUB_TAGS[category]) return null;
+
+    const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
+    const { keywords } = SUB_TAGS[category];
+
+    for (const [tag, words] of Object.entries(keywords)) {
+      for (const word of words) {
+        if (text.includes(word)) {
+          return tag;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Get sub-tag for a link (cached on link object)
+  function getSubTag(link) {
+    if (link.subTag !== undefined) return link.subTag;
+    link.subTag = detectSubTag(link);
+    return link.subTag;
+  }
+
   // Load domain->category cache from localStorage
   function loadCategoryCache() {
     try {
@@ -5785,6 +6374,7 @@ Return JSON:
   const FILTER_KEY = 'boards-filter';
   const PENDING_SAVES_KEY = 'boards_pending_saves';
   let currentFilter = localStorage.getItem(FILTER_KEY) || 'all';
+  let searchQuery = '';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
 
@@ -5838,6 +6428,17 @@ Return JSON:
   const settingsModal = $('settingsModal');
   const userMenuSettings = $('userMenuSettings');
 
+  // Bottom Navigation DOM
+  const bottomNav = $('bottomNav');
+  const fabMenu = $('fabMenu');
+  const fabTrigger = $('fabTrigger');
+  const fabShareLink = $('fabShareLink');
+  const fabPhotoUpload = $('fabPhotoUpload');
+  const fabVideoUpload = $('fabVideoUpload');
+  const photoInput = $('photoInput');
+  const videoInput = $('videoInput');
+  const bottomThemeToggle = $('bottomThemeToggle');
+
   // Progress DOM
   const progressBar = $('progressBar');
   const progressFill = $('progressFill');
@@ -5868,7 +6469,8 @@ Return JSON:
     const counts = { all: links.length };
     for (const l of links) counts[l.category] = (counts[l.category] || 0) + 1;
 
-    let html = `<button class="filter-token ${currentFilter === 'all' ? 'filter-token--active' : ''}" data-category="all">All</button>`;
+    let html = `<input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off" value="${esc(searchQuery)}">`;
+    html += `<button class="filter-token ${currentFilter === 'all' ? 'filter-token--active' : ''}" data-category="all">All</button>`;
 
     const sorted = Object.entries(cats)
       .filter(([n]) => counts[n] > 0 && n !== 'uncategorized')
@@ -5882,25 +6484,185 @@ Return JSON:
     }
 
     filters.innerHTML = html;
+
+    // Re-attach search input listener after re-render
+    const searchInput = $('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', handleSearch);
+      searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+          searchQuery = '';
+          searchInput.value = '';
+          renderGrid();
+        }
+      });
+    }
+
+    // Render sub-tags if applicable
+    renderSubTags();
+  }
+
+  function renderSubTags() {
+    const subTagsEl = $('subTags');
+    if (!subTagsEl) return;
+
+    // Beta feature - hide bar unless explicitly enabled
+    // Enable via console: window.enableSubTagsBar()
+    if (!showSubTagsBar) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      return;
+    }
+
+    // Hide if "all" or no sub-tags for this category
+    if (currentFilter === 'all' || !SUB_TAGS[currentFilter]) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      currentSubTag = null;
+      return;
+    }
+
+    const categoryConfig = SUB_TAGS[currentFilter];
+    const links = getAllLinks().filter(l => l.category === currentFilter);
+
+    // Count items per sub-tag
+    const counts = {};
+    let untaggedCount = 0;
+    for (const link of links) {
+      const tag = getSubTag(link);
+      if (tag) {
+        counts[tag] = (counts[tag] || 0) + 1;
+      } else {
+        untaggedCount++;
+      }
+    }
+
+    // Only show sub-tags bar if we have tagged items
+    const hasTaggedItems = Object.keys(counts).length > 0;
+    if (!hasTaggedItems) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      currentSubTag = null;
+      return;
+    }
+
+    // Build sub-tags HTML
+    let html = `<button class="sub-tag ${!currentSubTag ? 'sub-tag--active' : ''}" data-subtag="">All<span class="sub-tag__count">${links.length}</span></button>`;
+
+    for (const tag of categoryConfig.tags) {
+      const count = counts[tag] || 0;
+      if (count > 0) {
+        const active = currentSubTag === tag ? 'sub-tag--active' : '';
+        html += `<button class="sub-tag ${active}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
+      }
+    }
+
+    // Add "Other" for untagged items
+    if (untaggedCount > 0) {
+      const active = currentSubTag === 'other' ? 'sub-tag--active' : '';
+      html += `<button class="sub-tag ${active}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
+    }
+
+    subTagsEl.innerHTML = html;
+    subTagsEl.classList.add('sub-tags--visible');
+  }
+
+  function handleSearch(e) {
+    searchQuery = e.target.value.toLowerCase().trim();
+    renderGrid();
+  }
+
+  function matchesSearch(link) {
+    if (!searchQuery) return true;
+    const q = searchQuery;
+    return (
+      (link.title && link.title.toLowerCase().includes(q)) ||
+      (link.domain && link.domain.toLowerCase().includes(q)) ||
+      (link.description && link.description.toLowerCase().includes(q)) ||
+      (link.category && link.category.toLowerCase().includes(q)) ||
+      (link.url && link.url.toLowerCase().includes(q))
+    );
   }
 
   function renderGrid(newIds = []) {
     const newIdSet = new Set(newIds);
     const allLinks = getAllLinks();
-    // Always show loading cards regardless of filter
-    const links = currentFilter === 'all'
+    // Filter by category, then by search query
+    let links = currentFilter === 'all'
       ? allLinks
       : allLinks.filter(l => l.category === currentFilter || l.loading);
 
+    // Apply sub-tag filter
+    if (currentSubTag && currentFilter !== 'all') {
+      links = links.filter(l => {
+        if (l.loading) return true;
+        const tag = getSubTag(l);
+        if (currentSubTag === 'other') {
+          return tag === null;
+        }
+        return tag === currentSubTag;
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery) {
+      links = links.filter(l => matchesSearch(l) || l.loading);
+    }
+
     if (links.length === 0) {
-      grid.innerHTML = `<div class="empty-state">
-        <div class="empty-state__box">
-          <p class="empty-state__text">
-            Save links you like. Paste URLs anywhere on this page or click + to add.<br><br>
-            Links are auto-categorized and stored locally in your browser.
-          </p>
-        </div>
-      </div>`;
+      const totalLinks = allLinks.length;
+      let emptyHtml;
+
+      if (totalLinks === 0) {
+        // New user - no links at all
+        emptyHtml = `<div class="empty-state">
+          <div class="empty-state__box">
+            <h2 class="empty-state__title">Welcome to Boards</h2>
+            <p class="empty-state__text">
+              Collect and organize links you love.
+            </p>
+            <div class="empty-state__actions">
+              <button class="empty-state__cta" id="emptyStateCta">Add Your First Link</button>
+            </div>
+            <p class="empty-state__hint">
+              Tip: Paste any URL directly on this page
+            </p>
+          </div>
+        </div>`;
+      } else if (searchQuery) {
+        // No results from search
+        emptyHtml = `<div class="empty-state">
+          <div class="empty-state__box">
+            <p class="empty-state__text">
+              No links match "${esc(searchQuery)}"
+            </p>
+            <button class="empty-state__clear" id="clearSearch">Clear Search</button>
+          </div>
+        </div>`;
+      } else {
+        // Filtered to empty category
+        emptyHtml = `<div class="empty-state">
+          <div class="empty-state__box">
+            <p class="empty-state__text">
+              No links in this category yet
+            </p>
+          </div>
+        </div>`;
+      }
+
+      grid.innerHTML = emptyHtml;
+
+      // Attach handlers for empty state buttons
+      const ctaBtn = $('emptyStateCta');
+      if (ctaBtn) ctaBtn.onclick = () => openModal(addModal);
+
+      const clearBtn = $('clearSearch');
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          searchQuery = '';
+          const input = $('searchInput');
+          if (input) input.value = '';
+          renderGrid();
+        };
+      }
+
       return;
     }
 
@@ -5969,19 +6731,26 @@ Return JSON:
         <div class="grid-item__resize" data-action="resize"></div>`;
 
       if (hasImg) {
+        // Show sub-tag when filtered into a category, otherwise show category
+        const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
+          ? (getSubTag(l) || l.category)
+          : l.category;
         html += `<article class="grid-item${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
-          <span class="grid-item__category">${cap(l.category)}</span>
+          <span class="grid-item__category">${cap(displayTag)}</span>
           ${detailsHtml}
         </article>`;
       } else {
+        const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
+          ? (getSubTag(l) || l.category)
+          : l.category;
         html += `<article class="grid-item grid-item--placeholder${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
-          <span class="grid-item__category">${cap(l.category)}</span>
+          <span class="grid-item__category">${cap(displayTag)}</span>
           ${detailsHtml}
         </article>`;
       }
@@ -6007,7 +6776,124 @@ Return JSON:
   // ============================================
   // Events
   // ============================================
-  $('addBtn').onclick = () => openModal(addModal);
+
+  // FAB Menu - Toggle open/close
+  fabTrigger.onclick = () => {
+    fabMenu.classList.toggle('fab-menu--open');
+  };
+
+  // Close FAB menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!fabMenu.contains(e.target)) {
+      fabMenu.classList.remove('fab-menu--open');
+    }
+  });
+
+  // FAB Menu Actions
+  fabShareLink.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    openModal(addModal);
+  };
+
+  fabPhotoUpload.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    photoInput.click();
+  };
+
+  fabVideoUpload.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    videoInput.click();
+  };
+
+  // Photo upload handler
+  photoInput.onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    toast(`Uploading ${files.length} photo${files.length > 1 ? 's' : ''}...`);
+
+    for (const file of files) {
+      try {
+        // Create a local object URL for preview
+        const objectUrl = URL.createObjectURL(file);
+        const id = 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        const photoLink = {
+          id,
+          url: objectUrl,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          description: `Photo uploaded: ${new Date().toLocaleDateString()}`,
+          image: objectUrl,
+          domain: 'Photo',
+          category: 'uncategorized',
+          confidence: 1,
+          content_type: 'image',
+          type_confidence: 1,
+          isLocalFile: true,
+          fileType: file.type,
+          fileName: file.name
+        };
+
+        addLink(photoLink);
+      } catch (err) {
+        console.error('Photo upload error:', err);
+        toast(`Failed to add ${file.name}`, true);
+      }
+    }
+
+    renderFilters();
+    renderGrid();
+    photoInput.value = '';
+    toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
+  };
+
+  // Video upload handler
+  videoInput.onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    toast(`Uploading ${files.length} video${files.length > 1 ? 's' : ''}...`);
+
+    for (const file of files) {
+      try {
+        // Create a local object URL for preview
+        const objectUrl = URL.createObjectURL(file);
+        const id = 'video_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        const videoLink = {
+          id,
+          url: objectUrl,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          description: `Video uploaded: ${new Date().toLocaleDateString()}`,
+          image: null,
+          domain: 'Video',
+          category: 'uncategorized',
+          confidence: 1,
+          content_type: 'video',
+          type_confidence: 1,
+          isLocalFile: true,
+          fileType: file.type,
+          fileName: file.name
+        };
+
+        addLink(videoLink);
+      } catch (err) {
+        console.error('Video upload error:', err);
+        toast(`Failed to add ${file.name}`, true);
+      }
+    }
+
+    renderFilters();
+    renderGrid();
+    videoInput.value = '';
+    toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
+  };
+
+  // Bottom theme toggle
+  bottomThemeToggle.onclick = () => {
+    document.documentElement.classList.toggle('light');
+    localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
+  };
 
   addForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -6154,6 +7040,7 @@ Return JSON:
     const t = e.target.closest('.filter-token');
     if (t) {
       currentFilter = t.dataset.category;
+      currentSubTag = null; // Reset sub-tag when changing category
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
       renderGrid();
@@ -6161,6 +7048,20 @@ Return JSON:
       updateShareButton();
     }
   };
+
+  // Sub-tag filter click handler
+  const subTagsEl = $('subTags');
+  if (subTagsEl) {
+    subTagsEl.onclick = (e) => {
+      const t = e.target.closest('.sub-tag');
+      if (t) {
+        const tag = t.dataset.subtag;
+        currentSubTag = tag === '' ? null : tag;
+        renderSubTags();
+        renderGrid();
+      }
+    };
+  }
 
   // Close any open menus when clicking outside
   document.addEventListener('click', (e) => {
@@ -6454,16 +7355,59 @@ Return JSON:
   };
 
   $('devExport').onclick = () => {
+    exportAsJson();
+  };
+
+  // Admin Panel Export Buttons
+  $('adminExportJson').onclick = () => {
+    exportAsJson();
+  };
+
+  $('adminExportCsv').onclick = () => {
+    exportAsCsv();
+  };
+
+  function exportAsJson() {
     const data = load();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'things-i-like-backup.json';
+    a.download = 'boards-backup.json';
     a.click();
     URL.revokeObjectURL(url);
-    toast('Data exported');
-  };
+    toast('Exported as JSON');
+  }
+
+  function exportAsCsv() {
+    const links = getAllLinks();
+    if (links.length === 0) {
+      toast('No links to export');
+      return;
+    }
+
+    const headers = ['title', 'url', 'domain', 'category', 'content_type', 'description', 'addedAt'];
+    const csvRows = [headers.join(',')];
+
+    for (const link of links) {
+      const row = headers.map(h => {
+        const val = link[h] || '';
+        // Escape quotes and wrap in quotes
+        return `"${String(val).replace(/"/g, '""')}"`;
+      });
+      csvRows.push(row.join(','));
+    }
+
+    const csv = csvRows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'boards-links.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`Exported ${links.length} links as CSV`);
+  }
 
   $('devRefetch').onclick = async () => {
     const links = getAllLinks().filter(l => !l.image);
@@ -6947,6 +7891,8 @@ Return JSON:
       authBtn.style.display = 'none';
       userMenu.style.display = '';
       shareBtn.style.display = '';
+      // Show FAB menu for logged in users
+      fabMenu.style.display = '';
 
       // Update user menu content - show @username or first name
       userMenuEmail.textContent = getDisplayName();
@@ -6966,6 +7912,8 @@ Return JSON:
       userMenu.style.display = 'none';
       shareBtn.style.display = 'none';
       adminBtn.style.display = 'none';
+      // Hide FAB menu for logged out users
+      fabMenu.style.display = 'none';
     }
   }
 
@@ -7024,10 +7972,10 @@ Return JSON:
 
     if (isShared) {
       shareBtn.textContent = 'Shared ✓';
-      shareBtn.classList.add('share-btn--active');
+      shareBtn.classList.add('bottom-nav__share-btn--active');
     } else {
       shareBtn.textContent = 'Share';
-      shareBtn.classList.remove('share-btn--active');
+      shareBtn.classList.remove('bottom-nav__share-btn--active');
     }
   }
 

@@ -2,6 +2,20 @@
 
 AI-powered widgets that analyze your pins and suggest complementary products, style summaries, and related content.
 
+**Implementation Status**: ✅ Shipped
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Standardized Widget Card | ✅ Shipped | Header outside bordered content box |
+| Complete the Look | ✅ Shipped | Inline zone, user items + suggestions |
+| Style Summary | ✅ Shipped | Hero zone, style label + traits |
+| Refresh Widget | ✅ Shipped | ⟳ icon in header, per-widget refresh |
+| Loading State | ✅ Shipped | Shows inside widget content box |
+| Widget Zones | ✅ Shipped | Hero, inline, footer positioning |
+| AI Insights Banner | ❌ Removed | Each widget has its own header |
+| Widget Feedback | ❌ Removed | Simplified UI |
+| Widget Favorites | ❌ Removed | Simplified UI |
+
 ---
 
 ## User Goals
@@ -9,8 +23,7 @@ AI-powered widgets that analyze your pins and suggest complementary products, st
 - **Discover new products** that match my existing taste
 - **Complete outfits/looks** based on items I've saved
 - **Get personalized suggestions** that improve over time
-- **Control recommendation quality** with feedback
-- **Understand why** something was recommended
+- **Refresh suggestions** when I want new recommendations
 
 ---
 
@@ -28,95 +41,98 @@ AI-powered widgets that analyze your pins and suggest complementary products, st
 
 ## Wireframes
 
-### Complete the Look Widget
+### Standardized Widget Card Structure ✅ IMPLEMENTED
+
+All AI widgets use the same structure: header OUTSIDE the bordered content box.
 
 ```
+WIDGET TITLE   [AI]                                   ⟳   ← Header (no border)
 ┌─────────────────────────────────────────────────────────┐
-│  ✨ Complete the Look                          [⋮]     │
-├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  Based on your saved items:                             │
+│  Widget-specific content here                           │  ← Body (bordered box)
+│  (no section headlines)                                 │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+
+Header Elements:
+- Title: Uppercase xs monospace, muted color
+- AI badge: Outline style (muted border), inline with title
+- Refresh: ⟳ icon (16px), no border, floating right
+```
+
+### Loading State ✅ IMPLEMENTED
+
+```
+STYLE SUMMARY   [AI]
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│                 Generating insights...                  │  ← Loader inside body
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Complete the Look Widget ✅ IMPLEMENTED
+
+```
+COMPLETE THE LOOK   [AI]                              ⟳
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐                   │
-│  │ [your]  │ │ [your]  │ │ [your]  │                   │
+│  │ [your]  │ │ [your]  │ │ [your]  │  ← Your items     │
 │  │ jacket  │ │  pants  │ │  shoes  │                   │
 │  └─────────┘ └─────────┘ └─────────┘                   │
-│                                                         │
-│  You might also like:                                   │
+│  ─────────────────────────────────────────────────────  │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │         │ │         │ │         │ │         │       │
 │  │  [rec]  │ │  [rec]  │ │  [rec]  │ │  [rec]  │       │
-│  │         │ │         │ │         │ │         │       │
 │  │ $89     │ │ $125    │ │ $45     │ │ $199    │       │
-│  │ ★ Palace│ │ ★ Stussy│ │ ★ Nike  │ │ ★ BAPE  │       │
+│  │ Palace  │ │ Stussy  │ │ Nike    │ │ BAPE    │       │
 │  └─────────┘ └─────────┘ └─────────┘ └─────────┘       │
-│   [♡ Save]   [♡ Save]   [♡ Save]   [♡ Save]           │
-│                                                         │
-│  [ 👎 Not for me ]  [ 💬 Feedback ]  [ ♡ Save All ]    │
+│                                           ↑ AI picks   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Style Summary Widget
+### Style Summary Widget ✅ IMPLEMENTED
+
+```
+STYLE SUMMARY   [AI]                                  ⟳
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  Minimal Modern                   ← Style label         │
+│  Based on 12 items                ← Sublabel            │
+│                                                         │
+│  ┌──────────┐ ┌───────────┐ ┌──────────────┐           │
+│  │ Clean    │ │ Neutral   │ │ Versatile    │  ← Traits │
+│  │ lines    │ │ palette   │ │ pieces       │           │
+│  └──────────┘ └───────────┘ └──────────────┘           │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Widget Zones
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  🎨 Your Style Summary                         [⋮]     │
+│  [Hero Zone]    Style Summary widget appears here       │
+│  (No separate banner - widget has its own header)       │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  Based on 47 saved items, your style is:                │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
+│  │     │ │     │ │     │ │     │ │     │              │
+│  │     │ │     │ │     │ │     │ │     │              │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘              │
 │                                                         │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │  "Contemporary streetwear with Japanese         │    │
-│  │   influence. Clean silhouettes meet bold        │    │
-│  │   graphics. Neutral palette with occasional     │    │
-│  │   pops of color."                               │    │
-│  └─────────────────────────────────────────────────┘    │
+│  ┌─────┐ ┌──────────────────────────────┐ ┌─────┐      │
+│  │     │ │  [Inline Zone]               │ │     │      │
+│  │     │ │   Complete the Look widget   │ │     │      │
+│  └─────┘ └──────────────────────────────┘ └─────┘      │
 │                                                         │
-│  Top Brands:         Color Palette:                     │
-│  1. Stüssy          ■ Black (45%)                       │
-│  2. Palace          ■ White (25%)                       │
-│  3. Nike            ■ Navy (15%)                        │
-│  4. Carhartt WIP    ■ Grey (10%)                        │
-│  5. BAPE            ■ Other (5%)                        │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
+│  │     │ │     │ │     │ │     │ │     │              │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘              │
 │                                                         │
-│  [ 🔄 Refresh ]                    [ Share Style ]      │
+├─────────────────────────────────────────────────────────┤
+│  [Footer Zone]  Reserved for future widgets             │
 └─────────────────────────────────────────────────────────┘
-```
-
-### Widget Menu (⋮)
-
-```
-┌─────────────────────────┐
-│  ★ Add to Favorites     │
-│  ────────────────────   │
-│  ⏸ Pause this widget    │
-│  🚫 Hide permanently    │
-│  ────────────────────   │
-│  📄 View PRD            │
-│  💬 Send Feedback       │
-└─────────────────────────┘
-```
-
-### Widget States
-
-```
-Active:
-┌──────────────────────┐
-│  ✨ Widget Title     │
-│  [content loading]   │
-└──────────────────────┘
-
-Paused:
-┌──────────────────────┐
-│  ⏸ Widget Title      │
-│  [Resume] to see     │
-│  recommendations     │
-└──────────────────────┘
-
-Hidden (in Settings):
-┌──────────────────────┐
-│  🚫 Widget Title     │
-│  [Restore]           │
-└──────────────────────┘
 ```
 
 ---
@@ -199,8 +215,47 @@ User's Saved Pins
 
 ## Technical Notes
 
+### Implementation Details
 - Widget content generated by `generate-widget` Supabase function
 - Claude Haiku (primary) / GPT-4o mini (fallback) for AI
 - 5-minute client cache, branded Shopify API integration
-- Widget state stored in localStorage: favorites, hidden, dismissed
-- Feedback collected and stored for model improvement
+- SERP API for product image fallback when Shopify unavailable
+
+### Config-Driven Architecture (Phase 2)
+- Widgets defined in TypeScript config files (`config/widgets/*.ts`)
+- Eligibility rules as declarative config, not code
+- Registry pattern with runtime evaluators (`config/registry.ts`)
+- Schema types in `config/schema.ts`
+- Key files:
+  - `supabase/functions/generate-widget/config/schema.ts` - Type definitions
+  - `supabase/functions/generate-widget/config/registry.ts` - Widget loader
+  - `supabase/functions/generate-widget/config/widgets/complete-the-look.ts`
+  - `supabase/functions/generate-widget/config/widgets/style-summary.ts`
+
+### Widget Card Structure
+- Outer wrapper: `.widget-complete` (no border) with `data-widget-id`
+- Header: `.widget-complete__header` - sits OUTSIDE the content box
+- Body: `.widget-complete__body` - bordered box (--subtle border, --surface bg)
+- Loading: `.widget-complete__body--loading` centers loader inside body
+- File: `boards/index.html` - `renderCompleteTheLookWidget()`, `renderStyleSummaryWidget()`
+
+### CSS Classes
+```css
+.widget-complete              /* Outer wrapper (no border) */
+.widget-complete__header      /* Header row (outside box) */
+.widget-complete__header-left /* Title and badge group */
+.widget-complete__title       /* Widget name, xs muted mono */
+.widget-complete__badge       /* "AI" tag, outline style */
+.widget-complete__refresh-btn /* ⟳ icon (16px), no border */
+.widget-complete__body        /* Bordered content box */
+.widget-complete__body--loading /* Centered loader modifier */
+.widget-complete__section     /* Content section */
+.widget-complete__divider     /* Horizontal separator */
+.widget-complete__items       /* Item grid container */
+```
+
+### Removed Features
+- ~~AI Insights banner (widget-section__header)~~
+- ~~Widget feedback (rateWidget, submitWidgetFeedback)~~
+- ~~Widget favorites (toggleWidgetFavorite)~~
+- ~~Widget dismiss/hide (dismissWidget, hideWidget)~~

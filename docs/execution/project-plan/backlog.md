@@ -12,6 +12,35 @@
 | Music links (Spotify, SoundCloud) - album art, artist info, audio preview | Pending |
 | Direct image upload to Supabase Storage | Pending |
 | Direct video upload with compression | Pending |
+| **Notes Support** - Add text notes as pins without URLs | Pending |
+| **Photo Upload** - Add photos directly (not just links) | Pending |
+| **Video Upload** - Upload video files with player | Pending |
+| Note/media pin visual differentiation | Pending |
+
+---
+
+## Content Reader
+
+| Story | Status |
+|-------|--------|
+| **PDF Reader** | Pending |
+| Detect PDF links and content type | Pending |
+| Inline PDF preview in expanded view | Pending |
+| Full-screen PDF reader mode | Pending |
+| Extract text/images for thumbnails | Pending |
+| **Newsletter Reader** | Pending |
+| Detect newsletter/email content | Pending |
+| Clean reader view (strip tracking/formatting) | Pending |
+| Save newsletter as readable text | Pending |
+| **Article Reader** | Pending |
+| News article detection | Pending |
+| Reader mode (clean article extraction) | Pending |
+| Save article text locally | Pending |
+| Offline reading support | Pending |
+| **Text View Mode** | Pending |
+| Toggle between visual and text-focused views | Pending |
+| Text-heavy content card design | Pending |
+| Reading time estimates | Pending |
 
 ---
 

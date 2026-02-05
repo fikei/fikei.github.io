@@ -1,8 +1,24 @@
 # AI Widget System - Technical Documentation
 
-**Version:** 3.0
-**Last Updated:** 2026-02-03
+**Version:** 5.0
+**Last Updated:** 2026-02-05
 **Status:** Active
+
+## Recent Updates (v5.0 - Phase 2: Config-Generated Widgets)
+
+- **Config-Driven Widget Definitions**: Widgets defined in TypeScript config files, not hard-coded
+- **Widget Definition Schema**: Type-safe schema for eligibility, confidence, generation, enrichment, rendering
+- **Config-Based Eligibility**: Rules moved from code to `config/widgets/*.ts` files
+- **Registry Loader**: Centralized registry with runtime evaluation functions
+- **Adding New Widgets**: Now just requires creating a config file (no code changes)
+
+## Previous Updates (v4.0)
+
+- **SERP API Integration**: Added as fallback image strategy after Shopify API
+- **Eligibility Engine**: Widgets must pass eligibility rules to render
+- **Confidence Scoring**: AI returns confidence (0.0-1.0), low confidence widgets suppressed
+- **Validation Engine**: Server-side tracking of success/failure for optimization
+- **Client Instrumentation**: Event tracking for views, clicks, dismissals, refreshes
 
 ## Table of Contents
 
@@ -522,6 +538,338 @@ generateWidgets()
 
 ---
 
+## Phase 1 Features (Implemented)
+
+### Eligibility Engine
+
+Widgets must "earn" existence through eligibility rules. Each widget has configurable rules that determine if it should render.
+
+```typescript
+interface EligibilityRule {
+  name: string
+  check: (context: EligibilityContext) => EligibilityResult
+  weight: number // 0-1, how much this rule affects overall score
+}
+
+// Rules for complete-the-look widget:
+// - min_items: At least 2 items required (weight: 1.0)
+// - category_match: Content must be wear/fashion (weight: 0.8)
+// - content_quality: Items need metadata (weight: 0.6)
+```
+
+**Response when not eligible:**
+```json
+{
+  "content": null,
+  "suppressed": true,
+  "reason": "eligibility_failed",
+  "meta": {
+    "eligibility": {
+      "eligible": false,
+      "score": 0.45,
+      "rules": [
+        { "name": "min_items", "passed": true, "score": 1.0 },
+        { "name": "category_match", "passed": false, "score": 0 }
+      ]
+    }
+  }
+}
+```
+
+### Confidence Scoring
+
+AI returns a confidence score (0.0-1.0) with each response. Widgets with confidence below threshold are suppressed or degraded.
+
+```typescript
+const CONFIDENCE_THRESHOLDS = {
+  'complete-the-look': { threshold: 0.6, fallbackBehavior: 'degrade' },
+  'style-summary': { threshold: 0.5, fallbackBehavior: 'suppress' }
+}
+```
+
+**Prompt addition for confidence:**
+```
+IMPORTANT: Include a "confidence" field (0.0 to 1.0) in your response indicating how confident you are in your suggestions based on:
+- How well you understand the items
+- How relevant your suggestions are
+- Whether you have enough context
+```
+
+### Image Strategy Pipeline
+
+Three strategies tried in order:
+
+1. **Shopify JSON API** (primary) - Most reliable for Shopify stores
+2. **SERP API** (secondary) - Google Shopping results, costs money but reliable
+3. **HTML Scraping** (fallback) - Pattern matching on brand websites
+
+```typescript
+async function scrapeProductImage(brandName, query): ImageResolutionResult {
+  // Strategy 1: Shopify API
+  if (brandConfig.shopifyDomain) {
+    const result = await tryShopifyApi(...)
+    if (result.image) return { ...result, strategy: 'shopify' }
+  }
+
+  // Strategy 2: SERP API
+  if (serpApiKey) {
+    const result = await trySerpApi(...)
+    if (result.image) return { ...result, strategy: 'serp' }
+  }
+
+  // Strategy 3: HTML scraping
+  if (brandConfig.searchUrl) {
+    const result = await scrapeHtml(...)
+    if (result.image) return { ...result, strategy: 'scrape' }
+  }
+
+  return { image: null, url: brandUrl, strategy: 'none' }
+}
+```
+
+### Client-Side Instrumentation
+
+Events tracked for validation and optimization:
+
+| Event | Data Captured |
+|-------|--------------|
+| `view` | widgetId, cached, confidence, eligibility score, images found/requested |
+| `click` | widgetId, brand, product name, hasImage |
+| `refresh` | widgetId, refresh counter |
+| `dismiss` | widgetId |
+| `suppressed` | widgetId, reason, eligibility, confidence |
+
+```javascript
+// Event buffer persisted to localStorage
+const WIDGET_EVENTS_KEY = 'boards_widget_events'
+
+function trackWidgetEvent(eventType, widgetId, data) {
+  widgetEventBuffer.push({
+    type: eventType,
+    widgetId,
+    timestamp: Date.now(),
+    data
+  })
+  saveWidgetEvents()
+}
+```
+
+### Response Meta Object
+
+All widget responses now include a `meta` object for observability:
+
+```typescript
+interface WidgetMeta {
+  widgetId: string
+  eligibility: {
+    eligible: boolean
+    score: number
+    rules: Array<{ name: string; passed: boolean; reason: string; score: number }>
+  }
+  confidence: number
+  timing: {
+    total: number   // Total request time
+    ai: number      // Claude API time
+    enrichment: number  // Image scraping time
+  }
+  imageStats: {
+    requested: number
+    found: number
+    strategies: { shopify: number; serp: number; scrape: number; none: number }
+  }
+  validation: {
+    brandsReplaced: number      // AI suggested unsupported brands
+    categoryCorrected: number   // Brand didn't make that category
+  }
+}
+```
+
+---
+
+## Phase 2 Features (Implemented)
+
+### Config-Driven Widget System
+
+Widgets are now defined as TypeScript configuration files rather than hard-coded logic. This allows adding new widgets without modifying core code.
+
+#### File Structure
+
+```
+supabase/functions/generate-widget/
+├── index.ts                    # Main function (uses config registry)
+└── config/
+    ├── schema.ts               # TypeScript type definitions
+    ├── registry.ts             # Loader and runtime evaluation
+    └── widgets/
+        ├── complete-the-look.ts  # Widget definition
+        └── style-summary.ts      # Widget definition
+```
+
+### Widget Definition Schema
+
+Each widget is defined with a complete configuration:
+
+```typescript
+interface WidgetDefinition {
+  // Identity
+  id: string
+  name: string
+  description: string
+  version: string
+
+  // Eligibility rules (config-driven)
+  eligibility: {
+    rules: EligibilityRuleConfig[]
+    requireAllCritical: boolean
+    minOverallScore: number
+  }
+
+  // Confidence thresholds
+  confidence: {
+    threshold: number           // 0-1
+    fallbackBehavior: 'suppress' | 'degrade' | 'retry'
+  }
+
+  // AI generation settings
+  generation: {
+    model: string               // e.g., 'claude-3-haiku-20240307'
+    maxTokens: number
+    promptTemplate: string      // Template with {{variables}}
+    constraints?: string[]
+  }
+
+  // Image enrichment settings
+  enrichment: {
+    enabled: boolean
+    strategies: ('shopify' | 'serp' | 'scrape')[]
+    timeout: number
+    brandsEnabled: boolean
+  }
+
+  // UI rendering settings
+  rendering: {
+    zone: 'hero' | 'inline' | 'footer' | 'sidebar'
+    template: string
+    priority: number
+  }
+
+  // Metadata
+  categories: string[]
+  tags: string[]
+  enabled: boolean
+}
+```
+
+### Eligibility Rule Types
+
+Rules are now declarative configurations:
+
+```typescript
+type EligibilityRuleType =
+  | 'min_items'           // Minimum number of items
+  | 'max_items'           // Maximum items
+  | 'category_match'      // Content matches categories
+  | 'content_quality'     // Items have metadata
+  | 'variety'             // Different sources/domains
+  | 'recency'             // Recently added items
+
+interface EligibilityRuleConfig {
+  type: EligibilityRuleType
+  weight: number              // 0-1
+  params: Record<string, any> // Rule-specific parameters
+}
+```
+
+### Example Widget Config
+
+```typescript
+// config/widgets/complete-the-look.ts
+export const completeTheLook: WidgetDefinition = {
+  id: 'complete-the-look',
+  name: 'Complete the Look',
+  version: '2.0.0',
+
+  eligibility: {
+    rules: [
+      { type: 'min_items', weight: 1.0, params: { min: 2 } },
+      { type: 'category_match', weight: 0.8, params: {
+        categories: ['wear', 'fashion'],
+        fallbackToContent: true
+      }},
+      { type: 'content_quality', weight: 0.6, params: {
+        minScore: 0.5,
+        weights: { title: 0.4, description: 0.3, image: 0.2, url: 0.1 }
+      }}
+    ],
+    requireAllCritical: true,
+    minOverallScore: 0.5
+  },
+
+  confidence: {
+    threshold: 0.6,
+    fallbackBehavior: 'degrade'
+  },
+
+  generation: {
+    model: 'claude-3-haiku-20240307',
+    maxTokens: 1024,
+    promptTemplate: `You are a fashion stylist AI...`,
+    constraints: ['Only suggest from supported brands']
+  },
+
+  enrichment: {
+    enabled: true,
+    strategies: ['shopify', 'serp', 'scrape'],
+    timeout: 5000,
+    brandsEnabled: true
+  },
+
+  rendering: {
+    zone: 'inline',
+    template: 'product-grid',
+    priority: 10
+  },
+
+  categories: ['wear', 'fashion'],
+  tags: ['shopping', 'recommendations'],
+  enabled: true
+}
+```
+
+### Registry API
+
+The registry provides runtime access to widget configurations:
+
+```typescript
+// Get a widget definition
+const widget = getWidget('complete-the-look')
+
+// Get all enabled widgets
+const widgets = getEnabledWidgets()
+
+// Get widgets for a category
+const categoryWidgets = getWidgetsForCategory('wear')
+
+// Check eligibility using config rules
+const eligibility = checkEligibility(widgetId, context)
+
+// Get confidence config
+const config = getConfidenceConfig(widgetId)
+```
+
+### Adding a New Widget
+
+To add a new widget:
+
+1. Create config file: `config/widgets/my-widget.ts`
+2. Export widget definition matching `WidgetDefinition` type
+3. Import and add to registry in `config/registry.ts`
+4. Deploy: `supabase functions deploy generate-widget`
+
+No changes to core logic required.
+
+---
+
 ## Proposed Infrastructure Layers
 
 Based on the issues encountered, here are recommended abstractions:
@@ -749,8 +1097,11 @@ interface ScrapingMonitor {
 | File | Purpose |
 |------|---------|
 | `supabase/functions/generate-widget/index.ts` | Edge Function - AI generation + scraping |
+| `supabase/functions/generate-widget/config/schema.ts` | TypeScript types for widget definitions |
+| `supabase/functions/generate-widget/config/registry.ts` | Widget loader and runtime evaluation |
+| `supabase/functions/generate-widget/config/widgets/*.ts` | Individual widget configurations |
 | `boards/index.html` | Client app - Widget registry, rendering, feedback |
-| `docs/TECH-ai-widget-system.md` | This documentation |
+| `docs/infrastructure/technical-design/ai-widget-system.md` | This documentation |
 
 ---
 

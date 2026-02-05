@@ -4,6 +4,41 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-05] - Widget Phase 2: Config-Generated Widgets
+
+### Added
+- **Config-Driven Widget System**
+  - `config/schema.ts` - TypeScript types for widget definitions (206 lines)
+  - `config/registry.ts` - Widget loader and runtime evaluation (329 lines)
+  - `config/widgets/complete-the-look.ts` - Fashion recommendations widget
+  - `config/widgets/style-summary.ts` - Style analysis widget
+
+- **Eligibility Rule Evaluators**
+  - `min_items` - Minimum number of items required
+  - `max_items` - Maximum items for focused widgets
+  - `category_match` - Content matches target categories
+  - `content_quality` - Items have sufficient metadata
+  - `variety` - Items from different sources/domains
+  - `recency` - Recently added items
+
+### Changed
+- **Refactored `index.ts`** - Removed 180 lines of hard-coded eligibility rules, replaced with config imports
+- **CLAUDE.md** - Updated Supabase project references with correct project IDs:
+  - Boards (`yfhudwakpgzswiylhfbh`): generate-widget, enrich-link
+  - Ops (`ycilriwjnmcelkspmfmg`): notion-sync
+  - Systemic (`atdqdfpdeytfuvvpsasz`): design system tools
+
+### Documentation
+- Updated `ai-widget-system.md` to v5.0 with Phase 2 architecture
+- Updated `phase-3-ai-intelligence.md` with Phase 2 completion status
+- Added widget testing curl commands to CLAUDE.md
+
+### Deployed
+- `generate-widget` function deployed to Supabase (Boards project)
+- Tested and verified config-driven eligibility working
+
+---
+
 ## [2026-02-04] - AI Agent Infrastructure Foundation
 
 ### Added
