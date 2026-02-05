@@ -253,7 +253,7 @@ jobs:
           fi
 
       - name: Sync Page Structure
-        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+        if: env.SUPABASE_URL != ''
         run: |
           echo "═══════════════════════════════════════════"
           echo "📁 STRUCTURE SYNC: Create/move pages"
@@ -329,7 +329,7 @@ jobs:
           sleep 5
 
       - name: Cleanup Orphaned Pages
-        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+        if: env.SUPABASE_URL != ''
         run: |
           echo "═══════════════════════════════════════════"
           echo "🧹 CLEANUP: Archive orphaned pages"
