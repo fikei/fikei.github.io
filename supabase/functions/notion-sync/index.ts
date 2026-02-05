@@ -77,7 +77,9 @@ interface SyncResult {
   errors: string[]
   timestamp: string
   // State tracking fields
-  needsSync?: string[]  // Pages that need syncing (check-changes)
+  needsSync?: string[]  // Pages that need syncing (check-changes) - priority ordered: new pages first, then changed
+  newPages?: string[]   // Pages never synced before (highest priority)
+  changedPages?: string[]  // Pages with content changes (second priority)
   upToDate?: string[]   // Pages that are up to date
   totalChecked?: number
   states?: SyncState[]  // All page states (get-state)
@@ -1672,25 +1674,29 @@ serve(async (req) => {
         const allStates = await stateManager.getAllStates()
         const stateMap = new Map(allStates.map(s => [s.page_path, s]))
 
-        // Find pages that need syncing
-        const needsSync: string[] = []
+        // Find pages that need syncing, separated by priority
+        const newPages: string[] = []      // Never synced - highest priority
+        const changedPages: string[] = []  // Hash changed - second priority
         const upToDate: string[] = []
 
         for (const [pagePath, currentHash] of Object.entries(contentHashes)) {
           const state = stateMap.get(pagePath)
 
           if (!state || !state.github_hash) {
-            // Never synced before
-            needsSync.push(pagePath)
+            // Never synced before - highest priority
+            newPages.push(pagePath)
           } else if (state.github_hash !== currentHash) {
-            // Hash changed
-            needsSync.push(pagePath)
+            // Hash changed - second priority
+            changedPages.push(pagePath)
           } else {
             upToDate.push(pagePath)
           }
         }
 
-        result.needsSync = needsSync
+        // Return needsSync in priority order: new pages first, then changed pages
+        result.needsSync = [...newPages, ...changedPages]
+        result.newPages = newPages
+        result.changedPages = changedPages
         result.upToDate = upToDate
         result.totalChecked = Object.keys(contentHashes).length
         break
