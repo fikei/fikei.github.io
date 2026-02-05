@@ -54,11 +54,19 @@ When working on this project, always follow these guidelines:
      4. Merge to master to trigger Notion sync
    - The GitHub Actions workflow (`agent-automation.yml`) auto-syncs docs to Notion on push to master
    - To manually trigger sync: `gh workflow run agent-automation.yml`
+   - **When consolidating multiple docs into one:**
+     1. Create the new consolidated doc
+     2. Move old files to appropriate `archive/` folder using `git mv`
+     3. Update `notion-structure.json` to remove old entries and add new one
+     4. Add `archive/README.md` listing what was archived and why
+     5. On next sync, old Notion pages are automatically deleted
+   - **GitHub is always the source of truth** - Notion structure matches `notion-structure.json`
    - Documentation locations:
      - PRDs → `docs/strategy/prds/`
      - Tech specs → `docs/infrastructure/technical-design/`
      - Project plans → `docs/execution/`
      - UX documentation → `docs/ux/`
+     - Archived docs → `*/archive/`
 
 6. **Maintain an explicit changelog**
    - Update `CHANGELOG.md` after completing significant work
