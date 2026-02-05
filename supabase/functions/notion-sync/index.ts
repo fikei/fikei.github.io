@@ -37,10 +37,12 @@ interface SyncRequest {
   action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves'
   structure?: Structure
   page?: PageUpdate
+  root?: string  // Override root page name (default: NOTION_ROOT_PAGE env var or "Ctrl")
   dryRun?: boolean  // For cleanup: preview without deleting
   skipContent?: boolean  // For sync-structure: only create pages, skip content updates
   pageSources?: Record<string, 'ai' | 'human'>  // For cleanup: track page origins
   protectHuman?: boolean  // For cleanup: protect human-created pages from deletion
+  targetSection?: string  // For sync-structure: only sync this section and its children (e.g., "User Experience" or "User Experience/Components/Pins")
 }
 
 interface MovedPage {
@@ -60,6 +62,11 @@ interface SyncResult {
   moved: MovedPage[]  // Pages that were moved in Notion
   errors: string[]
   timestamp: string
+  debug?: {
+    totalBlocks: number
+    failedBlocks: number
+    blockTypes: Record<string, number>
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -94,26 +101,70 @@ class NotionClient {
   }
 
   async findPageByTitle(title: string): Promise<string | null> {
+    console.log(`Searching for page: "${title}"`)
+
+    // Try exact title search first
     const results = await this.request('/search', {
       method: 'POST',
       body: JSON.stringify({
         query: title,
         filter: { property: 'object', value: 'page' },
-        page_size: 10,
+        page_size: 100,  // Increased from 10
       }),
     })
 
-    // Find exact match
+    // Find exact match (case-sensitive)
     for (const page of results.results) {
       const titleProp = Object.values(page.properties).find(
         (prop: any) => prop.type === 'title'
       ) as any
       const pageTitle = titleProp?.title?.[0]?.plain_text
       if (pageTitle === title) {
+        console.log(`  Found exact match: ${page.id}`)
         return page.id
       }
     }
 
+    // Try case-insensitive match as fallback
+    const titleLower = title.toLowerCase()
+    for (const page of results.results) {
+      const titleProp = Object.values(page.properties).find(
+        (prop: any) => prop.type === 'title'
+      ) as any
+      const pageTitle = titleProp?.title?.[0]?.plain_text
+      if (pageTitle?.toLowerCase() === titleLower) {
+        console.log(`  Found case-insensitive match: ${page.id}`)
+        return page.id
+      }
+    }
+
+    // If title has multiple words, try searching with just first few words
+    const words = title.split(' ')
+    if (words.length > 2) {
+      const shortQuery = words.slice(0, 2).join(' ')
+      console.log(`  Trying shorter query: "${shortQuery}"`)
+      const retryResults = await this.request('/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: shortQuery,
+          filter: { property: 'object', value: 'page' },
+          page_size: 100,
+        }),
+      })
+
+      for (const page of retryResults.results) {
+        const titleProp = Object.values(page.properties).find(
+          (prop: any) => prop.type === 'title'
+        ) as any
+        const pageTitle = titleProp?.title?.[0]?.plain_text
+        if (pageTitle === title || pageTitle?.toLowerCase() === titleLower) {
+          console.log(`  Found with shorter query: ${page.id}`)
+          return page.id
+        }
+      }
+    }
+
+    console.log(`  Page not found: "${title}"`)
     return null
   }
 
@@ -205,7 +256,12 @@ class NotionClient {
     return page.id
   }
 
-  async updatePageContent(pageId: string, content: string): Promise<void> {
+  async updatePageContent(pageId: string, content: string): Promise<{
+    total: number
+    failed: number
+    types: Record<string, number>
+    failedTypes: Record<string, number>
+  }> {
     // Get existing blocks
     const existingBlocks = await this.request(`/blocks/${pageId}/children`)
 
@@ -220,10 +276,16 @@ class NotionClient {
 
     // Add new blocks in batches of 100 (Notion API limit)
     const blocks = this.markdownToBlocks(content)
-    await this.addBlocksWithRetry(pageId, blocks)
+    console.log(`Updating page with ${blocks.length} blocks`)
+    return await this.addBlocksWithRetry(pageId, blocks)
   }
 
-  async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<void> {
+  async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<{
+    total: number
+    failed: number
+    types: Record<string, number>
+    failedTypes: Record<string, number>
+  }> {
     // Get existing blocks
     const existingBlocks = await this.request(`/blocks/${pageId}/children`)
 
@@ -236,13 +298,27 @@ class NotionClient {
       }
     }
 
-    await this.addBlocksWithRetry(pageId, blocks)
+    console.log(`Updating page with ${blocks.length} blocks`)
+    return await this.addBlocksWithRetry(pageId, blocks)
   }
 
   // Add blocks with resilient error handling - if batch fails, try individual blocks
-  private async addBlocksWithRetry(pageId: string, blocks: any[]): Promise<void> {
+  // Returns stats about what was added/failed
+  private async addBlocksWithRetry(pageId: string, blocks: any[]): Promise<{
+    total: number
+    failed: number
+    types: Record<string, number>
+    failedTypes: Record<string, number>
+  }> {
     const BATCH_SIZE = 100
     let failedBlocks = 0
+    const blockTypes: Record<string, number> = {}
+    const failedTypes: Record<string, number> = {}
+
+    // Count block types
+    for (const block of blocks) {
+      blockTypes[block.type] = (blockTypes[block.type] || 0) + 1
+    }
 
     for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
       const batch = blocks.slice(i, i + BATCH_SIZE)
@@ -253,9 +329,9 @@ class NotionClient {
           method: 'PATCH',
           body: JSON.stringify({ children: batch }),
         })
-      } catch (batchError) {
+      } catch (batchError: any) {
         // Batch failed - try adding blocks one by one
-        console.error(`Batch ${i / BATCH_SIZE + 1} failed, trying individual blocks:`, batchError.message)
+        console.error(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError.message)
 
         for (const block of batch) {
           try {
@@ -263,10 +339,11 @@ class NotionClient {
               method: 'PATCH',
               body: JSON.stringify({ children: [block] }),
             })
-          } catch (blockError) {
-            // Log which block type failed and continue
+          } catch (blockError: any) {
+            // Track which block types are failing
             console.error(`Block failed (type: ${block.type}):`, blockError.message)
             failedBlocks++
+            failedTypes[block.type] = (failedTypes[block.type] || 0) + 1
           }
           // Small delay between individual block adds
           await new Promise(resolve => setTimeout(resolve, 50))
@@ -281,7 +358,10 @@ class NotionClient {
 
     if (failedBlocks > 0) {
       console.error(`Total blocks failed: ${failedBlocks} of ${blocks.length}`)
+      console.error(`Failed types:`, failedTypes)
     }
+
+    return { total: blocks.length, failed: failedBlocks, types: blockTypes, failedTypes }
   }
 
   async archivePage(pageId: string): Promise<void> {
@@ -916,6 +996,48 @@ function collectPageIds(
 // SYNC LOGIC
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Filter structure to only include a target section and its children
+ * @param structure Full structure
+ * @param targetPath Section path like "User Experience" or "User Experience/Components/Pins"
+ * @returns Filtered structure with only the target section, or original if not found
+ */
+function filterStructureBySection(structure: Structure, targetPath: string): Structure {
+  const pathParts = targetPath.split('/').map(p => p.trim())
+
+  function findSection(pages: PageDef[], remainingPath: string[]): PageDef | null {
+    if (remainingPath.length === 0) return null
+
+    const targetTitle = remainingPath[0]
+    for (const page of pages) {
+      if (page.title.toLowerCase() === targetTitle.toLowerCase()) {
+        if (remainingPath.length === 1) {
+          // Found the target section
+          return page
+        }
+        // Need to go deeper
+        if (page.children) {
+          return findSection(page.children, remainingPath.slice(1))
+        }
+      }
+    }
+    return null
+  }
+
+  const targetSection = findSection(structure.sections, pathParts)
+
+  if (!targetSection) {
+    console.log(`Target section '${targetPath}' not found, syncing full structure`)
+    return structure
+  }
+
+  console.log(`Filtering to section: ${targetSection.title}`)
+  return {
+    root: structure.root,
+    sections: [targetSection]
+  }
+}
+
 async function syncStructure(
   client: NotionClient,
   structure: Structure,
@@ -968,8 +1090,16 @@ async function syncStructure(
           result.created.push(pagePath)
         } else if (!skipContent && contentToUse) {
           // Update existing content page
-          await client.updatePageContent(pageId, contentToUse)
-          result.updated.push(pagePath)
+          const stats = await client.updatePageContent(pageId, contentToUse)
+          result.updated.push(`${pagePath} (${stats.total} blocks, ${stats.failed} failed)`)
+          // Accumulate debug stats
+          if (result.debug) {
+            result.debug.totalBlocks += stats.total
+            result.debug.failedBlocks += stats.failed
+            for (const [type, count] of Object.entries(stats.types)) {
+              result.debug.blockTypes[type] = (result.debug.blockTypes[type] || 0) + count
+            }
+          }
         } else if (!isSectionPage) {
           result.skipped.push(pagePath)
         }
@@ -986,9 +1116,17 @@ async function syncStructure(
           // Now update section page with linked TOC
           if (!skipContent && isSectionPage) {
             const tocBlocks = generateLinkedTocBlocks(page.title, page.children, childIds)
-            await client.updatePageWithBlocks(pageId, tocBlocks)
+            const stats = await client.updatePageWithBlocks(pageId, tocBlocks)
             if (!created) {
-              result.updated.push(pagePath)
+              result.updated.push(`${pagePath} (${stats.total} blocks, ${stats.failed} failed)`)
+            }
+            // Accumulate debug stats
+            if (result.debug) {
+              result.debug.totalBlocks += stats.total
+              result.debug.failedBlocks += stats.failed
+              for (const [type, count] of Object.entries(stats.types)) {
+                result.debug.blockTypes[type] = (result.debug.blockTypes[type] || 0) + count
+              }
             }
           }
         }
@@ -1010,8 +1148,11 @@ async function syncStructure(
 // DEFAULT STRUCTURE
 // ═══════════════════════════════════════════════════════════════
 
+// Root page name - can be overridden via NOTION_ROOT_PAGE env var or request.root
+const DEFAULT_ROOT = Deno.env.get('NOTION_ROOT_PAGE') || 'Ctrl'
+
 const DEFAULT_STRUCTURE: Structure = {
-  root: 'Ctrl Rodeo',
+  root: DEFAULT_ROOT,
   sections: [
     {
       title: 'Strategy',
@@ -1361,18 +1502,33 @@ serve(async (req) => {
       moved: [],
       errors: [],
       timestamp: new Date().toISOString(),
+      debug: {
+        totalBlocks: 0,
+        failedBlocks: 0,
+        blockTypes: {},
+      },
     }
+
+    // Apply root override if provided
+    const effectiveRoot = request.root || DEFAULT_ROOT
 
     switch (request.action) {
       case 'create-structure':
         // Create the default structure (structure only, no content)
-        await syncStructure(client, DEFAULT_STRUCTURE, result, true)
+        const createStruct = { ...DEFAULT_STRUCTURE, root: effectiveRoot }
+        await syncStructure(client, createStruct, result, true)
         break
 
       case 'sync-structure':
         // Sync with provided or default structure
         // Use skipContent flag if provided (for faster structure-only sync)
-        const structure = request.structure || DEFAULT_STRUCTURE
+        // Use targetSection to filter to a specific section (e.g., "User Experience" or "User Experience/Components/Pins")
+        let structure = request.structure || DEFAULT_STRUCTURE
+        // Apply root override
+        structure = { ...structure, root: effectiveRoot }
+        if (request.targetSection) {
+          structure = filterStructureBySection(structure, request.targetSection)
+        }
         await syncStructure(client, structure, result, request.skipContent || false)
         break
 
@@ -1383,8 +1539,13 @@ serve(async (req) => {
         } else {
           const pageId = await client.findPageByTitle(request.page.pageTitle)
           if (pageId) {
-            await client.updatePageContent(pageId, request.page.content)
-            result.updated.push(request.page.pageTitle)
+            const stats = await client.updatePageContent(pageId, request.page.content)
+            result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
+            if (result.debug) {
+              result.debug.totalBlocks = stats.total
+              result.debug.failedBlocks = stats.failed
+              result.debug.blockTypes = stats.types
+            }
           } else {
             result.errors.push(`Page '${request.page.pageTitle}' not found`)
           }
@@ -1394,7 +1555,7 @@ serve(async (req) => {
       case 'cleanup':
         // Move pages not in expected structure to Archive folder
         // Respects source field: human-created pages are protected
-        const cleanupStructure = request.structure || DEFAULT_STRUCTURE
+        const cleanupStructure = { ...(request.structure || DEFAULT_STRUCTURE), root: effectiveRoot }
         await cleanupLegacyPages(
           client,
           cleanupStructure,
@@ -1407,7 +1568,7 @@ serve(async (req) => {
 
       case 'detect-moves':
         // Detect pages that were moved in Notion
-        const detectStructure = request.structure || DEFAULT_STRUCTURE
+        const detectStructure = { ...(request.structure || DEFAULT_STRUCTURE), root: effectiveRoot }
         await detectMovedPages(client, detectStructure, result)
         break
 
