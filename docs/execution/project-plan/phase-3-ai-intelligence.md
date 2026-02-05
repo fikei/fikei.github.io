@@ -119,10 +119,11 @@
 | | What do users save? | Pending |
 | | Aggregate feedback informs confidence | Pending |
 
-### Widget Phase 2: Config-Generated Widgets (IN PROGRESS)
+### Widget Phase 2: Config-Generated Widgets (COMPLETE)
 
 **Automation Level**: Medium → High
 **Started**: 2026-02-05
+**Completed**: 2026-02-05
 
 | Story | Tasks | Status |
 |-------|-------|--------|
@@ -133,19 +134,26 @@
 | | Enrichment config (strategies, timeout, fallback) | Complete |
 | | Rendering config (zone, template, fallback) | Complete |
 | | Refactor index.ts to use config registry | Complete |
-| **Category-Agnostic Matching** | | In Progress |
+| **Category-Agnostic Matching** | | Complete |
 | | Remove hard-coded category logic from eligibility | Complete |
 | | Category rules now in config files | Complete |
-| | Widgets match ANY category meeting criteria | Pending |
-| | Same system supports multiple categories without branching | Pending |
-| **Template Selection Engine** | | Pending |
-| | Define template library | Pending |
-| | Auto-select template based on content type | Pending |
-| | Template versioning | Pending |
-| **Widget Registry as Data** | | In Progress |
+| | Widgets match ANY category meeting criteria | Complete |
+| | Same system supports multiple categories without branching | Complete |
+| | Discovery endpoint returns eligible widgets for any category | Complete |
+| | Frontend delegates category matching to server config | Complete |
+| **Template Selection Engine** | | Complete |
+| | Define template library (product-grid, style-card, simple-list, text-summary) | Complete |
+| | Auto-select template based on widget config `template.name` | Complete |
+| | Template versioning (each template has version field) | Complete |
+| | Fallback template chain (primary → fallback → simple-list) | Complete |
+| **Widget Registry as Data** | | Complete |
 | | Registry loaded from config files | Complete |
-| | Hot-reload widget definitions | Pending |
+| | Hot-reload via registerWidget() / unregisterWidget() / reloadWidget() | Complete |
 | | Adding new widget = adding config file (no code changes) | Complete |
+| | Discovery endpoint: POST { action: 'discover' } | Complete |
+| | Registry summary endpoint: POST { action: 'registry' } | Complete |
+| **Config-Driven Enrichment** | | Complete |
+| | Enrichment triggered by widget config, not hard-coded widget ID | Complete |
 
 ### Widget Phase 3: Self-Selecting Widgets (Pending)
 

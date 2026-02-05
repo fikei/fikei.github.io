@@ -3812,6 +3812,8 @@ Return JSON:
   ]
 }`,
       template: {
+        name: 'product-grid',
+        fallback: 'simple-list',
         layout: 'two-column',
         sections: ['your-items', 'suggestions']
       },
@@ -3840,6 +3842,8 @@ Return JSON:
   "summary": "One sentence describing the overall aesthetic"
 }`,
       template: {
+        name: 'style-card',
+        fallback: 'text-summary',
         layout: 'card',
         sections: ['label', 'traits']
       },
@@ -4094,7 +4098,12 @@ Return JSON:
   // Check if widget criteria are met
   function checkWidgetCriteria(widget, items, currentCategory) {
     const c = widget.criteria;
-    if (c.category && c.category !== currentCategory) return false;
+    // Phase 2: Category-agnostic — category field can be a string or array
+    if (c.category) {
+      const widgetCategories = Array.isArray(c.category) ? c.category : [c.category];
+      const matchesCategory = widgetCategories.includes(currentCategory) || widgetCategories.includes('all');
+      if (!matchesCategory) return false;
+    }
     if (c.minItems && items.length < c.minItems) return false;
     if (c.maxItems && items.length > c.maxItems) return false;
     return true;
@@ -4535,6 +4544,130 @@ Return JSON:
       </div>`;
   }
 
+  // ===========================================================================
+  // PHASE 2: TEMPLATE SELECTION ENGINE
+  // Templates are registered by name and selected via widget config.
+  // Adding a new widget appearance = adding a template + a widget config.
+  // ===========================================================================
+
+  const WIDGET_TEMPLATES = {
+    // Template: product-grid
+    // Used by: complete-the-look
+    // Layout: user items on top, AI suggestions below, separated by divider
+    'product-grid': {
+      name: 'product-grid',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        return renderCompleteTheLookWidget(widget, items, aiResult);
+      }
+    },
+
+    // Template: style-card
+    // Used by: style-summary
+    // Layout: style label + sublabel + trait pills
+    'style-card': {
+      name: 'style-card',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        return renderStyleSummaryWidget(widget, items, aiResult);
+      }
+    },
+
+    // Template: simple-list (fallback)
+    // Generic list rendering for any widget with suggestions
+    'simple-list': {
+      name: 'simple-list',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const listItems = (aiResult.suggestions || aiResult.traits || []).slice(0, 5);
+        const listHtml = listItems.map(item => {
+          const label = typeof item === 'string' ? item : (item.name || item.label || JSON.stringify(item));
+          return `<div style="padding: var(--space-1) 0; border-bottom: 1px solid var(--subtle);">${esc(label)}</div>`;
+        }).join('');
+
+        return `
+          <div class="widget-complete" data-widget-id="${widget.id}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">&#x27F3;</button>
+            </div>
+            <div class="widget-complete__body">
+              <div style="padding: var(--space-2);">${listHtml || '<div style="color:var(--muted);">No results</div>'}</div>
+            </div>
+          </div>`;
+      }
+    },
+
+    // Template: text-summary (fallback for style-card)
+    // Plain text rendering of style analysis
+    'text-summary': {
+      name: 'text-summary',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
+        return `
+          <div class="widget-complete" data-widget-id="${widget.id}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
+            </div>
+            <div class="widget-complete__body">
+              <div style="padding: var(--space-2); color: var(--muted);">${esc(text)}</div>
+            </div>
+          </div>`;
+      }
+    }
+  };
+
+  /**
+   * Select and render a widget using the template engine.
+   * Tries the primary template, falls back to fallbackTemplate, then simple-list.
+   * @param {object} widget - Widget definition from WIDGET_REGISTRY
+   * @param {Array} items - User's items
+   * @param {object} aiResult - AI-generated content
+   * @returns {string} Rendered HTML
+   */
+  function renderWidgetWithTemplate(widget, items, aiResult) {
+    // Determine template name from widget config
+    const templateName = widget.template?.name || widget.template?.layout || null;
+    const fallbackName = widget.template?.fallback || null;
+
+    // Map legacy layout names to template names
+    const templateAliases = {
+      'two-column': 'product-grid',
+      'card': 'style-card'
+    };
+
+    const resolvedName = templateAliases[templateName] || templateName;
+    const resolvedFallback = templateAliases[fallbackName] || fallbackName;
+
+    // Try primary template
+    let template = WIDGET_TEMPLATES[resolvedName];
+    if (template) {
+      const html = template.render(widget, items, aiResult);
+      if (html) return html;
+    }
+
+    // Try fallback template
+    if (resolvedFallback) {
+      template = WIDGET_TEMPLATES[resolvedFallback];
+      if (template) {
+        const html = template.render(widget, items, aiResult);
+        if (html) return html;
+      }
+    }
+
+    // Last resort: simple-list
+    return WIDGET_TEMPLATES['simple-list'].render(widget, items, aiResult);
+  }
+
   // Store inline widgets for grid injection
   let inlineWidgetHtml = '';
   const INLINE_WIDGET_POSITION = 8; // Insert inline widget after this many cards
@@ -4555,12 +4688,9 @@ Return JSON:
     footerSection.classList.remove('widget-section--visible');
     inlineWidgetHtml = '';
 
-    // Only show widgets when filtering to 'wear' category
-    if (currentFilter !== 'wear') {
-      renderGrid();
-      widgetGenerationInProgress = false;
-      return;
-    }
+    // Phase 2: Category-agnostic — show widgets for any category that has matching configs
+    // The widget registry (server-side) defines which categories each widget supports
+    const widgetCategory = currentFilter || 'all';
 
     const allLinks = getAllLinks();
     const items = normalizeWearItems(allLinks);
@@ -4571,8 +4701,8 @@ Return JSON:
       return;
     }
 
-    // Get applicable widgets
-    const applicableWidgets = getApplicableWidgets(items, 'wear');
+    // Get applicable widgets for the current category
+    const applicableWidgets = getApplicableWidgets(items, widgetCategory);
 
     if (applicableWidgets.length === 0) {
       renderGrid();
@@ -4610,8 +4740,8 @@ Return JSON:
 
     for (const widget of applicableWidgets) {
       // Get AI content via Edge Function (handles API key server-side)
-      // Phase 1: Pass category for eligibility checking
-      const aiResult = await generateWidgetContent(widget, items, currentFilter);
+      // Phase 2: Pass current category for config-driven eligibility checking
+      const aiResult = await generateWidgetContent(widget, items, widgetCategory);
 
       // Phase 1: Handle suppressed widgets
       if (aiResult && aiResult._suppressed) {
@@ -4620,12 +4750,8 @@ Return JSON:
         continue;
       }
 
-      let widgetHtml = '';
-      if (widget.id === 'complete-the-look') {
-        widgetHtml = renderCompleteTheLookWidget(widget, items, aiResult);
-      } else if (widget.id === 'style-summary') {
-        widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
-      }
+      // Phase 2: Template Selection Engine — route via widget.template config
+      let widgetHtml = renderWidgetWithTemplate(widget, items, aiResult);
 
       // Skip if no HTML was generated
       if (!widgetHtml) {
@@ -4750,12 +4876,8 @@ Return JSON:
       return;
     }
 
-    let widgetHtml = '';
-    if (widget.id === 'complete-the-look') {
-      widgetHtml = renderCompleteTheLookWidget(widget, items, aiResult);
-    } else if (widget.id === 'style-summary') {
-      widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
-    }
+    // Phase 2: Template Selection Engine — route via widget.template config
+    let widgetHtml = renderWidgetWithTemplate(widget, items, aiResult);
 
     // Update only this widget's display
     if (widget.zone === 'inline') {

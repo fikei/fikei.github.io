@@ -1,5 +1,6 @@
 // Widget Registry for Phase 2: Config-Generated Widgets
 // Loads widget definitions from config files and provides runtime access
+// Phase 2 additions: hot-reload, category-agnostic matching, template selection
 
 import type {
   WidgetDefinition,
@@ -21,6 +22,7 @@ import { styleSummary } from './widgets/style-summary.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
+// Hot-reload: register() / unregister() allow dynamic widget management
 // =============================================================================
 
 const registry: WidgetRegistry = {
@@ -52,6 +54,35 @@ const registry: WidgetRegistry = {
 }
 
 // =============================================================================
+// HOT-RELOAD: Dynamic widget registration
+// Adding a new widget = register(widgetDef), no code changes to this file
+// =============================================================================
+
+export function registerWidget(widget: WidgetDefinition): void {
+  registry.widgets[widget.id] = widget
+  registry.lastUpdated = new Date().toISOString()
+  console.log(`[registry] Registered widget: ${widget.id} v${widget.version}`)
+}
+
+export function unregisterWidget(widgetId: string): boolean {
+  if (registry.widgets[widgetId]) {
+    delete registry.widgets[widgetId]
+    registry.lastUpdated = new Date().toISOString()
+    console.log(`[registry] Unregistered widget: ${widgetId}`)
+    return true
+  }
+  return false
+}
+
+export function reloadWidget(widget: WidgetDefinition): void {
+  const existing = registry.widgets[widget.id]
+  if (existing) {
+    console.log(`[registry] Reloading widget: ${widget.id} (v${existing.version} -> v${widget.version})`)
+  }
+  registerWidget(widget)
+}
+
+// =============================================================================
 // REGISTRY ACCESS FUNCTIONS
 // =============================================================================
 
@@ -76,6 +107,82 @@ export function getWidgetsForCategory(category: string): WidgetDefinition[] {
 export function getConfidenceConfig(widgetId: string): ConfidenceConfig {
   const widget = getWidget(widgetId)
   return widget?.confidence || registry.defaults.confidence
+}
+
+// =============================================================================
+// CATEGORY-AGNOSTIC MATCHING
+// Discovers eligible widgets for any category+items combination
+// No hard-coded category logic — driven entirely by widget config
+// =============================================================================
+
+export interface DiscoveryResult {
+  widgetId: string
+  widget: WidgetDefinition
+  eligibility: EligibilityDecision
+}
+
+/**
+ * Discover all eligible widgets for a given category and items context.
+ * This replaces hard-coded per-widget-id lookups: the system now asks
+ * "which widgets should appear?" rather than "should this specific widget appear?"
+ */
+export function discoverWidgets(
+  category: string,
+  items: EligibilityContext['items'],
+  userPrefs?: Record<string, any>
+): DiscoveryResult[] {
+  const candidates = getWidgetsForCategory(category)
+
+  console.log(`[registry] Discovering widgets for category="${category}" with ${items.length} items, ${candidates.length} candidates`)
+
+  const results: DiscoveryResult[] = []
+
+  for (const widget of candidates) {
+    const context: EligibilityContext = {
+      widgetId: widget.id,
+      items,
+      category,
+      userPrefs
+    }
+
+    const eligibility = checkEligibility(widget.id, context)
+
+    if (eligibility.eligible) {
+      results.push({ widgetId: widget.id, widget, eligibility })
+      console.log(`[registry] ✓ ${widget.id} eligible (score: ${eligibility.score.toFixed(2)})`)
+    } else {
+      console.log(`[registry] ✗ ${widget.id} not eligible (score: ${eligibility.score.toFixed(2)})`)
+    }
+  }
+
+  // Sort by rendering priority (lower = higher priority)
+  results.sort((a, b) => a.widget.rendering.priority - b.widget.rendering.priority)
+
+  return results
+}
+
+/**
+ * Returns a summary of all registered widgets and their categories.
+ * Useful for the frontend to know what's available without calling AI.
+ */
+export function getRegistrySummary(): Array<{
+  id: string
+  name: string
+  version: string
+  categories: string[]
+  zone: string
+  template: string
+  enabled: boolean
+}> {
+  return getAllWidgets().map(w => ({
+    id: w.id,
+    name: w.name,
+    version: w.version,
+    categories: w.categories,
+    zone: w.rendering.zone,
+    template: w.rendering.template,
+    enabled: w.enabled
+  }))
 }
 
 // =============================================================================
@@ -326,4 +433,4 @@ export function buildPrompt(
 // =============================================================================
 
 export { registry }
-export type { WidgetDefinition, WidgetRegistry }
+export type { WidgetDefinition, WidgetRegistry, DiscoveryResult }

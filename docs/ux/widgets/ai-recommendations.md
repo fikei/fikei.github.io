@@ -232,6 +232,42 @@ User's Saved Pins
   - `supabase/functions/generate-widget/config/widgets/complete-the-look.ts`
   - `supabase/functions/generate-widget/config/widgets/style-summary.ts`
 
+### Phase 2: Config-Driven Architecture
+
+#### Template Selection Engine
+Widgets are rendered via a template registry, not hard-coded per widget ID.
+
+```
+WIDGET_TEMPLATES = {
+  'product-grid'  → renderCompleteTheLookWidget()   (v1.0)
+  'style-card'    → renderStyleSummaryWidget()       (v1.0)
+  'simple-list'   → Generic list fallback            (v1.0)
+  'text-summary'  → Plain text fallback              (v1.0)
+}
+```
+
+**Template selection flow:**
+```
+widget.template.name → WIDGET_TEMPLATES[name] → render()
+                    ↓ (if fails)
+widget.template.fallback → WIDGET_TEMPLATES[fallback] → render()
+                    ↓ (if fails)
+'simple-list' → WIDGET_TEMPLATES['simple-list'] → render()
+```
+
+- File: `boards/index.html` - `renderWidgetWithTemplate()`, `WIDGET_TEMPLATES`
+
+#### Category-Agnostic Matching
+Widgets are discovered via server-side config, not hard-coded categories.
+
+- Discovery endpoint: `POST { action: 'discover', category, items }`
+- Registry endpoint: `POST { action: 'registry' }`
+- File: `supabase/functions/generate-widget/config/registry.ts` - `discoverWidgets()`
+
+#### Hot-Reload Registry
+- `registerWidget(widget)` / `unregisterWidget(id)` / `reloadWidget(widget)`
+- File: `supabase/functions/generate-widget/config/registry.ts`
+
 ### Widget Card Structure
 - Outer wrapper: `.widget-complete` (no border) with `data-widget-id`
 - Header: `.widget-complete__header` - sits OUTSIDE the content box

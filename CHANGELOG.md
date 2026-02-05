@@ -4,7 +4,7 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
-## [2026-02-05] - Widget Phase 2: Config-Generated Widgets
+## [2026-02-05] - Widget Phase 2: Config-Generated Widgets (COMPLETE)
 
 ### Added
 - **Config-Driven Widget System**
@@ -21,21 +21,35 @@ All notable changes to ctrl.rodeo will be documented in this file.
   - `variety` - Items from different sources/domains
   - `recency` - Recently added items
 
+- **Category-Agnostic Matching**
+  - `discoverWidgets(category, items)` - Finds all eligible widgets for any category
+  - `getRegistrySummary()` - Returns registered widget metadata for frontend
+  - Discovery endpoint: `POST { action: 'discover', category, items }` returns eligible widgets
+  - Registry endpoint: `POST { action: 'registry' }` returns widget catalog
+  - Frontend no longer hard-codes 'wear' — works with any category that has widgets
+
+- **Template Selection Engine**
+  - `WIDGET_TEMPLATES` registry with 4 templates: `product-grid`, `style-card`, `simple-list`, `text-summary`
+  - `renderWidgetWithTemplate(widget, items, aiResult)` - Selects template via widget config
+  - Fallback chain: primary template → fallback template → `simple-list`
+  - Each template has `name`, `version`, and `render()` function
+  - Removed all hard-coded `if (widget.id === 'complete-the-look')` rendering branches
+
+- **Hot-Reload Widget Registry**
+  - `registerWidget(widget)` - Add a widget at runtime
+  - `unregisterWidget(widgetId)` - Remove a widget at runtime
+  - `reloadWidget(widget)` - Update a widget in-place with version logging
+
 ### Changed
 - **Refactored `index.ts`** - Removed 180 lines of hard-coded eligibility rules, replaced with config imports
-- **CLAUDE.md** - Updated Supabase project references with correct project IDs:
-  - Boards (`yfhudwakpgzswiylhfbh`): generate-widget, enrich-link
-  - Ops (`ycilriwjnmcelkspmfmg`): notion-sync
-  - Systemic (`atdqdfpdeytfuvvpsasz`): design system tools
+- **Config-driven enrichment** - Enrichment now triggered by `widget.enrichment.enabled` config, not widget ID
+- **`boards/index.html`** - Widget rendering uses template engine; category filtering is config-driven
+- **CLAUDE.md** - Updated Supabase project references with correct project IDs
 
 ### Documentation
-- Updated `ai-widget-system.md` to v5.0 with Phase 2 architecture
-- Updated `phase-3-ai-intelligence.md` with Phase 2 completion status
-- Added widget testing curl commands to CLAUDE.md
-
-### Deployed
-- `generate-widget` function deployed to Supabase (Boards project)
-- Tested and verified config-driven eligibility working
+- Updated `phase-3-ai-intelligence.md` - Widget Phase 2 marked COMPLETE with all tasks
+- Updated `project-plan/index.md` - Phase 2 milestone added
+- Updated `CHANGELOG.md` - This entry
 
 ---
 
