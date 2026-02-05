@@ -6,9 +6,7 @@
 // Body: { action: 'sync-structure' | 'update-page', structure?: Structure, page?: PageUpdate }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
-// State tracking disabled temporarily due to bundle size limits
-// import { SyncStateManager, SyncState } from './state-manager.ts'
+import { SyncStateManager, SyncState } from './state-manager.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,10 +32,12 @@ interface Structure {
 interface PageUpdate {
   pageTitle: string
   content: string
+  pagePath?: string      // File path for state tracking (e.g., "docs/strategy/vision.md")
+  contentHash?: string   // SHA-256 hash of content for state tracking
 }
 
 interface SyncRequest {
-  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves' | 'check-changes' | 'get-state'
+  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves' | 'check-changes' | 'get-state' | 'update-state'
   structure?: Structure
   page?: PageUpdate
   root?: string  // Override root page name (default: NOTION_ROOT_PAGE env var or "Ctrl")
@@ -48,6 +48,13 @@ interface SyncRequest {
   targetSection?: string  // For sync-structure: only sync this section and its children
   useStateTracking?: boolean  // Enable hash-based change detection (Phase 1)
   contentHashes?: Record<string, string>  // Pre-computed hashes for change detection
+  stateUpdates?: Array<{  // For update-state: batch update multiple page states
+    pagePath: string
+    notionPageId?: string
+    githubHash: string
+    blockCount?: number
+    source?: 'ai' | 'human'
+  }>
 }
 
 interface MovedPage {
@@ -67,6 +74,12 @@ interface SyncResult {
   moved: MovedPage[]  // Pages that were moved in Notion
   errors: string[]
   timestamp: string
+  // State tracking fields
+  needsSync?: string[]  // Pages that need syncing (check-changes)
+  upToDate?: string[]   // Pages that are up to date
+  totalChecked?: number
+  states?: SyncState[]  // All page states (get-state)
+  totalPages?: number
   debug?: {
     totalBlocks: number
     failedBlocks: number
@@ -1566,6 +1579,24 @@ serve(async (req) => {
         const stats = await client.updatePageContent(pageId, request.page.content)
         result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
 
+        // Update sync state if path and hash provided
+        if (request.page.pagePath && request.page.contentHash) {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+          if (supabaseUrl && supabaseKey) {
+            const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
+            await stateManager.upsertState({
+              page_path: request.page.pagePath,
+              notion_page_id: pageId,
+              github_hash: request.page.contentHash,
+              last_synced_at: new Date().toISOString(),
+              block_count: stats.total,
+              source: 'ai'  // Default to AI, could be passed in request
+            })
+          }
+        }
+
         if (result.debug) {
           result.debug.totalBlocks = stats.total
           result.debug.failedBlocks = stats.failed
@@ -1594,11 +1625,98 @@ serve(async (req) => {
         await detectMovedPages(client, detectStructure, result)
         break
 
-      case 'check-changes':
-      case 'get-state':
-        // State tracking temporarily disabled due to bundle size limits
-        result.errors.push('State tracking actions temporarily disabled. Use sync-structure or update-page instead.')
+      case 'check-changes': {
+        // Compare provided hashes against stored state to find pages needing sync
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+        if (!supabaseUrl || !supabaseKey) {
+          result.errors.push('Supabase credentials not configured for state tracking')
+          break
+        }
+
+        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
+        const contentHashes = request.contentHashes || {}
+
+        // Get all current states
+        const allStates = await stateManager.getAllStates()
+        const stateMap = new Map(allStates.map(s => [s.page_path, s]))
+
+        // Find pages that need syncing
+        const needsSync: string[] = []
+        const upToDate: string[] = []
+
+        for (const [pagePath, currentHash] of Object.entries(contentHashes)) {
+          const state = stateMap.get(pagePath)
+
+          if (!state || !state.github_hash) {
+            // Never synced before
+            needsSync.push(pagePath)
+          } else if (state.github_hash !== currentHash) {
+            // Hash changed
+            needsSync.push(pagePath)
+          } else {
+            upToDate.push(pagePath)
+          }
+        }
+
+        result.needsSync = needsSync
+        result.upToDate = upToDate
+        result.totalChecked = Object.keys(contentHashes).length
         break
+      }
+
+      case 'get-state': {
+        // Return current sync states for all pages
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+        if (!supabaseUrl || !supabaseKey) {
+          result.errors.push('Supabase credentials not configured for state tracking')
+          break
+        }
+
+        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
+        const allStates = await stateManager.getAllStates()
+
+        result.states = allStates
+        result.totalPages = allStates.length
+        break
+      }
+
+      case 'update-state': {
+        // Batch update sync states after successful syncs
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+        if (!supabaseUrl || !supabaseKey) {
+          result.errors.push('Supabase credentials not configured for state tracking')
+          break
+        }
+
+        if (!request.stateUpdates || request.stateUpdates.length === 0) {
+          result.errors.push('No state updates provided')
+          break
+        }
+
+        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
+        let updatedCount = 0
+
+        for (const update of request.stateUpdates) {
+          await stateManager.upsertState({
+            page_path: update.pagePath,
+            notion_page_id: update.notionPageId || null,
+            github_hash: update.githubHash,
+            last_synced_at: new Date().toISOString(),
+            block_count: update.blockCount || 0,
+            source: update.source || 'ai'
+          })
+          updatedCount++
+        }
+
+        result.updated.push(`Updated state for ${updatedCount} pages`)
+        break
+      }
 
       default:
         return new Response(

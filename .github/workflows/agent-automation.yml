@@ -253,7 +253,7 @@ jobs:
           fi
 
       - name: Sync Page Structure
-        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+        if: env.SUPABASE_URL != ''
         run: |
           echo "═══════════════════════════════════════════"
           echo "📁 STRUCTURE SYNC: Create/move pages"
@@ -301,10 +301,12 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Structure sync successful"
-            # Show what was created/updated and save for content sync
-            echo "$response" | python3 << 'PYEOF'
-          import json,sys
-          r=json.load(sys.stdin)
+            # Save response and parse it
+            echo "$response" > /tmp/structure_response.json
+            python3 << 'PYEOF'
+          import json
+          with open('/tmp/structure_response.json') as f:
+              r = json.load(f)
           created = r.get('created', [])
           print('Created:', created)
           print('Updated:', r.get('updated', []))
@@ -327,7 +329,7 @@ jobs:
           sleep 5
 
       - name: Cleanup Orphaned Pages
-        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+        if: env.SUPABASE_URL != ''
         run: |
           echo "═══════════════════════════════════════════"
           echo "🧹 CLEANUP: Archive orphaned pages"
@@ -402,7 +404,7 @@ jobs:
           echo "═══════════════════════════════════════════"
           echo "📝 CONTENT SYNC: GitHub → Notion"
           echo "═══════════════════════════════════════════"
-          echo "Mode: Incremental (only changed .md files)"
+          echo "Mode: State-based (compares hashes to stored state)"
           echo ""
 
           # Wait for Notion to index any newly created pages from structure sync
@@ -411,61 +413,20 @@ jobs:
             sleep 10
           fi
 
-          # Initialize created pages file if it doesn't exist (structure sync may not have run)
-          touch /tmp/created_pages.txt
-
           # Track failed pages for retry
           > /tmp/failed_pages.txt
-
-          update_page() {
-            local title="$1"
-            local file="$2"
-            local is_new="$3"  # "new" or "changed"
-
-            if [ ! -f "$file" ]; then
-              echo "⏭️ $title — file not found: $file"
-              return 0
-            fi
-
-            # Calculate stats
-            local word_count=$(wc -w < "$file" | tr -d ' ')
-            local line_count=$(wc -l < "$file" | tr -d ' ')
-
-            if [ "$is_new" = "new" ]; then
-              echo "📄 $title — NEW (+${word_count} words)"
-            else
-              echo "📄 $title — syncing ${word_count} words"
-            fi
-
-            content=$(head -c 40000 "$file" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-            payload="{\"action\":\"update-page\",\"page\":{\"pageTitle\":\"$title\",\"content\":$content}}"
-
-            response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
-              -H "Authorization: Bearer $SB_KEY" \
-              -H "Content-Type: application/json" \
-              -d "$payload")
-
-            if echo "$response" | grep -q '"success":true'; then
-              # Extract block count from response
-              local blocks=$(echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r.get('updated',[''])[0].split('(')[1].split(' ')[0] if r.get('updated') else '?')" 2>/dev/null || echo "?")
-              echo "   ✅ Done (${blocks} blocks)"
-              return 0
-            else
-              echo "   ⚠️ Failed — will retry"
-              echo -e "$title\t$file\t$is_new" >> /tmp/failed_pages.txt
-              return 1
-            fi
-          }
 
           if [ ! -f "notion-structure.json" ]; then
             echo "⚠️ notion-structure.json not found, skipping content sync"
             exit 0
           fi
 
-          # Build file-to-title mapping - sync all or just changed files
+          # Step 1: Compute hashes for all .md files and determine what needs syncing
           python3 << 'PYEOF'
           import json
           import os
+          import hashlib
+          import subprocess
 
           def extract_pages(obj, pages=None):
               if pages is None:
@@ -482,75 +443,176 @@ jobs:
                       extract_pages(item, pages)
               return pages
 
+          def compute_hash(filepath):
+              """Compute SHA-256 hash of file content"""
+              try:
+                  with open(filepath, 'rb') as f:
+                      return hashlib.sha256(f.read()).hexdigest()
+              except FileNotFoundError:
+                  return None
+
           with open('notion-structure.json') as f:
               config = json.load(f)
 
           pages = extract_pages(config)
 
-          # Check if we need to do a full sync (only on explicit request)
+          # Compute hashes for all pages with files
+          content_hashes = {}
+          for title, filepath in pages:
+              if filepath and os.path.exists(filepath):
+                  content_hashes[filepath] = compute_hash(filepath)
+
+          print(f"📊 Computed hashes for {len(content_hashes)} files")
+
+          # Check if force full sync
           force_full_sync = os.environ.get('FORCE_FULL_SYNC', 'false') == 'true'
 
-          # Read changed files from git diff
-          changed_files = set()
-          if os.path.exists('/tmp/changed_files.txt'):
-              with open('/tmp/changed_files.txt') as f:
-                  changed_files = set(line.strip() for line in f if line.strip())
-
-          # Read newly created pages (from structure sync)
-          created_page_titles = set()
-          if os.path.exists('/tmp/created_pages.txt'):
-              with open('/tmp/created_pages.txt') as f:
-                  created_page_titles = set(line.strip() for line in f if line.strip())
-
           if force_full_sync:
-              # Sync ALL pages with content (manual trigger only)
-              pages_to_sync = [(title, filepath, 'full') for title, filepath in pages if filepath]
-              print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages with content")
+              # Sync ALL pages
+              pages_to_sync = [(title, filepath, content_hashes.get(filepath, ''))
+                               for title, filepath in pages if filepath and os.path.exists(filepath)]
+              print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages")
+
+              with open('/tmp/pages_to_sync.txt', 'w') as f:
+                  for title, filepath, hash_val in pages_to_sync:
+                      f.write(f"{title}\t{filepath}\t{hash_val}\n")
           else:
-              # Sync pages that: 1) file changed in commit, OR 2) page was just created
-              pages_to_sync = []
-              for title, filepath in pages:
-                  if filepath in changed_files:
-                      pages_to_sync.append((title, filepath, 'changed'))
-                  elif title in created_page_titles and filepath:
-                      pages_to_sync.append((title, filepath, 'new'))
+              # Call check-changes to find what needs syncing
+              print("🔍 Checking state to find pages needing sync...")
 
-              changed_count = len([p for p in pages_to_sync if p[2] == 'changed'])
-              new_count = len([p for p in pages_to_sync if p[2] == 'new'])
+              payload = {
+                  'action': 'check-changes',
+                  'contentHashes': content_hashes
+              }
 
-              print(f"📋 Incremental sync: {len(pages_to_sync)} pages ({changed_count} changed, {new_count} new)")
-              if created_page_titles:
-                  print(f"   New pages: {', '.join(sorted(created_page_titles)[:5])}{'...' if len(created_page_titles) > 5 else ''}")
+              with open('/tmp/check_payload.json', 'w') as f:
+                  json.dump(payload, f)
 
-          with open('/tmp/pages_to_sync.txt', 'w') as f:
-              for title, filepath, status in pages_to_sync:
-                  f.write(f"{title}\t{filepath}\t{status}\n")
+              # Call the edge function
+              result = subprocess.run([
+                  'curl', '-s', '-X', 'POST',
+                  f"{os.environ['SB_URL']}/functions/v1/notion-sync",
+                  '-H', f"Authorization: Bearer {os.environ['SB_KEY']}",
+                  '-H', 'Content-Type: application/json',
+                  '-d', '@/tmp/check_payload.json'
+              ], capture_output=True, text=True)
 
-          if not pages_to_sync:
-              print("✨ No pages need content updates")
+              try:
+                  response = json.loads(result.stdout)
+                  needs_sync = set(response.get('needsSync', []))
+                  up_to_date = response.get('upToDate', [])
+
+                  print(f"   Needs sync: {len(needs_sync)} pages")
+                  print(f"   Up to date: {len(up_to_date)} pages")
+
+                  if needs_sync:
+                      print(f"   Pages: {', '.join(list(needs_sync)[:5])}{'...' if len(needs_sync) > 5 else ''}")
+
+                  # Build list of pages to sync
+                  pages_to_sync = []
+                  for title, filepath in pages:
+                      if filepath in needs_sync:
+                          pages_to_sync.append((title, filepath, content_hashes.get(filepath, '')))
+
+                  with open('/tmp/pages_to_sync.txt', 'w') as f:
+                      for title, filepath, hash_val in pages_to_sync:
+                          f.write(f"{title}\t{filepath}\t{hash_val}\n")
+
+                  if not pages_to_sync:
+                      print("✨ All pages are up to date!")
+
+              except json.JSONDecodeError:
+                  print(f"⚠️ Failed to parse check-changes response: {result.stdout[:200]}")
+                  # Fall back to syncing nothing (safe default)
+                  open('/tmp/pages_to_sync.txt', 'w').close()
           PYEOF
 
-          # Read and process pages
+          # Step 2: Sync pages that need updating
           if [ -s /tmp/pages_to_sync.txt ]; then
-            while IFS=$'\t' read -r title filepath; do
-              update_page "$title" "$filepath"
+            echo ""
+            echo "Syncing pages..."
+
+            while IFS=$'\t' read -r title filepath hash_val; do
+              if [ ! -f "$filepath" ]; then
+                echo "⏭️ $title — file not found: $filepath"
+                continue
+              fi
+
+              word_count=$(wc -w < "$filepath" | tr -d ' ')
+              echo "📄 $title — syncing ${word_count} words"
+
+              # Build payload with hash info for state tracking
+              content=$(head -c 40000 "$filepath" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+              payload=$(python3 -c "
+          import json
+          print(json.dumps({
+              'action': 'update-page',
+              'page': {
+                  'pageTitle': '$title',
+                  'content': $content,
+                  'pagePath': '$filepath',
+                  'contentHash': '$hash_val'
+              }
+          }))
+          ")
+
+              response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
+                -H "Authorization: Bearer $SB_KEY" \
+                -H "Content-Type: application/json" \
+                -d "$payload")
+
+              if echo "$response" | grep -q '"success":true'; then
+                blocks=$(echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r.get('updated',[''])[0].split('(')[1].split(' ')[0] if r.get('updated') else '?')" 2>/dev/null || echo "?")
+                echo "   ✅ Done (${blocks} blocks)"
+              else
+                echo "   ⚠️ Failed — will retry"
+                echo -e "$title\t$filepath\t$hash_val" >> /tmp/failed_pages.txt
+              fi
               sleep 2
             done < /tmp/pages_to_sync.txt
 
-            # Retry failed pages up to 3 times with increasing delays
+            # Retry failed pages up to 3 times
             for retry in 1 2 3; do
               if [ -s /tmp/failed_pages.txt ]; then
                 failed_count=$(wc -l < /tmp/failed_pages.txt)
                 echo ""
-                echo "🔄 Retry $retry: $failed_count failed pages (waiting ${retry}0s for Notion to index...)"
+                echo "🔄 Retry $retry: $failed_count failed pages (waiting ${retry}0s...)"
                 sleep $((retry * 10))
 
-                # Move failed to retry queue
                 mv /tmp/failed_pages.txt /tmp/retry_pages.txt
                 > /tmp/failed_pages.txt
 
-                while IFS=$'\t' read -r title filepath; do
-                  update_page "$title" "$filepath"
+                while IFS=$'\t' read -r title filepath hash_val; do
+                  if [ ! -f "$filepath" ]; then
+                    continue
+                  fi
+
+                  echo "📄 $title — retrying..."
+                  content=$(head -c 40000 "$filepath" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+                  payload=$(python3 -c "
+          import json
+          print(json.dumps({
+              'action': 'update-page',
+              'page': {
+                  'pageTitle': '$title',
+                  'content': $content,
+                  'pagePath': '$filepath',
+                  'contentHash': '$hash_val'
+              }
+          }))
+          ")
+
+                  response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
+                    -H "Authorization: Bearer $SB_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d "$payload")
+
+                  if echo "$response" | grep -q '"success":true'; then
+                    echo "   ✅ Done"
+                  else
+                    echo "   ⚠️ Still failing"
+                    echo -e "$title\t$filepath\t$hash_val" >> /tmp/failed_pages.txt
+                  fi
                   sleep 3
                 done < /tmp/retry_pages.txt
               else
@@ -563,7 +625,7 @@ jobs:
               echo ""
               echo "⚠️ Some pages still failed after 3 retries:"
               cat /tmp/failed_pages.txt | cut -f1
-              echo "These will be retried on next workflow run."
+              echo "State NOT updated for these - will retry next run."
             fi
           else
             echo "✨ No markdown files changed - skipping content sync"
