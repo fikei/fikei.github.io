@@ -262,21 +262,36 @@ class NotionClient {
     types: Record<string, number>
     failedTypes: Record<string, number>
   }> {
-    // Get existing blocks
-    const existingBlocks = await this.request(`/blocks/${pageId}/children`)
+    // Get existing blocks (paginate if needed)
+    let existingBlocks: any[] = []
+    let cursor: string | undefined
+    do {
+      const url = cursor
+        ? `/blocks/${pageId}/children?start_cursor=${cursor}&page_size=100`
+        : `/blocks/${pageId}/children?page_size=100`
+      const response = await this.request(url)
+      existingBlocks = existingBlocks.concat(response.results)
+      cursor = response.has_more ? response.next_cursor : undefined
+    } while (cursor)
 
-    // Delete existing blocks (in batches to avoid rate limits)
-    for (const block of existingBlocks.results) {
-      try {
-        await this.request(`/blocks/${block.id}`, { method: 'DELETE' })
-      } catch (e) {
-        // Ignore deletion errors
+    console.log(`Deleting ${existingBlocks.length} existing blocks...`)
+
+    // Delete existing blocks in parallel batches (faster than one-by-one)
+    const DELETE_BATCH_SIZE = 10  // Delete 10 at a time in parallel
+    for (let i = 0; i < existingBlocks.length; i += DELETE_BATCH_SIZE) {
+      const batch = existingBlocks.slice(i, i + DELETE_BATCH_SIZE)
+      await Promise.all(batch.map(block =>
+        this.request(`/blocks/${block.id}`, { method: 'DELETE' }).catch(() => {})
+      ))
+      // Small delay between batches to respect rate limits
+      if (i + DELETE_BATCH_SIZE < existingBlocks.length) {
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
 
     // Add new blocks in batches of 100 (Notion API limit)
     const blocks = this.markdownToBlocks(content)
-    console.log(`Updating page with ${blocks.length} blocks`)
+    console.log(`Adding ${blocks.length} new blocks...`)
     return await this.addBlocksWithRetry(pageId, blocks)
   }
 
@@ -286,15 +301,27 @@ class NotionClient {
     types: Record<string, number>
     failedTypes: Record<string, number>
   }> {
-    // Get existing blocks
-    const existingBlocks = await this.request(`/blocks/${pageId}/children`)
+    // Get existing blocks (paginate if needed)
+    let existingBlocks: any[] = []
+    let cursor: string | undefined
+    do {
+      const url = cursor
+        ? `/blocks/${pageId}/children?start_cursor=${cursor}&page_size=100`
+        : `/blocks/${pageId}/children?page_size=100`
+      const response = await this.request(url)
+      existingBlocks = existingBlocks.concat(response.results)
+      cursor = response.has_more ? response.next_cursor : undefined
+    } while (cursor)
 
-    // Delete existing blocks
-    for (const block of existingBlocks.results) {
-      try {
-        await this.request(`/blocks/${block.id}`, { method: 'DELETE' })
-      } catch (e) {
-        // Ignore deletion errors
+    // Delete existing blocks in parallel batches
+    const DELETE_BATCH_SIZE = 10
+    for (let i = 0; i < existingBlocks.length; i += DELETE_BATCH_SIZE) {
+      const batch = existingBlocks.slice(i, i + DELETE_BATCH_SIZE)
+      await Promise.all(batch.map(block =>
+        this.request(`/blocks/${block.id}`, { method: 'DELETE' }).catch(() => {})
+      ))
+      if (i + DELETE_BATCH_SIZE < existingBlocks.length) {
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
 
