@@ -100,26 +100,70 @@ class NotionClient {
   }
 
   async findPageByTitle(title: string): Promise<string | null> {
+    console.log(`Searching for page: "${title}"`)
+
+    // Try exact title search first
     const results = await this.request('/search', {
       method: 'POST',
       body: JSON.stringify({
         query: title,
         filter: { property: 'object', value: 'page' },
-        page_size: 10,
+        page_size: 100,  // Increased from 10
       }),
     })
 
-    // Find exact match
+    // Find exact match (case-sensitive)
     for (const page of results.results) {
       const titleProp = Object.values(page.properties).find(
         (prop: any) => prop.type === 'title'
       ) as any
       const pageTitle = titleProp?.title?.[0]?.plain_text
       if (pageTitle === title) {
+        console.log(`  Found exact match: ${page.id}`)
         return page.id
       }
     }
 
+    // Try case-insensitive match as fallback
+    const titleLower = title.toLowerCase()
+    for (const page of results.results) {
+      const titleProp = Object.values(page.properties).find(
+        (prop: any) => prop.type === 'title'
+      ) as any
+      const pageTitle = titleProp?.title?.[0]?.plain_text
+      if (pageTitle?.toLowerCase() === titleLower) {
+        console.log(`  Found case-insensitive match: ${page.id}`)
+        return page.id
+      }
+    }
+
+    // If title has multiple words, try searching with just first few words
+    const words = title.split(' ')
+    if (words.length > 2) {
+      const shortQuery = words.slice(0, 2).join(' ')
+      console.log(`  Trying shorter query: "${shortQuery}"`)
+      const retryResults = await this.request('/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: shortQuery,
+          filter: { property: 'object', value: 'page' },
+          page_size: 100,
+        }),
+      })
+
+      for (const page of retryResults.results) {
+        const titleProp = Object.values(page.properties).find(
+          (prop: any) => prop.type === 'title'
+        ) as any
+        const pageTitle = titleProp?.title?.[0]?.plain_text
+        if (pageTitle === title || pageTitle?.toLowerCase() === titleLower) {
+          console.log(`  Found with shorter query: ${page.id}`)
+          return page.id
+        }
+      }
+    }
+
+    console.log(`  Page not found: "${title}"`)
     return null
   }
 

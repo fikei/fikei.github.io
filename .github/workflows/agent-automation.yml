@@ -131,7 +131,7 @@ jobs:
       - name: Update Config for Moved Pages
         if: steps.detect-moves.outputs.moves_detected == 'true'
         run: |
-          echo "📝 Updating notion-structure.json to reflect Notion changes..."
+          echo "📝 Auto-updating notion-structure.json to reflect Notion changes..."
 
           python3 << 'PYEOF'
           import json
@@ -149,15 +149,102 @@ jobs:
           with open('notion-structure.json') as f:
               structure = json.load(f)
 
-          # For now, just log the moves - full restructure is complex
-          # In the future, we could auto-update the structure
-          print("Pages moved in Notion:")
-          for m in moved:
-              print(f"  - {m['title']}: {m['expectedParent']} → {m['actualParent']}")
+          def find_and_remove_page(obj, title, parent_list=None, parent_key=None):
+              """Find a page by title and remove it from its parent. Returns the removed page."""
+              if isinstance(obj, dict):
+                  for key in ['children', 'sections']:
+                      if key in obj and isinstance(obj[key], list):
+                          for i, child in enumerate(obj[key]):
+                              if isinstance(child, dict) and child.get('title') == title:
+                                  return obj[key].pop(i)
+                              result = find_and_remove_page(child, title, obj[key], key)
+                              if result:
+                                  return result
+              return None
 
-          print("\n⚠️ Manual update needed: Please update notion-structure.json to match Notion")
-          print("Or move the pages back in Notion to match the expected structure")
+          def find_parent(obj, parent_title):
+              """Find a parent page/section by title. Returns the 'children' list to append to."""
+              if isinstance(obj, dict):
+                  if obj.get('title') == parent_title:
+                      if 'children' not in obj:
+                          obj['children'] = []
+                      return obj['children']
+                  for key in ['children', 'sections']:
+                      if key in obj and isinstance(obj[key], list):
+                          for child in obj[key]:
+                              result = find_parent(child, parent_title)
+                              if result is not None:
+                                  return result
+              return None
+
+          changes_made = []
+          for m in moved:
+              title = m['title']
+              old_parent = m['expectedParent']
+              new_parent = m['actualParent']
+
+              print(f"Moving '{title}': {old_parent} → {new_parent}")
+
+              # Remove page from old location
+              page_data = find_and_remove_page(structure, title)
+              if not page_data:
+                  print(f"  ⚠️ Could not find '{title}' in structure")
+                  continue
+
+              # Find new parent and add page there
+              new_parent_children = find_parent(structure, new_parent)
+              if new_parent_children is None:
+                  # Try finding in sections at root level
+                  for section in structure.get('sections', []):
+                      if section.get('title') == new_parent:
+                          if 'children' not in section:
+                              section['children'] = []
+                          new_parent_children = section['children']
+                          break
+
+              if new_parent_children is not None:
+                  new_parent_children.append(page_data)
+                  changes_made.append(f"{title}: {old_parent} → {new_parent}")
+                  print(f"  ✅ Moved successfully")
+              else:
+                  print(f"  ⚠️ Could not find parent '{new_parent}' - skipping")
+                  # Put it back where it was
+                  old_parent_children = find_parent(structure, old_parent)
+                  if old_parent_children is not None:
+                      old_parent_children.append(page_data)
+
+          if changes_made:
+              # Save updated structure
+              with open('notion-structure.json', 'w') as f:
+                  json.dump(structure, f, indent=2)
+
+              print(f"\n✅ Updated notion-structure.json with {len(changes_made)} moves:")
+              for c in changes_made:
+                  print(f"  • {c}")
+
+              # Signal that we need to commit
+              with open('/tmp/structure_updated', 'w') as f:
+                  f.write('true')
+          else:
+              print("\n⚠️ No changes could be applied automatically")
           PYEOF
+
+      - name: Commit Structure Changes
+        if: steps.detect-moves.outputs.moves_detected == 'true'
+        run: |
+          if [ -f /tmp/structure_updated ]; then
+            echo "📤 Committing structure changes..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add notion-structure.json
+            git commit -m "Auto-update structure to match Notion page moves
+
+            Pages were reorganized in Notion and structure was updated to match.
+            " || echo "No changes to commit"
+            git push || echo "Push failed - may need manual intervention"
+          else
+            echo "No structure changes to commit"
+          fi
 
       - name: Sync Structure with Content
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
