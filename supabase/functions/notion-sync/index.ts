@@ -34,6 +34,8 @@ interface PageUpdate {
   content: string
   pagePath?: string      // File path for state tracking (e.g., "docs/strategy/vision.md")
   contentHash?: string   // SHA-256 hash of content for state tracking
+  parentPageTitle?: string  // Parent page title - used to create page if it doesn't exist
+  icon?: string           // Emoji icon for the page (default: document icon)
 }
 
 interface SyncRequest {
@@ -601,7 +603,7 @@ class NotionClient {
     return segments.length > 0 ? segments : [{ type: 'text', text: { content: text } }]
   }
 
-  private markdownToBlocks(markdown: string): any[] {
+  markdownToBlocks(markdown: string): any[] {
     const lines = markdown.split('\n')
     const blocks: any[] = []
     let i = 0
@@ -1564,20 +1566,48 @@ serve(async (req) => {
         break
 
       case 'update-page': {
-        // Update a single page's content
+        // Update a single page's content (or create if it doesn't exist)
         if (!request.page) {
           result.errors.push('Missing page data for update-page action')
           break
         }
 
-        const pageId = await client.findPageByTitle(request.page.pageTitle)
+        let pageId = await client.findPageByTitle(request.page.pageTitle)
+        let wasCreated = false
+
         if (!pageId) {
-          result.errors.push(`Page '${request.page.pageTitle}' not found`)
-          break
+          // Page doesn't exist - try to create it if we have parent info
+          if (request.page.parentPageTitle) {
+            const parentId = await client.findPageByTitle(request.page.parentPageTitle)
+            if (!parentId) {
+              result.errors.push(`Parent page '${request.page.parentPageTitle}' not found, cannot create '${request.page.pageTitle}'`)
+              break
+            }
+
+            // Create the page under its parent
+            const icon = request.page.icon || '📄'
+            pageId = await client.createPage(parentId, request.page.pageTitle, icon, request.page.content)
+            wasCreated = true
+            result.created.push(request.page.pageTitle)
+          } else {
+            result.errors.push(`Page '${request.page.pageTitle}' not found (provide parentPageTitle to auto-create)`)
+            break
+          }
         }
 
-        const stats = await client.updatePageContent(pageId, request.page.content)
-        result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
+        // Update content (skip if we just created with content)
+        let stats: { total: number; failed: number; types: Record<string, number>; failedTypes: Record<string, number> }
+        if (wasCreated) {
+          // Just count blocks we created
+          const blocks = client.markdownToBlocks(request.page.content)
+          stats = { total: blocks.length, failed: 0, types: {}, failedTypes: {} }
+        } else {
+          stats = await client.updatePageContent(pageId, request.page.content)
+        }
+
+        if (!wasCreated) {
+          result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
+        }
 
         // Update sync state if path and hash provided
         if (request.page.pagePath && request.page.contentHash) {
