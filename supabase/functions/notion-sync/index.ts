@@ -237,6 +237,36 @@ class NotionClient {
     }
   }
 
+  async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<void> {
+    // Get existing blocks
+    const existingBlocks = await this.request(`/blocks/${pageId}/children`)
+
+    // Delete existing blocks
+    for (const block of existingBlocks.results) {
+      try {
+        await this.request(`/blocks/${block.id}`, { method: 'DELETE' })
+      } catch (e) {
+        // Ignore deletion errors
+      }
+    }
+
+    // Add new blocks in batches of 100
+    const BATCH_SIZE = 100
+
+    for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
+      const batch = blocks.slice(i, i + BATCH_SIZE)
+      if (batch.length > 0) {
+        await this.request(`/blocks/${pageId}/children`, {
+          method: 'PATCH',
+          body: JSON.stringify({ children: batch }),
+        })
+        if (i + BATCH_SIZE < blocks.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+    }
+  }
+
   async archivePage(pageId: string): Promise<void> {
     await this.request(`/pages/${pageId}`, {
       method: 'PATCH',
@@ -752,27 +782,139 @@ class NotionClient {
 // TABLE OF CONTENTS GENERATOR
 // ═══════════════════════════════════════════════════════════════
 
-// Generate a table of contents markdown for section pages
-function generateTableOfContents(children: PageDef[], depth = 0): string {
-  if (!children || children.length === 0) return ''
+// Generate linked TOC blocks with page mentions
+function generateLinkedTocBlocks(
+  title: string,
+  children: PageDef[],
+  childIds: Map<string, string>
+): any[] {
+  const blocks: any[] = []
 
-  const lines: string[] = []
+  // Add title heading
+  blocks.push({
+    object: 'block',
+    type: 'heading_1',
+    heading_1: {
+      rich_text: [{ type: 'text', text: { content: title } }],
+    },
+  })
 
-  for (const child of children) {
-    const indent = '  '.repeat(depth)
-    const icon = child.icon || '📄'
-    lines.push(`${indent}- ${icon} **${child.title}**`)
+  // Add "Contents" heading
+  blocks.push({
+    object: 'block',
+    type: 'heading_2',
+    heading_2: {
+      rich_text: [{ type: 'text', text: { content: 'Contents' } }],
+    },
+  })
 
-    // Add nested children
-    if (child.children && child.children.length > 0) {
-      const nestedContent = generateTableOfContents(child.children, depth + 1)
-      if (nestedContent) {
-        lines.push(nestedContent)
+  // Add TOC items as bulleted list with page mentions
+  function addTocItems(items: PageDef[], ids: Map<string, string>) {
+    for (const item of items) {
+      const pageId = ids.get(item.title)
+      const icon = item.icon || '📄'
+
+      if (pageId) {
+        // Create bulleted list item with page mention (linked)
+        blocks.push({
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [
+              { type: 'text', text: { content: `${icon} ` } },
+              {
+                type: 'mention',
+                mention: {
+                  type: 'page',
+                  page: { id: pageId },
+                },
+              },
+            ],
+          },
+        })
+      } else {
+        // Fallback: plain text if page ID not found
+        blocks.push({
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [
+              { type: 'text', text: { content: `${icon} ` } },
+              {
+                type: 'text',
+                text: { content: item.title },
+                annotations: { bold: true },
+              },
+            ],
+          },
+        })
+      }
+
+      // Add nested children as indented items (shown inline for simplicity)
+      if (item.children && item.children.length > 0) {
+        for (const child of item.children) {
+          const childPageId = ids.get(child.title)
+          const childIcon = child.icon || '📄'
+
+          if (childPageId) {
+            blocks.push({
+              object: 'block',
+              type: 'bulleted_list_item',
+              bulleted_list_item: {
+                rich_text: [
+                  { type: 'text', text: { content: `    ${childIcon} ` } },
+                  {
+                    type: 'mention',
+                    mention: {
+                      type: 'page',
+                      page: { id: childPageId },
+                    },
+                  },
+                ],
+              },
+            })
+          } else {
+            blocks.push({
+              object: 'block',
+              type: 'bulleted_list_item',
+              bulleted_list_item: {
+                rich_text: [
+                  { type: 'text', text: { content: `    ${childIcon} ` } },
+                  {
+                    type: 'text',
+                    text: { content: child.title },
+                    annotations: { bold: true },
+                  },
+                ],
+              },
+            })
+          }
+        }
       }
     }
   }
 
-  return lines.join('\n')
+  addTocItems(children, childIds)
+
+  return blocks
+}
+
+// Collect all page IDs from a tree of pages (title -> id mapping)
+function collectPageIds(
+  pages: PageDef[],
+  existingIds: Map<string, string>,
+  collected: Map<string, string> = new Map()
+): Map<string, string> {
+  for (const page of pages) {
+    const id = existingIds.get(page.title)
+    if (id) {
+      collected.set(page.title, id)
+    }
+    if (page.children) {
+      collectPageIds(page.children, existingIds, collected)
+    }
+  }
+  return collected
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -793,25 +935,27 @@ async function syncStructure(
   }
 
   // Recursively create/sync pages under their correct parents
-  async function syncPages(parentId: string, pages: PageDef[], depth = 0, parentPath = '') {
+  // Returns a map of title -> pageId for all pages synced
+  async function syncPages(
+    parentId: string,
+    pages: PageDef[],
+    depth = 0,
+    parentPath = ''
+  ): Promise<Map<string, string>> {
     // Get existing children of this parent
     const existingChildren = await client.getChildPages(parentId)
+    const syncedIds = new Map<string, string>()
 
     for (const page of pages) {
       const pagePath = parentPath ? `${parentPath} > ${page.title}` : page.title
+      const isSectionPage = page.children && page.children.length > 0 && !page.content
 
       try {
-        // Determine content: file content, or generate TOC for section pages
+        // For section pages: create without content first, we'll add linked TOC after children
+        // For content pages: use the file content
         let contentToUse: string | undefined = undefined
-        if (!skipContent) {
-          if (page.content) {
-            // Page has file content
-            contentToUse = page.content
-          } else if (page.children && page.children.length > 0) {
-            // Section page with children - generate table of contents
-            const toc = generateTableOfContents(page.children)
-            contentToUse = `# ${page.title}\n\n## Contents\n\n${toc}`
-          }
+        if (!skipContent && page.content) {
+          contentToUse = page.content
         }
 
         // Find or create under the correct parent
@@ -823,19 +967,35 @@ async function syncStructure(
           contentToUse
         )
 
+        syncedIds.set(page.title, pageId)
+
         if (created) {
           result.created.push(pagePath)
         } else if (!skipContent && contentToUse) {
-          // Update existing page content (only if not skipping content)
+          // Update existing content page
           await client.updatePageContent(pageId, contentToUse)
           result.updated.push(pagePath)
-        } else {
+        } else if (!isSectionPage) {
           result.skipped.push(pagePath)
         }
 
-        // Sync children recursively
+        // Sync children recursively first (to get their IDs)
         if (page.children && pageId) {
-          await syncPages(pageId, page.children, depth + 1, pagePath)
+          const childIds = await syncPages(pageId, page.children, depth + 1, pagePath)
+
+          // Merge child IDs into our map
+          for (const [title, id] of childIds) {
+            syncedIds.set(title, id)
+          }
+
+          // Now update section page with linked TOC
+          if (!skipContent && isSectionPage) {
+            const tocBlocks = generateLinkedTocBlocks(page.title, page.children, childIds)
+            await client.updatePageWithBlocks(pageId, tocBlocks)
+            if (!created) {
+              result.updated.push(pagePath)
+            }
+          }
         }
 
         // Rate limiting - wait between operations
@@ -844,6 +1004,8 @@ async function syncStructure(
         result.errors.push(`Failed to sync '${pagePath}': ${error.message}`)
       }
     }
+
+    return syncedIds
   }
 
   await syncPages(rootId, structure.sections)
