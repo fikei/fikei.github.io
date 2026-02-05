@@ -96,7 +96,9 @@ jobs:
           echo "$CHANGED" > /tmp/changed_files.txt
 
       - name: Detect Moved Pages in Notion
-        if: env.SUPABASE_URL != ''
+        # DISABLED: GitHub is source of truth, not Notion
+        # Re-enable this when bidirectional sync is ready
+        if: false
         id: detect-moves
         run: |
           echo "🔍 Checking for pages moved in Notion..."
@@ -246,12 +248,13 @@ jobs:
             echo "No structure changes to commit"
           fi
 
-      - name: Sync Structure with Content
+      - name: Sync Page Structure
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
-          echo "🔄 Step 1: Syncing page structure WITH content..."
+          echo "📁 Syncing page structure to Notion..."
+          echo "   (Creates pages/folders, no content yet)"
 
-          # Sync structure ONLY (no content) - content synced individually in Step 3
+          # Sync structure ONLY (no content) - content synced individually in next step
           if [ -f "notion-structure.json" ]; then
             # Build payload WITHOUT file contents - just structure
             python3 << 'PYEOF'
@@ -304,7 +307,8 @@ jobs:
       - name: Cleanup Orphaned Pages
         if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
         run: |
-          echo "🧹 Step 2: Cleaning up orphaned Notion pages..."
+          echo "🧹 Cleaning up orphaned Notion pages..."
+          echo "   (Archives pages not in notion-structure.json)"
 
           if [ ! -f "notion-structure.json" ]; then
             echo "⚠️ notion-structure.json not found, skipping cleanup"
@@ -362,7 +366,7 @@ jobs:
           # Small delay before content sync
           sleep 5
 
-      - name: Update Individual Pages (Changed Files Only)
+      - name: Sync Page Content
         if: env.SUPABASE_URL != ''
         env:
           SB_URL: ${{ secrets.SUPABASE_URL }}
@@ -370,7 +374,7 @@ jobs:
           STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
           FORCE_FULL_SYNC: ${{ github.event.inputs.force_full_sync }}
         run: |
-          echo "🔄 Step 3: Updating page content..."
+          echo "📝 Syncing page content to Notion..."
 
           # Wait for Notion to index any newly created pages from Step 1
           if [ "$STRUCTURE_CHANGED" = "true" ]; then
