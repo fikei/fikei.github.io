@@ -37,6 +37,7 @@ interface SyncRequest {
   action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves'
   structure?: Structure
   page?: PageUpdate
+  root?: string  // Override root page name (default: NOTION_ROOT_PAGE env var or "Ctrl")
   dryRun?: boolean  // For cleanup: preview without deleting
   skipContent?: boolean  // For sync-structure: only create pages, skip content updates
   pageSources?: Record<string, 'ai' | 'human'>  // For cleanup: track page origins
@@ -1147,8 +1148,11 @@ async function syncStructure(
 // DEFAULT STRUCTURE
 // ═══════════════════════════════════════════════════════════════
 
+// Root page name - can be overridden via NOTION_ROOT_PAGE env var or request.root
+const DEFAULT_ROOT = Deno.env.get('NOTION_ROOT_PAGE') || 'Ctrl'
+
 const DEFAULT_STRUCTURE: Structure = {
-  root: 'Ctrl Rodeo',
+  root: DEFAULT_ROOT,
   sections: [
     {
       title: 'Strategy',
@@ -1505,10 +1509,14 @@ serve(async (req) => {
       },
     }
 
+    // Apply root override if provided
+    const effectiveRoot = request.root || DEFAULT_ROOT
+
     switch (request.action) {
       case 'create-structure':
         // Create the default structure (structure only, no content)
-        await syncStructure(client, DEFAULT_STRUCTURE, result, true)
+        const createStruct = { ...DEFAULT_STRUCTURE, root: effectiveRoot }
+        await syncStructure(client, createStruct, result, true)
         break
 
       case 'sync-structure':
@@ -1516,6 +1524,8 @@ serve(async (req) => {
         // Use skipContent flag if provided (for faster structure-only sync)
         // Use targetSection to filter to a specific section (e.g., "User Experience" or "User Experience/Components/Pins")
         let structure = request.structure || DEFAULT_STRUCTURE
+        // Apply root override
+        structure = { ...structure, root: effectiveRoot }
         if (request.targetSection) {
           structure = filterStructureBySection(structure, request.targetSection)
         }
@@ -1545,7 +1555,7 @@ serve(async (req) => {
       case 'cleanup':
         // Move pages not in expected structure to Archive folder
         // Respects source field: human-created pages are protected
-        const cleanupStructure = request.structure || DEFAULT_STRUCTURE
+        const cleanupStructure = { ...(request.structure || DEFAULT_STRUCTURE), root: effectiveRoot }
         await cleanupLegacyPages(
           client,
           cleanupStructure,
@@ -1558,7 +1568,7 @@ serve(async (req) => {
 
       case 'detect-moves':
         // Detect pages that were moved in Notion
-        const detectStructure = request.structure || DEFAULT_STRUCTURE
+        const detectStructure = { ...(request.structure || DEFAULT_STRUCTURE), root: effectiveRoot }
         await detectMovedPages(client, detectStructure, result)
         break
 
