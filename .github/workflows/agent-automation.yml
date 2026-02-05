@@ -378,13 +378,16 @@ jobs:
             sleep 10
           fi
 
+          # Track failed pages for retry
+          > /tmp/failed_pages.txt
+
           update_page() {
             local title="$1"
             local file="$2"
 
             if [ ! -f "$file" ]; then
               echo "⏭️ Skipping $title (file not found: $file)"
-              return
+              return 0
             fi
 
             echo "📄 Updating: $title"
@@ -398,10 +401,12 @@ jobs:
 
             if echo "$response" | grep -q '"success":true'; then
               echo "  ✅ Updated"
+              return 0
             else
-              echo "  ⚠️ Issue: $response"
+              echo "  ⚠️ Failed (will retry): $title"
+              echo -e "$title\t$file" >> /tmp/failed_pages.txt
+              return 1
             fi
-            sleep 3
           }
 
           if [ ! -f "notion-structure.json" ]; then
@@ -463,11 +468,41 @@ jobs:
               print("✨ No pages need content updates")
           PYEOF
 
-          # Read and process only changed pages
+          # Read and process pages
           if [ -s /tmp/pages_to_sync.txt ]; then
             while IFS=$'\t' read -r title filepath; do
               update_page "$title" "$filepath"
+              sleep 2
             done < /tmp/pages_to_sync.txt
+
+            # Retry failed pages up to 3 times with increasing delays
+            for retry in 1 2 3; do
+              if [ -s /tmp/failed_pages.txt ]; then
+                failed_count=$(wc -l < /tmp/failed_pages.txt)
+                echo ""
+                echo "🔄 Retry $retry: $failed_count failed pages (waiting ${retry}0s for Notion to index...)"
+                sleep $((retry * 10))
+
+                # Move failed to retry queue
+                mv /tmp/failed_pages.txt /tmp/retry_pages.txt
+                > /tmp/failed_pages.txt
+
+                while IFS=$'\t' read -r title filepath; do
+                  update_page "$title" "$filepath"
+                  sleep 3
+                done < /tmp/retry_pages.txt
+              else
+                break
+              fi
+            done
+
+            # Report any remaining failures
+            if [ -s /tmp/failed_pages.txt ]; then
+              echo ""
+              echo "⚠️ Some pages still failed after 3 retries:"
+              cat /tmp/failed_pages.txt | cut -f1
+              echo "These will be retried on next workflow run."
+            fi
           else
             echo "✨ No pages need updating"
           fi
