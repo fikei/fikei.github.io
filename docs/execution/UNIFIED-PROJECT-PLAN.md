@@ -1,7 +1,7 @@
 # Unified Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-05
+> **Last Updated**: 2026-02-05 (Major expansion: Multiple Boards, AI Pin Generation, Bulk Operations, Mobile iOS, Content Reader)
 
 ---
 
@@ -18,12 +18,37 @@
 
 1. [Phase 1: Foundation (SHIPPED)](#phase-1-foundation-shipped)
 2. [Phase 2: Core Experience (SHIPPED)](#phase-2-core-experience-shipped)
-3. [Phase 3: AI Intelligence (MOSTLY COMPLETE)](#phase-3-ai-intelligence-mostly-complete)
-4. [Phase 4: Sharing & Collaboration (IN PROGRESS)](#phase-4-sharing--collaboration-in-progress)
+3. [Phase 3: AI Intelligence](#phase-3-ai-intelligence-mostly-complete)
+   - Epic 3.1: Content Type System ✅
+   - Epic 3.2: Image Resolution Pipeline ✅
+   - Epic 3.3: AI Widget System - Phase 1 (Core) ✅
+   - Epic 3.4: AI Widget System - Phase 2 (Intelligence) ⏳
+   - Epic 3.5: AI Widget System - Phase 3 (Advanced) ⏳
+   - Epic 3.6: AI Pin Generation ⏳
+4. [Phase 4: Sharing & Collaboration](#phase-4-sharing--collaboration-in-progress)
+   - Epic 4.1: Basic Sharing ✅
+   - Epic 4.2: Username System ⏳
+   - Epic 4.3: Multiple Boards ⏳ **NEW**
+   - Epic 4.4: Collaborative Boards 🔄
 5. [Phase 5: User Experience Polish](#phase-5-user-experience-polish)
+   - Epic 5.1: Onboarding 🔄
+   - Epic 5.2: Settings & Preferences ⏳
+   - Epic 5.3: Search & Navigation 🔄
+   - Epic 5.4: Grid Improvements 🔄
+   - Epic 5.5: Bulk Operations ⏳ **NEW**
+   - Epic 5.6: Authentication Enhancements ⏳
 6. [Phase 6: Performance & Scale](#phase-6-performance--scale)
 7. [Phase 7: Platform Expansion](#phase-7-platform-expansion)
+   - Epic 7.1: Browser Extension ⏳
+   - Epic 7.2: Import/Export ⏳
+   - Epic 7.3: Mobile App (iOS First) ⏳ **EXPANDED**
+   - Epic 7.4: Android App ⏳ **NEW**
 8. [Backlog: Future Considerations](#backlog-future-considerations)
+   - Rich Media Support ⏳ **EXPANDED**
+   - Content Reader ⏳ **NEW**
+   - Advanced AI Features ⏳
+   - Admin Enhancements ⏳
+   - Sharing Enhancements ⏳
 
 ---
 
@@ -169,7 +194,7 @@
 | | "Edit image" button on cards | ⏳ |
 | | Re-fetch, search, upload options | ⏳ |
 
-### Epic 3.3: AI Widget System ✅
+### Epic 3.3: AI Widget System - Phase 1 (Core) ✅
 **Released: 2026-02-03**
 
 | Story | Tasks | Status |
@@ -197,6 +222,95 @@
 | | Track widget views | ⏳ |
 | | Track product clicks | ⏳ |
 | | Track saves to board | ⏳ |
+
+### Epic 3.4: AI Widget System - Phase 2 (Intelligence) ⏳
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Dynamic Brand Discovery** | | ⏳ |
+| | Analyze URLs for brand keywords | ⏳ |
+| | Extract brands from user's existing board | ⏳ |
+| | Find similar brands via embeddings | ⏳ |
+| | Validate scrapeability before suggesting | ⏳ |
+| | Auto-add new brands to registry | ⏳ |
+| **User-Customizable Prompts** | | ⏳ |
+| | Simple UI for tone/style preferences | ⏳ |
+| | Budget range selector ($, $$, $$$, $$$$) | ⏳ |
+| | Preferred brands input | ⏳ |
+| | Style preferences (minimal, bold, classic, etc.) | ⏳ |
+| | Custom prompt additions field | ⏳ |
+| | Merge user prefs with base prompt | ⏳ |
+| **SERP API Integration** | | ⏳ |
+| | Google Custom Search API setup | ⏳ |
+| | Bing Image Search API fallback | ⏳ |
+| | Integrate as primary image source | ⏳ |
+| | Replace HTML scraping where unreliable | ⏳ |
+| | Cost monitoring and rate limiting | ⏳ |
+| **Brand Health Dashboard** | | ⏳ |
+| | Per-brand success rate tracking | ⏳ |
+| | Failure reason categorization | ⏳ |
+| | Automatic alerting on degradation | ⏳ |
+| | One-click brand disable | ⏳ |
+| | Admin UI for brand management | ⏳ |
+
+### Epic 3.5: AI Widget System - Phase 3 (Advanced) ⏳
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **A/B Testing Framework** | | ⏳ |
+| | Split traffic between prompt variants | ⏳ |
+| | Track engagement metrics per variant | ⏳ |
+| | Statistical significance calculation | ⏳ |
+| | Automatic winner selection | ⏳ |
+| | Prompt version history | ⏳ |
+| **Price Range Filtering** | | ⏳ |
+| | User budget preference setting | ⏳ |
+| | Filter suggestions by price range | ⏳ |
+| | Price-aware brand selection | ⏳ |
+| | "Similar but cheaper" suggestions | ⏳ |
+| **Seasonal/Occasion Filters** | | ⏳ |
+| | Season detection (current weather/date) | ⏳ |
+| | Occasion selector (casual, work, formal, etc.) | ⏳ |
+| | Context-aware prompt adjustments | ⏳ |
+| | Holiday/event themed suggestions | ⏳ |
+| **Multiple Outfit Options** | | ⏳ |
+| | Generate 3 alternative outfit combinations | ⏳ |
+| | Carousel/tabs for outfit switching | ⏳ |
+| | "More like this" / "Less like this" feedback | ⏳ |
+| | Style comparison view | ⏳ |
+| **Outfit History** | | ⏳ |
+| | Track past widget generations | ⏳ |
+| | Save favorite suggestions | ⏳ |
+| | "You might also like" based on history | ⏳ |
+| | Suggestion deduplication | ⏳ |
+
+### Epic 3.6: AI Pin Generation ⏳
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Search-Based Pin Generation** | | ⏳ |
+| | Search input modal with query field | ⏳ |
+| | AI-powered web search for relevant content | ⏳ |
+| | Preview search results before adding | ⏳ |
+| | Bulk add from search results | ⏳ |
+| | AI auto-categorization on add | ⏳ |
+| **Category-Based Generation** | | ⏳ |
+| | "Suggest pins for this category" action | ⏳ |
+| | AI analyzes existing category content | ⏳ |
+| | Generate complementary suggestions | ⏳ |
+| | Source from curated databases/APIs | ⏳ |
+| | One-click add suggested pins | ⏳ |
+| **Prompt-Based Generation** | | ⏳ |
+| | Free-form prompt input field | ⏳ |
+| | AI interprets intent and finds content | ⏳ |
+| | Natural language queries ("find minimalist furniture") | ⏳ |
+| | Generate pins matching prompt criteria | ⏳ |
+| | Refine results with follow-up prompts | ⏳ |
+| **Content-Based Generation** | | ⏳ |
+| | "More like this" action on any pin | ⏳ |
+| | AI finds similar content across web | ⏳ |
+| | Style/aesthetic matching algorithm | ⏳ |
+| | Generate variations based on pin attributes | ⏳ |
 
 ---
 
@@ -229,7 +343,35 @@
 | | Show @username on shared boards | ⏳ |
 | | Username edit in settings | ⏳ |
 
-### Epic 4.3: Collaborative Boards 🔄
+### Epic 4.3: Multiple Boards ⏳
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Create New Board** | | ⏳ |
+| | "New Board" button in board switcher | ⏳ |
+| | Board creation modal with name input | ⏳ |
+| | Choose board type (moodboard vs. folder) | ⏳ |
+| | Set default category behavior | ⏳ |
+| | Create board in local storage / Supabase | ⏳ |
+| | Navigate to new empty board | ⏳ |
+| **Rename Board** | | ⏳ |
+| | Board settings/edit action in header | ⏳ |
+| | Inline rename functionality | ⏳ |
+| | Update board name in storage | ⏳ |
+| | Sync rename across devices | ⏳ |
+| **Moodboard vs. Folder Concept** | | ⏳ |
+| | Define moodboard behavior (visual-first, grid-focused) | ⏳ |
+| | Define folder behavior (organized, category-focused) | ⏳ |
+| | Different default layouts per type | ⏳ |
+| | Type indicator in board switcher | ⏳ |
+| | Convert between types option | ⏳ |
+| **Board Management** | | ⏳ |
+| | Delete board with confirmation | ⏳ |
+| | Duplicate/clone board | ⏳ |
+| | Board ordering/reordering | ⏳ |
+| | Archive inactive boards | ⏳ |
+
+### Epic 4.4: Collaborative Boards 🔄
 
 **Current Sprint Focus: 2026-02-04 to 2026-02-18**
 
@@ -363,6 +505,8 @@
 | **Theme Settings** | | ✅ |
 | | Dark/Light/System toggle | ✅ |
 | | Persist in localStorage | ✅ |
+| | Remove light/dark toggle from main navigation | ⏳ |
+| | Keep theme toggle only in settings panel | ⏳ |
 | **Widget Preferences** | | ⏳ |
 | | Favorite/hide widgets | ⏳ |
 | | Restore hidden widgets | ⏳ |
@@ -419,7 +563,29 @@
 | | Sort by name | ⏳ |
 | | Sort by domain | ⏳ |
 
-### Epic 5.5: Authentication Enhancements ⏳
+### Epic 5.5: Bulk Operations ⏳
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Bulk Add Links** | | ⏳ |
+| | Multi-line paste detection and parsing | ⏳ |
+| | Preview all extracted URLs before adding | ⏳ |
+| | Batch enrichment with progress indicator | ⏳ |
+| | Conflict/duplicate resolution UI | ⏳ |
+| | Bulk category assignment option | ⏳ |
+| | Cancel mid-batch capability | ⏳ |
+| **Bulk Selection Mode** | | ⏳ |
+| | Toggle selection mode in header | ⏳ |
+| | Click to select multiple pins | ⏳ |
+| | "Select all" / "Select none" actions | ⏳ |
+| | Selection count indicator | ⏳ |
+| **Bulk Actions** | | ⏳ |
+| | Move selected to category | ⏳ |
+| | Move selected to different board | ⏳ |
+| | Delete selected with confirmation | ⏳ |
+| | Export selected as JSON/CSV | ⏳ |
+
+### Epic 5.6: Authentication Enhancements ⏳
 
 | Story | Tasks | Status |
 |-------|-------|--------|
@@ -492,25 +658,59 @@
 | | Browser bookmarks HTML | ⏳ |
 | | AI categorization on import | ⏳ |
 
-### Epic 7.3: Mobile App ⏳
+### Epic 7.3: Mobile App (iOS First) ⏳
 
 | Story | Tasks | Status |
 |-------|-------|--------|
 | **App Foundation** | | ⏳ |
-| | Choose framework (RN/Flutter/PWA) | ⏳ |
-| | Supabase authentication | ⏳ |
-| | Main board view | ⏳ |
-| | Pull-to-refresh | ⏳ |
-| | Offline caching | ⏳ |
-| **Quick Save Shortcut** | | ⏳ |
-| | iOS Share Extension | ⏳ |
-| | Android Share Intent | ⏳ |
+| | Choose framework (Swift native vs React Native) | ⏳ |
+| | Supabase SDK integration | ⏳ |
+| | Authentication flow (magic link + OAuth) | ⏳ |
+| | Offline-first architecture | ⏳ |
+| | Sync engine for local/cloud data | ⏳ |
+| **iOS Share Extension** | | ⏳ HIGH PRIORITY |
+| | Create Share Extension target | ⏳ |
+| | Accept URLs from any app | ⏳ |
+| | Quick board selector | ⏳ |
 | | Quick category picker | ⏳ |
-| | Haptic feedback | ⏳ |
+| | Background enrichment after share | ⏳ |
+| | Haptic feedback on save | ⏳ |
+| | "Saved!" confirmation animation | ⏳ |
+| **Board Viewing** | | ⏳ |
+| | Grid layout matching web | ⏳ |
+| | Category filter bar (horizontal scroll) | ⏳ |
+| | Board switcher | ⏳ |
+| | Pull-to-refresh | ⏳ |
+| | Tap to expand pin details | ⏳ |
+| | Swipe gestures for navigation | ⏳ |
+| **Board Editing** | | ⏳ |
+| | Add new pins (paste or share) | ⏳ |
+| | Edit pin metadata | ⏳ |
+| | Delete pins with swipe | ⏳ |
+| | Change pin category | ⏳ |
+| | Move pins between boards | ⏳ |
+| | Drag to reorder | ⏳ |
 | **Home Screen Widget** | | ⏳ |
-| | iOS WidgetKit | ⏳ |
+| | iOS WidgetKit integration | ⏳ |
+| | Recent pins widget (small/medium/large) | ⏳ |
+| | Quick add widget | ⏳ |
+| | Category shortcut widgets | ⏳ |
+
+### Epic 7.4: Android App ⏳
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **App Foundation** | | ⏳ |
+| | Port from iOS or cross-platform build | ⏳ |
+| | Material Design adaptation | ⏳ |
+| | Android-specific auth flow | ⏳ |
+| **Share Intent** | | ⏳ |
+| | Register as share target | ⏳ |
+| | Accept URLs from any app | ⏳ |
+| | Quick save flow | ⏳ |
+| **App Widgets** | | ⏳ |
 | | Android App Widgets | ⏳ |
-| | Recent links display | ⏳ |
+| | Recent pins display | ⏳ |
 
 ---
 
@@ -524,6 +724,33 @@
 | Music links (Spotify, SoundCloud) - album art, artist info, audio preview | ⏳ |
 | Direct image upload to Supabase Storage | ⏳ |
 | Direct video upload with compression | ⏳ |
+| **Notes Support** - Add text notes as pins without URLs | ⏳ |
+| **Photo Upload** - Add photos directly (not just links) | ⏳ |
+| **Video Upload** - Upload video files with player | ⏳ |
+| Note/media pin visual differentiation | ⏳ |
+
+### Content Reader ⏳
+
+| Story | Status |
+|-------|--------|
+| **PDF Reader** | ⏳ |
+| Detect PDF links and content type | ⏳ |
+| Inline PDF preview in expanded view | ⏳ |
+| Full-screen PDF reader mode | ⏳ |
+| Extract text/images for thumbnails | ⏳ |
+| **Newsletter Reader** | ⏳ |
+| Detect newsletter/email content | ⏳ |
+| Clean reader view (strip tracking/formatting) | ⏳ |
+| Save newsletter as readable text | ⏳ |
+| **Article Reader** | ⏳ |
+| News article detection | ⏳ |
+| Reader mode (clean article extraction) | ⏳ |
+| Save article text locally | ⏳ |
+| Offline reading support | ⏳ |
+| **Text View Mode** | ⏳ |
+| Toggle between visual and text-focused views | ⏳ |
+| Text-heavy content card design | ⏳ |
+| Reading time estimates | ⏳ |
 
 ### Advanced AI Features ⏳
 
@@ -585,13 +812,13 @@
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 18 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 12 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 28 | 0 | 12 | 0 |
-| Phase 4: Sharing & Collaboration | 8 | 8 | 52 | 2 |
-| Phase 5: UX Polish | 13 | 0 | 42 | 0 |
+| Phase 3: AI Intelligence | 28 | 0 | 68 | 0 |
+| Phase 4: Sharing & Collaboration | 8 | 8 | 72 | 2 |
+| Phase 5: UX Polish | 13 | 0 | 60 | 0 |
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
-| Phase 7: Platform Expansion | 0 | 0 | 22 | 0 |
-| Backlog | 0 | 0 | 30 | 0 |
-| **TOTAL** | **80** | **8** | **167** | **2** |
+| Phase 7: Platform Expansion | 0 | 0 | 46 | 0 |
+| Backlog | 0 | 0 | 52 | 0 |
+| **TOTAL** | **80** | **8** | **307** | **2** |
 
 ---
 
