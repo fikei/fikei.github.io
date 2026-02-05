@@ -27,22 +27,56 @@
       "title": "User Experience",
       "icon": "🎨",
       "children": [
-        { "title": "CTRL Design System", "icon": "🎨", "file": "design-system/README.md" },
-        { "title": "Grid Layout & Display", "icon": "📐" },
-        { "title": "Authentication & Accounts", "icon": "🔐" },
-        { "title": "Add Links", "icon": "➕" },
-        { "title": "Link Management", "icon": "🔗" },
-        { "title": "Categories & Filtering", "icon": "🏷️" },
-        { "title": "Content Type System", "icon": "📦" },
-        { "title": "AI Widgets", "icon": "🤖" },
-        { "title": "Link Enrichment", "icon": "✨" },
-        { "title": "Sharing & Collaboration", "icon": "👥" },
-        { "title": "Data Sync", "icon": "🔄" },
-        { "title": "Settings & Preferences", "icon": "⚙️" },
-        { "title": "Admin Panel", "icon": "🛠️" },
-        { "title": "Keyboard Shortcuts", "icon": "⌨️" },
-        { "title": "Mobile Experience", "icon": "📱" },
-        { "title": "Error Handling", "icon": "⚠️" }
+        {
+          "title": "Components",
+          "icon": "🧩",
+          "children": [
+            {
+              "title": "Pins",
+              "icon": "📌",
+              "children": [
+                { "title": "Content Types", "icon": "📦", "file": "docs/ux/pins/content-types.md" },
+                { "title": "Link Enrichment", "icon": "✨", "file": "docs/ux/pins/link-enrichment.md" },
+                { "title": "Add Links", "icon": "➕", "file": "docs/ux/pins/add-links.md" },
+                { "title": "Link Management", "icon": "🔗", "file": "docs/ux/pins/link-management.md" }
+              ]
+            },
+            {
+              "title": "Widgets",
+              "icon": "🤖",
+              "children": [
+                { "title": "AI Recommendations", "icon": "💡", "file": "docs/ux/widgets/ai-recommendations.md" },
+                { "title": "Widget Preferences", "icon": "⚙️", "file": "docs/ux/widgets/widget-preferences.md" }
+              ]
+            },
+            {
+              "title": "Boards",
+              "icon": "📋",
+              "children": [
+                { "title": "Categories & Filtering", "icon": "🏷️", "file": "docs/ux/boards/categories-filtering.md" },
+                { "title": "Grid Layout & Display", "icon": "📐", "file": "docs/ux/boards/grid-layout.md" },
+                { "title": "Sharing & Collaboration", "icon": "👥", "file": "docs/ux/boards/sharing.md" }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Actions",
+          "icon": "⚡",
+          "children": [
+            {
+              "title": "User Profiles & Roles",
+              "icon": "👤",
+              "children": [
+                { "title": "Authentication", "icon": "🔐", "file": "docs/ux/users/authentication.md" },
+                { "title": "Onboarding", "icon": "🚀", "file": "docs/ux/users/onboarding.md" },
+                { "title": "Settings & Preferences", "icon": "⚙️", "file": "docs/ux/users/settings.md" }
+              ]
+            },
+            { "title": "Admin Panel", "icon": "🛠️", "file": "docs/ux/admin-panel.md" }
+          ]
+        },
+        { "title": "CTRL Design System", "icon": "🎨", "file": "design-system/README.md" }
       ]
     },
     {
