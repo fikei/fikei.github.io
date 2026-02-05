@@ -535,6 +535,16 @@
 | AI image generation for missing thumbnails | ⏳ |
 | User-customizable AI prompts | ⏳ |
 
+### Category Sub-Tags ⏳
+
+| Story | Status |
+|-------|--------|
+| Show sub-category tags when filtering (e.g., "Wear" → shirts, pants, shoes, outerwear, rings) | ⏳ |
+| AI-detect item type from image/metadata for auto-tagging | ⏳ |
+| Sub-tag filter bar (click tag to filter within category) | ⏳ |
+| Manual tag editing on pins | ⏳ |
+| Tag hierarchy per category (wear: tops/bottoms/footwear/accessories) | ⏳ |
+
 ### Admin Enhancements ⏳
 
 | Story | Status |
