@@ -2497,10 +2497,10 @@ body {
   color: var(--muted);
 }
 
-/* Complete the Look v2 - Two Column Layout */
+/* Complete the Look v2 - Nested Card Layout */
 .widget-complete {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
+  background: var(--bg);
+  border: 1px solid var(--fg);
   padding: var(--space-4);
 }
 
@@ -2511,16 +2511,44 @@ body {
   margin-bottom: var(--space-4);
 }
 
+.widget-complete__header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .widget-complete__title {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-base);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--fg);
 }
 
-.widget-complete__subtitle {
+.widget-complete__badge {
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.widget-complete__refresh-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: var(--font-size-base);
   color: var(--muted);
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.widget-complete__refresh-btn:hover {
+  color: var(--fg);
 }
 
 .widget-complete__body {
@@ -2536,14 +2564,6 @@ body {
   gap: var(--space-3);
 }
 
-.widget-complete__section-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin-bottom: var(--space-1);
-}
 
 .widget-complete__divider {
   width: 1px;
@@ -2710,92 +2730,6 @@ body {
   font-style: normal;
 }
 
-.widget-complete__actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.widget-complete__action {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
-  transition: all 0.15s ease;
-}
-
-.widget-complete__action:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--bg-elevated);
-}
-
-.widget-complete__action--active {
-  color: #f59e0b;
-  border-color: #f59e0b;
-}
-
-.widget-complete__action--danger:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-}
-
-.widget-complete--favorite {
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
-}
-
-.widget-complete__refresh {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  transition: all 0.15s ease;
-}
-
-.widget-complete__refresh:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.widget-complete__feedback {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-top: 1px solid var(--border);
-  margin-top: var(--space-3);
-}
-
-.widget-complete__feedback-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-  margin-right: auto;
-}
-
-.widget-complete__feedback-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.15s ease;
-}
-
-.widget-complete__feedback-btn:hover {
-  border-color: var(--accent);
-  background: var(--bg-elevated);
-}
 
 .widget-complete__shop-link {
   display: inline-flex;
@@ -3917,35 +3851,8 @@ Return JSON:
     } catch {}
   }
 
-  // Toggle favorite status
-  window.toggleWidgetFavorite = function(widgetId) {
-    widgetPrefs.favorites[widgetId] = !widgetPrefs.favorites[widgetId];
-    if (!widgetPrefs.favorites[widgetId]) delete widgetPrefs.favorites[widgetId];
-    saveWidgetPrefs();
-    generateWidgets();
-    console.log('[widget] Favorite toggled:', widgetId, widgetPrefs.favorites[widgetId] ? 'on' : 'off');
-  };
-
-  // Dismiss widget (hide until next session or manual restore)
-  window.dismissWidget = function(widgetId) {
-    widgetPrefs.dismissed[widgetId] = Date.now();
-    saveWidgetPrefs();
-    generateWidgets();
-    console.log('[widget] Dismissed:', widgetId);
-  };
-
-  // Permanently hide widget
-  window.hideWidget = function(widgetId) {
-    if (confirm('Hide this widget permanently? You can restore it from Settings.')) {
-      widgetPrefs.hidden[widgetId] = true;
-      saveWidgetPrefs();
-      generateWidgets();
-      console.log('[widget] Hidden:', widgetId);
-    }
-  };
-
   // ============================================
-  // Widget Feedback System - Collects user input for PRD improvements
+  // Widget Feedback System - User preferences for personalization
   // ============================================
   const WIDGET_FEEDBACK_KEY = 'boards_widget_feedback';
   let widgetFeedback = { ratings: {}, comments: [], userPrefs: {} };
@@ -3968,36 +3875,6 @@ Return JSON:
       localStorage.setItem(WIDGET_FEEDBACK_KEY, JSON.stringify(widgetFeedback));
     } catch {}
   }
-
-  // Rate a widget result (thumbs up/down)
-  window.rateWidget = function(widgetId, isPositive) {
-    if (!widgetFeedback.ratings[widgetId]) {
-      widgetFeedback.ratings[widgetId] = { up: 0, down: 0 };
-    }
-    if (isPositive) {
-      widgetFeedback.ratings[widgetId].up++;
-    } else {
-      widgetFeedback.ratings[widgetId].down++;
-    }
-    saveWidgetFeedback();
-    toast(isPositive ? 'Thanks for the feedback!' : 'We\'ll try to do better');
-    console.log('[widget] Feedback:', widgetId, isPositive ? '👍' : '👎', widgetFeedback.ratings[widgetId]);
-  };
-
-  // Submit text feedback for a widget
-  window.submitWidgetFeedback = function(widgetId) {
-    const text = prompt('How can we improve this widget? What would you like to see?');
-    if (text && text.trim()) {
-      widgetFeedback.comments.push({
-        widgetId,
-        text: text.trim(),
-        timestamp: Date.now()
-      });
-      saveWidgetFeedback();
-      toast('Feedback saved - thank you!');
-      console.log('[widget] Comment saved:', widgetId, text);
-    }
-  };
 
   // Set user preferences for widget personalization
   window.setWidgetPreferences = function() {
@@ -4345,44 +4222,23 @@ Return JSON:
       }
     }
 
-    const subtitle = aiResult?.reasoning ? esc(aiResult.reasoning).slice(0, 50) + '...' :
-      dominantTier !== 'mainstream' ? `${dominantTier.charAt(0).toUpperCase() + dominantTier.slice(1)} picks` : 'From your collection';
-
-    const isFavorite = widgetPrefs.favorites[widget.id];
-
     return `
-      <div class="widget-complete ${isFavorite ? 'widget-complete--favorite' : ''}" data-widget-id="${widget.id}">
+      <div class="widget-complete" data-widget-id="${widget.id}">
         <div class="widget-complete__header">
-          <div>
+          <div class="widget-complete__header-left">
             <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__subtitle">${subtitle}</span>
+            <span class="widget-complete__badge">AI</span>
           </div>
-          <div class="widget-complete__actions">
-            <button class="widget-complete__action ${isFavorite ? 'widget-complete__action--active' : ''}" onclick="toggleWidgetFavorite('${widget.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-              ${isFavorite ? '★' : '☆'}
-            </button>
-            <button class="widget-complete__action" onclick="refreshWidget('${widget.id}')" title="Get new suggestions">↻</button>
-            <button class="widget-complete__action" onclick="dismissWidget('${widget.id}')" title="Dismiss for now">✕</button>
-            <button class="widget-complete__action widget-complete__action--danger" onclick="hideWidget('${widget.id}')" title="Hide permanently">🚫</button>
-          </div>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">↻</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Your Outfit</div>
             <div class="widget-complete__items">${userItemsHtml}</div>
           </div>
           <div class="widget-complete__divider"></div>
           <div class="widget-complete__section">
-            <div class="widget-complete__section-title">Complete With</div>
             <div class="widget-complete__items">${suggestionsHtml}</div>
           </div>
-        </div>
-        <div class="widget-complete__feedback">
-          <span class="widget-complete__feedback-label">Was this helpful?</span>
-          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', true)" title="Good suggestions">👍</button>
-          <button class="widget-complete__feedback-btn" onclick="rateWidget('${widget.id}', false)" title="Not helpful">👎</button>
-          <button class="widget-complete__feedback-btn" onclick="submitWidgetFeedback('${widget.id}')" title="Share feedback">💬</button>
-          <button class="widget-complete__feedback-btn" onclick="setWidgetPreferences()" title="Set your preferences">⚙️</button>
         </div>
       </div>`;
   }
