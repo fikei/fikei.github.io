@@ -59,11 +59,17 @@ jobs:
         run: |
           echo "🔍 Detecting changed files..."
 
-          # Manual trigger always does full sync
+          # Manual trigger - only full sync if force_full_sync is true
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "🔄 Manual trigger - will sync all pages"
-            echo "structure_changed=true" >> $GITHUB_OUTPUT
-            git ls-files > /tmp/changed_files.txt
+            if [ "$FORCE_SYNC" = "true" ]; then
+              echo "🔄 Manual trigger with force_full_sync - will sync all pages"
+              echo "structure_changed=true" >> $GITHUB_OUTPUT
+              git ls-files > /tmp/changed_files.txt
+            else
+              echo "📋 Manual trigger (no force) - no files changed"
+              echo "structure_changed=false" >> $GITHUB_OUTPUT
+              echo "" > /tmp/changed_files.txt
+            fi
             exit 0
           fi
 
