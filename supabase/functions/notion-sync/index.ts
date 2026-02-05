@@ -135,6 +135,23 @@ class NotionClient {
     return children
   }
 
+  // Check if a page is empty (no content, or only child pages)
+  async isPageEmpty(pageId: string): Promise<boolean> {
+    try {
+      const results = await this.request(`/blocks/${pageId}/children?page_size=100`)
+
+      // A page is empty if it has no blocks, or only child_page blocks
+      const contentBlocks = results.results.filter(
+        (block: any) => block.type !== 'child_page'
+      )
+
+      return contentBlocks.length === 0
+    } catch (e) {
+      // If we can't read it, assume it's not empty (safer)
+      return false
+    }
+  }
+
   async findOrCreateChildPage(
     parentId: string,
     title: string,
@@ -932,8 +949,26 @@ async function cleanupLegacyPages(
         const pageSource = pageSources[title] || 'human'  // Default to human (protected)
 
         if (protectHuman && pageSource === 'human') {
-          // Human-created page - protect from deletion
-          result.protected.push(`Protected (human-created): ${pagePath}`)
+          // Human-created page - check if it's empty before protecting
+          const isEmpty = await client.isPageEmpty(pageId)
+
+          if (isEmpty) {
+            // Human-created but empty (title only) - delete it
+            if (dryRun) {
+              result.deleted.push(`[DRY RUN] Would delete empty human page: ${pagePath}`)
+            } else {
+              try {
+                await client.movePage(pageId, archiveFolderId!)
+                result.deleted.push(`Deleted empty human page: ${pagePath}`)
+                await new Promise(resolve => setTimeout(resolve, 150))
+              } catch (error) {
+                result.errors.push(`Failed to delete '${pagePath}': ${error.message}`)
+              }
+            }
+          } else {
+            // Human-created with content - protect from deletion
+            result.protected.push(`Protected (human-created with content): ${pagePath}`)
+          }
           continue
         }
 
