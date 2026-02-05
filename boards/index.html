@@ -3072,9 +3072,6 @@ body {
   <nav class="bottom-nav" id="bottomNav">
     <div class="bottom-nav__left">
       <button class="bottom-nav__share-btn" id="shareBtn" style="display:none;">Share</button>
-      <button class="float-btn theme-toggle" id="bottomThemeToggle" aria-label="Toggle theme">
-        <div class="theme-toggle__knob"></div>
-      </button>
     </div>
     <div class="bottom-nav__right">
       <div class="fab-menu" id="fabMenu" style="display:none;">
@@ -6186,7 +6183,6 @@ Return JSON:
   const fabVideoUpload = $('fabVideoUpload');
   const photoInput = $('photoInput');
   const videoInput = $('videoInput');
-  const bottomThemeToggle = $('bottomThemeToggle');
 
   // Progress DOM
   const progressBar = $('progressBar');
@@ -6560,12 +6556,6 @@ Return JSON:
     renderGrid();
     videoInput.value = '';
     toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
-  };
-
-  // Bottom theme toggle
-  bottomThemeToggle.onclick = () => {
-    document.documentElement.classList.toggle('light');
-    localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
   };
 
   addForm.onsubmit = async (e) => {
