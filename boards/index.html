@@ -4645,6 +4645,22 @@ Return JSON:
   // Make openWidgetPrdModal available globally
   window.openWidgetPrdModal = openWidgetPrdModal;
 
+  // Beta feature: enable sub-tags filter bar
+  // Usage: window.enableSubTagsBar() in console
+  window.enableSubTagsBar = function() {
+    showSubTagsBar = true;
+    renderSubTags();
+    console.log('[beta] Sub-tags bar enabled');
+  };
+
+  window.disableSubTagsBar = function() {
+    showSubTagsBar = false;
+    currentSubTag = null;
+    renderSubTags();
+    renderGrid();
+    console.log('[beta] Sub-tags bar disabled');
+  };
+
   // ============================================
   // Image Resolution System
   // ============================================
@@ -5376,6 +5392,7 @@ Return JSON:
   };
 
   let currentSubTag = null; // Current sub-tag filter
+  let showSubTagsBar = false; // Beta feature - enable via: window.enableSubTagsBar()
 
   // Detect sub-tag from link title/description
   function detectSubTag(link) {
@@ -6172,6 +6189,13 @@ Return JSON:
     const subTagsEl = $('subTags');
     if (!subTagsEl) return;
 
+    // Beta feature - hide bar unless explicitly enabled
+    // Enable via console: window.enableSubTagsBar()
+    if (!showSubTagsBar) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      return;
+    }
+
     // Hide if "all" or no sub-tags for this category
     if (currentFilter === 'all' || !SUB_TAGS[currentFilter]) {
       subTagsEl.classList.remove('sub-tags--visible');
@@ -6398,19 +6422,26 @@ Return JSON:
         <div class="grid-item__resize" data-action="resize"></div>`;
 
       if (hasImg) {
+        // Show sub-tag when filtered into a category, otherwise show category
+        const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
+          ? (getSubTag(l) || l.category)
+          : l.category;
         html += `<article class="grid-item${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
-          <span class="grid-item__category">${cap(l.category)}</span>
+          <span class="grid-item__category">${cap(displayTag)}</span>
           ${detailsHtml}
         </article>`;
       } else {
+        const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
+          ? (getSubTag(l) || l.category)
+          : l.category;
         html += `<article class="grid-item grid-item--placeholder${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
-          <span class="grid-item__category">${cap(l.category)}</span>
+          <span class="grid-item__category">${cap(displayTag)}</span>
           ${detailsHtml}
         </article>`;
       }
