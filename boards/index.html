@@ -2248,38 +2248,6 @@ body {
   margin: var(--space-2) 0;
 }
 
-.widget-section__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.widget-section__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.widget-section__refresh {
-  background: none;
-  border: none;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  transition: color 0.15s;
-}
-
-.widget-section__refresh:hover {
-  color: var(--fg);
-}
-
 .widget-section__content {
   display: flex;
   flex-direction: column;
@@ -2526,6 +2494,13 @@ body {
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
   align-items: start;
+}
+
+.widget-complete__body--loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80px;
 }
 
 .widget-complete__section {
@@ -2960,10 +2935,6 @@ body {
 
   <!-- AI Widget Section - Hero Zone -->
   <section class="widget-section widget-zone widget-zone--hero" id="widgetSection" data-zone="hero">
-    <div class="widget-section__header">
-      <span class="widget-section__title">AI Insights</span>
-      <button class="widget-section__refresh" id="widgetRefresh">Refresh</button>
-    </div>
     <div class="widget-section__content" id="widgetContent"></div>
   </section>
 
@@ -4306,7 +4277,19 @@ Return JSON:
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
       heroSection.classList.add('widget-section--visible');
-      heroContent.innerHTML = '<div class="widget__loader">Generating insights...</div>';
+      const heroWidget = widgetsByZone.hero[0];
+      heroContent.innerHTML = `
+        <div class="widget-complete" data-widget-id="${heroWidget.id}">
+          <div class="widget-complete__header">
+            <div class="widget-complete__header-left">
+              <span class="widget-complete__title">${heroWidget.name}</span>
+              <span class="widget-complete__badge">AI</span>
+            </div>
+          </div>
+          <div class="widget-complete__body widget-complete__body--loading">
+            <div class="widget__loader">Generating insights...</div>
+          </div>
+        </div>`;
     }
 
     // Generate content for each zone
@@ -4400,7 +4383,18 @@ Return JSON:
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
       if (heroContent) {
-        heroContent.innerHTML = '<div class="widget__loader">Refreshing...</div>';
+        heroContent.innerHTML = `
+          <div class="widget-complete" data-widget-id="${widget.id}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${widget.name}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+            </div>
+            <div class="widget-complete__body widget-complete__body--loading">
+              <div class="widget__loader">Refreshing...</div>
+            </div>
+          </div>`;
       }
     }
 
@@ -4441,21 +4435,6 @@ Return JSON:
     loadWidgetStatus();
     loadWidgetPrefs();
     loadWidgetFeedback();
-
-    const refreshBtn = $('widgetRefresh');
-    if (refreshBtn) {
-      refreshBtn.onclick = () => {
-        // Clear cache for current items to force regeneration
-        const allLinks = getAllLinks();
-        const items = normalizeWearItems(allLinks);
-        const itemIds = items.map(i => i.id).sort().join(',');
-        Object.keys(widgetCache).forEach(key => {
-          if (key.includes(itemIds)) delete widgetCache[key];
-        });
-        saveWidgetCache();
-        generateWidgets();
-      };
-    }
   }
 
   // Render admin widgets panel
