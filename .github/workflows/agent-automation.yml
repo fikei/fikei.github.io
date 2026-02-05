@@ -302,21 +302,21 @@ jobs:
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Structure sync successful"
             # Show what was created/updated and save for content sync
-            echo "$response" | python3 -c "
-import json,sys
-r=json.load(sys.stdin)
-created = r.get('created', [])
-print('Created:', created)
-print('Updated:', r.get('updated', []))
-print('Errors:', r.get('errors', []))
-# Save created page titles for content sync
-with open('/tmp/created_pages.txt', 'w') as f:
-    for page_path in created:
-        # Extract page title from path like 'Execution > Project Plan > Phase 1'
-        title = page_path.split(' > ')[-1] if ' > ' in page_path else page_path
-        f.write(title + '\n')
-print(f'📝 {len(created)} new pages will have content synced')
-"
+            echo "$response" | python3 << 'PYEOF'
+          import json,sys
+          r=json.load(sys.stdin)
+          created = r.get('created', [])
+          print('Created:', created)
+          print('Updated:', r.get('updated', []))
+          print('Errors:', r.get('errors', []))
+          # Save created page titles for content sync
+          with open('/tmp/created_pages.txt', 'w') as f:
+              for page_path in created:
+                  # Extract page title from path like 'Execution > Project Plan > Phase 1'
+                  title = page_path.split(' > ')[-1] if ' > ' in page_path else page_path
+                  f.write(title + '\n')
+          print(str(len(created)) + ' new pages will have content synced')
+          PYEOF
           else
             echo "⚠️ Structure sync had issues"
             > /tmp/created_pages.txt
@@ -420,13 +420,23 @@ print(f'📝 {len(created)} new pages will have content synced')
           update_page() {
             local title="$1"
             local file="$2"
+            local is_new="$3"  # "new" or "changed"
 
             if [ ! -f "$file" ]; then
-              echo "⏭️ Skipping $title (file not found: $file)"
+              echo "⏭️ $title — file not found: $file"
               return 0
             fi
 
-            echo "📄 Updating: $title"
+            # Calculate stats
+            local word_count=$(wc -w < "$file" | tr -d ' ')
+            local line_count=$(wc -l < "$file" | tr -d ' ')
+
+            if [ "$is_new" = "new" ]; then
+              echo "📄 $title — NEW (+${word_count} words)"
+            else
+              echo "📄 $title — syncing ${word_count} words"
+            fi
+
             content=$(head -c 40000 "$file" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
             payload="{\"action\":\"update-page\",\"page\":{\"pageTitle\":\"$title\",\"content\":$content}}"
 
@@ -436,11 +446,13 @@ print(f'📝 {len(created)} new pages will have content synced')
               -d "$payload")
 
             if echo "$response" | grep -q '"success":true'; then
-              echo "  ✅ Updated"
+              # Extract block count from response
+              local blocks=$(echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r.get('updated',[''])[0].split('(')[1].split(' ')[0] if r.get('updated') else '?')" 2>/dev/null || echo "?")
+              echo "   ✅ Done (${blocks} blocks)"
               return 0
             else
-              echo "  ⚠️ Failed (will retry): $title"
-              echo -e "$title\t$file" >> /tmp/failed_pages.txt
+              echo "   ⚠️ Failed — will retry"
+              echo -e "$title\t$file\t$is_new" >> /tmp/failed_pages.txt
               return 1
             fi
           }
@@ -492,27 +504,27 @@ print(f'📝 {len(created)} new pages will have content synced')
 
           if force_full_sync:
               # Sync ALL pages with content (manual trigger only)
-              pages_to_sync = [(title, filepath) for title, filepath in pages if filepath]
+              pages_to_sync = [(title, filepath, 'full') for title, filepath in pages if filepath]
               print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages with content")
           else:
               # Sync pages that: 1) file changed in commit, OR 2) page was just created
               pages_to_sync = []
               for title, filepath in pages:
                   if filepath in changed_files:
-                      pages_to_sync.append((title, filepath))
+                      pages_to_sync.append((title, filepath, 'changed'))
                   elif title in created_page_titles and filepath:
-                      pages_to_sync.append((title, filepath))
+                      pages_to_sync.append((title, filepath, 'new'))
 
-              changed_count = len([p for p in pages_to_sync if p[1] in changed_files])
-              new_count = len(pages_to_sync) - changed_count
+              changed_count = len([p for p in pages_to_sync if p[2] == 'changed'])
+              new_count = len([p for p in pages_to_sync if p[2] == 'new'])
 
               print(f"📋 Incremental sync: {len(pages_to_sync)} pages ({changed_count} changed, {new_count} new)")
               if created_page_titles:
                   print(f"   New pages: {', '.join(sorted(created_page_titles)[:5])}{'...' if len(created_page_titles) > 5 else ''}")
 
           with open('/tmp/pages_to_sync.txt', 'w') as f:
-              for title, filepath in pages_to_sync:
-                  f.write(f"{title}\t{filepath}\n")
+              for title, filepath, status in pages_to_sync:
+                  f.write(f"{title}\t{filepath}\t{status}\n")
 
           if not pages_to_sync:
               print("✨ No pages need content updates")
