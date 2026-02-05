@@ -6,8 +6,9 @@
 // Body: { action: 'sync-structure' | 'update-page', structure?: Structure, page?: PageUpdate }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// Using built-in Web Crypto API (no import needed)
+
+// State tracking disabled temporarily due to bundle size limits
+// import { SyncStateManager, SyncState } from './state-manager.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,164 +71,6 @@ interface SyncResult {
     totalBlocks: number
     failedBlocks: number
     blockTypes: Record<string, number>
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// SYNC STATE MANAGER
-// ═══════════════════════════════════════════════════════════════
-
-interface SyncState {
-  page_path: string
-  notion_page_id: string | null
-  github_hash: string | null
-  notion_last_edited: string | null
-  last_synced_at: string | null
-  sync_direction: 'bidirectional' | 'github-only' | 'notion-only'
-  block_count: number
-  source: 'ai' | 'human'
-}
-
-class SyncStateManager {
-  private supabase: SupabaseClient
-
-  constructor(supabaseUrl: string, supabaseKey: string) {
-    this.supabase = createClient(supabaseUrl, supabaseKey)
-  }
-
-  // Compute SHA-256 hash of content (Web Crypto API)
-  async computeHash(content: string): Promise<string> {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(content)
-    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  }
-
-  // Get sync state for a page
-  async getState(pagePath: string): Promise<SyncState | null> {
-    const { data, error } = await this.supabase
-      .from('sync_state')
-      .select('*')
-      .eq('page_path', pagePath)
-      .single()
-
-    if (error || !data) return null
-    return data as SyncState
-  }
-
-  // Get all sync states
-  async getAllStates(): Promise<SyncState[]> {
-    const { data, error } = await this.supabase
-      .from('sync_state')
-      .select('*')
-
-    if (error || !data) return []
-    return data as SyncState[]
-  }
-
-  // Update or create sync state
-  async upsertState(state: Partial<SyncState> & { page_path: string }): Promise<void> {
-    const { error } = await this.supabase
-      .from('sync_state')
-      .upsert({
-        ...state,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'page_path'
-      })
-
-    if (error) {
-      console.error('Failed to update sync state:', error)
-    }
-  }
-
-  // Check if content has changed (compare hash)
-  async hasContentChanged(pagePath: string, currentContent: string): Promise<boolean> {
-    const state = await this.getState(pagePath)
-    if (!state || !state.github_hash) return true
-
-    const currentHash = await this.computeHash(currentContent)
-    return currentHash !== state.github_hash
-  }
-
-  // Log a sync operation
-  async logSync(
-    operation: 'structure' | 'content' | 'conflict' | 'cleanup',
-    pagePath: string | null,
-    direction: 'github_to_notion' | 'notion_to_github' | 'structure_only',
-    status: 'success' | 'failed' | 'skipped' | 'conflict',
-    blocksChanged: number = 0,
-    details: Record<string, any> = {}
-  ): Promise<void> {
-    const { error } = await this.supabase
-      .from('sync_log')
-      .insert({
-        operation,
-        page_path: pagePath,
-        direction,
-        status,
-        blocks_changed: blocksChanged,
-        details
-      })
-
-    if (error) {
-      console.error('Failed to log sync:', error)
-    }
-  }
-
-  // Get structure hash
-  async getStructureHash(): Promise<string | null> {
-    const { data, error } = await this.supabase
-      .from('structure_state')
-      .select('structure_hash')
-      .eq('id', 1)
-      .single()
-
-    if (error || !data) return null
-    return data.structure_hash
-  }
-
-  // Update structure hash
-  async updateStructureHash(hash: string, pageCount: number): Promise<void> {
-    const { error } = await this.supabase
-      .from('structure_state')
-      .upsert({
-        id: 1,
-        structure_hash: hash,
-        last_synced_at: new Date().toISOString(),
-        page_count: pageCount,
-        updated_at: new Date().toISOString()
-      })
-
-    if (error) {
-      console.error('Failed to update structure hash:', error)
-    }
-  }
-
-  // Get pages that need syncing (changed since last sync)
-  async getDirtyPages(currentHashes: Map<string, string>): Promise<string[]> {
-    const states = await this.getAllStates()
-    const dirtyPages: string[] = []
-
-    for (const state of states) {
-      const currentHash = currentHashes.get(state.page_path)
-
-      // Page is dirty if:
-      // 1. We have new content and hash is different
-      // 2. Never synced before
-      // 3. Notion was edited since last sync
-      if (!state.last_synced_at) {
-        dirtyPages.push(state.page_path)
-      } else if (currentHash && currentHash !== state.github_hash) {
-        dirtyPages.push(state.page_path)
-      } else if (state.notion_last_edited && state.last_synced_at &&
-                 new Date(state.notion_last_edited) > new Date(state.last_synced_at)) {
-        dirtyPages.push(state.page_path)
-      }
-    }
-
-    return dirtyPages
   }
 }
 
@@ -1302,22 +1145,8 @@ async function syncStructure(
             syncedIds.set(title, id)
           }
 
-          // Now update section page with linked TOC
-          if (!skipContent && isSectionPage) {
-            const tocBlocks = generateLinkedTocBlocks(page.title, page.children, childIds)
-            const stats = await client.updatePageWithBlocks(pageId, tocBlocks)
-            if (!created) {
-              result.updated.push(`${pagePath} (${stats.total} blocks, ${stats.failed} failed)`)
-            }
-            // Accumulate debug stats
-            if (result.debug) {
-              result.debug.totalBlocks += stats.total
-              result.debug.failedBlocks += stats.failed
-              for (const [type, count] of Object.entries(stats.types)) {
-                result.debug.blockTypes[type] = (result.debug.blockTypes[type] || 0) + count
-              }
-            }
-          }
+          // TOC generation disabled - section pages are just containers
+          // Child pages appear naturally in Notion's sidebar
         }
 
         // Rate limiting - wait between operations
@@ -1734,26 +1563,6 @@ serve(async (req) => {
           break
         }
 
-        // If state tracking enabled, check if content actually changed
-        let stateManager: SyncStateManager | null = null
-        if (request.useStateTracking) {
-          const supabaseUrl = Deno.env.get('SUPABASE_URL')
-          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-          if (supabaseUrl && supabaseKey) {
-            stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
-
-            // Check if content has changed
-            const pagePath = (request.page as any).filePath || request.page.pageTitle
-            const hasChanged = await stateManager.hasContentChanged(pagePath, request.page.content)
-
-            if (!hasChanged) {
-              result.skipped.push(`${request.page.pageTitle} (no changes detected)`)
-              break
-            }
-          }
-        }
-
         const stats = await client.updatePageContent(pageId, request.page.content)
         result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
 
@@ -1761,29 +1570,6 @@ serve(async (req) => {
           result.debug.totalBlocks = stats.total
           result.debug.failedBlocks = stats.failed
           result.debug.blockTypes = stats.types
-        }
-
-        // Update state if tracking enabled
-        if (stateManager) {
-          const pagePath = (request.page as any).filePath || request.page.pageTitle
-          const contentHash = await stateManager.computeHash(request.page.content)
-
-          await stateManager.upsertState({
-            page_path: pagePath,
-            notion_page_id: pageId,
-            github_hash: contentHash,
-            last_synced_at: new Date().toISOString(),
-            block_count: stats.total
-          })
-
-          await stateManager.logSync(
-            'content',
-            pagePath,
-            'github_to_notion',
-            stats.failed === 0 ? 'success' : 'failed',
-            stats.total,
-            { failed: stats.failed, types: stats.types }
-          )
         }
         break
       }
@@ -1808,55 +1594,11 @@ serve(async (req) => {
         await detectMovedPages(client, detectStructure, result)
         break
 
-      case 'check-changes': {
-        // Phase 1: Check which pages have changed using hash comparison
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-        if (!supabaseUrl || !supabaseKey) {
-          result.errors.push('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured')
-          break
-        }
-
-        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
-
-        // If content hashes provided, check which pages are dirty
-        if (request.contentHashes) {
-          const hashMap = new Map(Object.entries(request.contentHashes))
-          const dirtyPages = await stateManager.getDirtyPages(hashMap)
-
-          // Add dirty pages info to result
-          ;(result as any).dirtyPages = dirtyPages
-          ;(result as any).totalTracked = hashMap.size
-          ;(result as any).changedCount = dirtyPages.length
-        } else {
-          // Just return current state
-          const states = await stateManager.getAllStates()
-          ;(result as any).states = states
-          ;(result as any).stateCount = states.length
-        }
+      case 'check-changes':
+      case 'get-state':
+        // State tracking temporarily disabled due to bundle size limits
+        result.errors.push('State tracking actions temporarily disabled. Use sync-structure or update-page instead.')
         break
-      }
-
-      case 'get-state': {
-        // Get sync state for debugging/monitoring
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-        if (!supabaseUrl || !supabaseKey) {
-          result.errors.push('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured')
-          break
-        }
-
-        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
-        const states = await stateManager.getAllStates()
-        const structureHash = await stateManager.getStructureHash()
-
-        ;(result as any).syncStates = states
-        ;(result as any).structureHash = structureHash
-        ;(result as any).pageCount = states.length
-        break
-      }
 
       default:
         return new Response(
