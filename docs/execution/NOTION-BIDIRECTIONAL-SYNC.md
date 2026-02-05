@@ -185,27 +185,74 @@ As a user, I want to be notified when comments require manual attention.
 
 ## Phase 3: Advanced Features
 
-### Epic 3.1: Selective Sync Control
+### Epic 3.1: Incremental Content Sync
 
-#### Story 3.1.1: Page-Level Sync Settings
+**Goal:** Update only changed blocks instead of replacing entire page content
+
+#### Story 3.1.1: Block-Level Change Detection
+As a system, I need to detect which specific blocks changed rather than replacing all content.
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.1.1.1 | Store block IDs and content hashes in sync state table | pending |
+| 3.1.1.2 | Compare current blocks against stored state to find changes | pending |
+| 3.1.1.3 | Categorize changes as: insert, update, delete, reorder | pending |
+| 3.1.1.4 | Generate minimal change set for sync operation | pending |
+
+#### Story 3.1.2: Incremental Block Updates
+As a system, I need to apply only the changed blocks instead of full page reload.
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.1.2.1 | Use Notion `PATCH /blocks/{id}` for updating existing blocks | pending |
+| 3.1.2.2 | Use Notion `POST /blocks/{id}/children` for inserting new blocks | pending |
+| 3.1.2.3 | Use Notion `DELETE /blocks/{id}` for removing deleted blocks | pending |
+| 3.1.2.4 | Handle block reordering via delete + insert at new position | pending |
+| 3.1.2.5 | Preserve block IDs to maintain Notion comments/links | pending |
+
+#### Story 3.1.3: Markdown Diff to Block Operations
+As a system, I need to convert markdown diffs into Notion block operations.
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.1.3.1 | Parse unified diff output to identify changed lines | pending |
+| 3.1.3.2 | Map line changes to corresponding Notion blocks | pending |
+| 3.1.3.3 | Handle structural changes (new headings, table rows) | pending |
+| 3.1.3.4 | Optimize for minimal API calls (batch where possible) | pending |
+
+#### Story 3.1.4: Sync State Persistence
+As a system, I need to persist block state between syncs for comparison.
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.1.4.1 | Create `notion_block_state` table with block_id, page_id, content_hash | pending |
+| 3.1.4.2 | Update state after each successful sync | pending |
+| 3.1.4.3 | Handle state recovery if sync fails mid-operation | pending |
+| 3.1.4.4 | Add cleanup job for orphaned block states | pending |
+
+---
+
+### Epic 3.2: Selective Sync Control
+
+#### Story 3.2.1: Page-Level Sync Settings
 As a user, I want to control which pages sync bidirectionally.
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 3.1.1.1 | Add `sync: bidirectional | github-only | notion-only` to structure | pending |
-| 3.1.1.2 | Respect sync settings in both directions | pending |
-| 3.1.1.3 | Default human pages to bidirectional, AI pages to github-only | pending |
+| 3.2.1.1 | Add `sync: bidirectional | github-only | notion-only` to structure | pending |
+| 3.2.1.2 | Respect sync settings in both directions | pending |
+| 3.2.1.3 | Default human pages to bidirectional, AI pages to github-only | pending |
 
-### Epic 3.2: Sync History & Audit
+### Epic 3.3: Sync History & Audit
 
-#### Story 3.2.1: Sync Activity Log
+#### Story 3.3.1: Sync Activity Log
 As a user, I want to see a history of sync operations.
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 3.2.1.1 | Create `notion_sync_log` table in Supabase | pending |
-| 3.2.1.2 | Log all sync operations with timestamps and changes | pending |
-| 3.2.1.3 | Add `get-sync-history` action to retrieve recent activity | pending |
+| 3.3.1.1 | Create `notion_sync_log` table in Supabase | pending |
+| 3.3.1.2 | Log all sync operations with timestamps and changes | pending |
+| 3.3.1.3 | Add `get-sync-history` action to retrieve recent activity | pending |
 
 ---
 
@@ -236,6 +283,20 @@ CREATE TABLE notion_sync_state (
   last_github_edit TIMESTAMP,
   sync_direction TEXT DEFAULT 'bidirectional'
 );
+
+-- Track block state for incremental sync (Phase 3)
+CREATE TABLE notion_block_state (
+  block_id TEXT PRIMARY KEY,
+  page_id TEXT REFERENCES notion_sync_state(page_id),
+  block_type TEXT,
+  content_hash TEXT,
+  position INTEGER,
+  parent_block_id TEXT,
+  last_synced_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_block_state_page ON notion_block_state(page_id);
 
 -- Log sync operations
 CREATE TABLE notion_sync_log (
