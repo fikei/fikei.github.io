@@ -4,6 +4,35 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-05] - NotionSync Pre-Phase: System Cleanup & PRD Rewrite
+
+### Added
+- **Modular code architecture** for notion-sync edge function:
+  - `types.ts` — TypeScript interfaces for all Notion API responses, requests, and sync types
+  - `markdown.ts` — Extracted markdown-to-Notion-blocks converter as standalone module (+ strikethrough support)
+  - `validator.ts` — Schema validation for notion-structure.json (file paths, duplicates, depth, sources)
+  - `logger.ts` — Structured logging with levels, context, and summary metrics
+- **NOTION-SYNC-GUIDE.md** — Full operational guide: actions reference, troubleshooting, architecture, setup
+- **Workflow metrics summary** — New "Sync Summary" step in agent-automation.yml showing duration, API calls, pages
+- **Workflow claude/* branch support** — notion-sync now runs on claude/* branches too
+
+### Changed
+- **Removed DEFAULT_STRUCTURE** — System is now fully root-agnostic, no hardcoded Notion page names
+- **Structure is required** — `sync-structure`, `create-structure`, `cleanup`, and `detect-moves` now require structure in request body (no silent fallback)
+- **Root page resolution** — Checked from: request body > env var > structure.root > error (clear precedence)
+- **All actions return `metrics`** — duration, API calls, blocks created/failed in every response
+- **PRD rewritten** around three pillars: Documentation Creation, Documentation Management, Documentation Sync
+  - Added Doc Management Agent phases (staleness detection, auto-cleanup, structure health)
+  - Added Comment-Driven Updates phase (commands, free-form, intent parsing, reply & resolution)
+  - Added default vs variable structure template system (project type templates)
+  - Marked all pre-phase tasks as complete
+
+### Fixed
+- Unused variable warnings (`_e` prefix for caught errors)
+- Removed duplicate "Content Type System" from default structure (structure removed entirely)
+
+---
+
 ## [2026-02-05] - Widget Phase 2: Config-Generated Widgets
 
 ### Added

@@ -43,7 +43,7 @@ env:
 jobs:
   # Sync to Notion on master/main push or manual trigger
   notion-sync:
-    if: (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')) || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/'))) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -676,6 +676,66 @@ jobs:
           echo "═══════════════════════════════════════════"
           echo "✅ SYNC COMPLETE"
           echo "═══════════════════════════════════════════"
+
+      - name: Sync Summary
+        if: always() && env.SUPABASE_URL != ''
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "📊 SYNC SUMMARY"
+          echo "═══════════════════════════════════════════"
+          echo ""
+
+          # Parse structure response if available
+          if [ -f /tmp/structure_response.json ]; then
+            python3 << 'PYEOF'
+          import json
+          try:
+              with open('/tmp/structure_response.json') as f:
+                  r = json.load(f)
+              created = len(r.get('created', []))
+              updated = len(r.get('updated', []))
+              skipped = len(r.get('skipped', []))
+              errors = len(r.get('errors', []))
+              deleted = len(r.get('deleted', []))
+              protected_pages = len(r.get('protected', []))
+              metrics = r.get('metrics', {})
+
+              print("Structure Sync:")
+              print(f"  Created:   {created}")
+              print(f"  Skipped:   {skipped}")
+              if errors:
+                  print(f"  Errors:    {errors}")
+              if metrics:
+                  print(f"  Duration:  {metrics.get('durationMs', '?')}ms")
+                  print(f"  API calls: {metrics.get('apiCalls', '?')}")
+          except Exception as e:
+              print(f"  Could not parse structure response: {e}")
+          PYEOF
+          fi
+
+          # Count content sync results
+          if [ -f /tmp/pages_to_sync.json ]; then
+            TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pages_to_sync.json'))))" 2>/dev/null || echo "?")
+            echo ""
+            echo "Content Sync:"
+            echo "  Pages synced: $TOTAL"
+          fi
+
+          echo ""
+          echo "Root page: $(python3 -c "import json; print(json.load(open('notion-structure.json')).get('root', '?'))" 2>/dev/null || echo "?")"
+          echo "Total pages in structure: $(python3 -c "
+          import json
+          def count(obj):
+              c = 0
+              if isinstance(obj, dict):
+                  if 'title' in obj: c += 1
+                  for k in ['children', 'sections']:
+                      if k in obj:
+                          for child in obj[k]: c += count(child)
+              return c
+          print(sum(count(s) for s in json.load(open('notion-structure.json')).get('sections', [])))
+          " 2>/dev/null || echo "?")"
 
   # Triggered on every push - quick status and security check
   on-push:

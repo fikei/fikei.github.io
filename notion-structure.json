@@ -356,6 +356,12 @@
               "icon": "\ud83d\udd04",
               "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
               "source": "ai"
+            },
+            {
+              "title": "Notion Sync Guide",
+              "icon": "\ud83d\udcd6",
+              "file": "docs/infrastructure/NOTION-SYNC-GUIDE.md",
+              "source": "ai"
             }
           ]
         }
