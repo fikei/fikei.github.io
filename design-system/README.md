@@ -358,16 +358,16 @@ Button group for admin panel sections.
 
 ### AI Widget Card
 
-Standardized container for AI-powered recommendation widgets.
+Standardized container for AI-powered recommendation widgets. Header sits outside the content box.
 
 ```html
 <div class="widget-complete" data-widget-id="widget-123">
   <div class="widget-complete__header">
     <div class="widget-complete__header-left">
-      <span class="widget-complete__title">Complete the Look</span>
+      <span class="widget-complete__title">Style Summary</span>
       <span class="widget-complete__badge">AI</span>
     </div>
-    <button class="widget-complete__refresh-btn" onclick="refreshWidget('widget-123')" title="Refresh suggestions">↻</button>
+    <button class="widget-complete__refresh-btn" onclick="refreshWidget('widget-123')" title="Refresh suggestions">⟳</button>
   </div>
   <div class="widget-complete__body">
     <!-- Widget-specific content goes here -->
@@ -375,13 +375,28 @@ Standardized container for AI-powered recommendation widgets.
 </div>
 ```
 
+**Structure:**
+```
+WIDGET TITLE   [AI]                         ⟳   ← Header (outside box)
+┌─────────────────────────────────────────────┐
+│  Widget content                             │  ← Body (bordered box)
+└─────────────────────────────────────────────┘
+```
+
 **AI Widget Card behavior:**
-- Outer border with padding, no inner section borders
-- Header: Title (left) + AI badge (inline) + Refresh button (floating right)
+- Outer wrapper: no border, contains header + body
+- Header: Title (muted, xs) + AI badge (outline) + Refresh icon (16px, floating right)
 - AI badge: outline style (transparent bg, muted border), 9px uppercase
-- Refresh button: icon only, no border, muted color, hover effect
-- Body: holds widget-specific content (items, sections, etc.)
-- All AI widgets use this same outer structure for consistency
+- Refresh icon: ⟳ character, 16px, muted color, hover effect
+- Body: bordered box (--subtle border, --surface bg) holds widget content
+- Loading state: use `.widget-complete__body--loading` for centered loader
+
+**Loading state:**
+```html
+<div class="widget-complete__body widget-complete__body--loading">
+  <div class="widget__loader">Generating insights...</div>
+</div>
+```
 
 **Variants:**
 
