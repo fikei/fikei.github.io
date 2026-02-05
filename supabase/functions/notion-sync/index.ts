@@ -6,7 +6,9 @@
 // Body: { action: 'sync-structure' | 'update-page', structure?: Structure, page?: PageUpdate }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { SyncStateManager, SyncState } from './state-manager.ts'
+
+// State tracking disabled temporarily due to bundle size limits
+// import { SyncStateManager, SyncState } from './state-manager.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1575,26 +1577,6 @@ serve(async (req) => {
           break
         }
 
-        // If state tracking enabled, check if content actually changed
-        let stateManager: SyncStateManager | null = null
-        if (request.useStateTracking) {
-          const supabaseUrl = Deno.env.get('SUPABASE_URL')
-          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-          if (supabaseUrl && supabaseKey) {
-            stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
-
-            // Check if content has changed
-            const pagePath = (request.page as any).filePath || request.page.pageTitle
-            const hasChanged = await stateManager.hasContentChanged(pagePath, request.page.content)
-
-            if (!hasChanged) {
-              result.skipped.push(`${request.page.pageTitle} (no changes detected)`)
-              break
-            }
-          }
-        }
-
         const stats = await client.updatePageContent(pageId, request.page.content)
         result.updated.push(`${request.page.pageTitle} (${stats.total} blocks, ${stats.failed} failed)`)
 
@@ -1602,29 +1584,6 @@ serve(async (req) => {
           result.debug.totalBlocks = stats.total
           result.debug.failedBlocks = stats.failed
           result.debug.blockTypes = stats.types
-        }
-
-        // Update state if tracking enabled
-        if (stateManager) {
-          const pagePath = (request.page as any).filePath || request.page.pageTitle
-          const contentHash = await stateManager.computeHash(request.page.content)
-
-          await stateManager.upsertState({
-            page_path: pagePath,
-            notion_page_id: pageId,
-            github_hash: contentHash,
-            last_synced_at: new Date().toISOString(),
-            block_count: stats.total
-          })
-
-          await stateManager.logSync(
-            'content',
-            pagePath,
-            'github_to_notion',
-            stats.failed === 0 ? 'success' : 'failed',
-            stats.total,
-            { failed: stats.failed, types: stats.types }
-          )
         }
         break
       }
@@ -1649,55 +1608,11 @@ serve(async (req) => {
         await detectMovedPages(client, detectStructure, result)
         break
 
-      case 'check-changes': {
-        // Phase 1: Check which pages have changed using hash comparison
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-        if (!supabaseUrl || !supabaseKey) {
-          result.errors.push('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured')
-          break
-        }
-
-        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
-
-        // If content hashes provided, check which pages are dirty
-        if (request.contentHashes) {
-          const hashMap = new Map(Object.entries(request.contentHashes))
-          const dirtyPages = await stateManager.getDirtyPages(hashMap)
-
-          // Add dirty pages info to result
-          ;(result as any).dirtyPages = dirtyPages
-          ;(result as any).totalTracked = hashMap.size
-          ;(result as any).changedCount = dirtyPages.length
-        } else {
-          // Just return current state
-          const states = await stateManager.getAllStates()
-          ;(result as any).states = states
-          ;(result as any).stateCount = states.length
-        }
+      case 'check-changes':
+      case 'get-state':
+        // State tracking temporarily disabled due to bundle size limits
+        result.errors.push('State tracking actions temporarily disabled. Use sync-structure or update-page instead.')
         break
-      }
-
-      case 'get-state': {
-        // Get sync state for debugging/monitoring
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-        if (!supabaseUrl || !supabaseKey) {
-          result.errors.push('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured')
-          break
-        }
-
-        const stateManager = new SyncStateManager(supabaseUrl, supabaseKey)
-        const states = await stateManager.getAllStates()
-        const structureHash = await stateManager.getStructureHash()
-
-        ;(result as any).syncStates = states
-        ;(result as any).structureHash = structureHash
-        ;(result as any).pageCount = states.length
-        break
-      }
 
       default:
         return new Response(
