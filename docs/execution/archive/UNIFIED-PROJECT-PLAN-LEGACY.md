@@ -879,6 +879,17 @@ These foundational systems support all phases:
 | AI image generation for missing thumbnails | ⏳ |
 | User-customizable AI prompts | ⏳ |
 
+### Category Sub-Tags ✅
+
+| Story | Status |
+|-------|--------|
+| Show sub-category tags when filtering (e.g., "Wear" → tops, bottoms, outerwear, footwear, accessories, bags) | ✅ |
+| Keyword-based sub-tag detection from title/description | ✅ |
+| Sub-tag filter bar (click tag to filter within category) | ✅ |
+| Tag hierarchy per category (wear, home, use) | ✅ |
+| Manual tag editing on pins | ⏳ |
+| AI image-based sub-tag detection | ⏳ |
+
 ### Admin Enhancements ⏳
 
 | Story | Status |
