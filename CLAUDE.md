@@ -68,9 +68,13 @@ When working on this project, always follow these guidelines:
      - `"source": "ai"` - AI-generated page (can be freely deleted/reorganized)
      - `"source": "human"` - Human-created page (protected)
      - When adding new pages, always set `"source": "ai"` for AI-generated content
-   - **Deletion rules based on source:**
-     - AI pages (`source: ai`): Can delete, archive, or reorganize freely
-     - Human pages (`source: human`): Can edit content, but only delete/archive if ALL content has been consolidated elsewhere first
+   - **Automatic cleanup rules** (pages NOT in `notion-structure.json`):
+     1. AI pages (`source: ai`) → **DELETE** (move to Archive)
+     2. Human pages (`source: human`) that are empty (title only, no content) → **DELETE**
+     3. Human pages (`source: human`) with content → **PROTECT** (do not delete)
+   - **Manual deletion rules:**
+     - AI pages: Can delete, archive, or reorganize freely anytime
+     - Human pages: Only delete/archive if ALL content has been consolidated elsewhere first
      - When consolidating human pages: Verify all content is preserved before archiving
    - **When moving content:**
      - ~~Strike through~~ the old content in the original location
