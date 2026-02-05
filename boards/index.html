@@ -2468,16 +2468,14 @@ body {
 
 /* Complete the Look v2 - Nested Card Layout */
 .widget-complete {
-  background: var(--bg);
-  border: 1px solid var(--fg);
-  padding: var(--space-4);
+  /* Outer wrapper - no border, contains header + content box */
 }
 
 .widget-complete__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .widget-complete__header-left {
@@ -2488,11 +2486,10 @@ body {
 
 .widget-complete__title {
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--fg);
+  letter-spacing: 0.1em;
+  color: var(--muted);
 }
 
 .widget-complete__badge {
@@ -2509,9 +2506,9 @@ body {
 .widget-complete__refresh-btn {
   background: none;
   border: none;
-  padding: 0;
+  padding: 4px;
   cursor: pointer;
-  font-size: var(--font-size-base);
+  font-size: 16px;
   color: var(--muted);
   transition: color 0.15s;
   line-height: 1;
@@ -2522,6 +2519,9 @@ body {
 }
 
 .widget-complete__body {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
@@ -4199,7 +4199,7 @@ Return JSON:
             <span class="widget-complete__title">${widget.name}</span>
             <span class="widget-complete__badge">AI</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">↻</button>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-complete__section">
@@ -4239,7 +4239,7 @@ Return JSON:
             <span class="widget-complete__title">${widget.name}</span>
             <span class="widget-complete__badge">AI</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">↻</button>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
         <div class="widget-complete__body">
           <div class="widget-style__content">
