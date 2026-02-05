@@ -1,7 +1,7 @@
 # Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-05 (Widget Phase 0 ~95%, Phase 1 COMPLETE)
+> **Last Updated**: 2026-02-05 (Widget Phase 0 ~95%, Phase 1 COMPLETE, Phase 2 IN PROGRESS)
 
 ---
 
@@ -30,6 +30,17 @@
 ---
 
 ## Recent Milestones
+
+### Widget Phase 2: Config-Generated Widgets 🔄
+**Started: 2026-02-05**
+
+- **Widget Definition Schema**: TypeScript types in `config/schema.ts`
+- **Config-Driven Eligibility**: Rules defined declaratively, not in code
+- **Registry as Data**: `config/registry.ts` with runtime evaluators
+- **Two Widgets Migrated**: `complete-the-look`, `style-summary`
+- **180+ lines removed**: Hard-coded eligibility logic replaced with config
+
+**Remaining**: Category-agnostic matching, template selection engine, hot-reload
 
 ### Widget Phase 1: Rule-Driven Automation ✅
 **Completed: 2026-02-05**

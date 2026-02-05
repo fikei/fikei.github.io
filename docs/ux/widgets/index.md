@@ -179,5 +179,13 @@ Widgets pull from a curated catalog of brand partners:
 - Widgets generated via `generate-widget` edge function
 - Uses Claude Haiku for fast, contextual recommendations
 - Brand catalog stored in Supabase with affiliate links
-- Recommendations cached with 1-hour TTL
+- Recommendations cached with 1-hour TTL (client), persistent (server)
 - User preferences stored in user profile
+
+### Architecture
+
+Widgets use a **config-driven** architecture:
+- Widget definitions in TypeScript config files
+- Eligibility rules evaluated at runtime
+- Adding new widgets = adding config file (no code changes)
+- See [AI Recommendations](./ai-recommendations.md#config-driven-architecture-phase-2) for details
