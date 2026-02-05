@@ -19,6 +19,8 @@ import {
   getConfidenceConfig,
   getWidget,
   buildPrompt,
+  discoverWidgets,
+  getRegistrySummary,
 } from './config/registry.ts'
 import type { EligibilityContext, EligibilityDecision } from './config/schema.ts'
 
@@ -1071,8 +1073,74 @@ serve(async (req) => {
   let enrichmentTime = 0
 
   try {
-    const requestBody = await req.json() as ExtendedWidgetRequest
-    const { widgetId, prompt, items, category, userPrefs, skipEligibility } = requestBody
+    const requestBody = await req.json()
+
+    // ========================================================================
+    // PHASE 2: Widget Discovery Endpoint
+    // POST { action: 'discover', category, items }
+    // Returns eligible widgets for a category without generating AI content
+    // ========================================================================
+    if (requestBody.action === 'discover') {
+      const { category, items, userPrefs } = requestBody as {
+        action: string
+        category: string
+        items: WearItem[]
+        userPrefs?: Record<string, any>
+      }
+
+      if (!category || !items || items.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'category and items are required for discovery' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const configItems = items.map(item => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        image: item.image,
+        url: item.url
+      }))
+
+      const discoveries = discoverWidgets(category, configItems, userPrefs)
+
+      return new Response(
+        JSON.stringify({
+          widgets: discoveries.map(d => ({
+            widgetId: d.widgetId,
+            name: d.widget.name,
+            zone: d.widget.rendering.zone,
+            template: d.widget.rendering.template,
+            fallbackTemplate: d.widget.rendering.fallbackTemplate,
+            cssClass: d.widget.rendering.cssClass,
+            priority: d.widget.rendering.priority,
+            eligibility: d.eligibility
+          })),
+          category,
+          itemCount: items.length,
+          timestamp: Date.now()
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ========================================================================
+    // PHASE 2: Registry Summary Endpoint
+    // POST { action: 'registry' }
+    // Returns all registered widgets and their metadata
+    // ========================================================================
+    if (requestBody.action === 'registry') {
+      return new Response(
+        JSON.stringify({ widgets: getRegistrySummary(), timestamp: Date.now() }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ========================================================================
+    // Standard widget generation (existing flow)
+    // ========================================================================
+    const { widgetId, prompt, items, category, userPrefs, skipEligibility } = requestBody as ExtendedWidgetRequest
 
     if (!widgetId || !prompt || !items || items.length === 0) {
       return new Response(
@@ -1354,8 +1422,11 @@ Respond with valid JSON only, no markdown or explanation.`
       validation: { brandsReplaced: 0, categoryCorrected: 0 }
     }
 
-    // For complete-the-look widget, enrich suggestions with shopping URLs and scraped images
-    if (widgetId === 'complete-the-look' && content.suggestions && Array.isArray(content.suggestions)) {
+    // Phase 2: Config-driven enrichment — use widget config instead of hard-coded widget ID
+    const widgetConfig = getWidget(widgetId)
+    const enrichmentEnabled = widgetConfig?.enrichment?.enabled ?? false
+
+    if (enrichmentEnabled && content.suggestions && Array.isArray(content.suggestions)) {
       const enrichmentStart = Date.now()
       const enrichmentResult = await enrichSuggestions(content.suggestions)
       enrichmentTime = Date.now() - enrichmentStart

@@ -31,6 +31,17 @@
 
 ## Recent Milestones
 
+### Widget Phase 2: Config-Generated Widgets ✅
+**Completed: 2026-02-05**
+
+- **Category-Agnostic Matching**: Widgets discovered by category via config, no hard-coded category logic
+- **Template Selection Engine**: 4 templates (product-grid, style-card, simple-list, text-summary) with fallback chains
+- **Hot-Reload Registry**: registerWidget() / unregisterWidget() / reloadWidget() for dynamic management
+- **Discovery Endpoint**: POST { action: 'discover' } returns eligible widgets for any category
+- **Config-Driven Enrichment**: Enrichment triggered by widget config, not hard-coded widget ID
+
+See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#widget-phase-2-config-generated-widgets-complete) for full details.
+
 ### Widget Phase 1: Rule-Driven Automation ✅
 **Completed: 2026-02-05**
 
@@ -66,7 +77,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |-------|------|------------|--------|
 | 0 | Deterministic MVP | Very Low | ~95% Complete |
 | 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
-| 2 | Config-Generated Widgets | Medium→High | **IN PROGRESS** |
+| 2 | Config-Generated Widgets | Medium→High | **COMPLETE** |
 | 3 | Self-Selecting Widgets | High | Pending |
 | 4 | Self-Optimizing System | Full | Pending |
 
