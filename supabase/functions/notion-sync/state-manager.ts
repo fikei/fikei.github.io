@@ -1,7 +1,7 @@
 // Sync State Manager for Notion Bidirectional Sync
 // Epic 1.1: State Tracking Layer
 
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.95.0'
 
 export interface SyncState {
   page_path: string

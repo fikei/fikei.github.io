@@ -428,19 +428,29 @@ jobs:
           import hashlib
           import subprocess
 
-          def extract_pages(obj, pages=None):
+          def extract_pages(obj, pages=None, parent_title=None):
+              """Extract pages with their parent info for auto-creation support.
+              Returns list of (title, filepath, icon, parent_title)"""
               if pages is None:
                   pages = []
               if isinstance(obj, dict):
-                  if 'title' in obj and 'file' in obj:
-                      pages.append((obj['title'], obj['file']))
+                  current_title = obj.get('title')
+                  icon = obj.get('icon', '📄')
+
+                  if 'file' in obj and current_title:
+                      # This is a content page - record with parent info
+                      pages.append((current_title, obj['file'], icon, parent_title))
+
+                  # Recurse into children, using current title as parent
                   for key in ['children', 'sections']:
                       if key in obj:
                           for child in obj[key]:
-                              extract_pages(child, pages)
+                              # If this page has a title, it becomes the parent for children
+                              child_parent = current_title if current_title else parent_title
+                              extract_pages(child, pages, child_parent)
               elif isinstance(obj, list):
                   for item in obj:
-                      extract_pages(item, pages)
+                      extract_pages(item, pages, parent_title)
               return pages
 
           def compute_hash(filepath):
@@ -454,13 +464,17 @@ jobs:
           with open('notion-structure.json') as f:
               config = json.load(f)
 
-          pages = extract_pages(config)
+          # Root page is the parent for top-level sections
+          root_page = config.get('root', 'Ctrl')
+          pages = extract_pages(config, parent_title=root_page)
 
           # Compute hashes for all pages with files
           content_hashes = {}
-          for title, filepath in pages:
+          page_info = {}  # filepath -> (title, icon, parent_title)
+          for title, filepath, icon, parent_title in pages:
               if filepath and os.path.exists(filepath):
                   content_hashes[filepath] = compute_hash(filepath)
+                  page_info[filepath] = (title, icon, parent_title)
 
           print(f"📊 Computed hashes for {len(content_hashes)} files")
 
@@ -469,13 +483,16 @@ jobs:
 
           if force_full_sync:
               # Sync ALL pages
-              pages_to_sync = [(title, filepath, content_hashes.get(filepath, ''))
-                               for title, filepath in pages if filepath and os.path.exists(filepath)]
+              pages_to_sync = []
+              for filepath, (title, icon, parent_title) in page_info.items():
+                  pages_to_sync.append((title, filepath, content_hashes.get(filepath, ''), icon, parent_title))
               print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages")
 
-              with open('/tmp/pages_to_sync.txt', 'w') as f:
-                  for title, filepath, hash_val in pages_to_sync:
-                      f.write(f"{title}\t{filepath}\t{hash_val}\n")
+              # Save as JSON for easier parsing
+              with open('/tmp/pages_to_sync.json', 'w') as f:
+                  json.dump([{
+                      'title': t, 'filepath': fp, 'hash': h, 'icon': i, 'parent': p
+                  } for t, fp, h, i, p in pages_to_sync], f)
           else:
               # Call check-changes to find what needs syncing
               print("🔍 Checking state to find pages needing sync...")
@@ -508,15 +525,20 @@ jobs:
                   if needs_sync:
                       print(f"   Pages: {', '.join(list(needs_sync)[:5])}{'...' if len(needs_sync) > 5 else ''}")
 
-                  # Build list of pages to sync
+                  # Build list of pages to sync with full info
                   pages_to_sync = []
-                  for title, filepath in pages:
+                  for filepath, (title, icon, parent_title) in page_info.items():
                       if filepath in needs_sync:
-                          pages_to_sync.append((title, filepath, content_hashes.get(filepath, '')))
+                          pages_to_sync.append({
+                              'title': title,
+                              'filepath': filepath,
+                              'hash': content_hashes.get(filepath, ''),
+                              'icon': icon,
+                              'parent': parent_title
+                          })
 
-                  with open('/tmp/pages_to_sync.txt', 'w') as f:
-                      for title, filepath, hash_val in pages_to_sync:
-                          f.write(f"{title}\t{filepath}\t{hash_val}\n")
+                  with open('/tmp/pages_to_sync.json', 'w') as f:
+                      json.dump(pages_to_sync, f)
 
                   if not pages_to_sync:
                       print("✨ All pages are up to date!")
@@ -524,112 +546,123 @@ jobs:
               except json.JSONDecodeError:
                   print(f"⚠️ Failed to parse check-changes response: {result.stdout[:200]}")
                   # Fall back to syncing nothing (safe default)
-                  open('/tmp/pages_to_sync.txt', 'w').close()
+                  with open('/tmp/pages_to_sync.json', 'w') as f:
+                      json.dump([], f)
           PYEOF
 
-          # Step 2: Sync pages that need updating
-          if [ -s /tmp/pages_to_sync.txt ]; then
-            echo ""
-            echo "Syncing pages..."
-
-            while IFS=$'\t' read -r title filepath hash_val; do
-              if [ ! -f "$filepath" ]; then
-                echo "⏭️ $title — file not found: $filepath"
-                continue
-              fi
-
-              word_count=$(wc -w < "$filepath" | tr -d ' ')
-              echo "📄 $title — syncing ${word_count} words"
-
-              # Build payload with hash info for state tracking
-              content=$(head -c 40000 "$filepath" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-              payload=$(python3 -c "
+          # Step 2: Sync pages that need updating (using JSON format with parent/icon info)
+          python3 << 'SYNC_PYEOF'
           import json
-          print(json.dumps({
-              'action': 'update-page',
-              'page': {
-                  'pageTitle': '$title',
-                  'content': $content,
-                  'pagePath': '$filepath',
-                  'contentHash': '$hash_val'
+          import os
+          import subprocess
+          import time
+
+          # Load pages to sync
+          try:
+              with open('/tmp/pages_to_sync.json') as f:
+                  pages_to_sync = json.load(f)
+          except (FileNotFoundError, json.JSONDecodeError):
+              pages_to_sync = []
+
+          if not pages_to_sync:
+              print("✨ No pages need syncing")
+              exit(0)
+
+          print(f"\nSyncing {len(pages_to_sync)} pages...")
+          failed_pages = []
+
+          def sync_page(page, is_retry=False):
+              """Sync a single page, returns True on success"""
+              filepath = page['filepath']
+              title = page['title']
+              hash_val = page['hash']
+              icon = page.get('icon', '📄')
+              parent = page.get('parent')
+
+              if not os.path.exists(filepath):
+                  print(f"⏭️ {title} — file not found: {filepath}")
+                  return True  # Don't retry missing files
+
+              # Read content
+              with open(filepath, 'r') as f:
+                  content = f.read()[:40000]
+
+              word_count = len(content.split())
+              action = "retrying" if is_retry else f"syncing {word_count} words"
+              print(f"📄 {title} — {action}")
+
+              # Build payload with parent info for auto-creation
+              payload = {
+                  'action': 'update-page',
+                  'page': {
+                      'pageTitle': title,
+                      'content': content,
+                      'pagePath': filepath,
+                      'contentHash': hash_val,
+                      'parentPageTitle': parent,
+                      'icon': icon
+                  }
               }
-          }))
-          ")
 
-              response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
-                -H "Authorization: Bearer $SB_KEY" \
-                -H "Content-Type: application/json" \
-                -d "$payload")
+              # Call the edge function
+              result = subprocess.run([
+                  'curl', '-s', '-X', 'POST',
+                  f"{os.environ['SB_URL']}/functions/v1/notion-sync",
+                  '-H', f"Authorization: Bearer {os.environ['SB_KEY']}",
+                  '-H', 'Content-Type: application/json',
+                  '-d', json.dumps(payload)
+              ], capture_output=True, text=True)
 
-              if echo "$response" | grep -q '"success":true'; then
-                blocks=$(echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r.get('updated',[''])[0].split('(')[1].split(' ')[0] if r.get('updated') else '?')" 2>/dev/null || echo "?")
-                echo "   ✅ Done (${blocks} blocks)"
-              else
-                echo "   ⚠️ Failed — will retry"
-                echo -e "$title\t$filepath\t$hash_val" >> /tmp/failed_pages.txt
-              fi
-              sleep 2
-            done < /tmp/pages_to_sync.txt
+              try:
+                  response = json.loads(result.stdout)
+                  if response.get('success'):
+                      # Check if created or updated
+                      created = response.get('created', [])
+                      updated = response.get('updated', [])
+                      if created:
+                          print(f"   ✅ Created: {created[0]}")
+                      elif updated:
+                          # Extract block count from update message
+                          blocks = updated[0].split('(')[1].split(' ')[0] if '(' in updated[0] else '?'
+                          print(f"   ✅ Done ({blocks} blocks)")
+                      else:
+                          print(f"   ✅ Done")
+                      return True
+                  else:
+                      errors = response.get('errors', [])
+                      print(f"   ⚠️ Failed: {errors[0] if errors else 'unknown error'}")
+                      return False
+              except json.JSONDecodeError:
+                  print(f"   ⚠️ Failed: invalid response")
+                  return False
 
-            # Retry failed pages up to 3 times
-            for retry in 1 2 3; do
-              if [ -s /tmp/failed_pages.txt ]; then
-                failed_count=$(wc -l < /tmp/failed_pages.txt)
-                echo ""
-                echo "🔄 Retry $retry: $failed_count failed pages (waiting ${retry}0s...)"
-                sleep $((retry * 10))
+          # First pass
+          for page in pages_to_sync:
+              if not sync_page(page):
+                  failed_pages.append(page)
+              time.sleep(2)
 
-                mv /tmp/failed_pages.txt /tmp/retry_pages.txt
-                > /tmp/failed_pages.txt
+          # Retry failed pages up to 3 times
+          for retry in range(1, 4):
+              if not failed_pages:
+                  break
+              print(f"\n🔄 Retry {retry}: {len(failed_pages)} failed pages (waiting {retry * 10}s...)")
+              time.sleep(retry * 10)
 
-                while IFS=$'\t' read -r title filepath hash_val; do
-                  if [ ! -f "$filepath" ]; then
-                    continue
-                  fi
+              retry_pages = failed_pages
+              failed_pages = []
+              for page in retry_pages:
+                  if not sync_page(page, is_retry=True):
+                      failed_pages.append(page)
+                  time.sleep(3)
 
-                  echo "📄 $title — retrying..."
-                  content=$(head -c 40000 "$filepath" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-                  payload=$(python3 -c "
-          import json
-          print(json.dumps({
-              'action': 'update-page',
-              'page': {
-                  'pageTitle': '$title',
-                  'content': $content,
-                  'pagePath': '$filepath',
-                  'contentHash': '$hash_val'
-              }
-          }))
-          ")
-
-                  response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
-                    -H "Authorization: Bearer $SB_KEY" \
-                    -H "Content-Type: application/json" \
-                    -d "$payload")
-
-                  if echo "$response" | grep -q '"success":true'; then
-                    echo "   ✅ Done"
-                  else
-                    echo "   ⚠️ Still failing"
-                    echo -e "$title\t$filepath\t$hash_val" >> /tmp/failed_pages.txt
-                  fi
-                  sleep 3
-                done < /tmp/retry_pages.txt
-              else
-                break
-              fi
-            done
-
-            # Report any remaining failures
-            if [ -s /tmp/failed_pages.txt ]; then
-              echo ""
-              echo "⚠️ Some pages still failed after 3 retries:"
-              cat /tmp/failed_pages.txt | cut -f1
-              echo "State NOT updated for these - will retry next run."
-            fi
-          else
-            echo "✨ No markdown files changed - skipping content sync"
-          fi
+          # Report any remaining failures
+          if failed_pages:
+              print(f"\n⚠️ Some pages still failed after 3 retries:")
+              for page in failed_pages:
+                  print(f"   - {page['title']}")
+              print("State NOT updated for these - will retry next run.")
+          SYNC_PYEOF
 
           echo ""
           echo "═══════════════════════════════════════════"
