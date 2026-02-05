@@ -3302,6 +3302,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             <div class="theme-toggle__knob"></div>
           </button>
         </div>
+        <div class="settings-row">
+          <div class="settings-row__label">
+            <span class="settings-row__title">Prioritize Grid Flow</span>
+            <span class="settings-row__description">Fill gaps over strict order</span>
+          </div>
+          <button class="theme-toggle" id="gridFlowToggle">
+            <div class="theme-toggle__knob"></div>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -6113,6 +6122,7 @@ Return JSON:
   const FILTER_KEY = 'boards-filter';
   const PENDING_SAVES_KEY = 'boards_pending_saves';
   let currentFilter = localStorage.getItem(FILTER_KEY) || 'all';
+  let gridFlowPriority = localStorage.getItem('boards-grid-flow') === 'true';
   let searchQuery = '';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
@@ -6331,7 +6341,7 @@ Return JSON:
     // Sort by saved order, fallback to date
     const data = load();
     const order = data.linkOrder || [];
-    const sorted = [...links].sort((a, b) => {
+    let sorted = [...links].sort((a, b) => {
       const aIdx = order.indexOf(a.id);
       const bIdx = order.indexOf(b.id);
       if (aIdx === -1 && bIdx === -1) return new Date(b.addedAt) - new Date(a.addedAt);
@@ -6339,6 +6349,14 @@ Return JSON:
       if (bIdx === -1) return -1;
       return aIdx - bIdx;
     });
+
+    // When grid flow priority is enabled, move expanded cards to front
+    // This allows 1x1 cards to fill gaps left by expanded cards
+    if (gridFlowPriority) {
+      const expanded = sorted.filter(l => expandedCards[l.id]);
+      const normal = sorted.filter(l => !expandedCards[l.id]);
+      sorted = [...expanded, ...normal];
+    }
 
     let html = '';
     let cardCount = 0;
@@ -7504,6 +7522,18 @@ Return JSON:
   themeToggle.onclick = () => {
     const isLight = document.documentElement.classList.toggle('light');
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  };
+
+  // Grid flow toggle
+  const gridFlowToggle = $('gridFlowToggle');
+  if (gridFlowPriority) gridFlowToggle.classList.add('theme-toggle--active');
+
+  gridFlowToggle.onclick = () => {
+    gridFlowPriority = !gridFlowPriority;
+    gridFlowToggle.classList.toggle('theme-toggle--active', gridFlowPriority);
+    localStorage.setItem('boards-grid-flow', gridFlowPriority);
+    renderGrid();
+    toast(gridFlowPriority ? 'Grid flow priority enabled' : 'Grid flow priority disabled');
   };
 
   // ============================================

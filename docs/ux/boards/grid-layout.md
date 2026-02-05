@@ -9,6 +9,7 @@ The visual presentation of pins in a responsive, masonry-style grid inspired by 
 | Responsive Grid | ✅ Shipped | 2-5 columns based on viewport |
 | Card Expansion | ✅ Shipped | Medium (2x2) and Large (3x2) |
 | Grid Reflow | ✅ Shipped | Auto gap-filling via `grid-auto-flow: dense` |
+| Grid Flow Priority | ✅ Shipped | Setting to prioritize flow over order |
 | List View | ⏳ Planned | Alternative dense view |
 | Sort Options | ⏳ Planned | Date, name, domain |
 
@@ -202,6 +203,32 @@ When cards expand to 2x2 or 3x2 sizes, smaller cards automatically fill gaps.
 - CSS property: `grid-auto-flow: dense`
 - File: `boards/index.html:814-820`
 - Behavior: Grid auto-placement fills available gaps with smaller items
+
+### Grid Flow Priority Setting ✅ IMPLEMENTED
+
+When `grid-auto-flow: dense` isn't enough (order conflicts with placement), users can enable "Prioritize Grid Flow" in Settings.
+
+**How it works:**
+- Expanded cards are moved to the front of the render order
+- 1x1 cards fill the remaining grid positions
+- Results in a fully packed grid with no gaps
+
+```
+Order Priority (default):          Flow Priority (enabled):
+┌──────┐  ┌───────────────┐        ┌───────────────┐  ┌──────┐
+│  1   │  │               │        │               │  │  1   │
+└──────┘  │    2 (2x2)    │        │    2 (2x2)    │  ├──────┤
+[ GAP ]   │               │        │               │  │  3   │
+          └───────────────┘        └───────────────┘  └──────┘
+┌──────┐  ┌──────┐  ┌──────┐      ┌──────┐  ┌──────┐  ┌──────┐
+│  3   │  │  4   │  │  5   │      │  4   │  │  5   │  │  6   │
+└──────┘  └──────┘  └──────┘      └──────┘  └──────┘  └──────┘
+```
+
+**Implementation details:**
+- Setting: `boards-grid-flow` in localStorage
+- File: `boards/index.html:6340-6346`
+- Toggle: Settings → "Prioritize Grid Flow"
 
 ---
 

@@ -7,6 +7,7 @@ User-configurable options for customizing the Boards experience.
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Theme Toggle | ✅ Shipped | Dark/Light mode |
+| Grid Flow Priority | ✅ Shipped | Fill gaps over order |
 | Export JSON | ✅ Shipped | In Admin Panel |
 | Export CSV | ✅ Shipped | In Admin Panel |
 | Widget Preferences | ⏳ Planned | Favorite/hide widgets |
@@ -91,6 +92,31 @@ Dark Mode (Default):              Light Mode:
 │ ██████████████████│             │                   │
 └───────────────────┘             └───────────────────┘
 ```
+
+### Grid Flow Priority ✅ IMPLEMENTED
+
+```
+┌─────────────────────────────────────────┐
+│  Settings                         [X]   │
+├─────────────────────────────────────────┤
+│                                         │
+│  Light Mode              [ ○──── ]      │
+│  Switch to light theme                  │
+│                                         │
+│  Prioritize Grid Flow    [ ────● ]      │
+│  Fill gaps over strict order            │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**How it works:**
+- **OFF (default)**: Cards display in saved order; gaps may appear
+- **ON**: Expanded cards render first, 1x1 cards fill remaining gaps
+
+**Implementation details:**
+- Setting: `boards-grid-flow` in localStorage
+- File: `boards/index.html:6340-6346` (sort logic)
+- Toggle: `gridFlowToggle` element
 
 ### Export Data ✅ IMPLEMENTED
 
