@@ -356,6 +356,66 @@ Button group for admin panel sections.
 - Wraps on narrow screens
 - Buttons match admin panel style
 
+### AI Widget Card
+
+Standardized container for AI-powered recommendation widgets.
+
+```html
+<div class="widget-complete" data-widget-id="widget-123">
+  <div class="widget-complete__header">
+    <div class="widget-complete__header-left">
+      <span class="widget-complete__title">Complete the Look</span>
+      <span class="widget-complete__badge">AI</span>
+    </div>
+    <button class="widget-complete__refresh-btn" onclick="refreshWidget('widget-123')" title="Refresh suggestions">↻</button>
+  </div>
+  <div class="widget-complete__body">
+    <!-- Widget-specific content goes here -->
+  </div>
+</div>
+```
+
+**AI Widget Card behavior:**
+- Outer border with padding, no inner section borders
+- Header: Title (left) + AI badge (inline) + Refresh button (floating right)
+- AI badge: inverted colors (white on black), 9px uppercase
+- Refresh button: icon only, no border, muted color, hover effect
+- Body: holds widget-specific content (items, sections, etc.)
+- All AI widgets use this same outer structure for consistency
+
+**Variants:**
+
+```html
+<!-- Complete the Look Widget -->
+<div class="widget-complete" data-widget-id="complete-look">
+  <div class="widget-complete__header">...</div>
+  <div class="widget-complete__body">
+    <div class="widget-complete__section">
+      <div class="widget-complete__items"><!-- User's items --></div>
+    </div>
+    <div class="widget-complete__divider"></div>
+    <div class="widget-complete__section">
+      <div class="widget-complete__items"><!-- AI suggestions --></div>
+    </div>
+  </div>
+</div>
+
+<!-- Style Summary Widget -->
+<div class="widget-complete" data-widget-id="style-summary">
+  <div class="widget-complete__header">...</div>
+  <div class="widget-complete__body">
+    <div class="widget-style__content">
+      <div class="widget-style__label">Minimal Modern</div>
+      <div class="widget-style__sublabel">Based on 12 items</div>
+      <div class="widget-style__traits">
+        <span class="widget-style__trait">Clean lines</span>
+        <span class="widget-style__trait">Neutral palette</span>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
 ## Light Mode
 
 Add `.light` class to `<html>` to enable light mode:

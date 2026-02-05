@@ -2416,15 +2416,9 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Style Summary Widget */
-.widget-style {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
-}
-
-.widget-style__header {
-  margin-bottom: var(--space-3);
+/* Style Summary Widget - inner content (now nested in widget-complete) */
+.widget-style__content {
+  /* No border/background - handled by widget-complete outer wrapper */
 }
 
 .widget-style__label {
@@ -2438,6 +2432,7 @@ body {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--muted);
+  margin-bottom: var(--space-3);
 }
 
 .widget-style__traits {
@@ -4263,12 +4258,21 @@ Return JSON:
     const traitsHtml = traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
 
     return `
-      <div class="widget-style">
-        <div class="widget-style__header">
-          <div class="widget-style__label">${esc(label)}</div>
-          <div class="widget-style__sublabel">${esc(sublabel)}</div>
+      <div class="widget-complete" data-widget-id="${widget.id}">
+        <div class="widget-complete__header">
+          <div class="widget-complete__header-left">
+            <span class="widget-complete__title">${widget.name}</span>
+            <span class="widget-complete__badge">AI</span>
+          </div>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">↻</button>
         </div>
-        <div class="widget-style__traits">${traitsHtml}</div>
+        <div class="widget-complete__body">
+          <div class="widget-style__content">
+            <div class="widget-style__label">${esc(label)}</div>
+            <div class="widget-style__sublabel">${esc(sublabel)}</div>
+            <div class="widget-style__traits">${traitsHtml}</div>
+          </div>
+        </div>
       </div>`;
   }
 

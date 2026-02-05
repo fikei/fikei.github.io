@@ -2,6 +2,18 @@
 
 AI-powered widgets that analyze your pins and suggest complementary products, style summaries, and related content.
 
+**Implementation Status**: ✅ Shipped
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Standardized Widget Card | ✅ Shipped | Title + AI badge + refresh icon |
+| Complete the Look | ✅ Shipped | Hero zone, user items + suggestions |
+| Style Summary | ✅ Shipped | Footer zone, style label + traits |
+| Refresh Widget | ✅ Shipped | Regenerate AI content on demand |
+| Widget Zones | ✅ Shipped | Hero, inline, footer positioning |
+| Widget Feedback | ❌ Removed | Simplified UI |
+| Widget Favorites | ❌ Removed | Simplified UI |
+
 ---
 
 ## User Goals
@@ -9,8 +21,7 @@ AI-powered widgets that analyze your pins and suggest complementary products, st
 - **Discover new products** that match my existing taste
 - **Complete outfits/looks** based on items I've saved
 - **Get personalized suggestions** that improve over time
-- **Control recommendation quality** with feedback
-- **Understand why** something was recommended
+- **Refresh suggestions** when I want new recommendations
 
 ---
 
@@ -28,95 +39,89 @@ AI-powered widgets that analyze your pins and suggest complementary products, st
 
 ## Wireframes
 
-### Complete the Look Widget
+### Standardized Widget Card Structure ✅ IMPLEMENTED
+
+All AI widgets use the same outer card structure for consistency:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  ✨ Complete the Look                          [⋮]     │
+│  WIDGET TITLE   [AI]                              [↻]   │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  Based on your saved items:                             │
+│  Widget-specific content here                           │
+│  (no section headlines)                                 │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+
+Header Elements:
+- Title: Uppercase, monospace, left-aligned
+- AI badge: Inverted tag inline with title
+- Refresh: Icon button, no border, floating right
+```
+
+### Complete the Look Widget ✅ IMPLEMENTED
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  COMPLETE THE LOOK   [AI]                         [↻]   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐                   │
-│  │ [your]  │ │ [your]  │ │ [your]  │                   │
+│  │ [your]  │ │ [your]  │ │ [your]  │  ← Your items     │
 │  │ jacket  │ │  pants  │ │  shoes  │                   │
 │  └─────────┘ └─────────┘ └─────────┘                   │
-│                                                         │
-│  You might also like:                                   │
+│  ─────────────────────────────────────────────────────  │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │         │ │         │ │         │ │         │       │
 │  │  [rec]  │ │  [rec]  │ │  [rec]  │ │  [rec]  │       │
-│  │         │ │         │ │         │ │         │       │
 │  │ $89     │ │ $125    │ │ $45     │ │ $199    │       │
-│  │ ★ Palace│ │ ★ Stussy│ │ ★ Nike  │ │ ★ BAPE  │       │
+│  │ Palace  │ │ Stussy  │ │ Nike    │ │ BAPE    │       │
 │  └─────────┘ └─────────┘ └─────────┘ └─────────┘       │
-│   [♡ Save]   [♡ Save]   [♡ Save]   [♡ Save]           │
-│                                                         │
-│  [ 👎 Not for me ]  [ 💬 Feedback ]  [ ♡ Save All ]    │
+│                                           ↑ AI picks   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Style Summary Widget
+### Style Summary Widget ✅ IMPLEMENTED
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  🎨 Your Style Summary                         [⋮]     │
+│  STYLE SUMMARY   [AI]                             [↻]   │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  Based on 47 saved items, your style is:                │
+│  Minimal Modern                   ← Style label         │
+│  Based on 12 items                ← Sublabel            │
 │                                                         │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │  "Contemporary streetwear with Japanese         │    │
-│  │   influence. Clean silhouettes meet bold        │    │
-│  │   graphics. Neutral palette with occasional     │    │
-│  │   pops of color."                               │    │
-│  └─────────────────────────────────────────────────┘    │
+│  ┌──────────┐ ┌───────────┐ ┌──────────────┐           │
+│  │ Clean    │ │ Neutral   │ │ Versatile    │  ← Traits │
+│  │ lines    │ │ palette   │ │ pieces       │           │
+│  └──────────┘ └───────────┘ └──────────────┘           │
 │                                                         │
-│  Top Brands:         Color Palette:                     │
-│  1. Stüssy          ■ Black (45%)                       │
-│  2. Palace          ■ White (25%)                       │
-│  3. Nike            ■ Navy (15%)                        │
-│  4. Carhartt WIP    ■ Grey (10%)                        │
-│  5. BAPE            ■ Other (5%)                        │
-│                                                         │
-│  [ 🔄 Refresh ]                    [ Share Style ]      │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Widget Menu (⋮)
+### Widget Zones
 
 ```
-┌─────────────────────────┐
-│  ★ Add to Favorites     │
-│  ────────────────────   │
-│  ⏸ Pause this widget    │
-│  🚫 Hide permanently    │
-│  ────────────────────   │
-│  📄 View PRD            │
-│  💬 Send Feedback       │
-└─────────────────────────┘
-```
-
-### Widget States
-
-```
-Active:
-┌──────────────────────┐
-│  ✨ Widget Title     │
-│  [content loading]   │
-└──────────────────────┘
-
-Paused:
-┌──────────────────────┐
-│  ⏸ Widget Title      │
-│  [Resume] to see     │
-│  recommendations     │
-└──────────────────────┘
-
-Hidden (in Settings):
-┌──────────────────────┐
-│  🚫 Widget Title     │
-│  [Restore]           │
-└──────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  [Hero Zone]    Complete the Look widget appears here   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
+│  │     │ │     │ │     │ │     │ │     │              │
+│  │     │ │     │ │     │ │     │ │     │              │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘              │
+│                                                         │
+│  ┌─────┐ ┌──────────────────────────────┐ ┌─────┐      │
+│  │     │ │  [Inline Zone]               │ │     │      │
+│  │     │ │   Future widget position     │ │     │      │
+│  └─────┘ └──────────────────────────────┘ └─────┘      │
+│                                                         │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐              │
+│  │     │ │     │ │     │ │     │ │     │              │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘              │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│  [Footer Zone]  Style Summary widget appears here       │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -199,8 +204,32 @@ User's Saved Pins
 
 ## Technical Notes
 
+### Implementation Details
 - Widget content generated by `generate-widget` Supabase function
 - Claude Haiku (primary) / GPT-4o mini (fallback) for AI
 - 5-minute client cache, branded Shopify API integration
-- Widget state stored in localStorage: favorites, hidden, dismissed
-- Feedback collected and stored for model improvement
+
+### Widget Card Structure
+- Outer wrapper: `.widget-complete` with `data-widget-id`
+- Header: `.widget-complete__header` with title, AI badge, refresh button
+- Body: `.widget-complete__body` holds widget-specific content
+- File: `boards/index.html` - `renderCompleteTheLookWidget()`, `renderStyleSummaryWidget()`
+
+### CSS Classes
+```css
+.widget-complete         /* Outer card container */
+.widget-complete__header /* Header with title + badge + refresh */
+.widget-complete__header-left  /* Title and badge group */
+.widget-complete__title  /* Widget name, uppercase mono */
+.widget-complete__badge  /* "AI" tag, inverted colors */
+.widget-complete__refresh-btn  /* Refresh icon, no border */
+.widget-complete__body   /* Content area */
+.widget-complete__section /* Content section */
+.widget-complete__divider /* Horizontal separator */
+.widget-complete__items  /* Item grid container */
+```
+
+### Removed Features
+- ~~Widget feedback (rateWidget, submitWidgetFeedback)~~
+- ~~Widget favorites (toggleWidgetFavorite)~~
+- ~~Widget dismiss/hide (dismissWidget, hideWidget)~~
