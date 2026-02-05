@@ -41,18 +41,32 @@ When working on this project, always follow these guidelines:
    - Remind me about secrets, deployments, or verification steps
 
 4. **Maintain unified project plan tracking**
-   - All tasks requested in chat should be added to `PROJECT-STATUS.md`
+   - All tasks should be tracked in `docs/execution/UNIFIED-PROJECT-PLAN.md`
    - Update task status (pending/in-progress/complete) as work progresses
-   - Keep the project plan as single source of truth for what's been requested and done
+   - Keep the unified plan as single source of truth for all stories and tasks
    - Reference the project plan when resuming work or starting new sessions
 
-5. **Maintain an explicit changelog**
+5. **Sync documentation to Notion and GitHub**
+   - When creating or updating PRDs, technical specs, or project plans:
+     1. Write/update the markdown file in `docs/`
+     2. Ensure the file is listed in `notion-structure.json` if new
+     3. Commit and push to feature branch
+     4. Merge to master to trigger Notion sync
+   - The GitHub Actions workflow (`agent-automation.yml`) auto-syncs docs to Notion on push to master
+   - To manually trigger sync: `gh workflow run agent-automation.yml`
+   - Documentation locations:
+     - PRDs → `docs/strategy/prds/`
+     - Tech specs → `docs/infrastructure/technical-design/`
+     - Project plans → `docs/execution/`
+     - UX documentation → `docs/ux/`
+
+6. **Maintain an explicit changelog**
    - Update `CHANGELOG.md` after completing significant work
    - Log what was changed, added, or fixed
    - Include date and brief description
    - Group changes by session or feature
 
-6. **Use and extend the design system**
+7. **Use and extend the design system**
    - Check `design-system/` before creating any UI
    - Reuse existing components from `design-system/components.css`
    - Use tokens from `design-system/tokens.css` (colors, spacing, typography)
