@@ -97,48 +97,24 @@
     .variant-toolbar button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
     .variant-toolbar button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
-    /* Grid lines on variant cards — column + row overlay */
-    .variant-item--gridlines .w-shell {
-      outline: 1px solid rgba(255,255,255,0.15);
-      outline-offset: -1px;
-      position: relative;
-    }
-    .variant-item--gridlines .w-shell::before {
+    /* Overarching print-design grid overlay — columns + baselines across all variants */
+    .variant-grid--gridlines { position: relative; padding-top: var(--space-4); }
+    .variant-grid--gridlines::before {
       content: '';
       position: absolute;
       inset: 0;
       pointer-events: none;
-      z-index: 5;
-      background:
-        repeating-linear-gradient(to right,
-          rgba(255,255,255,0.06) 0px,
-          rgba(255,255,255,0.06) 1px,
-          transparent 1px,
-          transparent 25%
-        ),
-        repeating-linear-gradient(to bottom,
-          rgba(255,255,255,0.06) 0px,
-          rgba(255,255,255,0.06) 1px,
-          transparent 1px,
-          transparent 40px
-        );
-    }
-    .variant-item--gridlines .w-body,
-    .variant-item--gridlines .w-header,
-    .variant-item--gridlines .w-actions {
-      outline: 1px dashed rgba(255,255,255,0.12);
-      outline-offset: -1px;
+      z-index: 10;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: calc(100% / 12) 100%, 100% 40px;
     }
 
-    /* Flag overlay on each variant */
-    .variant-flag { position: absolute; top: 4px; right: 4px; z-index: 3; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: var(--border-thin) solid var(--border-subtle); cursor: pointer; opacity: 0.4; transition: opacity 0.15s ease; }
-    .variant-flag:hover { opacity: 1; }
-    .variant-flag svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-    .variant-item--flagged .variant-flag { opacity: 1; background: var(--color-error); border-color: var(--color-error); color: var(--color-white); z-index: 6; }
+    /* Blocked state (triggered via right-click menu) */
     .variant-item--flagged .w-shell { opacity: 0.2; }
     .variant-item--flagged .variant-label { text-decoration: line-through; color: var(--color-error); }
     .variant-item { position: relative; }
-    /* Blocked overlay with label */
     .variant-blocked { display: none; position: absolute; top: 24px; left: 0; right: 0; bottom: 0; z-index: 5; align-items: center; justify-content: center; }
     .variant-item--flagged .variant-blocked { display: flex; }
     .variant-blocked span { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--color-error); padding: var(--space-1) var(--space-3); border: var(--border-thin) solid var(--color-error); }
@@ -147,13 +123,19 @@
     .variant-label--noted::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--color-warning); margin-right: var(--space-1); vertical-align: middle; flex-shrink: 0; }
     .variant-label { display: flex; align-items: center; }
 
-    /* Right-click comment popover */
-    .variant-note { position: absolute; top: 28px; left: 0; right: 0; z-index: 10; background: var(--bg); border: var(--border-thin) solid var(--border); padding: var(--space-2); display: none; flex-direction: column; gap: var(--space-2); }
-    .variant-note.open { display: flex; }
-    .variant-note textarea { font-family: var(--font-primary); font-size: var(--text-xs); background: var(--bg-surface); color: var(--fg); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-2); resize: vertical; min-height: 48px; line-height: var(--leading-normal); }
-    .variant-note textarea:focus { outline: none; border-color: var(--fg); }
-    .variant-note__footer { display: flex; justify-content: space-between; align-items: center; }
-    .variant-note__hint { font-size: 8px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+    /* Right-click context menu */
+    .variant-ctx-menu { position: fixed; z-index: 100; background: var(--bg); border: var(--border-thin) solid var(--border); min-width: 160px; padding: var(--space-1) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
+    .variant-ctx-menu__item { display: block; width: 100%; padding: var(--space-2) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg); background: transparent; border: none; cursor: pointer; text-align: left; }
+    .variant-ctx-menu__item:hover { background: var(--bg-surface); }
+    .variant-ctx-menu__item--danger { color: var(--color-error); }
+    .variant-ctx-menu__divider { height: 1px; background: var(--border-subtle); margin: var(--space-1) 0; }
+
+    /* Inline comment area (opens via context menu) */
+    .variant-comment { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--bg); border-top: var(--border-thin) solid var(--border); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+    .variant-comment textarea { font-family: var(--font-primary); font-size: var(--text-xs); background: var(--bg-surface); color: var(--fg); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-2); resize: vertical; min-height: 40px; line-height: var(--leading-normal); }
+    .variant-comment textarea:focus { outline: none; border-color: var(--fg); }
+    .variant-comment__footer { display: flex; justify-content: space-between; align-items: center; }
+    .variant-comment__hint { font-size: 8px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
 
     /* Blacklist table */
     .audit-table { border-collapse: collapse; font-family: var(--font-primary); margin-top: var(--space-4); width: 100%; }
@@ -1681,21 +1663,11 @@ function setNote(name, size, text) {
 // ============================================
 
 var variantGridLinesOn = false;
-var activeNotePopover = null; // track open popover
 
 function toggleVariantGridLines(btn) {
   variantGridLinesOn = !variantGridLinesOn;
   btn.classList.toggle('active');
-  document.querySelectorAll('#variantGrid .variant-item').forEach(function(item) {
-    item.classList.toggle('variant-item--gridlines', variantGridLinesOn);
-  });
-}
-
-function closeActiveNote() {
-  if (activeNotePopover) {
-    activeNotePopover.classList.remove('open');
-    activeNotePopover = null;
-  }
+  document.getElementById('variantGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
 }
 
 function showVariants() {
@@ -1728,9 +1700,10 @@ function showVariants() {
   var auditName = widgetVal || templateVal;
   var template = source.dataset.template;
 
-  desc.textContent = auditName + ' (' + template + ') — ' + ALL_SIZES.length + ' sizes. Right-click to comment. Click X to flag.';
+  desc.textContent = auditName + ' (' + template + ') — ' + ALL_SIZES.length + ' sizes. Right-click for options.';
 
   grid.innerHTML = '';
+  grid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
   var stats = { flagged: 0, noted: 0 };
 
   ALL_SIZES.forEach(function(size) {
@@ -1747,7 +1720,6 @@ function showVariants() {
 
     var wrapper = document.createElement('div');
     wrapper.className = 'variant-item variant-item--' + size +
-      (variantGridLinesOn ? ' variant-item--gridlines' : '') +
       (isFlagged ? ' variant-item--flagged' : '');
     wrapper.dataset.auditName = auditName;
     wrapper.dataset.size = size;
@@ -1761,41 +1733,19 @@ function showVariants() {
     lblText.textContent = size + ' (' + SIZE_LABELS[size] + ')';
     lbl.appendChild(lblText);
 
-    // Flag button
-    var flag = document.createElement('button');
-    flag.className = 'variant-flag';
-    flag.title = isFlagged ? 'Unflag — allow this variant' : 'Flag — blacklist this variant';
-    flag.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-    flag.dataset.auditName = auditName;
-    flag.dataset.size = size;
-
-    // Note popover (hidden, shown on right-click)
-    var noteDiv = document.createElement('div');
-    noteDiv.className = 'variant-note';
-    noteDiv.dataset.auditName = auditName;
-    noteDiv.dataset.size = size;
-    noteDiv.innerHTML =
-      '<textarea placeholder="How should this variant change?" data-audit-name="' + auditName + '" data-size="' + size + '">' + (entry.note || '').replace(/</g, '&lt;') + '</textarea>' +
-      '<div class="variant-note__footer">' +
-        '<span class="variant-note__hint">Esc to close</span>' +
-        '<button class="w-btn w-btn--sm" data-action="save-note" data-audit-name="' + auditName + '" data-size="' + size + '">Save</button>' +
-      '</div>';
-
     // Blocked overlay
     var blocked = document.createElement('div');
     blocked.className = 'variant-blocked';
     blocked.innerHTML = '<span>Blocked</span>';
 
     wrapper.appendChild(lbl);
-    wrapper.appendChild(flag);
     wrapper.appendChild(blocked);
-    wrapper.appendChild(noteDiv);
     wrapper.appendChild(clone);
     grid.appendChild(wrapper);
   });
 
   var parts = [];
-  if (stats.flagged > 0) parts.push(stats.flagged + ' flagged');
+  if (stats.flagged > 0) parts.push(stats.flagged + ' blocked');
   if (stats.noted > 0) parts.push(stats.noted + ' noted');
   count.textContent = parts.join(', ');
 
@@ -1807,57 +1757,105 @@ function showVariants() {
 }
 
 // ============================================
-// Right-click → open note popover
+// Right-click context menu
 // ============================================
 
-document.addEventListener('contextmenu', function(e) {
-  var item = e.target.closest('.variant-item');
-  if (!item) return;
-  // Don't override right-click on the textarea itself
-  if (e.target.tagName === 'TEXTAREA') return;
+var ctxMenu = null;
 
-  e.preventDefault();
-  closeActiveNote();
+function showContextMenu(e, item) {
+  closeContextMenu();
+  var name = item.dataset.auditName;
+  var size = item.dataset.size;
+  var entry = getAuditEntry(name, size);
+  var isFlagged = !!entry.flagged;
 
-  var noteDiv = item.querySelector('.variant-note');
-  if (noteDiv) {
-    noteDiv.classList.add('open');
-    activeNotePopover = noteDiv;
-    var ta = noteDiv.querySelector('textarea');
-    if (ta) ta.focus();
-  }
-});
+  var menu = document.createElement('div');
+  menu.className = 'variant-ctx-menu';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
 
-// Close on Escape
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeActiveNote();
-});
+  // Block / Unblock
+  var blockBtn = document.createElement('button');
+  blockBtn.className = 'variant-ctx-menu__item' + (!isFlagged ? ' variant-ctx-menu__item--danger' : '');
+  blockBtn.textContent = isFlagged ? 'Unblock' : 'Block';
+  blockBtn.addEventListener('click', function() {
+    toggleBlock(item, name, size);
+    closeContextMenu();
+  });
+  menu.appendChild(blockBtn);
 
-// Close when clicking outside
-document.addEventListener('click', function(e) {
-  if (activeNotePopover && !activeNotePopover.contains(e.target)) {
-    // Save before closing
-    var ta = activeNotePopover.querySelector('textarea');
-    if (ta) setNote(ta.dataset.auditName, ta.dataset.size, ta.value);
-    updateNoteIndicator(ta.dataset.auditName, ta.dataset.size);
-    closeActiveNote();
-    renderAuditTable();
-  }
-});
+  // Divider
+  var divider = document.createElement('div');
+  divider.className = 'variant-ctx-menu__divider';
+  menu.appendChild(divider);
 
-// Save note button
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-action="save-note"]');
-  if (!btn) return;
-  var name = btn.dataset.auditName;
-  var size = btn.dataset.size;
-  var noteDiv = btn.closest('.variant-note');
-  var ta = noteDiv.querySelector('textarea');
-  setNote(name, size, ta.value);
-  updateNoteIndicator(name, size);
-  closeActiveNote();
+  // Add / Edit comment
+  var commentBtn = document.createElement('button');
+  commentBtn.className = 'variant-ctx-menu__item';
+  commentBtn.textContent = entry.note ? 'Edit comment' : 'Add comment';
+  commentBtn.addEventListener('click', function() {
+    openComment(item, name, size);
+    closeContextMenu();
+  });
+  menu.appendChild(commentBtn);
+
+  document.body.appendChild(menu);
+  ctxMenu = menu;
+
+  // Keep menu in viewport
+  var rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = (e.clientX - rect.width) + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+}
+
+function closeContextMenu() {
+  if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; }
+}
+
+function toggleBlock(item, name, size) {
+  var entry = getAuditEntry(name, size);
+  var nowFlagged = !entry.flagged;
+  setFlag(name, size, nowFlagged);
+  item.classList.toggle('variant-item--flagged', nowFlagged);
+  updateStats();
   renderAuditTable();
-});
+}
+
+function openComment(item, name, size) {
+  closeComment();
+  var entry = getAuditEntry(name, size);
+  var div = document.createElement('div');
+  div.className = 'variant-comment';
+  div.id = 'activeComment';
+  div.innerHTML =
+    '<textarea placeholder="How should this variant change?">' + (entry.note || '').replace(/</g, '&lt;') + '</textarea>' +
+    '<div class="variant-comment__footer"><span class="variant-comment__hint">Esc to close · auto-saves on blur</span></div>';
+
+  item.appendChild(div);
+  var ta = div.querySelector('textarea');
+  ta.focus();
+
+  ta.addEventListener('blur', function() {
+    setNote(name, size, ta.value);
+    updateNoteIndicator(name, size);
+    renderAuditTable();
+    setTimeout(closeComment, 50);
+  });
+
+  ta.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      setNote(name, size, ta.value);
+      updateNoteIndicator(name, size);
+      renderAuditTable();
+      closeComment();
+    }
+  });
+}
+
+function closeComment() {
+  var el = document.getElementById('activeComment');
+  if (el) el.remove();
+}
 
 function updateNoteIndicator(name, size) {
   var entry = getAuditEntry(name, size);
@@ -1866,37 +1864,37 @@ function updateNoteIndicator(name, size) {
     var lbl = item.querySelector('.variant-label');
     if (lbl) lbl.classList.toggle('variant-label--noted', !!entry.note);
   });
-  // Update count
+  updateStats();
+}
+
+function updateStats() {
   var stats = { flagged: 0, noted: 0 };
   var keys = Object.keys(audit);
   keys.forEach(function(k) { if (audit[k].flagged) stats.flagged++; if (audit[k].note) stats.noted++; });
   var parts = [];
-  if (stats.flagged > 0) parts.push(stats.flagged + ' flagged');
+  if (stats.flagged > 0) parts.push(stats.flagged + ' blocked');
   if (stats.noted > 0) parts.push(stats.noted + ' noted');
   var count = document.getElementById('variantCount');
   if (count) count.textContent = parts.join(', ');
 }
 
-// ============================================
-// Flag clicks
-// ============================================
+// Right-click → context menu
+document.addEventListener('contextmenu', function(e) {
+  var item = e.target.closest('.variant-item');
+  if (!item) { closeContextMenu(); return; }
+  if (e.target.tagName === 'TEXTAREA') return;
+  e.preventDefault();
+  showContextMenu(e, item);
+});
 
+// Close context menu on click outside
 document.addEventListener('click', function(e) {
-  var flag = e.target.closest('.variant-flag');
-  if (!flag) return;
+  if (ctxMenu && !ctxMenu.contains(e.target)) closeContextMenu();
+});
 
-  var name = flag.dataset.auditName;
-  var size = flag.dataset.size;
-  var entry = getAuditEntry(name, size);
-  var nowFlagged = !entry.flagged;
-  setFlag(name, size, nowFlagged);
-
-  var wrapper = flag.closest('.variant-item');
-  wrapper.classList.toggle('variant-item--flagged', nowFlagged);
-  flag.title = nowFlagged ? 'Unflag — allow this variant' : 'Flag — blacklist this variant';
-
-  updateNoteIndicator(name, size); // refresh counts
-  renderAuditTable();
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeContextMenu();
 });
 
 // ============================================
