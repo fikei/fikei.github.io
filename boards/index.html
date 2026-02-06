@@ -2287,7 +2287,54 @@ body {
 .widget-inline {
   grid-column: 1 / -1;
   margin: var(--space-2) 0;
+  position: relative;
   /* No border/background - handled by inner widget-complete__body */
+}
+
+.widget-inline[draggable="true"] {
+  cursor: grab;
+}
+
+.widget-inline[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.widget-inline.dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+}
+
+.widget-inline__drag-handle {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+
+.widget-inline:hover .widget-inline__drag-handle {
+  opacity: 0.5;
+}
+
+.widget-inline__drag-handle:hover {
+  opacity: 1 !important;
+}
+
+.widget-inline__drag-handle::before {
+  content: '\2630';
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.widget-inline__drag-handle:active {
+  cursor: grabbing;
 }
 
 
@@ -3436,6 +3483,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             </label>
           </div>
         </div>
+        <div class="share-modal__section">
+          <label class="share-modal__label">Widgets</label>
+          <div class="share-modal__options">
+            <label class="share-modal__option">
+              <input type="checkbox" id="shareHideWidgets">
+              <span class="share-modal__option-text">
+                <strong>Hide AI widgets</strong>
+                <small>Don't show AI-generated widgets in shared view</small>
+              </span>
+            </label>
+          </div>
+        </div>
         <div class="share-modal__section share-modal__link-section" id="shareLinkSection" style="display:none;">
           <label class="share-modal__label">Share Link</label>
           <div class="share-modal__link-row">
@@ -4246,6 +4305,26 @@ Return JSON:
     generateWidgets();
     console.log('[widget] Dismissed:', widgetId);
   };
+
+  // Widget positions in grid (persisted in localStorage)
+  const WIDGET_POSITIONS_KEY = 'boards_widget_positions';
+  let widgetPositions = {}; // { widgetId: gridIndex }
+
+  function loadWidgetPositions() {
+    try {
+      widgetPositions = JSON.parse(localStorage.getItem(WIDGET_POSITIONS_KEY) || '{}');
+    } catch { widgetPositions = {}; }
+  }
+
+  function saveWidgetPositions() {
+    try {
+      localStorage.setItem(WIDGET_POSITIONS_KEY, JSON.stringify(widgetPositions));
+    } catch {}
+  }
+
+  function getWidgetPosition(widgetId) {
+    return widgetPositions[widgetId] ?? INLINE_WIDGET_POSITION;
+  }
 
   // Permanently hide widget
   window.hideWidget = function(widgetId) {
@@ -5193,7 +5272,8 @@ Return JSON:
 
   // Store inline widgets for grid injection
   let inlineWidgetHtml = '';
-  const INLINE_WIDGET_POSITION = 8; // Insert inline widget after this many cards
+  let inlineWidgets = []; // Array of { id, html } for drag-and-drop support
+  const INLINE_WIDGET_POSITION = 8; // Default: insert inline widget after this many cards
   let widgetGenerationInProgress = false; // Mutex to prevent duplicate generation
 
   // Main widget generation function - zone-aware
@@ -5210,6 +5290,7 @@ Return JSON:
     heroSection.classList.remove('widget-section--visible');
     footerSection.classList.remove('widget-section--visible');
     inlineWidgetHtml = '';
+    inlineWidgets = [];
 
     // Phase 2: Category-agnostic — show widgets for any category that has matching configs
     // The widget registry (server-side) defines which categories each widget supports
@@ -5305,10 +5386,13 @@ Return JSON:
       if (widget.zone === 'hero') {
         heroHtml += widgetHtml;
       } else if (widget.zone === 'inline') {
-        inlineWidgetHtml += `
-          <div class="widget-inline">
+        const widgetWrapHtml = `
+          <div class="widget-inline" data-widget-id="${esc(widget.id)}" draggable="true">
+            <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
             ${widgetHtml}
           </div>`;
+        inlineWidgetHtml += widgetWrapHtml;
+        inlineWidgets.push({ id: widget.id, html: widgetWrapHtml });
       } else if (widget.zone === 'footer') {
         footerHtml += widgetHtml;
       }
@@ -5364,9 +5448,10 @@ Return JSON:
     // Show loading state for this specific widget
     if (widget.zone === 'inline') {
       // Replace inline widget with loading state
-      const inlineContainer = document.querySelector('.widget-inline');
+      const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
+          <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
           <div class="widget-complete">
             <div class="widget-complete__header">
               <div class="widget-complete__header-left">
@@ -5405,7 +5490,7 @@ Return JSON:
       console.log('[widget] Widget suppressed on refresh:', widgetId, aiResult.reason);
       // Hide the widget since it's no longer eligible
       if (widget.zone === 'inline') {
-        const inlineContainer = document.querySelector('.widget-inline');
+        const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
         if (inlineContainer) {
           inlineContainer.style.display = 'none';
         }
@@ -5424,16 +5509,21 @@ Return JSON:
 
     // Update only this widget's display
     if (widget.zone === 'inline') {
-      const inlineContainer = document.querySelector('.widget-inline');
+      const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.style.display = ''; // Ensure visible
-        inlineContainer.innerHTML = widgetHtml;
+        inlineContainer.innerHTML = `<div class="widget-inline__drag-handle" title="Drag to reposition"></div>${widgetHtml}`;
       }
       // Also update stored HTML for future grid re-renders
-      inlineWidgetHtml = `
-        <div class="widget-inline">
+      const updatedWrapHtml = `
+        <div class="widget-inline" data-widget-id="${esc(widgetId)}" draggable="true">
+          <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
           ${widgetHtml}
         </div>`;
+      inlineWidgetHtml = updatedWrapHtml;
+      // Update the inlineWidgets array entry
+      const iwIdx = inlineWidgets.findIndex(iw => iw.id === widgetId);
+      if (iwIdx >= 0) inlineWidgets[iwIdx].html = updatedWrapHtml;
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
       if (heroContent) {
@@ -5519,6 +5609,7 @@ Return JSON:
     loadWidgetStatus();
     loadWidgetPrefs();
     loadWidgetFeedback();
+    loadWidgetPositions();
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
@@ -7414,13 +7505,25 @@ Return JSON:
 
     let html = '';
     let cardCount = 0;
-    let inlineWidgetInserted = false;
+
+    // Build a map of widget positions for injection
+    const widgetsByPosition = {};
+    if (inlineWidgets.length > 0) {
+      for (const iw of inlineWidgets) {
+        const pos = getWidgetPosition(iw.id);
+        if (!widgetsByPosition[pos]) widgetsByPosition[pos] = [];
+        widgetsByPosition[pos].push(iw.html);
+      }
+    }
+    const widgetPositionKeys = Object.keys(widgetsByPosition).map(Number).sort((a, b) => a - b);
+    let widgetPosIdx = 0;
 
     for (const l of sorted) {
-      // Inject inline widget after INLINE_WIDGET_POSITION cards
-      if (!inlineWidgetInserted && inlineWidgetHtml && cardCount >= INLINE_WIDGET_POSITION) {
-        html += inlineWidgetHtml;
-        inlineWidgetInserted = true;
+      // Inject inline widgets at their configured positions
+      while (widgetPosIdx < widgetPositionKeys.length && cardCount >= widgetPositionKeys[widgetPosIdx]) {
+        const pos = widgetPositionKeys[widgetPosIdx];
+        html += widgetsByPosition[pos].join('');
+        widgetPosIdx++;
       }
       cardCount++;
 
@@ -7490,9 +7593,11 @@ Return JSON:
       }
     }
 
-    // Add inline widget at end if not yet inserted and we have one
-    if (!inlineWidgetInserted && inlineWidgetHtml) {
-      html += inlineWidgetHtml;
+    // Add remaining inline widgets at end if not yet inserted
+    while (widgetPosIdx < widgetPositionKeys.length) {
+      const pos = widgetPositionKeys[widgetPosIdx];
+      html += widgetsByPosition[pos].join('');
+      widgetPosIdx++;
     }
 
     grid.innerHTML = html;
@@ -7921,8 +8026,9 @@ Return JSON:
     }
   };
 
-  // Drag and drop reordering
+  // Drag and drop reordering (links + widgets)
   let draggedId = null;
+  let draggedWidgetId = null;
   let isDragging = false;
   let dropPosition = null; // 'before' or 'after'
 
@@ -7932,10 +8038,30 @@ Return JSON:
     });
   }
 
+  // Get the card index of a grid-item by counting preceding grid-items
+  function getCardIndex(gridItem) {
+    const items = Array.from(grid.querySelectorAll('.grid-item'));
+    return items.indexOf(gridItem);
+  }
+
   grid.ondragstart = (e) => {
+    // Handle widget drag
+    const widget = e.target.closest('.widget-inline');
+    if (widget && widget.dataset.widgetId) {
+      draggedWidgetId = widget.dataset.widgetId;
+      draggedId = null;
+      isDragging = true;
+      widget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', 'widget:' + draggedWidgetId);
+      return;
+    }
+
+    // Handle link card drag
     const item = e.target.closest('.grid-item');
     if (!item) return;
     draggedId = item.dataset.id;
+    draggedWidgetId = null;
     isDragging = true;
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
@@ -7945,8 +8071,11 @@ Return JSON:
   grid.ondragend = (e) => {
     const item = e.target.closest('.grid-item');
     if (item) item.classList.remove('dragging');
+    const widget = e.target.closest('.widget-inline');
+    if (widget) widget.classList.remove('dragging');
     clearDragClasses();
     draggedId = null;
+    draggedWidgetId = null;
     dropPosition = null;
     setTimeout(() => { isDragging = false; }, 100);
   };
@@ -7954,9 +8083,9 @@ Return JSON:
   grid.ondragover = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
     const item = e.target.closest('.grid-item');
     if (item && item.dataset.id !== draggedId) {
-      // Determine if dropping before or after based on mouse position
       const rect = item.getBoundingClientRect();
       const midX = rect.left + rect.width / 2;
       const isBefore = e.clientX < midX;
@@ -7976,13 +8105,28 @@ Return JSON:
 
   grid.ondrop = (e) => {
     e.preventDefault();
-    const targetItem = e.target.closest('.grid-item');
-    if (!targetItem || !draggedId) return;
     clearDragClasses();
-    const targetId = targetItem.dataset.id;
-    if (draggedId !== targetId) {
-      reorderLinks(draggedId, targetId, dropPosition);
+
+    const targetItem = e.target.closest('.grid-item');
+    if (!targetItem) return;
+
+    // Widget being dropped onto a grid position
+    if (draggedWidgetId) {
+      const targetIndex = getCardIndex(targetItem);
+      const newPosition = dropPosition === 'after' ? targetIndex + 1 : targetIndex;
+      widgetPositions[draggedWidgetId] = newPosition;
+      saveWidgetPositions();
       renderGrid();
+      return;
+    }
+
+    // Link card being reordered
+    if (draggedId) {
+      const targetId = targetItem.dataset.id;
+      if (draggedId !== targetId) {
+        reorderLinks(draggedId, targetId, dropPosition);
+        renderGrid();
+      }
     }
   };
 
@@ -8734,6 +8878,7 @@ Return JSON:
     shareCreateBtn.style.display = '';
     shareStopBtn.style.display = 'none';
     shareCreateBtn.textContent = 'Create Share Link';
+    $('shareHideWidgets').checked = false;
 
     // Check if already shared
     loadExistingShare(category);
@@ -8779,6 +8924,9 @@ Return JSON:
     // Set update mode radio
     const modeRadio = document.querySelector(`input[name="shareUpdateMode"][value="${share.update_mode}"]`);
     if (modeRadio) modeRadio.checked = true;
+
+    // Set hide widgets checkbox
+    $('shareHideWidgets').checked = !!share.hide_widgets;
 
     // Show link
     const shareUrl = `${window.location.origin}/boards/share.html?id=${share.slug}`;
@@ -8826,6 +8974,7 @@ Return JSON:
 
     const visibility = document.querySelector('input[name="shareVisibility"]:checked')?.value || 'link';
     const updateMode = document.querySelector('input[name="shareUpdateMode"]:checked')?.value || 'live';
+    const hideWidgets = $('shareHideWidgets').checked;
 
     shareCreateBtn.disabled = true;
     shareCreateBtn.textContent = currentShare ? 'Updating...' : 'Creating...';
@@ -8871,6 +9020,7 @@ Return JSON:
         snapshot_link_ids: snapshotIds,
         expanded_cards: expandedForShare,
         link_order: linkOrderForShare,
+        hide_widgets: hideWidgets,
         owner_email: currentUser.email,
         updated_at: new Date().toISOString()
       };
