@@ -2,85 +2,92 @@
    Uses CTRL Design System tokens
    ============================================ */
 
-/* Viewer Container - 3-column layout */
-.viewer-container {
-  display: grid;
-  grid-template-columns: var(--systemic-nav-width) 1fr var(--systemic-context-width);
-  height: 100%;
-  overflow: hidden;
-}
-
-/* Component Navigation (Left Sidebar) */
-.component-nav {
-  background: var(--bg-surface);
-  border-right: var(--border-thin) solid var(--border);
+/* Docs View - full height flex column */
+#docs-view {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.nav-header {
-  padding: var(--space-4);
+#docs-view.active {
+  display: flex;
+}
+
+/* Docs Navigation - sticky bar (widgets.html pattern) */
+.docs-nav {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
   border-bottom: var(--border-thin) solid var(--border-subtle);
+  z-index: var(--z-sticky, 10);
+  padding: var(--space-3) var(--space-6);
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  overflow-x: auto;
+  flex-shrink: 0;
 }
 
-.nav-header h3 {
-  font-family: var(--font-mono);
+.docs-nav__link {
+  font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  color: var(--fg-muted);
-  margin: 0 0 var(--space-3);
-}
-
-.nav-sections {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-2) 0;
-}
-
-.nav-section {
-  margin-bottom: var(--space-4);
-}
-
-.nav-section-title {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-widest);
-  color: var(--fg-subtle);
-  padding: var(--space-2) var(--space-4);
-  margin: 0;
-}
-
-.nav-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.nav-list li a {
-  display: block;
-  padding: var(--space-2) var(--space-4);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
   color: var(--fg-muted);
   text-decoration: none;
-  transition: all var(--duration-normal) var(--ease-default);
+  white-space: nowrap;
+  padding: var(--space-1) 0;
+  border-bottom: 2px solid transparent;
+  transition: all var(--duration-fast) var(--ease-default);
 }
 
-.nav-list li a:hover {
+.docs-nav__link:hover {
   color: var(--fg);
-  background: var(--bg-elevated);
 }
 
-.nav-list li a.active {
+.docs-nav__link.active {
   color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+.docs-nav__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.docs-nav__spacer {
+  flex: 1;
+}
+
+.docs-nav__select {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
   background: var(--bg);
-  border-left: var(--border-medium) solid var(--fg);
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
 }
 
-/* Component Stage (Center) */
+.docs-nav__select:hover,
+.docs-nav__select:focus {
+  color: var(--fg);
+  border-color: var(--border);
+}
+
+/* Viewer Container - 2-column layout (stage + context sidebar) */
+.viewer-container {
+  display: grid;
+  grid-template-columns: 1fr var(--systemic-context-width);
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Component Stage (Main) */
 .component-stage {
   display: flex;
   flex-direction: column;
@@ -88,15 +95,7 @@
   background: var(--bg);
 }
 
-.stage-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-4);
-  border-bottom: var(--border-thin) solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
+/* Breadcrumb */
 .breadcrumb {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -104,7 +103,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .breadcrumb-link {
@@ -132,15 +132,19 @@
   color: var(--fg-muted);
 }
 
-.variant-controls {
+/* View toggle in nav */
+.docs-nav .view-toggle {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
+/* State toggles in nav */
 .state-toggles {
   display: flex;
   gap: var(--space-1);
+  flex-shrink: 0;
 }
 
 .state-btn {
@@ -245,12 +249,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.sidebar-header {
-  padding: var(--space-3);
-  border-bottom: var(--border-thin) solid var(--border-subtle);
-  flex-shrink: 0;
 }
 
 .view-toggle {
@@ -501,18 +499,23 @@
 /* Responsive */
 @media (max-width: 1200px) {
   .viewer-container {
-    grid-template-columns: 200px 1fr 280px;
+    grid-template-columns: 1fr 280px;
   }
 }
 
 @media (max-width: 900px) {
-  .viewer-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+  .docs-nav {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
   }
 
-  .component-nav {
+  .docs-nav__spacer {
     display: none;
+  }
+
+  .viewer-container {
+    grid-template-columns: 1fr;
   }
 
   .context-sidebar {
@@ -529,18 +532,6 @@
 
   .context-sidebar.expanded {
     transform: translateY(0);
-  }
-
-  .sidebar-header {
-    cursor: pointer;
-  }
-
-  .sidebar-header::before {
-    content: '━━━';
-    display: block;
-    text-align: center;
-    color: var(--fg-subtle);
-    margin-bottom: var(--space-2);
   }
 }
 
@@ -645,31 +636,11 @@
   min-width: 80px;
 }
 
-/* Navigation item styles */
-.nav-list li a {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.nav-item-name {
+/* Component dropdown option groups */
+.docs-nav__select optgroup {
   font-family: var(--font-primary);
   font-size: var(--text-xs);
-}
-
-.nav-item-meta {
-  font-family: var(--font-primary);
-  font-size: 8px;
-  color: var(--fg-subtle);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.nav-empty {
-  padding: var(--space-4);
-  color: var(--fg-subtle);
-  font-size: var(--text-xs);
-  font-style: italic;
 }
 
 /* Breadcrumb meta */

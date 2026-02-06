@@ -27,17 +27,16 @@ class DesignSystemViewer {
    * Bind DOM elements
    */
   bindElements() {
-    // Navigation
-    this.componentNav = DOMUtils.$('#component-nav', this.container);
-    this.foundationsList = DOMUtils.$('#foundations-list', this.container);
-    this.componentsList = DOMUtils.$('#components-list', this.container);
-    this.componentSearch = DOMUtils.$('#component-search', this.container);
+    // Docs nav bar
+    this.docsNav = DOMUtils.$('#docs-nav', this.container);
+    this.foundationLinks = DOMUtils.$$('.docs-nav__link', this.container);
+    this.componentSelect = DOMUtils.$('#component-select', this.container);
+    this.variantSelect = DOMUtils.$('#variant-select', this.container);
+    this.breadcrumb = DOMUtils.$('#stage-breadcrumb', this.container);
+    this.breadcrumbSystemName = DOMUtils.$('#breadcrumb-system-name', this.container);
 
     // Stage
     this.componentStage = DOMUtils.$('#component-stage', this.container);
-    this.breadcrumb = DOMUtils.$('#stage-breadcrumb', this.container);
-    this.variantControls = DOMUtils.$('#variant-controls', this.container);
-    this.variantSelect = DOMUtils.$('#variant-select', this.container);
     this.componentPreview = DOMUtils.$('#component-preview', this.container);
     this.componentSpecs = DOMUtils.$('#component-specs', this.container);
     this.specsGrid = DOMUtils.$('#specs-grid', this.container);
@@ -71,7 +70,23 @@ class DesignSystemViewer {
    * Bind event listeners
    */
   bindEvents() {
-    // View toggle
+    // Foundation nav links
+    this.foundationLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.selectFoundation(link.dataset.section);
+      });
+    });
+
+    // Component dropdown
+    this.componentSelect?.addEventListener('change', (e) => {
+      const type = e.target.value;
+      if (!type) return;
+      const comp = this.designSystem?.components?.find(c => c.type === type);
+      if (comp) this.selectComponent(comp);
+    });
+
+    // View toggle (Design / Code)
     DOMUtils.$$('.toggle-btn', this.container).forEach(btn => {
       btn.addEventListener('click', () => this.switchContext(btn.dataset.context));
     });
@@ -86,19 +101,16 @@ class DesignSystemViewer {
       this.selectVariant(e.target.value);
     });
 
-    // Component search
-    this.componentSearch?.addEventListener('input', DOMUtils.debounce((e) => {
-      this.filterComponents(e.target.value);
-    }, 200));
-
     // Copy buttons
     DOMUtils.$$('.copy-btn', this.container).forEach(btn => {
       btn.addEventListener('click', () => this.copyCode(btn.dataset.copy));
     });
 
     // Mobile sidebar toggle
-    DOMUtils.$('.sidebar-header', this.container)?.addEventListener('click', () => {
-      this.contextSidebar?.classList.toggle('expanded');
+    this.contextSidebar?.addEventListener('click', (e) => {
+      if (window.innerWidth <= 900 && e.target === this.contextSidebar) {
+        this.contextSidebar.classList.toggle('expanded');
+      }
     });
   }
 
@@ -142,57 +154,34 @@ class DesignSystemViewer {
   }
 
   /**
-   * Render the navigation tree
+   * Render the navigation (populate component dropdown + update breadcrumb)
    */
   renderNavigation() {
     if (!this.designSystem) return;
 
-    // Clear existing components
-    if (this.componentsList) {
-      this.componentsList.innerHTML = '';
+    // Update breadcrumb system name
+    if (this.breadcrumbSystemName) {
+      this.breadcrumbSystemName.textContent = this.designSystem.name || 'System';
     }
 
-    // Add component items (now consolidated)
-    const components = this.designSystem.components || [];
+    // Populate component dropdown
+    if (this.componentSelect) {
+      const components = this.designSystem.components || [];
 
-    if (components.length === 0) {
-      const li = DOMUtils.createElement('li', { className: 'nav-empty' }, [
-        'No components found'
-      ]);
-      this.componentsList?.appendChild(li);
-    } else {
-      components.forEach(component => {
-        const variantCount = component.variants?.length || 0;
-        const usageCount = component.totalUsage || 0;
+      // Reset dropdown
+      this.componentSelect.innerHTML = '<option value="">Component...</option>';
 
-        const li = DOMUtils.createElement('li', {}, [
-          DOMUtils.createElement('a', {
-            href: '#',
-            data: { section: 'component', id: component.type },
-            onClick: (e) => {
-              e.preventDefault();
-              this.selectComponent(component);
-            }
-          }, [
-            DOMUtils.createElement('span', { className: 'nav-item-name' }, [
-              component.name || this.formatName(component.type)
-            ]),
-            DOMUtils.createElement('span', { className: 'nav-item-meta' }, [
-              `${variantCount} variant${variantCount !== 1 ? 's' : ''}`
-            ])
-          ])
-        ]);
-        this.componentsList?.appendChild(li);
-      });
+      if (components.length > 0) {
+        components.forEach(component => {
+          const variantCount = component.variants?.length || 0;
+          const name = component.name || this.formatName(component.type);
+          const option = document.createElement('option');
+          option.value = component.type;
+          option.textContent = `${name} (${variantCount})`;
+          this.componentSelect.appendChild(option);
+        });
+      }
     }
-
-    // Bind foundation links
-    this.foundationsList?.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.selectFoundation(link.dataset.section);
-      });
-    });
   }
 
   /**
@@ -254,9 +243,9 @@ class DesignSystemViewer {
       { label: this.formatName(section) }
     ]);
 
-    // Hide variant controls
-    if (this.variantControls) {
-      this.variantControls.hidden = true;
+    // Hide variant select for foundations
+    if (this.variantSelect) {
+      this.variantSelect.hidden = true;
     }
 
     // Render foundation content
@@ -307,14 +296,14 @@ class DesignSystemViewer {
       { label: component.name, meta: `${variantCount} variant${variantCount !== 1 ? 's' : ''} · ${totalUsage} usage${totalUsage !== 1 ? 's' : ''}` }
     ]);
 
-    // Show variant controls if multiple variants
-    if (component.variants?.length > 1) {
-      this.variantControls.hidden = false;
+    // Show variant dropdown if multiple variants
+    if (component.variants?.length > 1 && this.variantSelect) {
+      this.variantSelect.hidden = false;
       this.variantSelect.innerHTML = component.variants
         .map((v, i) => `<option value="${i}">${v.name || 'Variant ' + (i + 1)} (${v.usageCount || 0})</option>`)
         .join('');
-    } else {
-      this.variantControls.hidden = true;
+    } else if (this.variantSelect) {
+      this.variantSelect.hidden = true;
     }
 
     // Render component preview
@@ -328,14 +317,19 @@ class DesignSystemViewer {
    * Update navigation active state
    */
   updateNavActiveState(activeId) {
-    // Remove all active states
-    DOMUtils.$$('.nav-list a', this.container).forEach(link => {
-      link.classList.remove('active');
+    // Update foundation link active states
+    this.foundationLinks.forEach(link => {
+      link.classList.toggle('active', link.dataset.section === activeId);
     });
 
-    // Set active state
-    const activeLink = DOMUtils.$(`[data-section="${activeId}"], [data-id="${activeId}"]`, this.container);
-    activeLink?.classList.add('active');
+    // Update component dropdown if a component is selected
+    const foundations = ['color', 'typography', 'spacing', 'elevation'];
+    if (foundations.includes(activeId)) {
+      // Deselect component dropdown when viewing a foundation
+      if (this.componentSelect) this.componentSelect.value = '';
+    } else if (this.componentSelect) {
+      this.componentSelect.value = activeId;
+    }
   }
 
   /**
@@ -958,16 +952,10 @@ class DesignSystemViewer {
   }
 
   /**
-   * Filter components by search
+   * Filter components by search (no-op since using dropdown now)
    */
   filterComponents(query) {
-    const items = DOMUtils.$$('#components-list li', this.container);
-    const lowerQuery = query.toLowerCase();
-
-    items.forEach(item => {
-      const text = item.textContent.toLowerCase();
-      item.style.display = text.includes(lowerQuery) ? '' : 'none';
-    });
+    // Component filtering is now handled by the native <select> dropdown
   }
 
   /**
