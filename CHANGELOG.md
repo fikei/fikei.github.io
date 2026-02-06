@@ -4,6 +4,14 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-06] - Notion Structure Audit, Bug Tracking, Decision Log
+
+### Changed
+- **`docs/execution/BUGS.md`** — Populated from empty placeholder with 8 real bugs discovered during codebase analysis: 2 high priority (sync writes silently lost, 30s polling read-only), 4 medium (CORS proxy silent degradation, widget timeout UX, logo detection false positives, category change doesn't re-trigger widgets), 4 low (expanded card desync, incomplete URL param removal, paste detection annoyance, hardcoded admin email).
+- **`docs/strategy/decision-log.md`** — Added 7 new Architecture Decision Records (ADR-006 through ADR-012): localStorage-first architecture, CORS proxies for client-side scraping, domain profile caching for AI cost amortization, config-driven widget system, two-tier pin enrichment, single-file frontend (no build step), magic link authentication.
+
+---
+
 ## [2026-02-06] - Tech Stack, Risk Register, Project Plan Updates
 
 ### Added
