@@ -192,6 +192,78 @@ Before adding anything new, fix the existing experience:
 
 Widgets that fire on **item count + category filter only**. No timestamps, no interaction tracking, no AI eligibility checks. All triggers can be evaluated client-side from the `links[]` array.
 
+### Priority: High-Value Widgets (Build First)
+
+These two widgets are user-validated priorities. Build and ship before the standard tier rollout.
+
+#### Widget #40: Upcoming Releases (watch: Deadline)
+
+**Question**: "Upcoming releases from your saves"
+**Why priority**: High user excitement. Direct, time-sensitive value — tells you when something you care about is coming.
+
+| | Detail |
+|---|--------|
+| **Trigger** | 2+ watch items |
+| **Template** | list |
+| **Data** | title, domain + AI-inferred release dates (fallback to TMDB later) |
+| **Title** | "Upcoming releases for you" |
+| **Body** | List of saved shows/movies with inferred or known upcoming seasons/sequels, sorted by release proximity |
+| **Row format** | Show title + "Season N — Expected Q2 2026" status + external link icon |
+| **Actions** | Visit link, dismiss item |
+| **Loading text** | "Checking your watchlist..." |
+| **Grid sizes** | sm (1x1, compact 2-3 items), med (2x1, full list), tall (1x2, full list + images) |
+
+**Phase 1 (ship now)**: AI infers release dates from show titles and domain context. Won't be perfectly accurate but gives directional value with "AI" badge.
+**Phase 2 (later)**: Add TMDB API integration for verified release dates. Replace AI inference where API data exists.
+
+#### Widget #41: More Like Your Board (all: Discover)
+
+**Question**: "More like your board"
+**Why priority**: Universal — works across every category. Proactive discovery is the highest-value AI feature.
+
+| | Detail |
+|---|--------|
+| **Trigger** | 3+ items in any single category |
+| **Template** | suggestion |
+| **Data** | title, domain, category (existing data — can ship immediately) |
+| **Title** | Category-specific (see variants below) |
+| **Body** | 2-3 AI-recommended items with reasoning, each with title + source + why-you'd-like-it blurb |
+| **Row format** | Recommendation title + source domain + one-line reason |
+| **Actions** | Visit link, save to board, dismiss |
+| **Loading text** | "Finding things you'd love..." |
+| **Grid sizes** | sm (1x1, single recommendation), med (2x1, 2-3 recs), tall (1x2, recs + reasoning), lg (2x2, recs + images + full reasoning) |
+
+**Category-specific titles:**
+
+| Category | Widget title | Prompt flavor |
+|----------|-------------|---------------|
+| eat | "Restaurants you'd love" | Similar cuisine, vibe, price point |
+| home | "Pieces that fit your space" | Same aesthetic, complementary items |
+| watch | "Shows cut from the same cloth" | Similar genre, tone, pacing |
+| read | "Your next great read" | Same topic depth, writing style |
+| use | "Tools you're missing" | Same workflow, complementary features |
+| wear | "Brands on your wavelength" | Same aesthetic, price tier, style |
+| follow | "Creators in your orbit" | Same niche, cross-pollination |
+| go | "Places that match your taste" | Same vibe, region, experience type |
+| all (fallback) | "More like your board" | General pattern matching |
+
+**Differentiating from "Add more pins":**
+
+| | Add more pins | More like your board |
+|---|---|---|
+| **Intent** | Gap-filling ("you have few items") | Enrichment ("based on your taste") |
+| **Trigger** | Low item count / empty state | 3+ items (enough for pattern) |
+| **Content** | Generic prompt to paste a URL | Specific named recommendations with reasoning |
+| **Action** | Opens paste/search UI | Direct links to explore + one-tap save |
+| **Tone** | Utility ("add content") | Discovery ("you'd love this") |
+| **Placement** | Empty state / CTA | Widget card alongside existing content |
+
+**How it changes per category**: The AI prompt shifts focus based on category context. For `eat`, it weighs cuisine similarity and neighborhood proximity. For `watch`, it weighs genre and tone. For `use`, it looks at workflow complementarity. The widget shell stays the same — the AI response drives the variance.
+
+**How it competes with "Add more pins"**: It doesn't — they serve different moments. "Add pins" activates when the board feels empty (explicit user action). "Discover" activates when the board has enough signal for the AI to infer taste (proactive suggestion). They can coexist: empty state shows "Add pins", populated state shows "More like your board."
+
+---
+
 ### Tier 1: One widget per original category (8 categories)
 
 Each gets its first widget. Prioritize templates already built.
@@ -842,6 +914,7 @@ Every widget has a **job** (what it does), a **trigger** (when it appears), and 
 | 38 | all (cross) | Contradict | "You're saying two different things" | cross: items from opposing themes detected | text-block | title, category, domain |
 | 39 | go | Cluster | "You're orbiting a neighborhood" | 3+ places in same inferred city/area | hero-card | title, url, domain, **geo inference** |
 | 40 | watch | Deadline | "Upcoming releases from your saves" | 2+ TV shows saved with active/upcoming seasons | list | title, domain, **release dates (TMDB)** |
+| 41 | all | Discover | "More like your board" | 3+ items in any single category | suggestion | title, domain, category |
 
 ---
 
@@ -864,7 +937,7 @@ Every widget has a **job** (what it does), a **trigger** (when it appears), and 
 | **gift** | 1 | Assign |
 | **make** | 1 | Assemble |
 | **spend** | 1 | Calculate |
-| **all / cross** | 7 | Behavior, Predict, Archaeologist, Expire, Drift, Ritual, Contradict |
+| **all / cross** | 8 | Behavior, Predict, Archaeologist, Expire, Drift, Ritual, Contradict, **Discover** |
 
 ### Template Usage Summary
 
@@ -880,6 +953,7 @@ Every widget has a **job** (what it does), a **trigger** (when it appears), and 
 | pick-one | 2 | Binary choice with feedback loop |
 | commit-list | 2 | Accumulator lists with running totals |
 | quick-add | 1 | Single suggestion with add action |
+| suggestion | 1 | AI recommendations with reasoning (#41 Discover) |
 | bundle | 1 | Grouped items as a set |
 
 ---
@@ -958,8 +1032,11 @@ These widgets use ONLY title + url + domain + category (data that already exists
 | 34 | Proxy (follow) | AI infers relationships from creator names/platforms |
 | 35 | Substitute (eat) | AI infers vibe from restaurant name + domain |
 | 36 | Ladder (home) | AI infers product type + suggests price tiers |
+| 41 | Discover (all) | AI recommends similar items from saved titles + domains |
 
-**These 7 widgets can ship immediately** — no schema changes, no new APIs, no new data. Just AI prompt + existing item data.
+**These 8 widgets can ship immediately** — no schema changes, no new APIs, no new data. Just AI prompt + existing item data.
+
+**Priority order**: #40 (Upcoming Releases) and #41 (More Like Your Board) ship first — user-validated high-value widgets.
 
 ### What Needs One Prerequisite
 

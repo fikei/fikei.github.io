@@ -81,6 +81,7 @@
   <a href="#atoms">Atoms</a>
   <a href="#molecules">Molecules</a>
   <a href="#layouts">Layouts</a>
+  <a href="#priority">Priority</a>
   <a href="#grid">Grid Sizes</a>
 </nav>
 
@@ -894,6 +895,291 @@
 
   <hr class="section-divider">
 
+  <!-- ====== PRIORITY WIDGETS ====== -->
+  <div class="section" id="priority">
+    <h2 class="section__heading">Priority Widgets</h2>
+    <p class="section__desc">User-validated high-value widgets. Build and ship first.</p>
+
+    <div class="component-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+
+      <!-- #40 Upcoming Releases — med (2x1) -->
+      <div class="w-shell" style="grid-column: span 2;">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Upcoming releases for you</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Severance</span>
+                <span class="w-text w-text--meta">Season 3 — Expected Q3 2026</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--success">Soon</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">The White Lotus</span>
+                <span class="w-text w-text--meta">Season 4 — Filming</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--muted">2027</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Squid Game</span>
+                <span class="w-text w-text--meta">Season 3 — Expected 2026</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--muted">2026</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-play"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Dune: Part Three</span>
+                <span class="w-text w-text--meta">Feature film — No date announced</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--muted">TBD</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 8 saved shows</span>
+        </div>
+      </div>
+
+      <!-- #40 Upcoming Releases — sm (1x1, compact) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Upcoming releases</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <span class="w-text w-text--title">Severance S3</span>
+            </div>
+            <span class="w-badge w-badge--success">Soon</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <span class="w-text w-text--title">Squid Game S3</span>
+            </div>
+            <span class="w-badge w-badge--muted">2026</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- #41 More Like Your Board — eat variant (med) -->
+      <div class="w-shell" style="grid-column: span 2;">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Restaurants you'd love</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Bar Chelou</span>
+                <span class="w-text w-text--meta">Natural wine bar — Similar vibe to Chez Pascal and your French saves</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Kismet</span>
+                <span class="w-text w-text--meta">Middle Eastern — Matches your preference for ingredient-driven cooking</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Petit Trois</span>
+                <span class="w-text w-text--meta">French bistro — Same price range and neighborhood feel as your top picks</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 6 saved restaurants</span>
+          <button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button>
+        </div>
+      </div>
+
+      <!-- #41 More Like Your Board — watch variant (med) -->
+      <div class="w-shell" style="grid-column: span 2;">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Shows cut from the same cloth</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Pachinko</span>
+                <span class="w-text w-text--meta">Multi-generational storytelling — you gravitate toward slow-burn drama</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Shogun</span>
+                <span class="w-text w-text--meta">Period drama — similar production quality to your top-rated saves</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 5 saved shows</span>
+          <button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button>
+        </div>
+      </div>
+
+      <!-- #41 More Like Your Board — read variant (sm) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Your next great read</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">The Myth of Normal</span>
+              <span class="w-text w-text--meta">You read a lot about systems thinking — this applies it to health</span>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> Read</button>
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button>
+        </div>
+      </div>
+
+      <!-- #41 More Like Your Board — home variant (sm) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Pieces that fit your space</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Floyd Side Table</span>
+                <span class="w-text w-text--meta">Minimal — matches your saved aesthetic</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> View</button>
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button>
+        </div>
+      </div>
+
+      <!-- #41 More Like Your Board — wear variant (tall/1x2) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Brands on your wavelength</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-img w-img--hero w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">Auralee</span>
+              <span class="w-text w-text--meta">Japanese minimalism — you save a lot of clean-cut pieces at this price point</span>
+            </div>
+          </div>
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">Studio Nicholson</span>
+              <span class="w-text w-text--meta">Architectural tailoring — overlaps with your Jil Sander and Lemaire saves</span>
+            </div>
+          </div>
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">Baserange</span>
+              <span class="w-text w-text--meta">Natural fabrics — complements the earthy palette in your wardrobe</span>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 14 saved items</span>
+          <button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
   <!-- ====== GRID SIZE PERMUTATIONS ====== -->
   <div class="section" id="grid">
     <h2 class="section__heading">Grid Size Permutations</h2>
@@ -1065,6 +1351,79 @@
           <span class="w-text w-text--meta" style="text-align:center">Launcher + snippets for your Figma + VS Code workflow</span>
         </div>
         <div class="w-actions"><button class="w-btn w-btn--filled">Add to board</button></div>
+      </div>
+
+      <!-- PRIORITY: med (2x1) — #40 Upcoming Releases -->
+      <div class="w-shell w-shell--med">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Upcoming releases</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <div><span class="w-text w-text--title">Severance S3</span><span class="w-text w-text--meta">Expected Q3 2026</span></div>
+            </div>
+            <span class="w-badge w-badge--success">Soon</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <div><span class="w-text w-text--title">Squid Game S3</span><span class="w-text w-text--meta">Expected 2026</span></div>
+            </div>
+            <span class="w-badge w-badge--muted">2026</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-play"/></svg></span>
+              <div><span class="w-text w-text--title">Dune: Part Three</span><span class="w-text w-text--meta">No date yet</span></div>
+            </div>
+            <span class="w-badge w-badge--muted">TBD</span>
+          </div>
+        </div>
+        <div class="w-actions"><span class="w-text w-text--meta">Based on 8 shows</span></div>
+      </div>
+
+      <!-- PRIORITY: sm (1x1) — #41 Discover (eat) -->
+      <div class="w-shell w-shell--sm">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">You'd love</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div><span class="w-text w-text--title">Kismet</span><span class="w-text w-text--meta">Ingredient-driven — your style</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> Visit</button><button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button></div>
+      </div>
+
+      <!-- PRIORITY: lg (2x2) — #41 Discover (wear) -->
+      <div class="w-shell w-shell--lg">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Brands on your wavelength</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-img w-img--hero w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-row">
+            <div><span class="w-text w-text--title">Auralee</span><span class="w-text w-text--meta">Japanese minimalism — clean-cut pieces at this price point</span></div>
+            <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div><span class="w-text w-text--title">Studio Nicholson</span><span class="w-text w-text--meta">Architectural tailoring — overlaps with Jil Sander saves</span></div>
+            <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div><span class="w-text w-text--title">Baserange</span><span class="w-text w-text--meta">Natural fabrics — earthy palette</span></div>
+            <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions"><span class="w-text w-text--meta">Based on 14 items</span><button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button></div>
       </div>
 
     </div>

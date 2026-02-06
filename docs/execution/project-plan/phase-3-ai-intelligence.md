@@ -188,7 +188,8 @@
 | geographic location | ❌ AI-inferred | 2 widgets |
 | release dates | ❌ External API | 1 widget |
 
-**7 widgets can ship immediately with existing data**: #1, 4, 6, 26, 34, 35, 36
+**8 widgets can ship immediately with existing data**: #1, 4, 6, 26, 34, 35, 36, 41
+**Priority widgets**: #40 (AI-inferred dates, ship now), #41 (existing data, ship now)
 
 #### Design System Components
 
@@ -231,6 +232,30 @@
 | | Update discovery endpoint to match on `tags[]` as well as `category` | Pending |
 | | Sub-type widgets (#13, 23, 28, 31, 32) use tags for garment/cuisine/genre matching | Pending |
 | | Cross-category widgets use `category: 'all'` or multi-category query | Pending |
+
+#### Priority Widgets (Build First)
+
+User-validated high-value widgets. Ship before standard tier rollout.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **watch: Upcoming Releases (#40)** | | Pending |
+| | Server config: watch-deadline.ts (list template, 2+ watch items) | Pending |
+| | AI prompt: identify shows/movies, infer upcoming seasons/releases from titles | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | List body layout with w-row × N (release date + urgency indicator) | Pending |
+| | Phase 1: AI-inferred dates (ship now), Phase 2: TMDB API (later) | Pending |
+| **all: More Like Your Board (#41)** | | Pending |
+| | Server config: all-discover.ts (suggestion template, 3+ items in any category) | Pending |
+| | AI prompt: analyze saved items, recommend 2-3 new items with reasoning | Pending |
+| | Category-specific title variants (8 category-aware titles) | Pending |
+| | Frontend WIDGET_REGISTRY entry with category-dynamic title | Pending |
+| | Suggestion body layout with w-row × 2-3 + external link + save action | Pending |
+| | Differentiation from "Add more pins" (trigger threshold, tone, placement) | Pending |
+| **Deploy & Test Priority Widgets** | | Pending |
+| | Test #40 with real watch items — verify AI release date inference quality | Pending |
+| | Test #41 across 3+ categories — verify recommendation relevance | Pending |
+| | Verify coexistence with empty state "Add pins" CTA | Pending |
 
 #### Tier 1: First Widget Per Original Category (8 widgets)
 
