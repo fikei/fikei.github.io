@@ -11,7 +11,7 @@ on:
   schedule:
     # Daily synthesis at 9 AM UTC
     - cron: '0 9 * * *'
-    # Weekly improvement analysis on Fridays at 4 PM UTC
+    # Weekly health check + improvement analysis on Fridays at 4 PM UTC
     - cron: '0 16 * * 5'
   workflow_dispatch:
     inputs:
@@ -27,6 +27,7 @@ on:
           - chief-of-staff
           - security-compliance
           - continuous-improvement
+          - health-check
           - all
       force_full_sync:
         description: 'Force full Notion sync (all pages)'
@@ -41,9 +42,17 @@ env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
 jobs:
-  # Sync to Notion on every push or manual trigger
+  # Sync to Notion
+  # - master/main: only when doc files changed
+  # - claude/*: only when doc files changed
+  # - manual: always sync
   notion-sync:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (github.event_name == 'push' && (
+        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/heads/claude/')
+      )) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,7 +60,139 @@ jobs:
         with:
           fetch-depth: 2  # Need previous commit for diff
 
+      - name: Check if docs changed
+        id: docs-filter
+        run: |
+          # Manual trigger always syncs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_sync=true" >> $GITHUB_OUTPUT
+            echo "✅ Always sync on manual trigger"
+            exit 0
+          fi
+
+          # For push events, only sync if doc-related files changed
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            DOC_CHANGES=$(git diff --name-only HEAD~1 HEAD -- '*.md' 'notion-structure.json' 'docs/' | wc -l)
+          else
+            DOC_CHANGES=1
+          fi
+
+          if [ "$DOC_CHANGES" -gt 0 ]; then
+            echo "should_sync=true" >> $GITHUB_OUTPUT
+            echo "✅ $DOC_CHANGES doc files changed — will sync"
+          else
+            echo "should_sync=false" >> $GITHUB_OUTPUT
+            echo "⏭️ No doc files changed — skipping Notion sync"
+          fi
+
+      - name: Auto-discover untracked docs
+        if: steps.docs-filter.outputs.should_sync == 'true'
+        id: autodiscover
+        run: |
+          if [ ! -f "notion-structure.json" ]; then
+            echo "untracked_count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          python3 << 'PYEOF'
+          import json, os
+
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+
+          # Collect all file paths from structure
+          tracked = set()
+          def walk(pages):
+              for page in pages:
+                  if 'file' in page:
+                      tracked.add(page['file'])
+                  if 'children' in page:
+                      walk(page['children'])
+          walk(structure.get('sections', []))
+
+          # Find all .md files in docs/
+          all_docs = set()
+          for root, dirs, files in os.walk('docs'):
+              dirs[:] = [d for d in dirs if d != 'archive']
+              for f in files:
+                  if f.endswith('.md'):
+                      all_docs.add(os.path.join(root, f))
+
+          untracked = sorted(all_docs - tracked)
+
+          if untracked:
+              print(f"📂 Found {len(untracked)} untracked doc(s):")
+              for f in untracked:
+                  print(f"  - {f}")
+              with open('/tmp/untracked_docs.json', 'w') as out:
+                  json.dump(untracked, out)
+          else:
+              print("✅ All docs/ files are tracked in notion-structure.json")
+              with open('/tmp/untracked_docs.json', 'w') as out:
+                  json.dump([], out)
+
+          # Write count for downstream steps
+          with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as gh:
+              gh.write(f"untracked_count={len(untracked)}\n")
+          PYEOF
+
+      - name: Create Untracked Docs Issue
+        if: steps.autodiscover.outputs.untracked_count > 0
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const today = new Date().toISOString().split('T')[0];
+
+            let untracked = [];
+            try {
+              untracked = JSON.parse(fs.readFileSync('/tmp/untracked_docs.json', 'utf8'));
+            } catch (e) { return; }
+
+            if (untracked.length === 0) return;
+
+            // Check if an open issue already exists
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'untracked-docs',
+              state: 'open'
+            });
+
+            let body = `## Untracked Docs Found — ${today}\n\n`;
+            body += `These \`.md\` files exist in \`docs/\` but are **not** in \`notion-structure.json\`:\n\n`;
+            for (const f of untracked) {
+              body += `- [ ] \`${f}\`\n`;
+            }
+            body += `\n### What to do\n`;
+            body += `- **To sync to Notion**: Add entries to \`notion-structure.json\` under the appropriate section\n`;
+            body += `- **To exclude**: Move to \`docs/archive/\` or add to an ignore list\n`;
+            body += `\n---\n*Generated by Auto-Discovery Agent*`;
+
+            if (existing.data.length > 0) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: body
+              });
+              console.log(`Updated existing issue #${existing.data[0].number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `📂 Untracked docs found in docs/`,
+                body: body,
+                labels: ['untracked-docs', 'automated']
+              });
+              console.log('Created new untracked docs issue');
+            }
+
       - name: Detect Changed Files
+        if: steps.docs-filter.outputs.should_sync == 'true'
         id: changes
         env:
           FORCE_SYNC: ${{ inputs.force_full_sync }}
@@ -84,19 +225,25 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
 
-          # Check if structure config changed
+          # Check if structure config changed (affects page organization, not content)
           if echo "$CHANGED" | grep -q "notion-structure.json"; then
             echo "structure_changed=true" >> $GITHUB_OUTPUT
-            echo "📋 Structure config changed - will sync all pages"
+            echo "📁 Structure config changed - will update page organization"
           else
             echo "structure_changed=false" >> $GITHUB_OUTPUT
           fi
+
+          # Count markdown files changed
+          MD_COUNT=$(echo "$CHANGED" | grep -c '\.md$' || echo "0")
+          echo "📄 $MD_COUNT markdown files changed"
 
           # Save changed files for later
           echo "$CHANGED" > /tmp/changed_files.txt
 
       - name: Detect Moved Pages in Notion
-        if: env.SUPABASE_URL != ''
+        # DISABLED: GitHub is source of truth, not Notion
+        # Re-enable this when bidirectional sync is ready
+        if: false
         id: detect-moves
         run: |
           echo "🔍 Checking for pages moved in Notion..."
@@ -246,12 +393,16 @@ jobs:
             echo "No structure changes to commit"
           fi
 
-      - name: Sync Structure with Content
-        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+      - name: Sync Page Structure
+        if: env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
         run: |
-          echo "🔄 Step 1: Syncing page structure WITH content..."
+          echo "═══════════════════════════════════════════"
+          echo "📁 STRUCTURE SYNC: Create/move pages"
+          echo "═══════════════════════════════════════════"
+          echo "Creates page hierarchy, no content yet"
+          echo ""
 
-          # Sync structure ONLY (no content) - content synced individually in Step 3
+          # Sync structure ONLY (no content) - content synced individually in next step
           if [ -f "notion-structure.json" ]; then
             # Build payload WITHOUT file contents - just structure
             python3 << 'PYEOF'
@@ -291,10 +442,27 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Structure sync successful"
-            # Show what was created/updated
-            echo "$response" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Created:', r.get('created', [])); print('Updated:', r.get('updated', [])); print('Errors:', r.get('errors', []))"
+            # Save response and parse it
+            echo "$response" > /tmp/structure_response.json
+            python3 << 'PYEOF'
+          import json
+          with open('/tmp/structure_response.json') as f:
+              r = json.load(f)
+          created = r.get('created', [])
+          print('Created:', created)
+          print('Updated:', r.get('updated', []))
+          print('Errors:', r.get('errors', []))
+          # Save created page titles for content sync
+          with open('/tmp/created_pages.txt', 'w') as f:
+              for page_path in created:
+                  # Extract page title from path like 'Execution > Project Plan > Phase 1'
+                  title = page_path.split(' > ')[-1] if ' > ' in page_path else page_path
+                  f.write(title + '\n')
+          print(str(len(created)) + ' new pages will have content synced')
+          PYEOF
           else
             echo "⚠️ Structure sync had issues"
+            > /tmp/created_pages.txt
           fi
 
           # Small delay before cleanup
@@ -302,9 +470,13 @@ jobs:
           sleep 5
 
       - name: Cleanup Orphaned Pages
-        if: env.SUPABASE_URL != '' && steps.changes.outputs.structure_changed == 'true'
+        if: env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
         run: |
-          echo "🧹 Step 2: Cleaning up orphaned Notion pages..."
+          echo "═══════════════════════════════════════════"
+          echo "🧹 CLEANUP: Archive orphaned pages"
+          echo "═══════════════════════════════════════════"
+          echo "Archives pages not in notion-structure.json"
+          echo ""
 
           if [ ! -f "notion-structure.json" ]; then
             echo "⚠️ notion-structure.json not found, skipping cleanup"
@@ -362,17 +534,21 @@ jobs:
           # Small delay before content sync
           sleep 5
 
-      - name: Update Individual Pages (Changed Files Only)
-        if: env.SUPABASE_URL != ''
+      - name: Sync Page Content
+        if: env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
         env:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           STRUCTURE_CHANGED: ${{ steps.changes.outputs.structure_changed }}
           FORCE_FULL_SYNC: ${{ github.event.inputs.force_full_sync }}
         run: |
-          echo "🔄 Step 3: Updating page content..."
+          echo "═══════════════════════════════════════════"
+          echo "📝 CONTENT SYNC: GitHub → Notion"
+          echo "═══════════════════════════════════════════"
+          echo "Mode: State-based (compares hashes to stored state)"
+          echo ""
 
-          # Wait for Notion to index any newly created pages from Step 1
+          # Wait for Notion to index any newly created pages from structure sync
           if [ "$STRUCTURE_CHANGED" = "true" ]; then
             echo "⏳ Waiting 10s for Notion to index new pages..."
             sleep 10
@@ -381,133 +557,406 @@ jobs:
           # Track failed pages for retry
           > /tmp/failed_pages.txt
 
-          update_page() {
-            local title="$1"
-            local file="$2"
-
-            if [ ! -f "$file" ]; then
-              echo "⏭️ Skipping $title (file not found: $file)"
-              return 0
-            fi
-
-            echo "📄 Updating: $title"
-            content=$(head -c 40000 "$file" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-            payload="{\"action\":\"update-page\",\"page\":{\"pageTitle\":\"$title\",\"content\":$content}}"
-
-            response=$(curl -s -X POST "$SB_URL/functions/v1/notion-sync" \
-              -H "Authorization: Bearer $SB_KEY" \
-              -H "Content-Type: application/json" \
-              -d "$payload")
-
-            if echo "$response" | grep -q '"success":true'; then
-              echo "  ✅ Updated"
-              return 0
-            else
-              echo "  ⚠️ Failed (will retry): $title"
-              echo -e "$title\t$file" >> /tmp/failed_pages.txt
-              return 1
-            fi
-          }
-
           if [ ! -f "notion-structure.json" ]; then
             echo "⚠️ notion-structure.json not found, skipping content sync"
             exit 0
           fi
 
-          # Build file-to-title mapping - sync all or just changed files
+          # Step 1: Compute hashes for all .md files and determine what needs syncing
           python3 << 'PYEOF'
           import json
           import os
+          import hashlib
+          import subprocess
 
-          def extract_pages(obj, pages=None):
+          def extract_pages(obj, pages=None, parent_title=None):
+              """Extract pages with their parent info for auto-creation support.
+              Returns list of (title, filepath, icon, parent_title)"""
               if pages is None:
                   pages = []
               if isinstance(obj, dict):
-                  if 'title' in obj and 'file' in obj:
-                      pages.append((obj['title'], obj['file']))
+                  current_title = obj.get('title')
+                  icon = obj.get('icon', '📄')
+
+                  if 'file' in obj and current_title:
+                      # This is a content page - record with parent info
+                      pages.append((current_title, obj['file'], icon, parent_title))
+
+                  # Recurse into children, using current title as parent
                   for key in ['children', 'sections']:
                       if key in obj:
                           for child in obj[key]:
-                              extract_pages(child, pages)
+                              # If this page has a title, it becomes the parent for children
+                              child_parent = current_title if current_title else parent_title
+                              extract_pages(child, pages, child_parent)
               elif isinstance(obj, list):
                   for item in obj:
-                      extract_pages(item, pages)
+                      extract_pages(item, pages, parent_title)
               return pages
+
+          def compute_hash(filepath):
+              """Compute SHA-256 hash of file content"""
+              try:
+                  with open(filepath, 'rb') as f:
+                      return hashlib.sha256(f.read()).hexdigest()
+              except FileNotFoundError:
+                  return None
 
           with open('notion-structure.json') as f:
               config = json.load(f)
 
-          pages = extract_pages(config)
+          # Root page is the parent for top-level sections
+          root_page = config.get('root', 'Ctrl')
+          pages = extract_pages(config, parent_title=root_page)
 
-          # Check if we need to do a full sync
-          structure_changed = os.environ.get('STRUCTURE_CHANGED', 'false') == 'true'
+          # Compute hashes for all pages with files
+          content_hashes = {}
+          page_info = {}  # filepath -> (title, icon, parent_title)
+          for title, filepath, icon, parent_title in pages:
+              if filepath and os.path.exists(filepath):
+                  content_hashes[filepath] = compute_hash(filepath)
+                  page_info[filepath] = (title, icon, parent_title)
+
+          print(f"📊 Computed hashes for {len(content_hashes)} files")
+
+          # Save root page name for Step 2 (content sync script)
+          with open('/tmp/root_page.txt', 'w') as f:
+              f.write(root_page)
+
+          # Check if force full sync
           force_full_sync = os.environ.get('FORCE_FULL_SYNC', 'false') == 'true'
-          do_full_sync = structure_changed or force_full_sync
 
-          if do_full_sync:
-              # Sync ALL pages with content
-              pages_to_sync = [(title, filepath) for title, filepath in pages if filepath]
-              reason = "structure changed" if structure_changed else "force full sync requested"
-              print(f"📋 Full sync ({reason}): syncing ALL {len(pages_to_sync)} pages with content")
+          if force_full_sync:
+              # Sync ALL pages
+              pages_to_sync = []
+              for filepath, (title, icon, parent_title) in page_info.items():
+                  pages_to_sync.append((title, filepath, content_hashes.get(filepath, ''), icon, parent_title))
+              print(f"📋 Full sync (force requested): syncing ALL {len(pages_to_sync)} pages")
+
+              # Save as JSON for easier parsing
+              with open('/tmp/pages_to_sync.json', 'w') as f:
+                  json.dump([{
+                      'title': t, 'filepath': fp, 'hash': h, 'icon': i, 'parent': p
+                  } for t, fp, h, i, p in pages_to_sync], f)
           else:
-              # Read changed files
-              changed_files = set()
-              if os.path.exists('/tmp/changed_files.txt'):
-                  with open('/tmp/changed_files.txt') as f:
-                      changed_files = set(line.strip() for line in f if line.strip())
+              # Call check-changes to find what needs syncing
+              print("🔍 Checking state to find pages needing sync...")
 
-              # Only sync pages whose files changed
-              pages_to_sync = [(title, filepath) for title, filepath in pages if filepath in changed_files]
-              print(f"📋 Incremental sync: {len(pages_to_sync)} changed pages (of {len(pages)} total)")
+              payload = {
+                  'action': 'check-changes',
+                  'root': root_page,
+                  'contentHashes': content_hashes
+              }
 
-          with open('/tmp/pages_to_sync.txt', 'w') as f:
-              for title, filepath in pages_to_sync:
-                  f.write(f"{title}\t{filepath}\n")
+              with open('/tmp/check_payload.json', 'w') as f:
+                  json.dump(payload, f)
 
-          if not pages_to_sync:
-              print("✨ No pages need content updates")
+              # Call the edge function
+              result = subprocess.run([
+                  'curl', '-s', '-X', 'POST',
+                  f"{os.environ['SB_URL']}/functions/v1/notion-sync",
+                  '-H', f"Authorization: Bearer {os.environ['SB_KEY']}",
+                  '-H', 'Content-Type: application/json',
+                  '-d', '@/tmp/check_payload.json'
+              ], capture_output=True, text=True)
+
+              try:
+                  response = json.loads(result.stdout)
+                  needs_sync = set(response.get('needsSync', []))
+                  up_to_date = response.get('upToDate', [])
+                  errors = response.get('errors', [])
+
+                  print(f"   Needs sync: {len(needs_sync)} pages")
+                  print(f"   Up to date: {len(up_to_date)} pages")
+
+                  pages_to_sync = []
+
+                  # If state check returned nothing (empty state table or error),
+                  # fall back to syncing all pages
+                  if len(needs_sync) == 0 and len(up_to_date) == 0 and len(content_hashes) > 0:
+                      if errors:
+                          print(f"   ⚠️ State check errors: {errors}")
+                      print(f"   📋 No state found — first-time sync, pushing ALL {len(content_hashes)} pages")
+                      for filepath, (title, icon, parent_title) in page_info.items():
+                          pages_to_sync.append({
+                              'title': title,
+                              'filepath': filepath,
+                              'hash': content_hashes.get(filepath, ''),
+                              'icon': icon,
+                              'parent': parent_title
+                          })
+                  else:
+                      if needs_sync:
+                          print(f"   Pages: {', '.join(list(needs_sync)[:5])}{'...' if len(needs_sync) > 5 else ''}")
+                      # Build list of pages to sync with full info
+                      for filepath, (title, icon, parent_title) in page_info.items():
+                          if filepath in needs_sync:
+                              pages_to_sync.append({
+                                  'title': title,
+                                  'filepath': filepath,
+                                  'hash': content_hashes.get(filepath, ''),
+                                  'icon': icon,
+                                  'parent': parent_title
+                              })
+
+                  with open('/tmp/pages_to_sync.json', 'w') as f:
+                      json.dump(pages_to_sync, f)
+
+                  if not pages_to_sync:
+                      print("✨ All pages are up to date!")
+
+              except json.JSONDecodeError:
+                  print(f"⚠️ Failed to parse check-changes response: {result.stdout[:200]}")
+                  # Fall back to syncing nothing (safe default)
+                  with open('/tmp/pages_to_sync.json', 'w') as f:
+                      json.dump([], f)
           PYEOF
 
-          # Read and process pages
-          if [ -s /tmp/pages_to_sync.txt ]; then
-            while IFS=$'\t' read -r title filepath; do
-              update_page "$title" "$filepath"
-              sleep 2
-            done < /tmp/pages_to_sync.txt
+          # Step 2: Sync pages that need updating (using JSON format with parent/icon info)
+          python3 -u << 'SYNC_PYEOF'
+          import json
+          import os
+          import subprocess
+          import time
+          import sys
 
-            # Retry failed pages up to 3 times with increasing delays
-            for retry in 1 2 3; do
-              if [ -s /tmp/failed_pages.txt ]; then
-                failed_count=$(wc -l < /tmp/failed_pages.txt)
-                echo ""
-                echo "🔄 Retry $retry: $failed_count failed pages (waiting ${retry}0s for Notion to index...)"
-                sleep $((retry * 10))
+          def log(msg):
+              """Print with immediate flush for GitHub Actions"""
+              print(msg, flush=True)
 
-                # Move failed to retry queue
-                mv /tmp/failed_pages.txt /tmp/retry_pages.txt
-                > /tmp/failed_pages.txt
+          # Load root page name
+          try:
+              with open('/tmp/root_page.txt') as f:
+                  root_page = f.read().strip()
+          except FileNotFoundError:
+              root_page = 'Ctrl'
 
-                while IFS=$'\t' read -r title filepath; do
-                  update_page "$title" "$filepath"
-                  sleep 3
-                done < /tmp/retry_pages.txt
-              else
-                break
-              fi
-            done
+          # Load pages to sync
+          try:
+              with open('/tmp/pages_to_sync.json') as f:
+                  pages_to_sync = json.load(f)
+          except (FileNotFoundError, json.JSONDecodeError):
+              pages_to_sync = []
 
-            # Report any remaining failures
-            if [ -s /tmp/failed_pages.txt ]; then
-              echo ""
-              echo "⚠️ Some pages still failed after 3 retries:"
-              cat /tmp/failed_pages.txt | cut -f1
-              echo "These will be retried on next workflow run."
-            fi
-          else
-            echo "✨ No pages need updating"
-          fi
+          if not pages_to_sync:
+              log("✨ No pages need syncing")
+              exit(0)
 
-          echo "📊 Content sync complete!"
+          log(f"\n───────────────────────────────────────────")
+          log(f"📤 SYNCING {len(pages_to_sync)} PAGES")
+          log(f"───────────────────────────────────────────")
+          failed_pages = []
+
+          def sync_page(page, index, total, is_retry=False):
+              """Sync a single page, returns True on success"""
+              filepath = page['filepath']
+              title = page['title']
+              hash_val = page['hash']
+              icon = page.get('icon', '📄')
+              parent = page.get('parent')
+
+              if not os.path.exists(filepath):
+                  log(f"[{index}/{total}] ⏭️ {title} — file not found")
+                  return True  # Don't retry missing files
+
+              # Read content
+              with open(filepath, 'r') as f:
+                  content = f.read()[:40000]
+
+              word_count = len(content.split())
+              prefix = f"[{index}/{total}]" if not is_retry else "[retry]"
+              log(f"{prefix} 📄 {title} ({word_count} words)...")
+
+              # Build payload with parent info for auto-creation
+              payload = {
+                  'action': 'update-page',
+                  'root': root_page,
+                  'page': {
+                      'pageTitle': title,
+                      'content': content,
+                      'pagePath': filepath,
+                      'contentHash': hash_val,
+                      'parentPageTitle': parent,
+                      'icon': icon
+                  }
+              }
+
+              # Call the edge function
+              result = subprocess.run([
+                  'curl', '-s', '-X', 'POST',
+                  f"{os.environ['SB_URL']}/functions/v1/notion-sync",
+                  '-H', f"Authorization: Bearer {os.environ['SB_KEY']}",
+                  '-H', 'Content-Type: application/json',
+                  '-d', json.dumps(payload)
+              ], capture_output=True, text=True)
+
+              try:
+                  response = json.loads(result.stdout)
+                  if response.get('success'):
+                      # Check if created or updated
+                      created = response.get('created', [])
+                      updated = response.get('updated', [])
+                      if created:
+                          log(f"        ✅ Created")
+                      elif updated:
+                          # Extract block count from update message
+                          blocks = updated[0].split('(')[1].split(' ')[0] if '(' in updated[0] else '?'
+                          log(f"        ✅ Done ({blocks} blocks)")
+                      else:
+                          log(f"        ✅ Done")
+                      return True
+                  else:
+                      errors = response.get('errors', [])
+                      error = response.get('error', '')
+                      msg = errors[0] if errors else (error if error else f'unknown: {json.dumps(response)[:200]}')
+                      log(f"        ⚠️ Failed: {msg}")
+                      return False
+              except json.JSONDecodeError:
+                  log(f"        ⚠️ Failed: {result.stdout[:300] if result.stdout else 'no response'}")
+                  return False
+
+          # First pass
+          total = len(pages_to_sync)
+          for i, page in enumerate(pages_to_sync, 1):
+              if not sync_page(page, i, total):
+                  failed_pages.append(page)
+              time.sleep(2)
+
+          # Retry failed pages up to 3 times
+          for retry in range(1, 4):
+              if not failed_pages:
+                  break
+              log(f"\n🔄 Retry {retry}: {len(failed_pages)} failed pages (waiting {retry * 10}s...)")
+              time.sleep(retry * 10)
+
+              retry_pages = failed_pages
+              failed_pages = []
+              for page in retry_pages:
+                  if not sync_page(page, 0, 0, is_retry=True):
+                      failed_pages.append(page)
+                  time.sleep(3)
+
+          # Report any remaining failures
+          if failed_pages:
+              log(f"\n⚠️ Some pages still failed after 3 retries:")
+              for page in failed_pages:
+                  log(f"   - {page['title']}")
+              log("State NOT updated for these - will retry next run.")
+          SYNC_PYEOF
+
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "✅ SYNC COMPLETE"
+          echo "═══════════════════════════════════════════"
+
+      - name: Sync Summary
+        if: always() && env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "📊 SYNC SUMMARY"
+          echo "═══════════════════════════════════════════"
+
+          python3 << 'PYEOF'
+          import json, os
+
+          # --- Structure metrics ---
+          struct = {}
+          if os.path.exists('/tmp/structure_response.json'):
+              try:
+                  with open('/tmp/structure_response.json') as f:
+                      struct = json.load(f)
+              except Exception:
+                  pass
+
+          created = struct.get('created', [])
+          updated = struct.get('updated', [])
+          skipped = struct.get('skipped', [])
+          errors = struct.get('errors', [])
+          deleted = struct.get('deleted', [])
+          protected_pages = struct.get('protected', [])
+          metrics = struct.get('metrics', {})
+
+          print("\n📁 Structure Sync")
+          print(f"  Created:    {len(created)}")
+          print(f"  Skipped:    {len(skipped)}")
+          if deleted:
+              print(f"  Deleted:    {len(deleted)}")
+          if protected_pages:
+              print(f"  Protected:  {len(protected_pages)}")
+          if errors:
+              print(f"  Errors:     {len(errors)}")
+              for e in errors[:5]:
+                  print(f"    - {e}")
+          if metrics:
+              duration = metrics.get('durationMs', 0)
+              api_calls = metrics.get('apiCalls', 0)
+              print(f"  Duration:   {duration/1000:.1f}s")
+              print(f"  API calls:  {api_calls}")
+
+          # --- Content metrics ---
+          pages_synced = []
+          if os.path.exists('/tmp/pages_to_sync.json'):
+              try:
+                  with open('/tmp/pages_to_sync.json') as f:
+                      pages_synced = json.load(f)
+              except Exception:
+                  pass
+
+          print(f"\n📝 Content Sync")
+          print(f"  Pages synced: {len(pages_synced)}")
+          if pages_synced:
+              for p in pages_synced[:10]:
+                  title = p.get('title', p) if isinstance(p, dict) else p
+                  print(f"    - {title}")
+              if len(pages_synced) > 10:
+                  print(f"    ... and {len(pages_synced) - 10} more")
+
+          # --- Failed pages ---
+          failed = []
+          if os.path.exists('/tmp/failed_pages.txt'):
+              with open('/tmp/failed_pages.txt') as f:
+                  failed = [l.strip() for l in f if l.strip()]
+          if failed:
+              print(f"\n⚠️  Failed ({len(failed)})")
+              for p in failed:
+                  print(f"    - {p}")
+
+          # --- Structure overview ---
+          try:
+              with open('notion-structure.json') as f:
+                  config = json.load(f)
+              root = config.get('root', '?')
+              def count_pages(obj):
+                  c = 0
+                  if isinstance(obj, dict):
+                      if 'title' in obj: c += 1
+                      for k in ['children', 'sections']:
+                          if k in obj:
+                              for child in obj[k]: c += count_pages(child)
+                  return c
+              def count_files(obj):
+                  c = 0
+                  if isinstance(obj, dict):
+                      if 'file' in obj: c += 1
+                      for k in ['children', 'sections']:
+                          if k in obj:
+                              for child in obj[k]: c += count_files(child)
+                  return c
+              total_pages = sum(count_pages(s) for s in config.get('sections', []))
+              total_files = sum(count_files(s) for s in config.get('sections', []))
+              sections = len(config.get('sections', []))
+
+              print(f"\n📋 Structure")
+              print(f"  Root:       {root}")
+              print(f"  Sections:   {sections}")
+              print(f"  Pages:      {total_pages}")
+              print(f"  With files: {total_files}")
+          except Exception:
+              pass
+
+          print("")
+          PYEOF
 
   # Triggered on every push - quick status and security check
   on-push:
@@ -697,6 +1146,340 @@ jobs:
               title: title,
               body: `## Continuous Improvement Weekly Analysis\n\n### Metrics Summary\n*See action logs for detailed metrics*\n\n### Opportunities Identified\n- [ ] Review and prioritize\n\n### Experiments to Consider\n- [ ] Define experiments based on data\n\n---\n*Generated by AI Agent Workforce*`,
               labels: ['weekly-improvement', 'automated']
+            });
+
+  # Weekly docs health check (runs alongside weekly-improvement on Fridays)
+  docs-health-check:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 5') ||
+      (github.event_name == 'workflow_dispatch' && inputs.agent == 'health-check')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auto-discover untracked docs
+        id: autodiscover
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "🔍 AUTO-DISCOVERY: Scanning for untracked docs"
+          echo "═══════════════════════════════════════════"
+          echo ""
+
+          if [ ! -f "notion-structure.json" ]; then
+            echo "⚠️ notion-structure.json not found, skipping"
+            echo "untracked=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Extract all file paths from notion-structure.json
+          python3 << 'PYEOF'
+          import json, os, glob
+
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+
+          # Collect all file paths from structure
+          tracked = set()
+          def walk(pages):
+              for page in pages:
+                  if 'file' in page:
+                      tracked.add(page['file'])
+                  if 'children' in page:
+                      walk(page['children'])
+          walk(structure.get('sections', []))
+
+          # Find all .md files in docs/
+          all_docs = set()
+          for root, dirs, files in os.walk('docs'):
+              # Skip archive directories
+              dirs[:] = [d for d in dirs if d != 'archive']
+              for f in files:
+                  if f.endswith('.md'):
+                      path = os.path.join(root, f)
+                      all_docs.add(path)
+
+          # Find untracked files
+          untracked = sorted(all_docs - tracked)
+
+          if untracked:
+              print(f"📂 Found {len(untracked)} untracked doc(s):")
+              for f in untracked:
+                  print(f"  - {f}")
+
+              # Write to file for later steps
+              with open('/tmp/untracked_docs.json', 'w') as out:
+                  json.dump(untracked, out)
+          else:
+              print("✅ All docs/ files are tracked in notion-structure.json")
+              with open('/tmp/untracked_docs.json', 'w') as out:
+                  json.dump([], out)
+          PYEOF
+
+      - name: Run Docs Health Check
+        if: env.SUPABASE_URL != ''
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "🏥 DOCS HEALTH CHECK"
+          echo "═══════════════════════════════════════════"
+          echo ""
+
+          if [ ! -f "notion-structure.json" ]; then
+            echo "⚠️ notion-structure.json not found, skipping"
+            exit 0
+          fi
+
+          # Build health check payload
+          python3 << 'PYEOF' > /tmp/health_payload.json
+          import json
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+          payload = {
+              'action': 'health-check',
+              'structure': structure,
+              'staleDays': 90,
+              'autoFix': False
+          }
+          print(json.dumps(payload))
+          PYEOF
+
+          response=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/health_payload.json)
+
+          # Split response body and HTTP status code
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "$body" > /tmp/health_response.json
+
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Health check API returned HTTP $http_code"
+            echo "Response: $body"
+            echo ""
+            echo "Possible fixes:"
+            echo "  1. Deploy with: supabase functions deploy notion-sync --no-verify-jwt --project-ref ycilriwjnmcelkspmfmg"
+            echo "  2. Or set SUPABASE_SERVICE_KEY to the service_role key from Supabase Dashboard > Settings > API"
+            exit 0
+          fi
+
+          # Parse and display report
+          python3 << 'PYEOF'
+          import json
+          try:
+              with open('/tmp/health_response.json') as f:
+                  r = json.load(f)
+              report = r.get('healthReport', {})
+
+              print(f"Summary: {report.get('summary', 'N/A')}")
+              print(f"")
+              print(f"Total pages:  {report.get('totalPages', '?')}")
+              print(f"Checked:      {report.get('pagesChecked', '?')}")
+              print(f"Healthy:      {report.get('healthy', '?')}")
+
+              stale = report.get('stale', [])
+              if stale:
+                  print(f"\n⏰ Stale pages ({len(stale)}):")
+                  for p in stale:
+                      print(f"  - {p['title']} ({p.get('daysSinceEdit', '?')} days)")
+
+              empty = report.get('empty', [])
+              if empty:
+                  print(f"\n📭 Empty pages ({len(empty)}):")
+                  for p in empty:
+                      print(f"  - {p['title']} (human: {p.get('isHuman', '?')})")
+
+              orphaned = report.get('orphaned', [])
+              if orphaned:
+                  print(f"\n👻 Orphaned pages ({len(orphaned)}):")
+                  for p in orphaned:
+                      print(f"  - {p['title']} (under {p.get('parentTitle', '?')})")
+
+              missing = report.get('missingInNotion', [])
+              if missing:
+                  print(f"\n❌ Missing in Notion ({len(missing)}):")
+                  for p in missing:
+                      print(f"  - {p['title']} (expected under {p.get('parentTitle', '?')})")
+
+              dupes = report.get('duplicateTitles', [])
+              if dupes:
+                  print(f"\n⚠️ Duplicate titles ({len(dupes)}):")
+                  for d in dupes:
+                      print(f"  - \"{d['title']}\" x{d['count']}")
+
+              needs_review = report.get('needsReview', [])
+              if needs_review:
+                  print(f"\n📋 Needs review ({len(needs_review)}):")
+                  for p in needs_review:
+                      print(f"  - {p['title']} ({p.get('daysSinceEdit', '?')} days)")
+
+              similar = report.get('similarPages', [])
+              if similar:
+                  print(f"\n🔄 Similar pages ({len(similar)} pairs):")
+                  for s in similar:
+                      pct = round(s.get('similarity', 0) * 100)
+                      print(f"  - {s['pageA']} ↔ {s['pageB']} ({pct}% similar)")
+
+              fmt_issues = report.get('formattingIssues', [])
+              if fmt_issues:
+                  print(f"\n🔧 Formatting issues ({len(fmt_issues)} files):")
+                  for f in fmt_issues:
+                      print(f"  - {f['page']}: {'; '.join(f['issues'])}")
+
+          except Exception as e:
+              print(f"Could not parse health report: {e}")
+          PYEOF
+
+      - name: Create Health Report Issue
+        if: env.SUPABASE_URL != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const today = new Date().toISOString().split('T')[0];
+
+            let report = {};
+            try {
+              const raw = fs.readFileSync('/tmp/health_response.json', 'utf8');
+              const response = JSON.parse(raw);
+              report = response.healthReport || {};
+            } catch (e) {
+              console.log('No health report to process');
+              return;
+            }
+
+            const stale = report.stale || [];
+            const empty = report.empty || [];
+            const orphaned = report.orphaned || [];
+            const missing = report.missingInNotion || [];
+            const needsReview = report.needsReview || [];
+            const dupes = report.duplicateTitles || [];
+            const brokenLinks = report.brokenLinks || [];
+            const unbalanced = report.unbalancedSections || [];
+            const similarPages = report.similarPages || [];
+            const formattingIssues = report.formattingIssues || [];
+
+            // Load untracked docs from auto-discovery step
+            let untrackedDocs = [];
+            try {
+              const untrackedRaw = fs.readFileSync('/tmp/untracked_docs.json', 'utf8');
+              untrackedDocs = JSON.parse(untrackedRaw);
+            } catch (e) { /* no untracked docs file */ }
+
+            const totalIssues = stale.length + empty.length + orphaned.length + missing.length + brokenLinks.length;
+
+            // Only create issue if there are problems
+            if (totalIssues === 0 && dupes.length === 0 && unbalanced.length === 0 && similarPages.length === 0 && formattingIssues.length === 0 && untrackedDocs.length === 0) {
+              console.log('✅ All pages healthy, no issue needed');
+              return;
+            }
+
+            let body = `## Docs Health Report — ${today}\n\n`;
+            body += `**Summary**: ${report.summary || 'N/A'}\n\n`;
+
+            if (stale.length > 0) {
+              body += `### ⏰ Stale Pages (${stale.length})\n`;
+              for (const p of stale) {
+                body += `- [ ] **${p.title}** — ${p.daysSinceEdit} days since edit\n`;
+              }
+              body += '\n';
+            }
+
+            if (empty.length > 0) {
+              body += `### 📭 Empty Pages (${empty.length})\n`;
+              for (const p of empty) {
+                body += `- [ ] **${p.title}** (${p.isHuman ? 'human' : 'bot'}-created)\n`;
+              }
+              body += '\n';
+            }
+
+            if (orphaned.length > 0) {
+              body += `### 👻 Orphaned Pages (${orphaned.length})\n`;
+              for (const p of orphaned) {
+                body += `- [ ] **${p.title}** under ${p.parentTitle}\n`;
+              }
+              body += '\n';
+            }
+
+            if (missing.length > 0) {
+              body += `### ❌ Missing in Notion (${missing.length})\n`;
+              for (const p of missing) {
+                body += `- [ ] **${p.title}** (expected under ${p.parentTitle})\n`;
+              }
+              body += '\n';
+            }
+
+            if (brokenLinks.length > 0) {
+              body += `### 🔗 Broken Internal Links (${brokenLinks.length})\n`;
+              for (const l of brokenLinks) {
+                body += `- [ ] **${l.page}** — \`${l.brokenLink}\` → \`${l.target}\` not found\n`;
+              }
+              body += '\n';
+            }
+
+            if (dupes.length > 0) {
+              body += `### ⚠️ Duplicate Titles (${dupes.length})\n`;
+              for (const d of dupes) {
+                body += `- **"${d.title}"** appears ${d.count}x\n`;
+              }
+              body += '\n';
+            }
+
+            if (unbalanced.length > 0) {
+              body += `### 📐 Unbalanced Sections\n`;
+              for (const u of unbalanced) {
+                body += `- ${u}\n`;
+              }
+              body += '\n';
+            }
+
+            if (needsReview.length > 0) {
+              body += `### 📋 Needs Review (${needsReview.length})\n`;
+              for (const p of needsReview) {
+                body += `- [ ] **${p.title}** — ${p.daysSinceEdit} days since last edit\n`;
+              }
+              body += '\n';
+            }
+
+            if (similarPages.length > 0) {
+              body += `### 🔄 Similar Pages (${similarPages.length} pairs)\n`;
+              for (const s of similarPages) {
+                body += `- [ ] **${s.pageA}** ↔ **${s.pageB}** (${Math.round(s.similarity * 100)}% similar`;
+                if (s.sharedHeadings.length > 0) {
+                  body += `, ${s.sharedHeadings.length} shared headings`;
+                }
+                body += `)\n`;
+              }
+              body += '\n';
+            }
+
+            if (formattingIssues.length > 0) {
+              body += `### 🔧 Formatting Issues (${formattingIssues.length} files)\n`;
+              for (const f of formattingIssues) {
+                body += `- **${f.page}** (\`${f.file}\`): ${f.issues.join('; ')}\n`;
+              }
+              body += '\n';
+            }
+
+            if (untrackedDocs.length > 0) {
+              body += `### 📂 Untracked Docs (${untrackedDocs.length})\n`;
+              body += `These files exist in \`docs/\` but are not in \`notion-structure.json\`:\n`;
+              for (const f of untrackedDocs) {
+                body += `- [ ] \`${f}\`\n`;
+              }
+              body += '\n> Add these to `notion-structure.json` to sync them to Notion, or move to `archive/` if no longer needed.\n\n';
+            }
+
+            body += '---\n*Generated by Docs Health Check Agent*';
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🏥 Docs Health Report — ${today}`,
+              body: body,
+              labels: ['docs-health', 'automated']
             });
 
   # Manual agent trigger

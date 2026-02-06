@@ -1,158 +1,259 @@
 # Deployment Guide
 
-> How to deploy and manage ctrl.rodeo infrastructure
+> How code gets from repository to production
 
 ---
 
-## Status Legend
+## Architecture
 
-| Icon | Meaning |
-|------|---------|
-| ✅ | Configured |
-| 🔄 | Needs Update |
-| ⏳ | Not Set Up |
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Developer  │────▶│   GitHub     │────▶│  GitHub      │
+│   git push   │     │   Repository │     │  Pages       │
+└──────────────┘     └──────┬───────┘     │  (ctrl.rodeo)│
+                            │             └──────────────┘
+                            │
+                            ▼
+                     ┌──────────────┐     ┌──────────────┐
+                     │   GitHub     │────▶│  Supabase    │
+                     │   Actions    │     │  (Notion     │
+                     │              │     │   sync)      │
+                     └──────────────┘     └──────────────┘
+
+┌──────────────┐     ┌──────────────┐
+│   Developer  │────▶│  Supabase    │
+│   supabase   │     │  Edge        │
+│   functions  │     │  Functions   │
+│   deploy     │     │              │
+└──────────────┘     └──────────────┘
+```
+
+There are two independent deployment paths:
+1. **Frontend** (automatic): Push to `main` → GitHub Pages builds and serves
+2. **Edge Functions** (manual): `supabase functions deploy` from local machine
 
 ---
 
-## Environments
+## Frontend: GitHub Pages
 
-| Environment | URL | Purpose | Status |
-|-------------|-----|---------|--------|
-| Production | ctrl.rodeo | Live site | ✅ |
-| Preview | GitHub PR previews | Testing | ✅ |
-| Local | localhost:4000 | Development | ✅ |
+### How It Works
 
----
+GitHub Pages runs Jekyll on every push to `main`, converting the repo into a static site served at `ctrl.rodeo`.
 
-## GitHub Pages (Frontend)
+| Setting | Value |
+|---------|-------|
+| Source branch | `main` |
+| Custom domain | ctrl.rodeo (via CNAME file) |
+| HTTPS | Enforced (GitHub automatic) |
+| Build | Jekyll (minimal theme) |
+| Config | `_config.yml`: `theme: jekyll-theme-minimal` |
 
-### Automatic Deployment
-
-Pushes to `main` automatically deploy via GitHub Pages.
+### Deploy
 
 ```bash
-# Local preview
-bundle install
-bundle exec jekyll serve
-
-# Manual deploy (just push to main)
 git push origin main
 ```
 
-### Configuration
+That's it. GitHub Pages builds automatically. No manual steps.
 
-| Setting | Value | Status |
-|---------|-------|--------|
-| Source branch | main | ✅ |
-| Custom domain | ctrl.rodeo | ✅ |
-| HTTPS | Enforced | ✅ |
+### Local Preview
+
+```bash
+bundle install
+bundle exec jekyll serve
+# → http://localhost:4000
+```
+
+### Rollback
+
+```bash
+git revert HEAD
+git push origin main
+```
 
 ---
 
-## Supabase Functions
+## Edge Functions: Supabase
 
-### Deploy All Functions
+### How It Works
+
+Edge functions are TypeScript files in `supabase/functions/`. They run on Deno and are deployed manually via the Supabase CLI. There's no CI/CD for function deployment.
+
+### Prerequisites
 
 ```bash
-cd /Users/ian/Documents/GitHub/fikei.github.io
-supabase functions deploy agent-handler
-supabase functions deploy notion-sync
+# Install Supabase CLI
+brew install supabase/tap/supabase
+
+# Link to project (one-time per project)
+supabase link --project-ref yfhudwakpgzswiylhfbh  # Boards
+supabase link --project-ref ycilriwjnmcelkspmfmg  # Ops
+```
+
+### Deploy Functions
+
+```bash
+# Boards project functions
+supabase link --project-ref yfhudwakpgzswiylhfbh
 supabase functions deploy enrich-link
 supabase functions deploy generate-widget
+supabase functions deploy categorize
+
+# Ops project functions
+supabase link --project-ref ycilriwjnmcelkspmfmg
+supabase functions deploy notion-sync
+
+# Systemic project functions
+supabase link --project-ref atdqdfpdeytfuvvpsasz
+supabase functions deploy systemic-analyze
+supabase functions deploy systemic-fetch
 ```
 
 ### Set Secrets
 
 ```bash
-supabase secrets set ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY
-supabase secrets set NOTION_API_KEY=YOUR_NOTION_API_KEY
-supabase secrets set OPENAI_API_KEY=YOUR_OPENAI_API_KEY
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase secrets set OPENAI_API_KEY=sk-...
+supabase secrets set NOTION_API_KEY=ntn_...
 ```
 
-### Function Status
-
-| Function | Last Deploy | Status |
-|----------|-------------|--------|
-| agent-handler | 2026-02-04 | ✅ |
-| notion-sync | 2026-02-04 | ✅ |
-| enrich-link | Previous | ✅ |
-| generate-widget | Previous | ✅ |
-
----
-
-## GitHub Actions
-
-### Workflows
-
-| Workflow | Trigger | Status |
-|----------|---------|--------|
-| agent-automation | Push, PR, Schedule | ✅ |
-
-### Secrets Required
-
-| Secret | Purpose | Status |
-|--------|---------|--------|
-| NOTION_API_KEY | Notion sync | ✅ |
-| ANTHROPIC_API_KEY | Claude AI | ✅ |
-| SUPABASE_URL | API endpoint | ⏳ |
-| SUPABASE_ANON_KEY | API auth | ⏳ |
-
----
-
-## Notion Sync
-
-### Manual Sync
+### View Logs
 
 ```bash
-cd /Users/ian/Documents/GitHub/fikei.github.io
-export NOTION_API_KEY=ntn_...
-./scripts/sync-docs-to-notion.sh
-```
-
-### Automatic Sync (Planned)
-
-Add to GitHub Actions to sync on every push.
-
----
-
-## Monitoring
-
-### Current Status
-
-| Service | Monitoring | Status |
-|---------|------------|--------|
-| GitHub Pages | GitHub Status | ✅ |
-| Supabase | Dashboard | ✅ |
-| Functions | Supabase Logs | ✅ |
-
-### Health Checks
-
-| Endpoint | Expected | Status |
-|----------|----------|--------|
-| ctrl.rodeo | 200 | ✅ |
-| ctrl.rodeo/boards | 200 | ✅ |
-| Supabase functions | 200 | ✅ |
-
----
-
-## Rollback Procedures
-
-### Frontend Rollback
-
-```bash
-# Revert to previous commit
-git revert HEAD
-git push origin main
+supabase functions logs enrich-link --tail
+supabase functions logs generate-widget --tail
+supabase functions logs notion-sync --tail
 ```
 
 ### Function Rollback
 
 ```bash
-# Deploy previous version
-git checkout HEAD~1 -- supabase/functions/[function-name]
-supabase functions deploy [function-name]
+git checkout HEAD~1 -- supabase/functions/{function-name}
+supabase functions deploy {function-name}
 ```
+
+### Current Functions
+
+| Function | Project | Purpose | Last Deploy |
+|----------|---------|---------|-------------|
+| `enrich-link` | Boards | AI classification + image resolution | Previous |
+| `generate-widget` | Boards | AI widget generation | 2026-02-05 |
+| `categorize` | Boards | AI pin categorization | Previous |
+| `agent-handler` | Boards | AI agent orchestration | 2026-02-04 |
+| `notion-sync` | Ops | GitHub ↔ Notion documentation sync | 2026-02-04 |
+| `systemic-analyze` | Systemic | Design system analysis | Previous |
+| `systemic-fetch` | Systemic | Design system data fetching | Previous |
 
 ---
 
-*Last updated: 2026-02-04*
+## GitHub Actions: Automation
+
+### Workflow: `agent-automation.yml`
+
+A single workflow file (881 lines) handles all automation.
+
+| Trigger | What Runs |
+|---------|-----------|
+| Push to `main`, `master`, `claude/*` | Notion sync (structure + content), security scan |
+| Pull request opened/synced | Documentation standards check |
+| Daily (9 AM UTC) | Chief of Staff synthesis issue |
+| Weekly (Friday 4 PM UTC) | Continuous improvement analysis issue |
+| Manual dispatch | Run specific agent |
+
+### Key Jobs
+
+**notion-sync** — The most complex job. On every push:
+1. Checks out repo with `depth=2` (for `git diff`)
+2. Detects changed `.md` files
+3. Syncs page structure to Notion (creates/deletes pages)
+4. Cleans up orphaned Notion pages (AI-created only)
+5. Syncs changed file contents (SHA-256 hash comparison, retry with backoff)
+
+**on-push** — Security scan: greps for hardcoded secrets in `supabase/` and `.env` files.
+
+**on-pull-request** — Checks PR description length, looks for PRD links.
+
+### Required Secrets
+
+| Secret | Purpose | Set In |
+|--------|---------|--------|
+| `SUPABASE_URL` | Ops project URL | GitHub Secrets |
+| `SUPABASE_SERVICE_KEY` | Full-access key for sync | GitHub Secrets |
+| `NOTION_API_KEY` | Notion integration token | GitHub Secrets |
+| `ANTHROPIC_API_KEY` | Claude API (for agents) | GitHub Secrets |
+
+---
+
+## Database Migrations
+
+Migrations are SQL files in `supabase/migrations/`. They're applied manually via the Supabase dashboard or CLI.
+
+```bash
+# Apply migrations (if using local dev)
+supabase db push
+
+# Or apply via dashboard: SQL Editor → paste migration content
+```
+
+| Migration | File | Tables |
+|-----------|------|--------|
+| 001 | `001_shared_boards.sql` | shared_boards, board_views, board_invites |
+| 002 | `002_*.sql` | shared_boards alterations |
+| 003 | `003_content_type_system.sql` | content_types, domain_profiles, classification_log |
+| 004 | `004_image_resolution_system.sql` | image_strategies, strategy_performance |
+| 005 | `005_systemic_ai.sql` | audit_jobs, design_systems, design_tokens, etc. |
+| 006 | `006_notion_sync_state.sql` | sync_state, block_state, sync_log, structure_state |
+
+See [Database Schema](./technical-design/database-schema.md) for full table definitions.
+
+---
+
+## Environment Variables
+
+### Edge Functions (Deno)
+
+Accessed via `Deno.env.get('KEY')`:
+
+| Variable | Required By |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | enrich-link, generate-widget, categorize, agent-handler |
+| `OPENAI_API_KEY` | generate-widget (fallback) |
+| `SUPABASE_URL` | All functions (auto-set by Supabase) |
+| `SUPABASE_SERVICE_ROLE_KEY` | enrich-link, notion-sync (bypasses RLS) |
+| `NOTION_API_KEY` | notion-sync |
+
+### GitHub Actions
+
+Set in repository Settings → Secrets:
+
+| Variable | Required By |
+|----------|-------------|
+| `SUPABASE_URL` | notion-sync job |
+| `SUPABASE_SERVICE_KEY` | notion-sync job |
+| `NOTION_API_KEY` | notion-sync job |
+| `ANTHROPIC_API_KEY` | agent jobs |
+
+### Client-Side
+
+Hardcoded in `boards/index.html` (public, by design):
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `SUPABASE_URL` | `https://yfhudwakpgzswiylhfbh.supabase.co` | API endpoint |
+| `SUPABASE_ANON_KEY` | JWT (anon role) | Public API access (RLS enforced) |
+
+---
+
+## Monitoring
+
+| Service | How to Monitor |
+|---------|---------------|
+| GitHub Pages | `ctrl.rodeo` responds with 200 |
+| Supabase Functions | `supabase functions logs {name} --tail` |
+| Supabase Database | Supabase Dashboard → Database |
+| GitHub Actions | Repository → Actions tab |
+| Notion Sync | `sync_log` table in Ops database |
+
+---
+
+*Last updated: 2026-02-05*

@@ -1,7 +1,7 @@
 # Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-05 (Widget Phase 0 ~95%, Phase 1 COMPLETE)
+> **Last Updated**: 2026-02-05 (Widget Phase 0 ~95%, Phase 1 COMPLETE, Phase 2 IN PROGRESS)
 
 ---
 
@@ -25,22 +25,22 @@
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/10 |
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/50 |
-| [Backlog](./backlog.md) | Future | 0/40 |
+| [Backlog](./backlog.md) | Future | 0/45 |
 
 ---
 
 ## Recent Milestones
 
-### Widget Phase 2: Config-Generated Widgets ✅
-**Completed: 2026-02-05**
+### Widget Phase 2: Config-Generated Widgets 🔄
+**Started: 2026-02-05**
 
-- **Category-Agnostic Matching**: Widgets discovered by category via config, no hard-coded category logic
-- **Template Selection Engine**: 4 UX-pattern templates (grid-split, hero-card, list, text-block) with fallback chains
-- **Hot-Reload Registry**: registerWidget() / unregisterWidget() / reloadWidget() for dynamic management
-- **Discovery Endpoint**: POST { action: 'discover' } returns eligible widgets for any category
-- **Config-Driven Enrichment**: Enrichment triggered by widget config, not hard-coded widget ID
+- **Widget Definition Schema**: TypeScript types in `config/schema.ts`
+- **Config-Driven Eligibility**: Rules defined declaratively, not in code
+- **Registry as Data**: `config/registry.ts` with runtime evaluators
+- **Two Widgets Migrated**: `complete-the-look`, `style-summary`
+- **180+ lines removed**: Hard-coded eligibility logic replaced with config
 
-See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#widget-phase-2-config-generated-widgets-complete) for full details.
+**Remaining**: Category-agnostic matching, template selection engine, hot-reload
 
 ### Widget Phase 1: Rule-Driven Automation ✅
 **Completed: 2026-02-05**
@@ -77,8 +77,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |-------|------|------------|--------|
 | 0 | Deterministic MVP | Very Low | ~95% Complete |
 | 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
-| 2 | Config-Generated Widgets | Medium→High | **COMPLETE** |
-| 2.5 | Rules-Based Widget Catalog | Medium→High | **Pending** (40 widgets, 6 tiers) |
+| 2 | Config-Generated Widgets | Medium→High | **IN PROGRESS** |
 | 3 | Self-Selecting Widgets | High | Pending |
 | 4 | Self-Optimizing System | Full | Pending |
 
@@ -90,9 +89,6 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |------|---------|-------|
 | Email invitations for collaborative boards | Resend API setup required | Human |
 | Push notifications | FCM/APNs setup required | Human |
-| Widget staleness triggers (4 widgets) | `last_interacted_at` schema migration needed | AI + Human |
-| Widget dynamic categories (12 widgets) | AI category assignment + tags[] pipeline needed | AI |
-| Widget action templates | handleQuickAdd cache key bug | AI |
 
 ---
 
@@ -103,7 +99,6 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Collaborative pricing model | Free vs premium tiers | Revenue, feature gating |
 | Mobile app platform | iOS first vs cross-platform | Development timeline |
 | Analytics provider | Privacy-friendly options | User trust, compliance |
-| SERP API key | SerpApi vs alternatives | Cost, reliability |
 
 ---
 

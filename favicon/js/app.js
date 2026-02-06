@@ -327,23 +327,40 @@ class FaviconApp {
 
   async generateWithProxy(prompt) {
     // Call the Cloudflare Worker proxy (API key is stored server-side)
-    const response = await fetch(IMAGEN_PROXY_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ prompt })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Image generation failed');
+    let response;
+    try {
+      response = await fetch(IMAGEN_PROXY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt })
+      });
+    } catch (e) {
+      throw new Error('Failed to connect to image service. Check your internet connection.');
     }
 
-    const data = await response.json();
+    // Get response text first to handle empty responses
+    const text = await response.text();
+
+    if (!text) {
+      throw new Error('Empty response from server. The worker may not be configured correctly.');
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('Invalid JSON response:', text);
+      throw new Error('Invalid response from server');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || `Server error: ${response.status}`);
+    }
 
     if (!data.generatedImages || data.generatedImages.length === 0) {
-      throw new Error('No image generated');
+      throw new Error(data.error || 'No image generated');
     }
 
     const base64Image = data.generatedImages[0].image.imageBytes;
