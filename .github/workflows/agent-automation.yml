@@ -1051,12 +1051,26 @@ jobs:
           print(json.dumps(payload))
           PYEOF
 
-          response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+          response=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
             -d @/tmp/health_payload.json)
 
-          echo "$response" > /tmp/health_response.json
+          # Split response body and HTTP status code
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "$body" > /tmp/health_response.json
+
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Health check API returned HTTP $http_code"
+            echo "Response: $body"
+            echo ""
+            echo "Possible fixes:"
+            echo "  1. Deploy with: supabase functions deploy notion-sync --no-verify-jwt --project-ref ycilriwjnmcelkspmfmg"
+            echo "  2. Or set SUPABASE_SERVICE_KEY to the service_role key from Supabase Dashboard > Settings > API"
+            exit 0
+          fi
 
           # Parse and display report
           python3 << 'PYEOF'
