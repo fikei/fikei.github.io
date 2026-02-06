@@ -36,13 +36,25 @@
     .grid-controls button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
     .grid-controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
-    /* Placeholder images */
-    .w-img--placeholder { background: var(--gray-300); }
-
     /* Nav */
-    .nav { position: sticky; top: 0; background: var(--bg); border-bottom: var(--border-thin) solid var(--border-subtle); z-index: var(--z-sticky); padding: var(--space-3) var(--space-6); display: flex; gap: var(--space-4); overflow-x: auto; }
+    .nav { position: sticky; top: 0; background: var(--bg); border-bottom: var(--border-thin) solid var(--border-subtle); z-index: var(--z-sticky); padding: var(--space-3) var(--space-6); display: flex; gap: var(--space-4); align-items: center; overflow-x: auto; }
     .nav a { font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); text-decoration: none; white-space: nowrap; }
     .nav a:hover { color: var(--fg); }
+    .nav__spacer { flex: 1; }
+    .nav select { font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); background: var(--bg); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-1) var(--space-3); cursor: pointer; white-space: nowrap; }
+    .nav select option { text-transform: none; letter-spacing: normal; }
+
+    /* Variant explorer */
+    .variant-grid { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: start; }
+    .variant-item { display: flex; flex-direction: column; }
+    .variant-label { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--fg-muted); margin-bottom: var(--space-2); }
+    .variant-item .w-shell { min-width: 0; }
+    .variant-item--sm { width: 200px; }
+    .variant-item--med { width: 420px; }
+    .variant-item--tall { width: 200px; }
+    .variant-item--lg { width: 420px; }
+    .variant-item--wide { width: 640px; }
+    .variant-item--xl { width: 640px; }
 
     @media (max-width: 900px) {
       .grid-test--5col { grid-template-columns: repeat(3, 1fr); }
@@ -83,11 +95,61 @@
   <a href="#layouts">Layouts</a>
   <a href="#priority">Priority</a>
   <a href="#grid">Grid Sizes</a>
+  <span class="nav__spacer"></span>
+  <select id="widgetFilter" onchange="showVariants()">
+    <option value="">Widget...</option>
+    <optgroup label="Priority">
+      <option value="watch-deadline">#40 Upcoming Releases</option>
+      <option value="discover-eat">#41 Discover (eat)</option>
+      <option value="discover-watch">#41 Discover (watch)</option>
+      <option value="discover-read">#41 Discover (read)</option>
+      <option value="discover-home">#41 Discover (home)</option>
+      <option value="discover-wear">#41 Discover (wear)</option>
+    </optgroup>
+    <optgroup label="Catalog">
+      <option value="eat-decide">#1 Decide (eat)</option>
+      <option value="read-synthesize">#4 Synthesize (read)</option>
+      <option value="go-sequence">#6 Sequence (go)</option>
+      <option value="follow-decay">#8 Decay (follow)</option>
+      <option value="all-behavior">#15 Behavior (all)</option>
+      <option value="home-conflict">#17 Conflict (home)</option>
+      <option value="all-archaeologist">#20 Archaeologist (all)</option>
+      <option value="use-compare">#26 Compare (use)</option>
+      <option value="all-ritual">#33 Ritual (all)</option>
+      <option value="follow-proxy">#34 Proxy (follow)</option>
+      <option value="home-ladder">#36 Ladder (home)</option>
+    </optgroup>
+    <optgroup label="Content">
+      <option value="read-recommend">Article Recommendation</option>
+      <option value="read-digest">News Digest</option>
+      <option value="read-deep">Deep Read</option>
+    </optgroup>
+  </select>
+  <select id="templateFilter" onchange="showVariants()">
+    <option value="">Template...</option>
+    <option value="choices">Choices</option>
+    <option value="comparison">Comparison</option>
+    <option value="grouped">Grouped</option>
+    <option value="list">List</option>
+    <option value="narrative">Narrative</option>
+    <option value="spectrum">Spectrum</option>
+    <option value="suggestion">Suggestion</option>
+    <option value="verdict">Verdict</option>
+  </select>
 </nav>
 
 <div class="showcase">
   <h1 class="showcase__title">Widget Components</h1>
   <p class="showcase__subtitle">ctrl.rodeo design system — v2 with visual/narrative focus, photos, SVG icons, anchored actions</p>
+
+  <!-- ====== VARIANT EXPLORER (hidden until dropdown used) ====== -->
+  <div class="section" id="variants" style="display:none">
+    <h2 class="section__heading">Size Variants</h2>
+    <p class="section__desc" id="variantDesc">All valid sizes for the selected widget.</p>
+    <div class="variant-grid" id="variantGrid"></div>
+  </div>
+
+  <hr class="section-divider" id="variantDivider" style="display:none">
 
   <!-- ====== ATOMS ====== -->
   <div class="section" id="atoms">
@@ -162,11 +224,11 @@
         <div class="component-card__label">w-img</div>
         <div class="component-card__demo">
           <div class="variants-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/demo-thumb/80/80" alt="thumb demo"></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/demo-card/160/160" alt="card demo"></div>
           </div>
-          <div class="w-img w-img--hero w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
-          <div class="w-img w-img--banner w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-img w-img--hero"><img src="https://picsum.photos/seed/demo-hero/400/300" alt="hero demo"></div>
+          <div class="w-img w-img--banner"><img src="https://picsum.photos/seed/demo-banner/600/200" alt="banner demo"></div>
         </div>
       </div>
 
@@ -261,7 +323,7 @@
         <div class="component-card__label">w-row (with w-img)</div>
         <div class="component-card__demo">
           <div class="w-row" style="border:none;padding-top:0">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/chez-pascal/80/80" alt="Chez Pascal"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Chez Pascal</span>
               <span class="w-text w-text--meta">French bistro — saved 3 weeks ago</span>
@@ -269,7 +331,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tacos-gordo/80/80" alt="Tacos El Gordo"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Tacos El Gordo</span>
               <span class="w-text w-text--meta">Mexican street food — your most saved</span>
@@ -322,14 +384,6 @@
               <button class="w-btn">Not tonight</button>
             </div>
           </div>
-          <span class="w-text w-text--label" style="margin-top:var(--space-3)">Floating (old w-footer)</span>
-          <div>
-            <div style="border:var(--border-thin) solid var(--border-subtle);padding:var(--space-3)"><span class="w-text w-text--meta">Body content here</span></div>
-            <div style="padding:var(--space-2) 0;display:flex;gap:var(--space-2)">
-              <button class="w-btn w-btn--filled">Pick this one</button>
-              <button class="w-btn">Not tonight</button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -340,12 +394,12 @@
   <!-- ====== BODY LAYOUTS AS FULL WIDGETS ====== -->
   <div class="section" id="layouts">
     <h2 class="section__heading">Widget Examples</h2>
-    <p class="section__desc">Real widgets with visual/narrative content, photos, SVG icons, anchored actions.</p>
+    <p class="section__desc">Real widgets with photos, SVG icons, anchored actions. One visual per row.</p>
 
     <div class="component-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
 
       <!-- #1 eat-decide (choices + photos) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="eat-decide" data-template="choices">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Pick one for tonight</span>
@@ -359,7 +413,7 @@
         <div class="w-body w-body--choices">
           <div class="w-option">
             <div style="display:flex;gap:var(--space-3);align-items:center">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/chez-pascal/80/80" alt="Chez Pascal"></div>
               <div>
                 <span class="w-text w-text--title">Chez Pascal</span>
                 <span class="w-text w-text--meta">French bistro — you haven't tried French in 3 weeks</span>
@@ -368,7 +422,7 @@
           </div>
           <div class="w-option">
             <div style="display:flex;gap:var(--space-3);align-items:center">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tacos-gordo/80/80" alt="Tacos El Gordo"></div>
               <div>
                 <span class="w-text w-text--title">Tacos El Gordo</span>
                 <span class="w-text w-text--meta">Mexican street — your most-saved cuisine</span>
@@ -377,7 +431,7 @@
           </div>
           <div class="w-option">
             <div style="display:flex;gap:var(--space-3);align-items:center">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/sushi-nakazawa/80/80" alt="Sushi Nakazawa"></div>
               <div>
                 <span class="w-text w-text--title">Sushi Nakazawa</span>
                 <span class="w-text w-text--meta">Omakase — saved last week, still unvisited</span>
@@ -392,7 +446,7 @@
       </div>
 
       <!-- #4 read-synthesize (narrative) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="read-synthesize" data-template="narrative">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">The hidden thread</span>
@@ -417,8 +471,8 @@
         </div>
       </div>
 
-      <!-- #6 go-sequence (list + map pins) -->
-      <div class="w-shell">
+      <!-- #6 go-sequence (list + photos) -->
+      <div class="w-shell" data-widget="go-sequence" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Route these into a trip</span>
@@ -430,7 +484,7 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/golden-gate/80/80" alt="Golden Gate Bridge"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Golden Gate Bridge</span>
               <span class="w-text w-text--meta">Start here — morning light</span>
@@ -438,7 +492,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tartine-bakery/80/80" alt="Tartine Bakery"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Tartine Bakery</span>
               <span class="w-text w-text--meta">12 min drive — lunch stop</span>
@@ -446,7 +500,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/sfmoma-art/80/80" alt="SFMOMA"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">SFMOMA</span>
               <span class="w-text w-text--meta">8 min walk — afternoon</span>
@@ -460,8 +514,8 @@
         </div>
       </div>
 
-      <!-- NEW: Article recommendation (narrative + hero image) -->
-      <div class="w-shell">
+      <!-- Article recommendation (suggestion + hero) -->
+      <div class="w-shell" data-widget="read-recommend" data-template="suggestion">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Recommended read</span>
@@ -473,10 +527,10 @@
           </div>
         </div>
         <div class="w-body w-body--suggestion">
-          <div class="w-img w-img--hero w-img--placeholder" style="width:100%"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
-          <div style="text-align:center">
+          <div class="w-img w-img--hero" style="width:100%"><img src="https://picsum.photos/seed/book-overthinking/400/300" alt="Book cover"></div>
+          <div>
             <span class="w-text w-text--title">The Age of Magical Overthinking</span>
-            <span class="w-text w-text--meta" style="display:block;margin-top:var(--space-1)">Amanda Montell — Based on your saves about cognitive biases and decision-making</span>
+            <span class="w-text w-text--meta" style="margin-top:var(--space-1)">Amanda Montell — Based on your saves about cognitive biases and decision-making</span>
           </div>
           <div class="w-tag-group w-tag-group--center">
             <span class="w-badge">Psychology</span>
@@ -489,8 +543,8 @@
         </div>
       </div>
 
-      <!-- NEW: News digest (list with article images) -->
-      <div class="w-shell">
+      <!-- News digest (list with card images) -->
+      <div class="w-shell" data-widget="read-digest" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Your news digest</span>
@@ -502,7 +556,7 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/ai-chip/160/160" alt="AI article"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Claude 4.5 Benchmarks</span>
               <span class="w-text w-text--meta">The Verge — 4 min read — Matches your AI tooling saves</span>
@@ -510,7 +564,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/design-grid/160/160" alt="Design article"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Design Systems at Scale</span>
               <span class="w-text w-text--meta">Smashing Mag — 8 min read — Related to your design system research</span>
@@ -518,7 +572,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/remote-desk/160/160" alt="Work article"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">The Future of Remote Work</span>
               <span class="w-text w-text--meta">Wired — 6 min read — Trending in your network</span>
@@ -532,7 +586,7 @@
       </div>
 
       <!-- #26 use-compare (comparison) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="use-compare" data-template="comparison">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Have you considered?</span>
@@ -545,7 +599,7 @@
         </div>
         <div class="w-body w-body--comparison">
           <div class="w-option">
-            <div class="w-img w-img--wide w-img--placeholder" style="width:100%"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--wide" style="width:100%"><img src="https://picsum.photos/seed/figma-ui/400/225" alt="Figma"></div>
             <span class="w-text w-text--title">Figma</span>
             <span class="w-text w-text--meta">Your current tool</span>
             <div class="w-tag-group">
@@ -555,7 +609,7 @@
           </div>
           <div class="w-divider w-divider--labeled">vs</div>
           <div class="w-option">
-            <div class="w-img w-img--wide w-img--placeholder" style="width:100%"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--wide" style="width:100%"><img src="https://picsum.photos/seed/penpot-ui/400/225" alt="Penpot"></div>
             <span class="w-text w-text--title">Penpot</span>
             <span class="w-text w-text--meta">Open-source alternative</span>
             <div class="w-tag-group">
@@ -570,8 +624,8 @@
         </div>
       </div>
 
-      <!-- #36 home-ladder (list with photos) -->
-      <div class="w-shell">
+      <!-- #36 home-ladder (list with card images) -->
+      <div class="w-shell" data-widget="home-ladder" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Good / Better / Best</span>
@@ -583,7 +637,7 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/ikea-shelf/160/160" alt="IKEA KALLAX"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">IKEA KALLAX</span>
               <span class="w-text w-text--meta">$79 — functional, modular, MDF</span>
@@ -591,7 +645,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/cb2-bookcase/160/160" alt="CB2 Stairway"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">CB2 Stairway</span>
               <span class="w-text w-text--meta">$349 — solid wood, modern aesthetic</span>
@@ -599,7 +653,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/usm-haller/160/160" alt="USM Haller"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">USM Haller</span>
               <span class="w-text w-text--meta">$1,200 — Swiss-made, lifetime piece</span>
@@ -612,8 +666,8 @@
         </div>
       </div>
 
-      <!-- #8 follow-decay (list with icons) -->
-      <div class="w-shell">
+      <!-- #8 follow-decay (list with status icons) -->
+      <div class="w-shell" data-widget="follow-decay" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Who are you ignoring?</span>
@@ -655,8 +709,8 @@
         </div>
       </div>
 
-      <!-- #17 home-conflict (verdict with hero image) -->
-      <div class="w-shell">
+      <!-- #17 home-conflict (verdict) -->
+      <div class="w-shell" data-widget="home-conflict" data-template="verdict">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">These styles clash</span>
@@ -684,8 +738,8 @@
         </div>
       </div>
 
-      <!-- #40 watch-deadline (list with icons) -->
-      <div class="w-shell">
+      <!-- #40 watch-deadline (list with photos) -->
+      <div class="w-shell" data-widget="watch-deadline" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Upcoming releases</span>
@@ -697,7 +751,7 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/white-lotus/80/80" alt="White Lotus"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">White Lotus S3</span>
               <span class="w-text w-text--meta">Premieres Feb 16 — 10 days</span>
@@ -705,7 +759,7 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/stranger-things/80/80" alt="Stranger Things"></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Stranger Things S5</span>
               <span class="w-text w-text--meta">Expected Q3 2026</span>
@@ -719,7 +773,7 @@
       </div>
 
       <!-- #33 all-ritual (grouped with icons) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="all-ritual" data-template="grouped">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Daily ritual bundle</span>
@@ -766,8 +820,8 @@
         </div>
       </div>
 
-      <!-- NEW: Article deep-read (narrative + hero) -->
-      <div class="w-shell">
+      <!-- Deep-read article (narrative + banner) -->
+      <div class="w-shell" data-widget="read-deep" data-template="narrative">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Worth a deep read</span>
@@ -779,10 +833,10 @@
           </div>
         </div>
         <div class="w-body w-body--narrative" style="padding:0">
-          <div class="w-img w-img--banner w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-img w-img--banner"><img src="https://picsum.photos/seed/indie-web/600/200" alt="Article banner"></div>
           <div style="padding:var(--space-4)">
             <p class="w-text w-text--prose">This longform piece from Anil Dash connects three of your saved themes — <strong>open source governance, creator economics, and platform decay</strong> — into a single argument about the future of the indie web.</p>
-            <span class="w-text w-text--meta" style="display:block;margin-top:var(--space-2)">anil.dash — 14 min read</span>
+            <span class="w-text w-text--meta" style="margin-top:var(--space-2)">anil.dash — 14 min read</span>
           </div>
         </div>
         <div class="w-actions">
@@ -792,7 +846,7 @@
       </div>
 
       <!-- #20 all-archaeologist (verdict) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="all-archaeologist" data-template="verdict">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Oldest forgotten save</span>
@@ -819,7 +873,7 @@
       </div>
 
       <!-- #34 follow-proxy (narrative) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="follow-proxy" data-template="narrative">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">The influence chain</span>
@@ -831,7 +885,7 @@
         </div>
         <div class="w-body w-body--narrative">
           <p class="w-text w-text--prose">You follow <strong>@dan_abramov</strong>, <strong>@swyx</strong>, and <strong>@kentcdodds</strong> — all in the React ecosystem. Dan influences Swyx's thinking, who shapes Kent's teaching. You're getting a filtered, amplified view of React core team opinions.</p>
-          <span class="w-text w-text--note" style="display:block;margin-top:var(--space-2)">Consider adding a contrarian voice like @RyanCarniato (Solid.js) for balance.</span>
+          <span class="w-text w-text--note" style="margin-top:var(--space-2)">Consider adding a contrarian voice like @RyanCarniato (Solid.js) for balance.</span>
         </div>
         <div class="w-actions">
           <button class="w-btn">Add suggested</button>
@@ -839,7 +893,7 @@
       </div>
 
       <!-- #15 all-behavior (spectrum) -->
-      <div class="w-shell">
+      <div class="w-shell" data-widget="all-behavior" data-template="spectrum">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Your saving pattern</span>
@@ -898,7 +952,7 @@
     <div class="component-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
 
       <!-- #40 Upcoming Releases — med (2x1) -->
-      <div class="w-shell" style="grid-column: span 2;">
+      <div class="w-shell" style="grid-column: span 2;" data-widget="watch-deadline" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Upcoming releases for you</span>
@@ -912,7 +966,7 @@
         <div class="w-body w-body--list">
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/severance-tv/80/80" alt="Severance"></div>
               <div>
                 <span class="w-text w-text--title">Severance</span>
                 <span class="w-text w-text--meta">Season 3 — Expected Q3 2026</span>
@@ -922,7 +976,7 @@
           </div>
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/white-lotus/80/80" alt="The White Lotus"></div>
               <div>
                 <span class="w-text w-text--title">The White Lotus</span>
                 <span class="w-text w-text--meta">Season 4 — Filming</span>
@@ -932,7 +986,7 @@
           </div>
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/squid-game/80/80" alt="Squid Game"></div>
               <div>
                 <span class="w-text w-text--title">Squid Game</span>
                 <span class="w-text w-text--meta">Season 3 — Expected 2026</span>
@@ -942,7 +996,7 @@
           </div>
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-play"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/dune-desert/80/80" alt="Dune"></div>
               <div>
                 <span class="w-text w-text--title">Dune: Part Three</span>
                 <span class="w-text w-text--meta">Feature film — No date announced</span>
@@ -956,8 +1010,8 @@
         </div>
       </div>
 
-      <!-- #40 Upcoming Releases — sm (1x1, compact) -->
-      <div class="w-shell">
+      <!-- #40 Upcoming Releases — sm (1x1, compact icons) -->
+      <div class="w-shell" data-widget="watch-deadline" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Upcoming releases</span>
@@ -986,8 +1040,8 @@
         </div>
       </div>
 
-      <!-- #41 More Like Your Board — eat variant (med) -->
-      <div class="w-shell" style="grid-column: span 2;">
+      <!-- #41 Discover — eat variant (med) -->
+      <div class="w-shell" style="grid-column: span 2;" data-widget="discover-eat" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Restaurants you'd love</span>
@@ -1001,7 +1055,7 @@
         <div class="w-body w-body--list">
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/bar-chelou/80/80" alt="Bar Chelou"></div>
               <div>
                 <span class="w-text w-text--title">Bar Chelou</span>
                 <span class="w-text w-text--meta">Natural wine bar — Similar vibe to Chez Pascal and your French saves</span>
@@ -1011,7 +1065,7 @@
           </div>
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/kismet-la/80/80" alt="Kismet"></div>
               <div>
                 <span class="w-text w-text--title">Kismet</span>
                 <span class="w-text w-text--meta">Middle Eastern — Matches your preference for ingredient-driven cooking</span>
@@ -1021,7 +1075,7 @@
           </div>
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/petit-trois/80/80" alt="Petit Trois"></div>
               <div>
                 <span class="w-text w-text--title">Petit Trois</span>
                 <span class="w-text w-text--meta">French bistro — Same price range and neighborhood feel as your top picks</span>
@@ -1036,8 +1090,8 @@
         </div>
       </div>
 
-      <!-- #41 More Like Your Board — watch variant (med) -->
-      <div class="w-shell" style="grid-column: span 2;">
+      <!-- #41 Discover — watch variant (med) -->
+      <div class="w-shell" style="grid-column: span 2;" data-widget="discover-watch" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Shows cut from the same cloth</span>
@@ -1051,7 +1105,7 @@
         <div class="w-body w-body--list">
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/pachinko-tv/80/80" alt="Pachinko"></div>
               <div>
                 <span class="w-text w-text--title">Pachinko</span>
                 <span class="w-text w-text--meta">Multi-generational storytelling — you gravitate toward slow-burn drama</span>
@@ -1061,7 +1115,7 @@
           </div>
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/shogun-fx/80/80" alt="Shogun"></div>
               <div>
                 <span class="w-text w-text--title">Shogun</span>
                 <span class="w-text w-text--meta">Period drama — similar production quality to your top-rated saves</span>
@@ -1076,8 +1130,8 @@
         </div>
       </div>
 
-      <!-- #41 More Like Your Board — read variant (sm) -->
-      <div class="w-shell">
+      <!-- #41 Discover — read variant (sm) -->
+      <div class="w-shell" data-widget="discover-read" data-template="suggestion">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Your next great read</span>
@@ -1102,8 +1156,8 @@
         </div>
       </div>
 
-      <!-- #41 More Like Your Board — home variant (sm) -->
-      <div class="w-shell">
+      <!-- #41 Discover — home variant (sm) -->
+      <div class="w-shell" data-widget="discover-home" data-template="suggestion">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Pieces that fit your space</span>
@@ -1117,7 +1171,7 @@
         <div class="w-body w-body--suggestion">
           <div class="w-row">
             <div style="display:flex;gap:var(--space-3);align-items:center">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/floyd-table/80/80" alt="Floyd Side Table"></div>
               <div>
                 <span class="w-text w-text--title">Floyd Side Table</span>
                 <span class="w-text w-text--meta">Minimal — matches your saved aesthetic</span>
@@ -1131,8 +1185,8 @@
         </div>
       </div>
 
-      <!-- #41 More Like Your Board — wear variant (tall/1x2) -->
-      <div class="w-shell">
+      <!-- #41 Discover — wear variant (tall) -->
+      <div class="w-shell" data-widget="discover-wear" data-template="list">
         <div class="w-header">
           <div class="w-header__left">
             <span class="w-text w-text--label">Brands on your wavelength</span>
@@ -1144,7 +1198,7 @@
           </div>
         </div>
         <div class="w-body w-body--list">
-          <div class="w-img w-img--hero w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-img w-img--hero"><img src="https://picsum.photos/seed/fashion-minimal/400/300" alt="Fashion"></div>
           <div class="w-row">
             <div>
               <span class="w-text w-text--title">Auralee</span>
@@ -1189,7 +1243,7 @@
     <div class="grid-test grid-test--5col" id="sizeGrid">
 
       <!-- sm (1x1) — verdict -->
-      <div class="w-shell w-shell--sm">
+      <div class="w-shell w-shell--sm" data-widget="home-conflict" data-template="verdict">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Style clash</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
@@ -1207,7 +1261,7 @@
       </div>
 
       <!-- sm (1x1) — choices compact -->
-      <div class="w-shell w-shell--sm">
+      <div class="w-shell w-shell--sm" data-widget="eat-decide" data-template="choices">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Tonight?</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
@@ -1226,7 +1280,7 @@
       </div>
 
       <!-- med (2x1) — narrative -->
-      <div class="w-shell w-shell--med">
+      <div class="w-shell w-shell--med" data-widget="read-synthesize" data-template="narrative">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">The hidden thread</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
@@ -1243,7 +1297,7 @@
       </div>
 
       <!-- sm (1x1) — spectrum -->
-      <div class="w-shell w-shell--sm">
+      <div class="w-shell w-shell--sm" data-widget="all-behavior" data-template="spectrum">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Pattern</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
@@ -1254,27 +1308,27 @@
         </div>
       </div>
 
-      <!-- tall (1x2) — list + images -->
-      <div class="w-shell w-shell--tall">
+      <!-- tall (1x2) — list + photos -->
+      <div class="w-shell w-shell--tall" data-widget="go-sequence" data-template="list">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Trip route</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/golden-gate/80/80" alt="Golden Gate"></div>
             <div class="w-row__content"><span class="w-text w-text--title">Golden Gate</span><span class="w-text w-text--meta">Start — morning</span></div>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tartine-bakery/80/80" alt="Tartine"></div>
             <div class="w-row__content"><span class="w-text w-text--title">Tartine</span><span class="w-text w-text--meta">Lunch — 12 min</span></div>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/sfmoma-art/80/80" alt="SFMOMA"></div>
             <div class="w-row__content"><span class="w-text w-text--title">SFMOMA</span><span class="w-text w-text--meta">Afternoon — 8 min</span></div>
           </div>
           <div class="w-row">
-            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/dolores-park/80/80" alt="Dolores Park"></div>
             <div class="w-row__content"><span class="w-text w-text--title">Dolores Park</span><span class="w-text w-text--meta">Sunset</span></div>
           </div>
         </div>
@@ -1282,7 +1336,7 @@
       </div>
 
       <!-- med (2x1) — comparison -->
-      <div class="w-shell w-shell--med">
+      <div class="w-shell w-shell--med" data-widget="use-compare" data-template="comparison">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Have you considered?</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
@@ -1303,26 +1357,26 @@
         <div class="w-actions"><button class="w-btn">Keep current</button><button class="w-btn">Try alternative</button></div>
       </div>
 
-      <!-- lg (2x2) — news digest with hero -->
-      <div class="w-shell w-shell--lg">
+      <!-- lg (2x2) — news digest with banner -->
+      <div class="w-shell w-shell--lg" data-widget="read-digest" data-template="list">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Your news digest</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
         </div>
         <div class="w-body w-body--narrative" style="padding:0">
-          <div class="w-img w-img--banner w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-img w-img--banner"><img src="https://picsum.photos/seed/tech-news/600/200" alt="Tech news"></div>
           <div style="padding:var(--space-4)">
             <span class="w-text w-text--title">Claude 4.5 Benchmarks Drop</span>
             <p class="w-text w-text--prose" style="margin-top:var(--space-2)">The latest benchmarks show significant improvements in reasoning and tool use. This connects to your recent saves about AI-assisted development workflows.</p>
-            <span class="w-text w-text--meta" style="display:block;margin-top:var(--space-2)">The Verge — 4 min read</span>
+            <span class="w-text w-text--meta" style="margin-top:var(--space-2)">The Verge — 4 min read</span>
             <div class="w-divider" style="margin:var(--space-3) 0"></div>
             <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/design-grid/80/80" alt="Design Systems"></div>
               <div class="w-row__content"><span class="w-text w-text--title">Design Systems at Scale</span><span class="w-text w-text--meta">Smashing — 8 min read</span></div>
               <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
             </div>
             <div class="w-row">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/remote-desk/80/80" alt="Remote Work"></div>
               <div class="w-row__content"><span class="w-text w-text--title">Future of Remote Work</span><span class="w-text w-text--meta">Wired — 6 min</span></div>
               <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
             </div>
@@ -1332,20 +1386,20 @@
       </div>
 
       <!-- sm (1x1) — suggestion -->
-      <div class="w-shell w-shell--sm">
+      <div class="w-shell w-shell--sm" data-widget="discover-home" data-template="suggestion">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Workflow gap</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
         </div>
         <div class="w-body w-body--suggestion">
           <span class="w-text w-text--title">Raycast</span>
-          <span class="w-text w-text--meta" style="text-align:center">Launcher + snippets for your Figma + VS Code workflow</span>
+          <span class="w-text w-text--meta">Launcher + snippets for your Figma + VS Code workflow</span>
         </div>
         <div class="w-actions"><button class="w-btn w-btn--filled">Add to board</button></div>
       </div>
 
-      <!-- PRIORITY: med (2x1) — #40 Upcoming Releases -->
-      <div class="w-shell w-shell--med">
+      <!-- med (2x1) — #40 Upcoming Releases -->
+      <div class="w-shell w-shell--med" data-widget="watch-deadline" data-template="list">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Upcoming releases</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
@@ -1376,8 +1430,8 @@
         <div class="w-actions"><span class="w-text w-text--meta">Based on 8 shows</span></div>
       </div>
 
-      <!-- PRIORITY: sm (1x1) — #41 Discover (eat) -->
-      <div class="w-shell w-shell--sm">
+      <!-- sm (1x1) — #41 Discover (eat) -->
+      <div class="w-shell w-shell--sm" data-widget="discover-eat" data-template="suggestion">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">You'd love</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
@@ -1385,7 +1439,7 @@
         <div class="w-body w-body--suggestion">
           <div class="w-row">
             <div style="display:flex;gap:var(--space-2);align-items:center">
-              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/kismet-la/80/80" alt="Kismet"></div>
               <div><span class="w-text w-text--title">Kismet</span><span class="w-text w-text--meta">Ingredient-driven — your style</span></div>
             </div>
           </div>
@@ -1393,14 +1447,14 @@
         <div class="w-actions"><button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> Visit</button><button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button></div>
       </div>
 
-      <!-- PRIORITY: lg (2x2) — #41 Discover (wear) -->
-      <div class="w-shell w-shell--lg">
+      <!-- lg (2x2) — #41 Discover (wear) -->
+      <div class="w-shell w-shell--lg" data-widget="discover-wear" data-template="list">
         <div class="w-header">
           <div class="w-header__left"><span class="w-text w-text--label">Brands on your wavelength</span><span class="w-badge">AI</span></div>
           <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
         </div>
         <div class="w-body w-body--list">
-          <div class="w-img w-img--hero w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-img w-img--hero"><img src="https://picsum.photos/seed/fashion-minimal/400/300" alt="Fashion"></div>
           <div class="w-row">
             <div><span class="w-text w-text--title">Auralee</span><span class="w-text w-text--meta">Japanese minimalism — clean-cut pieces at this price point</span></div>
             <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
@@ -1428,38 +1482,109 @@
 
 </div>
 
+<script src="../js/image-enrichment.js"></script>
 <script>
 function setGrid(cols, btn) {
-  const grid = document.getElementById('sizeGrid');
+  var grid = document.getElementById('sizeGrid');
   grid.className = 'grid-test grid-test--' + cols + 'col';
-  document.querySelectorAll('.grid-controls button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.grid-controls button').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
 }
 
-// Image pipeline — replace all placeholders with real photos
-// Seeds from nearest title text so each item gets a consistent image
-document.querySelectorAll('.w-img--placeholder').forEach(function(el, i) {
-  var row = el.closest('.w-row, .w-option');
-  var shell = el.closest('.w-shell') || el.closest('.component-card');
-  var titleEl = row && row.querySelector('.w-text--title');
-  if (!titleEl && shell) titleEl = shell.querySelector('.w-text--title');
-  if (!titleEl && shell) titleEl = shell.querySelector('.w-text--label');
-  var text = titleEl ? titleEl.textContent : 'demo-' + i;
-  var seed = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+// Template → valid sizes
+var TEMPLATE_SIZES = {
+  verdict:    ['sm', 'med', 'lg'],
+  list:       ['sm', 'med', 'tall', 'lg', 'wide'],
+  narrative:  ['med', 'tall', 'lg'],
+  spectrum:   ['sm', 'med', 'lg'],
+  comparison: ['med', 'lg'],
+  choices:    ['sm', 'med', 'lg'],
+  suggestion: ['sm', 'med', 'tall', 'lg'],
+  grouped:    ['med', 'tall', 'lg']
+};
 
-  var w = 80, h = 80;
-  if (el.classList.contains('w-img--hero')) { w = 400; h = 300; }
-  else if (el.classList.contains('w-img--banner')) { w = 600; h = 200; }
-  else if (el.classList.contains('w-img--wide')) { w = 400; h = 225; }
-  else if (el.classList.contains('w-img--card')) { w = 160; h = 160; }
+var SIZE_LABELS = {
+  sm: '1x1', med: '2x1', tall: '1x2', lg: '2x2', wide: '3x1', xl: '3x2'
+};
 
-  var img = document.createElement('img');
-  img.src = 'https://picsum.photos/seed/' + seed + '/' + w + '/' + h;
-  img.alt = text;
-  img.loading = 'lazy';
-  el.innerHTML = '';
-  el.appendChild(img);
-  el.classList.remove('w-img--placeholder');
+function showVariants() {
+  var widgetVal = document.getElementById('widgetFilter').value;
+  var templateVal = document.getElementById('templateFilter').value;
+  var explorer = document.getElementById('variants');
+  var divider = document.getElementById('variantDivider');
+  var grid = document.getElementById('variantGrid');
+  var desc = document.getElementById('variantDesc');
+
+  if (!widgetVal && !templateVal) {
+    explorer.style.display = 'none';
+    divider.style.display = 'none';
+    return;
+  }
+
+  // Build selector
+  var selector = '.w-shell';
+  if (widgetVal) selector += '[data-widget="' + widgetVal + '"]';
+  if (templateVal) selector += '[data-template="' + templateVal + '"]';
+
+  var source = document.querySelector(selector);
+  if (!source) {
+    grid.innerHTML = '<p class="w-text w-text--meta" style="padding:var(--space-4)">No matching widget found for this combination.</p>';
+    explorer.style.display = '';
+    divider.style.display = '';
+    return;
+  }
+
+  var template = source.dataset.template;
+  var sizes = TEMPLATE_SIZES[template] || ['sm', 'med', 'lg'];
+  var widget = source.dataset.widget || '';
+  var label = widgetVal || templateVal;
+  desc.textContent = 'Showing ' + label + ' (' + template + ') at ' + sizes.length + ' valid sizes.';
+
+  grid.innerHTML = '';
+  sizes.forEach(function(size) {
+    var clone = source.cloneNode(true);
+    // Strip any existing size and grid-span styles
+    clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
+    clone.style.cssText = '';
+    clone.classList.add('w-shell--' + size);
+
+    var wrapper = document.createElement('div');
+    wrapper.className = 'variant-item variant-item--' + size;
+
+    var lbl = document.createElement('div');
+    lbl.className = 'variant-label';
+    lbl.textContent = size + ' (' + SIZE_LABELS[size] + ')';
+
+    wrapper.appendChild(lbl);
+    wrapper.appendChild(clone);
+    grid.appendChild(wrapper);
+  });
+
+  explorer.style.display = '';
+  divider.style.display = '';
+  explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================
+// Image Enrichment Pipeline
+// Uses js/image-enrichment.js module.
+// Strategy: picsum (MVP), upgradeable to
+// unsplash or enrich-link edge function.
+// ============================================
+
+var pipeline = ImageEnrichment({ strategy: 'picsum' });
+
+// Wire up all refresh buttons — reselect images on click
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.w-icon-btn');
+  if (!btn) return;
+  var svg = btn.querySelector('use');
+  if (!svg) return;
+  var href = svg.getAttribute('href') || svg.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+  if (href !== '#icon-refresh') return;
+
+  var shell = btn.closest('.w-shell');
+  if (shell) pipeline.applyToContainer(shell, true);
 });
 </script>
 

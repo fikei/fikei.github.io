@@ -134,12 +134,14 @@
 }
 
 .w-text--title {
+  display: block;
   font-size: var(--text-lg);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
 }
 
 .w-text--meta {
+  display: block;
   font-size: var(--text-xs);
   color: var(--fg-muted);
 }
@@ -428,9 +430,9 @@
 .w-headline {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  text-align: center;
+  text-align: left;
 }
 
 /* --- w-tag-group --- */
@@ -440,7 +442,7 @@
   gap: var(--space-1);
 }
 
-.w-tag-group--center { justify-content: center; }
+.w-tag-group--center { justify-content: flex-start; }
 
 /* --- w-stat --- */
 .w-stat {
@@ -512,7 +514,7 @@
   transition: left 0.4s ease;
 }
 
-.w-axis__note { text-align: center; }
+.w-axis__note { text-align: left; }
 
 /* --- w-option --- */
 .w-option {
@@ -554,12 +556,12 @@
    Applied to .w-body to control internal layout
    ============================================ */
 
-/* Verdict: centered headline + tags */
+/* Verdict: headline + tags */
 .w-body--verdict {
-  text-align: center;
+  text-align: left;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-6) var(--space-4);
@@ -655,7 +657,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 }
 
@@ -712,7 +714,7 @@
 
   .w-body { padding: var(--space-2); }
 
-  .w-body--verdict { padding: var(--space-3) var(--space-2); gap: var(--space-2); }
+  .w-body--verdict { padding: var(--space-3) var(--space-2); gap: var(--space-2); align-items: flex-start; }
 
   .w-img--card { width: 48px; height: 48px; }
   .w-img--hero { aspect-ratio: 3 / 2; }
@@ -777,6 +779,7 @@
   .w-body--verdict {
     padding: var(--space-8) var(--space-6);
     gap: var(--space-4);
+    align-items: flex-start;
   }
 
   .w-body--spectrum { gap: var(--space-6); }
