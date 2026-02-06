@@ -132,6 +132,20 @@ When working on this project, always follow these guidelines:
       - Widget features → `docs/ux/widgets/`
       - Pin features → `docs/ux/pins/`
 
+12. **Check widget design comments before working on widgets**
+    - At the start of every prompt involving widget work, check for existing design audit comments
+    - Read the audit state from `design-system/widgets.html` (localStorage key: `widget-variant-audit`)
+    - Export current audit data by opening `design-system/widgets.html` and clicking "Copy as JSON" in the Audit Log, or inspect the `widget-variant-audit` key in localStorage
+    - Alternatively, search `widgets.html` for hardcoded audit state or review the variant audit section
+    - Report findings: list any variants with status yellow (to process), orange (needs review), or red (blocked)
+    - Add audit items to your task checklist before starting implementation
+    - Stoplight status meanings:
+      - **Green** = No updates needed
+      - **Yellow** = Comment to process (designer left feedback, needs developer action)
+      - **Orange** = Updated and needs review (developer acted on feedback, awaiting designer approval)
+      - **Red** = Blocked (variant should not be implemented)
+    - When completing widget work, update the stoplight status (mark processed → orange) for any comments you addressed
+
 ---
 
 ## Quick Reference

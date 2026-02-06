@@ -9,10 +9,11 @@
    with sensible constraints per template.
 
    All sizes (column x row):
-          1 col    2 col    3 col
-   1 row  sm       med      wide
-   2 row  tall     lg       xl
-   3 row  col      poster   max
+          1 col    2 col    3 col    4 col
+   1 row  sm       med      wide     banner
+   2 row  tall     lg       xl       pano
+   3 row  col      poster   max      cinema
+   4 row  —        board    wall     full
 
    Valid sizes per template (editable in showcase):
      verdict:    sm, med, lg
@@ -37,6 +38,12 @@
 .w-shell--col    { grid-column: span 1; grid-row: span 3; }
 .w-shell--poster { grid-column: span 2; grid-row: span 3; }
 .w-shell--max    { grid-column: span 3; grid-row: span 3; }
+.w-shell--banner { grid-column: span 4; grid-row: span 1; }
+.w-shell--pano   { grid-column: span 4; grid-row: span 2; }
+.w-shell--cinema { grid-column: span 4; grid-row: span 3; }
+.w-shell--board  { grid-column: span 2; grid-row: span 4; }
+.w-shell--wall   { grid-column: span 3; grid-row: span 4; }
+.w-shell--full   { grid-column: span 4; grid-row: span 4; }
 
 /* ============================================
    Shell / Structure

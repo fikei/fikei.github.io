@@ -91,6 +91,12 @@
     .variant-item--col { width: 200px; }
     .variant-item--poster { width: 420px; }
     .variant-item--max { width: 640px; }
+    .variant-item--banner { width: 860px; }
+    .variant-item--pano { width: 860px; }
+    .variant-item--cinema { width: 860px; }
+    .variant-item--board { width: 420px; }
+    .variant-item--wall { width: 640px; }
+    .variant-item--full { width: 860px; }
 
     /* Variant audit controls */
     .variant-toolbar { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
@@ -391,7 +397,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="atomsDivider">
 
   <!-- ====== MOLECULES ====== -->
   <div class="section" id="molecules">
@@ -494,7 +500,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="moleculesDivider">
 
   <!-- ====== BODY LAYOUTS AS FULL WIDGETS ====== -->
   <div class="section" id="layouts">
@@ -1047,7 +1053,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="layoutsDivider">
 
   <!-- ====== PRIORITY WIDGETS ====== -->
   <div class="section" id="priority">
@@ -1332,7 +1338,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="priorityDivider">
 
   <!-- ====== GRID SIZE PERMUTATIONS ====== -->
   <div class="section" id="grid">
@@ -1606,15 +1612,21 @@ function toggleGridLines(btn) {
 }
 
 // ============================================
-// Grid sizing — all 9 sizes (1x1 → 3x3)
+// Grid sizing — all 16 sizes (1x1 → 4x4)
 // ============================================
 
-var ALL_SIZES = ['sm', 'med', 'wide', 'tall', 'lg', 'xl', 'col', 'poster', 'max'];
+var ALL_SIZES = [
+  'sm', 'med', 'wide', 'banner',
+  'tall', 'lg', 'xl', 'pano',
+  'col', 'poster', 'max', 'cinema',
+  'board', 'wall', 'full'
+];
 
 var SIZE_LABELS = {
-  sm: '1x1', med: '2x1', wide: '3x1',
-  tall: '1x2', lg: '2x2', xl: '3x2',
-  col: '1x3', poster: '2x3', max: '3x3'
+  sm: '1x1', med: '2x1', wide: '3x1', banner: '4x1',
+  tall: '1x2', lg: '2x2', xl: '3x2', pano: '4x2',
+  col: '1x3', poster: '2x3', max: '3x3', cinema: '4x3',
+  board: '2x4', wall: '3x4', full: '4x4'
 };
 
 // ============================================
@@ -1706,6 +1718,33 @@ function toggleVariantGridLines(btn) {
   document.getElementById('variantGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
 }
 
+// ============================================
+// Section filtering — hide unrelated sections
+// when a widget/template is selected
+// ============================================
+
+function filterSections(source) {
+  var hideable = ['layouts', 'priority', 'grid', 'moleculesDivider', 'layoutsDivider', 'priorityDivider'];
+  if (!source) {
+    // No filter — show all, reset atom/molecule cards
+    hideable.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = ''; });
+    document.querySelectorAll('#atoms .component-card, #molecules .component-card').forEach(function(c) { c.style.display = ''; });
+    return;
+  }
+  // Hide widget examples, priority, and grid sections
+  hideable.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  // Detect which w- component classes are used in the source widget
+  var html = source.outerHTML;
+  document.querySelectorAll('#atoms .component-card, #molecules .component-card').forEach(function(card) {
+    var label = card.querySelector('.component-card__label');
+    if (!label) return;
+    var name = label.textContent.trim(); // e.g. "w-text", "w-badge", "w-row"
+    // Check if the source widget HTML contains this component class
+    var used = html.indexOf(name) !== -1;
+    card.style.display = used ? '' : 'none';
+  });
+}
+
 function showVariants() {
   var widgetVal = document.getElementById('widgetFilter').value;
   var templateVal = document.getElementById('templateFilter').value;
@@ -1718,6 +1757,7 @@ function showVariants() {
   if (!widgetVal && !templateVal) {
     explorer.style.display = 'none';
     divider.style.display = 'none';
+    filterSections(null);
     return;
   }
 
@@ -1732,6 +1772,8 @@ function showVariants() {
     divider.style.display = '';
     return;
   }
+
+  filterSections(source);
 
   var auditName = widgetVal || templateVal;
   var template = source.dataset.template;
