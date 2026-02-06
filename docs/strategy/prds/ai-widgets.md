@@ -41,6 +41,8 @@ Widgets must work with **titles, URLs, domains, and images**. Anything beyond th
 
 ## Categories & What Users Curate
 
+### Current (static, user-selected)
+
 | Category | What they save | Example items |
 |----------|---------------|---------------|
 | **wear** | Clothing, shoes, accessories | Nike Dunk, Reigning Champ hoodie |
@@ -51,6 +53,35 @@ Widgets must work with **titles, URLs, domains, and images**. Anything beyond th
 | **go** | Destinations, stays, experiences | Airbnb, Google Maps pin |
 | **follow** | People, accounts, creators | Instagram, Twitter, Substack |
 | **read** | Books, articles, newsletters | Amazon book, Pocket article |
+
+### Future: Dynamic AI-Evaluated Categories
+
+The 8 static categories are a starting constraint, not the end state. The widget catalog already demands 9 new categories (gift, spend, make, listen, learn, events, work, all, cross). Rather than extending the enum indefinitely, **categories should become AI-inferred from content**.
+
+**How it works**:
+1. User saves a link. AI analyzes title + URL + domain
+2. AI assigns a **primary category** (from known set OR a new emergent one)
+3. AI also assigns **secondary tags** — finer-grained labels (e.g., "Italian restaurant", "sci-fi show", "running shoe")
+4. Filter bar renders dynamically from whatever categories exist in the user's collection
+5. Widget eligibility evaluates against AI-assigned categories and tags, not a hard-coded enum
+
+**What this unlocks**:
+- No more "category not in filter bar" blocker — any category the AI assigns automatically appears
+- Sub-type classification (#13, 23, 28, 31, 32) becomes a natural output of the same pipeline
+- Cross-category widgets work because items can have multiple tags
+- Users who save niche content (e.g., "plants", "vinyl", "board games") get categories that fit their collection, not our predefined list
+
+**Requirements**:
+- Extend `enrich-link` edge function to return `{ category, tags[] }` instead of just `{ category }`
+- Add `tags` column to items table (text array)
+- Update filter bar to render from `SELECT DISTINCT category FROM items`
+- Update widget eligibility to match on tags as well as category
+- Fallback: if AI confidence is low, let user pick from existing + "other"
+
+**Migration path**:
+- Phase 1: Keep static 8 categories, add `tags[]` as supplementary data
+- Phase 2: AI suggests category on save, user confirms (with override)
+- Phase 3: Filter bar fully dynamic, renders whatever categories exist
 
 ---
 
@@ -769,48 +800,48 @@ Every widget has a **job** (what it does), a **trigger** (when it appears), and 
 
 ### Working Table
 
-| # | Category | Job | Question | Trigger | Shape |
-|---|----------|-----|----------|---------|-------|
-| 1 | eat | Decide | "Pick one restaurant for tonight" | 3+ restaurants saved | pick-one |
-| 2 | home | Gap Analysis | "What's missing from this room?" | 5+ items in same inferred style | grid-split |
-| 3 | watch | Persuade | "Why should I press play on this?" | 3+ saves stale: 14+ days | hero-card |
-| 4 | read | Synthesize | "What's the hidden thread?" | 4+ articles in same inferred topic | text-block |
-| 5 | use | Gap Analysis | "What's the hole in your workflow?" | 3+ tools in same inferred workflow | quick-add |
-| 6 | go | Sequence | "Route these into a trip" | 3+ destinations in same region | list |
-| 7 | gift | Assign | "Who gets what?" | 5+ items + 2+ people in follow | grid-split |
-| 8 | follow | Decay | "Who are you ignoring?" | stale: 30+ days on any followed creator | list |
-| 9 | spend (cross) | Calculate | "What's your wishlist total?" | cross: 5+ items with price-inferrable titles | stat-row |
-| 10 | make | Assemble | "Build a project plan from your saves" | 4+ items that form a project (tools + materials) | commit-list |
-| 11 | listen | Curator | "Build a listening session arc" | 5+ music/podcast saves | list |
-| 12 | learn | Dependency Map | "What do you need to learn first?" | 3+ learning resources in same topic | list |
-| 13 | wear | Redundancy | "You already own three of these" | 3+ items in same garment type | stat-row |
-| 14 | events | Collision | "These dates conflict" | 2+ events with overlapping dates | list |
-| 15 | all | Behavior | "Your saving pattern this month" | time: 10+ saves across 2+ months | spectrum |
-| 16 | read | Backlog | "How long to read all of this?" | 5+ unread articles | stat-row |
-| 17 | home | Conflict | "These styles clash" | 3+ items from conflicting inferred styles | hero-card |
-| 18 | work | Pattern Reveal | "The job you're circling" | 5+ job/company/tool saves | hero-card |
-| 19 | all | Predict | "What you'll save next" | time: 15+ saves with clear category trend | hero-card |
-| 20 | all | Archaeologist | "Your oldest forgotten save" | stale: 60+ days, no interaction | hero-card |
-| 21 | eat | Negotiate | "Build a dining week on budget" | 3+ restaurants with price-inferrable names | commit-list |
-| 22 | read | Translate | "The international angle you're missing" | 4+ articles from same-language sources | grid-split |
-| 23 | wear | Remix | "Unexpected outfit pairings" | 4+ items across 2+ garment types | pick-one |
-| 24 | follow | Audit | "Your feed has redundancy" | 3+ creators in same inferred niche | spectrum |
-| 25 | all | Expire | "These links are dead" | 10+ saves stale: 30+ days | stat-row |
-| 26 | use | Compare | "Have you considered the alternative?" | 1+ tool saved with known competitors | swap |
-| 27 | read | Pace | "You're saving faster than reading" | time: 5+ saves in last 14 days | stat-row |
-| 28 | watch | Mood | "Your watchlist emotional arc" | 4+ titles with inferrable genre | spectrum |
-| 29 | home + wear (cross) | Bridge | "Do your spaces match your clothes?" | cross: 3+ items in home AND 3+ in wear | hero-card |
-| 30 | learn | Graduate | "Your skill level is climbing" | time: 3+ saves in same topic across 2+ months | list |
-| 31 | wear | Season | "You have a seasonal blind spot" | 5+ items skewed to 1-2 seasons | spectrum |
-| 32 | eat | Portion | "Your cuisine diversity" | 4+ restaurants with inferrable cuisine type | stat-row |
-| 33 | all (cross) | Ritual | "Bundle saves into a daily routine" | cross: items across 3+ categories | bundle |
-| 34 | follow | Proxy | "The influence chain you're in" | 3+ creators in same domain | text-block |
-| 35 | eat | Substitute | "Same vibe, different diet" | 1+ restaurant saved | swap |
-| 36 | home | Ladder | "Good / better / best" | 1+ item with price-inferrable title | list |
-| 37 | all | Drift | "How your taste is evolving" | time: 10+ saves across 3+ months | spectrum |
-| 38 | all (cross) | Contradict | "You're saying two different things" | cross: items from opposing themes detected | text-block |
-| 39 | go | Cluster | "You're orbiting a neighborhood" | 3+ places in same inferred city/area | hero-card |
-| 40 | watch | Deadline | "Upcoming releases from your saves" | 2+ TV shows saved with active/upcoming seasons | list |
+| # | Category | Job | Question | Trigger | Shape | Data Sources |
+|---|----------|-----|----------|---------|-------|-------------|
+| 1 | eat | Decide | "Pick one restaurant for tonight" | 3+ restaurants saved | pick-one | title, domain |
+| 2 | home | Gap Analysis | "What's missing from this room?" | 5+ items in same inferred style | grid-split | title, domain, image |
+| 3 | watch | Persuade | "Why should I press play on this?" | 3+ saves stale: 14+ days | hero-card | title, domain, **last_interacted_at** |
+| 4 | read | Synthesize | "What's the hidden thread?" | 4+ articles in same inferred topic | text-block | title, url, domain |
+| 5 | use | Gap Analysis | "What's the hole in your workflow?" | 3+ tools in same inferred workflow | quick-add | title, domain |
+| 6 | go | Sequence | "Route these into a trip" | 3+ destinations in same region | list | title, url, domain |
+| 7 | gift | Assign | "Who gets what?" | 5+ items + 2+ people in follow | grid-split | title, domain, follow items |
+| 8 | follow | Decay | "Who are you ignoring?" | stale: 30+ days on any followed creator | list | title, domain, **last_interacted_at** |
+| 9 | spend (cross) | Calculate | "What's your wishlist total?" | cross: 5+ items with price-inferrable titles | stat-row | title (price inference), domain |
+| 10 | make | Assemble | "Build a project plan from your saves" | 4+ items that form a project (tools + materials) | commit-list | title, url, domain |
+| 11 | listen | Curator | "Build a listening session arc" | 5+ music/podcast saves | list | title, domain |
+| 12 | learn | Dependency Map | "What do you need to learn first?" | 3+ learning resources in same topic | list | title, url, domain |
+| 13 | wear | Redundancy | "You already own three of these" | 3+ items in same garment type | stat-row | title, domain, **sub-type** |
+| 14 | events | Collision | "These dates conflict" | 2+ events with overlapping dates | list | title (date inference) |
+| 15 | all | Behavior | "Your saving pattern this month" | time: 10+ saves across 2+ months | spectrum | title, category, **created_at** |
+| 16 | read | Backlog | "How long to read all of this?" | 5+ unread articles | stat-row | title, domain, **article length** |
+| 17 | home | Conflict | "These styles clash" | 3+ items from conflicting inferred styles | hero-card | title, domain |
+| 18 | work | Pattern Reveal | "The job you're circling" | 5+ job/company/tool saves | hero-card | title, domain |
+| 19 | all | Predict | "What you'll save next" | time: 15+ saves with clear category trend | hero-card | title, category, **created_at** |
+| 20 | all | Archaeologist | "Your oldest forgotten save" | stale: 60+ days, no interaction | hero-card | title, url, **last_interacted_at** |
+| 21 | eat | Negotiate | "Build a dining week on budget" | 3+ restaurants with price-inferrable names | commit-list | title, domain, **budget input** |
+| 22 | read | Translate | "The international angle you're missing" | 4+ articles from same-language sources | grid-split | title, url, domain |
+| 23 | wear | Remix | "Unexpected outfit pairings" | 4+ items across 2+ garment types | pick-one | title, domain, **sub-type** |
+| 24 | follow | Audit | "Your feed has redundancy" | 3+ creators in same inferred niche | spectrum | title, domain |
+| 25 | all | Expire | "These links are dead" | 10+ saves stale: 30+ days | stat-row | url, **link health**, **last_interacted_at** |
+| 26 | use | Compare | "Have you considered the alternative?" | 1+ tool saved with known competitors | swap | title, domain |
+| 27 | read | Pace | "You're saving faster than reading" | time: 5+ saves in last 14 days | stat-row | title, **created_at**, **article length** |
+| 28 | watch | Mood | "Your watchlist emotional arc" | 4+ titles with inferrable genre | spectrum | title, domain, **genre sub-type** |
+| 29 | home + wear (cross) | Bridge | "Do your spaces match your clothes?" | cross: 3+ items in home AND 3+ in wear | hero-card | title, domain (both categories) |
+| 30 | learn | Graduate | "Your skill level is climbing" | time: 3+ saves in same topic across 2+ months | list | title, domain, **created_at** |
+| 31 | wear | Season | "You have a seasonal blind spot" | 5+ items skewed to 1-2 seasons | spectrum | title, domain, **seasonal sub-type** |
+| 32 | eat | Portion | "Your cuisine diversity" | 4+ restaurants with inferrable cuisine type | stat-row | title, domain, **cuisine sub-type** |
+| 33 | all (cross) | Ritual | "Bundle saves into a daily routine" | cross: items across 3+ categories | bundle | title, domain, category |
+| 34 | follow | Proxy | "The influence chain you're in" | 3+ creators in same domain | text-block | title, domain |
+| 35 | eat | Substitute | "Same vibe, different diet" | 1+ restaurant saved | swap | title, domain |
+| 36 | home | Ladder | "Good / better / best" | 1+ item with price-inferrable title | list | title, domain |
+| 37 | all | Drift | "How your taste is evolving" | time: 10+ saves across 3+ months | spectrum | title, category, **created_at** |
+| 38 | all (cross) | Contradict | "You're saying two different things" | cross: items from opposing themes detected | text-block | title, category, domain |
+| 39 | go | Cluster | "You're orbiting a neighborhood" | 3+ places in same inferred city/area | hero-card | title, url, domain, **geo inference** |
+| 40 | watch | Deadline | "Upcoming releases from your saves" | 2+ TV shows saved with active/upcoming seasons | list | title, domain, **release dates (TMDB)** |
 
 ---
 
@@ -905,11 +936,11 @@ Every widget depends on data. Some data exists, some can be inferred by AI, some
 
 | Blocker | Impact | Widgets blocked | Resolution | Priority |
 |---------|--------|----------------|------------|----------|
-| **No sub-type classifier** | Can't distinguish hoodie from sneaker, comedy from thriller, Italian from Thai | #13, 23, 28, 31, 32 | Extend content-type system (Epic 3.1) with sub-type taxonomy | High — blocks 5 widgets |
+| **No sub-type classifier** | Can't distinguish hoodie from sneaker, comedy from thriller, Italian from Thai | #13, 23, 28, 31, 32 | Solved by dynamic AI categories: `tags[]` array provides sub-type (see "Dynamic AI-Evaluated Categories") | High — blocks 5 widgets |
 | **No cross-category query** | Current eligibility filters by single category; cross-category widgets need all items | #7, 9, 29, 33, 38 | Update discovery endpoint to accept `category: 'all'` or `categories: [...]` | Medium — blocks 5 widgets |
 | **No interaction tracking** | Can't measure staleness without `last_interacted_at` | #3, 8, 20, 25 | Schema migration + click/view tracking integration | Medium — blocks 4 widgets |
 | **Inference-based eligibility is expensive** | AI call needed BEFORE generation to determine if widget should render (e.g., "do these styles clash?") | #2, 5, 17, 24, 31 | Two-pass system: lightweight inference → eligibility → full generation | Low — defer to Phase 6 |
-| **New categories not in data model** | 7 new categories (gift, spend, make, listen, learn, events, work) don't exist in category enum or filter UI | #7, 9, 10, 11, 12, 14, 18 | Either: (a) extend category enum or (b) use tags/labels instead | High — blocks 7 widgets |
+| **New categories not in data model** | 7 new categories (gift, spend, make, listen, learn, events, work) don't exist in category enum or filter UI | #7, 9, 10, 11, 12, 14, 18 | Dynamic AI categories: AI assigns category on save, filter bar renders dynamically (see "Dynamic AI-Evaluated Categories") | High — blocks 7 widgets |
 | **External API dependency** | Deadline (#40) needs TMDB; Expire (#25) needs link-checking infra | #25, 40 | Add API keys to edge function env; build link-checker cron job | Low — defer |
 | **Budget input** | Negotiate (#21) optimizes against a budget, but no way for user to set one | #21 | Add budget parameter to widget config or prompt user inline | Low — defer |
 | **handleQuickAdd cache key bug** | Action widgets that use quick-add template will silently fail | #5 | Fix: align getCacheKey call with cache storage key (include refresh counter) | High — blocks action Tier 3 |

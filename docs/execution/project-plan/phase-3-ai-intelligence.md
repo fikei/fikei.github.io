@@ -169,8 +169,8 @@
 | **Fix handleQuickAdd cache key** | All action widgets silently fail | Pending | Align getCacheKey with cache storage (1 line) |
 | **Verify `created_at` in schema** | 5 time-based widgets can't evaluate triggers | Pending | Check Supabase items table |
 | **Add `last_interacted_at` column** | 4 staleness widgets blocked | Pending | Schema migration + click/view tracking |
-| **Extend category enum** | 7 widgets use new categories (gift, spend, make, listen, learn, events, work) | Pending | Update filter bar + category mapping |
-| **No sub-type classifier** | Can't distinguish garment type, cuisine, genre (5 widgets) | Pending | Extend Epic 3.1 content-type system |
+| **Dynamic AI categories** | 7 widgets need new categories + 5 need sub-types (12 total) | Pending | AI-inferred categories + tags[] on save; filter bar renders dynamically |
+| **No sub-type classifier** | Can't distinguish garment type, cuisine, genre (5 widgets) | Pending | Solved by tags[] from dynamic AI categories |
 | **Cross-category query pattern** | 5 cross-category widgets need items across all categories | Pending | Update discovery endpoint to accept multiple categories |
 | **Inference eligibility is expensive** | 5 widgets need AI to determine if they should render | Deferred | Two-pass system (Phase 6) |
 | **External API keys (TMDB, link-check)** | 2 widgets need external services | Deferred | Add API keys to edge function env |
@@ -213,6 +213,24 @@
 | | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Pending |
 | | Implement suggestion renderer (w-row featured + w-btn) | Pending |
 | | Implement grouped renderer (w-section × N with w-row × N) | Pending |
+
+#### Dynamic AI-Evaluated Categories
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **AI Category Assignment** | | Pending |
+| | Extend `enrich-link` to return `{ category, tags[] }` instead of `{ category }` | Pending |
+| | Add `tags` column (text array) to items table | Pending |
+| | AI assigns primary category + secondary tags on link save | Pending |
+| | Fallback: user confirms/overrides if AI confidence < threshold | Pending |
+| **Dynamic Filter Bar** | | Pending |
+| | Render filter bar from `SELECT DISTINCT category FROM items` | Pending |
+| | Remove hard-coded category list from frontend | Pending |
+| | New categories auto-appear when user saves items the AI classifies differently | Pending |
+| **Widget Eligibility on Tags** | | Pending |
+| | Update discovery endpoint to match on `tags[]` as well as `category` | Pending |
+| | Sub-type widgets (#13, 23, 28, 31, 32) use tags for garment/cuisine/genre matching | Pending |
+| | Cross-category widgets use `category: 'all'` or multi-category query | Pending |
 
 #### Tier 1: First Widget Per Original Category (8 widgets)
 
