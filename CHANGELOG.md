@@ -4,14 +4,23 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
-## [2026-02-05] - Core Systems Architecture & Pin Expansion Backlog
+## [2026-02-05] - Comprehensive Architecture Documentation
 
 ### Added
-- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Architecture document covering the three core systems: Pin Creation, Pin Enrichment, and AI Widget Pipeline. Documents how they connect, data flows, key architectural decisions, and shared infrastructure. Enrichment model generalized for future pin types.
+- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Pin Creation, Pin Enrichment, and AI Widget Pipeline architecture with data flows and key decisions.
+- **`docs/infrastructure/technical-design/database-schema.md`** — Complete schema reference for all 25+ tables across 6 migrations, with column types, RLS policies, constraints, and ER diagram.
+- **`docs/infrastructure/technical-design/client-architecture.md`** — Structural map of the 9,100-line boards/index.html monolith: section ranges, state management, rendering pipeline, boot sequence, event system.
+- **`docs/infrastructure/technical-design/auth-system.md`** — Passwordless magic link auth flow, session management, anonymous vs authenticated capabilities, admin system, data migration on first login.
+- **`docs/infrastructure/technical-design/sync-protocol.md`** — localStorage-to-Supabase sync protocol: upload/download flows, conflict resolution, offline behavior, cross-device polling, known gaps.
+- **`docs/infrastructure/technical-design/api-reference.md`** — Request/response contracts for enrich-link, generate-widget, categorize, and notion-sync edge functions plus REST API patterns.
+- **`docs/infrastructure/dependencies.md`** — All external service dependencies with fallback behavior, cost breakdown, and risk assessment.
 
 ### Changed
-- **`docs/execution/project-plan/backlog.md`** — Consolidated Rich Media Support, Content Reader, and Pin Type Abstraction into a structured **Pin Expansion** section with 5 epics: Pin Type Abstraction (prerequisite), Link Pin Enhancements, Note Pins, Image Pins, File Pins.
-- **`notion-structure.json`** — Added Core Systems Architecture to Technical Design section
+- **`docs/infrastructure/deployment.md`** — Expanded from checklist to full deployment guide: architecture diagram, two deployment paths (GitHub Pages auto + Supabase CLI manual), GitHub Actions workflow details, environment variables, database migrations.
+- **`docs/infrastructure/security.md`** — Expanded from checklist to detailed security model: RLS policy matrix for all tables, CORS issues, data protection (transit + rest), input validation, third-party risk assessment, known gaps.
+- **`COSTS.md`** — Added per-operation AI cost estimates, all 3 Supabase projects, free tier monitoring thresholds, 8 free integrations, cost optimization strategies.
+- **`docs/execution/project-plan/backlog.md`** — Consolidated Rich Media Support, Content Reader, and Pin Type Abstraction into a structured **Pin Expansion** section with 5 epics.
+- **`notion-structure.json`** — Added 7 new documentation entries to Infrastructure section.
 
 ---
 
