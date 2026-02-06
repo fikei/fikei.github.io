@@ -619,6 +619,10 @@ jobs:
 
           print(f"📊 Computed hashes for {len(content_hashes)} files")
 
+          # Save root page name for Step 2 (content sync script)
+          with open('/tmp/root_page.txt', 'w') as f:
+              f.write(root_page)
+
           # Check if force full sync
           force_full_sync = os.environ.get('FORCE_FULL_SYNC', 'false') == 'true'
 
@@ -640,6 +644,7 @@ jobs:
 
               payload = {
                   'action': 'check-changes',
+                  'root': root_page,
                   'contentHashes': content_hashes
               }
 
@@ -719,6 +724,13 @@ jobs:
               """Print with immediate flush for GitHub Actions"""
               print(msg, flush=True)
 
+          # Load root page name
+          try:
+              with open('/tmp/root_page.txt') as f:
+                  root_page = f.read().strip()
+          except FileNotFoundError:
+              root_page = 'Ctrl'
+
           # Load pages to sync
           try:
               with open('/tmp/pages_to_sync.json') as f:
@@ -758,6 +770,7 @@ jobs:
               # Build payload with parent info for auto-creation
               payload = {
                   'action': 'update-page',
+                  'root': root_page,
                   'page': {
                       'pageTitle': title,
                       'content': content,
