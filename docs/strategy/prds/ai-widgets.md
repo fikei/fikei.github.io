@@ -74,15 +74,49 @@ Widgets must work with **titles, URLs, domains, and images**. Anything beyond th
 2. QUESTION    What's the one question users would ask?
      |         ("What's missing?" / "What's my vibe?" / "What should I try next?")
      v
-3. COMPONENT   What's the simplest UI that answers it?
+3. COMPONENT   What's the simplest base component that answers it?
      |         (Pick from design system: card, list, meter, tag group, etc.)
      v
-4. DATA        Wire AI output into the component
-     |         (Prompt → JSON schema → render function)
+4. DESIGN      Sub-components, layout, and copy
+     |         - What goes inside the base component?
+     |         - What's the hierarchy? (headline → detail → action)
+     |         - What does the copy say? (labels, empty states, loading text)
+     |         - Wireframe the layout at actual size
      v
-5. VALIDATE    Does it earn existence?
+5. BUILD       Connect data sources
+     |         - AI prompt → JSON schema (what shape does the AI return?)
+     |         - Map JSON fields → sub-components
+     |         - Fallbacks for missing/low-quality data
+     |         - Server config (eligibility rules, confidence threshold)
+     v
+6. VALIDATE    Does it earn existence?
                (Confidence check, user feedback, suppression rules)
 ```
+
+### Design layer in detail
+
+The design step is where the widget gets real. For each widget:
+
+**Sub-components** — What elements appear inside the base component?
+- Headline text (e.g., "Minimal Modern")
+- Supporting text (e.g., "Based on 12 items")
+- Tags/pills (e.g., trait words)
+- Images (user's items? AI suggestions? neither?)
+- Action buttons (refresh, visit, add, dismiss)
+
+**Layout** — How are sub-components arranged?
+- Vertical stack? Horizontal split? Grid?
+- What's the visual hierarchy? What's biggest?
+- How does it respond on mobile?
+
+**Copy** — What does the widget actually say?
+- Widget title (appears in header)
+- Loading state text ("Analyzing your collection...")
+- Empty state text ("Save 3+ items to unlock insights")
+- Error state text ("Couldn't generate — try refreshing")
+- AI attribution ("Based on your 12 saved items")
+
+**Wireframe** — Sketch at actual width before writing any code.
 
 ---
 
