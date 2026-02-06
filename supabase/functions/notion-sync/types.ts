@@ -196,6 +196,7 @@ export interface ValidationResult {
 export interface HealthCheckRequest extends SyncRequest {
   action: 'health-check'
   staleDays?: number       // Days before a page is considered stale (default: 90)
+  reviewDays?: number      // Days before a page needs review (default: 30)
   autoFix?: boolean        // Apply fixes automatically (archive empty, etc.)
 }
 
@@ -211,6 +212,21 @@ export interface PageHealth {
   file?: string
 }
 
+export interface SimilarPages {
+  pageA: string
+  fileA: string
+  pageB: string
+  fileB: string
+  similarity: number  // 0-1, where 1 = identical
+  sharedHeadings: string[]
+}
+
+export interface FormattingIssue {
+  page: string
+  file: string
+  issues: string[]
+}
+
 export interface HealthReport {
   timestamp: string
   root: string
@@ -221,7 +237,12 @@ export interface HealthReport {
   empty: PageHealth[]
   orphaned: PageHealth[]
   missingInNotion: PageHealth[]
+  needsReview: PageHealth[]            // A.2.6: pages past review threshold but not yet stale
   duplicateTitles: { title: string; count: number; locations: string[] }[]
+  brokenLinks: { page: string; file: string; brokenLink: string; target: string }[]
+  unbalancedSections: string[]
+  similarPages: SimilarPages[]
+  formattingIssues: FormattingIssue[]
   autoFixed: string[]
   summary: string
 }
