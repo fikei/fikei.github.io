@@ -419,112 +419,51 @@ class NotionClient {
 // TABLE OF CONTENTS GENERATOR
 // ═══════════════════════════════════════════════════════════════
 
-function generateLinkedTocBlocks(
-  title: string,
+/** Generate a flat list of child page links for section pages */
+function generateChildPageLinks(
   children: PageDef[],
   childIds: Map<string, string>
 ): any[] {
   const blocks: any[] = []
 
-  blocks.push({
-    object: 'block',
-    type: 'heading_1',
-    heading_1: {
-      rich_text: [{ type: 'text', text: { content: title } }],
-    },
-  })
+  for (const item of children) {
+    const pageId = childIds.get(item.title)
+    const icon = item.icon || '\ud83d\udcc4'
 
-  blocks.push({
-    object: 'block',
-    type: 'heading_2',
-    heading_2: {
-      rich_text: [{ type: 'text', text: { content: 'Contents' } }],
-    },
-  })
-
-  function addTocItems(items: PageDef[], ids: Map<string, string>) {
-    for (const item of items) {
-      const pageId = ids.get(item.title)
-      const icon = item.icon || '\ud83d\udcc4'
-
-      if (pageId) {
-        blocks.push({
-          object: 'block',
-          type: 'bulleted_list_item',
-          bulleted_list_item: {
-            rich_text: [
-              { type: 'text', text: { content: `${icon} ` } },
-              {
-                type: 'mention',
-                mention: {
-                  type: 'page',
-                  page: { id: pageId },
-                },
+    if (pageId) {
+      blocks.push({
+        object: 'block',
+        type: 'bulleted_list_item',
+        bulleted_list_item: {
+          rich_text: [
+            { type: 'text', text: { content: `${icon} ` } },
+            {
+              type: 'mention',
+              mention: {
+                type: 'page',
+                page: { id: pageId },
               },
-            ],
-          },
-        })
-      } else {
-        blocks.push({
-          object: 'block',
-          type: 'bulleted_list_item',
-          bulleted_list_item: {
-            rich_text: [
-              { type: 'text', text: { content: `${icon} ` } },
-              {
-                type: 'text',
-                text: { content: item.title },
-                annotations: { bold: true },
-              },
-            ],
-          },
-        })
-      }
-
-      if (item.children && item.children.length > 0) {
-        for (const child of item.children) {
-          const childPageId = ids.get(child.title)
-          const childIcon = child.icon || '\ud83d\udcc4'
-
-          if (childPageId) {
-            blocks.push({
-              object: 'block',
-              type: 'bulleted_list_item',
-              bulleted_list_item: {
-                rich_text: [
-                  { type: 'text', text: { content: `    ${childIcon} ` } },
-                  {
-                    type: 'mention',
-                    mention: {
-                      type: 'page',
-                      page: { id: childPageId },
-                    },
-                  },
-                ],
-              },
-            })
-          } else {
-            blocks.push({
-              object: 'block',
-              type: 'bulleted_list_item',
-              bulleted_list_item: {
-                rich_text: [
-                  { type: 'text', text: { content: `    ${childIcon} ` } },
-                  {
-                    type: 'text',
-                    text: { content: child.title },
-                    annotations: { bold: true },
-                  },
-                ],
-              },
-            })
-          }
-        }
-      }
+            },
+          ],
+        },
+      })
+    } else {
+      blocks.push({
+        object: 'block',
+        type: 'bulleted_list_item',
+        bulleted_list_item: {
+          rich_text: [
+            { type: 'text', text: { content: `${icon} ` } },
+            {
+              type: 'text',
+              text: { content: item.title },
+              annotations: { bold: true },
+            },
+          ],
+        },
+      })
     }
   }
-
-  addTocItems(children, childIds)
 
   return blocks
 }
@@ -652,6 +591,19 @@ async function syncStructure(
           const childIds = await syncPages(pageId, page.children, depth + 1, pagePath)
           for (const [title, id] of childIds) {
             syncedIds.set(title, id)
+          }
+
+          // Section pages: set child page links as content
+          if (isSectionPage && !skipContent) {
+            const linkBlocks = generateChildPageLinks(page.children, childIds)
+            if (linkBlocks.length > 0) {
+              const stats = await client.updatePageWithBlocks(pageId, linkBlocks)
+              result.updated.push(`${pagePath} (${linkBlocks.length} links)`)
+              if (result.debug) {
+                result.debug.totalBlocks += stats.total
+                result.debug.failedBlocks += stats.failed
+              }
+            }
           }
         }
 
