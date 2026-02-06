@@ -722,58 +722,107 @@ jobs:
           echo "═══════════════════════════════════════════"
           echo "📊 SYNC SUMMARY"
           echo "═══════════════════════════════════════════"
-          echo ""
 
-          # Parse structure response if available
-          if [ -f /tmp/structure_response.json ]; then
-            python3 << 'PYEOF'
-          import json
+          python3 << 'PYEOF'
+          import json, os
+
+          # --- Structure metrics ---
+          struct = {}
+          if os.path.exists('/tmp/structure_response.json'):
+              try:
+                  with open('/tmp/structure_response.json') as f:
+                      struct = json.load(f)
+              except Exception:
+                  pass
+
+          created = struct.get('created', [])
+          updated = struct.get('updated', [])
+          skipped = struct.get('skipped', [])
+          errors = struct.get('errors', [])
+          deleted = struct.get('deleted', [])
+          protected_pages = struct.get('protected', [])
+          metrics = struct.get('metrics', {})
+
+          print("\n📁 Structure Sync")
+          print(f"  Created:    {len(created)}")
+          print(f"  Skipped:    {len(skipped)}")
+          if deleted:
+              print(f"  Deleted:    {len(deleted)}")
+          if protected_pages:
+              print(f"  Protected:  {len(protected_pages)}")
+          if errors:
+              print(f"  Errors:     {len(errors)}")
+              for e in errors[:5]:
+                  print(f"    - {e}")
+          if metrics:
+              duration = metrics.get('durationMs', 0)
+              api_calls = metrics.get('apiCalls', 0)
+              print(f"  Duration:   {duration/1000:.1f}s")
+              print(f"  API calls:  {api_calls}")
+
+          # --- Content metrics ---
+          pages_synced = []
+          if os.path.exists('/tmp/pages_to_sync.json'):
+              try:
+                  with open('/tmp/pages_to_sync.json') as f:
+                      pages_synced = json.load(f)
+              except Exception:
+                  pass
+
+          print(f"\n📝 Content Sync")
+          print(f"  Pages synced: {len(pages_synced)}")
+          if pages_synced:
+              for p in pages_synced[:10]:
+                  title = p.get('title', p) if isinstance(p, dict) else p
+                  print(f"    - {title}")
+              if len(pages_synced) > 10:
+                  print(f"    ... and {len(pages_synced) - 10} more")
+
+          # --- Failed pages ---
+          failed = []
+          if os.path.exists('/tmp/failed_pages.txt'):
+              with open('/tmp/failed_pages.txt') as f:
+                  failed = [l.strip() for l in f if l.strip()]
+          if failed:
+              print(f"\n⚠️  Failed ({len(failed)})")
+              for p in failed:
+                  print(f"    - {p}")
+
+          # --- Structure overview ---
           try:
-              with open('/tmp/structure_response.json') as f:
-                  r = json.load(f)
-              created = len(r.get('created', []))
-              updated = len(r.get('updated', []))
-              skipped = len(r.get('skipped', []))
-              errors = len(r.get('errors', []))
-              deleted = len(r.get('deleted', []))
-              protected_pages = len(r.get('protected', []))
-              metrics = r.get('metrics', {})
+              with open('notion-structure.json') as f:
+                  config = json.load(f)
+              root = config.get('root', '?')
+              def count_pages(obj):
+                  c = 0
+                  if isinstance(obj, dict):
+                      if 'title' in obj: c += 1
+                      for k in ['children', 'sections']:
+                          if k in obj:
+                              for child in obj[k]: c += count_pages(child)
+                  return c
+              def count_files(obj):
+                  c = 0
+                  if isinstance(obj, dict):
+                      if 'file' in obj: c += 1
+                      for k in ['children', 'sections']:
+                          if k in obj:
+                              for child in obj[k]: c += count_files(child)
+                  return c
+              total_pages = sum(count_pages(s) for s in config.get('sections', []))
+              total_files = sum(count_files(s) for s in config.get('sections', []))
+              sections = len(config.get('sections', []))
 
-              print("Structure Sync:")
-              print(f"  Created:   {created}")
-              print(f"  Skipped:   {skipped}")
-              if errors:
-                  print(f"  Errors:    {errors}")
-              if metrics:
-                  print(f"  Duration:  {metrics.get('durationMs', '?')}ms")
-                  print(f"  API calls: {metrics.get('apiCalls', '?')}")
-          except Exception as e:
-              print(f"  Could not parse structure response: {e}")
+              print(f"\n📋 Structure")
+              print(f"  Root:       {root}")
+              print(f"  Sections:   {sections}")
+              print(f"  Pages:      {total_pages}")
+              print(f"  With files: {total_files}")
+          except Exception:
+              pass
+
+          print("")
           PYEOF
-          fi
-
-          # Count content sync results
-          if [ -f /tmp/pages_to_sync.json ]; then
-            TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pages_to_sync.json'))))" 2>/dev/null || echo "?")
-            echo ""
-            echo "Content Sync:"
-            echo "  Pages synced: $TOTAL"
-          fi
-
-          echo ""
-          echo "Root page: $(python3 -c "import json; print(json.load(open('notion-structure.json')).get('root', '?'))" 2>/dev/null || echo "?")"
-          echo "Total pages in structure: $(python3 -c "
-          import json
-          def count(obj):
-              c = 0
-              if isinstance(obj, dict):
-                  if 'title' in obj: c += 1
-                  for k in ['children', 'sections']:
-                      if k in obj:
-                          for child in obj[k]: c += count(child)
-              return c
-          print(sum(count(s) for s in json.load(open('notion-structure.json')).get('sections', [])))
-          " 2>/dev/null || echo "?")"
 
   # Triggered on every push - quick status and security check
   on-push:
@@ -1081,10 +1130,12 @@ jobs:
             const orphaned = report.orphaned || [];
             const missing = report.missingInNotion || [];
             const dupes = report.duplicateTitles || [];
-            const totalIssues = stale.length + empty.length + orphaned.length + missing.length;
+            const brokenLinks = report.brokenLinks || [];
+            const unbalanced = report.unbalancedSections || [];
+            const totalIssues = stale.length + empty.length + orphaned.length + missing.length + brokenLinks.length;
 
             // Only create issue if there are problems
-            if (totalIssues === 0 && dupes.length === 0) {
+            if (totalIssues === 0 && dupes.length === 0 && unbalanced.length === 0) {
               console.log('✅ All pages healthy, no issue needed');
               return;
             }
@@ -1124,10 +1175,26 @@ jobs:
               body += '\n';
             }
 
+            if (brokenLinks.length > 0) {
+              body += `### 🔗 Broken Internal Links (${brokenLinks.length})\n`;
+              for (const l of brokenLinks) {
+                body += `- [ ] **${l.page}** — \`${l.brokenLink}\` → \`${l.target}\` not found\n`;
+              }
+              body += '\n';
+            }
+
             if (dupes.length > 0) {
               body += `### ⚠️ Duplicate Titles (${dupes.length})\n`;
               for (const d of dupes) {
                 body += `- **"${d.title}"** appears ${d.count}x\n`;
+              }
+              body += '\n';
+            }
+
+            if (unbalanced.length > 0) {
+              body += `### 📐 Unbalanced Sections\n`;
+              for (const u of unbalanced) {
+                body += `- ${u}\n`;
               }
               body += '\n';
             }

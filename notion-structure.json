@@ -346,12 +346,6 @@
               "source": "human"
             },
             {
-              "title": "Content Type and Image Systems Tech",
-              "icon": "\ud83d\udcc4",
-              "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
-              "source": "human"
-            },
-            {
               "title": "Notion Bidirectional Sync",
               "icon": "\ud83d\udd04",
               "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",

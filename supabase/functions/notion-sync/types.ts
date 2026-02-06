@@ -222,6 +222,8 @@ export interface HealthReport {
   orphaned: PageHealth[]
   missingInNotion: PageHealth[]
   duplicateTitles: { title: string; count: number; locations: string[] }[]
+  brokenLinks: { page: string; file: string; brokenLink: string; target: string }[]
+  unbalancedSections: string[]
   autoFixed: string[]
   summary: string
 }

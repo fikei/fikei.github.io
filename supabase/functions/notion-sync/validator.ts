@@ -109,6 +109,63 @@ export function validateStructure(structure: unknown): ValidationResult {
     }
   }
 
+  // A.1.4: Check for duplicate file paths (two entries pointing to same file)
+  const allFiles = new Map<string, string[]>() // filepath -> page titles
+  function collectFiles(pages: unknown[], parentPath: string) {
+    for (const page of pages) {
+      if (!page || typeof page !== 'object') continue
+      const p = page as Record<string, unknown>
+      const title = (p.title || '?') as string
+      if (p.file && typeof p.file === 'string') {
+        const existing = allFiles.get(p.file) || []
+        existing.push(title)
+        allFiles.set(p.file, existing)
+      }
+      if (Array.isArray(p.children)) {
+        collectFiles(p.children, `${parentPath} > ${title}`)
+      }
+    }
+  }
+  collectFiles(s.sections as unknown[], s.root as string)
+
+  for (const [filepath, titles] of allFiles) {
+    if (titles.length > 1) {
+      warnings.push(`Duplicate file "${filepath}" used by pages: ${titles.join(', ')}`)
+    }
+  }
+
+  // A.3.5: Check for unbalanced trees
+  const sectionSizes: { title: string; count: number }[] = []
+  function countDeep(pages: unknown[]): number {
+    let c = 0
+    for (const page of pages) {
+      if (!page || typeof page !== 'object') continue
+      c++
+      const p = page as Record<string, unknown>
+      if (Array.isArray(p.children)) {
+        c += countDeep(p.children)
+      }
+    }
+    return c
+  }
+  for (const section of s.sections as Record<string, unknown>[]) {
+    const title = (section.title || '?') as string
+    const children = Array.isArray(section.children) ? section.children : []
+    const size = 1 + countDeep(children)
+    sectionSizes.push({ title, count: size })
+  }
+  if (sectionSizes.length >= 2) {
+    const max = Math.max(...sectionSizes.map(s => s.count))
+    const min = Math.min(...sectionSizes.map(s => s.count))
+    if (max > 0 && min > 0 && max / min > 5) {
+      const largest = sectionSizes.find(s => s.count === max)!
+      const smallest = sectionSizes.find(s => s.count === min)!
+      warnings.push(
+        `Unbalanced structure: "${largest.title}" has ${largest.count} pages vs "${smallest.title}" with ${smallest.count}. Consider splitting large sections.`
+      )
+    }
+  }
+
   return { valid: errors.length === 0, errors, warnings }
 }
 
@@ -146,6 +203,62 @@ export function extractAllTitles(pages: PageDef[]): Set<string> {
 
   walk(pages)
   return titles
+}
+
+/** A.2.4: Find broken internal links in markdown files
+ *  Returns links that reference files not in the structure */
+export function findBrokenLinks(
+  structure: Structure,
+  readFile: (path: string) => string | null,
+): { page: string; file: string; brokenLink: string; target: string }[] {
+  const structureFiles = new Set(extractFilePaths(structure))
+  const broken: { page: string; file: string; brokenLink: string; target: string }[] = []
+
+  // Regex for markdown links: [text](path)
+  const linkPattern = /\[([^\]]*)\]\(([^)]+)\)/g
+
+  function walkPages(pages: PageDef[]) {
+    for (const page of pages) {
+      if (page.file) {
+        const content = readFile(page.file)
+        if (content) {
+          let match
+          while ((match = linkPattern.exec(content)) !== null) {
+            const target = match[2]
+            // Only check relative links to local files, skip URLs and anchors
+            if (target.startsWith('http') || target.startsWith('#') || target.startsWith('mailto:')) continue
+            // Strip anchor from path
+            const filePath = target.split('#')[0]
+            if (!filePath) continue
+            // Resolve relative to the file's directory
+            const dir = page.file.includes('/') ? page.file.substring(0, page.file.lastIndexOf('/')) : ''
+            const resolved = filePath.startsWith('/') ? filePath.slice(1) : (dir ? `${dir}/${filePath}` : filePath)
+            // Normalize ../ paths
+            const parts = resolved.split('/')
+            const normalized: string[] = []
+            for (const p of parts) {
+              if (p === '..') normalized.pop()
+              else if (p !== '.') normalized.push(p)
+            }
+            const normalizedPath = normalized.join('/')
+            // Check if target exists in structure files or as a known file
+            if (normalizedPath.endsWith('.md') && !structureFiles.has(normalizedPath)) {
+              broken.push({
+                page: page.title,
+                file: page.file,
+                brokenLink: match[0],
+                target: normalizedPath,
+              })
+            }
+          }
+        }
+      }
+      if (page.children) walkPages(page.children)
+    }
+  }
+
+  walkPages(structure.sections)
+  return broken
 }
 
 /** Count total pages in a structure */

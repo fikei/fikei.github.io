@@ -344,7 +344,39 @@ Every sync response includes a `metrics` object:
 }
 ```
 
-The workflow summary step prints these at the end of each run.
+The workflow summary step prints structure metrics, content sync counts, failed pages, and structure overview at the end of each run.
+
+---
+
+## Codebase
+
+The edge function is modular — each file has a single responsibility.
+
+```
+supabase/functions/notion-sync/
+├── index.ts          # Entry point, HTTP handler, NotionClient, action router
+├── types.ts          # All TypeScript interfaces (Structure, SyncRequest, etc.)
+├── markdown.ts       # Markdown → Notion blocks converter
+├── validator.ts      # Schema validation for notion-structure.json
+├── health.ts         # Health check: staleness, orphans, empty, duplicates
+├── state-manager.ts  # Supabase-backed sync state tracking (hashes, timestamps)
+└── logger.ts         # Structured logging with levels and context
+```
+
+### Key Classes
+
+**`NotionClient`** (`index.ts`) — Wraps the Notion API. Methods:
+- `findPageByTitle(title)` — Search by title
+- `getChildPages(parentId)` — List children of a page
+- `findOrCreateChildPage(...)` — Create page if missing
+- `replacePageContent(pageId, blocks)` — Clear + append blocks
+- `isHumanCreated(pageId)` — Check `created_by.type`
+- `archivePage(pageId)` — Move to trash
+
+**`SyncStateManager`** (`state-manager.ts`) — Tracks what's been synced. Methods:
+- `hasContentChanged(path, hash)` — Compare hash to stored state
+- `upsertState(path, hash, pageId)` — Update after successful sync
+- `getDirtyPages(hashes)` — Bulk compare to find changes
 
 ---
 

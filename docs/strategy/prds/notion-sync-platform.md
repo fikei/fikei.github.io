@@ -148,7 +148,7 @@ An AI agent that continuously monitors, organizes, and improves documentation qu
 | A.1.1 | Track last-modified dates for all pages | High | complete |
 | A.1.2 | Flag pages not updated in > 90 days (configurable threshold) | High | complete |
 | A.1.3 | Detect orphaned pages (in Notion but not in structure) | High | complete |
-| A.1.4 | Detect duplicate/overlapping content between pages | Medium | pending |
+| A.1.4 | Detect duplicate/overlapping content between pages | Medium | complete |
 | A.1.5 | Generate health report as GitHub issue (weekly) | Medium | complete |
 
 #### Epic A.2: Auto-Cleanup
@@ -158,7 +158,7 @@ An AI agent that continuously monitors, organizes, and improves documentation qu
 | A.2.1 | Archive empty bot-created pages (autoFix mode) | High | complete |
 | A.2.2 | Archive orphaned bot-created pages (autoFix mode) | High | complete |
 | A.2.3 | Merge near-duplicate pages with AI assistance | Medium | pending |
-| A.2.4 | Fix broken internal links between pages | Medium | pending |
+| A.2.4 | Detect broken internal links between pages | Medium | complete |
 | A.2.5 | Normalize formatting inconsistencies | Low | pending |
 | A.2.6 | Add "last reviewed" metadata to pages | Low | pending |
 
@@ -170,7 +170,7 @@ An AI agent that continuously monitors, organizes, and improves documentation qu
 | A.3.2 | Detect pages deeper than 5 levels (performance risk) | Medium | complete |
 | A.3.3 | Warn on duplicate page titles | Medium | complete |
 | A.3.4 | Detect pages in structure but missing in Notion | High | complete |
-| A.3.5 | Suggest restructuring for unbalanced trees | Low | pending |
+| A.3.5 | Suggest restructuring for unbalanced trees | Low | complete |
 
 #### Epic A.4: Workflow Integration
 
