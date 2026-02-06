@@ -340,3 +340,378 @@ Row of 2-4 key metrics.
 | Profiler | "Tell me who I am based on what I save" | `hero-card` |
 | Prioritizer | "Tell me what to do next" | `list` |
 | Analyzer | "Show me the numbers / dimensions" | `spectrum` or `stat-row` |
+
+---
+
+## Part 2: Action Templates
+
+### Problem
+
+The 20 consumption templates above answer **"What should I know?"** None of them ask the user to **do something** and close a feedback loop. Consumption-only widgets are billboards — they inform, but they don't learn. Action templates are conversations.
+
+### What makes a template "action"
+
+Every action card needs three things a consumption card doesn't:
+
+1. **A verb** — what the user does (pick, add, swap, confirm, answer)
+2. **A response** — what changes when they act (board updates, AI learns, item moves)
+3. **A feedback loop** — why acting makes the system smarter next time
+
+### Action taxonomy
+
+| Intent | User is saying... | Example |
+|--------|-------------------|---------|
+| Discovery | "Show me more like this" | swipe-stack, quick-add |
+| Decision | "Help me choose" | pick-one, vote-split |
+| Transaction | "Help me buy/do" | commit-list, alert |
+| Organization | "Help me sort/plan" | bundle, goal |
+| Feedback | "Learn from my preferences" | prompt, swap |
+
+---
+
+### 10 Action Templates
+
+#### 1. `pick-one`
+"Which of these?" — Choose one from 2–3 options. AI learns the preference.
+
+```
++---------------------------------------------------------+
+|  Which direction?                  AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  +---------------------+  +---------------------+  | |
+| |  |      [image]        |  |      [image]        |  | |
+| |  |                     |  |                     |  | |
+| |  |  Minimal & Clean    |  |  Bold & Graphic     |  | |
+| |  |  COS, Lemaire,      |  |  Palace, Brain Dead, | | |
+| |  |  Norse Projects     |  |  Stussy             |  | |
+| |  |                     |  |                     |  | |
+| |  |  [ This one ]       |  |  [ This one ]       |  | |
+| |  +---------------------+  +---------------------+  | |
+| |                                                     | |
+| |           [ Neither / Skip ]                        | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Choice trains the profiler. Next `hero-card` and `grid-split` reflect this.
+
+#### 2. `swipe-stack`
+Rapid yes/no on a queue of items. Tinder for curation.
+
+```
++---------------------------------------------------------+
+|  Quick Sort                        AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |           +---------------------+                   | |
+| |           |                     |                   | |
+| |           |      [image]        |                   | |
+| |           |                     |                   | |
+| |           |  Norse Projects     |                   | |
+| |           |  Twill Chino        |                   | |
+| |           |  $185               |                   | |
+| |           |                     |                   | |
+| |           +---------------------+                   | |
+| |                                                     | |
+| |        [ X Pass ]    [ + Save ]                     | |
+| |                                                     | |
+| |              3 of 8 remaining                       | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Passes and saves train `grid-split` suggestions. Builds taste profile fast.
+
+#### 3. `quick-add`
+Single high-confidence suggestion with a prominent save action.
+
+```
++---------------------------------------------------------+
+|  You might want this               AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  +--------+  New Balance 990v6                      | |
+| |  | [img]  |  $184.99                                | |
+| |  |        |                                         | |
+| |  +--------+  "Fills your footwear gap -             | |
+| |               you have tops and bottoms             | |
+| |               but no sneakers."                     | |
+| |                                                     | |
+| |  [ + Add to board ]         [ Visit site > ]        | |
+| |                                                     | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Add -> item appears in board -> future widgets exclude this gap.
+
+#### 4. `swap`
+"Replace this with that" — an upgrade or alternative with a commit action.
+
+```
++---------------------------------------------------------+
+|  Upgrade?                          AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  +------------------+     +------------------+      | |
+| |  |    [current]     |     |    [suggested]   |      | |
+| |  |                  |     |                  |      | |
+| |  |  Uniqlo Tee      | --> |  Reigning Champ  |      | |
+| |  |  $14.90          |     |  Midweight Tee   |      | |
+| |  |                  |     |  $65             |      | |
+| |  +------------------+     +------------------+      | |
+| |                                                     | |
+| |  "Same fit, much better fabric. Your most-          | |
+| |   worn category - worth the upgrade."               | |
+| |                                                     | |
+| |  [ Keep current ]          [ Swap it ]              | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Swap -> replaces pin on board. Keep -> AI stops suggesting upgrades for this item.
+
+#### 5. `commit-list`
+Ready-to-buy list with links and total. The checkout moment.
+
+```
++---------------------------------------------------------+
+|  Ready to buy                      AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  [x]  New Balance 990v6             $185   [ > ]    | |
+| |  [x]  Carhartt WIP Michigan Coat    $298   [ > ]    | |
+| |  [ ]  Timex Marlin Automatic        $249   [ > ]    | |
+| |  [ ]  Bellroy Sling Bag             $89    [ > ]    | |
+| |                                                     | |
+| |  -------------------------------------------        | |
+| |  Selected: 2 items               Total: $483        | |
+| |                                                     | |
+| |  [ Open selected in tabs ]                          | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Checked items -> tracked as "intent to purchase" -> removed from gap analysis.
+
+#### 6. `vote-split`
+Two competing directions — user's choice shapes all future widgets.
+
+```
++---------------------------------------------------------+
+|  Your collection could go either way   AI        [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |     Workwear               Minimalist               | |
+| |                                                     | |
+| |  Carhartt WIP           COS                         | |
+| |  Iron Heart              Lemaire                    | |
+| |  Red Wing                Common Projects            | |
+| |                                                     | |
+| |  Rugged, heavy          Clean, restrained           | |
+| |  fabrics, utility       silhouettes, quiet          | |
+| |  pockets                luxury                      | |
+| |                                                     | |
+| |  [ Lean this way ]     [ Lean this way ]            | |
+| |                                                     | |
+| |           [ I like both ]                           | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Preference stored -> `hero-card` label shifts -> `grid-split` suggestions align.
+
+#### 7. `prompt`
+AI asks, user answers. Open-ended input that feeds the system.
+
+```
++---------------------------------------------------------+
+|  Quick question                    AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  You've saved a lot of outerwear lately.            | |
+| |  What are you looking for?                          | |
+| |                                                     | |
+| |  +-----------------------------------------------+ | |
+| |  |  e.g. "lightweight for spring" or "waterproof" | | |
+| |  +-----------------------------------------------+ | |
+| |                                                     | |
+| |                              [ Submit ]             | |
+| |                                                     | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Response -> constrains next `grid-split` and `checklist` suggestions.
+
+#### 8. `bundle`
+Assembled set — review the whole package, add all at once.
+
+```
++---------------------------------------------------------+
+|  Weekend Kit                       AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  +------+ +------+ +------+ +------+ +------+      | |
+| |  |[img] | |[img] | |[img] | |[img] | |[img] |      | |
+| |  | Tee  | |Shorts| | Cap  | |Snkrs | | Bag  |      | |
+| |  | $35  | | $65  | | $40  | | $110 | | $89  |      | |
+| |  +------+ +------+ +------+ +------+ +------+      | |
+| |                                                     | |
+| |  5 items  |  Total: $339  |  All from your brands   | |
+| |                                                     | |
+| |  [ Save bundle to board ]    [ Edit items ]         | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Save -> all 5 pins added at once. Edit -> opens `swipe-stack` for the bundle.
+
+#### 9. `goal`
+Set a target, see progress, take the next step.
+
+```
++---------------------------------------------------------+
+|  Capsule Wardrobe                  AI            [R]    |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  Goal: 30-piece capsule wardrobe                    | |
+| |                                                     | |
+| |  [====================---------]  22 / 30           | |
+| |                                                     | |
+| |  Covered:  Tops 8  Bottoms 5  Outerwear 4          | |
+| |  Missing:  Footwear 3  Accessories 5  Basics 3     | |
+| |                                                     | |
+| |  Next step:                                         | |
+| |  +--------+  White leather sneaker                  | |
+| |  | [img]  |  Common Projects Achilles               | |
+| |  +--------+  "Versatile - works with 80% of your   | |
+| |               existing pieces"                      | |
+| |                                                     | |
+| |  [ + Add to board ]    [ Change goal ]              | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Add -> progress bar moves -> next suggestion updates. Change goal -> recomputes gaps.
+
+#### 10. `alert`
+Time-sensitive notification with a single action. Urgency-driven.
+
+```
++---------------------------------------------------------+
+|  ! Price Drop                      AI                   |
++---------------------------------------------------------+
+| +-----------------------------------------------------+ |
+| |                                                     | |
+| |  +--------+                                         | |
+| |  | [img]  |  Norse Projects Nunk Jacket             | |
+| |  |        |  ~~$350~~ -> $210  (-40%)               | |
+| |  +--------+                                         | |
+| |                                                     | |
+| |  On your board since Jan 12.                        | |
+| |  Lowest price in 6 months.                          | |
+| |                                                     | |
+| |  [ Visit store > ]              [ Dismiss ]         | |
+| |                                                     | |
+| +-----------------------------------------------------+ |
++---------------------------------------------------------+
+```
+**Loop**: Visit -> tracked as high-intent. Dismiss -> stops alerts for this item.
+
+---
+
+## Complete Template Inventory (30)
+
+### Consumption templates (19)
+Inform the user. No feedback loop.
+
+| # | Template | User job | Fallback | Status |
+|---|----------|----------|----------|--------|
+| 1 | `grid-split` | Complement / compare | -> `list` | Built |
+| 2 | `hero-card` | Identity / summary | -> `text-block` | Built |
+| 3 | `list` | Ranked actions | *(terminal)* | Built |
+| 4 | `text-block` | Narrative analysis | *(terminal)* | Built |
+| 5 | `spectrum` | Dimensional positioning | -> `text-block` | Not built |
+| 6 | `stat-row` | Collection metrics | -> `list` | Not built |
+| 7 | `comparison` | Head-to-head attributes | -> `grid-split` | Not built |
+| 8 | `timeline` | Sequential path/journey | -> `list` | Not built |
+| 9 | `rank-podium` | Top picks emphasized | -> `stack-rank` | Not built |
+| 10 | `progress` | Goal tracking | -> `stat-row` | Not built |
+| 11 | `quote` | Single big insight | -> `text-block` | Not built |
+| 12 | `carousel` | Browseable row | -> `grid-split` | Not built |
+| 13 | `matrix` | Quadrant positioning | -> `map` | Not built |
+| 14 | `score-card` | Headline metric + breakdown | -> `stat-row` | Not built |
+| 15 | `pill-cloud` | Weighted tags/themes | -> `hero-card` | Not built |
+| 16 | `stack-rank` | Visually weighted ranking | -> `list` | Not built |
+| 17 | `accordion` | Expandable detail sections | -> `list` | Not built |
+| 18 | `media-feature` | Visual hero with overlay | -> `hero-card` | Not built |
+| 19 | `map` | Spatial/conceptual plotting | -> `matrix` | Not built |
+
+### Hybrid (1)
+Informs and collects lightweight input.
+
+| # | Template | User job | Fallback | Status |
+|---|----------|----------|----------|--------|
+| 20 | `checklist` | Actionable to-dos | -> `list` | Not built |
+
+### Action templates (10)
+Collect user input. Close a feedback loop. Make the system smarter.
+
+| # | Template | Verb | Feedback loop | Fallback | Status |
+|---|----------|------|---------------|----------|--------|
+| 21 | `pick-one` | Choose | Trains taste profile | -> `vote-split` | Not built |
+| 22 | `swipe-stack` | Pass / Save | Rapid preference building | -> `quick-add` | Not built |
+| 23 | `quick-add` | Add to board | Fills gaps, updates suggestions | -> `list` | Not built |
+| 24 | `swap` | Keep / Replace | Upgrades collection | -> `comparison` | Not built |
+| 25 | `commit-list` | Select + open | Purchase intent tracking | -> `checklist` | Not built |
+| 26 | `vote-split` | Pick direction | Shapes all future widgets | -> `pick-one` | Not built |
+| 27 | `prompt` | Type + submit | Constrains AI suggestions | -> `text-block` | Not built |
+| 28 | `bundle` | Save set | Batch-adds to board | -> `carousel` | Not built |
+| 29 | `goal` | Add + set target | Progress-driven suggestions | -> `progress` | Not built |
+| 30 | `alert` | Visit / Dismiss | Intent + notification prefs | -> `quick-add` | Not built |
+
+---
+
+## Implications
+
+### For implementation
+- 30 templates = 19 consumption + 1 hybrid + 10 action
+- 4 are built, 26 are not
+- Action templates require client-side event handling and state persistence that consumption templates do not
+- Action templates feed back into the system: choices train the AI, adds update the board, dismissals adjust future suggestions
+
+### For widget config authors
+Pick the template that matches the **user job**, not the content type:
+
+**Consumption** (read-only):
+- "Suggesting complements?" -> `grid-split`
+- "Reflecting identity?" -> `hero-card`
+- "Prioritizing actions?" -> `list`
+- "Showing where they fall?" -> `spectrum`
+- "Showing metrics?" -> `stat-row`
+- "Explaining reasoning?" -> `text-block`
+
+**Action** (feedback loop):
+- "Help them choose between options?" -> `pick-one` or `vote-split`
+- "Help them discover rapidly?" -> `swipe-stack`
+- "One strong suggestion?" -> `quick-add`
+- "Upgrade an existing item?" -> `swap`
+- "Ready to buy?" -> `commit-list`
+- "Need user input?" -> `prompt`
+- "Assemble a set?" -> `bundle`
+- "Track toward a goal?" -> `goal`
+- "Time-sensitive?" -> `alert`
+
+### For category expansion
+Each category maps to the same 4 archetypes (consumption) plus action widgets as needed:
+
+| Archetype | User job | Template |
+|-----------|----------|----------|
+| Completer | "Fill the gaps in my collection" | `grid-split` |
+| Profiler | "Tell me who I am based on what I save" | `hero-card` |
+| Prioritizer | "Tell me what to do next" | `list` |
+| Analyzer | "Show me the numbers / dimensions" | `spectrum` or `stat-row` |
+| Decider | "Help me choose" | `pick-one` or `vote-split` |
+| Actioner | "Add this to my board" | `quick-add` or `bundle` |

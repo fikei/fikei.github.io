@@ -8,7 +8,7 @@ Design research findings that inform product decisions. Each study documents the
 
 | Study | Date | Status | Outcome |
 |-------|------|--------|---------|
-| [Widget Template Patterns](./widget-template-patterns.md) | 2026-02-05 | Complete | 6 UX patterns identified across 12 categories, 48 widget concepts |
+| [Widget Template Patterns](./widget-template-patterns.md) | 2026-02-06 | Complete | 30 templates (19 consumption, 1 hybrid, 10 action) across 12 categories, 48 widget concepts |
 
 ---
 
