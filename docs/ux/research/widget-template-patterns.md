@@ -271,7 +271,7 @@ Single prose block in a card.
 +---------------------------------------------------------+
 ```
 
-### `spectrum` (not built)
+### `spectrum` (built)
 
 Labeled scales showing dimensional positioning.
 
@@ -293,7 +293,7 @@ Labeled scales showing dimensional positioning.
 +---------------------------------------------------------+
 ```
 
-### `stat-row` (not built)
+### `stat-row` (built)
 
 Row of 2-4 key metrics.
 
@@ -423,7 +423,7 @@ Rapid yes/no on a queue of items. Tinder for curation.
 ```
 **Loop**: Passes and saves train `grid-split` suggestions. Builds taste profile fast.
 
-#### 3. `quick-add`
+#### 3. `quick-add` (built)
 Single high-confidence suggestion with a prominent save action.
 
 ```
@@ -633,8 +633,8 @@ Inform the user. No feedback loop.
 | 2 | `hero-card` | Identity / summary | -> `text-block` | Built |
 | 3 | `list` | Ranked actions | *(terminal)* | Built |
 | 4 | `text-block` | Narrative analysis | *(terminal)* | Built |
-| 5 | `spectrum` | Dimensional positioning | -> `text-block` | Not built |
-| 6 | `stat-row` | Collection metrics | -> `list` | Not built |
+| 5 | `spectrum` | Dimensional positioning | -> `text-block` | Built |
+| 6 | `stat-row` | Collection metrics | -> `list` | Built |
 | 7 | `comparison` | Head-to-head attributes | -> `grid-split` | Not built |
 | 8 | `timeline` | Sequential path/journey | -> `list` | Not built |
 | 9 | `rank-podium` | Top picks emphasized | -> `stack-rank` | Not built |
@@ -663,7 +663,7 @@ Collect user input. Close a feedback loop. Make the system smarter.
 |---|----------|------|---------------|----------|--------|
 | 21 | `pick-one` | Choose | Trains taste profile | -> `vote-split` | Not built |
 | 22 | `swipe-stack` | Pass / Save | Rapid preference building | -> `quick-add` | Not built |
-| 23 | `quick-add` | Add to board | Fills gaps, updates suggestions | -> `list` | Not built |
+| 23 | `quick-add` | Add to board | Fills gaps, updates suggestions | -> `list` | Built |
 | 24 | `swap` | Keep / Replace | Upgrades collection | -> `comparison` | Not built |
 | 25 | `commit-list` | Select + open | Purchase intent tracking | -> `checklist` | Not built |
 | 26 | `vote-split` | Pick direction | Shapes all future widgets | -> `pick-one` | Not built |
@@ -678,7 +678,7 @@ Collect user input. Close a feedback loop. Make the system smarter.
 
 ### For implementation
 - 30 templates = 19 consumption + 1 hybrid + 10 action
-- 4 are built, 26 are not
+- 7 are built, 23 are not
 - Action templates require client-side event handling and state persistence that consumption templates do not
 - Action templates feed back into the system: choices train the AI, adds update the board, dismissals adjust future suggestions
 

@@ -4,6 +4,38 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-06] - Widget Templates: spectrum, stat-row, quick-add
+
+### Added
+- **`spectrum` template** — Labeled horizontal scales showing dimensional positioning (e.g. Budget <--*--> Luxury)
+  - CSS: `.widget-spectrum__axes`, `.widget-spectrum__track`, `.widget-spectrum__marker`
+  - Renders 2-4 axes from AI `{ axes: [{ leftLabel, rightLabel, position, note }] }` response
+  - Widget config: `price-radar` — positions user on budget/style/brand dimensions
+
+- **`stat-row` template** — Row of 2-4 key collection metrics with large values
+  - CSS: `.widget-statrow__grid`, `.widget-statrow__value`, `.widget-statrow__label`
+  - Renders stats from AI `{ stats: [{ value, label }] }` response
+  - Widget config: `collection-stats` — brands count, style count, avg price
+
+- **`quick-add` action template** — Single high-confidence suggestion with "Add to board" button
+  - CSS: `.widget-quickadd__content`, `.widget-quickadd__btn--primary/secondary`
+  - First action template with feedback loop: Add → item in board → future widgets exclude gap
+  - `handleQuickAdd()` — calls `addLink()` to mutate board state, tracks event, updates UI
+  - Widget config: `gap-filler` — AI identifies biggest collection gap, suggests one product
+
+- **3 new server-side widget configs**
+  - `config/widgets/price-radar.ts` — spectrum template, categories: wear/tech/home/all
+  - `config/widgets/collection-stats.ts` — stat-row template, all 12 categories
+  - `config/widgets/gap-filler.ts` — quick-add template, categories: wear/tech/home/fitness
+
+### Changed
+- `WIDGET_TEMPLATES` now has 7 templates (was 4)
+- `WIDGET_REGISTRY` now has 5 widgets (was 2)
+- Server registry imports 5 widget configs (was 2)
+- Research doc: 7 of 30 templates now built (was 4)
+
+---
+
 ## [2026-02-05] - Widget Phase 2: Config-Generated Widgets (COMPLETE)
 
 ### Added

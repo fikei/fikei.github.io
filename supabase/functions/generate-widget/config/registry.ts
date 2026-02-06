@@ -19,6 +19,9 @@ import type {
 // Import widget definitions
 import { completeTheLook } from './widgets/complete-the-look.ts'
 import { styleSummary } from './widgets/style-summary.ts'
+import { priceRadar } from './widgets/price-radar.ts'
+import { collectionStats } from './widgets/collection-stats.ts'
+import { gapFiller } from './widgets/gap-filler.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -29,6 +32,9 @@ const registry: WidgetRegistry = {
   widgets: {
     'complete-the-look': completeTheLook,
     'style-summary': styleSummary,
+    'price-radar': priceRadar,
+    'collection-stats': collectionStats,
+    'gap-filler': gapFiller,
   },
 
   defaults: {

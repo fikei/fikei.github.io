@@ -2828,6 +2828,205 @@ body {
   text-decoration: underline;
 }
 
+/* Spectrum Template - Dimensional positioning scales */
+.widget-spectrum__axes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+.widget-spectrum__axis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.widget-spectrum__labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.widget-spectrum__track {
+  position: relative;
+  height: 2px;
+  background: var(--subtle);
+  margin: var(--space-2) 0;
+}
+
+.widget-spectrum__marker {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  background: var(--fg);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 0.4s ease;
+}
+
+.widget-spectrum__note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Stat Row Template - Collection metrics */
+.widget-statrow__grid {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-around;
+  padding: var(--space-2) 0;
+}
+
+.widget-statrow__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 60px;
+}
+
+.widget-statrow__value {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--fg);
+  line-height: 1;
+}
+
+.widget-statrow__label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* Quick Add Template - Single suggestion with action */
+.widget-quickadd__content {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+}
+
+.widget-quickadd__image {
+  flex: 0 0 80px;
+  width: 80px;
+  height: 80px;
+  background: var(--subtle);
+  overflow: hidden;
+}
+
+.widget-quickadd__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.widget-quickadd__image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--muted);
+}
+
+.widget-quickadd__details {
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-quickadd__name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.widget-quickadd__brand {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.widget-quickadd__price {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  margin-top: var(--space-1);
+}
+
+.widget-quickadd__reason {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: var(--space-2);
+  line-height: 1.4;
+}
+
+.widget-quickadd__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.widget-quickadd__btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.widget-quickadd__btn--primary {
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+}
+
+.widget-quickadd__btn--primary:hover {
+  background: transparent;
+  color: var(--fg);
+}
+
+.widget-quickadd__btn--secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--subtle);
+}
+
+.widget-quickadd__btn--secondary:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.widget-quickadd__added {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Widget PRD Modal */
 .widget-prd-modal {
   max-width: 600px;
@@ -3849,6 +4048,104 @@ Return JSON:
       },
       createdAt: '2024-01-15',
       updatedAt: '2024-01-20'
+    },
+    'price-radar': {
+      id: 'price-radar',
+      version: '1.0',
+      name: 'Price Radar',
+      description: 'Shows where you fall on key dimensions like budget, style, and brand affinity.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: ['wear', 'tech', 'home', 'all'],
+        minItems: 3,
+        maxItems: null,
+        itemTypes: ['product']
+      },
+      prompt: `Analyze these saved items and position the user on 2-3 meaningful dimensions.
+
+Choose axes relevant to the content (e.g. Budget<->Luxury, Minimal<->Bold, Classic<->Trendy).
+For each axis, estimate where the user falls (0.0 = fully left, 1.0 = fully right).
+
+Return JSON:
+{
+  "axes": [
+    { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.35, "note": "You: $85 avg" },
+    { "leftLabel": "Minimal", "rightLabel": "Bold", "position": 0.2, "note": "Mostly neutrals" }
+  ],
+  "confidence": 0.75
+}`,
+      template: {
+        name: 'spectrum',
+        fallback: 'text-block'
+      },
+      createdAt: '2026-02-06',
+      updatedAt: '2026-02-06'
+    },
+    'collection-stats': {
+      id: 'collection-stats',
+      version: '1.0',
+      name: 'Collection Stats',
+      description: 'Key metrics about your saved items — brands, categories, price range, and more.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: ['wear', 'tech', 'home', 'eat', 'read', 'all'],
+        minItems: 3,
+        maxItems: null,
+        itemTypes: ['product']
+      },
+      prompt: `Analyze these saved items and extract 3-4 key metrics about the collection.
+
+Return JSON:
+{
+  "stats": [
+    { "value": "12", "label": "brands" },
+    { "value": "3", "label": "styles" },
+    { "value": "$85", "label": "avg price" }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'stat-row',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-06',
+      updatedAt: '2026-02-06'
+    },
+    'gap-filler': {
+      id: 'gap-filler',
+      version: '1.0',
+      name: 'You Might Want This',
+      description: 'AI identifies the biggest gap in your collection and suggests one item to fill it.',
+      status: 'active',
+      zone: 'inline',
+      criteria: {
+        category: ['wear', 'tech', 'home', 'fitness'],
+        minItems: 2,
+        maxItems: null,
+        itemTypes: ['product']
+      },
+      prompt: `Analyze these saved items and identify the single biggest gap in the user's collection.
+Suggest ONE specific product that would fill that gap.
+
+Return JSON:
+{
+  "suggestion": {
+    "name": "Product Name",
+    "brand": "Brand Name",
+    "price": "$XX.XX",
+    "reason": "Fills your category gap — you have X and Y but no Z.",
+    "searchQuery": "brand product name"
+  },
+  "confidence": 0.85
+}`,
+      template: {
+        name: 'quick-add',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-06',
+      updatedAt: '2026-02-06'
     }
   };
 
@@ -4621,6 +4918,132 @@ Return JSON:
             </div>
           </div>`;
       }
+    },
+
+    // Template: spectrum
+    // Labeled scales showing dimensional positioning (e.g. Budget <--*--> Luxury)
+    'spectrum': {
+      name: 'spectrum',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const axes = aiResult.axes || [];
+        if (axes.length === 0) return '';
+
+        const axesHtml = axes.slice(0, 4).map(axis => {
+          const position = Math.max(0, Math.min(1, axis.position || 0.5));
+          const pct = (position * 100).toFixed(1);
+          return `
+            <div class="widget-spectrum__axis">
+              <div class="widget-spectrum__labels">
+                <span>${esc(axis.leftLabel || axis.left || '')}</span>
+                <span>${esc(axis.rightLabel || axis.right || '')}</span>
+              </div>
+              <div class="widget-spectrum__track">
+                <div class="widget-spectrum__marker" style="left: ${pct}%"></div>
+              </div>
+              ${axis.note ? `<div class="widget-spectrum__note">${esc(axis.note)}</div>` : ''}
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="widget-complete" data-widget-id="${widget.id}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
+            </div>
+            <div class="widget-complete__body" style="display:block;">
+              <div class="widget-spectrum__axes">${axesHtml}</div>
+            </div>
+          </div>`;
+      }
+    },
+
+    // Template: stat-row
+    // Row of 2-4 key metrics with large values and small labels
+    'stat-row': {
+      name: 'stat-row',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const stats = aiResult.stats || [];
+        if (stats.length === 0) return '';
+
+        const statsHtml = stats.slice(0, 4).map(stat => {
+          return `
+            <div class="widget-statrow__stat">
+              <span class="widget-statrow__value">${esc(String(stat.value))}</span>
+              <span class="widget-statrow__label">${esc(stat.label)}</span>
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="widget-complete" data-widget-id="${widget.id}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
+            </div>
+            <div class="widget-complete__body" style="display:block;">
+              <div class="widget-statrow__grid">${statsHtml}</div>
+            </div>
+          </div>`;
+      }
+    },
+
+    // Template: quick-add (action)
+    // Single high-confidence suggestion with "Add to board" action button
+    'quick-add': {
+      name: 'quick-add',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const suggestion = aiResult.suggestion || aiResult.suggestions?.[0] || null;
+        if (!suggestion) return '';
+
+        const name = suggestion.name || 'Suggested item';
+        const brand = suggestion.brand || '';
+        const price = suggestion.price || '';
+        const reason = suggestion.reason || '';
+        const url = suggestion.url || suggestion.searchQuery ? `https://www.google.com/search?q=${encodeURIComponent(suggestion.searchQuery)}` : '#';
+        const imageUrl = suggestion.imageUrl || suggestion.image || '';
+        const widgetId = widget.id;
+
+        const imageHtml = imageUrl
+          ? `<img src="${esc(imageUrl)}" alt="${esc(name)}" onerror="this.parentElement.innerHTML='<div class=\\'widget-quickadd__image-placeholder\\'>+</div>'">`
+          : `<div class="widget-quickadd__image-placeholder">+</div>`;
+
+        return `
+          <div class="widget-complete" data-widget-id="${widgetId}">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
+              </div>
+              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widgetId}')" title="Refresh">&#x27F3;</button>
+            </div>
+            <div class="widget-complete__body" style="display:block;">
+              <div class="widget-quickadd__content">
+                <div class="widget-quickadd__image">${imageHtml}</div>
+                <div class="widget-quickadd__details">
+                  <div class="widget-quickadd__name">${esc(name)}</div>
+                  ${brand ? `<div class="widget-quickadd__brand">${esc(brand)}</div>` : ''}
+                  ${price ? `<div class="widget-quickadd__price">${esc(price)}</div>` : ''}
+                  ${reason ? `<div class="widget-quickadd__reason">"${esc(reason)}"</div>` : ''}
+                  <div class="widget-quickadd__actions" id="quickadd-actions-${widgetId}">
+                    <button class="widget-quickadd__btn widget-quickadd__btn--primary" onclick="handleQuickAdd('${widgetId}', this)">+ Add to board</button>
+                    <a class="widget-quickadd__btn widget-quickadd__btn--secondary" href="${esc(url)}" target="_blank" rel="noopener">Visit site ›</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }
     }
   };
 
@@ -4897,6 +5320,75 @@ Return JSON:
     }
 
     console.log('[widget] Refresh complete for:', widgetId);
+  };
+
+  // Quick-add action handler — adds AI suggestion to the user's board
+  window.handleQuickAdd = function(widgetId, btnEl) {
+    // Find the widget element and extract suggestion data
+    const widgetEl = btnEl.closest('[data-widget-id]');
+    if (!widgetEl) return;
+
+    // Get the cached AI result for this widget
+    const widget = WIDGET_REGISTRY[widgetId];
+    if (!widget) return;
+
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const itemIds = items.map(i => i.id);
+    const cacheKey = getCacheKey(widgetId, itemIds);
+    const cached = widgetCache[cacheKey];
+    const aiResult = cached?.data;
+    const suggestion = aiResult?.suggestion || aiResult?.suggestions?.[0];
+
+    if (!suggestion) {
+      console.warn('[widget] No suggestion data for quick-add:', widgetId);
+      return;
+    }
+
+    // Build a link object from the suggestion
+    const linkUrl = suggestion.url || (suggestion.searchQuery
+      ? `https://www.google.com/search?q=${encodeURIComponent(suggestion.searchQuery)}`
+      : null);
+
+    if (!linkUrl) {
+      console.warn('[widget] No URL for quick-add suggestion');
+      return;
+    }
+
+    const newLink = {
+      id: 'link_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      url: linkUrl,
+      title: suggestion.name || 'AI Suggestion',
+      description: suggestion.reason || '',
+      image: suggestion.imageUrl || suggestion.image || '',
+      category: currentFilter || 'all',
+      domain: linkUrl.replace(/^https?:\/\//, '').split('/')[0],
+      source: 'ai-quick-add',
+      widgetId: widgetId
+    };
+
+    // Add to board
+    const result = addLink(newLink);
+    console.log('[widget] Quick-add result:', result);
+
+    // Track the action
+    trackWidgetEvent(WIDGET_EVENTS.CLICK, widgetId, {
+      action: 'quick-add',
+      suggestion: suggestion.name,
+      brand: suggestion.brand
+    });
+
+    // Update UI — replace button with confirmation
+    const actionsEl = document.getElementById(`quickadd-actions-${widgetId}`);
+    if (actionsEl) {
+      const visitUrl = linkUrl;
+      actionsEl.innerHTML = `
+        <span class="widget-quickadd__added">&#x2713; Added</span>
+        <a class="widget-quickadd__btn widget-quickadd__btn--secondary" href="${esc(visitUrl)}" target="_blank" rel="noopener">Visit site ›</a>`;
+    }
+
+    // Re-render the grid to show the new item
+    renderGrid();
   };
 
   // Widget refresh button handler
