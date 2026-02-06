@@ -2,88 +2,11 @@
    Uses CTRL Design System tokens
    ============================================ */
 
-/* Docs View - full height flex column */
-#docs-view {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-#docs-view.active {
-  display: flex;
-}
-
-/* Docs Navigation - sticky bar (widgets.html pattern) */
-.docs-nav {
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-  border-bottom: var(--border-thin) solid var(--border-subtle);
-  z-index: var(--z-sticky, 10);
-  padding: var(--space-3) var(--space-6);
-  display: flex;
-  gap: var(--space-4);
-  align-items: center;
-  overflow-x: auto;
-  flex-shrink: 0;
-}
-
-.docs-nav__link {
-  font-family: var(--font-primary);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  color: var(--fg-muted);
-  text-decoration: none;
-  white-space: nowrap;
-  padding: var(--space-1) 0;
-  border-bottom: 2px solid transparent;
-  transition: all var(--duration-fast) var(--ease-default);
-}
-
-.docs-nav__link:hover {
-  color: var(--fg);
-}
-
-.docs-nav__link.active {
-  color: var(--fg);
-  border-bottom-color: var(--fg);
-}
-
-.docs-nav__divider {
-  width: 1px;
-  height: 16px;
-  background: var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.docs-nav__spacer {
-  flex: 1;
-}
-
-.docs-nav__select {
-  font-family: var(--font-primary);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  color: var(--fg-muted);
-  background: var(--bg);
-  border: var(--border-thin) solid var(--border-subtle);
-  padding: var(--space-1) var(--space-3);
-  cursor: pointer;
-}
-
-.docs-nav__select:hover,
-.docs-nav__select:focus {
-  color: var(--fg);
-  border-color: var(--border);
-}
-
 /* Viewer Container - 2-column layout (stage + context sidebar) */
 .viewer-container {
   display: grid;
   grid-template-columns: 1fr var(--systemic-context-width);
-  flex: 1;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -95,49 +18,21 @@
   background: var(--bg);
 }
 
-/* Breadcrumb */
-.breadcrumb {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: nowrap;
-  white-space: nowrap;
+/* Showcase - widgets.html-style scrollable content area with grid texture */
+.showcase {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+  background:
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(var(--border-subtle) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-.breadcrumb-link {
-  color: var(--fg-muted);
-  text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-default);
-}
-
-.breadcrumb-link:hover {
-  color: var(--fg);
-}
-
-.breadcrumb-sep {
-  color: var(--fg-subtle);
-  padding: 0 var(--space-1);
-  user-select: none;
-}
-
-.breadcrumb-current {
-  color: var(--fg);
-  font-weight: 500;
-}
-
-.breadcrumb-text {
-  color: var(--fg-muted);
-}
-
-/* View toggle in nav */
-.docs-nav .view-toggle {
-  display: flex;
-  background: var(--bg);
-  border: var(--border-thin) solid var(--border-subtle);
-  flex-shrink: 0;
+.showcase > .foundation-content,
+.showcase > .preview-main,
+.showcase > .variants-preview-gallery {
+  max-width: 960px;
 }
 
 /* State toggles in nav */
@@ -172,25 +67,13 @@
   color: var(--bg);
 }
 
-/* Component Preview Area */
-.component-preview {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-8);
-  overflow: auto;
-  background:
-    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px),
-    linear-gradient(var(--border-subtle) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
+/* Preview placeholder */
 .preview-placeholder {
   text-align: center;
   color: var(--fg-muted);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  padding: var(--space-16) 0;
 }
 
 .preview-component {
@@ -248,37 +131,9 @@
   border-left: var(--border-thin) solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
-.view-toggle {
-  display: flex;
-  background: var(--bg);
-  border: var(--border-thin) solid var(--border);
-}
-
-.toggle-btn {
-  flex: 1;
-  padding: var(--space-2);
-  background: transparent;
-  border: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  color: var(--fg-muted);
-  cursor: pointer;
-  transition: all var(--duration-normal) var(--ease-default);
-}
-
-.toggle-btn:hover {
-  color: var(--fg);
-}
-
-.toggle-btn.active {
-  background: var(--fg);
-  color: var(--bg);
-}
 
 /* Context Panels */
 .context-panel {
@@ -504,18 +359,12 @@
 }
 
 @media (max-width: 900px) {
-  .docs-nav {
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-  }
-
-  .docs-nav__spacer {
-    display: none;
-  }
-
   .viewer-container {
     grid-template-columns: 1fr;
+  }
+
+  .showcase {
+    padding: var(--space-4);
   }
 
   .context-sidebar {
@@ -636,21 +485,6 @@
   min-width: 80px;
 }
 
-/* Component dropdown option groups */
-.docs-nav__select optgroup {
-  font-family: var(--font-primary);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-}
-
-/* Breadcrumb meta */
-.breadcrumb-meta {
-  margin-left: var(--space-3);
-  font-size: 8px;
-  color: var(--fg-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
 /* Preview main container */
 .preview-main {
@@ -684,10 +518,9 @@
   padding: var(--space-8);
 }
 
-/* Component preview improvements */
-.component-preview {
-  flex-direction: column;
-  gap: var(--space-6);
+/* Showcase content flow */
+.showcase > * + * {
+  margin-top: var(--space-6);
 }
 
 /* Variants Preview Gallery */

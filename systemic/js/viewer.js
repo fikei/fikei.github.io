@@ -24,17 +24,9 @@ class DesignSystemViewer {
   }
 
   /**
-   * Bind DOM elements
+   * Bind DOM elements (stage + sidebar - nav is bound separately via rebindNav)
    */
   bindElements() {
-    // Docs nav bar
-    this.docsNav = DOMUtils.$('#docs-nav', this.container);
-    this.foundationLinks = DOMUtils.$$('.docs-nav__link', this.container);
-    this.componentSelect = DOMUtils.$('#component-select', this.container);
-    this.variantSelect = DOMUtils.$('#variant-select', this.container);
-    this.breadcrumb = DOMUtils.$('#stage-breadcrumb', this.container);
-    this.breadcrumbSystemName = DOMUtils.$('#breadcrumb-system-name', this.container);
-
     // Stage
     this.componentStage = DOMUtils.$('#component-stage', this.container);
     this.componentPreview = DOMUtils.$('#component-preview', this.container);
@@ -67,9 +59,34 @@ class DesignSystemViewer {
   }
 
   /**
-   * Bind event listeners
+   * Bind event listeners for stage + sidebar (not nav - that's rebindNav)
    */
   bindEvents() {
+    // Copy buttons
+    DOMUtils.$$('.copy-btn', this.container).forEach(btn => {
+      btn.addEventListener('click', () => this.copyCode(btn.dataset.copy));
+    });
+
+    // Mobile sidebar toggle
+    this.contextSidebar?.addEventListener('click', (e) => {
+      if (window.innerWidth <= 900 && e.target === this.contextSidebar) {
+        this.contextSidebar.classList.toggle('expanded');
+      }
+    });
+  }
+
+  /**
+   * Rebind nav elements after app.js rebuilds the nav bar
+   * Called by app.js after renderDocsNav()
+   */
+  rebindNav(navElement) {
+    // Cache nav element references
+    this.foundationLinks = DOMUtils.$$('.docs-nav__link[data-section]', navElement);
+    this.componentSelect = DOMUtils.$('#component-select', navElement);
+    this.variantSelect = DOMUtils.$('#variant-select', navElement);
+    this.breadcrumb = DOMUtils.$('#stage-breadcrumb', navElement);
+    this.breadcrumbSystemName = DOMUtils.$('#breadcrumb-system-name', navElement);
+
     // Foundation nav links
     this.foundationLinks.forEach(link => {
       link.addEventListener('click', (e) => {
@@ -87,12 +104,12 @@ class DesignSystemViewer {
     });
 
     // View toggle (Design / Code)
-    DOMUtils.$$('.toggle-btn', this.container).forEach(btn => {
+    DOMUtils.$$('.toggle-btn', navElement).forEach(btn => {
       btn.addEventListener('click', () => this.switchContext(btn.dataset.context));
     });
 
     // State toggles
-    DOMUtils.$$('.state-btn', this.container).forEach(btn => {
+    DOMUtils.$$('.state-btn', navElement).forEach(btn => {
       btn.addEventListener('click', () => this.switchState(btn.dataset.state));
     });
 
@@ -101,17 +118,17 @@ class DesignSystemViewer {
       this.selectVariant(e.target.value);
     });
 
-    // Copy buttons
-    DOMUtils.$$('.copy-btn', this.container).forEach(btn => {
-      btn.addEventListener('click', () => this.copyCode(btn.dataset.copy));
-    });
-
-    // Mobile sidebar toggle
-    this.contextSidebar?.addEventListener('click', (e) => {
-      if (window.innerWidth <= 900 && e.target === this.contextSidebar) {
-        this.contextSidebar.classList.toggle('expanded');
-      }
-    });
+    // Restore active states
+    if (this.currentContext) {
+      DOMUtils.$$('.toggle-btn', navElement).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.context === this.currentContext);
+      });
+    }
+    if (this.currentState) {
+      DOMUtils.$$('.state-btn', navElement).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.state === this.currentState);
+      });
+    }
   }
 
   /**
@@ -154,34 +171,11 @@ class DesignSystemViewer {
   }
 
   /**
-   * Render the navigation (populate component dropdown + update breadcrumb)
+   * Render navigation - now handled by app.js renderDocsNav()
+   * This just triggers the route to refresh the nav
    */
   renderNavigation() {
-    if (!this.designSystem) return;
-
-    // Update breadcrumb system name
-    if (this.breadcrumbSystemName) {
-      this.breadcrumbSystemName.textContent = this.designSystem.name || 'System';
-    }
-
-    // Populate component dropdown
-    if (this.componentSelect) {
-      const components = this.designSystem.components || [];
-
-      // Reset dropdown
-      this.componentSelect.innerHTML = '<option value="">Component...</option>';
-
-      if (components.length > 0) {
-        components.forEach(component => {
-          const variantCount = component.variants?.length || 0;
-          const name = component.name || this.formatName(component.type);
-          const option = document.createElement('option');
-          option.value = component.type;
-          option.textContent = `${name} (${variantCount})`;
-          this.componentSelect.appendChild(option);
-        });
-      }
-    }
+    // Nav is built by app.js; nothing to do here
   }
 
   /**
@@ -317,15 +311,16 @@ class DesignSystemViewer {
    * Update navigation active state
    */
   updateNavActiveState(activeId) {
-    // Update foundation link active states
-    this.foundationLinks.forEach(link => {
-      link.classList.toggle('active', link.dataset.section === activeId);
-    });
+    // Update foundation link active states (may not exist if nav not yet rendered)
+    if (this.foundationLinks) {
+      this.foundationLinks.forEach(link => {
+        link.classList.toggle('active', link.dataset.section === activeId);
+      });
+    }
 
     // Update component dropdown if a component is selected
     const foundations = ['color', 'typography', 'spacing', 'elevation'];
     if (foundations.includes(activeId)) {
-      // Deselect component dropdown when viewing a foundation
       if (this.componentSelect) this.componentSelect.value = '';
     } else if (this.componentSelect) {
       this.componentSelect.value = activeId;
@@ -875,8 +870,8 @@ class DesignSystemViewer {
   switchContext(context) {
     this.currentContext = context;
 
-    // Update toggle buttons
-    DOMUtils.$$('.toggle-btn', this.container).forEach(btn => {
+    // Update toggle buttons (in the app nav, not container)
+    DOMUtils.$$('.toggle-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.context === context);
     });
 
@@ -891,8 +886,8 @@ class DesignSystemViewer {
   switchState(state) {
     this.currentState = state;
 
-    // Update state buttons
-    DOMUtils.$$('.state-btn', this.container).forEach(btn => {
+    // Update state buttons (in the app nav, not container)
+    DOMUtils.$$('.state-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.state === state);
     });
 
