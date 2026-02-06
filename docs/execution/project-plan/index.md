@@ -78,6 +78,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | 0 | Deterministic MVP | Very Low | ~95% Complete |
 | 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
 | 2 | Config-Generated Widgets | Medium→High | **COMPLETE** |
+| 2.5 | Rules-Based Widget Catalog | Medium→High | **Pending** (40 widgets, 6 tiers) |
 | 3 | Self-Selecting Widgets | High | Pending |
 | 4 | Self-Optimizing System | Full | Pending |
 
@@ -89,6 +90,10 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |------|---------|-------|
 | Email invitations for collaborative boards | Resend API setup required | Human |
 | Push notifications | FCM/APNs setup required | Human |
+| Widget staleness triggers (4 widgets) | `last_interacted_at` schema migration needed | AI + Human |
+| Widget new categories (7 widgets) | Category enum extension (gift, spend, make, listen, learn, events, work) | Human decision |
+| Widget sub-type classification (5 widgets) | Sub-type taxonomy design needed | AI + Human |
+| Widget action templates | handleQuickAdd cache key bug | AI |
 
 ---
 

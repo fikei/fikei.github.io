@@ -1,7 +1,7 @@
 # PRD: AI Widgets
 
 **Date**: 2026-02-06
-**Status**: Draft
+**Status**: Active
 **Owner**: Ian
 
 ---
@@ -157,78 +157,798 @@ Before adding anything new, fix the existing experience:
 
 ---
 
-## Phase 3: One Widget Per Category
+## Phase 3: Rules-Based Widgets (Simple Triggers)
 
-For each category, follow the process: Content → Question → Component → Data → Validate.
+Widgets that fire on **item count + category filter only**. No timestamps, no interaction tracking, no AI eligibility checks. All triggers can be evaluated client-side from the `links[]` array.
 
-### wear (existing)
-- Complete the Look → grid-split
-- Style Summary → hero-card
+### Tier 1: One widget per original category (8 categories)
 
-### home
-- **Question**: "What room are you building?"
-- **Content**: Furniture/decor titles and domains (CB2, West Elm, IKEA, HAY)
-- **Component**: hero-card — room label + style traits ("Scandinavian Minimal", "Mid-Century Warm")
-- **Why this component**: Same job as Style Summary — reflect identity back. Titles + domains are enough.
+Each gets its first widget. Prioritize templates already built.
 
-### watch
-- **Question**: "What should I watch next?"
-- **Content**: Movie/show titles, streaming domains (Netflix, Letterboxd, IMDb)
-- **Component**: list — ranked recommendations based on what they've saved
-- **Why this component**: Linear recommendations. No images needed — titles are the content.
+| Category | # | Job | Question | Trigger | Shape | Notes |
+|----------|---|-----|----------|---------|-------|-------|
+| wear | — | (existing) | "What's my aesthetic?" | 3+ wear items | hero-card | Style Summary — shipped |
+| eat | 1 | Decide | "Pick one for tonight" | 3+ eat items | pick-one | New template needed |
+| home | 36 | Ladder | "Good / better / best" | 1+ home item | list | Built template |
+| watch | 40 | Deadline | "Upcoming from your saves" | 2+ watch items | list | Built template |
+| use | 26 | Compare | "Considered the alternative?" | 1+ use item | swap | New template needed |
+| go | 6 | Sequence | "Route these into a trip" | 3+ go items | list | Built template |
+| follow | 34 | Proxy | "The influence chain" | 3+ follow creators | text-block | Built template |
+| read | 16 | Backlog | "How long to read all this?" | 5+ read items | stat-row | Built template |
 
-### use
-- **Question**: "What kind of setup are you building?"
-- **Content**: Tool/app titles and domains
-- **Component**: hero-card — label ("Creative Pro Stack", "Minimal Developer") + tool category tags
-- **Why this component**: Reflect identity. Tool names are rich enough for AI inference.
+**Why these over the Phase 3 identity widgets**: The old Phase 3 mapped 6/8 categories to hero-card identity reflection ("What's my vibe?"). These are more divergent — each category gets a different job and shape. Identity widgets become one option, not the default.
 
-### eat
-- **Question**: "What cuisine are you into?"
-- **Content**: Restaurant names, recipe titles, food domains
-- **Component**: hero-card — cuisine label + trait tags ("Southeast Asian", "Fermentation-heavy")
-- **Why this component**: Same pattern — reflect taste back.
+### Tier 2: Second widget per category + new categories
 
-### go
-- **Question**: "What kind of traveler are you?"
-- **Content**: Destination names, Airbnb/hotel domains
-- **Component**: hero-card — traveler label + style tags ("Budget Explorer", "Boutique Hotels")
-- **Why this component**: Reflect identity from destination choices.
+After Tier 1 is validated, add a second widget to each original category and first widgets for new categories.
 
-### follow
-- **Question**: "What topics do you follow?"
-- **Content**: Creator names, platform domains (IG, Twitter, Substack, YouTube)
-- **Component**: list — topic clusters extracted from creator descriptions/handles
-- **Why this component**: Creators map to topics. List is the right shape.
+| Category | # | Job | Question | Trigger | Shape |
+|----------|---|-----|----------|---------|-------|
+| eat | 32 | Portion | "Your cuisine diversity" | 4+ eat items | stat-row |
+| eat | 35 | Substitute | "Same vibe, different diet" | 1+ eat item | swap |
+| home | 2 | Gap Analysis | "What's missing?" | 5+ home items | grid-split |
+| watch | 28 | Mood | "Emotional arc of your watchlist" | 4+ watch items | spectrum |
+| use | 5 | Gap Analysis | "Hole in your workflow" | 3+ use items | quick-add |
+| wear | 13 | Redundancy | "You already own three of these" | 3+ same garment type | stat-row |
+| wear | 23 | Remix | "Unexpected pairings" | 4+ items, 2+ types | pick-one |
+| read | 4 | Synthesize | "The hidden thread" | 4+ read items | text-block |
+| read | 22 | Translate | "International angle missing" | 4+ same-language articles | grid-split |
+| follow | 24 | Audit | "Feed redundancy" | 3+ same-niche creators | spectrum |
+| go | 39 | Cluster | "Orbiting a neighborhood" | 3+ same-area places | hero-card |
+| learn | 12 | Dependency Map | "What to learn first" | 3+ learning saves | list |
+| listen | 11 | Curator | "Build a listening session" | 5+ music/podcast saves | list |
+| events | 14 | Collision | "These dates conflict" | 2+ events | list |
+| make | 10 | Assemble | "Project plan from saves" | 4+ project items | commit-list |
+| gift | 7 | Assign | "Who gets what?" | 5+ items + 2+ in follow | grid-split |
 
-### read
-- **Question**: "What are you reading about?"
-- **Content**: Article headlines, book titles, publisher domains
-- **Component**: hero-card — reading label + topic tags ("Tech Criticism", "Long-form Narrative")
-- **Why this component**: Titles are rich. Reflect reading identity.
+### Tier 3: Action-first widgets
 
-### Pattern
-6 of 8 categories use **hero-card**. This is the most versatile component for the data we actually have (titles + domains → identity inference). The hero-card template is already built and working.
+Prove action templates work end-to-end before scaling.
+
+| Priority | # | Job | Question | Template | Test |
+|----------|---|-----|----------|----------|------|
+| First | 5 | Gap Analysis (use) | "Hole in your workflow" | quick-add | Add item → appears in grid |
+| Second | 26 | Compare (use) | "Considered the alternative?" | swap | Save alt → replaces original |
+| Third | 35 | Substitute (eat) | "Same vibe, different diet" | swap | Save substitute → both visible |
+| Fourth | 21 | Negotiate (eat) | "Dining week on budget" | commit-list | Check/uncheck → total updates |
+
+**Success criteria**: User completes the action → item persists → next widget generation reflects the change.
 
 ---
 
-## Phase 4: Prove Action Templates Work
+## Phase 4: Time-Based Widgets
 
-After all 8 categories have at least one consumption widget, pick ONE action template and prove the feedback loop works end-to-end:
+Require `created_at` timestamp on items. No new UI infrastructure, just date math in eligibility checks.
 
-- **Candidate**: `quick-add` for wear (gap-filler widget, already built)
-- **Test**: Does clicking "Add to board" actually add the item and improve future suggestions?
-- **Success criteria**: User adds an item → item appears in grid → next widget generation excludes that gap
+| # | Category | Job | Question | Trigger | Shape |
+|---|----------|-----|----------|---------|-------|
+| 15 | all | Behavior | "Saving pattern this month" | 10+ saves across 2+ months | spectrum |
+| 19 | all | Predict | "What you'll save next" | 15+ saves with category trend | hero-card |
+| 27 | read | Pace | "Saving faster than reading" | 5+ saves in last 14 days | stat-row |
+| 30 | learn | Graduate | "Skill level is climbing" | 3+ topic saves across 2+ months | list |
+| 37 | all | Drift | "How your taste is evolving" | 10+ saves across 3+ months | spectrum |
+
+**Prerequisite**: Items must store `created_at` or `saved_at`. Check if this already exists in the data model.
+
+---
+
+## Phase 5: Staleness Widgets
+
+Require interaction tracking — "last viewed" or "last clicked" per item. New data to store.
+
+| # | Category | Job | Question | Trigger | Shape |
+|---|----------|-----|----------|---------|-------|
+| 3 | watch | Persuade | "Why press play on this?" | 3+ saves stale 14+ days | hero-card |
+| 8 | follow | Decay | "Who are you ignoring?" | any creator stale 30+ days | list |
+| 20 | all | Archaeologist | "Oldest forgotten save" | any item stale 60+ days | hero-card |
+| 25 | all | Expire | "These links are dead" | 10+ saves stale 30+ days | stat-row |
+
+**Prerequisite**: Add `last_interacted_at` field to items table. Update on link click, widget view, or board visit.
+
+---
+
+## Phase 6: Cross-Category & Inference Widgets
+
+The most complex triggers. Require either cross-category evaluation or AI-driven eligibility.
+
+### Cross-category (evaluate across boundaries)
+
+| # | Category | Job | Question | Trigger | Shape |
+|---|----------|-----|----------|---------|-------|
+| 9 | spend | Calculate | "Wishlist total" | 5+ price-inferrable items across categories | stat-row |
+| 29 | home + wear | Bridge | "Spaces match your clothes?" | 3+ in home AND 3+ in wear | hero-card |
+| 33 | all | Ritual | "Bundle into daily routine" | items across 3+ categories | bundle |
+| 38 | all | Contradict | "Saying two different things" | opposing themes across categories | text-block |
+
+### Inference-based (AI determines eligibility)
+
+| # | Category | Job | Question | Trigger | Shape |
+|---|----------|-----|----------|---------|-------|
+| 2 | home | Gap Analysis | "What's missing from this room?" | 5+ items, same inferred style | grid-split |
+| 5 | use | Gap Analysis | "Hole in your workflow" | 3+ tools, same inferred workflow | quick-add |
+| 17 | home | Conflict | "These styles clash" | 3+ items, conflicting inferred styles | hero-card |
+| 18 | work | Pattern Reveal | "The job you're circling" | 5+ job/company/tool saves | hero-card |
+| 31 | wear | Season | "Seasonal blind spot" | 5+ items skewed to 1-2 seasons | spectrum |
+
+**Note**: Widgets #2 and #5 appear in both Tier 2 (rules-based) and here. Tier 2 uses a simplified count trigger; Phase 6 adds the AI eligibility layer for higher confidence.
+
+---
+
+## Widget Design System
+
+All 40 widgets are built from a shared set of nestable, generic components. No widget gets custom HTML. Every visual element maps to a named component with defined behavior.
+
+### Design Principles
+
+1. **Composition over templates** — Templates are arrangements of generic components, not custom layouts
+2. **Every component has one job** — `w-stat` shows a number. `w-row` shows an item. No dual-purpose components
+3. **Nest, don't fork** — A checklist row is `w-row` with a `w-checkbox` inside it, not a new `w-row--checkable` component
+4. **Shell is constant** — Every widget has the same outer structure. Only the body varies
+5. **Actions are always in the footer** — No buttons floating in the body. Footer owns all CTAs
+
+### Component Hierarchy
+
+```
+w-shell ─────────────────────────── Every widget
+├── w-header ────────────────────── Fixed structure, never varies
+│   ├── w-title                     Widget name ("Cuisine Balance")
+│   ├── w-badge                     "AI" pill
+│   └── w-controls
+│       ├── w-icon-btn (refresh)    ⟳
+│       └── w-icon-btn (dismiss)    ✕
+│
+├── w-body ──────────────────────── Layout set by modifier class
+│   └── (body content — see layouts below)
+│
+└── w-footer ────────────────────── Always present
+    └── w-action-bar
+        └── w-btn × N              Primary + secondary actions
+```
+
+### Atoms (6 components)
+
+Smallest visual units. Cannot be broken down further.
+
+| Atom | Purpose | Variants | Used in |
+|------|---------|----------|---------|
+| `w-text` | Any text element | `--display` (24px, serif), `--title` (12px, uppercase), `--meta` (10px, muted), `--value` (18px, mono), `--label` (10px, uppercase, muted), `--note` (10px, italic, muted), `--prose` (12px, normal case) | All 40 |
+| `w-badge` | Small tag pill | `--default` (outline), `--filled` (inverted), `--accent` (highlight) | 8 verdict, 2 choices |
+| `w-bar` | Horizontal fill | `--full` (100% width container), `--inline` (fits in row). Fill via `style="--fill: 67%"` | 6 spectrum, 6 stats |
+| `w-icon-btn` | Icon-only button | `--refresh` (⟳), `--dismiss` (✕), `--check` (✓), `--expand` (▼) | All 40 (header) |
+| `w-divider` | Separator line | `--horizontal`, `--vertical`, `--labeled` (text in middle, e.g. "vs") | 3 split, 2 comparison, 2 checklist |
+| `w-checkbox` | Checkable control | `--checked`, `--unchecked` | 2 checklist |
+
+```html
+<!-- Atom examples -->
+<span class="w-text w-text--display">Minimal Modern</span>
+<span class="w-text w-text--meta">Based on 12 items</span>
+<span class="w-badge">Clean lines</span>
+<span class="w-badge w-badge--filled">67%</span>
+<div class="w-bar" style="--fill: 67%"></div>
+<button class="w-icon-btn w-icon-btn--refresh">⟳</button>
+<div class="w-divider"></div>
+<div class="w-divider w-divider--labeled">vs</div>
+<label class="w-checkbox"><input type="checkbox"> Item</label>
+```
+
+### Molecules (7 components)
+
+Atoms composed into recognizable patterns.
+
+#### `w-headline`
+Title + optional subtitle + optional attribution. Used in verdict body layouts.
+
+```html
+<div class="w-headline">
+  <span class="w-text w-text--display">Split Personality</span>
+  <span class="w-text w-text--meta">Home vs. Wardrobe aesthetic</span>
+</div>
+```
+**Used by**: 8 verdict widgets (#3, 17, 18, 19, 20, 29, 39 + all hero-card)
+
+#### `w-tag-group`
+Row of badges. Wraps on overflow.
+
+```html
+<div class="w-tag-group">
+  <span class="w-badge">Monochrome</span>
+  <span class="w-badge">Texture</span>
+  <span class="w-badge">Clean lines</span>
+</div>
+```
+**Used by**: 8 verdict widgets, standalone in several list/stat widgets
+
+#### `w-stat`
+Large value + label + optional bar. The numeric building block.
+
+```html
+<div class="w-stat">
+  <span class="w-text w-text--value">47</span>
+  <span class="w-text w-text--label">Backlog</span>
+  <div class="w-bar" style="--fill: 80%"></div>
+</div>
+```
+**Used by**: 6 stat widgets (#9, 13, 16, 25, 27, 32), checklist totals (#10, 21)
+
+#### `w-row`
+A single item in a list. Icon/indicator + content + optional trailing action. The most reused molecule.
+
+```html
+<div class="w-row">
+  <span class="w-row__indicator">🔴</span>
+  <div class="w-row__content">
+    <span class="w-text w-text--title">White Lotus S3</span>
+    <span class="w-text w-text--meta">3 days away</span>
+  </div>
+  <button class="w-icon-btn w-icon-btn--expand">→</button>
+</div>
+```
+**Used by**: 8 list widgets, 3 split widgets (inside columns), 2 checklist, 1 suggestion, 1 grouped
+
+#### `w-axis`
+A labeled horizontal bar for spectrum visualizations. Left label + bar + right label + optional note.
+
+```html
+<div class="w-axis">
+  <span class="w-text w-text--label">Light</span>
+  <div class="w-bar" style="--fill: 60%"></div>
+  <span class="w-text w-text--label">Heavy</span>
+  <span class="w-text w-text--note">You're 60% toward heavy</span>
+</div>
+```
+**Used by**: 6 spectrum widgets (#15, 24, 28, 31, 37)
+
+#### `w-option`
+A selectable card for choice/comparison layouts. Title + meta + description + optional action.
+
+```html
+<div class="w-option">
+  <span class="w-text w-text--title">Floral skirt + Hiking boots</span>
+  <span class="w-text w-text--meta">"Rugged Feminine"</span>
+  <button class="w-btn w-btn--sm">I'd wear this</button>
+</div>
+```
+**Used by**: 2 pick-one (#1, 23), 2 swap (#26, 35)
+
+#### `w-section`
+A labeled group of rows. Section header + child rows. For grouped/bundled layouts.
+
+```html
+<div class="w-section">
+  <span class="w-text w-text--label">☀️ Morning</span>
+  <div class="w-row">...</div>
+  <div class="w-row">...</div>
+</div>
+```
+**Used by**: 1 bundle (#33), can be reused in any list that needs grouping
+
+### Body Layouts (11 types)
+
+Each is a modifier on `w-body` that determines how molecules are arranged inside it. Every template maps to exactly one layout.
+
+#### `w-body--verdict` → hero-card template (8 widgets)
+
+```
+┌─────────────────────────────┐
+│                             │
+│   w-headline                │
+│     w-text--display         │
+│     w-text--meta            │
+│                             │
+│   w-tag-group               │
+│     w-badge × N             │
+│                             │
+└─────────────────────────────┘
+```
+
+Widgets: #3 Persuade, #17 Conflict, #18 Pattern Reveal, #19 Predict, #20 Archaeologist, #29 Bridge, #39 Cluster
+
+#### `w-body--list` → list template (8 widgets)
+
+```
+┌─────────────────────────────┐
+│ w-row                       │
+│   indicator | title | meta  │
+│ w-row                       │
+│   indicator | title | meta  │
+│ w-row                       │
+│   indicator | title | meta  │
+└─────────────────────────────┘
+```
+
+Widgets: #6 Sequence, #8 Decay, #11 Curator, #12 Dependency Map, #14 Collision, #30 Graduate, #36 Ladder, #40 Deadline
+
+#### `w-body--stats` → stat-row template (6 widgets)
+
+```
+┌─────────────────────────────┐
+│  w-stat    w-stat    w-stat │
+│   47        3/wk     15wk  │
+│  backlog   reading  behind  │
+│  ████░░    ██░░░░   ████░░ │
+└─────────────────────────────┘
+```
+
+Widgets: #9 Calculate, #13 Redundancy, #16 Backlog, #25 Expire, #27 Pace, #32 Portion
+
+#### `w-body--spectrum` → spectrum template (6 widgets)
+
+```
+┌─────────────────────────────┐
+│ w-axis                      │
+│   Spring ████░░░░░░  40%    │
+│ w-axis                      │
+│   Summer ██████████  100%   │
+│ w-axis                      │
+│   Fall   ██░░░░░░░░  20%   │
+└─────────────────────────────┘
+```
+
+Widgets: #15 Behavior, #24 Audit, #28 Mood, #31 Season, #37 Drift
+
+#### `w-body--split` → grid-split template (3 widgets)
+
+```
+┌──────────────┬──────────────┐
+│ w-column     │ w-column     │
+│  w-text--lbl │  w-text--lbl │
+│  w-row       │  w-row       │
+│  w-row       │  w-row       │
+│  w-row       │  w-row       │
+└──────────────┴──────────────┘
+```
+
+Widgets: #2 Gap Analysis, #7 Assign, #22 Translate
+
+#### `w-body--narrative` → text-block template (3 widgets)
+
+```
+┌─────────────────────────────┐
+│ w-text--prose               │
+│                             │
+│ Paragraph of insight text   │
+│ with inline emphasis and    │
+│ indented hierarchy.         │
+│                             │
+│   └→ sub-point              │
+│       └→ deeper point       │
+└─────────────────────────────┘
+```
+
+Widgets: #4 Synthesize, #34 Proxy, #38 Contradict
+
+#### `w-body--comparison` → swap template (2 widgets)
+
+```
+┌────────────┐     ┌────────────┐
+│ w-option   │     │ w-option   │
+│  title     │ vs  │  title     │
+│  meta      │     │  meta      │
+│  [action]  │     │  [action]  │
+└────────────┘     └────────────┘
+  w-divider--labeled
+```
+
+Widgets: #26 Compare, #35 Substitute
+
+#### `w-body--choices` → pick-one template (2 widgets)
+
+```
+┌─────────────────────────────┐
+│ w-option (A)                │
+│   title + description       │
+│   [Select]                  │
+│ ─────────────────────────── │
+│ w-option (B)                │
+│   title + description       │
+│   [Select]                  │
+└─────────────────────────────┘
+```
+
+Widgets: #1 Decide, #23 Remix
+
+#### `w-body--checklist` → commit-list template (2 widgets)
+
+```
+┌─────────────────────────────┐
+│ w-row + w-checkbox          │
+│   ☑ Mon: Tacos El Gordo $15│
+│ w-row + w-checkbox          │
+│   ☑ Wed: Sugarfish     $45 │
+│ w-row + w-checkbox          │
+│   ☐ Fri: Bestia        $65 │
+│ w-divider                   │
+│ w-stat (total: $60 / $150) │
+└─────────────────────────────┘
+```
+
+Widgets: #10 Assemble, #21 Negotiate
+
+#### `w-body--suggestion` → quick-add template (1 widget)
+
+```
+┌─────────────────────────────┐
+│ w-row (featured, larger)    │
+│   Title                     │
+│   Brand · $price            │
+│   w-text--note (reason)     │
+└─────────────────────────────┘
+```
+
+Widget: #5 Gap Analysis (use)
+
+#### `w-body--grouped` → bundle template (1 widget)
+
+```
+┌─────────────────────────────┐
+│ w-section (☀️ Morning)      │
+│   w-row: Morning Brew       │
+│   w-row: Huberman podcast   │
+│                             │
+│ w-section (🌙 Evening)      │
+│   w-row: Letterboxd pick    │
+│   w-row: Substack digest    │
+└─────────────────────────────┘
+```
+
+Widget: #33 Ritual
+
+### Full Component Count
+
+| Layer | Components | Description |
+|-------|-----------|-------------|
+| Shell | 1 | `w-shell` (constant wrapper) |
+| Structure | 3 | `w-header`, `w-body`, `w-footer` |
+| Atoms | 6 | `w-text`, `w-badge`, `w-bar`, `w-icon-btn`, `w-divider`, `w-checkbox` |
+| Molecules | 7 | `w-headline`, `w-tag-group`, `w-stat`, `w-row`, `w-axis`, `w-option`, `w-section` |
+| Layouts | 11 | Body layout modifiers |
+| **Total** | **28** | 17 unique components + 11 layout modifiers |
+
+### Widget → Component Mapping
+
+Every widget fully described as a component composition.
+
+| # | Widget | Layout | Body contains |
+|---|--------|--------|---------------|
+| 1 | Decide | choices | `w-option × 2-3` each with `w-text--title` + `w-text--meta` + `w-btn` |
+| 2 | Gap Analysis (home) | split | `w-column × 2`, left has `w-row × N` (user items), right has `w-row × N` (suggestions) |
+| 3 | Persuade | verdict | `w-headline` (`--display`: pitch text, `--meta`: show title) + `w-tag-group` (genre tags) |
+| 4 | Synthesize | narrative | `w-text--prose` with indented hierarchy showing thread across articles |
+| 5 | Gap Analysis (use) | suggestion | `w-row` (featured) with `w-text--title` + `w-text--meta` + `w-text--note` (reason) |
+| 6 | Sequence | list | `w-row × N` with `w-row__indicator` (step number) + title (destination) + meta (duration) |
+| 7 | Assign | split | `w-column` (items) + `w-column` (people), rows connected by assignment |
+| 8 | Decay | list | `w-row × N` with `w-row__indicator` (⚠️/🔴 urgency) + title (creator) + meta (days since) |
+| 9 | Calculate | stats | `w-stat × 3`: total value, item count, avg price. Optional `w-bar` per stat |
+| 10 | Assemble | checklist | `w-row × N` each with `w-checkbox` + title (task) + meta (source item), `w-stat` (completion %) |
+| 11 | Curator | list | `w-row × N` with `w-row__indicator` (energy emoji) + title (track/pod) + meta (duration) |
+| 12 | Dependency Map | list | `w-row × N` with `w-row__indicator` (→ chain) + title (topic) + meta (prerequisite) |
+| 13 | Redundancy | stats | `w-stat × 3-4`: per garment type (e.g., "3 hoodies", "2 white tees", "4 sneakers") |
+| 14 | Collision | list | `w-row × N` with `w-row__indicator` (⚠️) + title (event) + meta (conflicting date) |
+| 15 | Behavior | spectrum | `w-axis × 4-6`: one per category, bar fill = save density, note = trend direction |
+| 16 | Backlog | stats | `w-stat × 3`: total items, estimated read time, weeks behind |
+| 17 | Conflict | verdict | `w-headline` (`--display`: "Style Clash", `--meta`: explanation) + `w-tag-group` (clashing traits) |
+| 18 | Pattern Reveal | verdict | `w-headline` (`--display`: job title inference, `--meta`: evidence) + `w-tag-group` (signals) |
+| 19 | Predict | verdict | `w-headline` (`--display`: predicted next save, `--meta`: confidence) + `w-tag-group` (pattern) |
+| 20 | Archaeologist | verdict | `w-headline` (`--display`: item title, `--meta`: "Saved 90 days ago") + `w-tag-group` (why forgotten) |
+| 21 | Negotiate | checklist | `w-row × N` each with `w-checkbox` + title (restaurant) + meta (est. price), `w-stat` (running total / budget) |
+| 22 | Translate | split | `w-column` (your sources) + `w-column` (international, each `w-row__indicator` = flag emoji) |
+| 23 | Remix | choices | `w-option × 2`: each shows pairing label + `w-text--meta` (style name) + "I'd wear this" btn |
+| 24 | Audit | spectrum | `w-axis × N`: one per topic, dots/fills show creator overlap, note = creator names |
+| 25 | Expire | stats | `w-stat × 3`: alive count, dead count, moved count. Below: `w-row × N` (dead links) |
+| 26 | Compare | comparison | `w-option` (your tool) + `w-divider--labeled` ("vs") + `w-option` (alternative) |
+| 27 | Pace | stats | `w-stat × 3`: save rate, read rate, backlog size. Below: `w-text--note` (weeks behind) |
+| 28 | Mood | spectrum | `w-axis × 1`: "Light → Heavy" with items plotted as fill, note = dominant genre |
+| 29 | Bridge | verdict | `w-headline` (`--display`: coherence label, `--meta`: home vs wear) + `w-tag-group` (overlap/tension) |
+| 30 | Graduate | list | `w-row × N` with `w-row__indicator` (✓/→/○ progression) + title (skill level) + meta (save count + date range) |
+| 31 | Season | spectrum | `w-axis × 4`: Spring/Summer/Fall/Winter, bar fill = save density |
+| 32 | Portion | stats | `w-stat × N` per cuisine: value = percentage, label = cuisine name, `w-bar` = proportion |
+| 33 | Ritual | grouped | `w-section × 2-3` (Morning/Afternoon/Evening), each containing `w-row × N` (items with category badge) |
+| 34 | Proxy | narrative | `w-text--prose` with indented tree showing influence chain (Creator A → B → C) |
+| 35 | Substitute | comparison | `w-option` (original) + `w-divider--labeled` ("vibes as") + `w-option` (alt), shared `w-text--note` (common traits) |
+| 36 | Ladder | list | `w-row × 3` with `w-row__indicator` (tier: $/$$/$$) + title (product) + meta (price + differentiator) |
+| 37 | Drift | spectrum | `w-axis × N` per category: dual bars (then vs now), note = direction of change |
+| 38 | Contradict | narrative | `w-text--prose` with setup → reveal → reaction structure. Two `w-badge` inline (contradicting themes) |
+| 39 | Cluster | verdict | `w-headline` (`--display`: neighborhood name, `--meta`: item count + radius) + `w-tag-group` (item types) |
+| 40 | Deadline | list | `w-row × N` with `w-row__indicator` (🔴/🟡/⚪ urgency color) + title (show) + meta (days remaining) |
+
+### Reuse Frequency
+
+Components ranked by how many of the 40 widgets use them:
+
+| Component | Widgets | % of 40 |
+|-----------|---------|---------|
+| `w-shell` | 40 | 100% |
+| `w-header` | 40 | 100% |
+| `w-footer` + `w-action-bar` | 40 | 100% |
+| `w-text` | 40 | 100% |
+| `w-btn` | 40 | 100% |
+| `w-icon-btn` | 40 | 100% |
+| `w-row` | 24 | 60% |
+| `w-badge` | 10 | 25% |
+| `w-stat` | 10 | 25% |
+| `w-bar` | 12 | 30% |
+| `w-headline` | 8 | 20% |
+| `w-tag-group` | 8 | 20% |
+| `w-axis` | 6 | 15% |
+| `w-option` | 4 | 10% |
+| `w-divider` | 7 | 18% |
+| `w-checkbox` | 2 | 5% |
+| `w-section` | 1 | 3% |
+
+### CSS Architecture
+
+Components use BEM naming consistent with the existing design system. All widget components use design tokens from `tokens.css`.
+
+```css
+/* Shell (constant) */
+.w-shell { }
+.w-header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; }
+.w-body { border: var(--border-thin) solid var(--border-subtle); background: var(--bg-surface); padding: var(--space-4); }
+.w-footer { padding: var(--space-2) 0; }
+
+/* Body layout modifiers */
+.w-body--verdict { text-align: center; }
+.w-body--list { display: flex; flex-direction: column; gap: var(--space-2); }
+.w-body--stats { display: flex; justify-content: space-around; text-align: center; }
+.w-body--spectrum { display: flex; flex-direction: column; gap: var(--space-3); }
+.w-body--split { display: grid; grid-template-columns: 1fr auto 1fr; }
+.w-body--narrative { }
+.w-body--comparison { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; }
+.w-body--choices { display: flex; flex-direction: column; gap: var(--space-3); }
+.w-body--checklist { display: flex; flex-direction: column; gap: var(--space-2); }
+.w-body--suggestion { }
+.w-body--grouped { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* Atoms */
+.w-text { font-family: var(--font-primary); }
+.w-text--display { font-family: var(--font-serif); font-size: var(--text-3xl); }
+.w-text--title { font-size: var(--text-lg); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+.w-text--meta { font-size: var(--text-xs); color: var(--fg-muted); }
+.w-text--value { font-size: var(--text-2xl); font-family: var(--font-primary); }
+.w-text--label { font-size: var(--text-xs); text-transform: uppercase; color: var(--fg-muted); letter-spacing: var(--tracking-wider); }
+.w-text--note { font-size: var(--text-xs); font-style: italic; color: var(--fg-muted); }
+.w-text--prose { font-size: var(--text-lg); line-height: var(--leading-relaxed); }
+
+.w-badge { /* extends .token from design system */ }
+.w-bar { height: 4px; background: var(--border-subtle); }
+.w-bar__fill { height: 100%; background: var(--fg); width: var(--fill); }
+.w-divider { border-top: var(--border-thin) solid var(--border-subtle); }
+.w-divider--vertical { border-left: var(--border-thin) solid var(--border-subtle); border-top: none; }
+.w-divider--labeled { /* text centered in divider line */ }
+.w-checkbox { /* styled checkbox */ }
+
+/* Molecules */
+.w-headline { display: flex; flex-direction: column; gap: var(--space-2); }
+.w-tag-group { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.w-stat { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+.w-row { display: flex; align-items: center; gap: var(--space-3); }
+.w-row__indicator { flex-shrink: 0; width: 20px; text-align: center; }
+.w-row__content { flex: 1; min-width: 0; }
+.w-axis { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; }
+.w-option { border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); }
+.w-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.w-action-bar { display: flex; gap: var(--space-2); }
+```
+
+### Migration from `widget-complete`
+
+The existing `widget-complete` maps directly to the new system:
+
+| Old | New | Notes |
+|-----|-----|-------|
+| `.widget-complete` | `.w-shell` | Same wrapper |
+| `.widget-complete__header` | `.w-header` | Same structure |
+| `.widget-complete__header-left` | (removed) | Flex handles alignment |
+| `.widget-complete__title` | `.w-title` → `w-text--label` | Uses atom |
+| `.widget-complete__badge` | `.w-badge` | Uses atom |
+| `.widget-complete__refresh-btn` | `.w-icon-btn--refresh` | Uses atom |
+| `.widget-complete__body` | `.w-body` + layout modifier | Body always has a layout |
+| `.widget-complete__body--grid-split` | `.w-body--split` | Named for content, not CSS |
+| `.widget-style__label` | `.w-text--display` | Generic atom |
+| `.widget-style__sublabel` | `.w-text--meta` | Generic atom |
+| `.widget-style__trait` | `.w-badge` | Generic atom |
+| `.widget-style__traits` | `.w-tag-group` | Generic molecule |
+
+---
+
+## Widget Catalog: 40 Use Cases
+
+Every widget has a **job** (what it does), a **trigger** (when it appears), and a **shape** (which template renders it). Triggers are the eligibility rules that determine when a widget earns its screen space.
+
+### Trigger Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| `n+ items` | Minimum item count in category |
+| `n+ types` | Items span multiple sub-types (garment, cuisine, genre, etc.) |
+| `cross:` | Requires items in multiple categories |
+| `time:` | Requires save history over a time period |
+| `stale:` | Items saved N+ days ago with no interaction |
+
+---
+
+### Working Table
+
+| # | Category | Job | Question | Trigger | Shape |
+|---|----------|-----|----------|---------|-------|
+| 1 | eat | Decide | "Pick one restaurant for tonight" | 3+ restaurants saved | pick-one |
+| 2 | home | Gap Analysis | "What's missing from this room?" | 5+ items in same inferred style | grid-split |
+| 3 | watch | Persuade | "Why should I press play on this?" | 3+ saves stale: 14+ days | hero-card |
+| 4 | read | Synthesize | "What's the hidden thread?" | 4+ articles in same inferred topic | text-block |
+| 5 | use | Gap Analysis | "What's the hole in your workflow?" | 3+ tools in same inferred workflow | quick-add |
+| 6 | go | Sequence | "Route these into a trip" | 3+ destinations in same region | list |
+| 7 | gift | Assign | "Who gets what?" | 5+ items + 2+ people in follow | grid-split |
+| 8 | follow | Decay | "Who are you ignoring?" | stale: 30+ days on any followed creator | list |
+| 9 | spend (cross) | Calculate | "What's your wishlist total?" | cross: 5+ items with price-inferrable titles | stat-row |
+| 10 | make | Assemble | "Build a project plan from your saves" | 4+ items that form a project (tools + materials) | commit-list |
+| 11 | listen | Curator | "Build a listening session arc" | 5+ music/podcast saves | list |
+| 12 | learn | Dependency Map | "What do you need to learn first?" | 3+ learning resources in same topic | list |
+| 13 | wear | Redundancy | "You already own three of these" | 3+ items in same garment type | stat-row |
+| 14 | events | Collision | "These dates conflict" | 2+ events with overlapping dates | list |
+| 15 | all | Behavior | "Your saving pattern this month" | time: 10+ saves across 2+ months | spectrum |
+| 16 | read | Backlog | "How long to read all of this?" | 5+ unread articles | stat-row |
+| 17 | home | Conflict | "These styles clash" | 3+ items from conflicting inferred styles | hero-card |
+| 18 | work | Pattern Reveal | "The job you're circling" | 5+ job/company/tool saves | hero-card |
+| 19 | all | Predict | "What you'll save next" | time: 15+ saves with clear category trend | hero-card |
+| 20 | all | Archaeologist | "Your oldest forgotten save" | stale: 60+ days, no interaction | hero-card |
+| 21 | eat | Negotiate | "Build a dining week on budget" | 3+ restaurants with price-inferrable names | commit-list |
+| 22 | read | Translate | "The international angle you're missing" | 4+ articles from same-language sources | grid-split |
+| 23 | wear | Remix | "Unexpected outfit pairings" | 4+ items across 2+ garment types | pick-one |
+| 24 | follow | Audit | "Your feed has redundancy" | 3+ creators in same inferred niche | spectrum |
+| 25 | all | Expire | "These links are dead" | 10+ saves stale: 30+ days | stat-row |
+| 26 | use | Compare | "Have you considered the alternative?" | 1+ tool saved with known competitors | swap |
+| 27 | read | Pace | "You're saving faster than reading" | time: 5+ saves in last 14 days | stat-row |
+| 28 | watch | Mood | "Your watchlist emotional arc" | 4+ titles with inferrable genre | spectrum |
+| 29 | home + wear (cross) | Bridge | "Do your spaces match your clothes?" | cross: 3+ items in home AND 3+ in wear | hero-card |
+| 30 | learn | Graduate | "Your skill level is climbing" | time: 3+ saves in same topic across 2+ months | list |
+| 31 | wear | Season | "You have a seasonal blind spot" | 5+ items skewed to 1-2 seasons | spectrum |
+| 32 | eat | Portion | "Your cuisine diversity" | 4+ restaurants with inferrable cuisine type | stat-row |
+| 33 | all (cross) | Ritual | "Bundle saves into a daily routine" | cross: items across 3+ categories | bundle |
+| 34 | follow | Proxy | "The influence chain you're in" | 3+ creators in same domain | text-block |
+| 35 | eat | Substitute | "Same vibe, different diet" | 1+ restaurant saved | swap |
+| 36 | home | Ladder | "Good / better / best" | 1+ item with price-inferrable title | list |
+| 37 | all | Drift | "How your taste is evolving" | time: 10+ saves across 3+ months | spectrum |
+| 38 | all (cross) | Contradict | "You're saying two different things" | cross: items from opposing themes detected | text-block |
+| 39 | go | Cluster | "You're orbiting a neighborhood" | 3+ places in same inferred city/area | hero-card |
+| 40 | watch | Deadline | "Upcoming releases from your saves" | 2+ TV shows saved with active/upcoming seasons | list |
+
+---
+
+### Category Coverage Summary
+
+| Category | Widget Count | Jobs |
+|----------|-------------|------|
+| **eat** | 5 | Decide, Negotiate, Portion, Substitute, (cross: Ritual) |
+| **home** | 4 | Gap Analysis, Conflict, Ladder, (cross: Bridge) |
+| **watch** | 4 | Persuade, Mood, Deadline, (cross: Ritual) |
+| **read** | 5 | Synthesize, Backlog, Translate, Pace, (cross: Ritual) |
+| **use** | 3 | Gap Analysis, Compare, (cross: Ritual) |
+| **go** | 2 | Sequence, Cluster |
+| **wear** | 4 | Redundancy, Remix, Season, (cross: Bridge) |
+| **follow** | 3 | Decay, Audit, Proxy |
+| **learn** | 2 | Dependency Map, Graduate |
+| **listen** | 1 | Curator |
+| **work** | 1 | Pattern Reveal |
+| **events** | 1 | Collision |
+| **gift** | 1 | Assign |
+| **make** | 1 | Assemble |
+| **spend** | 1 | Calculate |
+| **all / cross** | 7 | Behavior, Predict, Archaeologist, Expire, Drift, Ritual, Contradict |
+
+### Template Usage Summary
+
+| Template | Widget Count | Notes |
+|----------|-------------|-------|
+| hero-card | 8 | Identity reflection, single-verdict widgets |
+| list | 8 | Sequential, ranked, or time-ordered content |
+| stat-row | 6 | Numeric dashboards, proportions, counts |
+| spectrum | 6 | Proportional, mood, density, drift visualizations |
+| grid-split | 3 | Side-by-side comparison |
+| text-block | 3 | Narrative insights, influence chains |
+| swap | 2 | A/B direct comparison |
+| pick-one | 2 | Binary choice with feedback loop |
+| commit-list | 2 | Accumulator lists with running totals |
+| quick-add | 1 | Single suggestion with add action |
+| bundle | 1 | Grouped items as a set |
+
+---
+
+### Trigger Implementation Notes
+
+**Simple triggers** (item count + category filter):
+- Widgets 1–6, 8, 11–14, 16, 21, 23, 26, 30, 32, 34–36, 39–40
+- Can be evaluated client-side from `links[]` array
+
+**Time-based triggers** (require save date comparison):
+- Widgets 15, 19, 27, 30, 37
+- Need `created_at` or `saved_at` timestamp on items
+
+**Staleness triggers** (require last-interaction tracking):
+- Widgets 3, 8, 20, 25
+- Need interaction history or "last viewed" timestamp (not currently stored)
+
+**Cross-category triggers** (require items in multiple categories):
+- Widgets 7, 9, 29, 33, 38
+- Must evaluate across category boundaries
+
+**Inference triggers** (require AI to determine eligibility):
+- Widgets 2, 5, 17, 18, 24, 28, 31, 38
+- Style clash detection, workflow inference, niche detection
+- More expensive — may need server-side eligibility check
+
+---
+
+## Data Gaps & Technical Blockers
+
+Every widget depends on data. Some data exists, some can be inferred by AI, some doesn't exist at all. This section maps what's missing.
+
+### Data Source Matrix
+
+| Data needed | Status | Widgets affected | Resolution |
+|-------------|--------|-----------------|------------|
+| **title, url, domain, image** | ✅ Available | All 40 | Existing item schema |
+| **category** | ✅ Available | All 40 | Existing field (8 values) |
+| **description** | ⚠️ Often empty | #4, 34, 38 (narrative) | AI infers from title + domain |
+| **created_at / saved_at** | ❓ Verify | #15, 19, 27, 30, 37 (5 widgets) | Check Supabase schema; add migration if missing |
+| **last_interacted_at** | ❌ Missing | #3, 8, 20, 25 (4 widgets) | New column + client-side event tracking |
+| **price** | ❌ Missing | #9, 21, 36 (3 widgets) | AI infers from title/domain; unreliable |
+| **sub-type classification** | ❌ Missing | #13, 23, 28, 31, 32 (5 widgets) | Garment type, cuisine, genre — need classification pipeline |
+| **geographic location** | ❌ Missing | #6, 39 (2 widgets) | AI infers from title/domain; no structured geo field |
+| **person/creator entity** | ❌ Missing | #7, 34 (2 widgets) | No person model; AI guesses from follow items |
+| **release dates** | ❌ Missing | #40 (1 widget) | Requires external API (TMDB, etc.) |
+| **link health (alive/dead)** | ❌ Missing | #25 (1 widget) | Requires HTTP HEAD checks on saved URLs |
+| **article length / read time** | ❌ Missing | #16, 27 (2 widgets) | Requires fetching article metadata or estimating from domain |
+| **event dates** | ❌ Missing | #14 (1 widget) | No date field on items; AI infers from title |
+| **new categories in UI** | ❌ Missing | #7, 9, 10, 11, 12, 14, 18 (7 widgets) | gift, spend, make, listen, learn, events, work not in filter bar |
+
+### Technical Blockers
+
+| Blocker | Impact | Widgets blocked | Resolution | Priority |
+|---------|--------|----------------|------------|----------|
+| **No sub-type classifier** | Can't distinguish hoodie from sneaker, comedy from thriller, Italian from Thai | #13, 23, 28, 31, 32 | Extend content-type system (Epic 3.1) with sub-type taxonomy | High — blocks 5 widgets |
+| **No cross-category query** | Current eligibility filters by single category; cross-category widgets need all items | #7, 9, 29, 33, 38 | Update discovery endpoint to accept `category: 'all'` or `categories: [...]` | Medium — blocks 5 widgets |
+| **No interaction tracking** | Can't measure staleness without `last_interacted_at` | #3, 8, 20, 25 | Schema migration + click/view tracking integration | Medium — blocks 4 widgets |
+| **Inference-based eligibility is expensive** | AI call needed BEFORE generation to determine if widget should render (e.g., "do these styles clash?") | #2, 5, 17, 24, 31 | Two-pass system: lightweight inference → eligibility → full generation | Low — defer to Phase 6 |
+| **New categories not in data model** | 7 new categories (gift, spend, make, listen, learn, events, work) don't exist in category enum or filter UI | #7, 9, 10, 11, 12, 14, 18 | Either: (a) extend category enum or (b) use tags/labels instead | High — blocks 7 widgets |
+| **External API dependency** | Deadline (#40) needs TMDB; Expire (#25) needs link-checking infra | #25, 40 | Add API keys to edge function env; build link-checker cron job | Low — defer |
+| **Budget input** | Negotiate (#21) optimizes against a budget, but no way for user to set one | #21 | Add budget parameter to widget config or prompt user inline | Low — defer |
+| **handleQuickAdd cache key bug** | Action widgets that use quick-add template will silently fail | #5 | Fix: align getCacheKey call with cache storage key (include refresh counter) | High — blocks action Tier 3 |
+
+### What Can Ship Without Any New Data
+
+These widgets use ONLY title + url + domain + category (data that already exists):
+
+| # | Widget | Why it works with existing data |
+|---|--------|-------------------------------|
+| 1 | Decide (eat) | AI picks from restaurant names |
+| 4 | Synthesize (read) | AI finds thread across article titles |
+| 6 | Sequence (go) | AI routes from destination names |
+| 26 | Compare (use) | AI identifies tool category from title + domain |
+| 34 | Proxy (follow) | AI infers relationships from creator names/platforms |
+| 35 | Substitute (eat) | AI infers vibe from restaurant name + domain |
+| 36 | Ladder (home) | AI infers product type + suggests price tiers |
+
+**These 7 widgets can ship immediately** — no schema changes, no new APIs, no new data. Just AI prompt + existing item data.
+
+### What Needs One Prerequisite
+
+| Prerequisite | Widgets unlocked | Effort |
+|-------------|-----------------|--------|
+| Verify `created_at` exists | #15, 19, 27, 30, 37 (5 widgets) | Check schema — likely already there |
+| Add `last_interacted_at` | #3, 8, 20, 25 (4 widgets) | Schema migration + 3 event hooks |
+| Extend category enum | #7, 9, 10, 11, 12, 14, 18 (7 widgets) | Filter bar update + category mapping |
+| Fix handleQuickAdd cache bug | #5 + all action widgets (4 widgets) | 1 line fix in boards/index.html |
 
 ---
 
 ## What We're NOT Building (Yet)
 
-- Multiple widgets per category (one is enough to start)
-- Spectrum/stat-row templates (built but not validated — keep in research)
-- Action templates beyond quick-add (9 templates in backlog)
-- Cross-category widgets ("Your overall taste profile")
 - Widget marketplace or discovery UI
+- User-created custom widgets
+- Real-time collaborative widgets
+- External API integrations (TMDB, link-checking) — noted in catalog but deferred
+- Sub-type classification pipeline — needed for 5 widgets but requires extending Epic 3.1
+- Budget input mechanism — needed for Negotiate widget only
 
 ---
 

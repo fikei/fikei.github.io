@@ -155,6 +155,228 @@
 | **Config-Driven Enrichment** | | Complete |
 | | Enrichment triggered by widget config, not hard-coded widget ID | Complete |
 
+### Widget Phase 2.5: Rules-Based Widget Catalog (Pending)
+
+**Automation Level**: Medium → High
+**Reference**: [PRD: AI Widgets](/docs/strategy/prds/ai-widgets.md)
+
+> 40 use-case-driven widgets, built from a shared component system (17 components, 11 body layouts). Rollout in tiers by trigger complexity.
+
+#### Prerequisites & Blockers
+
+| Blocker | Impact | Status | Resolution |
+|---------|--------|--------|------------|
+| **Fix handleQuickAdd cache key** | All action widgets silently fail | Pending | Align getCacheKey with cache storage (1 line) |
+| **Verify `created_at` in schema** | 5 time-based widgets can't evaluate triggers | Pending | Check Supabase items table |
+| **Add `last_interacted_at` column** | 4 staleness widgets blocked | Pending | Schema migration + click/view tracking |
+| **Extend category enum** | 7 widgets use new categories (gift, spend, make, listen, learn, events, work) | Pending | Update filter bar + category mapping |
+| **No sub-type classifier** | Can't distinguish garment type, cuisine, genre (5 widgets) | Pending | Extend Epic 3.1 content-type system |
+| **Cross-category query pattern** | 5 cross-category widgets need items across all categories | Pending | Update discovery endpoint to accept multiple categories |
+| **Inference eligibility is expensive** | 5 widgets need AI to determine if they should render | Deferred | Two-pass system (Phase 6) |
+| **External API keys (TMDB, link-check)** | 2 widgets need external services | Deferred | Add API keys to edge function env |
+
+#### Data Source Status
+
+| Data | Available? | Used by |
+|------|-----------|---------|
+| title, url, domain, image | ✅ Yes | All 40 widgets |
+| category | ✅ Yes | All 40 widgets |
+| created_at | ❓ Verify | 5 time-based widgets |
+| last_interacted_at | ❌ Missing | 4 staleness widgets |
+| price | ❌ AI-inferred | 3 widgets (unreliable) |
+| sub-type (garment/cuisine/genre) | ❌ Missing | 5 widgets |
+| geographic location | ❌ AI-inferred | 2 widgets |
+| release dates | ❌ External API | 1 widget |
+
+**7 widgets can ship immediately with existing data**: #1, 4, 6, 26, 34, 35, 36
+
+#### Design System Components
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Widget Component System** | | Pending |
+| | Define 6 atoms: w-text, w-badge, w-bar, w-icon-btn, w-divider, w-checkbox | Pending |
+| | Define 7 molecules: w-headline, w-tag-group, w-stat, w-row, w-axis, w-option, w-section | Pending |
+| | Define 11 body layout modifiers (verdict, list, stats, spectrum, split, narrative, comparison, choices, checklist, suggestion, grouped) | Pending |
+| | Define w-shell, w-header, w-body, w-footer structure | Pending |
+| | Write CSS for all components using design tokens | Pending |
+| | Migrate existing widget-complete to w-shell | Pending |
+| **Template Render Functions** | | Pending |
+| | Implement verdict renderer (w-headline + w-tag-group) | Pending |
+| | Implement list renderer (w-row × N) | Pending |
+| | Implement stats renderer (w-stat × N) | Pending |
+| | Implement spectrum renderer (w-axis × N) | Pending |
+| | Implement split renderer (w-column × 2 with w-row × N) | Pending |
+| | Implement narrative renderer (w-text--prose) | Pending |
+| | Implement comparison renderer (w-option × 2 + w-divider--labeled) | Pending |
+| | Implement choices renderer (w-option × N) | Pending |
+| | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Pending |
+| | Implement suggestion renderer (w-row featured + w-btn) | Pending |
+| | Implement grouped renderer (w-section × N with w-row × N) | Pending |
+
+#### Tier 1: First Widget Per Original Category (8 widgets)
+
+Simple triggers — item count + category filter. Client-side evaluation only.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **eat: Decide (#1)** | | Pending |
+| | Server config: eat-decide.ts (pick-one template, 3+ eat items) | Pending |
+| | AI prompt: given restaurant names, pick 1 with reasoning | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | Choices body layout with w-option × 2-3 | Pending |
+| **home: Ladder (#36)** | | Pending |
+| | Server config: home-ladder.ts (list template, 1+ home item) | Pending |
+| | AI prompt: infer item type, suggest budget/mid/splurge alternatives | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | List body layout with w-row × 3 (tier indicators) | Pending |
+| **watch: Deadline (#40)** | | Pending |
+| | Server config: watch-deadline.ts (list template, 2+ watch items) | Pending |
+| | AI prompt: identify shows, infer upcoming seasons/sequels | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | List body layout with w-row × N (urgency color indicators) | Pending |
+| **use: Compare (#26)** | | Pending |
+| | Server config: use-compare.ts (swap template, 1+ use item) | Pending |
+| | AI prompt: identify tool category, suggest competitor with differentiator | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | Comparison body layout with w-option × 2 + w-divider--labeled | Pending |
+| **go: Sequence (#6)** | | Pending |
+| | Server config: go-sequence.ts (list template, 3+ go items) | Pending |
+| | AI prompt: given destinations, suggest optimal route order with durations | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | List body layout with w-row × N (step number indicators) | Pending |
+| **follow: Proxy (#34)** | | Pending |
+| | Server config: follow-proxy.ts (text-block template, 3+ follow items) | Pending |
+| | AI prompt: infer creator relationships and influence chains | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | Narrative body layout with w-text--prose (indented hierarchy) | Pending |
+| **read: Backlog (#16)** | | Pending |
+| | Server config: read-backlog.ts (stat-row template, 5+ read items) | Pending |
+| | AI prompt: estimate read times from titles, calculate backlog depth | Pending |
+| | Frontend WIDGET_REGISTRY entry | Pending |
+| | Stats body layout with w-stat × 3 | Pending |
+| **Deploy & Test Tier 1** | | Pending |
+| | Deploy updated edge function with 7 new widget configs | Pending |
+| | Test each widget with real board data | Pending |
+| | Verify discovery endpoint returns new widgets | Pending |
+
+#### Tier 2: Second Widget + New Categories (16 widgets)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **eat: Portion (#32)** | | Pending |
+| | Server config + frontend entry (stat-row, 4+ eat items) | Pending |
+| **eat: Substitute (#35)** | | Pending |
+| | Server config + frontend entry (swap, 1+ eat item) | Pending |
+| **home: Gap Analysis (#2)** | | Pending |
+| | Server config + frontend entry (grid-split, 5+ home items) | Pending |
+| **watch: Mood (#28)** | | Pending |
+| | Server config + frontend entry (spectrum, 4+ watch items) | Pending |
+| **use: Gap Analysis (#5)** | | Pending |
+| | Server config + frontend entry (quick-add, 3+ use items) | Pending |
+| **wear: Redundancy (#13)** | | Pending |
+| | Server config + frontend entry (stat-row, 3+ same type) | Pending |
+| **wear: Remix (#23)** | | Pending |
+| | Server config + frontend entry (pick-one, 4+ items, 2+ types) | Pending |
+| **read: Synthesize (#4)** | | Pending |
+| | Server config + frontend entry (text-block, 4+ read items) | Pending |
+| **read: Translate (#22)** | | Pending |
+| | Server config + frontend entry (grid-split, 4+ articles) | Pending |
+| **follow: Audit (#24)** | | Pending |
+| | Server config + frontend entry (spectrum, 3+ same-niche) | Pending |
+| **go: Cluster (#39)** | | Pending |
+| | Server config + frontend entry (hero-card, 3+ same-area) | Pending |
+| **learn: Dependency Map (#12)** | | Pending |
+| | Server config + frontend entry (list, 3+ learning saves) | Pending |
+| **listen: Curator (#11)** | | Pending |
+| | Server config + frontend entry (list, 5+ music/podcast) | Pending |
+| **events: Collision (#14)** | | Pending |
+| | Server config + frontend entry (list, 2+ events) | Pending |
+| **make: Assemble (#10)** | | Pending |
+| | Server config + frontend entry (commit-list, 4+ project items) | Pending |
+| **gift: Assign (#7)** | | Pending |
+| | Server config + frontend entry (grid-split, 5+ items + 2+ people) | Pending |
+
+#### Tier 3: Prove Action Templates (4 widgets)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Action: Gap Analysis quick-add (#5)** | | Pending |
+| | Wire handleQuickAdd: add item → grid update → re-generate | Pending |
+| | Fix cache key mismatch bug | Pending |
+| | Verify: added item appears in grid, next widget excludes it | Pending |
+| **Action: Compare swap (#26)** | | Pending |
+| | Wire swap action: save alternative → replaces original | Pending |
+| | Verify: alternative persists, widget reflects change | Pending |
+| **Action: Substitute swap (#35)** | | Pending |
+| | Wire swap action: save substitute → both visible | Pending |
+| **Action: Negotiate checklist (#21)** | | Pending |
+| | Wire checkbox toggle: running total updates | Pending |
+| | Verify: check/uncheck ripples through budget total | Pending |
+
+#### Time-Based Widgets (5 widgets)
+
+Requires `created_at` timestamp on items.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Verify created_at exists in data model** | | Pending |
+| | Check Supabase schema for timestamp field | Pending |
+| | Add migration if missing | Pending |
+| **all: Behavior (#15)** | | Pending |
+| | Server config + frontend entry (spectrum, time: 10+ saves, 2+ months) | Pending |
+| **all: Predict (#19)** | | Pending |
+| | Server config + frontend entry (hero-card, time: 15+ saves) | Pending |
+| **read: Pace (#27)** | | Pending |
+| | Server config + frontend entry (stat-row, time: 5+ in 14 days) | Pending |
+| **learn: Graduate (#30)** | | Pending |
+| | Server config + frontend entry (list, time: 3+ same topic, 2+ months) | Pending |
+| **all: Drift (#37)** | | Pending |
+| | Server config + frontend entry (spectrum, time: 10+ saves, 3+ months) | Pending |
+
+#### Staleness Widgets (4 widgets)
+
+Requires `last_interacted_at` field — new data to store.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Add interaction tracking** | | Pending |
+| | Add `last_interacted_at` column to items table | Pending |
+| | Update on link click, widget view, board visit | Pending |
+| **watch: Persuade (#3)** | | Pending |
+| | Server config + frontend entry (hero-card, stale: 14+ days) | Pending |
+| **follow: Decay (#8)** | | Pending |
+| | Server config + frontend entry (list, stale: 30+ days) | Pending |
+| **all: Archaeologist (#20)** | | Pending |
+| | Server config + frontend entry (hero-card, stale: 60+ days) | Pending |
+| **all: Expire (#25)** | | Pending |
+| | Server config + frontend entry (stat-row, 10+ stale: 30+ days) | Pending |
+
+#### Cross-Category & Inference Widgets (9 widgets)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **spend: Calculate (#9)** | | Pending |
+| | Cross-category trigger: 5+ price-inferrable items | Pending |
+| **home+wear: Bridge (#29)** | | Pending |
+| | Cross-category trigger: 3+ in each category | Pending |
+| **all: Ritual (#33)** | | Pending |
+| | Cross-category trigger: items across 3+ categories | Pending |
+| **all: Contradict (#38)** | | Pending |
+| | Cross-category + inference: opposing themes | Pending |
+| **home: Conflict (#17)** | | Pending |
+| | Inference trigger: conflicting style detection | Pending |
+| **work: Pattern Reveal (#18)** | | Pending |
+| | Inference trigger: job/company pattern in saves | Pending |
+| **wear: Season (#31)** | | Pending |
+| | Inference trigger: seasonal skew detection | Pending |
+| **home: Gap Analysis (#2) — enhanced** | | Pending |
+| | Inference trigger: same inferred style (upgrade from Tier 2 count trigger) | Pending |
+| **use: Gap Analysis (#5) — enhanced** | | Pending |
+| | Inference trigger: same inferred workflow (upgrade from Tier 2 count trigger) | Pending |
+
+---
+
 ### Widget Phase 3: Self-Selecting Widgets (Pending)
 
 **Automation Level**: High
