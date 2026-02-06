@@ -251,6 +251,7 @@ class SystemicApp {
     this.bindEvents();
     this.loadSavedSystems();
     this.initViewer();
+    this.initRouter();
   }
 
   /**
@@ -292,11 +293,6 @@ class SystemicApp {
    * Bind event listeners
    */
   bindEvents() {
-    // Navigation
-    this.navButtons.forEach(btn => {
-      btn.addEventListener('click', () => this.switchView(btn.dataset.view));
-    });
-
     // Audit form submission
     this.auditForm?.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -320,15 +316,79 @@ class SystemicApp {
 
     // Theme toggle
     this.themeToggle?.addEventListener('click', () => this.toggleTheme());
+  }
 
-    // Run a scan button (top right)
-    DOMUtils.$('#run-scan-btn')?.addEventListener('click', () => {
-      this.switchView('audit');
+  /**
+   * Initialize hash-based router
+   */
+  initRouter() {
+    // Listen for hash changes
+    window.addEventListener('hashchange', () => this.handleRoute());
+
+    // Handle initial route
+    this.handleRoute();
+  }
+
+  /**
+   * Parse the current hash into route segments
+   * Examples: #systems, #audit, #docs, #docs/color, #docs/component/button
+   */
+  parseHash() {
+    const hash = window.location.hash.slice(1) || 'systems';
+    const parts = hash.split('/');
+    return {
+      view: parts[0] || 'systems',
+      section: parts[1] || null,
+      detail: parts[2] || null
+    };
+  }
+
+  /**
+   * Handle route changes based on URL hash
+   */
+  handleRoute() {
+    const route = this.parseHash();
+
+    // Switch to the correct view panel
+    this.activateView(route.view);
+
+    // Handle sub-routes for docs view
+    if (route.view === 'docs') {
+      // If a system is loaded and a section is specified, navigate to it
+      if (this.viewer?.designSystem && route.section) {
+        const foundations = ['color', 'typography', 'spacing', 'elevation'];
+        if (foundations.includes(route.section)) {
+          this.viewer.selectFoundation(route.section);
+        } else if (route.section === 'component' && route.detail) {
+          const comp = this.viewer.designSystem.components?.find(
+            c => c.type === route.detail
+          );
+          if (comp) {
+            this.viewer.selectComponent(comp);
+          }
+        }
+      }
+    }
+
+    // Load systems list when switching to systems view
+    if (route.view === 'systems') {
+      this.renderSystemsList();
+    }
+  }
+
+  /**
+   * Activate a view panel and update nav state
+   */
+  activateView(view) {
+    // Update navigation links
+    this.navButtons.forEach(btn => {
+      const btnView = btn.getAttribute('href')?.slice(1) || btn.dataset.view;
+      btn.classList.toggle('active', btnView === view);
     });
 
-    // Go to audit button
-    DOMUtils.$('[data-action="go-to-audit"]')?.addEventListener('click', () => {
-      this.switchView('audit');
+    // Update panels
+    this.viewPanels.forEach(panel => {
+      panel.classList.toggle('active', panel.id === `${view}-view`);
     });
   }
 
@@ -343,23 +403,10 @@ class SystemicApp {
   }
 
   /**
-   * Switch between views
+   * Switch between views by updating the URL hash
    */
   switchView(view) {
-    // Update navigation
-    this.navButtons.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === view);
-    });
-
-    // Update panels
-    this.viewPanels.forEach(panel => {
-      panel.classList.toggle('active', panel.id === `${view}-view`);
-    });
-
-    // Load content for specific views
-    if (view === 'systems') {
-      this.renderSystemsList();
-    }
+    window.location.hash = view;
   }
 
   /**
@@ -606,7 +653,7 @@ class SystemicApp {
       // Switch to docs view after delay
       setTimeout(() => {
         this.viewer.load(designSystem);
-        this.switchView('docs');
+        window.location.hash = 'docs/color';
         this.resetAuditForm();
       }, 1500);
 
@@ -847,12 +894,9 @@ class SystemicApp {
           <div class="empty-icon">+</div>
           <h3>No design systems yet</h3>
           <p>Start an audit to generate your first design system.</p>
-          <button class="btn btn--filled" data-action="go-to-audit">Start Audit</button>
+          <a class="btn btn--filled" href="#audit">Start Audit</a>
         </div>
       `;
-
-      DOMUtils.$('[data-action="go-to-audit"]', this.systemsGrid)
-        ?.addEventListener('click', () => this.switchView('audit'));
       return;
     }
 
@@ -893,7 +937,7 @@ class SystemicApp {
         const fullSystem = this.loadDesignSystem(id);
         if (fullSystem) {
           this.viewer.load(fullSystem);
-          this.switchView('docs');
+          window.location.hash = 'docs/color';
         } else {
           this.showToast('Failed to load design system', 'error');
         }

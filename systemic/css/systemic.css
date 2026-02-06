@@ -60,6 +60,7 @@
 }
 
 .nav-btn {
+  display: inline-block;
   padding: var(--space-2) var(--space-4);
   background: transparent;
   border: var(--border-thin) solid transparent;
@@ -68,6 +69,7 @@
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
+  text-decoration: none;
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-default);
 }

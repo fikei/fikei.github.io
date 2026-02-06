@@ -204,6 +204,34 @@ class DesignSystemViewer {
   }
 
   /**
+   * Render breadcrumb navigation
+   * @param {Array} items - Array of { label, hash?, meta? }
+   */
+  renderBreadcrumb(items) {
+    if (!this.breadcrumb) return;
+
+    const parts = items.map((item, i) => {
+      const isLast = i === items.length - 1;
+
+      if (isLast) {
+        let html = `<span class="breadcrumb-current">${item.label}</span>`;
+        if (item.meta) {
+          html += `<span class="breadcrumb-meta">${item.meta}</span>`;
+        }
+        return html;
+      }
+
+      if (item.hash) {
+        return `<a href="${item.hash}" class="breadcrumb-link">${item.label}</a>`;
+      }
+
+      return `<span class="breadcrumb-text">${item.label}</span>`;
+    });
+
+    this.breadcrumb.innerHTML = parts.join('<span class="breadcrumb-sep">/</span>');
+  }
+
+  /**
    * Select a foundation section
    */
   selectFoundation(section) {
@@ -213,8 +241,18 @@ class DesignSystemViewer {
     // Update navigation active state
     this.updateNavActiveState(section);
 
-    // Update breadcrumb
-    this.breadcrumb.innerHTML = `<span>Foundations</span> / <span>${this.formatName(section)}</span>`;
+    // Update URL hash (without triggering re-route)
+    const newHash = `docs/${section}`;
+    if (window.location.hash !== `#${newHash}`) {
+      history.replaceState(null, '', `#${newHash}`);
+    }
+
+    // Update breadcrumb with system name
+    this.renderBreadcrumb([
+      { label: 'Systems', hash: '#systems' },
+      { label: this.designSystem?.name || 'System', hash: '#docs' },
+      { label: this.formatName(section) }
+    ]);
 
     // Hide variant controls
     if (this.variantControls) {
@@ -254,13 +292,20 @@ class DesignSystemViewer {
     // Update navigation active state
     this.updateNavActiveState(component.type);
 
-    // Update breadcrumb with stats
+    // Update URL hash
+    const newHash = `docs/component/${component.type}`;
+    if (window.location.hash !== `#${newHash}`) {
+      history.replaceState(null, '', `#${newHash}`);
+    }
+
+    // Update breadcrumb with system name and stats
     const variantCount = component.variants?.length || 0;
     const totalUsage = component.totalUsage || 0;
-    this.breadcrumb.innerHTML = `
-      <span>Components</span> / <span>${component.name}</span>
-      <span class="breadcrumb-meta">${variantCount} variant${variantCount !== 1 ? 's' : ''} · ${totalUsage} usage${totalUsage !== 1 ? 's' : ''}</span>
-    `;
+    this.renderBreadcrumb([
+      { label: 'Systems', hash: '#systems' },
+      { label: this.designSystem?.name || 'System', hash: '#docs' },
+      { label: component.name, meta: `${variantCount} variant${variantCount !== 1 ? 's' : ''} · ${totalUsage} usage${totalUsage !== 1 ? 's' : ''}` }
+    ]);
 
     // Show variant controls if multiple variants
     if (component.variants?.length > 1) {

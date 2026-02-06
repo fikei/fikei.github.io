@@ -24,11 +24,11 @@
         <span class="tagline">Design System Generator</span>
       </div>
       <nav class="header-nav">
-        <button class="nav-btn" data-view="systems">My Systems</button>
-        <button class="nav-btn" data-view="docs">Documentation</button>
+        <a class="nav-btn active" href="#systems">My Systems</a>
+        <a class="nav-btn" href="#docs">Documentation</a>
       </nav>
       <div class="header-actions">
-        <button class="btn btn--filled" data-view="audit" id="run-scan-btn">Run a scan</button>
+        <a class="btn btn--filled" href="#audit" id="run-scan-btn">Run a scan</a>
         <button class="btn btn--ghost" id="theme-toggle">
           <span class="icon">*</span>
         </button>
@@ -37,8 +37,8 @@
 
     <!-- Main Content -->
     <main class="systemic-main">
-      <!-- Audit View (Default) -->
-      <section class="view-panel active" id="audit-view">
+      <!-- Audit View -->
+      <section class="view-panel" id="audit-view">
         <div class="audit-container">
           <!-- Start Audit Form -->
           <div class="audit-form-section" id="audit-form-section">
@@ -141,8 +141,8 @@
         </div>
       </section>
 
-      <!-- Systems View -->
-      <section class="view-panel" id="systems-view">
+      <!-- Systems View (Default) -->
+      <section class="view-panel active" id="systems-view">
         <div class="systems-container">
           <div class="section-header">
             <h2>My Design Systems</h2>
@@ -155,7 +155,7 @@
               <div class="empty-icon">📐</div>
               <h3>No design systems yet</h3>
               <p>Start an audit to generate your first design system.</p>
-              <button class="btn btn--filled" data-action="go-to-audit">Start Audit</button>
+              <a class="btn btn--filled" href="#audit">Start Audit</a>
             </div>
           </div>
         </div>
@@ -192,9 +192,11 @@
           <!-- Component Stage -->
           <main class="component-stage" id="component-stage">
             <div class="stage-header">
-              <div class="breadcrumb" id="stage-breadcrumb">
-                <span>Select a component</span>
-              </div>
+              <nav class="breadcrumb" id="stage-breadcrumb" aria-label="Breadcrumb">
+                <a href="#systems" class="breadcrumb-link">Systems</a>
+                <span class="breadcrumb-sep">/</span>
+                <span class="breadcrumb-current">Select a component</span>
+              </nav>
               <div class="variant-controls" id="variant-controls" hidden>
                 <select class="input input-sm" id="variant-select">
                   <!-- Variants populated dynamically -->
