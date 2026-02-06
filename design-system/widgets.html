@@ -134,10 +134,14 @@
     .variant-flag { position: absolute; top: 4px; right: 4px; z-index: 3; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: var(--border-thin) solid var(--border-subtle); cursor: pointer; opacity: 0.4; transition: opacity 0.15s ease; }
     .variant-flag:hover { opacity: 1; }
     .variant-flag svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-    .variant-item--flagged .variant-flag { opacity: 1; background: var(--color-error); border-color: var(--color-error); color: var(--color-white); }
-    .variant-item--flagged .w-shell { opacity: 0.25; }
+    .variant-item--flagged .variant-flag { opacity: 1; background: var(--color-error); border-color: var(--color-error); color: var(--color-white); z-index: 6; }
+    .variant-item--flagged .w-shell { opacity: 0.2; }
     .variant-item--flagged .variant-label { text-decoration: line-through; color: var(--color-error); }
     .variant-item { position: relative; }
+    /* Blocked overlay with label */
+    .variant-blocked { display: none; position: absolute; top: 24px; left: 0; right: 0; bottom: 0; z-index: 5; align-items: center; justify-content: center; }
+    .variant-item--flagged .variant-blocked { display: flex; }
+    .variant-blocked span { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--color-error); padding: var(--space-1) var(--space-3); border: var(--border-thin) solid var(--color-error); }
 
     /* Note indicator on label */
     .variant-label--noted::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--color-warning); margin-right: var(--space-1); vertical-align: middle; flex-shrink: 0; }
@@ -1777,8 +1781,14 @@ function showVariants() {
         '<button class="w-btn w-btn--sm" data-action="save-note" data-audit-name="' + auditName + '" data-size="' + size + '">Save</button>' +
       '</div>';
 
+    // Blocked overlay
+    var blocked = document.createElement('div');
+    blocked.className = 'variant-blocked';
+    blocked.innerHTML = '<span>Blocked</span>';
+
     wrapper.appendChild(lbl);
     wrapper.appendChild(flag);
+    wrapper.appendChild(blocked);
     wrapper.appendChild(noteDiv);
     wrapper.appendChild(clone);
     grid.appendChild(wrapper);
