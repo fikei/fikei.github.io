@@ -238,16 +238,23 @@ class NotionClient {
       cursor = response.has_more ? response.next_cursor ?? undefined : undefined
     } while (cursor)
 
-    this.log.info(`Deleting ${existingBlocks.length} existing blocks`)
+    // Always preserve child_page blocks — deleting them trashes child pages in Notion
+    const blocksToDelete = existingBlocks.filter(b => b.type !== 'child_page')
+    const preserved = existingBlocks.length - blocksToDelete.length
+    if (preserved > 0) {
+      this.log.info(`Preserving ${preserved} child_page blocks`)
+    }
+
+    this.log.info(`Deleting ${blocksToDelete.length} existing content blocks`)
 
     // Delete existing blocks in parallel batches
     const DELETE_BATCH_SIZE = 10
-    for (let i = 0; i < existingBlocks.length; i += DELETE_BATCH_SIZE) {
-      const batch = existingBlocks.slice(i, i + DELETE_BATCH_SIZE)
+    for (let i = 0; i < blocksToDelete.length; i += DELETE_BATCH_SIZE) {
+      const batch = blocksToDelete.slice(i, i + DELETE_BATCH_SIZE)
       await Promise.all(batch.map(block =>
         this.request(`/blocks/${block.id}`, { method: 'DELETE' }).catch(() => {})
       ))
-      if (i + DELETE_BATCH_SIZE < existingBlocks.length) {
+      if (i + DELETE_BATCH_SIZE < blocksToDelete.length) {
         await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
