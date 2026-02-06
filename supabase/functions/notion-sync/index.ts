@@ -239,7 +239,7 @@ class NotionClient {
     return await this.addBlocksWithRetry(pageId, blocks)
   }
 
-  async updatePageWithBlocks(pageId: string, blocks: any[]): Promise<BlockStats> {
+  async updatePageWithBlocks(pageId: string, blocks: any[], preserveChildPages = false): Promise<BlockStats> {
     // Get existing blocks (paginate if needed)
     let existingBlocks: any[] = []
     let cursor: string | undefined
@@ -252,14 +252,23 @@ class NotionClient {
       cursor = response.has_more ? response.next_cursor ?? undefined : undefined
     } while (cursor)
 
+    // Filter out child_page blocks to avoid trashing child pages
+    const blocksToDelete = preserveChildPages
+      ? existingBlocks.filter(b => b.type !== 'child_page')
+      : existingBlocks
+
+    if (preserveChildPages && blocksToDelete.length < existingBlocks.length) {
+      this.log.info(`Preserving ${existingBlocks.length - blocksToDelete.length} child_page blocks`)
+    }
+
     // Delete existing blocks in parallel batches
     const DELETE_BATCH_SIZE = 10
-    for (let i = 0; i < existingBlocks.length; i += DELETE_BATCH_SIZE) {
-      const batch = existingBlocks.slice(i, i + DELETE_BATCH_SIZE)
+    for (let i = 0; i < blocksToDelete.length; i += DELETE_BATCH_SIZE) {
+      const batch = blocksToDelete.slice(i, i + DELETE_BATCH_SIZE)
       await Promise.all(batch.map(block =>
         this.request(`/blocks/${block.id}`, { method: 'DELETE' }).catch(() => {})
       ))
-      if (i + DELETE_BATCH_SIZE < existingBlocks.length) {
+      if (i + DELETE_BATCH_SIZE < blocksToDelete.length) {
         await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
@@ -597,7 +606,7 @@ async function syncStructure(
           if (isSectionPage && !skipContent) {
             const linkBlocks = generateChildPageLinks(page.children, childIds)
             if (linkBlocks.length > 0) {
-              const stats = await client.updatePageWithBlocks(pageId, linkBlocks)
+              const stats = await client.updatePageWithBlocks(pageId, linkBlocks, true)
               result.updated.push(`${pagePath} (${linkBlocks.length} links)`)
               if (result.debug) {
                 result.debug.totalBlocks += stats.total
