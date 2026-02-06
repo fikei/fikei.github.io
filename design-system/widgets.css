@@ -4,13 +4,51 @@
    ============================================ */
 
 /* ============================================
+   Grid Sizing System
+   Like iOS Home Screen widgets: defined sizes
+   with sensible constraints per template.
+
+   Sizes (column x row):
+     sm    = 1x1  — glanceable summary
+     med   = 2x1  — comfortable horizontal
+     tall  = 1x2  — vertical detail
+     lg    = 2x2  — full featured
+     wide  = 3x1  — dashboard strip
+     xl    = 3x2  — maximum real estate
+
+   Valid sizes per template:
+     verdict:    sm, med, lg
+     list:       sm(3 rows), tall, med, lg
+     stats:      sm(stacked), med, wide
+     spectrum:   sm(2 axes), tall, med, lg
+     split:      med, lg              (min 2 cols)
+     narrative:  med, lg, wide        (needs reading width)
+     comparison: med, lg              (min 2 cols)
+     choices:    sm(2 opts), tall, med, lg
+     checklist:  sm(3 rows), tall, med, lg
+     suggestion: sm, med
+     grouped:    tall, lg, xl         (needs vertical space)
+   ============================================ */
+
+/* --- Grid span classes --- */
+.w-shell--sm   { grid-column: span 1; grid-row: span 1; }
+.w-shell--med  { grid-column: span 2; grid-row: span 1; }
+.w-shell--tall { grid-column: span 1; grid-row: span 2; }
+.w-shell--lg   { grid-column: span 2; grid-row: span 2; }
+.w-shell--wide { grid-column: span 3; grid-row: span 1; }
+.w-shell--xl   { grid-column: span 3; grid-row: span 2; }
+
+/* ============================================
    Shell / Structure
    Every widget uses w-shell > w-header + w-body + w-footer
    ============================================ */
 
 .w-shell {
-  /* Outer wrapper — no border, contains header + body + footer */
   container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .w-header {
@@ -18,6 +56,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) 0;
+  flex-shrink: 0;
 }
 
 .w-header__left {
@@ -26,6 +65,12 @@
   gap: var(--space-2);
   flex: 1;
   min-width: 0;
+}
+
+.w-header__left > .w-text--label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .w-header__controls {
@@ -39,15 +84,20 @@
   border: var(--border-thin) solid var(--border-subtle);
   background: var(--bg-surface);
   padding: var(--space-4);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .w-footer {
   padding: var(--space-2) 0;
+  flex-shrink: 0;
 }
 
 .w-action-bar {
   display: flex;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 /* ============================================
@@ -157,13 +207,8 @@
   transition: width var(--duration-slow) var(--ease-default);
 }
 
-.w-bar--thick {
-  height: 8px;
-}
-
-.w-bar--thin {
-  height: 2px;
-}
+.w-bar--thick { height: 8px; }
+.w-bar--thin  { height: 2px; }
 
 /* --- w-icon-btn --- */
 .w-icon-btn {
@@ -182,9 +227,7 @@
   flex-shrink: 0;
 }
 
-.w-icon-btn:hover {
-  color: var(--fg);
-}
+.w-icon-btn:hover { color: var(--fg); }
 
 /* --- w-divider --- */
 .w-divider {
@@ -229,9 +272,7 @@
   flex-shrink: 0;
 }
 
-.w-checkbox input {
-  display: none;
-}
+.w-checkbox input { display: none; }
 
 .w-checkbox__mark {
   width: 16px;
@@ -254,7 +295,7 @@
   line-height: 1;
 }
 
-/* --- w-btn (widget-specific button, extends .btn) --- */
+/* --- w-btn --- */
 .w-btn {
   display: inline-flex;
   align-items: center;
@@ -314,9 +355,7 @@
   gap: var(--space-1);
 }
 
-.w-tag-group--center {
-  justify-content: center;
-}
+.w-tag-group--center { justify-content: center; }
 
 /* --- w-stat --- */
 .w-stat {
@@ -369,10 +408,7 @@
   gap: var(--space-1);
 }
 
-.w-axis__labels {
-  display: flex;
-  justify-content: space-between;
-}
+.w-axis__labels { display: flex; justify-content: space-between; }
 
 .w-axis__track {
   position: relative;
@@ -391,9 +427,7 @@
   transition: left 0.4s ease;
 }
 
-.w-axis__note {
-  text-align: center;
-}
+.w-axis__note { text-align: center; }
 
 /* --- w-option --- */
 .w-option {
@@ -407,9 +441,7 @@
               background var(--duration-normal) var(--ease-default);
 }
 
-.w-option:hover {
-  border-color: var(--border);
-}
+.w-option:hover { border-color: var(--border); }
 
 .w-option--selected {
   border-color: var(--fg);
@@ -423,9 +455,7 @@
   gap: var(--space-2);
 }
 
-.w-section__title {
-  padding-bottom: var(--space-1);
-}
+.w-section__title { padding-bottom: var(--space-1); }
 
 /* --- w-column --- */
 .w-column {
@@ -445,6 +475,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--space-3);
   padding: var(--space-6) var(--space-4);
 }
@@ -457,9 +488,6 @@
 
 .w-body--list > .w-row:first-child {
   padding-top: 0;
-}
-
-.w-body--list > .w-row:first-child {
   border-top: none;
 }
 
@@ -552,6 +580,7 @@
   flex-direction: column;
   gap: var(--space-3);
   align-items: center;
+  justify-content: center;
 }
 
 /* Grouped: labeled sections */
@@ -587,12 +616,52 @@
 }
 
 /* ============================================
-   RESPONSIVE — Container queries
+   CONTAINER QUERY RESPONSIVE
+   Adapts layouts based on actual widget width.
+   Breakpoints map to grid sizes:
+     < 180px  = sm compressed (1x1 in 5-col grid)
+     < 280px  = sm standard
+     < 400px  = med or tall
+     >= 400px = lg, wide, xl
    ============================================ */
 
-@container (max-width: 300px) {
+/* --- SM: Compressed (< 180px) --- */
+@container (max-width: 180px) {
+  .w-header__left > .w-badge { display: none; }
+
+  .w-text--display { font-size: var(--text-xl); }
+  .w-text--title   { font-size: var(--text-xs); }
+  .w-text--value   { font-size: var(--text-lg); }
+  .w-text--prose   { font-size: var(--text-xs); }
+
+  .w-body { padding: var(--space-2); }
+
+  .w-body--verdict { padding: var(--space-3) var(--space-2); gap: var(--space-2); }
+  .w-body--stats   { padding: var(--space-3) var(--space-2); flex-direction: column; }
+
+  .w-body--list > .w-row { gap: var(--space-2); }
+  .w-row__indicator { display: none; }
+  .w-row__trailing  { display: none; }
+
+  .w-body--spectrum { gap: var(--space-2); }
+  .w-axis__labels .w-text { font-size: 8px; }
+
+  .w-body--choices > .w-option { padding: var(--space-2); }
+
+  .w-tag-group { gap: 2px; }
+  .w-badge { font-size: 7px; padding: 1px var(--space-1); }
+
+  .w-footer { display: none; }
+}
+
+/* --- SM: Standard (< 280px) --- */
+@container (max-width: 280px) {
+  .w-text--display { font-size: var(--text-2xl); }
+  .w-text--prose   { font-size: var(--text-sm); }
+
   .w-body--stats {
     flex-wrap: wrap;
+    padding: var(--space-4) var(--space-3);
   }
 
   .w-body--split {
@@ -603,6 +672,7 @@
     border-left: none;
     border-top: var(--border-thin) solid var(--border-subtle);
     min-height: 0;
+    align-self: auto;
   }
 
   .w-body--comparison {
@@ -618,5 +688,58 @@
   .w-body--comparison > .w-divider--labeled::after {
     border-left: none;
     border-top: var(--border-thin) solid var(--border-subtle);
+  }
+
+  .w-body--narrative .w-tag-group { display: none; }
+
+  .w-action-bar > .w-btn:not(:first-child) { display: none; }
+}
+
+/* --- MED/TALL: Standard (280-400px) — default styles apply --- */
+
+/* --- LG+: Expanded (> 400px) --- */
+@container (min-width: 400px) {
+  .w-text--display { font-size: 28px; }
+
+  .w-body--verdict {
+    padding: var(--space-8) var(--space-6);
+    gap: var(--space-4);
+  }
+
+  .w-body--stats {
+    padding: var(--space-8) var(--space-6);
+    gap: var(--space-6);
+  }
+
+  .w-body--spectrum { gap: var(--space-6); }
+  .w-body--grouped  { gap: var(--space-6); }
+
+  .w-body--choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .w-body--narrative { padding: var(--space-6); }
+  .w-text--prose { font-size: var(--text-xl); }
+}
+
+/* --- WIDE: Strip (> 560px) --- */
+@container (min-width: 560px) {
+  .w-body--stats .w-stat {
+    min-width: 100px;
+  }
+
+  .w-body--stats .w-text--value {
+    font-size: var(--text-3xl);
+  }
+
+  .w-body--list {
+    columns: 2;
+    column-gap: var(--space-6);
+  }
+
+  .w-body--list > .w-row {
+    break-inside: avoid;
   }
 }
