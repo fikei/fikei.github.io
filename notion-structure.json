@@ -271,6 +271,12 @@
               "source": "ai"
             },
             {
+              "title": "Phase 8: Automated Pin Creation",
+              "icon": "\ud83d\udd04",
+              "file": "docs/execution/project-plan/phase-8-automated-pins.md",
+              "source": "ai"
+            },
+            {
               "title": "Backlog",
               "icon": "\ud83d\udcdd",
               "file": "docs/execution/project-plan/backlog.md",

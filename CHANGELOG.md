@@ -4,6 +4,18 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-06] - Phase 8: Automated Pin Creation
+
+### Added
+- **`docs/execution/project-plan/phase-8-automated-pins.md`** — New phase for pins that arrive without manual user action. 5 epics: Feed Subscriptions (RSS/Atom), Inbound API & Webhooks (Zapier/IFTTT/email-to-board), Social Media Import (Twitter, Reddit, YouTube, Spotify), AI Discovery (suggested pins, "more like this", trending), Content Monitoring (page watching, price drops, brand new arrivals). Includes source tracking schema and architecture notes on enrichment pipeline reuse.
+- **ADR-013: Server-Side Pin Ingestion** in `docs/strategy/decision-log.md` — Proposed architecture for automated sources: shared `ingest-pin` edge function, same enrichment pipeline, `source` provenance metadata, `reviewed` flag for user acknowledgment.
+
+### Changed
+- **`docs/execution/project-plan/index.md`** — Added Phase 8 to phase overview and summary statistics (+65 pending tasks).
+- **`notion-structure.json`** — Added Phase 8 entry under Execution > Project Plan.
+
+---
+
 ## [2026-02-06] - Notion Structure Audit, Bug Tracking, Decision Log
 
 ### Changed

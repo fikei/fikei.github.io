@@ -235,6 +235,27 @@ Each decision follows this format:
 
 ---
 
+### ADR-013: Server-Side Pin Ingestion for Automated Sources
+
+**Date**: 2026-02-06
+**Status**: Proposed
+
+**Context**: Today, all pins are created client-side — the user pastes a URL, the client creates a skeleton in localStorage, then syncs to Supabase. For automated sources (RSS feeds, APIs, social imports, AI discovery), pins originate server-side with no client present. Need to decide how server-created pins reach the client.
+
+**Decision**: Automated pins are created server-side via a shared `ingest-pin` edge function. They flow through the same enrichment pipeline (classification, image resolution) but server-side. Pins sync to the client on the next 30s poll or via Supabase Realtime subscription. All automated pins carry `source` provenance metadata and a `reviewed: false` flag so the user can filter and acknowledge them.
+
+**Consequences**:
+- (+) All pin types (feed, API, social, discovery) use one ingestion path
+- (+) Enrichment pipeline reused — no separate enrichment code for automated pins
+- (+) Source tracking enables "where did this pin come from?" filtering
+- (+) `reviewed` flag prevents the board from silently filling up
+- (-) Reverses the normal data flow (server → client instead of client → server)
+- (-) 30s polling delay before automated pins appear (unless Realtime is implemented)
+- (-) Server-side enrichment costs scale with feed volume (mitigated by domain profile caching)
+- (-) API key management adds auth complexity
+
+---
+
 ## Template
 
 ```markdown
@@ -254,4 +275,4 @@ Each decision follows this format:
 
 ---
 
-*Last updated: 2026-02-04*
+*Last updated: 2026-02-06*

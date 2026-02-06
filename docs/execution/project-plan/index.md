@@ -25,6 +25,7 @@
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/10 |
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/50 |
+| [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/65 |
 | [Backlog](./backlog.md) | Future | 0/45 |
 
 ---
@@ -66,8 +67,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 5: UX Polish | 3 | 0 | 67 | 0 |
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
 | Phase 7: Platform Expansion | 0 | 0 | 50 | 0 |
+| Phase 8: Automated Pins | 0 | 0 | 65 | 0 |
 | Backlog | 0 | 0 | 40 | 0 |
-| **TOTAL** | **88** | **16** | **284** | **2** |
+| **TOTAL** | **88** | **16** | **349** | **2** |
 
 ---
 
