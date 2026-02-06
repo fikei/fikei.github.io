@@ -128,7 +128,7 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 | Multi-type domain learning | Pending |
 | Path pattern learning for complex domains | Pending |
 | Type discovery pipeline (clustering + AI analysis) | Pending |
-| AI image generation for missing thumbnails | Pending |
+| ~~AI image generation for missing thumbnails~~ | Superseded → [Epic 3.5: Image Intelligence](./phase-3-ai-intelligence.md#epic-35-image-intelligence-system-pending) |
 | User-customizable AI prompts | Pending |
 
 ---

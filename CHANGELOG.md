@@ -4,6 +4,19 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-06] - Epic 3.5: Image Intelligence System
+
+### Added
+- **`docs/execution/project-plan/phase-3-ai-intelligence.md`** — New Epic 3.5: Image Intelligence System with 6 stories: Partial Metadata Resilience, Independent Image Pipeline, Image Strategy Rules Engine, AI Image Editing, AI Image Generation, and Prompt-Driven Image Editor UI (replacing "Refresh Image"). 45 new tasks across the stories.
+
+### Changed
+- **Epic 3.2 "Manual Override"** — Marked as superseded by Epic 3.5 Story 6.
+- **Backlog "AI image generation for missing thumbnails"** — Marked as superseded by Epic 3.5 Story 5.
+- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Added "Planned: Image Intelligence System" section to image resolution pipeline, documenting the `ai_edit` and `ai_generate` strategies and the planned `resolve-image` edge function.
+- **`docs/execution/project-plan/index.md`** — Updated Phase 3 pending count (46 → 91).
+
+---
+
 ## [2026-02-06] - Phase 8: Automated Pin Creation
 
 ### Added

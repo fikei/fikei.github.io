@@ -53,9 +53,9 @@
 | | OG image extraction (no CORS) | Complete |
 | | Unsplash API search | Complete |
 | | Image source tracking | Complete |
-| **Manual Override** | | Pending |
-| | "Edit image" button on cards | Pending |
-| | Re-fetch, search, upload options | Pending |
+| **Manual Override** | | Superseded |
+| | ~~"Edit image" button on cards~~ | Superseded → Epic 3.5 Story 6 |
+| | ~~Re-fetch, search, upload options~~ | Superseded → Epic 3.5 Story 6 |
 
 ---
 
@@ -233,3 +233,97 @@
 | | AI finds similar content across web | Pending |
 | | Style/aesthetic matching algorithm | Pending |
 | | Generate variations based on pin attributes | Pending |
+
+---
+
+## Epic 3.5: Image Intelligence System (Pending)
+
+> **Vision**: A configurable, AI-powered image pipeline that can search, edit, and generate images independently from metadata enrichment — with automation rules that adapt to content type and category.
+>
+> **Supersedes**: Epic 3.2 "Manual Override" story, Backlog "AI image generation for missing thumbnails"
+
+### Story 1: Partial Metadata Resilience
+
+The enrichment pipeline today handles partial results implicitly but doesn't track or retry what's missing. Formalize partial enrichment so each field (title, description, image, classification) is independently trackable and retryable.
+
+| Task | Status |
+|------|--------|
+| Add `enrichment_status` field to pin model: `{ title: 'done', image: 'pending', classification: 'failed' }` | Pending |
+| Process currently-ignored client→server params (`forceRefresh`, `currentImage`, `skipIfHasImage`) in enrich-link | Pending |
+| Re-queue for missing fields only: if classification succeeds but image fails, retry image alone | Pending |
+| Surface enrichment completeness in admin panel (pins with missing metadata count) | Pending |
+| Batch re-enrichment action: "Enrich all pins missing images" in admin | Pending |
+
+### Story 2: Independent Image Pipeline
+
+Decouple image resolution from the broader enrichment call so images can be resolved, edited, or generated on their own schedule.
+
+| Task | Status |
+|------|--------|
+| Create `resolve-image` edge function — accepts `{ url, title, content_type, category, strategy_override? }` | Pending |
+| Extract image strategy logic from `enrich-link` into shared `image-strategies` module | Pending |
+| `enrich-link` calls shared module (no duplication) | Pending |
+| Client can call `resolve-image` independently (e.g., from image editor UI) | Pending |
+| `resolve-image` returns `{ image_url, image_source, strategy_used, alternatives[] }` — multiple candidates, not just first match | Pending |
+| Return ranked alternatives so the user or automation can pick the best | Pending |
+
+### Story 3: Image Strategy Rules Engine
+
+Replace hardcoded strategy arrays with a configurable rules engine. Each content type × category combination gets its own priority chain of strategies, including the new AI strategies.
+
+| Task | Status |
+|------|--------|
+| Define `ImageStrategyConfig` schema: `{ content_type, category?, strategies: [{ type, priority, params }] }` | Pending |
+| Migrate existing hardcoded strategy map to config format | Pending |
+| Add new strategy types: `ai_edit`, `ai_generate` alongside existing `scrape`, `search`, `platform`, `favicon`, `template` | Pending |
+| Rule evaluation: try strategies in priority order, stop on first success (or collect alternatives) | Pending |
+| Configurable stop conditions: "stop on first" vs "collect top 3" vs "always try AI" | Pending |
+| Per-category overrides: e.g., `wear` category → prioritize product photos, `read` category → prioritize article headers | Pending |
+| Per-content-type overrides: e.g., `video` → always use platform thumbnail, `product` → prefer Shopify → SERP → AI generate | Pending |
+| Store strategy configs in database (`image_strategy_configs` table) for runtime editing | Pending |
+| Admin UI for viewing and editing strategy priority rules | Pending |
+
+### Story 4: AI Image Editing
+
+Prompt-driven editing of existing pin images — background removal, style transfer, crop, enhance, recolor. Uses a generative AI image model.
+
+| Task | Status |
+|------|--------|
+| Evaluate AI image editing providers (Stability AI, DALL-E edit, Replicate) | Pending |
+| Create `edit-image` edge function — accepts `{ image_url, prompt, edit_type }` | Pending |
+| Supported edit types: `remove_background`, `enhance`, `crop_smart`, `style_transfer`, `recolor`, `freeform_prompt` | Pending |
+| Upload source image to provider, receive edited image | Pending |
+| Store edited image in Supabase Storage bucket (`pin-images/edited/`) | Pending |
+| Before/after preview in the UI before applying | Pending |
+| Preserve original image URL — edits create a new asset, original is recoverable | Pending |
+| Cost tracking per edit operation (log to `image_edit_log` table) | Pending |
+
+### Story 5: AI Image Generation
+
+Generate new images when no good source image exists — for note pins, abstract concepts, or when all search strategies fail.
+
+| Task | Status |
+|------|--------|
+| Evaluate AI image generation providers (DALL-E 3, Stability AI SDXL, Replicate) | Pending |
+| Create generation prompt builder: `{ title, description, category, content_type }` → image prompt | Pending |
+| Category-aware style guidance: `wear` → product photography style, `eat` → food photography, `read` → editorial illustration | Pending |
+| Store generated images in Supabase Storage bucket (`pin-images/generated/`) | Pending |
+| Tag with `image_source: 'ai_generated'` for transparency | Pending |
+| Generation as a strategy in the rules engine — triggered when higher-priority strategies fail | Pending |
+| User-initiated generation: "Generate an image for this pin" action | Pending |
+| Cost guardrails: daily generation budget per user, skip generation for low-value pins | Pending |
+
+### Story 6: Prompt-Driven Image Editor UI
+
+Replace "Refresh Image" button with a full image management interface. Users get control over how their pin images look.
+
+| Task | Status |
+|------|--------|
+| Replace "Refresh Image" menu item with "Edit Image" that opens image editor panel | Pending |
+| Image editor panel with tabs: **Search** / **Edit** / **Generate** / **Upload** | Pending |
+| **Search tab**: Re-run image resolution, show alternatives grid, click to select | Pending |
+| **Edit tab**: Prompt input + edit type selector, before/after preview, apply button | Pending |
+| **Generate tab**: Auto-generated prompt from pin metadata, editable, preview before applying | Pending |
+| **Upload tab**: Drag-and-drop or file picker for custom image | Pending |
+| Image history: show previous images for this pin, one-click revert | Pending |
+| Keyboard shortcut: `i` on selected pin opens image editor | Pending |
