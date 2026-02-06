@@ -88,7 +88,6 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Collaborative pricing model | Free vs premium tiers | Revenue, feature gating |
 | Mobile app platform | iOS first vs cross-platform | Development timeline |
 | Analytics provider | Privacy-friendly options | User trust, compliance |
-| SERP API key | SerpApi vs alternatives | Cost, reliability |
 
 ---
 
