@@ -4,6 +4,33 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-05] - Phase A: Docs Health Check & docs-sync Branch
+
+### Added
+- **`health-check` action** in notion-sync edge function (`health.ts`):
+  - Staleness detection (configurable threshold, default 90 days)
+  - Empty page detection with auto-archive for bot-created pages
+  - Orphaned page detection (in Notion but not in structure)
+  - Missing-in-Notion detection (in structure but not in Notion)
+  - Duplicate title detection
+  - `autoFix` mode to archive empty/orphaned bot-created pages
+- **Weekly health check workflow job** (`docs-health-check`):
+  - Runs every Friday alongside weekly improvement analysis
+  - Creates GitHub issue with actionable checklist when problems found
+  - Also triggerable manually via `health-check` agent option
+- **`docs-sync` branch strategy**:
+  - Dedicated `docs-sync` branch always triggers Notion sync
+  - `master`/`main` only syncs when `.md` or `notion-structure.json` files changed
+  - Prevents unnecessary syncs on code-only pushes
+- **`getPageLastEdited`** method on NotionClient for staleness tracking
+
+### Changed
+- Workflow condition: sync steps gated behind `docs-filter` check
+- PRD updated with Phase A task statuses (staleness, cleanup, structure health, workflow)
+- Sync guide updated with `health-check` action reference and `docs-sync` branch docs
+
+---
+
 ## [2026-02-05] - NotionSync Pre-Phase: System Cleanup & PRD Rewrite
 
 ### Added

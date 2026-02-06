@@ -36,7 +36,34 @@ Operational guide for the GitHub-to-Notion sync system. This system is **root-ag
 }
 ```
 
-2. The GitHub Actions workflow syncs automatically on push to master/main/claude/* branches.
+2. The GitHub Actions workflow syncs automatically on push.
+
+### Sync Triggers
+
+| Branch | When Syncs | Use Case |
+|--------|-----------|----------|
+| `docs-sync` | Always | Dedicated docs branch — push here to sync |
+| `master`/`main` | Only when `.md` or `notion-structure.json` changed | Avoids syncing on code-only pushes |
+| `claude/*` | Only when doc files changed | AI development branches |
+| Manual | Always (workflow_dispatch) | Force sync or health check |
+| Scheduled | Weekly Fridays | Health check only |
+
+### Recommended: `docs-sync` Branch
+
+Instead of syncing on every push to main, use a dedicated `docs-sync` branch:
+
+```bash
+# Create the branch (one-time)
+git checkout -b docs-sync
+git push -u origin docs-sync
+
+# When you want to sync docs to Notion
+git checkout docs-sync
+git merge main
+git push
+```
+
+This keeps Notion syncs intentional and avoids unnecessary API calls on code-only pushes.
 
 ---
 
@@ -146,6 +173,35 @@ curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
 - `newPages` — Never synced before
 - `changedPages` — Content changed since last sync
 - `upToDate` — No changes needed
+
+### `health-check`
+Runs a full health audit: staleness, empty pages, orphans, missing pages, duplicate titles.
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "health-check",
+    "staleDays": 90,
+    "autoFix": false,
+    "structure": { "root": "My Project", "sections": [...] }
+  }'
+```
+
+**Options:**
+- `staleDays: 90` — Days before a page is considered stale (default: 90)
+- `autoFix: true` — Auto-archive empty and orphaned bot-created pages
+
+**Response includes a `healthReport` with:**
+- `stale` — Pages not edited in > N days
+- `empty` — Pages with no content blocks
+- `orphaned` — Pages in Notion not in the structure
+- `missingInNotion` — Pages in structure but not in Notion
+- `duplicateTitles` — Titles that appear more than once
+- `autoFixed` — Actions taken (when `autoFix: true`)
+
+**Also runs weekly on Fridays** and creates a GitHub issue if problems are found.
 
 ### `detect-moves`
 Finds pages that were reorganized in Notion (different parent than expected).

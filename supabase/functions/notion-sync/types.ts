@@ -33,7 +33,9 @@ export interface PageUpdate {
 }
 
 export interface SyncRequest {
-  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves' | 'check-changes' | 'get-state' | 'update-state'
+  action: 'sync-structure' | 'update-page' | 'create-structure' | 'cleanup' | 'detect-moves' | 'check-changes' | 'get-state' | 'update-state' | 'health-check'
+  staleDays?: number
+  autoFix?: boolean
   structure?: Structure
   page?: PageUpdate
   root?: string
@@ -93,6 +95,8 @@ export interface SyncResult {
     failedBlocks: number
     blockTypes: Record<string, number>
   }
+  // Health check fields
+  healthReport?: HealthReport
 }
 
 export interface SyncMetrics {
@@ -183,4 +187,41 @@ export interface ValidationResult {
   valid: boolean
   errors: string[]
   warnings: string[]
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HEALTH CHECK TYPES
+// ═══════════════════════════════════════════════════════════════
+
+export interface HealthCheckRequest extends SyncRequest {
+  action: 'health-check'
+  staleDays?: number       // Days before a page is considered stale (default: 90)
+  autoFix?: boolean        // Apply fixes automatically (archive empty, etc.)
+}
+
+export interface PageHealth {
+  title: string
+  pageId: string
+  parentTitle: string | null
+  status: 'healthy' | 'stale' | 'empty' | 'orphaned' | 'missing-in-notion'
+  lastEdited: string | null
+  daysSinceEdit: number | null
+  isEmpty: boolean
+  isHuman: boolean
+  file?: string
+}
+
+export interface HealthReport {
+  timestamp: string
+  root: string
+  totalPages: number
+  pagesChecked: number
+  healthy: number
+  stale: PageHealth[]
+  empty: PageHealth[]
+  orphaned: PageHealth[]
+  missingInNotion: PageHealth[]
+  duplicateTitles: { title: string; count: number; locations: string[] }[]
+  autoFixed: string[]
+  summary: string
 }

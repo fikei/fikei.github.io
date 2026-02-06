@@ -10,6 +10,7 @@ import { SyncStateManager, SyncState } from './state-manager.ts'
 import { markdownToBlocks, parseRichText } from './markdown.ts'
 import { validateStructure, extractAllTitles, countPages } from './validator.ts'
 import { createLogger } from './logger.ts'
+import { runHealthCheck } from './health.ts'
 import type {
   PageDef, Structure, PageUpdate, SyncRequest,
   MovedPage, BlockStats, SyncResult, SyncMetrics,
@@ -158,6 +159,15 @@ class NotionClient {
       return page.created_by?.type === 'person'
     } catch (_e) {
       return true // Safer default
+    }
+  }
+
+  async getPageLastEdited(pageId: string): Promise<string | null> {
+    try {
+      const page: NotionPage = await this.request(`/pages/${pageId}`)
+      return page.last_edited_time || null
+    } catch (_e) {
+      return null
     }
   }
 
@@ -1065,6 +1075,22 @@ serve(async (req) => {
         }
 
         result.updated.push(`Updated state for ${updatedCount} pages`)
+        break
+      }
+
+      case 'health-check': {
+        if (!request.structure) {
+          result.errors.push('No structure provided for health check.')
+          break
+        }
+        const healthStructure = { ...request.structure, root: effectiveRoot || request.structure.root }
+        const healthReport = await runHealthCheck(
+          client,
+          healthStructure,
+          request.staleDays || 90,
+          request.autoFix || false,
+        )
+        result.healthReport = healthReport
         break
       }
 
