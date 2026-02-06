@@ -92,19 +92,29 @@
     .variant-item--poster { width: 420px; }
     .variant-item--max { width: 640px; }
 
-    /* Template constraint editor */
-    .constraint-editor { border-collapse: collapse; width: 100%; font-family: var(--font-primary); }
-    .constraint-editor th { font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); padding: var(--space-1) var(--space-2); font-weight: normal; }
-    .constraint-editor th:first-child { text-align: left; }
-    .constraint-editor td { padding: 0; text-align: center; }
-    .constraint-editor td:first-child { text-align: left; padding: var(--space-1) var(--space-2); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg); }
-    .constraint-cell { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; border: var(--border-thin) solid transparent; transition: border-color var(--duration-normal) var(--ease-default); }
-    .constraint-cell:hover { border-color: var(--border-subtle); }
-    .constraint-cell--on { background: var(--fg); }
-    .constraint-cell--on::after { content: ''; display: block; width: 8px; height: 8px; background: var(--fg); }
-    .constraint-cell--off { background: transparent; }
-    .constraint-cell--off::after { content: ''; display: block; width: 8px; height: 8px; border: var(--border-thin) solid var(--border-subtle); }
-    .constraint-size-label { font-size: 8px; color: var(--fg-muted); display: block; }
+    /* Variant audit controls */
+    .variant-toolbar { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .variant-toolbar button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
+    .variant-toolbar button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+    /* Grid lines on variant cards */
+    .variant-item--gridlines .w-shell { outline: 1px dashed var(--border-subtle); outline-offset: -1px; position: relative; }
+
+    /* Flag overlay on each variant */
+    .variant-flag { position: absolute; top: 4px; right: 4px; z-index: 3; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: var(--border-thin) solid var(--border-subtle); cursor: pointer; opacity: 0.4; transition: opacity 0.15s ease; }
+    .variant-flag:hover { opacity: 1; }
+    .variant-flag svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .variant-item--flagged .variant-flag { opacity: 1; background: var(--color-error); border-color: var(--color-error); color: var(--color-white); }
+    .variant-item--flagged .w-shell { opacity: 0.25; }
+    .variant-item--flagged .variant-label { text-decoration: line-through; color: var(--color-error); }
+    .variant-item { position: relative; }
+
+    /* Blacklist table */
+    .blacklist-table { border-collapse: collapse; font-family: var(--font-primary); margin-top: var(--space-4); width: 100%; }
+    .blacklist-table th { font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); padding: var(--space-2); text-align: left; font-weight: normal; border-bottom: var(--border-thin) solid var(--border-subtle); }
+    .blacklist-table td { font-size: var(--text-xs); padding: var(--space-2); border-bottom: var(--border-thin) solid var(--border-subtle); color: var(--fg); }
+    .blacklist-table td:last-child { color: var(--color-error); }
+    .blacklist-empty { font-size: var(--text-xs); color: var(--fg-muted); font-style: italic; padding: var(--space-4) 0; }
 
     @media (max-width: 900px) {
       .grid-test--5col { grid-template-columns: repeat(3, 1fr); }
@@ -144,7 +154,6 @@
   <a href="#molecules">Molecules</a>
   <a href="#layouts">Layouts</a>
   <a href="#priority">Priority</a>
-  <a href="#constraints">Constraints</a>
   <a href="#grid">Grid Sizes</a>
   <span class="nav__spacer"></span>
   <select id="widgetFilter" onchange="showVariants()">
@@ -195,9 +204,18 @@
 
   <!-- ====== VARIANT EXPLORER (hidden until dropdown used) ====== -->
   <div class="section" id="variants" style="display:none">
-    <h2 class="section__heading">Size Variants</h2>
-    <p class="section__desc" id="variantDesc">All valid sizes for the selected widget.</p>
+    <h2 class="section__heading">Variant Audit</h2>
+    <p class="section__desc" id="variantDesc">All sizes for the selected widget. Flag variants you want to blacklist.</p>
+
+    <div class="variant-toolbar">
+      <button onclick="toggleVariantGridLines(this)">Grid lines</button>
+      <span class="w-text w-text--meta" id="variantCount"></span>
+    </div>
+
     <div class="variant-grid" id="variantGrid"></div>
+
+    <!-- Blacklist output -->
+    <div id="blacklistOutput" style="margin-top:var(--space-8)"></div>
   </div>
 
   <hr class="section-divider" id="variantDivider" style="display:none">
@@ -1280,18 +1298,6 @@
 
   <hr class="section-divider">
 
-  <!-- ====== TEMPLATE CONSTRAINTS ====== -->
-  <div class="section" id="constraints">
-    <h2 class="section__heading">Template Constraints</h2>
-    <p class="section__desc">Click cells to toggle which sizes are allowed per template. Changes persist to localStorage and update the variant explorer.</p>
-    <table class="constraint-editor" id="constraintEditor"></table>
-    <div style="margin-top:var(--space-3)">
-      <button class="w-btn w-btn--sm" onclick="resetConstraints()">Reset to defaults</button>
-    </div>
-  </div>
-
-  <hr class="section-divider">
-
   <!-- ====== GRID SIZE PERMUTATIONS ====== -->
   <div class="section" id="grid">
     <h2 class="section__heading">Grid Size Permutations</h2>
@@ -1563,7 +1569,10 @@ function toggleGridLines(btn) {
   btn.classList.toggle('active');
 }
 
-// All 9 sizes in grid order (1x1 → 3x3)
+// ============================================
+// Grid sizing — all 9 sizes (1x1 → 3x3)
+// ============================================
+
 var ALL_SIZES = ['sm', 'med', 'wide', 'tall', 'lg', 'xl', 'col', 'poster', 'max'];
 
 var SIZE_LABELS = {
@@ -1572,101 +1581,58 @@ var SIZE_LABELS = {
   col: '1x3', poster: '2x3', max: '3x3'
 };
 
-// Default allowed sizes per template
-var DEFAULT_TEMPLATE_SIZES = {
-  verdict:    ['sm', 'med', 'lg'],
-  list:       ['sm', 'med', 'tall', 'lg', 'wide'],
-  narrative:  ['med', 'tall', 'lg'],
-  spectrum:   ['sm', 'med', 'lg'],
-  comparison: ['med', 'lg'],
-  choices:    ['sm', 'med', 'lg'],
-  suggestion: ['sm', 'med', 'tall', 'lg'],
-  grouped:    ['med', 'tall', 'lg']
-};
+// ============================================
+// Blacklist — persisted to localStorage
+// Keys: "widget:size" or "template:size"
+// ============================================
 
-// Live map — loaded from localStorage or defaults
-var TEMPLATE_SIZES = loadConstraints();
+var BLACKLIST_KEY = 'widget-variant-blacklist';
 
-var ALL_TEMPLATES = Object.keys(DEFAULT_TEMPLATE_SIZES);
-
-function loadConstraints() {
+function loadBlacklist() {
   try {
-    var saved = localStorage.getItem('widget-template-constraints');
+    var saved = localStorage.getItem(BLACKLIST_KEY);
     if (saved) return JSON.parse(saved);
   } catch (e) {}
-  // Deep copy defaults
-  var copy = {};
-  for (var t in DEFAULT_TEMPLATE_SIZES) copy[t] = DEFAULT_TEMPLATE_SIZES[t].slice();
-  return copy;
+  return {};
 }
 
-function saveConstraints() {
-  try { localStorage.setItem('widget-template-constraints', JSON.stringify(TEMPLATE_SIZES)); } catch (e) {}
+function saveBlacklist() {
+  try { localStorage.setItem(BLACKLIST_KEY, JSON.stringify(blacklist)); } catch (e) {}
 }
 
-function buildConstraintEditor() {
-  var table = document.getElementById('constraintEditor');
-  if (!table) return;
+var blacklist = loadBlacklist();
 
-  // Header row
-  var thead = '<thead><tr><th></th>';
-  ALL_SIZES.forEach(function(s, i) {
-    // Add row break indicators
-    var border = (i === 3 || i === 6) ? ' style="border-left:var(--border-thin) solid var(--border-subtle)"' : '';
-    thead += '<th' + border + '>' + s + '<span class="constraint-size-label">' + SIZE_LABELS[s] + '</span></th>';
-  });
-  thead += '</tr></thead>';
-
-  // Body rows
-  var tbody = '<tbody>';
-  ALL_TEMPLATES.forEach(function(tmpl) {
-    tbody += '<tr><td>' + tmpl + '</td>';
-    ALL_SIZES.forEach(function(size, i) {
-      var on = TEMPLATE_SIZES[tmpl].indexOf(size) !== -1;
-      var border = (i === 3 || i === 6) ? 'border-left:var(--border-thin) solid var(--border-subtle);' : '';
-      tbody += '<td style="' + border + '"><div class="constraint-cell constraint-cell--' + (on ? 'on' : 'off') + '" data-tmpl="' + tmpl + '" data-size="' + size + '"></div></td>';
-    });
-    tbody += '</tr>';
-  });
-  tbody += '</tbody>';
-
-  table.innerHTML = thead + tbody;
+function blacklistKey(name, size) {
+  return name + ':' + size;
 }
 
-// Delegate clicks on constraint cells
-document.addEventListener('click', function(e) {
-  var cell = e.target.closest('.constraint-cell');
-  if (!cell) return;
+function isBlacklisted(name, size) {
+  return !!blacklist[blacklistKey(name, size)];
+}
 
-  var tmpl = cell.dataset.tmpl;
-  var size = cell.dataset.size;
-  var arr = TEMPLATE_SIZES[tmpl];
-  var idx = arr.indexOf(size);
-
-  if (idx !== -1) {
-    // Disallow — remove
-    arr.splice(idx, 1);
-    cell.className = 'constraint-cell constraint-cell--off';
+function toggleBlacklist(name, size) {
+  var key = blacklistKey(name, size);
+  if (blacklist[key]) {
+    delete blacklist[key];
   } else {
-    // Allow — add and re-sort to match ALL_SIZES order
-    arr.push(size);
-    arr.sort(function(a, b) { return ALL_SIZES.indexOf(a) - ALL_SIZES.indexOf(b); });
-    cell.className = 'constraint-cell constraint-cell--on';
+    blacklist[key] = true;
   }
-
-  saveConstraints();
-});
-
-function resetConstraints() {
-  var copy = {};
-  for (var t in DEFAULT_TEMPLATE_SIZES) copy[t] = DEFAULT_TEMPLATE_SIZES[t].slice();
-  TEMPLATE_SIZES = copy;
-  saveConstraints();
-  buildConstraintEditor();
+  saveBlacklist();
 }
 
-// Build on load
-buildConstraintEditor();
+// ============================================
+// Variant explorer
+// ============================================
+
+var variantGridLinesOn = false;
+
+function toggleVariantGridLines(btn) {
+  variantGridLinesOn = !variantGridLinesOn;
+  btn.classList.toggle('active');
+  document.querySelectorAll('#variantGrid .variant-item').forEach(function(item) {
+    item.classList.toggle('variant-item--gridlines', variantGridLinesOn);
+  });
+}
 
 function showVariants() {
   var widgetVal = document.getElementById('widgetFilter').value;
@@ -1675,6 +1641,7 @@ function showVariants() {
   var divider = document.getElementById('variantDivider');
   var grid = document.getElementById('variantGrid');
   var desc = document.getElementById('variantDesc');
+  var count = document.getElementById('variantCount');
 
   if (!widgetVal && !templateVal) {
     explorer.style.display = 'none';
@@ -1695,36 +1662,136 @@ function showVariants() {
     return;
   }
 
+  // The audit name is the widget name or template name — used as blacklist key prefix
+  var auditName = widgetVal || templateVal;
   var template = source.dataset.template;
-  var sizes = TEMPLATE_SIZES[template] || ['sm', 'med', 'lg'];
-  var widget = source.dataset.widget || '';
-  var label = widgetVal || templateVal;
-  desc.textContent = 'Showing ' + label + ' (' + template + ') at ' + sizes.length + ' valid sizes.';
+
+  desc.textContent = auditName + ' (' + template + ') — all ' + ALL_SIZES.length + ' sizes. Flag variants to blacklist.';
 
   grid.innerHTML = '';
-  sizes.forEach(function(size) {
+  var flaggedCount = 0;
+
+  ALL_SIZES.forEach(function(size) {
     var clone = source.cloneNode(true);
-    // Strip any existing size and grid-span styles
     clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
     clone.style.cssText = '';
     clone.classList.add('w-shell--' + size);
 
     var wrapper = document.createElement('div');
-    wrapper.className = 'variant-item variant-item--' + size;
+    var isFlagged = isBlacklisted(auditName, size);
+    if (isFlagged) flaggedCount++;
+    wrapper.className = 'variant-item variant-item--' + size +
+      (variantGridLinesOn ? ' variant-item--gridlines' : '') +
+      (isFlagged ? ' variant-item--flagged' : '');
+    wrapper.dataset.auditName = auditName;
+    wrapper.dataset.size = size;
 
     var lbl = document.createElement('div');
     lbl.className = 'variant-label';
     lbl.textContent = size + ' (' + SIZE_LABELS[size] + ')';
 
+    // Flag button — positioned over the shell
+    var flag = document.createElement('button');
+    flag.className = 'variant-flag';
+    flag.title = isFlagged ? 'Unflag — allow this variant' : 'Flag — blacklist this variant';
+    flag.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    flag.dataset.auditName = auditName;
+    flag.dataset.size = size;
+
     wrapper.appendChild(lbl);
+    wrapper.appendChild(flag);
     wrapper.appendChild(clone);
     grid.appendChild(wrapper);
   });
+
+  count.textContent = flaggedCount > 0 ? flaggedCount + ' flagged' : '';
+
+  renderBlacklistTable();
 
   explorer.style.display = '';
   divider.style.display = '';
   explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// Delegate flag clicks
+document.addEventListener('click', function(e) {
+  var flag = e.target.closest('.variant-flag');
+  if (!flag) return;
+
+  var name = flag.dataset.auditName;
+  var size = flag.dataset.size;
+  toggleBlacklist(name, size);
+
+  // Update visual state
+  var wrapper = flag.closest('.variant-item');
+  var nowFlagged = isBlacklisted(name, size);
+  wrapper.classList.toggle('variant-item--flagged', nowFlagged);
+  flag.title = nowFlagged ? 'Unflag — allow this variant' : 'Flag — blacklist this variant';
+
+  // Update count
+  var flaggedCount = Object.keys(blacklist).length;
+  var count = document.getElementById('variantCount');
+  count.textContent = flaggedCount > 0 ? flaggedCount + ' flagged total' : '';
+
+  renderBlacklistTable();
+});
+
+// ============================================
+// Blacklist output table
+// ============================================
+
+function renderBlacklistTable() {
+  var output = document.getElementById('blacklistOutput');
+  if (!output) return;
+
+  var keys = Object.keys(blacklist).sort();
+  if (keys.length === 0) {
+    output.innerHTML = '';
+    return;
+  }
+
+  var html = '<h3 class="section__heading" style="font-size:var(--text-xs)">Blacklisted Variants</h3>';
+  html += '<table class="blacklist-table"><thead><tr><th>Widget / Template</th><th>Size</th><th>Grid</th><th>Status</th></tr></thead><tbody>';
+
+  keys.forEach(function(key) {
+    var parts = key.split(':');
+    var name = parts[0];
+    var size = parts[1];
+    html += '<tr><td>' + name + '</td><td>' + size + '</td><td>' + (SIZE_LABELS[size] || size) + '</td><td>Blocked</td></tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '<div style="margin-top:var(--space-3);display:flex;gap:var(--space-2)">';
+  html += '<button class="w-btn w-btn--sm" onclick="exportBlacklist()">Copy as JSON</button>';
+  html += '<button class="w-btn w-btn--sm" onclick="clearBlacklist()">Clear all</button>';
+  html += '</div>';
+
+  output.innerHTML = html;
+}
+
+function exportBlacklist() {
+  var keys = Object.keys(blacklist).sort();
+  var data = keys.map(function(key) {
+    var parts = key.split(':');
+    return { name: parts[0], size: parts[1], grid: SIZE_LABELS[parts[1]] || parts[1] };
+  });
+  var json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(function() {
+    var btn = document.querySelector('#blacklistOutput .w-btn');
+    if (btn) { var orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = orig; }, 1500); }
+  });
+}
+
+function clearBlacklist() {
+  blacklist = {};
+  saveBlacklist();
+  renderBlacklistTable();
+  // Re-render current variants to remove flags
+  showVariants();
+}
+
+// Initial render
+renderBlacklistTable();
 
 // ============================================
 // Image Enrichment Pipeline
