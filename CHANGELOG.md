@@ -4,23 +4,49 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
-## [2026-02-05] - Comprehensive Architecture Documentation
+## [2026-02-06] - Server-Driven Widget Discovery
 
 ### Added
-- **`docs/infrastructure/technical-design/core-systems-architecture.md`** — Pin Creation, Pin Enrichment, and AI Widget Pipeline architecture with data flows and key decisions.
-- **`docs/infrastructure/technical-design/database-schema.md`** — Complete schema reference for all 25+ tables across 6 migrations, with column types, RLS policies, constraints, and ER diagram.
-- **`docs/infrastructure/technical-design/client-architecture.md`** — Structural map of the 9,100-line boards/index.html monolith: section ranges, state management, rendering pipeline, boot sequence, event system.
-- **`docs/infrastructure/technical-design/auth-system.md`** — Passwordless magic link auth flow, session management, anonymous vs authenticated capabilities, admin system, data migration on first login.
-- **`docs/infrastructure/technical-design/sync-protocol.md`** — localStorage-to-Supabase sync protocol: upload/download flows, conflict resolution, offline behavior, cross-device polling, known gaps.
-- **`docs/infrastructure/technical-design/api-reference.md`** — Request/response contracts for enrich-link, generate-widget, categorize, and notion-sync edge functions plus REST API patterns.
-- **`docs/infrastructure/dependencies.md`** — All external service dependencies with fallback behavior, cost breakdown, and risk assessment.
+- **`discoverWidgetsFromServer(category, items)`** — Frontend calls server discovery endpoint before rendering widgets
+  - Server eligibility engine is now the source of truth for which widgets appear
+  - Graceful fallback: if server is unreachable, falls back to local `WIDGET_REGISTRY`
+  - Merges server metadata (zone, priority, eligibility) with local widget configs
+  - Server-only widgets auto-build temporary local entries from discovery response (prompt + template)
+- **Discovery endpoint enhanced** — Now returns `promptTemplate` and `constraints` per widget
+- **Loading state uses dynamic widget name** — No longer hard-coded "Style Summary"
+- **Action templates added to backlog** — 9 feedback-loop templates tracked for future implementation
+
+---
+
+## [2026-02-06] - Widget Templates: spectrum, stat-row, quick-add
+
+### Added
+- **`spectrum` template** — Labeled horizontal scales showing dimensional positioning (e.g. Budget <--*--> Luxury)
+  - CSS: `.widget-spectrum__axes`, `.widget-spectrum__track`, `.widget-spectrum__marker`
+  - Renders 2-4 axes from AI `{ axes: [{ leftLabel, rightLabel, position, note }] }` response
+  - Widget config: `price-radar` — positions user on budget/style/brand dimensions
+
+- **`stat-row` template** — Row of 2-4 key collection metrics with large values
+  - CSS: `.widget-statrow__grid`, `.widget-statrow__value`, `.widget-statrow__label`
+  - Renders stats from AI `{ stats: [{ value, label }] }` response
+  - Widget config: `collection-stats` — brands count, style count, avg price
+
+- **`quick-add` action template** — Single high-confidence suggestion with "Add to board" button
+  - CSS: `.widget-quickadd__content`, `.widget-quickadd__btn--primary/secondary`
+  - First action template with feedback loop: Add → item in board → future widgets exclude gap
+  - `handleQuickAdd()` — calls `addLink()` to mutate board state, tracks event, updates UI
+  - Widget config: `gap-filler` — AI identifies biggest collection gap, suggests one product
+
+- **3 new server-side widget configs**
+  - `config/widgets/price-radar.ts` — spectrum template, categories: wear/tech/home/all
+  - `config/widgets/collection-stats.ts` — stat-row template, all 12 categories
+  - `config/widgets/gap-filler.ts` — quick-add template, categories: wear/tech/home/fitness
 
 ### Changed
-- **`docs/infrastructure/deployment.md`** — Expanded from checklist to full deployment guide: architecture diagram, two deployment paths (GitHub Pages auto + Supabase CLI manual), GitHub Actions workflow details, environment variables, database migrations.
-- **`docs/infrastructure/security.md`** — Expanded from checklist to detailed security model: RLS policy matrix for all tables, CORS issues, data protection (transit + rest), input validation, third-party risk assessment, known gaps.
-- **`COSTS.md`** — Added per-operation AI cost estimates, all 3 Supabase projects, free tier monitoring thresholds, 8 free integrations, cost optimization strategies.
-- **`docs/execution/project-plan/backlog.md`** — Consolidated Rich Media Support, Content Reader, and Pin Type Abstraction into a structured **Pin Expansion** section with 5 epics.
-- **`notion-structure.json`** — Added 7 new documentation entries to Infrastructure section.
+- `WIDGET_TEMPLATES` now has 7 templates (was 4)
+- `WIDGET_REGISTRY` now has 5 widgets (was 2)
+- Server registry imports 5 widget configs (was 2)
+- Research doc: 7 of 30 templates now built (was 4)
 
 ---
 
@@ -49,9 +75,9 @@ All notable changes to ctrl.rodeo will be documented in this file.
   - Frontend no longer hard-codes 'wear' — works with any category that has widgets
 
 - **Template Selection Engine**
-  - `WIDGET_TEMPLATES` registry with 4 templates: `product-grid`, `style-card`, `simple-list`, `text-summary`
+  - `WIDGET_TEMPLATES` registry with 4 UX-pattern templates: `grid-split`, `hero-card`, `list`, `text-block`
   - `renderWidgetWithTemplate(widget, items, aiResult)` - Selects template via widget config
-  - Fallback chain: primary template → fallback template → `simple-list`
+  - Fallback chain: primary template → fallback template → `list`
   - Each template has `name`, `version`, and `render()` function
   - Removed all hard-coded `if (widget.id === 'complete-the-look')` rendering branches
 
