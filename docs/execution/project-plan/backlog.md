@@ -4,43 +4,76 @@
 
 ---
 
-## Rich Media Support
+## Pin Expansion
+
+Everything related to supporting multiple pin types, organized by epic. The Pin Type Abstraction epic is the prerequisite — start there before building any new pin type.
+
+> See: [Core Systems Architecture](../../infrastructure/technical-design/core-systems-architecture.md) for the enrichment extensibility model.
+
+### Epic 0: Pin Type Abstraction (Pre-requisite)
+
+Refactor the codebase from link-only to a generic pin system. Start this when implementing the first non-link pin type.
 
 | Story | Status |
 |-------|--------|
-| Video links (YouTube, Vimeo) - thumbnails, duration, inline preview | Pending |
-| Music links (Spotify, SoundCloud) - album art, artist info, audio preview | Pending |
-| Direct image upload to Supabase Storage | Pending |
-| Direct video upload with compression | Pending |
-| **Notes Support** - Add text notes as pins without URLs | Pending |
-| **Photo Upload** - Add photos directly (not just links) | Pending |
-| **Video Upload** - Upload video files with player | Pending |
-| Note/media pin visual differentiation | Pending |
+| **Introduce `Pin` base type** — Abstract `Link` into a `Pin` with `pin_type` discriminator field | Pending |
+| **Refactor `addLink()` → `addPin()`** — Generalize creation flow to dispatch by pin type | Pending |
+| **Refactor `syncLinkToSupabase()` → `syncPinToSupabase()`** — Type-agnostic persistence | Pending |
+| **Enrichment strategy registry** — Map `pin_type` → `{ clientEnrich(), serverEnrich() }` | Pending |
+| **Rename `enrich-link` edge function → `enrich-pin`** — Accept any pin type, route to type-specific handler | Pending |
+| **Database migration: `links` → `pins`** — Add `pin_type` column, backfill existing rows as `link` | Pending |
+| **Update widget eligibility** — Widgets declare which pin types they operate on | Pending |
+| **Pin type visual differentiation** — Distinct card rendering per pin type (icon, layout, actions) | Pending |
 
----
+### Epic 1: Link Pin Enhancements
 
-## Content Reader
+Richer experiences for URL-based pins that already exist. No abstraction needed — these extend the current `link` type.
 
 | Story | Status |
 |-------|--------|
-| **PDF Reader** | Pending |
-| Detect PDF links and content type | Pending |
-| Inline PDF preview in expanded view | Pending |
-| Full-screen PDF reader mode | Pending |
-| Extract text/images for thumbnails | Pending |
-| **Newsletter Reader** | Pending |
-| Detect newsletter/email content | Pending |
-| Clean reader view (strip tracking/formatting) | Pending |
-| Save newsletter as readable text | Pending |
-| **Article Reader** | Pending |
-| News article detection | Pending |
-| Reader mode (clean article extraction) | Pending |
-| Save article text locally | Pending |
-| Offline reading support | Pending |
-| **Text View Mode** | Pending |
-| Toggle between visual and text-focused views | Pending |
-| Text-heavy content card design | Pending |
-| Reading time estimates | Pending |
+| **Video embeds** — YouTube/Vimeo thumbnails, duration badge, inline preview | Pending |
+| **Music embeds** — Spotify/SoundCloud album art, artist info, audio preview | Pending |
+| **Article reader** — Detect article content, clean reader mode, save text locally | Pending |
+| **Newsletter reader** — Detect newsletter content, strip tracking/formatting | Pending |
+| **PDF reader** — Detect PDF links, inline preview, full-screen reader, extract text for thumbnails | Pending |
+| **Text view mode** — Toggle visual vs text-focused card layout, reading time estimates | Pending |
+| **Offline reading** — Cache article/newsletter text for offline access | Pending |
+
+### Epic 2: Note Pins
+
+Text-first pins without a URL. For capturing thoughts, snippets, quotes.
+
+| Story | Status |
+|-------|--------|
+| **Note creation UI** — Text input in Add modal (detect no URL → note mode) | Pending |
+| **Note card rendering** — Text-forward card layout, markdown support | Pending |
+| **Client enrichment** — Parse markdown, extract inline URLs as related links | Pending |
+| **Server enrichment** — NLP: topic extraction, entity recognition, auto-categorize | Pending |
+| **Note editing** — Inline edit, expand to full editor | Pending |
+
+### Epic 3: Image Pins
+
+Direct image uploads, not just links to images.
+
+| Story | Status |
+|-------|--------|
+| **Image upload UI** — Drag-and-drop or file picker in Add modal | Pending |
+| **Supabase Storage integration** — Upload to bucket, generate public URL | Pending |
+| **Image card rendering** — Full-bleed image card, EXIF display | Pending |
+| **Client enrichment** — Read EXIF data, generate thumbnail, detect dimensions | Pending |
+| **Server enrichment** — Vision AI: describe content, suggest category, detect objects | Pending |
+
+### Epic 4: File Pins
+
+Document and file uploads — PDFs, CSVs, other file types.
+
+| Story | Status |
+|-------|--------|
+| **File upload UI** — File picker with type detection and size limits | Pending |
+| **Supabase Storage integration** — Upload with content-type metadata | Pending |
+| **File card rendering** — File type icon, size, preview thumbnail | Pending |
+| **Client enrichment** — File type detection, size/format metadata | Pending |
+| **Server enrichment** — Content extraction (PDF text, CSV preview), AI summarize | Pending |
 
 ---
 

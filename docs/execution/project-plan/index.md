@@ -25,7 +25,7 @@
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/10 |
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/50 |
-| [Backlog](./backlog.md) | Future | 0/40 |
+| [Backlog](./backlog.md) | Future | 0/45 |
 
 ---
 

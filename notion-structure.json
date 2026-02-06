@@ -313,6 +313,12 @@
               "icon": "\ud83d\udcc8",
               "file": "docs/infrastructure/monitoring.md",
               "source": "human"
+            },
+            {
+              "title": "Dependencies",
+              "icon": "\ud83d\udd17",
+              "file": "docs/infrastructure/dependencies.md",
+              "source": "ai"
             }
           ]
         },
@@ -344,6 +350,42 @@
               "icon": "\ud83d\udd04",
               "file": "docs/infrastructure/technical-design/ai-widget-pipeline.md",
               "source": "human"
+            },
+            {
+              "title": "Core Systems Architecture",
+              "icon": "\ud83d\udd27",
+              "file": "docs/infrastructure/technical-design/core-systems-architecture.md",
+              "source": "ai"
+            },
+            {
+              "title": "Database Schema",
+              "icon": "\ud83d\uddc3\ufe0f",
+              "file": "docs/infrastructure/technical-design/database-schema.md",
+              "source": "ai"
+            },
+            {
+              "title": "Client Architecture",
+              "icon": "\ud83d\udda5\ufe0f",
+              "file": "docs/infrastructure/technical-design/client-architecture.md",
+              "source": "ai"
+            },
+            {
+              "title": "Auth System",
+              "icon": "\ud83d\udd10",
+              "file": "docs/infrastructure/technical-design/auth-system.md",
+              "source": "ai"
+            },
+            {
+              "title": "Sync Protocol",
+              "icon": "\ud83d\udd04",
+              "file": "docs/infrastructure/technical-design/sync-protocol.md",
+              "source": "ai"
+            },
+            {
+              "title": "API Reference",
+              "icon": "\ud83d\udce1",
+              "file": "docs/infrastructure/technical-design/api-reference.md",
+              "source": "ai"
             },
             {
               "title": "Content Type and Image Systems Tech",
