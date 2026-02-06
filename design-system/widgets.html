@@ -430,7 +430,6 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Golden Gate Bridge</span>
@@ -439,7 +438,6 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Tartine Bakery</span>
@@ -448,7 +446,6 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">SFMOMA</span>
@@ -700,7 +697,6 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <span class="w-icon" style="color:var(--color-success)"><svg><use href="#icon-play"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">White Lotus S3</span>
@@ -709,7 +705,6 @@
             <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-icon" style="color:var(--color-warning)"><svg><use href="#icon-clock"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Stranger Things S5</span>
@@ -1267,22 +1262,18 @@
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content"><span class="w-text w-text--title">Golden Gate</span><span class="w-text w-text--meta">Start — morning</span></div>
           </div>
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content"><span class="w-text w-text--title">Tartine</span><span class="w-text w-text--meta">Lunch — 12 min</span></div>
           </div>
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content"><span class="w-text w-text--title">SFMOMA</span><span class="w-text w-text--meta">Afternoon — 8 min</span></div>
           </div>
           <div class="w-row">
-            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
             <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content"><span class="w-text w-text--title">Dolores Park</span><span class="w-text w-text--meta">Sunset</span></div>
           </div>
@@ -1444,6 +1435,32 @@ function setGrid(cols, btn) {
   document.querySelectorAll('.grid-controls button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
+
+// Image pipeline — replace all placeholders with real photos
+// Seeds from nearest title text so each item gets a consistent image
+document.querySelectorAll('.w-img--placeholder').forEach(function(el, i) {
+  var row = el.closest('.w-row, .w-option');
+  var shell = el.closest('.w-shell') || el.closest('.component-card');
+  var titleEl = row && row.querySelector('.w-text--title');
+  if (!titleEl && shell) titleEl = shell.querySelector('.w-text--title');
+  if (!titleEl && shell) titleEl = shell.querySelector('.w-text--label');
+  var text = titleEl ? titleEl.textContent : 'demo-' + i;
+  var seed = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+
+  var w = 80, h = 80;
+  if (el.classList.contains('w-img--hero')) { w = 400; h = 300; }
+  else if (el.classList.contains('w-img--banner')) { w = 600; h = 200; }
+  else if (el.classList.contains('w-img--wide')) { w = 400; h = 225; }
+  else if (el.classList.contains('w-img--card')) { w = 160; h = 160; }
+
+  var img = document.createElement('img');
+  img.src = 'https://picsum.photos/seed/' + seed + '/' + w + '/' + h;
+  img.alt = text;
+  img.loading = 'lazy';
+  el.innerHTML = '';
+  el.appendChild(img);
+  el.classList.remove('w-img--placeholder');
+});
 </script>
 
 </body>
