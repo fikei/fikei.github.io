@@ -132,27 +132,38 @@ export class SyncStateManager {
   }
 
   // Get pages that need syncing (changed since last sync)
-  async getDirtyPages(currentHashes: Map<string, string>): Promise<string[]> {
+  // Returns pages in priority order: new pages first, then changed pages
+  async getDirtyPages(currentHashes: Map<string, string>): Promise<{
+    all: string[]
+    newPages: string[]
+    changedPages: string[]
+  }> {
     const states = await this.getAllStates()
-    const dirtyPages: string[] = []
+    const newPages: string[] = []      // Never synced - highest priority
+    const changedPages: string[] = []  // Hash changed or Notion edited - second priority
 
     for (const state of states) {
       const currentHash = currentHashes.get(state.page_path)
 
       // Page is dirty if:
-      // 1. We have new content and hash is different
-      // 2. Never synced before
+      // 1. Never synced before (highest priority - new pages)
+      // 2. Hash is different (content changed)
       // 3. Notion was edited since last sync
       if (!state.last_synced_at) {
-        dirtyPages.push(state.page_path)
+        newPages.push(state.page_path)
       } else if (currentHash && currentHash !== state.github_hash) {
-        dirtyPages.push(state.page_path)
+        changedPages.push(state.page_path)
       } else if (state.notion_last_edited && state.last_synced_at &&
                  new Date(state.notion_last_edited) > new Date(state.last_synced_at)) {
-        dirtyPages.push(state.page_path)
+        changedPages.push(state.page_path)
       }
     }
 
-    return dirtyPages
+    // Return in priority order: new pages first, then changed pages
+    return {
+      all: [...newPages, ...changedPages],
+      newPages,
+      changedPages
+    }
   }
 }

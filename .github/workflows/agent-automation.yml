@@ -6,12 +6,13 @@ on:
       - master
       - main
       - 'claude/**'
+      - docs-sync
   pull_request:
     types: [opened, synchronize, ready_for_review]
   schedule:
     # Daily synthesis at 9 AM UTC
     - cron: '0 9 * * *'
-    # Weekly improvement analysis on Fridays at 4 PM UTC
+    # Weekly health check + improvement analysis on Fridays at 4 PM UTC
     - cron: '0 16 * * 5'
   workflow_dispatch:
     inputs:
@@ -27,6 +28,7 @@ on:
           - chief-of-staff
           - security-compliance
           - continuous-improvement
+          - health-check
           - all
       force_full_sync:
         description: 'Force full Notion sync (all pages)'
@@ -41,9 +43,19 @@ env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
 jobs:
-  # Sync to Notion on master/main push or manual trigger
+  # Sync to Notion
+  # - docs-sync branch: always sync (dedicated docs branch)
+  # - master/main: only when doc files changed
+  # - claude/*: only when doc files changed
+  # - manual: always sync
   notion-sync:
-    if: (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')) || github.event_name == 'workflow_dispatch'
+    if: >-
+      (github.event_name == 'push' && (
+        github.ref == 'refs/heads/docs-sync' ||
+        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/heads/claude/')
+      )) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,7 +63,33 @@ jobs:
         with:
           fetch-depth: 2  # Need previous commit for diff
 
+      - name: Check if docs changed
+        id: docs-filter
+        run: |
+          # docs-sync branch and manual trigger always sync
+          if [ "${{ github.ref }}" = "refs/heads/docs-sync" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_sync=true" >> $GITHUB_OUTPUT
+            echo "✅ Always sync on docs-sync branch or manual trigger"
+            exit 0
+          fi
+
+          # For other branches, only sync if doc-related files changed
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            DOC_CHANGES=$(git diff --name-only HEAD~1 HEAD -- '*.md' 'notion-structure.json' 'docs/' | wc -l)
+          else
+            DOC_CHANGES=1
+          fi
+
+          if [ "$DOC_CHANGES" -gt 0 ]; then
+            echo "should_sync=true" >> $GITHUB_OUTPUT
+            echo "✅ $DOC_CHANGES doc files changed — will sync"
+          else
+            echo "should_sync=false" >> $GITHUB_OUTPUT
+            echo "⏭️ No doc files changed — skipping Notion sync"
+          fi
+
       - name: Detect Changed Files
+        if: steps.docs-filter.outputs.should_sync == 'true'
         id: changes
         env:
           FORCE_SYNC: ${{ inputs.force_full_sync }}
@@ -253,7 +291,7 @@ jobs:
           fi
 
       - name: Sync Page Structure
-        if: env.SUPABASE_URL != ''
+        if: env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
         run: |
           echo "═══════════════════════════════════════════"
           echo "📁 STRUCTURE SYNC: Create/move pages"
@@ -329,7 +367,7 @@ jobs:
           sleep 5
 
       - name: Cleanup Orphaned Pages
-        if: env.SUPABASE_URL != ''
+        if: env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
         run: |
           echo "═══════════════════════════════════════════"
           echo "🧹 CLEANUP: Archive orphaned pages"
@@ -394,7 +432,7 @@ jobs:
           sleep 5
 
       - name: Sync Page Content
-        if: env.SUPABASE_URL != ''
+        if: env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
         env:
           SB_URL: ${{ secrets.SUPABASE_URL }}
           SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -551,11 +589,16 @@ jobs:
           PYEOF
 
           # Step 2: Sync pages that need updating (using JSON format with parent/icon info)
-          python3 << 'SYNC_PYEOF'
+          python3 -u << 'SYNC_PYEOF'
           import json
           import os
           import subprocess
           import time
+          import sys
+
+          def log(msg):
+              """Print with immediate flush for GitHub Actions"""
+              print(msg, flush=True)
 
           # Load pages to sync
           try:
@@ -565,13 +608,15 @@ jobs:
               pages_to_sync = []
 
           if not pages_to_sync:
-              print("✨ No pages need syncing")
+              log("✨ No pages need syncing")
               exit(0)
 
-          print(f"\nSyncing {len(pages_to_sync)} pages...")
+          log(f"\n───────────────────────────────────────────")
+          log(f"📤 SYNCING {len(pages_to_sync)} PAGES")
+          log(f"───────────────────────────────────────────")
           failed_pages = []
 
-          def sync_page(page, is_retry=False):
+          def sync_page(page, index, total, is_retry=False):
               """Sync a single page, returns True on success"""
               filepath = page['filepath']
               title = page['title']
@@ -580,7 +625,7 @@ jobs:
               parent = page.get('parent')
 
               if not os.path.exists(filepath):
-                  print(f"⏭️ {title} — file not found: {filepath}")
+                  log(f"[{index}/{total}] ⏭️ {title} — file not found")
                   return True  # Don't retry missing files
 
               # Read content
@@ -588,8 +633,8 @@ jobs:
                   content = f.read()[:40000]
 
               word_count = len(content.split())
-              action = "retrying" if is_retry else f"syncing {word_count} words"
-              print(f"📄 {title} — {action}")
+              prefix = f"[{index}/{total}]" if not is_retry else "[retry]"
+              log(f"{prefix} 📄 {title} ({word_count} words)...")
 
               # Build payload with parent info for auto-creation
               payload = {
@@ -620,25 +665,26 @@ jobs:
                       created = response.get('created', [])
                       updated = response.get('updated', [])
                       if created:
-                          print(f"   ✅ Created: {created[0]}")
+                          log(f"        ✅ Created")
                       elif updated:
                           # Extract block count from update message
                           blocks = updated[0].split('(')[1].split(' ')[0] if '(' in updated[0] else '?'
-                          print(f"   ✅ Done ({blocks} blocks)")
+                          log(f"        ✅ Done ({blocks} blocks)")
                       else:
-                          print(f"   ✅ Done")
+                          log(f"        ✅ Done")
                       return True
                   else:
                       errors = response.get('errors', [])
-                      print(f"   ⚠️ Failed: {errors[0] if errors else 'unknown error'}")
+                      log(f"        ⚠️ Failed: {errors[0] if errors else 'unknown error'}")
                       return False
               except json.JSONDecodeError:
-                  print(f"   ⚠️ Failed: invalid response")
+                  log(f"        ⚠️ Failed: invalid response")
                   return False
 
           # First pass
-          for page in pages_to_sync:
-              if not sync_page(page):
+          total = len(pages_to_sync)
+          for i, page in enumerate(pages_to_sync, 1):
+              if not sync_page(page, i, total):
                   failed_pages.append(page)
               time.sleep(2)
 
@@ -646,28 +692,88 @@ jobs:
           for retry in range(1, 4):
               if not failed_pages:
                   break
-              print(f"\n🔄 Retry {retry}: {len(failed_pages)} failed pages (waiting {retry * 10}s...)")
+              log(f"\n🔄 Retry {retry}: {len(failed_pages)} failed pages (waiting {retry * 10}s...)")
               time.sleep(retry * 10)
 
               retry_pages = failed_pages
               failed_pages = []
               for page in retry_pages:
-                  if not sync_page(page, is_retry=True):
+                  if not sync_page(page, 0, 0, is_retry=True):
                       failed_pages.append(page)
                   time.sleep(3)
 
           # Report any remaining failures
           if failed_pages:
-              print(f"\n⚠️ Some pages still failed after 3 retries:")
+              log(f"\n⚠️ Some pages still failed after 3 retries:")
               for page in failed_pages:
-                  print(f"   - {page['title']}")
-              print("State NOT updated for these - will retry next run.")
+                  log(f"   - {page['title']}")
+              log("State NOT updated for these - will retry next run.")
           SYNC_PYEOF
 
           echo ""
           echo "═══════════════════════════════════════════"
           echo "✅ SYNC COMPLETE"
           echo "═══════════════════════════════════════════"
+
+      - name: Sync Summary
+        if: always() && env.SUPABASE_URL != '' && steps.docs-filter.outputs.should_sync == 'true'
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "📊 SYNC SUMMARY"
+          echo "═══════════════════════════════════════════"
+          echo ""
+
+          # Parse structure response if available
+          if [ -f /tmp/structure_response.json ]; then
+            python3 << 'PYEOF'
+          import json
+          try:
+              with open('/tmp/structure_response.json') as f:
+                  r = json.load(f)
+              created = len(r.get('created', []))
+              updated = len(r.get('updated', []))
+              skipped = len(r.get('skipped', []))
+              errors = len(r.get('errors', []))
+              deleted = len(r.get('deleted', []))
+              protected_pages = len(r.get('protected', []))
+              metrics = r.get('metrics', {})
+
+              print("Structure Sync:")
+              print(f"  Created:   {created}")
+              print(f"  Skipped:   {skipped}")
+              if errors:
+                  print(f"  Errors:    {errors}")
+              if metrics:
+                  print(f"  Duration:  {metrics.get('durationMs', '?')}ms")
+                  print(f"  API calls: {metrics.get('apiCalls', '?')}")
+          except Exception as e:
+              print(f"  Could not parse structure response: {e}")
+          PYEOF
+          fi
+
+          # Count content sync results
+          if [ -f /tmp/pages_to_sync.json ]; then
+            TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pages_to_sync.json'))))" 2>/dev/null || echo "?")
+            echo ""
+            echo "Content Sync:"
+            echo "  Pages synced: $TOTAL"
+          fi
+
+          echo ""
+          echo "Root page: $(python3 -c "import json; print(json.load(open('notion-structure.json')).get('root', '?'))" 2>/dev/null || echo "?")"
+          echo "Total pages in structure: $(python3 -c "
+          import json
+          def count(obj):
+              c = 0
+              if isinstance(obj, dict):
+                  if 'title' in obj: c += 1
+                  for k in ['children', 'sections']:
+                      if k in obj:
+                          for child in obj[k]: c += count(child)
+              return c
+          print(sum(count(s) for s in json.load(open('notion-structure.json')).get('sections', [])))
+          " 2>/dev/null || echo "?")"
 
   # Triggered on every push - quick status and security check
   on-push:
@@ -857,6 +963,183 @@ jobs:
               title: title,
               body: `## Continuous Improvement Weekly Analysis\n\n### Metrics Summary\n*See action logs for detailed metrics*\n\n### Opportunities Identified\n- [ ] Review and prioritize\n\n### Experiments to Consider\n- [ ] Define experiments based on data\n\n---\n*Generated by AI Agent Workforce*`,
               labels: ['weekly-improvement', 'automated']
+            });
+
+  # Weekly docs health check (runs alongside weekly-improvement on Fridays)
+  docs-health-check:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 5') ||
+      (github.event_name == 'workflow_dispatch' && inputs.agent == 'health-check')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Docs Health Check
+        if: env.SUPABASE_URL != ''
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "🏥 DOCS HEALTH CHECK"
+          echo "═══════════════════════════════════════════"
+          echo ""
+
+          if [ ! -f "notion-structure.json" ]; then
+            echo "⚠️ notion-structure.json not found, skipping"
+            exit 0
+          fi
+
+          # Build health check payload
+          python3 << 'PYEOF' > /tmp/health_payload.json
+          import json
+          with open('notion-structure.json') as f:
+              structure = json.load(f)
+          payload = {
+              'action': 'health-check',
+              'structure': structure,
+              'staleDays': 90,
+              'autoFix': False
+          }
+          print(json.dumps(payload))
+          PYEOF
+
+          response=$(curl -s -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/health_payload.json)
+
+          echo "$response" > /tmp/health_response.json
+
+          # Parse and display report
+          python3 << 'PYEOF'
+          import json
+          try:
+              with open('/tmp/health_response.json') as f:
+                  r = json.load(f)
+              report = r.get('healthReport', {})
+
+              print(f"Summary: {report.get('summary', 'N/A')}")
+              print(f"")
+              print(f"Total pages:  {report.get('totalPages', '?')}")
+              print(f"Checked:      {report.get('pagesChecked', '?')}")
+              print(f"Healthy:      {report.get('healthy', '?')}")
+
+              stale = report.get('stale', [])
+              if stale:
+                  print(f"\n⏰ Stale pages ({len(stale)}):")
+                  for p in stale:
+                      print(f"  - {p['title']} ({p.get('daysSinceEdit', '?')} days)")
+
+              empty = report.get('empty', [])
+              if empty:
+                  print(f"\n📭 Empty pages ({len(empty)}):")
+                  for p in empty:
+                      print(f"  - {p['title']} (human: {p.get('isHuman', '?')})")
+
+              orphaned = report.get('orphaned', [])
+              if orphaned:
+                  print(f"\n👻 Orphaned pages ({len(orphaned)}):")
+                  for p in orphaned:
+                      print(f"  - {p['title']} (under {p.get('parentTitle', '?')})")
+
+              missing = report.get('missingInNotion', [])
+              if missing:
+                  print(f"\n❌ Missing in Notion ({len(missing)}):")
+                  for p in missing:
+                      print(f"  - {p['title']} (expected under {p.get('parentTitle', '?')})")
+
+              dupes = report.get('duplicateTitles', [])
+              if dupes:
+                  print(f"\n⚠️ Duplicate titles ({len(dupes)}):")
+                  for d in dupes:
+                      print(f"  - \"{d['title']}\" x{d['count']}")
+
+          except Exception as e:
+              print(f"Could not parse health report: {e}")
+          PYEOF
+
+      - name: Create Health Report Issue
+        if: env.SUPABASE_URL != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const today = new Date().toISOString().split('T')[0];
+
+            let report = {};
+            try {
+              const raw = fs.readFileSync('/tmp/health_response.json', 'utf8');
+              const response = JSON.parse(raw);
+              report = response.healthReport || {};
+            } catch (e) {
+              console.log('No health report to process');
+              return;
+            }
+
+            const stale = report.stale || [];
+            const empty = report.empty || [];
+            const orphaned = report.orphaned || [];
+            const missing = report.missingInNotion || [];
+            const dupes = report.duplicateTitles || [];
+            const totalIssues = stale.length + empty.length + orphaned.length + missing.length;
+
+            // Only create issue if there are problems
+            if (totalIssues === 0 && dupes.length === 0) {
+              console.log('✅ All pages healthy, no issue needed');
+              return;
+            }
+
+            let body = `## Docs Health Report — ${today}\n\n`;
+            body += `**Summary**: ${report.summary || 'N/A'}\n\n`;
+
+            if (stale.length > 0) {
+              body += `### ⏰ Stale Pages (${stale.length})\n`;
+              for (const p of stale) {
+                body += `- [ ] **${p.title}** — ${p.daysSinceEdit} days since edit\n`;
+              }
+              body += '\n';
+            }
+
+            if (empty.length > 0) {
+              body += `### 📭 Empty Pages (${empty.length})\n`;
+              for (const p of empty) {
+                body += `- [ ] **${p.title}** (${p.isHuman ? 'human' : 'bot'}-created)\n`;
+              }
+              body += '\n';
+            }
+
+            if (orphaned.length > 0) {
+              body += `### 👻 Orphaned Pages (${orphaned.length})\n`;
+              for (const p of orphaned) {
+                body += `- [ ] **${p.title}** under ${p.parentTitle}\n`;
+              }
+              body += '\n';
+            }
+
+            if (missing.length > 0) {
+              body += `### ❌ Missing in Notion (${missing.length})\n`;
+              for (const p of missing) {
+                body += `- [ ] **${p.title}** (expected under ${p.parentTitle})\n`;
+              }
+              body += '\n';
+            }
+
+            if (dupes.length > 0) {
+              body += `### ⚠️ Duplicate Titles (${dupes.length})\n`;
+              for (const d of dupes) {
+                body += `- **"${d.title}"** appears ${d.count}x\n`;
+              }
+              body += '\n';
+            }
+
+            body += '---\n*Generated by Docs Health Check Agent*';
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🏥 Docs Health Report — ${today}`,
+              body: body,
+              labels: ['docs-health', 'automated']
             });
 
   # Manual agent trigger
