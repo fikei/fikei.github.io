@@ -664,6 +664,8 @@ jobs:
                   print(f"   Needs sync: {len(needs_sync)} pages")
                   print(f"   Up to date: {len(up_to_date)} pages")
 
+                  pages_to_sync = []
+
                   # If state check returned nothing (empty state table or error),
                   # fall back to syncing all pages
                   if len(needs_sync) == 0 and len(up_to_date) == 0 and len(content_hashes) > 0:
@@ -678,20 +680,19 @@ jobs:
                               'icon': icon,
                               'parent': parent_title
                           })
-                  elif needs_sync:
-                      print(f"   Pages: {', '.join(list(needs_sync)[:5])}{'...' if len(needs_sync) > 5 else ''}")
-
-                  # Build list of pages to sync with full info
-                  pages_to_sync = []
-                  for filepath, (title, icon, parent_title) in page_info.items():
-                      if filepath in needs_sync:
-                          pages_to_sync.append({
-                              'title': title,
-                              'filepath': filepath,
-                              'hash': content_hashes.get(filepath, ''),
-                              'icon': icon,
-                              'parent': parent_title
-                          })
+                  else:
+                      if needs_sync:
+                          print(f"   Pages: {', '.join(list(needs_sync)[:5])}{'...' if len(needs_sync) > 5 else ''}")
+                      # Build list of pages to sync with full info
+                      for filepath, (title, icon, parent_title) in page_info.items():
+                          if filepath in needs_sync:
+                              pages_to_sync.append({
+                                  'title': title,
+                                  'filepath': filepath,
+                                  'hash': content_hashes.get(filepath, ''),
+                                  'icon': icon,
+                                  'parent': parent_title
+                              })
 
                   with open('/tmp/pages_to_sync.json', 'w') as f:
                       json.dump(pages_to_sync, f)
