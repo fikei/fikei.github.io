@@ -141,6 +141,24 @@ class NotionClient {
     return children
   }
 
+  async getChildPagesAll(parentId: string): Promise<Array<{title: string, id: string}>> {
+    const children: Array<{title: string, id: string}> = []
+
+    try {
+      const results: NotionBlockChildren = await this.request(`/blocks/${parentId}/children?page_size=100`)
+
+      for (const block of results.results) {
+        if (block.type === 'child_page' && block.child_page) {
+          children.push({ title: block.child_page.title, id: block.id })
+        }
+      }
+    } catch (_e) {
+      // Ignore errors - parent might be new
+    }
+
+    return children
+  }
+
   async isPageEmpty(pageId: string): Promise<boolean> {
     try {
       const results: NotionBlockChildren = await this.request(`/blocks/${pageId}/children?page_size=100`)
@@ -652,7 +670,44 @@ async function cleanupLegacyPages(
   }
 
   async function cleanupChildren(parentId: string, expectedForParent: PageDef[], parentPath = '') {
-    const existingChildren = await client.getChildPages(parentId)
+    // Get ALL child pages including duplicates (Map would silently drop them)
+    const allChildren = await client.getChildPagesAll(parentId)
+
+    // Group by title to find duplicates
+    const titleGroups = new Map<string, string[]>()
+    for (const child of allChildren) {
+      const ids = titleGroups.get(child.title) || []
+      ids.push(child.id)
+      titleGroups.set(child.title, ids)
+    }
+
+    // Dedup pass: archive duplicate-titled pages (keep first instance)
+    for (const [title, ids] of titleGroups) {
+      if (ids.length > 1) {
+        const dupPath = parentPath ? `${parentPath} > ${title}` : title
+        log.info(`Found ${ids.length} duplicates of "${title}", archiving ${ids.length - 1}`)
+        for (let i = 1; i < ids.length; i++) {
+          if (dryRun) {
+            result.deleted.push(`[DRY RUN] Would archive duplicate: ${dupPath}`)
+          } else {
+            try {
+              await client.archivePage(ids[i])
+              result.deleted.push(`Archived duplicate: ${dupPath}`)
+              await new Promise(resolve => setTimeout(resolve, 150))
+            } catch (error) {
+              result.errors.push(`Failed to archive duplicate '${dupPath}': ${error.message}`)
+            }
+          }
+        }
+      }
+    }
+
+    // Build deduplicated map for orphan cleanup (one entry per title)
+    const existingChildren = new Map<string, string>()
+    for (const [title, ids] of titleGroups) {
+      existingChildren.set(title, ids[0])
+    }
+
     const expectedTitlesForParent = new Set(expectedForParent.map(p => p.title))
     if (parentId === rootId) {
       expectedTitlesForParent.add('Archive')
