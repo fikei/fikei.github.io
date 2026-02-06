@@ -6,7 +6,6 @@ on:
       - master
       - main
       - 'claude/**'
-      - docs-sync
   pull_request:
     types: [opened, synchronize, ready_for_review]
   schedule:
@@ -44,14 +43,12 @@ env:
 
 jobs:
   # Sync to Notion
-  # - docs-sync branch: always sync (dedicated docs branch)
   # - master/main: only when doc files changed
   # - claude/*: only when doc files changed
   # - manual: always sync
   notion-sync:
     if: >-
       (github.event_name == 'push' && (
-        github.ref == 'refs/heads/docs-sync' ||
         github.ref == 'refs/heads/master' ||
         github.ref == 'refs/heads/main' ||
         startsWith(github.ref, 'refs/heads/claude/')
@@ -66,14 +63,14 @@ jobs:
       - name: Check if docs changed
         id: docs-filter
         run: |
-          # docs-sync branch and manual trigger always sync
-          if [ "${{ github.ref }}" = "refs/heads/docs-sync" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # Manual trigger always syncs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "should_sync=true" >> $GITHUB_OUTPUT
-            echo "✅ Always sync on docs-sync branch or manual trigger"
+            echo "✅ Always sync on manual trigger"
             exit 0
           fi
 
-          # For other branches, only sync if doc-related files changed
+          # For push events, only sync if doc-related files changed
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
             DOC_CHANGES=$(git diff --name-only HEAD~1 HEAD -- '*.md' 'notion-structure.json' 'docs/' | wc -l)
           else
