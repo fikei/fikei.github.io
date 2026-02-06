@@ -4,6 +4,19 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-06] - Tech Stack, Risk Register, Project Plan Updates
+
+### Added
+- **`docs/infrastructure/technical-design/tech-stack.md`** — Complete tech stack reference: frontend (vanilla JS, CSS vars, Jekyll), backend (Supabase, Deno edge functions), AI services, third-party APIs, vendor libraries, dev tooling gaps, architecture diagram.
+- **`docs/infrastructure/risks.md`** — 13 known risks with severity, likelihood, status, detailed mitigations, and dev work references. Organized into "Do Now", "Do Soon", "Do Later" priority tiers.
+
+### Changed
+- **`docs/execution/project-plan/phase-6-performance.md`** — Added Epic 6.2 (Offline & Sync Reliability: retry queue, periodic full sync) and Epic 6.3 (Security Hardening: CORS restriction, Systemic RLS, CSP, rate limiting).
+- **`docs/execution/project-plan/backlog.md`** — Added "Technical Debt & Risk Mitigations" section with 4 epics: Server-Side Scraping Fallback (R1/R13), Client Modularization (R2), Critical-Path Test Suite (R6), Infrastructure Hardening (R11/R12/R7).
+- **`notion-structure.json`** — Added Tech Stack and Known Risks entries.
+
+---
+
 ## [2026-02-05] - Comprehensive Architecture Documentation
 
 ### Added

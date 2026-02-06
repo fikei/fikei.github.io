@@ -319,6 +319,12 @@
               "icon": "\ud83d\udd17",
               "file": "docs/infrastructure/dependencies.md",
               "source": "ai"
+            },
+            {
+              "title": "Known Risks",
+              "icon": "\u26a0\ufe0f",
+              "file": "docs/infrastructure/risks.md",
+              "source": "ai"
             }
           ]
         },
@@ -385,6 +391,12 @@
               "title": "API Reference",
               "icon": "\ud83d\udce1",
               "file": "docs/infrastructure/technical-design/api-reference.md",
+              "source": "ai"
+            },
+            {
+              "title": "Tech Stack",
+              "icon": "\ud83d\udee0\ufe0f",
+              "file": "docs/infrastructure/technical-design/tech-stack.md",
               "source": "ai"
             },
             {
