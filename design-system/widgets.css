@@ -8,34 +8,35 @@
    Like iOS Home Screen widgets: defined sizes
    with sensible constraints per template.
 
-   Sizes (column x row):
-     sm    = 1x1  — glanceable summary
-     med   = 2x1  — comfortable horizontal
-     tall  = 1x2  — vertical detail
-     lg    = 2x2  — full featured
-     wide  = 3x1  — dashboard strip
-     xl    = 3x2  — maximum real estate
+   All sizes (column x row):
+          1 col    2 col    3 col
+   1 row  sm       med      wide
+   2 row  tall     lg       xl
+   3 row  col      poster   max
 
-   Valid sizes per template:
+   Valid sizes per template (editable in showcase):
      verdict:    sm, med, lg
-     list:       sm(3 rows), tall, med, lg
-     spectrum:   sm(2 axes), tall, med, lg
+     list:       sm, med, tall, lg, wide
+     spectrum:   sm, med, lg
      split:      med, lg              (min 2 cols)
-     narrative:  med, lg, wide        (needs reading width)
+     narrative:  med, tall, lg
      comparison: med, lg              (min 2 cols)
-     choices:    sm(2 opts), tall, med, lg
-     checklist:  sm(3 rows), tall, med, lg
-     suggestion: sm, med
-     grouped:    tall, lg, xl         (needs vertical space)
+     choices:    sm, med, lg
+     checklist:  sm, tall, med, lg
+     suggestion: sm, med, tall, lg
+     grouped:    med, tall, lg
    ============================================ */
 
 /* --- Grid span classes --- */
-.w-shell--sm   { grid-column: span 1; grid-row: span 1; }
-.w-shell--med  { grid-column: span 2; grid-row: span 1; }
-.w-shell--tall { grid-column: span 1; grid-row: span 2; }
-.w-shell--lg   { grid-column: span 2; grid-row: span 2; }
-.w-shell--wide { grid-column: span 3; grid-row: span 1; }
-.w-shell--xl   { grid-column: span 3; grid-row: span 2; }
+.w-shell--sm     { grid-column: span 1; grid-row: span 1; }
+.w-shell--med    { grid-column: span 2; grid-row: span 1; }
+.w-shell--tall   { grid-column: span 1; grid-row: span 2; }
+.w-shell--lg     { grid-column: span 2; grid-row: span 2; }
+.w-shell--wide   { grid-column: span 3; grid-row: span 1; }
+.w-shell--xl     { grid-column: span 3; grid-row: span 2; }
+.w-shell--col    { grid-column: span 1; grid-row: span 3; }
+.w-shell--poster { grid-column: span 2; grid-row: span 3; }
+.w-shell--max    { grid-column: span 3; grid-row: span 3; }
 
 /* ============================================
    Shell / Structure
@@ -499,19 +500,17 @@
 
 .w-axis__track {
   position: relative;
-  height: 4px;
+  height: 2px;
   background: var(--border-subtle);
 }
 
 .w-axis__marker {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
+  width: 2px;
+  height: 12px;
   background: var(--fg);
-  border-radius: 50%;
   transform: translate(-50%, -50%);
-  transition: left 0.4s ease;
 }
 
 .w-axis__note { text-align: left; }

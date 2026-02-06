@@ -88,6 +88,23 @@
     .variant-item--lg { width: 420px; }
     .variant-item--wide { width: 640px; }
     .variant-item--xl { width: 640px; }
+    .variant-item--col { width: 200px; }
+    .variant-item--poster { width: 420px; }
+    .variant-item--max { width: 640px; }
+
+    /* Template constraint editor */
+    .constraint-editor { border-collapse: collapse; width: 100%; font-family: var(--font-primary); }
+    .constraint-editor th { font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); padding: var(--space-1) var(--space-2); font-weight: normal; }
+    .constraint-editor th:first-child { text-align: left; }
+    .constraint-editor td { padding: 0; text-align: center; }
+    .constraint-editor td:first-child { text-align: left; padding: var(--space-1) var(--space-2); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg); }
+    .constraint-cell { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; border: var(--border-thin) solid transparent; transition: border-color var(--duration-normal) var(--ease-default); }
+    .constraint-cell:hover { border-color: var(--border-subtle); }
+    .constraint-cell--on { background: var(--fg); }
+    .constraint-cell--on::after { content: ''; display: block; width: 8px; height: 8px; background: var(--fg); }
+    .constraint-cell--off { background: transparent; }
+    .constraint-cell--off::after { content: ''; display: block; width: 8px; height: 8px; border: var(--border-thin) solid var(--border-subtle); }
+    .constraint-size-label { font-size: 8px; color: var(--fg-muted); display: block; }
 
     @media (max-width: 900px) {
       .grid-test--5col { grid-template-columns: repeat(3, 1fr); }
@@ -127,6 +144,7 @@
   <a href="#molecules">Molecules</a>
   <a href="#layouts">Layouts</a>
   <a href="#priority">Priority</a>
+  <a href="#constraints">Constraints</a>
   <a href="#grid">Grid Sizes</a>
   <span class="nav__spacer"></span>
   <select id="widgetFilter" onchange="showVariants()">
@@ -1262,6 +1280,18 @@
 
   <hr class="section-divider">
 
+  <!-- ====== TEMPLATE CONSTRAINTS ====== -->
+  <div class="section" id="constraints">
+    <h2 class="section__heading">Template Constraints</h2>
+    <p class="section__desc">Click cells to toggle which sizes are allowed per template. Changes persist to localStorage and update the variant explorer.</p>
+    <table class="constraint-editor" id="constraintEditor"></table>
+    <div style="margin-top:var(--space-3)">
+      <button class="w-btn w-btn--sm" onclick="resetConstraints()">Reset to defaults</button>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
   <!-- ====== GRID SIZE PERMUTATIONS ====== -->
   <div class="section" id="grid">
     <h2 class="section__heading">Grid Size Permutations</h2>
@@ -1533,8 +1563,17 @@ function toggleGridLines(btn) {
   btn.classList.toggle('active');
 }
 
-// Template → valid sizes
-var TEMPLATE_SIZES = {
+// All 9 sizes in grid order (1x1 → 3x3)
+var ALL_SIZES = ['sm', 'med', 'wide', 'tall', 'lg', 'xl', 'col', 'poster', 'max'];
+
+var SIZE_LABELS = {
+  sm: '1x1', med: '2x1', wide: '3x1',
+  tall: '1x2', lg: '2x2', xl: '3x2',
+  col: '1x3', poster: '2x3', max: '3x3'
+};
+
+// Default allowed sizes per template
+var DEFAULT_TEMPLATE_SIZES = {
   verdict:    ['sm', 'med', 'lg'],
   list:       ['sm', 'med', 'tall', 'lg', 'wide'],
   narrative:  ['med', 'tall', 'lg'],
@@ -1545,9 +1584,89 @@ var TEMPLATE_SIZES = {
   grouped:    ['med', 'tall', 'lg']
 };
 
-var SIZE_LABELS = {
-  sm: '1x1', med: '2x1', tall: '1x2', lg: '2x2', wide: '3x1', xl: '3x2'
-};
+// Live map — loaded from localStorage or defaults
+var TEMPLATE_SIZES = loadConstraints();
+
+var ALL_TEMPLATES = Object.keys(DEFAULT_TEMPLATE_SIZES);
+
+function loadConstraints() {
+  try {
+    var saved = localStorage.getItem('widget-template-constraints');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  // Deep copy defaults
+  var copy = {};
+  for (var t in DEFAULT_TEMPLATE_SIZES) copy[t] = DEFAULT_TEMPLATE_SIZES[t].slice();
+  return copy;
+}
+
+function saveConstraints() {
+  try { localStorage.setItem('widget-template-constraints', JSON.stringify(TEMPLATE_SIZES)); } catch (e) {}
+}
+
+function buildConstraintEditor() {
+  var table = document.getElementById('constraintEditor');
+  if (!table) return;
+
+  // Header row
+  var thead = '<thead><tr><th></th>';
+  ALL_SIZES.forEach(function(s, i) {
+    // Add row break indicators
+    var border = (i === 3 || i === 6) ? ' style="border-left:var(--border-thin) solid var(--border-subtle)"' : '';
+    thead += '<th' + border + '>' + s + '<span class="constraint-size-label">' + SIZE_LABELS[s] + '</span></th>';
+  });
+  thead += '</tr></thead>';
+
+  // Body rows
+  var tbody = '<tbody>';
+  ALL_TEMPLATES.forEach(function(tmpl) {
+    tbody += '<tr><td>' + tmpl + '</td>';
+    ALL_SIZES.forEach(function(size, i) {
+      var on = TEMPLATE_SIZES[tmpl].indexOf(size) !== -1;
+      var border = (i === 3 || i === 6) ? 'border-left:var(--border-thin) solid var(--border-subtle);' : '';
+      tbody += '<td style="' + border + '"><div class="constraint-cell constraint-cell--' + (on ? 'on' : 'off') + '" data-tmpl="' + tmpl + '" data-size="' + size + '"></div></td>';
+    });
+    tbody += '</tr>';
+  });
+  tbody += '</tbody>';
+
+  table.innerHTML = thead + tbody;
+}
+
+// Delegate clicks on constraint cells
+document.addEventListener('click', function(e) {
+  var cell = e.target.closest('.constraint-cell');
+  if (!cell) return;
+
+  var tmpl = cell.dataset.tmpl;
+  var size = cell.dataset.size;
+  var arr = TEMPLATE_SIZES[tmpl];
+  var idx = arr.indexOf(size);
+
+  if (idx !== -1) {
+    // Disallow — remove
+    arr.splice(idx, 1);
+    cell.className = 'constraint-cell constraint-cell--off';
+  } else {
+    // Allow — add and re-sort to match ALL_SIZES order
+    arr.push(size);
+    arr.sort(function(a, b) { return ALL_SIZES.indexOf(a) - ALL_SIZES.indexOf(b); });
+    cell.className = 'constraint-cell constraint-cell--on';
+  }
+
+  saveConstraints();
+});
+
+function resetConstraints() {
+  var copy = {};
+  for (var t in DEFAULT_TEMPLATE_SIZES) copy[t] = DEFAULT_TEMPLATE_SIZES[t].slice();
+  TEMPLATE_SIZES = copy;
+  saveConstraints();
+  buildConstraintEditor();
+}
+
+// Build on load
+buildConstraintEditor();
 
 function showVariants() {
   var widgetVal = document.getElementById('widgetFilter').value;
