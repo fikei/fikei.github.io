@@ -4422,6 +4422,102 @@ Return JSON:
       });
   }
 
+  // =============================================================================
+  // SERVER-DRIVEN WIDGET DISCOVERY
+  // Asks the server which widgets are eligible for the current context.
+  // Server eligibility rules (config/widgets/*.ts) are the source of truth.
+  // Falls back to local WIDGET_REGISTRY if the server is unreachable.
+  // =============================================================================
+
+  async function discoverWidgetsFromServer(category, items) {
+    try {
+      const itemsPayload = items.map(i => ({
+        id: i.id,
+        title: i.title,
+        description: i.description || '',
+        image: i.image || '',
+        url: i.url
+      }));
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          action: 'discover',
+          category: category,
+          items: itemsPayload
+        })
+      });
+
+      if (!response.ok) {
+        console.warn('[discovery] Server returned', response.status, '— falling back to local registry');
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[discovery] Server returned', data.widgets?.length, 'eligible widgets for', category);
+
+      // Map server widgets to local WIDGET_REGISTRY entries, merging server metadata.
+      // If a widget exists only on the server (not in local WIDGET_REGISTRY), build
+      // a temporary local entry from the discovery response so it can still render.
+      const discoveredWidgets = [];
+      for (const serverWidget of (data.widgets || [])) {
+        const localWidget = WIDGET_REGISTRY[serverWidget.widgetId];
+        if (localWidget) {
+          // Merge: use local prompt + template config, server zone/priority/eligibility
+          discoveredWidgets.push({
+            ...localWidget,
+            zone: serverWidget.zone || localWidget.zone,
+            _serverEligibility: serverWidget.eligibility,
+            _serverPriority: serverWidget.priority
+          });
+        } else if (serverWidget.promptTemplate) {
+          // Server-only widget — build a temporary entry from discovery data
+          console.log('[discovery] Building temp entry for server widget:', serverWidget.widgetId);
+          discoveredWidgets.push({
+            id: serverWidget.widgetId,
+            name: serverWidget.name,
+            description: serverWidget.description || '',
+            status: 'active',
+            zone: serverWidget.zone,
+            criteria: {},
+            prompt: serverWidget.promptTemplate + (serverWidget.constraints?.length
+              ? '\n\nADDITIONAL CONSTRAINTS:\n' + serverWidget.constraints.map(c => '- ' + c).join('\n')
+              : ''),
+            template: {
+              name: serverWidget.template,
+              fallback: serverWidget.fallbackTemplate || 'list'
+            },
+            _serverEligibility: serverWidget.eligibility,
+            _serverPriority: serverWidget.priority,
+            _serverOnly: true
+          });
+        } else {
+          console.log('[discovery] Server widget', serverWidget.widgetId, 'not in local registry and no prompt — skipping');
+        }
+      }
+
+      // Sort by server priority (lower = higher priority), then favorites
+      discoveredWidgets.sort((a, b) => {
+        const aFav = widgetPrefs.favorites[a.id] ? 0 : 1;
+        const bFav = widgetPrefs.favorites[b.id] ? 0 : 1;
+        if (aFav !== bFav) return aFav - bFav;
+        return (a._serverPriority || 99) - (b._serverPriority || 99);
+      });
+
+      // Respect user preferences (hidden/dismissed)
+      return discoveredWidgets.filter(w =>
+        getWidgetStatus(w.id) === 'active' && shouldShowWidget(w.id)
+      );
+    } catch (err) {
+      console.warn('[discovery] Network error — falling back to local registry:', err.message);
+      return null;
+    }
+  }
+
   // Shuffle array randomly (Fisher-Yates)
   function shuffleArray(arr) {
     const a = [...arr];
@@ -5122,8 +5218,13 @@ Return JSON:
       return;
     }
 
-    // Get applicable widgets for the current category
-    const applicableWidgets = getApplicableWidgets(items, widgetCategory);
+    // Server-driven discovery: ask the server which widgets are eligible,
+    // fall back to local WIDGET_REGISTRY if server is unreachable.
+    let applicableWidgets = await discoverWidgetsFromServer(widgetCategory, items);
+    if (!applicableWidgets) {
+      console.log('[widget] Using local registry fallback');
+      applicableWidgets = getApplicableWidgets(items, widgetCategory);
+    }
 
     if (applicableWidgets.length === 0) {
       renderGrid();
@@ -5140,12 +5241,13 @@ Return JSON:
 
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
+      const firstHeroName = widgetsByZone.hero[0].name || 'Widget';
       heroSection.classList.add('widget-section--visible');
       heroContent.innerHTML = `
         <div class="widget-complete">
           <div class="widget-complete__header">
             <div class="widget-complete__header-left">
-              <span class="widget-complete__title">Style Summary</span>
+              <span class="widget-complete__title">${esc(firstHeroName)}</span>
               <span class="widget-complete__badge">AI</span>
             </div>
           </div>

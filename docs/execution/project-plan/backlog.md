@@ -44,6 +44,25 @@
 
 ---
 
+## Action Widget Templates
+
+Templates that collect user input and close a feedback loop (choices train AI, adds update boards).
+See [Widget Template Patterns research](../../ux/research/widget-template-patterns.md) for wireframes.
+
+| Story | Template | Verb | Status |
+|-------|----------|------|--------|
+| Pick between two options | `pick-one` | Choose | Pending |
+| Rapid preference building (pass/save stack) | `swipe-stack` | Pass / Save | Pending |
+| Suggest an upgrade/alternative | `swap` | Keep / Replace | Pending |
+| Ready-to-buy list with total | `commit-list` | Select + open | Pending |
+| Binary direction choice | `vote-split` | Pick direction | Pending |
+| Free-text constraint input | `prompt` | Type + submit | Pending |
+| Save a curated set at once | `bundle` | Save set | Pending |
+| Goal tracking with progress | `goal` | Add + set target | Pending |
+| Time-sensitive deal or restock | `alert` | Visit / Dismiss | Pending |
+
+---
+
 ## Advanced AI Features
 
 | Story | Status |

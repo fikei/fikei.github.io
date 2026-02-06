@@ -4,6 +4,20 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-06] - Server-Driven Widget Discovery
+
+### Added
+- **`discoverWidgetsFromServer(category, items)`** — Frontend calls server discovery endpoint before rendering widgets
+  - Server eligibility engine is now the source of truth for which widgets appear
+  - Graceful fallback: if server is unreachable, falls back to local `WIDGET_REGISTRY`
+  - Merges server metadata (zone, priority, eligibility) with local widget configs
+  - Server-only widgets auto-build temporary local entries from discovery response (prompt + template)
+- **Discovery endpoint enhanced** — Now returns `promptTemplate` and `constraints` per widget
+- **Loading state uses dynamic widget name** — No longer hard-coded "Style Summary"
+- **Action templates added to backlog** — 9 feedback-loop templates tracked for future implementation
+
+---
+
 ## [2026-02-06] - Widget Templates: spectrum, stat-row, quick-add
 
 ### Added
