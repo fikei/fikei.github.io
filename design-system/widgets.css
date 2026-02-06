@@ -19,7 +19,6 @@
    Valid sizes per template:
      verdict:    sm, med, lg
      list:       sm(3 rows), tall, med, lg
-     stats:      sm(stacked), med, wide
      spectrum:   sm(2 axes), tall, med, lg
      split:      med, lg              (min 2 cols)
      narrative:  med, lg, wide        (needs reading width)
@@ -98,6 +97,21 @@
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* Anchored actions — sits inside the body border as a visual continuation.
+   Use this instead of w-footer to avoid the "hanging button" feel. */
+.w-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-top: var(--border-thin) solid var(--border-subtle);
+  background: var(--bg-surface);
+  border-left: var(--border-thin) solid var(--border-subtle);
+  border-right: var(--border-thin) solid var(--border-subtle);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  margin-top: -1px; /* merge with body border */
 }
 
 /* ============================================
@@ -210,24 +224,95 @@
 .w-bar--thick { height: 8px; }
 .w-bar--thin  { height: 2px; }
 
+/* --- w-icon --- */
+.w-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.w-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.w-icon--sm svg { width: 12px; height: 12px; }
+
 /* --- w-icon-btn --- */
 .w-icon-btn {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
   color: var(--fg-muted);
-  font-size: 14px;
   cursor: pointer;
   transition: color var(--duration-normal) var(--ease-default);
   padding: 0;
   flex-shrink: 0;
 }
 
+.w-icon-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .w-icon-btn:hover { color: var(--fg); }
+
+/* --- w-img --- */
+.w-img {
+  position: relative;
+  overflow: hidden;
+  background: var(--border-subtle);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+.w-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.w-img--wide   { aspect-ratio: 16 / 9; }
+.w-img--banner  { aspect-ratio: 3 / 1; width: 100%; }
+.w-img--thumb  { width: 40px; height: 40px; }
+.w-img--card   { width: 80px; height: 80px; }
+.w-img--hero   { width: 100%; aspect-ratio: 4 / 3; }
+
+/* Placeholder when no image loaded */
+.w-img__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-muted);
+}
+
+.w-img__placeholder svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
 
 /* --- w-divider --- */
 .w-divider {
@@ -491,15 +576,6 @@
   border-top: none;
 }
 
-/* Stats: evenly distributed stat blocks */
-.w-body--stats {
-  display: flex;
-  justify-content: space-around;
-  text-align: center;
-  padding: var(--space-6) var(--space-4);
-  gap: var(--space-3);
-}
-
 /* Spectrum: stacked axes */
 .w-body--spectrum {
   display: flex;
@@ -637,7 +713,9 @@
   .w-body { padding: var(--space-2); }
 
   .w-body--verdict { padding: var(--space-3) var(--space-2); gap: var(--space-2); }
-  .w-body--stats   { padding: var(--space-3) var(--space-2); flex-direction: column; }
+
+  .w-img--card { width: 48px; height: 48px; }
+  .w-img--hero { aspect-ratio: 3 / 2; }
 
   .w-body--list > .w-row { gap: var(--space-2); }
   .w-row__indicator { display: none; }
@@ -658,11 +736,6 @@
 @container (max-width: 280px) {
   .w-text--display { font-size: var(--text-2xl); }
   .w-text--prose   { font-size: var(--text-sm); }
-
-  .w-body--stats {
-    flex-wrap: wrap;
-    padding: var(--space-4) var(--space-3);
-  }
 
   .w-body--split {
     grid-template-columns: 1fr;
@@ -706,11 +779,6 @@
     gap: var(--space-4);
   }
 
-  .w-body--stats {
-    padding: var(--space-8) var(--space-6);
-    gap: var(--space-6);
-  }
-
   .w-body--spectrum { gap: var(--space-6); }
   .w-body--grouped  { gap: var(--space-6); }
 
@@ -726,14 +794,6 @@
 
 /* --- WIDE: Strip (> 560px) --- */
 @container (min-width: 560px) {
-  .w-body--stats .w-stat {
-    min-width: 100px;
-  }
-
-  .w-body--stats .w-text--value {
-    font-size: var(--text-3xl);
-  }
-
   .w-body--list {
     columns: 2;
     column-gap: var(--space-6);

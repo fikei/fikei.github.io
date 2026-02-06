@@ -9,155 +9,108 @@
   <link rel="stylesheet" href="components.css">
   <link rel="stylesheet" href="widgets.css">
   <style>
-    /* Showcase-specific layout */
-    .showcase {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: var(--space-6);
-    }
-    .showcase__title {
-      font-family: var(--font-serif);
-      font-size: var(--text-3xl);
-      margin-bottom: var(--space-1);
-    }
-    .showcase__subtitle {
-      font-family: var(--font-primary);
-      font-size: var(--text-xs);
-      color: var(--fg-muted);
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-wider);
-      margin-bottom: var(--space-8);
-    }
+    /* === Showcase layout === */
+    .showcase { max-width: 1200px; margin: 0 auto; padding: var(--space-6); }
+    .showcase__title { font-family: var(--font-serif); font-size: var(--text-3xl); margin-bottom: var(--space-1); }
+    .showcase__subtitle { font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin-bottom: var(--space-8); }
 
-    .section {
-      margin-bottom: var(--space-16);
-    }
-    .section__heading {
-      font-family: var(--font-primary);
-      font-size: var(--text-lg);
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-wider);
-      color: var(--fg);
-      margin-bottom: var(--space-1);
-    }
-    .section__desc {
-      font-family: var(--font-primary);
-      font-size: var(--text-xs);
-      color: var(--fg-muted);
-      margin-bottom: var(--space-6);
-    }
+    .section { margin-bottom: var(--space-16); }
+    .section__heading { font-family: var(--font-primary); font-size: var(--text-lg); text-transform: uppercase; letter-spacing: var(--tracking-wider); color: var(--fg); margin-bottom: var(--space-1); }
+    .section__desc { font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-6); }
 
-    .component-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--space-6);
-    }
+    .component-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-6); }
+    .component-card { border: var(--border-thin) solid var(--border-subtle); padding: var(--space-4); }
+    .component-card__label { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--fg-muted); margin-bottom: var(--space-3); padding-bottom: var(--space-2); border-bottom: var(--border-thin) solid var(--border-subtle); }
+    .component-card__demo { display: flex; flex-direction: column; gap: var(--space-3); }
+    .variants-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 
-    .component-card {
-      border: var(--border-thin) solid var(--border-subtle);
-      padding: var(--space-4);
-    }
-    .component-card__label {
-      font-family: var(--font-primary);
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-widest);
-      color: var(--fg-muted);
-      margin-bottom: var(--space-3);
-      padding-bottom: var(--space-2);
-      border-bottom: var(--border-thin) solid var(--border-subtle);
-    }
-    .component-card__demo {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
+    .section-divider { border: none; border-top: var(--border-thin) solid var(--border-subtle); margin: var(--space-16) 0; }
 
-    /* Inline variants row */
-    .variants-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      align-items: center;
-    }
+    /* === Grid test beds === */
+    .grid-test { display: grid; gap: var(--space-4); grid-auto-rows: minmax(160px, auto); }
+    .grid-test--5col { grid-template-columns: repeat(5, 1fr); }
+    .grid-test--4col { grid-template-columns: repeat(4, 1fr); }
+    .grid-test--3col { grid-template-columns: repeat(3, 1fr); }
 
-    /* Widget demo grid */
-    .widget-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: var(--space-6);
-    }
+    .grid-controls { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+    .grid-controls button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
+    .grid-controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
-    /* Divider between major sections */
-    .section-divider {
-      border: none;
-      border-top: var(--border-thin) solid var(--border-subtle);
-      margin: var(--space-16) 0;
-    }
+    /* Placeholder images */
+    .w-img--placeholder { background: var(--gray-300); }
 
     /* Nav */
-    .nav {
-      position: sticky;
-      top: 0;
-      background: var(--bg);
-      border-bottom: var(--border-thin) solid var(--border-subtle);
-      z-index: var(--z-sticky);
-      padding: var(--space-3) var(--space-6);
-      display: flex;
-      gap: var(--space-4);
-      overflow-x: auto;
-    }
-    .nav a {
-      font-family: var(--font-primary);
-      font-size: var(--text-xs);
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-wide);
-      color: var(--fg-muted);
-      text-decoration: none;
-      white-space: nowrap;
-    }
+    .nav { position: sticky; top: 0; background: var(--bg); border-bottom: var(--border-thin) solid var(--border-subtle); z-index: var(--z-sticky); padding: var(--space-3) var(--space-6); display: flex; gap: var(--space-4); overflow-x: auto; }
+    .nav a { font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); text-decoration: none; white-space: nowrap; }
     .nav a:hover { color: var(--fg); }
+
+    @media (max-width: 900px) {
+      .grid-test--5col { grid-template-columns: repeat(3, 1fr); }
+      .grid-test--4col { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .grid-test--5col, .grid-test--4col, .grid-test--3col { grid-template-columns: repeat(2, 1fr); }
+    }
   </style>
 </head>
 <body>
+
+<!-- SVG icon sprite — all icons in one place -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+  <symbol id="icon-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="icon-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="icon-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="icon-bookmark" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+  <symbol id="icon-map-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  <symbol id="icon-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
+  <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="icon-coffee" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></symbol>
+  <symbol id="icon-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></symbol>
+  <symbol id="icon-tv" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></symbol>
+  <symbol id="icon-shuffle" viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></symbol>
+  <symbol id="icon-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></symbol>
+</svg>
 
 <nav class="nav">
   <a href="#atoms">Atoms</a>
   <a href="#molecules">Molecules</a>
   <a href="#layouts">Layouts</a>
-  <a href="#widgets">Widget Examples</a>
+  <a href="#grid">Grid Sizes</a>
 </nav>
 
 <div class="showcase">
   <h1 class="showcase__title">Widget Components</h1>
-  <p class="showcase__subtitle">ctrl.rodeo design system — w- prefixed components for AI widgets</p>
+  <p class="showcase__subtitle">ctrl.rodeo design system — v2 with visual/narrative focus, photos, SVG icons, anchored actions</p>
 
-  <!-- ========================================
-       ATOMS
-       ======================================== -->
+  <!-- ====== ATOMS ====== -->
   <div class="section" id="atoms">
     <h2 class="section__heading">Atoms</h2>
-    <p class="section__desc">Smallest visual units. Cannot be broken down further.</p>
+    <p class="section__desc">Smallest visual units.</p>
 
     <div class="component-grid">
 
-      <!-- w-text variants -->
+      <!-- w-text -->
       <div class="component-card">
-        <div class="component-card__label">w-text (7 variants)</div>
+        <div class="component-card__label">w-text</div>
         <div class="component-card__demo">
-          <span class="w-text w-text--display">Display Text</span>
-          <span class="w-text w-text--title">Title Text</span>
-          <span class="w-text w-text--meta">Meta text — supporting info</span>
-          <span class="w-text w-text--value">247</span>
-          <span class="w-text w-text--label">Label text</span>
-          <span class="w-text w-text--note">Note text — explanatory footnote</span>
-          <p class="w-text w-text--prose">Prose text for narrative paragraphs. Your saved articles cluster around three core themes that reveal an evolving interest pattern.</p>
+          <span class="w-text w-text--display">Display</span>
+          <span class="w-text w-text--title">Title</span>
+          <span class="w-text w-text--meta">Meta — supporting info</span>
+          <span class="w-text w-text--label">Label</span>
+          <span class="w-text w-text--note">Note — explanatory italic</span>
+          <p class="w-text w-text--prose">Prose for narrative paragraphs. Your saved articles cluster around themes that reveal an evolving interest pattern.</p>
         </div>
       </div>
 
-      <!-- w-badge variants -->
+      <!-- w-badge -->
       <div class="component-card">
-        <div class="component-card__label">w-badge (5 variants)</div>
+        <div class="component-card__label">w-badge</div>
         <div class="component-card__demo">
           <div class="variants-row">
             <span class="w-badge">Default</span>
@@ -166,10 +119,6 @@
           </div>
           <div class="variants-row">
             <span class="w-badge w-badge--filled">Filled</span>
-            <span class="w-badge w-badge--filled">67%</span>
-            <span class="w-badge w-badge--filled">Active</span>
-          </div>
-          <div class="variants-row">
             <span class="w-badge w-badge--accent">Accent</span>
             <span class="w-badge w-badge--success">Success</span>
             <span class="w-badge w-badge--error">Error</span>
@@ -177,61 +126,82 @@
         </div>
       </div>
 
-      <!-- w-bar variants -->
+      <!-- w-icon + w-icon-btn -->
       <div class="component-card">
-        <div class="component-card__label">w-bar (3 sizes)</div>
+        <div class="component-card__label">w-icon + w-icon-btn</div>
         <div class="component-card__demo">
-          <span class="w-text w-text--label">Thin (2px)</span>
-          <div class="w-bar w-bar--thin" style="--fill: 45%"><div class="w-bar__fill"></div></div>
-          <span class="w-text w-text--label">Default (4px)</span>
-          <div class="w-bar" style="--fill: 67%"><div class="w-bar__fill"></div></div>
-          <span class="w-text w-text--label">Thick (8px)</span>
-          <div class="w-bar w-bar--thick" style="--fill: 80%"><div class="w-bar__fill"></div></div>
-          <span class="w-text w-text--label">Multiple fills</span>
-          <div class="w-bar" style="--fill: 25%"><div class="w-bar__fill"></div></div>
-          <div class="w-bar" style="--fill: 50%"><div class="w-bar__fill"></div></div>
-          <div class="w-bar" style="--fill: 90%"><div class="w-bar__fill"></div></div>
+          <div class="variants-row">
+            <span class="w-icon"><svg><use href="#icon-refresh"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-x"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-arrow-right"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-check"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-plus"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-bookmark"/></svg></span>
+          </div>
+          <div class="variants-row">
+            <span class="w-icon"><svg><use href="#icon-clock"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-play"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-book"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-external"/></svg></span>
+          </div>
+          <span class="w-text w-text--label" style="margin-top:var(--space-2)">As buttons (equal sizing)</span>
+          <div class="variants-row">
+            <button class="w-icon-btn" title="Refresh"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn" title="Dismiss"><svg><use href="#icon-x"/></svg></button>
+            <button class="w-icon-btn" title="Navigate"><svg><use href="#icon-arrow-right"/></svg></button>
+            <button class="w-icon-btn" title="Save"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
         </div>
       </div>
 
-      <!-- w-icon-btn -->
+      <!-- w-img -->
       <div class="component-card">
-        <div class="component-card__label">w-icon-btn (4 types)</div>
+        <div class="component-card__label">w-img</div>
         <div class="component-card__demo">
           <div class="variants-row">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-            <span class="w-text w-text--meta">Refresh</span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
           </div>
-          <div class="variants-row">
-            <button class="w-icon-btn" title="Dismiss">&#x2715;</button>
-            <span class="w-text w-text--meta">Dismiss</span>
-          </div>
-          <div class="variants-row">
-            <button class="w-icon-btn" title="Check">&#x2713;</button>
-            <span class="w-text w-text--meta">Check</span>
-          </div>
-          <div class="variants-row">
-            <button class="w-icon-btn" title="Expand">&rarr;</button>
-            <span class="w-text w-text--meta">Expand</span>
-          </div>
+          <div class="w-img w-img--hero w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div class="w-img w-img--banner w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+        </div>
+      </div>
+
+      <!-- w-bar -->
+      <div class="component-card">
+        <div class="component-card__label">w-bar</div>
+        <div class="component-card__demo">
+          <div class="w-bar w-bar--thin" style="--fill:45%"><div class="w-bar__fill"></div></div>
+          <div class="w-bar" style="--fill:67%"><div class="w-bar__fill"></div></div>
+          <div class="w-bar w-bar--thick" style="--fill:80%"><div class="w-bar__fill"></div></div>
         </div>
       </div>
 
       <!-- w-divider -->
       <div class="component-card">
-        <div class="component-card__label">w-divider (3 variants)</div>
+        <div class="component-card__label">w-divider</div>
         <div class="component-card__demo">
-          <span class="w-text w-text--label">Horizontal</span>
           <div class="w-divider"></div>
-          <span class="w-text w-text--label">Labeled</span>
           <div class="w-divider w-divider--labeled">vs</div>
-          <span class="w-text w-text--label">Labeled (or)</span>
           <div class="w-divider w-divider--labeled">or</div>
-          <span class="w-text w-text--label">Vertical (shown inline)</span>
-          <div style="display:flex; align-items:center; height:40px; gap:var(--space-3)">
+          <div style="display:flex;align-items:center;height:40px;gap:var(--space-3)">
             <span class="w-text w-text--meta">Left</span>
             <div class="w-divider w-divider--vertical"></div>
             <span class="w-text w-text--meta">Right</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-btn -->
+      <div class="component-card">
+        <div class="component-card__label">w-btn</div>
+        <div class="component-card__demo">
+          <div class="variants-row">
+            <button class="w-btn">Default</button>
+            <button class="w-btn w-btn--filled">Filled</button>
+            <button class="w-btn w-btn--sm">Small</button>
           </div>
         </div>
       </div>
@@ -241,46 +211,21 @@
         <div class="component-card__label">w-checkbox</div>
         <div class="component-card__demo">
           <div class="variants-row">
-            <label class="w-checkbox">
-              <input type="checkbox">
-              <span class="w-checkbox__mark"></span>
-            </label>
+            <label class="w-checkbox"><input type="checkbox"><span class="w-checkbox__mark"></span></label>
             <span class="w-text w-text--meta">Unchecked</span>
           </div>
           <div class="variants-row">
-            <label class="w-checkbox">
-              <input type="checkbox" checked>
-              <span class="w-checkbox__mark"></span>
-            </label>
+            <label class="w-checkbox"><input type="checkbox" checked><span class="w-checkbox__mark"></span></label>
             <span class="w-text w-text--meta">Checked</span>
           </div>
         </div>
       </div>
-
-      <!-- w-btn -->
-      <div class="component-card">
-        <div class="component-card__label">w-btn (widget button)</div>
-        <div class="component-card__demo">
-          <div class="variants-row">
-            <button class="w-btn">Default</button>
-            <button class="w-btn w-btn--filled">Filled</button>
-            <button class="w-btn w-btn--sm">Small</button>
-          </div>
-          <div class="variants-row">
-            <button class="w-btn">Pick this one</button>
-            <button class="w-btn w-btn--filled">Save to board</button>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
   <hr class="section-divider">
 
-  <!-- ========================================
-       MOLECULES
-       ======================================== -->
+  <!-- ====== MOLECULES ====== -->
   <div class="section" id="molecules">
     <h2 class="section__heading">Molecules</h2>
     <p class="section__desc">Atoms composed into recognizable patterns.</p>
@@ -295,11 +240,6 @@
             <span class="w-text w-text--display">Minimal Modern</span>
             <span class="w-text w-text--meta">Based on 12 items</span>
           </div>
-          <div class="w-divider"></div>
-          <div class="w-headline">
-            <span class="w-text w-text--display">Split Personality</span>
-            <span class="w-text w-text--meta">Home vs. wardrobe aesthetic conflict</span>
-          </div>
         </div>
       </div>
 
@@ -311,84 +251,29 @@
             <span class="w-badge">Monochrome</span>
             <span class="w-badge">Texture</span>
             <span class="w-badge">Clean lines</span>
-            <span class="w-badge">Geometric</span>
-          </div>
-          <div class="w-divider"></div>
-          <div class="w-tag-group">
-            <span class="w-badge w-badge--filled">Italian 45%</span>
-            <span class="w-badge">Thai 30%</span>
-            <span class="w-badge">Mexican 25%</span>
           </div>
         </div>
       </div>
 
-      <!-- w-stat -->
+      <!-- w-row with image -->
       <div class="component-card">
-        <div class="component-card__label">w-stat (3 examples)</div>
-        <div class="component-card__demo">
-          <div style="display:flex; gap:var(--space-4); justify-content:space-around;">
-            <div class="w-stat">
-              <span class="w-text w-text--value">47</span>
-              <span class="w-text w-text--label">Backlog</span>
-            </div>
-            <div class="w-stat">
-              <span class="w-text w-text--value">12h</span>
-              <span class="w-text w-text--label">Read time</span>
-            </div>
-            <div class="w-stat">
-              <span class="w-text w-text--value">3.2</span>
-              <span class="w-text w-text--label">Per day</span>
-            </div>
-          </div>
-          <div class="w-divider"></div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">$2,340</span>
-            <span class="w-text w-text--label">Wishlist total</span>
-            <div class="w-bar" style="--fill: 60%"><div class="w-bar__fill"></div></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- w-row -->
-      <div class="component-card">
-        <div class="component-card__label">w-row (most reused — 60%)</div>
+        <div class="component-card__label">w-row (with w-img)</div>
         <div class="component-card__demo">
           <div class="w-row" style="border:none;padding-top:0">
-            <span class="w-row__indicator">1</span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
-              <span class="w-text w-text--title">White Lotus S3</span>
-              <span class="w-text w-text--meta">Premieres in 3 days</span>
+              <span class="w-text w-text--title">Chez Pascal</span>
+              <span class="w-text w-text--meta">French bistro — saved 3 weeks ago</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">2</span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
-              <span class="w-text w-text--title">Severance S2</span>
-              <span class="w-text w-text--meta">Currently airing</span>
+              <span class="w-text w-text--title">Tacos El Gordo</span>
+              <span class="w-text w-text--meta">Mexican street food — your most saved</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-          <div class="w-row">
-            <span class="w-row__indicator">&#x1F534;</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">@BoredApe</span>
-              <span class="w-text w-text--meta">No interaction in 47 days</span>
-            </div>
-            <button class="w-icon-btn">&#x2715;</button>
-          </div>
-          <div class="w-row">
-            <label class="w-checkbox">
-              <input type="checkbox" checked>
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Lumber &amp; hardware</span>
-              <span class="w-text w-text--meta">$45 — Home Depot</span>
-            </div>
-            <div class="w-row__trailing">
-              <span class="w-text w-text--meta">$45</span>
-            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
         </div>
       </div>
@@ -406,18 +291,6 @@
               <div class="w-axis__marker" style="left:60%"></div>
             </div>
           </div>
-          <span class="w-text w-text--note">You're 60% toward heavy content</span>
-          <div class="w-divider"></div>
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Budget</span>
-              <span class="w-text w-text--label">Premium</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:80%"></div>
-            </div>
-          </div>
-          <span class="w-text w-text--note">Your saves lean premium</span>
         </div>
       </div>
 
@@ -426,557 +299,51 @@
         <div class="component-card__label">w-option</div>
         <div class="component-card__demo">
           <div class="w-option">
-            <span class="w-text w-text--title">Option A: Chez Pascal</span>
-            <span class="w-text w-text--meta">French bistro — $$$ — 0.8mi</span>
-            <button class="w-btn w-btn--sm">Pick this</button>
+            <span class="w-text w-text--title">Option A</span>
+            <span class="w-text w-text--meta">French bistro — $$$</span>
           </div>
           <div class="w-option w-option--selected">
-            <span class="w-text w-text--title">Option B: Tacos El Gordo</span>
-            <span class="w-text w-text--meta">Mexican street — $ — 1.2mi</span>
-            <button class="w-btn w-btn--sm w-btn--filled">Selected</button>
+            <span class="w-text w-text--title">Option B</span>
+            <span class="w-text w-text--meta">Selected state</span>
           </div>
         </div>
       </div>
 
-      <!-- w-section -->
+      <!-- w-actions (anchored) -->
       <div class="component-card">
-        <div class="component-card__label">w-section</div>
+        <div class="component-card__label">w-actions (anchored vs w-footer)</div>
         <div class="component-card__demo">
-          <div class="w-section">
-            <div class="w-section__title">
-              <span class="w-text w-text--label">Morning</span>
-            </div>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Read: Deep Work</span>
-                <span class="w-text w-text--meta">25 min read</span>
-              </div>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Use: Figma</span>
-                <span class="w-text w-text--meta">Design review</span>
-              </div>
+          <span class="w-text w-text--label">Anchored (inside body)</span>
+          <div style="border:var(--border-thin) solid var(--border-subtle)">
+            <div style="padding:var(--space-3)"><span class="w-text w-text--meta">Body content here</span></div>
+            <div class="w-actions" style="margin-top:0;border-left:0;border-right:0">
+              <button class="w-btn w-btn--filled">Pick this one</button>
+              <button class="w-btn">Not tonight</button>
             </div>
           </div>
-          <div class="w-divider"></div>
-          <div class="w-section">
-            <div class="w-section__title">
-              <span class="w-text w-text--label">Evening</span>
-            </div>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Watch: Severance S2E4</span>
-                <span class="w-text w-text--meta">52 min</span>
-              </div>
+          <span class="w-text w-text--label" style="margin-top:var(--space-3)">Floating (old w-footer)</span>
+          <div>
+            <div style="border:var(--border-thin) solid var(--border-subtle);padding:var(--space-3)"><span class="w-text w-text--meta">Body content here</span></div>
+            <div style="padding:var(--space-2) 0;display:flex;gap:var(--space-2)">
+              <button class="w-btn w-btn--filled">Pick this one</button>
+              <button class="w-btn">Not tonight</button>
             </div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
   <hr class="section-divider">
 
-  <!-- ========================================
-       SHELL STRUCTURE
-       ======================================== -->
+  <!-- ====== BODY LAYOUTS AS FULL WIDGETS ====== -->
   <div class="section" id="layouts">
-    <h2 class="section__heading">Body Layouts</h2>
-    <p class="section__desc">11 layout modifiers applied to w-body. Each shown as a complete shell.</p>
-
-    <div class="widget-grid">
-
-      <!-- VERDICT -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Verdict Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-            <button class="w-icon-btn" title="Dismiss">&#x2715;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--verdict">
-          <div class="w-headline">
-            <span class="w-text w-text--display">Minimal Modern</span>
-            <span class="w-text w-text--meta">Based on 12 items across home &amp; wear</span>
-          </div>
-          <div class="w-tag-group w-tag-group--center">
-            <span class="w-badge">Clean lines</span>
-            <span class="w-badge">Monochrome</span>
-            <span class="w-badge">Geometric</span>
-            <span class="w-badge">Texture</span>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Explore style</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- LIST -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">List Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-            <button class="w-icon-btn" title="Dismiss">&#x2715;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--list">
-          <div class="w-row">
-            <span class="w-row__indicator">1</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Learn JavaScript basics</span>
-              <span class="w-text w-text--meta">Prerequisite for 3 other saves</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-          <div class="w-row">
-            <span class="w-row__indicator">2</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">React fundamentals</span>
-              <span class="w-text w-text--meta">Depends on: JavaScript basics</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-          <div class="w-row">
-            <span class="w-row__indicator">3</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Next.js deep dive</span>
-              <span class="w-text w-text--meta">Depends on: React fundamentals</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Start first</button>
-            <button class="w-btn">Dismiss</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- STATS -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Stats Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--stats">
-          <div class="w-stat">
-            <span class="w-text w-text--value">47</span>
-            <span class="w-text w-text--label">Backlog</span>
-            <div class="w-bar" style="--fill: 80%"><div class="w-bar__fill"></div></div>
-          </div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">12h</span>
-            <span class="w-text w-text--label">Read time</span>
-            <div class="w-bar" style="--fill: 55%"><div class="w-bar__fill"></div></div>
-          </div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">3.2</span>
-            <span class="w-text w-text--label">Per day</span>
-            <div class="w-bar" style="--fill: 35%"><div class="w-bar__fill"></div></div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">See full backlog</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- SPECTRUM -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Spectrum Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--spectrum">
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Casual</span>
-              <span class="w-text w-text--label">Formal</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:30%"></div>
-            </div>
-          </div>
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Budget</span>
-              <span class="w-text w-text--label">Premium</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:72%"></div>
-            </div>
-          </div>
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Minimal</span>
-              <span class="w-text w-text--label">Maximalist</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:20%"></div>
-            </div>
-          </div>
-          <span class="w-text w-text--note">Your style profile across 8 wear items</span>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">View items</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- SPLIT -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Split Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--split">
-          <div class="w-column">
-            <span class="w-text w-text--label">Your items</span>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Nike Dunk Low</span>
-                <span class="w-text w-text--meta">Footwear</span>
-              </div>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Linen trousers</span>
-                <span class="w-text w-text--meta">Bottoms</span>
-              </div>
-            </div>
-          </div>
-          <div class="w-divider w-divider--vertical"></div>
-          <div class="w-column">
-            <span class="w-text w-text--label">Missing pieces</span>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Oversized blazer</span>
-                <span class="w-text w-text--meta">AI suggestion</span>
-              </div>
-              <button class="w-icon-btn">&rarr;</button>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Canvas tote</span>
-                <span class="w-text w-text--meta">AI suggestion</span>
-              </div>
-              <button class="w-icon-btn">&rarr;</button>
-            </div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Add all to board</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- NARRATIVE -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Narrative Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--narrative">
-          <p class="w-text w-text--prose">Your saved articles cluster around three themes: developer productivity, design systems, and AI tooling. The hidden thread is <strong>workflow automation</strong> — you're building a mental model for reducing friction in creative work.</p>
-          <div class="w-tag-group" style="margin-top:var(--space-3)">
-            <span class="w-badge">Productivity</span>
-            <span class="w-badge">Design systems</span>
-            <span class="w-badge">AI tooling</span>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">See all articles</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMPARISON -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Comparison Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--comparison">
-          <div class="w-option">
-            <span class="w-text w-text--title">Notion</span>
-            <span class="w-text w-text--meta">Your current pick</span>
-            <div class="w-tag-group">
-              <span class="w-badge">Docs</span>
-              <span class="w-badge">Wiki</span>
-            </div>
-          </div>
-          <div class="w-divider w-divider--labeled">vs</div>
-          <div class="w-option">
-            <span class="w-text w-text--title">Obsidian</span>
-            <span class="w-text w-text--meta">Alternative worth trying</span>
-            <div class="w-tag-group">
-              <span class="w-badge">Markdown</span>
-              <span class="w-badge">Local</span>
-            </div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Keep current</button>
-            <button class="w-btn">Try alternative</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- CHOICES -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Choices Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--choices">
-          <div class="w-option">
-            <span class="w-text w-text--title">Floral skirt + Hiking boots</span>
-            <span class="w-text w-text--meta">"Rugged Feminine" — unexpected contrast</span>
-          </div>
-          <div class="w-option">
-            <span class="w-text w-text--title">Oversized blazer + Track pants</span>
-            <span class="w-text w-text--meta">"Casual Power" — your weekday uniform</span>
-          </div>
-          <div class="w-option w-option--selected">
-            <span class="w-text w-text--title">Linen shirt + Cargo shorts</span>
-            <span class="w-text w-text--meta">"Easy Minimal" — peak summer</span>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn w-btn--filled">I'd wear this</button>
-            <button class="w-btn">Surprise me again</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- CHECKLIST -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Checklist Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--checklist">
-          <div class="w-row" style="border:none;padding-top:0">
-            <label class="w-checkbox">
-              <input type="checkbox" checked>
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Lumber (2x4)</span>
-              <span class="w-text w-text--meta">Home Depot — $24</span>
-            </div>
-            <div class="w-row__trailing">
-              <span class="w-text w-text--meta">$24</span>
-            </div>
-          </div>
-          <div class="w-row">
-            <label class="w-checkbox">
-              <input type="checkbox" checked>
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Wood screws box</span>
-              <span class="w-text w-text--meta">Amazon — $12</span>
-            </div>
-            <div class="w-row__trailing">
-              <span class="w-text w-text--meta">$12</span>
-            </div>
-          </div>
-          <div class="w-row">
-            <label class="w-checkbox">
-              <input type="checkbox">
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Sandpaper (120 grit)</span>
-              <span class="w-text w-text--meta">Not yet sourced</span>
-            </div>
-            <div class="w-row__trailing">
-              <span class="w-text w-text--meta">~$8</span>
-            </div>
-          </div>
-          <div class="w-divider"></div>
-          <div class="w-stat" style="align-items:flex-end">
-            <span class="w-text w-text--value">$44</span>
-            <span class="w-text w-text--label">Total (2/3 sourced)</span>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Add missing items</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- SUGGESTION -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Suggestion Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--suggestion">
-          <div class="w-row" style="border:none;padding-top:0">
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Raycast</span>
-              <span class="w-text w-text--meta">Fills the gap between your Figma + VS Code workflow. Launcher + snippets + clipboard manager in one.</span>
-            </div>
-          </div>
-          <button class="w-btn w-btn--filled">Add to board</button>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Not for me</button>
-            <button class="w-btn">Show more like this</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- GROUPED -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Grouped Layout</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--grouped">
-          <div class="w-section">
-            <div class="w-section__title">
-              <span class="w-text w-text--label">Morning</span>
-            </div>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Read: Deep Work (Ch. 4)</span>
-                <span class="w-text w-text--meta">25 min read</span>
-              </div>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Use: Figma — Design review</span>
-                <span class="w-text w-text--meta">From your use saves</span>
-              </div>
-            </div>
-          </div>
-          <div class="w-divider"></div>
-          <div class="w-section">
-            <div class="w-section__title">
-              <span class="w-text w-text--label">Evening</span>
-            </div>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Watch: Severance S2E4</span>
-                <span class="w-text w-text--meta">52 min — currently airing</span>
-              </div>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Eat: Chez Pascal</span>
-                <span class="w-text w-text--meta">French bistro — saved 3 weeks ago</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn w-btn--filled">Looks good</button>
-            <button class="w-btn">Shuffle</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- LOADING STATE -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Loading State</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--loading">
-          <span class="w-loader">Generating insights...</span>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <hr class="section-divider">
-
-  <!-- ========================================
-       REAL WIDGET EXAMPLES
-       ======================================== -->
-  <div class="section" id="widgets">
     <h2 class="section__heading">Widget Examples</h2>
-    <p class="section__desc">Real widgets from the catalog rendered with w- components. Various categories and triggers.</p>
+    <p class="section__desc">Real widgets with visual/narrative content, photos, SVG icons, anchored actions.</p>
 
-    <div class="widget-grid">
+    <div class="component-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
 
-      <!-- #1 eat-decide (pick-one / choices) -->
+      <!-- #1 eat-decide (choices + photos) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
@@ -984,64 +351,42 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-            <button class="w-icon-btn" title="Dismiss">&#x2715;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--choices">
           <div class="w-option">
-            <span class="w-text w-text--title">Chez Pascal</span>
-            <span class="w-text w-text--meta">French bistro — you haven't tried French in 3 weeks</span>
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Chez Pascal</span>
+                <span class="w-text w-text--meta">French bistro — you haven't tried French in 3 weeks</span>
+              </div>
+            </div>
           </div>
           <div class="w-option">
-            <span class="w-text w-text--title">Tacos El Gordo</span>
-            <span class="w-text w-text--meta">Mexican street food — your most-saved cuisine</span>
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Tacos El Gordo</span>
+                <span class="w-text w-text--meta">Mexican street — your most-saved cuisine</span>
+              </div>
+            </div>
           </div>
           <div class="w-option">
-            <span class="w-text w-text--title">Sushi Nakazawa</span>
-            <span class="w-text w-text--meta">Omakase — saved last week, still unvisited</span>
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div>
+                <span class="w-text w-text--title">Sushi Nakazawa</span>
+                <span class="w-text w-text--meta">Omakase — saved last week, still unvisited</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn w-btn--filled">Pick for me</button>
-            <button class="w-btn">Not tonight</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #16 read-backlog (stat-row) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Reading backlog</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--stats">
-          <div class="w-stat">
-            <span class="w-text w-text--value">47</span>
-            <span class="w-text w-text--label">Unread</span>
-            <div class="w-bar" style="--fill: 85%"><div class="w-bar__fill"></div></div>
-          </div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">12h</span>
-            <span class="w-text w-text--label">Est. time</span>
-            <div class="w-bar" style="--fill: 55%"><div class="w-bar__fill"></div></div>
-          </div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">+5</span>
-            <span class="w-text w-text--label">This week</span>
-            <div class="w-bar" style="--fill: 40%"><div class="w-bar__fill"></div></div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Read oldest first</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Pick for me</button>
+          <button class="w-btn">Not tonight</button>
         </div>
       </div>
 
@@ -1053,7 +398,8 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--narrative">
@@ -1064,15 +410,13 @@
             <span class="w-badge">Creativity</span>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">View articles</button>
-            <button class="w-btn">Find more</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn">View articles</button>
+          <button class="w-btn">Find more</button>
         </div>
       </div>
 
-      <!-- #6 go-sequence (list) -->
+      <!-- #6 go-sequence (list + map pins) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
@@ -1080,48 +424,112 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <span class="w-row__indicator">1</span>
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Golden Gate Bridge</span>
               <span class="w-text w-text--meta">Start here — morning light</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">2</span>
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">Tartine Bakery</span>
               <span class="w-text w-text--meta">12 min drive — lunch stop</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">3</span>
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">SFMOMA</span>
               <span class="w-text w-text--meta">8 min walk — afternoon</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-          <div class="w-row">
-            <span class="w-row__indicator">4</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Dolores Park</span>
-              <span class="w-text w-text--meta">15 min walk — sunset</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn w-btn--filled">Open in Maps</button>
-            <button class="w-btn">Re-route</button>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Open in Maps</button>
+          <button class="w-btn">Re-route</button>
+        </div>
+      </div>
+
+      <!-- NEW: Article recommendation (narrative + hero image) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Recommended read</span>
+            <span class="w-badge">AI</span>
           </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-img w-img--hero w-img--placeholder" style="width:100%"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div style="text-align:center">
+            <span class="w-text w-text--title">The Age of Magical Overthinking</span>
+            <span class="w-text w-text--meta" style="display:block;margin-top:var(--space-1)">Amanda Montell — Based on your saves about cognitive biases and decision-making</span>
+          </div>
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge">Psychology</span>
+            <span class="w-badge">Behavior</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Save to board</button>
+          <button class="w-btn">Not interested</button>
+        </div>
+      </div>
+
+      <!-- NEW: News digest (list with article images) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Your news digest</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Claude 4.5 Benchmarks</span>
+              <span class="w-text w-text--meta">The Verge — 4 min read — Matches your AI tooling saves</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Design Systems at Scale</span>
+              <span class="w-text w-text--meta">Smashing Mag — 8 min read — Related to your design system research</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">The Future of Remote Work</span>
+              <span class="w-text w-text--meta">Wired — 6 min read — Trending in your network</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">See all recommendations</button>
         </div>
       </div>
 
@@ -1133,11 +541,13 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--comparison">
           <div class="w-option">
+            <div class="w-img w-img--wide w-img--placeholder" style="width:100%"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <span class="w-text w-text--title">Figma</span>
             <span class="w-text w-text--meta">Your current tool</span>
             <div class="w-tag-group">
@@ -1147,6 +557,7 @@
           </div>
           <div class="w-divider w-divider--labeled">vs</div>
           <div class="w-option">
+            <div class="w-img w-img--wide w-img--placeholder" style="width:100%"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <span class="w-text w-text--title">Penpot</span>
             <span class="w-text w-text--meta">Open-source alternative</span>
             <div class="w-tag-group">
@@ -1155,15 +566,13 @@
             </div>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Keep Figma</button>
-            <button class="w-btn">Save Penpot</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn">Keep Figma</button>
+          <button class="w-btn">Save Penpot</button>
         </div>
       </div>
 
-      <!-- #36 home-ladder (list) -->
+      <!-- #36 home-ladder (list with photos) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
@@ -1171,73 +580,41 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <span class="w-row__indicator">$</span>
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">IKEA KALLAX</span>
               <span class="w-text w-text--meta">$79 — functional, modular, MDF</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">$$</span>
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">CB2 Stairway</span>
               <span class="w-text w-text--meta">$349 — solid wood, modern aesthetic</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">$$$</span>
+            <div class="w-img w-img--card w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
             <div class="w-row__content">
               <span class="w-text w-text--title">USM Haller</span>
               <span class="w-text w-text--meta">$1,200 — Swiss-made, lifetime piece</span>
             </div>
-            <button class="w-icon-btn">&rarr;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Save all options</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn">Save all options</button>
         </div>
       </div>
 
-      <!-- #35 eat-substitute (comparison) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Same vibe, different diet</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--comparison">
-          <div class="w-option">
-            <span class="w-text w-text--title">Shake Shack</span>
-            <span class="w-text w-text--meta">Your save — burgers, casual</span>
-          </div>
-          <div class="w-divider w-divider--labeled">or</div>
-          <div class="w-option">
-            <span class="w-text w-text--title">By Chloe</span>
-            <span class="w-text w-text--meta">Plant-based version — same vibe</span>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Keep original</button>
-            <button class="w-btn">Save substitute</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #8 follow-decay (list) -->
+      <!-- #8 follow-decay (list with icons) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
@@ -1245,190 +622,42 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--list">
           <div class="w-row">
-            <span class="w-row__indicator">&#x1F534;</span>
+            <span class="w-icon" style="color:var(--color-error)"><svg><use href="#icon-alert"/></svg></span>
             <div class="w-row__content">
               <span class="w-text w-text--title">@DesignTwit</span>
               <span class="w-text w-text--meta">No interaction in 62 days</span>
             </div>
-            <button class="w-icon-btn">&#x2715;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-user-x"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">&#x1F7E1;</span>
+            <span class="w-icon" style="color:var(--color-warning)"><svg><use href="#icon-clock"/></svg></span>
             <div class="w-row__content">
               <span class="w-text w-text--title">@TechBro42</span>
               <span class="w-text w-text--meta">No interaction in 34 days</span>
             </div>
-            <button class="w-icon-btn">&#x2715;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-user-x"/></svg></button>
           </div>
           <div class="w-row">
-            <span class="w-row__indicator">&#x1F7E1;</span>
+            <span class="w-icon" style="color:var(--color-warning)"><svg><use href="#icon-clock"/></svg></span>
             <div class="w-row__content">
               <span class="w-text w-text--title">@VintageFinds</span>
               <span class="w-text w-text--meta">No interaction in 30 days</span>
             </div>
-            <button class="w-icon-btn">&#x2715;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-user-x"/></svg></button>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Unfollow all</button>
-            <button class="w-btn">Keep watching</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn">Unfollow all</button>
+          <button class="w-btn">Keep watching</button>
         </div>
       </div>
 
-      <!-- #34 follow-proxy (narrative) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">The influence chain</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--narrative">
-          <p class="w-text w-text--prose">You follow <strong>@dan_abramov</strong>, <strong>@swyx</strong>, and <strong>@kentcdodds</strong> — all in the React ecosystem. Dan influences Swyx's thinking, who influences Kent's teaching. You're getting a filtered, amplified version of React core team opinions.</p>
-          <span class="w-text w-text--note" style="display:block;margin-top:var(--space-2)">Consider adding a contrarian voice like @RyanCarniato (Solid.js) for balance.</span>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Add suggested</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #9 spend-calculate (stats) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Wishlist total</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--stats">
-          <div class="w-stat">
-            <span class="w-text w-text--value">$2,340</span>
-            <span class="w-text w-text--label">Total</span>
-          </div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">12</span>
-            <span class="w-text w-text--label">Items</span>
-          </div>
-          <div class="w-stat">
-            <span class="w-text w-text--value">$195</span>
-            <span class="w-text w-text--label">Avg price</span>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">See breakdown</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #40 watch-deadline (list) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Upcoming releases</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--list">
-          <div class="w-row">
-            <span class="w-row__indicator">&#x1F7E2;</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">White Lotus S3</span>
-              <span class="w-text w-text--meta">Premieres Feb 16 — 10 days</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-          <div class="w-row">
-            <span class="w-row__indicator">&#x1F7E1;</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Stranger Things S5</span>
-              <span class="w-text w-text--meta">Expected Q3 2026</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-          <div class="w-row">
-            <span class="w-row__indicator">&#x26AA;</span>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">The Bear S4</span>
-              <span class="w-text w-text--meta">No date announced</span>
-            </div>
-            <button class="w-icon-btn">&rarr;</button>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Set reminders</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #15 all-behavior (spectrum) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Your saving pattern</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--spectrum">
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Read</span>
-              <span class="w-text w-text--label">Watch</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:35%"></div>
-            </div>
-          </div>
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Browse</span>
-              <span class="w-text w-text--label">Buy</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:70%"></div>
-            </div>
-          </div>
-          <div class="w-axis">
-            <div class="w-axis__labels">
-              <span class="w-text w-text--label">Solo</span>
-              <span class="w-text w-text--label">Social</span>
-            </div>
-            <div class="w-axis__track">
-              <div class="w-axis__marker" style="left:25%"></div>
-            </div>
-          </div>
-          <span class="w-text w-text--note">Based on 34 saves over the last 30 days</span>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">View by category</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #17 home-conflict (verdict) -->
+      <!-- #17 home-conflict (verdict with hero image) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
@@ -1437,7 +666,7 @@
             <span class="w-badge w-badge--accent">Conflict</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--verdict">
@@ -1451,15 +680,49 @@
             <span class="w-badge w-badge--filled">Industrial</span>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">See clashing items</button>
-            <button class="w-btn">It's intentional</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn">See clashing items</button>
+          <button class="w-btn">It's intentional</button>
         </div>
       </div>
 
-      <!-- #33 all-ritual (grouped) -->
+      <!-- #40 watch-deadline (list with icons) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Upcoming releases</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <span class="w-icon" style="color:var(--color-success)"><svg><use href="#icon-play"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">White Lotus S3</span>
+              <span class="w-text w-text--meta">Premieres Feb 16 — 10 days</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <span class="w-icon" style="color:var(--color-warning)"><svg><use href="#icon-clock"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-tv"/></svg></span></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Stranger Things S5</span>
+              <span class="w-text w-text--meta">Expected Q3 2026</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Set reminders</button>
+        </div>
+      </div>
+
+      <!-- #33 all-ritual (grouped with icons) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
@@ -1467,23 +730,22 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-shuffle"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--grouped">
           <div class="w-section">
-            <div class="w-section__title">
-              <span class="w-text w-text--label">Morning routine</span>
-            </div>
+            <div class="w-section__title"><span class="w-text w-text--label">Morning</span></div>
             <div class="w-row" style="border:none;padding-top:0">
-              <span class="w-row__indicator">&#x2615;</span>
+              <span class="w-icon"><svg><use href="#icon-book"/></svg></span>
               <div class="w-row__content">
                 <span class="w-text w-text--title">Read: Morning Brew</span>
                 <span class="w-text w-text--meta">5 min — from your read saves</span>
               </div>
             </div>
             <div class="w-row">
-              <span class="w-row__indicator">&#x1F3A7;</span>
+              <span class="w-icon"><svg><use href="#icon-headphones"/></svg></span>
               <div class="w-row__content">
                 <span class="w-text w-text--title">Listen: Huberman Lab</span>
                 <span class="w-text w-text--meta">Saved episode — 45 min</span>
@@ -1492,11 +754,9 @@
           </div>
           <div class="w-divider"></div>
           <div class="w-section">
-            <div class="w-section__title">
-              <span class="w-text w-text--label">Wind-down</span>
-            </div>
+            <div class="w-section__title"><span class="w-text w-text--label">Wind-down</span></div>
             <div class="w-row" style="border:none;padding-top:0">
-              <span class="w-row__indicator">&#x1F4FA;</span>
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
               <div class="w-row__content">
                 <span class="w-text w-text--title">Watch: Chef's Table</span>
                 <span class="w-text w-text--meta">Next unwatched — S7E2</span>
@@ -1504,159 +764,34 @@
             </div>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn w-btn--filled">Start routine</button>
-            <button class="w-btn">Shuffle</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Start routine</button>
+          <button class="w-btn">Shuffle</button>
         </div>
       </div>
 
-      <!-- #5 use-gap (suggestion) -->
+      <!-- NEW: Article deep-read (narrative + hero) -->
       <div class="w-shell">
         <div class="w-header">
           <div class="w-header__left">
-            <span class="w-text w-text--label">Workflow gap</span>
+            <span class="w-text w-text--label">Worth a deep read</span>
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
           </div>
         </div>
-        <div class="w-body w-body--suggestion">
-          <div class="w-row" style="border:none;padding-top:0">
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Linear</span>
-              <span class="w-text w-text--meta">You use Figma (design) and VS Code (code) but have no project tracker. Linear bridges the gap with tight GitHub + Figma integrations.</span>
-            </div>
-          </div>
-          <button class="w-btn w-btn--filled">Add to board</button>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Not for me</button>
-            <button class="w-btn">More suggestions</button>
+        <div class="w-body w-body--narrative" style="padding:0">
+          <div class="w-img w-img--banner w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div style="padding:var(--space-4)">
+            <p class="w-text w-text--prose">This longform piece from Anil Dash connects three of your saved themes — <strong>open source governance, creator economics, and platform decay</strong> — into a single argument about the future of the indie web.</p>
+            <span class="w-text w-text--meta" style="display:block;margin-top:var(--space-2)">anil.dash — 14 min read</span>
           </div>
         </div>
-      </div>
-
-      <!-- #10 make-assemble (checklist) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">Project plan</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--checklist">
-          <div class="w-row" style="border:none;padding-top:0">
-            <label class="w-checkbox">
-              <input type="checkbox" checked>
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Walnut boards</span>
-              <span class="w-text w-text--meta">Rockler — saved 2 weeks ago</span>
-            </div>
-          </div>
-          <div class="w-row">
-            <label class="w-checkbox">
-              <input type="checkbox" checked>
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Hairpin legs (set of 4)</span>
-              <span class="w-text w-text--meta">Amazon — saved last week</span>
-            </div>
-          </div>
-          <div class="w-row">
-            <label class="w-checkbox">
-              <input type="checkbox">
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Danish oil finish</span>
-              <span class="w-text w-text--meta">AI suggestion — completes the build</span>
-            </div>
-          </div>
-          <div class="w-row">
-            <label class="w-checkbox">
-              <input type="checkbox">
-              <span class="w-checkbox__mark"></span>
-            </label>
-            <div class="w-row__content">
-              <span class="w-text w-text--title">Pocket hole jig</span>
-              <span class="w-text w-text--meta">AI suggestion — for clean joints</span>
-            </div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Save project</button>
-            <button class="w-btn">Add missing</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- #2 home-gap (split) -->
-      <div class="w-shell">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text w-text--label">What's missing?</span>
-            <span class="w-badge">AI</span>
-          </div>
-          <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
-          </div>
-        </div>
-        <div class="w-body w-body--split">
-          <div class="w-column">
-            <span class="w-text w-text--label">Your room</span>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Eames lounge</span>
-                <span class="w-text w-text--meta">Seating</span>
-              </div>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Floor lamp</span>
-                <span class="w-text w-text--meta">Lighting</span>
-              </div>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Wool rug</span>
-                <span class="w-text w-text--meta">Textile</span>
-              </div>
-            </div>
-          </div>
-          <div class="w-divider w-divider--vertical"></div>
-          <div class="w-column">
-            <span class="w-text w-text--label">Missing</span>
-            <div class="w-row" style="border:none;padding-top:0">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Side table</span>
-                <span class="w-text w-text--meta">No surface near seating</span>
-              </div>
-              <button class="w-icon-btn">&rarr;</button>
-            </div>
-            <div class="w-row">
-              <div class="w-row__content">
-                <span class="w-text w-text--title">Throw pillow</span>
-                <span class="w-text w-text--meta">Needs texture accent</span>
-              </div>
-              <button class="w-icon-btn">&rarr;</button>
-            </div>
-          </div>
-        </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn">Save suggestions</button>
-          </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Read now</button>
+          <button class="w-btn">Save for later</button>
         </div>
       </div>
 
@@ -1668,7 +803,7 @@
             <span class="w-badge">AI</span>
           </div>
           <div class="w-header__controls">
-            <button class="w-icon-btn" title="Refresh">&#x27F3;</button>
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
           </div>
         </div>
         <div class="w-body w-body--verdict">
@@ -1681,11 +816,76 @@
             <span class="w-badge">Business</span>
           </div>
         </div>
-        <div class="w-footer">
-          <div class="w-action-bar">
-            <button class="w-btn w-btn--filled">Read now</button>
-            <button class="w-btn">Remove</button>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Read now</button>
+          <button class="w-btn">Remove</button>
+        </div>
+      </div>
+
+      <!-- #34 follow-proxy (narrative) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">The influence chain</span>
+            <span class="w-badge">AI</span>
           </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--narrative">
+          <p class="w-text w-text--prose">You follow <strong>@dan_abramov</strong>, <strong>@swyx</strong>, and <strong>@kentcdodds</strong> — all in the React ecosystem. Dan influences Swyx's thinking, who shapes Kent's teaching. You're getting a filtered, amplified view of React core team opinions.</p>
+          <span class="w-text w-text--note" style="display:block;margin-top:var(--space-2)">Consider adding a contrarian voice like @RyanCarniato (Solid.js) for balance.</span>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Add suggested</button>
+        </div>
+      </div>
+
+      <!-- #15 all-behavior (spectrum) -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Your saving pattern</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--spectrum">
+          <div class="w-axis">
+            <div class="w-axis__labels"><span class="w-text w-text--label">Read</span><span class="w-text w-text--label">Watch</span></div>
+            <div class="w-axis__track"><div class="w-axis__marker" style="left:35%"></div></div>
+          </div>
+          <div class="w-axis">
+            <div class="w-axis__labels"><span class="w-text w-text--label">Browse</span><span class="w-text w-text--label">Buy</span></div>
+            <div class="w-axis__track"><div class="w-axis__marker" style="left:70%"></div></div>
+          </div>
+          <div class="w-axis">
+            <div class="w-axis__labels"><span class="w-text w-text--label">Solo</span><span class="w-text w-text--label">Social</span></div>
+            <div class="w-axis__track"><div class="w-axis__marker" style="left:25%"></div></div>
+          </div>
+          <span class="w-text w-text--note">Based on 34 saves over the last 30 days</span>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">View by category</button>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Generating</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--loading">
+          <span class="w-loader">Generating insights...</span>
         </div>
       </div>
 
@@ -1694,13 +894,198 @@
 
   <hr class="section-divider">
 
-  <div style="text-align:center; padding:var(--space-8) 0; color:var(--fg-muted);">
-    <span class="w-text w-text--label">ctrl.rodeo widget design system</span>
+  <!-- ====== GRID SIZE PERMUTATIONS ====== -->
+  <div class="section" id="grid">
+    <h2 class="section__heading">Grid Size Permutations</h2>
+    <p class="section__desc">Same widgets at different grid sizes. Toggle columns to test responsiveness.</p>
+
+    <div class="grid-controls">
+      <button class="active" onclick="setGrid(5,this)">5 col</button>
+      <button onclick="setGrid(4,this)">4 col</button>
+      <button onclick="setGrid(3,this)">3 col</button>
+    </div>
+
+    <div class="grid-test grid-test--5col" id="sizeGrid">
+
+      <!-- sm (1x1) — verdict -->
+      <div class="w-shell w-shell--sm">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Style clash</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--verdict">
+          <div class="w-headline">
+            <span class="w-text w-text--display">Scandi vs Industrial</span>
+          </div>
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge w-badge--filled">Scandi</span>
+            <span class="w-badge w-badge--filled">Industrial</span>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">View items</button></div>
+      </div>
+
+      <!-- sm (1x1) — choices compact -->
+      <div class="w-shell w-shell--sm">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Tonight?</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--choices">
+          <div class="w-option">
+            <span class="w-text w-text--title">Chez Pascal</span>
+            <span class="w-text w-text--meta">French bistro</span>
+          </div>
+          <div class="w-option">
+            <span class="w-text w-text--title">Tacos El Gordo</span>
+            <span class="w-text w-text--meta">Mexican street</span>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn w-btn--filled">Pick for me</button></div>
+      </div>
+
+      <!-- med (2x1) — narrative -->
+      <div class="w-shell w-shell--med">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">The hidden thread</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--narrative">
+          <p class="w-text w-text--prose">Your recent articles share an underlying theme: <strong>the tension between AI automation and human creativity</strong>.</p>
+          <div class="w-tag-group" style="margin-top:var(--space-3)">
+            <span class="w-badge">AI ethics</span>
+            <span class="w-badge">Dev tools</span>
+            <span class="w-badge">Creativity</span>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">View articles</button><button class="w-btn">Find more</button></div>
+      </div>
+
+      <!-- sm (1x1) — spectrum -->
+      <div class="w-shell w-shell--sm">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Pattern</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--spectrum">
+          <div class="w-axis"><div class="w-axis__labels"><span class="w-text w-text--label">Read</span><span class="w-text w-text--label">Watch</span></div><div class="w-axis__track"><div class="w-axis__marker" style="left:35%"></div></div></div>
+          <div class="w-axis"><div class="w-axis__labels"><span class="w-text w-text--label">Browse</span><span class="w-text w-text--label">Buy</span></div><div class="w-axis__track"><div class="w-axis__marker" style="left:70%"></div></div></div>
+        </div>
+      </div>
+
+      <!-- tall (1x2) — list + images -->
+      <div class="w-shell w-shell--tall">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Trip route</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content"><span class="w-text w-text--title">Golden Gate</span><span class="w-text w-text--meta">Start — morning</span></div>
+          </div>
+          <div class="w-row">
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content"><span class="w-text w-text--title">Tartine</span><span class="w-text w-text--meta">Lunch — 12 min</span></div>
+          </div>
+          <div class="w-row">
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content"><span class="w-text w-text--title">SFMOMA</span><span class="w-text w-text--meta">Afternoon — 8 min</span></div>
+          </div>
+          <div class="w-row">
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+            <div class="w-row__content"><span class="w-text w-text--title">Dolores Park</span><span class="w-text w-text--meta">Sunset</span></div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn w-btn--filled">Open in Maps</button></div>
+      </div>
+
+      <!-- med (2x1) — comparison -->
+      <div class="w-shell w-shell--med">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Have you considered?</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--comparison">
+          <div class="w-option">
+            <span class="w-text w-text--title">Notion</span>
+            <span class="w-text w-text--meta">Your current pick</span>
+            <div class="w-tag-group"><span class="w-badge">Docs</span><span class="w-badge">Wiki</span></div>
+          </div>
+          <div class="w-divider w-divider--labeled">vs</div>
+          <div class="w-option">
+            <span class="w-text w-text--title">Obsidian</span>
+            <span class="w-text w-text--meta">Worth trying</span>
+            <div class="w-tag-group"><span class="w-badge">Markdown</span><span class="w-badge">Local</span></div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">Keep current</button><button class="w-btn">Try alternative</button></div>
+      </div>
+
+      <!-- lg (2x2) — news digest with hero -->
+      <div class="w-shell w-shell--lg">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Your news digest</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--narrative" style="padding:0">
+          <div class="w-img w-img--banner w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+          <div style="padding:var(--space-4)">
+            <span class="w-text w-text--title">Claude 4.5 Benchmarks Drop</span>
+            <p class="w-text w-text--prose" style="margin-top:var(--space-2)">The latest benchmarks show significant improvements in reasoning and tool use. This connects to your recent saves about AI-assisted development workflows.</p>
+            <span class="w-text w-text--meta" style="display:block;margin-top:var(--space-2)">The Verge — 4 min read</span>
+            <div class="w-divider" style="margin:var(--space-3) 0"></div>
+            <div class="w-row" style="border:none;padding-top:0">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-row__content"><span class="w-text w-text--title">Design Systems at Scale</span><span class="w-text w-text--meta">Smashing — 8 min read</span></div>
+              <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+            </div>
+            <div class="w-row">
+              <div class="w-img w-img--thumb w-img--placeholder"><span class="w-img__placeholder"><svg><use href="#icon-image"/></svg></span></div>
+              <div class="w-row__content"><span class="w-text w-text--title">Future of Remote Work</span><span class="w-text w-text--meta">Wired — 6 min</span></div>
+              <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">See all</button></div>
+      </div>
+
+      <!-- sm (1x1) — suggestion -->
+      <div class="w-shell w-shell--sm">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Workflow gap</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <span class="w-text w-text--title">Raycast</span>
+          <span class="w-text w-text--meta" style="text-align:center">Launcher + snippets for your Figma + VS Code workflow</span>
+        </div>
+        <div class="w-actions"><button class="w-btn w-btn--filled">Add to board</button></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:var(--space-8) 0;color:var(--fg-muted)">
+    <span class="w-text w-text--label">ctrl.rodeo widget design system v2</span>
     <br>
-    <span class="w-text w-text--meta">17 components + 11 layouts = 28 building blocks for 40 widgets</span>
+    <span class="w-text w-text--meta">visual/narrative focus, photos, SVG icons, anchored actions</span>
   </div>
 
 </div>
+
+<script>
+function setGrid(cols, btn) {
+  const grid = document.getElementById('sizeGrid');
+  grid.className = 'grid-test grid-test--' + cols + 'col';
+  document.querySelectorAll('.grid-controls button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
 
 </body>
 </html>
