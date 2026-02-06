@@ -119,9 +119,14 @@
     .variant-item--flagged .variant-blocked { display: flex; }
     .variant-blocked span { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--color-error); padding: var(--space-1) var(--space-3); border: var(--border-thin) solid var(--color-error); }
 
-    /* Note indicator on label */
-    .variant-label--noted::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--color-warning); margin-right: var(--space-1); vertical-align: middle; flex-shrink: 0; }
+    /* Stoplight status indicator */
+    .variant-stoplight { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+    .variant-stoplight--green { background: #22c55e; }
+    .variant-stoplight--yellow { background: #eab308; }
+    .variant-stoplight--orange { background: #f97316; }
+    .variant-stoplight--red { background: #ef4444; }
     .variant-label { display: flex; align-items: center; }
+    .variant-comment-count { font-size: 8px; color: var(--fg-muted); margin-left: auto; padding: 1px 5px; border: var(--border-thin) solid var(--border-subtle); }
 
     /* Right-click context menu */
     .variant-ctx-menu { position: fixed; z-index: 100; background: var(--bg); border: var(--border-thin) solid var(--border); min-width: 160px; padding: var(--space-1) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
@@ -141,8 +146,10 @@
     .audit-table { border-collapse: collapse; font-family: var(--font-primary); margin-top: var(--space-4); width: 100%; }
     .audit-table th { font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); padding: var(--space-2); text-align: left; font-weight: normal; border-bottom: var(--border-thin) solid var(--border-subtle); }
     .audit-table td { font-size: var(--text-xs); padding: var(--space-2); border-bottom: var(--border-thin) solid var(--border-subtle); color: var(--fg); vertical-align: top; }
-    .audit-table td.status--blocked { color: var(--color-error); }
-    .audit-table td.status--note { color: var(--color-warning); }
+    .audit-table td.status--blocked { color: #ef4444; }
+    .audit-table td.status--todo { color: #eab308; }
+    .audit-table td.status--review { color: #f97316; }
+    .audit-table td.status--clean { color: #22c55e; }
     .audit-table .note-text { font-style: italic; color: var(--fg-muted); max-width: 300px; }
 
     @media (max-width: 900px) {
@@ -1641,7 +1648,7 @@ function setFlag(name, size, flagged) {
   var key = auditKey(name, size);
   if (!audit[key]) audit[key] = {};
   audit[key].flagged = flagged;
-  if (!flagged && !audit[key].note) delete audit[key]; // clean up empty entries
+  if (!flagged && !audit[key].note) delete audit[key];
   saveAudit();
 }
 
@@ -1651,12 +1658,41 @@ function setNote(name, size, text) {
   if (!audit[key]) audit[key] = {};
   if (text) {
     audit[key].note = text;
+    audit[key].processed = false; // new/edited comment resets to "to process"
   } else {
     delete audit[key].note;
-    if (!audit[key].flagged) delete audit[key]; // clean up empty entries
+    delete audit[key].processed;
+    if (!audit[key].flagged) delete audit[key];
   }
   saveAudit();
 }
+
+function setProcessed(name, size, val) {
+  var key = auditKey(name, size);
+  if (!audit[key]) audit[key] = {};
+  if (val) {
+    audit[key].processed = true;
+  } else {
+    delete audit[key].processed;
+  }
+  saveAudit();
+}
+
+// Stoplight status: green=clean, yellow=to process, orange=needs review, red=blocked
+function getStatus(name, size) {
+  var entry = getAuditEntry(name, size);
+  if (entry.flagged) return 'red';
+  if (entry.note && !entry.processed) return 'yellow';
+  if (entry.note && entry.processed) return 'orange';
+  return 'green';
+}
+
+var STATUS_LABELS = {
+  green: 'No updates',
+  yellow: 'To process',
+  orange: 'Needs review',
+  red: 'Blocked'
+};
 
 // ============================================
 // Variant explorer
@@ -1704,14 +1740,12 @@ function showVariants() {
 
   grid.innerHTML = '';
   grid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
-  var stats = { flagged: 0, noted: 0 };
 
   ALL_SIZES.forEach(function(size) {
     var entry = getAuditEntry(auditName, size);
     var isFlagged = !!entry.flagged;
     var hasNote = !!entry.note;
-    if (isFlagged) stats.flagged++;
-    if (hasNote) stats.noted++;
+    var status = getStatus(auditName, size);
 
     var clone = source.cloneNode(true);
     clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
@@ -1724,14 +1758,25 @@ function showVariants() {
     wrapper.dataset.auditName = auditName;
     wrapper.dataset.size = size;
 
-    // Label with note indicator
+    // Label with stoplight + comment count
     var lbl = document.createElement('div');
-    lbl.className = 'variant-label' + (hasNote ? ' variant-label--noted' : '');
+    lbl.className = 'variant-label';
     lbl.dataset.auditName = auditName;
     lbl.dataset.size = size;
+    var dot = document.createElement('span');
+    dot.className = 'variant-stoplight variant-stoplight--' + status;
+    dot.title = STATUS_LABELS[status];
+    lbl.appendChild(dot);
     var lblText = document.createElement('span');
     lblText.textContent = size + ' (' + SIZE_LABELS[size] + ')';
     lbl.appendChild(lblText);
+    if (hasNote) {
+      var badge = document.createElement('span');
+      badge.className = 'variant-comment-count';
+      badge.textContent = '1';
+      badge.title = entry.note;
+      lbl.appendChild(badge);
+    }
 
     // Blocked overlay
     var blocked = document.createElement('div');
@@ -1744,10 +1789,7 @@ function showVariants() {
     grid.appendChild(wrapper);
   });
 
-  var parts = [];
-  if (stats.flagged > 0) parts.push(stats.flagged + ' blocked');
-  if (stats.noted > 0) parts.push(stats.noted + ' noted');
-  count.textContent = parts.join(', ');
+  updateStats();
 
   renderAuditTable();
 
@@ -1799,6 +1841,40 @@ function showContextMenu(e, item) {
   });
   menu.appendChild(commentBtn);
 
+  // Progress actions based on stoplight status
+  var curStatus = getStatus(name, size);
+  if (curStatus === 'yellow') {
+    var div2 = document.createElement('div');
+    div2.className = 'variant-ctx-menu__divider';
+    menu.appendChild(div2);
+    var processBtn = document.createElement('button');
+    processBtn.className = 'variant-ctx-menu__item';
+    processBtn.textContent = 'Mark processed';
+    processBtn.addEventListener('click', function() {
+      setProcessed(name, size, true);
+      refreshVariantStatus(item, name, size);
+      renderAuditTable();
+      closeContextMenu();
+    });
+    menu.appendChild(processBtn);
+  }
+  if (curStatus === 'orange') {
+    var div3 = document.createElement('div');
+    div3.className = 'variant-ctx-menu__divider';
+    menu.appendChild(div3);
+    var approveBtn = document.createElement('button');
+    approveBtn.className = 'variant-ctx-menu__item';
+    approveBtn.textContent = 'Approve';
+    approveBtn.addEventListener('click', function() {
+      setNote(name, size, '');
+      setProcessed(name, size, false);
+      refreshVariantStatus(item, name, size);
+      renderAuditTable();
+      closeContextMenu();
+    });
+    menu.appendChild(approveBtn);
+  }
+
   document.body.appendChild(menu);
   ctxMenu = menu;
 
@@ -1817,8 +1893,29 @@ function toggleBlock(item, name, size) {
   var nowFlagged = !entry.flagged;
   setFlag(name, size, nowFlagged);
   item.classList.toggle('variant-item--flagged', nowFlagged);
-  updateStats();
+  refreshVariantStatus(item, name, size);
   renderAuditTable();
+}
+
+function refreshVariantStatus(item, name, size) {
+  var status = getStatus(name, size);
+  var entry = getAuditEntry(name, size);
+  // Update stoplight dot
+  var dot = item.querySelector('.variant-stoplight');
+  if (dot) { dot.className = 'variant-stoplight variant-stoplight--' + status; dot.title = STATUS_LABELS[status]; }
+  // Update comment count badge
+  var lbl = item.querySelector('.variant-label');
+  var badge = item.querySelector('.variant-comment-count');
+  if (entry.note && !badge && lbl) {
+    badge = document.createElement('span');
+    badge.className = 'variant-comment-count';
+    badge.textContent = '1';
+    badge.title = entry.note;
+    lbl.appendChild(badge);
+  } else if (!entry.note && badge) {
+    badge.remove();
+  }
+  updateStats();
 }
 
 function openComment(item, name, size) {
@@ -1858,24 +1955,27 @@ function closeComment() {
 }
 
 function updateNoteIndicator(name, size) {
-  var entry = getAuditEntry(name, size);
   var items = document.querySelectorAll('.variant-item[data-audit-name="' + name + '"][data-size="' + size + '"]');
   items.forEach(function(item) {
-    var lbl = item.querySelector('.variant-label');
-    if (lbl) lbl.classList.toggle('variant-label--noted', !!entry.note);
+    refreshVariantStatus(item, name, size);
   });
-  updateStats();
 }
 
 function updateStats() {
-  var stats = { flagged: 0, noted: 0 };
+  var stats = { red: 0, yellow: 0, orange: 0 };
   var keys = Object.keys(audit);
-  keys.forEach(function(k) { if (audit[k].flagged) stats.flagged++; if (audit[k].note) stats.noted++; });
+  keys.forEach(function(k) {
+    var e = audit[k];
+    if (e.flagged) stats.red++;
+    else if (e.note && !e.processed) stats.yellow++;
+    else if (e.note && e.processed) stats.orange++;
+  });
   var parts = [];
-  if (stats.flagged > 0) parts.push(stats.flagged + ' blocked');
-  if (stats.noted > 0) parts.push(stats.noted + ' noted');
+  if (stats.red > 0) parts.push(stats.red + ' blocked');
+  if (stats.yellow > 0) parts.push(stats.yellow + ' to process');
+  if (stats.orange > 0) parts.push(stats.orange + ' needs review');
   var count = document.getElementById('variantCount');
-  if (count) count.textContent = parts.join(', ');
+  if (count) count.textContent = parts.join(' · ');
 }
 
 // Right-click → context menu
@@ -1919,10 +2019,15 @@ function renderAuditTable() {
     var name = parts[0];
     var size = parts[1];
     var entry = audit[key];
-    var status = entry.flagged ? 'Blocked' : 'Review';
-    var statusClass = entry.flagged ? 'status--blocked' : 'status--note';
+    var status, statusClass;
+    if (entry.flagged) { status = 'Blocked'; statusClass = 'status--blocked'; }
+    else if (entry.note && entry.processed) { status = 'Needs review'; statusClass = 'status--review'; }
+    else if (entry.note) { status = 'To process'; statusClass = 'status--todo'; }
+    else { status = 'Clean'; statusClass = 'status--clean'; }
+    var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:' +
+      (entry.flagged ? '#ef4444' : entry.note && entry.processed ? '#f97316' : entry.note ? '#eab308' : '#22c55e') + '"></span>';
     var note = entry.note ? '<span class="note-text">' + entry.note.replace(/</g, '&lt;') + '</span>' : '';
-    html += '<tr><td>' + name + '</td><td>' + size + '</td><td>' + (SIZE_LABELS[size] || size) + '</td><td class="' + statusClass + '">' + status + '</td><td>' + note + '</td></tr>';
+    html += '<tr><td>' + name + '</td><td>' + size + '</td><td>' + (SIZE_LABELS[size] || size) + '</td><td class="' + statusClass + '">' + dot + status + '</td><td>' + note + '</td></tr>';
   });
 
   html += '</tbody></table>';
@@ -1941,6 +2046,9 @@ function exportAudit() {
     var entry = audit[key];
     var obj = { name: parts[0], size: parts[1], grid: SIZE_LABELS[parts[1]] || parts[1] };
     if (entry.flagged) obj.status = 'blocked';
+    else if (entry.note && entry.processed) obj.status = 'needs-review';
+    else if (entry.note) obj.status = 'to-process';
+    else obj.status = 'clean';
     if (entry.note) obj.note = entry.note;
     return obj;
   });
