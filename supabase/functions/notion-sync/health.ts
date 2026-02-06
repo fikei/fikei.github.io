@@ -5,6 +5,7 @@ import { createLogger } from './logger.ts'
 import type {
   Structure, PageDef, PageHealth, HealthReport,
   NotionPage, NotionSearchResult, NotionBlockChildren,
+  SimilarPages, FormattingIssue,
 } from './types.ts'
 
 interface HealthCheckClient {
@@ -17,6 +18,7 @@ interface HealthCheckClient {
 }
 
 const DEFAULT_STALE_DAYS = 90
+const DEFAULT_REVIEW_DAYS = 30
 
 function daysBetween(dateStr: string): number {
   const then = new Date(dateStr)
@@ -82,6 +84,7 @@ export async function runHealthCheck(
   staleDays: number = DEFAULT_STALE_DAYS,
   autoFix: boolean = false,
   readFile?: (path: string) => string | null,
+  reviewDays: number = DEFAULT_REVIEW_DAYS,
 ): Promise<HealthReport> {
   const log = createLogger('health-check')
 
@@ -105,9 +108,15 @@ export async function runHealthCheck(
 
   // A.2.4: Check for broken internal links
   let brokenLinks: { page: string; file: string; brokenLink: string; target: string }[] = []
+  let similarPages: SimilarPages[] = []
+  let formattingIssues: FormattingIssue[] = []
   if (readFile) {
-    const { findBrokenLinks } = await import('./validator.ts')
+    const { findBrokenLinks, findSimilarPages, checkFormatting } = await import('./validator.ts')
     brokenLinks = findBrokenLinks(structure, readFile)
+    // A.2.3: Detect near-duplicate pages
+    similarPages = findSimilarPages(structure, readFile)
+    // A.2.5: Check formatting consistency
+    formattingIssues = checkFormatting(structure, readFile)
   }
 
   const report: HealthReport = {
@@ -120,9 +129,12 @@ export async function runHealthCheck(
     empty: [],
     orphaned: [],
     missingInNotion: [],
+    needsReview: [],
     duplicateTitles: findDuplicateTitles(structure.sections),
     brokenLinks,
     unbalancedSections,
+    similarPages,
+    formattingIssues,
     autoFixed: [],
     summary: '',
   }
@@ -218,6 +230,11 @@ export async function runHealthCheck(
     } else if (days !== null && days > staleDays) {
       health.status = 'stale'
       report.stale.push(health)
+    } else if (days !== null && days > reviewDays) {
+      // A.2.6: Page is past review threshold but not yet stale
+      health.status = 'healthy' // Still healthy, just flagged for review
+      report.needsReview.push(health)
+      report.healthy++
     } else {
       report.healthy++
     }
@@ -277,12 +294,15 @@ export async function runHealthCheck(
   // Build summary
   const issues: string[] = []
   if (report.stale.length > 0) issues.push(`${report.stale.length} stale (>${staleDays} days)`)
+  if (report.needsReview.length > 0) issues.push(`${report.needsReview.length} need review (>${reviewDays} days)`)
   if (report.empty.length > 0) issues.push(`${report.empty.length} empty`)
   if (report.orphaned.length > 0) issues.push(`${report.orphaned.length} orphaned`)
   if (report.missingInNotion.length > 0) issues.push(`${report.missingInNotion.length} missing in Notion`)
   if (report.duplicateTitles.length > 0) issues.push(`${report.duplicateTitles.length} duplicate titles`)
   if (report.brokenLinks.length > 0) issues.push(`${report.brokenLinks.length} broken links`)
   if (report.unbalancedSections.length > 0) issues.push(`${report.unbalancedSections.length} unbalanced sections`)
+  if (report.similarPages.length > 0) issues.push(`${report.similarPages.length} similar page pairs`)
+  if (report.formattingIssues.length > 0) issues.push(`${report.formattingIssues.length} formatting issues`)
 
   if (issues.length === 0) {
     report.summary = `All ${report.healthy} pages are healthy.`
@@ -297,9 +317,12 @@ export async function runHealthCheck(
     total: report.totalPages,
     healthy: report.healthy,
     stale: report.stale.length,
+    needsReview: report.needsReview.length,
     empty: report.empty.length,
     orphaned: report.orphaned.length,
     missing: report.missingInNotion.length,
+    similarPairs: report.similarPages.length,
+    formattingIssues: report.formattingIssues.length,
     autoFixed: report.autoFixed.length,
   })
 

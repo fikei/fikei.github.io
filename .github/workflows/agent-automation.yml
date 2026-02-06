@@ -1102,6 +1102,25 @@ jobs:
                   for d in dupes:
                       print(f"  - \"{d['title']}\" x{d['count']}")
 
+              needs_review = report.get('needsReview', [])
+              if needs_review:
+                  print(f"\n📋 Needs review ({len(needs_review)}):")
+                  for p in needs_review:
+                      print(f"  - {p['title']} ({p.get('daysSinceEdit', '?')} days)")
+
+              similar = report.get('similarPages', [])
+              if similar:
+                  print(f"\n🔄 Similar pages ({len(similar)} pairs):")
+                  for s in similar:
+                      pct = round(s.get('similarity', 0) * 100)
+                      print(f"  - {s['pageA']} ↔ {s['pageB']} ({pct}% similar)")
+
+              fmt_issues = report.get('formattingIssues', [])
+              if fmt_issues:
+                  print(f"\n🔧 Formatting issues ({len(fmt_issues)} files):")
+                  for f in fmt_issues:
+                      print(f"  - {f['page']}: {'; '.join(f['issues'])}")
+
           except Exception as e:
               print(f"Could not parse health report: {e}")
           PYEOF
@@ -1129,13 +1148,16 @@ jobs:
             const empty = report.empty || [];
             const orphaned = report.orphaned || [];
             const missing = report.missingInNotion || [];
+            const needsReview = report.needsReview || [];
             const dupes = report.duplicateTitles || [];
             const brokenLinks = report.brokenLinks || [];
             const unbalanced = report.unbalancedSections || [];
+            const similarPages = report.similarPages || [];
+            const formattingIssues = report.formattingIssues || [];
             const totalIssues = stale.length + empty.length + orphaned.length + missing.length + brokenLinks.length;
 
             // Only create issue if there are problems
-            if (totalIssues === 0 && dupes.length === 0 && unbalanced.length === 0) {
+            if (totalIssues === 0 && dupes.length === 0 && unbalanced.length === 0 && similarPages.length === 0 && formattingIssues.length === 0) {
               console.log('✅ All pages healthy, no issue needed');
               return;
             }
@@ -1195,6 +1217,34 @@ jobs:
               body += `### 📐 Unbalanced Sections\n`;
               for (const u of unbalanced) {
                 body += `- ${u}\n`;
+              }
+              body += '\n';
+            }
+
+            if (needsReview.length > 0) {
+              body += `### 📋 Needs Review (${needsReview.length})\n`;
+              for (const p of needsReview) {
+                body += `- [ ] **${p.title}** — ${p.daysSinceEdit} days since last edit\n`;
+              }
+              body += '\n';
+            }
+
+            if (similarPages.length > 0) {
+              body += `### 🔄 Similar Pages (${similarPages.length} pairs)\n`;
+              for (const s of similarPages) {
+                body += `- [ ] **${s.pageA}** ↔ **${s.pageB}** (${Math.round(s.similarity * 100)}% similar`;
+                if (s.sharedHeadings.length > 0) {
+                  body += `, ${s.sharedHeadings.length} shared headings`;
+                }
+                body += `)\n`;
+              }
+              body += '\n';
+            }
+
+            if (formattingIssues.length > 0) {
+              body += `### 🔧 Formatting Issues (${formattingIssues.length} files)\n`;
+              for (const f of formattingIssues) {
+                body += `- **${f.page}** (\`${f.file}\`): ${f.issues.join('; ')}\n`;
               }
               body += '\n';
             }

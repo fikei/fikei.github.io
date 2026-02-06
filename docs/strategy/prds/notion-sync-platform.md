@@ -157,10 +157,10 @@ An AI agent that continuously monitors, organizes, and improves documentation qu
 |------|-------------|----------|--------|
 | A.2.1 | Archive empty bot-created pages (autoFix mode) | High | complete |
 | A.2.2 | Archive orphaned bot-created pages (autoFix mode) | High | complete |
-| A.2.3 | Merge near-duplicate pages with AI assistance | Medium | pending |
+| A.2.3 | Detect near-duplicate pages via content similarity | Medium | complete |
 | A.2.4 | Detect broken internal links between pages | Medium | complete |
-| A.2.5 | Normalize formatting inconsistencies | Low | pending |
-| A.2.6 | Add "last reviewed" metadata to pages | Low | pending |
+| A.2.5 | Check formatting inconsistencies (heading gaps, mixed markers) | Low | complete |
+| A.2.6 | Track "needs review" metadata (review threshold) | Low | complete |
 
 #### Epic A.3: Structure Health
 

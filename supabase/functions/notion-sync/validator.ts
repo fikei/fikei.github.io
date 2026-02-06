@@ -1,7 +1,7 @@
 // Notion Sync - Structure Validator
 // Schema validation for notion-structure.json
 
-import type { Structure, PageDef, ValidationResult } from './types.ts'
+import type { Structure, PageDef, ValidationResult, SimilarPages, FormattingIssue } from './types.ts'
 
 const VALID_SOURCES = new Set(['ai', 'human'])
 
@@ -276,4 +276,202 @@ export function countPages(pages: PageDef[]): number {
 
   walk(pages)
   return count
+}
+
+// ═══════════════════════════════════════════════════════════════
+// A.2.3: SIMILAR PAGE DETECTION
+// ═══════════════════════════════════════════════════════════════
+
+/** Extract headings from markdown content */
+function extractHeadings(content: string): string[] {
+  const headings: string[] = []
+  for (const line of content.split('\n')) {
+    const match = line.match(/^#{1,6}\s+(.+)/)
+    if (match) {
+      headings.push(match[1].trim().toLowerCase())
+    }
+  }
+  return headings
+}
+
+/** Generate word-level trigrams (3-word shingles) from text */
+function generateShingles(text: string): Set<string> {
+  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 0)
+  const shingles = new Set<string>()
+  for (let i = 0; i <= words.length - 3; i++) {
+    shingles.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`)
+  }
+  return shingles
+}
+
+/** Jaccard similarity between two sets */
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 0
+  let intersection = 0
+  for (const item of a) {
+    if (b.has(item)) intersection++
+  }
+  const union = a.size + b.size - intersection
+  return union === 0 ? 0 : intersection / union
+}
+
+/** A.2.3: Find pages with similar content that may be near-duplicates */
+export function findSimilarPages(
+  structure: Structure,
+  readFile: (path: string) => string | null,
+  threshold: number = 0.4,
+): SimilarPages[] {
+  const similar: SimilarPages[] = []
+
+  // Collect all pages with files
+  const pages: { title: string; file: string; content: string; headings: string[]; shingles: Set<string> }[] = []
+
+  function walk(items: PageDef[]) {
+    for (const page of items) {
+      if (page.file) {
+        const content = readFile(page.file)
+        if (content && content.trim().length > 50) {
+          pages.push({
+            title: page.title,
+            file: page.file,
+            content,
+            headings: extractHeadings(content),
+            shingles: generateShingles(content),
+          })
+        }
+      }
+      if (page.children) walk(page.children)
+    }
+  }
+
+  walk(structure.sections)
+
+  // Compare all pairs
+  for (let i = 0; i < pages.length; i++) {
+    for (let j = i + 1; j < pages.length; j++) {
+      const a = pages[i]
+      const b = pages[j]
+
+      // Check heading overlap
+      const sharedHeadings = a.headings.filter(h => b.headings.includes(h))
+
+      // Calculate content similarity via shingles
+      const similarity = jaccardSimilarity(a.shingles, b.shingles)
+
+      // Report if similarity exceeds threshold or many shared headings
+      if (similarity >= threshold || (sharedHeadings.length >= 3 && a.headings.length > 0 && b.headings.length > 0)) {
+        similar.push({
+          pageA: a.title,
+          fileA: a.file,
+          pageB: b.title,
+          fileB: b.file,
+          similarity: Math.round(similarity * 100) / 100,
+          sharedHeadings,
+        })
+      }
+    }
+  }
+
+  // Sort by similarity descending
+  similar.sort((a, b) => b.similarity - a.similarity)
+  return similar
+}
+
+// ═══════════════════════════════════════════════════════════════
+// A.2.5: FORMATTING CONSISTENCY CHECKS
+// ═══════════════════════════════════════════════════════════════
+
+/** A.2.5: Check for formatting inconsistencies in markdown files */
+export function checkFormatting(
+  structure: Structure,
+  readFile: (path: string) => string | null,
+): FormattingIssue[] {
+  const results: FormattingIssue[] = []
+
+  function walk(items: PageDef[]) {
+    for (const page of items) {
+      if (page.file) {
+        const content = readFile(page.file)
+        if (content) {
+          const issues = analyzeFormatting(content)
+          if (issues.length > 0) {
+            results.push({ page: page.title, file: page.file, issues })
+          }
+        }
+      }
+      if (page.children) walk(page.children)
+    }
+  }
+
+  walk(structure.sections)
+  return results
+}
+
+function analyzeFormatting(content: string): string[] {
+  const issues: string[] = []
+  const lines = content.split('\n')
+
+  // Track heading levels for gap detection
+  let prevHeadingLevel = 0
+  let headingLineNumbers: { level: number; line: number }[] = []
+
+  // Track list markers for consistency
+  const listMarkers = new Set<string>()
+
+  // Count consecutive blank lines
+  let consecutiveBlanks = 0
+  let maxConsecutiveBlanks = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const lineNum = i + 1
+
+    // Check heading level gaps (e.g., # -> ### skipping ##)
+    const headingMatch = line.match(/^(#{1,6})\s/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      headingLineNumbers.push({ level, line: lineNum })
+
+      if (prevHeadingLevel > 0 && level > prevHeadingLevel + 1) {
+        issues.push(`Heading level jump from h${prevHeadingLevel} to h${level} at line ${lineNum}`)
+      }
+      prevHeadingLevel = level
+
+      // Check missing blank line before heading (except first line)
+      if (i > 0 && lines[i - 1].trim() !== '') {
+        issues.push(`Missing blank line before heading at line ${lineNum}`)
+      }
+    }
+
+    // Track list markers
+    const listMatch = line.match(/^(\s*)([-*+]|\d+[.)]) /)
+    if (listMatch) {
+      const marker = listMatch[2]
+      if (marker === '-' || marker === '*' || marker === '+') {
+        listMarkers.add(marker)
+      }
+    }
+
+    // Track consecutive blank lines
+    if (line.trim() === '') {
+      consecutiveBlanks++
+      if (consecutiveBlanks > maxConsecutiveBlanks) {
+        maxConsecutiveBlanks = consecutiveBlanks
+      }
+    } else {
+      consecutiveBlanks = 0
+    }
+  }
+
+  // Check for mixed list markers
+  if (listMarkers.size > 1) {
+    issues.push(`Mixed list markers: ${Array.from(listMarkers).map(m => `"${m}"`).join(', ')}`)
+  }
+
+  // Check for excessive blank lines
+  if (maxConsecutiveBlanks > 3) {
+    issues.push(`Excessive blank lines (${maxConsecutiveBlanks} consecutive)`)
+  }
+
+  return issues
 }
