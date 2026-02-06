@@ -54,9 +54,14 @@ When working on this project, always follow these guidelines:
    - When creating or updating PRDs, technical specs, or project plans:
      1. Write/update the markdown file in `docs/`
      2. Ensure the file is listed in `notion-structure.json` if new
-     3. Commit and push - **Notion syncs automatically** (triggers on master and claude/* branches)
-   - The GitHub Actions workflow (`agent-automation.yml`) auto-syncs on any push
-   - To manually trigger sync: `gh workflow run agent-automation.yml`
+     3. Commit and push to `docs-sync` branch to trigger Notion sync
+   - **Notion sync triggers:**
+     - `docs-sync` branch: **Always syncs** — this is the preferred branch for doc updates
+     - `master`/`main`: Only syncs when `.md` or `notion-structure.json` files changed
+     - `claude/*`: Only syncs when doc files changed
+     - Manual: `gh workflow run agent-automation.yml -f force_full_sync=true`
+   - **When pushing doc changes, push to `docs-sync`** to ensure Notion is updated
+   - **Health check** runs weekly on Fridays and creates GitHub issues for stale/empty/orphaned pages
    - **When consolidating multiple docs into one:**
      1. Create the new consolidated doc
      2. Move old files to appropriate `archive/` folder using `git mv`
