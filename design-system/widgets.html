@@ -88,6 +88,75 @@
     .variant-item--lg { width: 420px; }
     .variant-item--wide { width: 640px; }
     .variant-item--xl { width: 640px; }
+    .variant-item--col { width: 200px; }
+    .variant-item--poster { width: 420px; }
+    .variant-item--max { width: 640px; }
+    .variant-item--banner { width: 860px; }
+    .variant-item--pano { width: 860px; }
+    .variant-item--cinema { width: 860px; }
+    .variant-item--board { width: 420px; }
+    .variant-item--wall { width: 640px; }
+    .variant-item--full { width: 860px; }
+
+    /* Variant audit controls */
+    .variant-toolbar { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .variant-toolbar button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
+    .variant-toolbar button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+    /* Overarching print-design grid overlay — columns + baselines across all variants */
+    .variant-grid--gridlines { position: relative; padding-top: var(--space-4); }
+    .variant-grid--gridlines::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: calc(100% / 12) 100%, 100% 40px;
+    }
+
+    /* Blocked state (triggered via right-click menu) */
+    .variant-item--flagged .w-shell { opacity: 0.2; }
+    .variant-item--flagged .variant-label { text-decoration: line-through; color: var(--color-error); }
+    .variant-item { position: relative; }
+    .variant-blocked { display: none; position: absolute; top: 24px; left: 0; right: 0; bottom: 0; z-index: 5; align-items: center; justify-content: center; }
+    .variant-item--flagged .variant-blocked { display: flex; }
+    .variant-blocked span { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--color-error); padding: var(--space-1) var(--space-3); border: var(--border-thin) solid var(--color-error); }
+
+    /* Stoplight status indicator */
+    .variant-stoplight { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+    .variant-stoplight--green { background: #22c55e; }
+    .variant-stoplight--yellow { background: #eab308; }
+    .variant-stoplight--orange { background: #f97316; }
+    .variant-stoplight--red { background: #ef4444; }
+    .variant-label { display: flex; align-items: center; }
+    .variant-comment-count { font-size: 8px; color: var(--fg-muted); margin-left: auto; padding: 1px 5px; border: var(--border-thin) solid var(--border-subtle); }
+
+    /* Right-click context menu */
+    .variant-ctx-menu { position: fixed; z-index: 100; background: var(--bg); border: var(--border-thin) solid var(--border); min-width: 160px; padding: var(--space-1) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
+    .variant-ctx-menu__item { display: block; width: 100%; padding: var(--space-2) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg); background: transparent; border: none; cursor: pointer; text-align: left; }
+    .variant-ctx-menu__item:hover { background: var(--bg-surface); }
+    .variant-ctx-menu__item--danger { color: var(--color-error); }
+    .variant-ctx-menu__divider { height: 1px; background: var(--border-subtle); margin: var(--space-1) 0; }
+
+    /* Inline comment area (opens via context menu) */
+    .variant-comment { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--bg); border-top: var(--border-thin) solid var(--border); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+    .variant-comment textarea { font-family: var(--font-primary); font-size: var(--text-xs); background: var(--bg-surface); color: var(--fg); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-2); resize: vertical; min-height: 40px; line-height: var(--leading-normal); }
+    .variant-comment textarea:focus { outline: none; border-color: var(--fg); }
+    .variant-comment__footer { display: flex; justify-content: space-between; align-items: center; }
+    .variant-comment__hint { font-size: 8px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+
+    /* Blacklist table */
+    .audit-table { border-collapse: collapse; font-family: var(--font-primary); margin-top: var(--space-4); width: 100%; }
+    .audit-table th { font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); padding: var(--space-2); text-align: left; font-weight: normal; border-bottom: var(--border-thin) solid var(--border-subtle); }
+    .audit-table td { font-size: var(--text-xs); padding: var(--space-2); border-bottom: var(--border-thin) solid var(--border-subtle); color: var(--fg); vertical-align: top; }
+    .audit-table td.status--blocked { color: #ef4444; }
+    .audit-table td.status--todo { color: #eab308; }
+    .audit-table td.status--review { color: #f97316; }
+    .audit-table td.status--clean { color: #22c55e; }
+    .audit-table .note-text { font-style: italic; color: var(--fg-muted); max-width: 300px; }
 
     @media (max-width: 900px) {
       .grid-test--5col { grid-template-columns: repeat(3, 1fr); }
@@ -177,9 +246,18 @@
 
   <!-- ====== VARIANT EXPLORER (hidden until dropdown used) ====== -->
   <div class="section" id="variants" style="display:none">
-    <h2 class="section__heading">Size Variants</h2>
-    <p class="section__desc" id="variantDesc">All valid sizes for the selected widget.</p>
+    <h2 class="section__heading">Variant Audit</h2>
+    <p class="section__desc" id="variantDesc">All sizes for the selected widget. Flag variants you want to blacklist.</p>
+
+    <div class="variant-toolbar">
+      <button onclick="toggleVariantGridLines(this)">Grid lines</button>
+      <span class="w-text w-text--meta" id="variantCount"></span>
+    </div>
+
     <div class="variant-grid" id="variantGrid"></div>
+
+    <!-- Blacklist output -->
+    <div id="blacklistOutput" style="margin-top:var(--space-8)"></div>
   </div>
 
   <hr class="section-divider" id="variantDivider" style="display:none">
@@ -319,7 +397,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="atomsDivider">
 
   <!-- ====== MOLECULES ====== -->
   <div class="section" id="molecules">
@@ -422,7 +500,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="moleculesDivider">
 
   <!-- ====== BODY LAYOUTS AS FULL WIDGETS ====== -->
   <div class="section" id="layouts">
@@ -975,7 +1053,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="layoutsDivider">
 
   <!-- ====== PRIORITY WIDGETS ====== -->
   <div class="section" id="priority">
@@ -1260,7 +1338,7 @@
     </div>
   </div>
 
-  <hr class="section-divider">
+  <hr class="section-divider" id="priorityDivider">
 
   <!-- ====== GRID SIZE PERMUTATIONS ====== -->
   <div class="section" id="grid">
@@ -1533,21 +1611,139 @@ function toggleGridLines(btn) {
   btn.classList.toggle('active');
 }
 
-// Template → valid sizes
-var TEMPLATE_SIZES = {
-  verdict:    ['sm', 'med', 'lg'],
-  list:       ['sm', 'med', 'tall', 'lg', 'wide'],
-  narrative:  ['med', 'tall', 'lg'],
-  spectrum:   ['sm', 'med', 'lg'],
-  comparison: ['med', 'lg'],
-  choices:    ['sm', 'med', 'lg'],
-  suggestion: ['sm', 'med', 'tall', 'lg'],
-  grouped:    ['med', 'tall', 'lg']
-};
+// ============================================
+// Grid sizing — all 16 sizes (1x1 → 4x4)
+// ============================================
+
+var ALL_SIZES = [
+  'sm', 'med', 'wide', 'banner',
+  'tall', 'lg', 'xl', 'pano',
+  'col', 'poster', 'max', 'cinema',
+  'board', 'wall', 'full'
+];
 
 var SIZE_LABELS = {
-  sm: '1x1', med: '2x1', tall: '1x2', lg: '2x2', wide: '3x1', xl: '3x2'
+  sm: '1x1', med: '2x1', wide: '3x1', banner: '4x1',
+  tall: '1x2', lg: '2x2', xl: '3x2', pano: '4x2',
+  col: '1x3', poster: '2x3', max: '3x3', cinema: '4x3',
+  board: '2x4', wall: '3x4', full: '4x4'
 };
+
+// ============================================
+// Audit state — flags + notes in localStorage
+// ============================================
+
+var AUDIT_KEY = 'widget-variant-audit';
+
+// Structure: { "widget:size": { flagged: bool, note: string } }
+function loadAudit() {
+  try {
+    var saved = localStorage.getItem(AUDIT_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return {};
+}
+
+function saveAudit() {
+  try { localStorage.setItem(AUDIT_KEY, JSON.stringify(audit)); } catch (e) {}
+}
+
+var audit = loadAudit();
+
+function auditKey(name, size) { return name + ':' + size; }
+
+function getAuditEntry(name, size) {
+  return audit[auditKey(name, size)] || {};
+}
+
+function setFlag(name, size, flagged) {
+  var key = auditKey(name, size);
+  if (!audit[key]) audit[key] = {};
+  audit[key].flagged = flagged;
+  if (!flagged && !audit[key].note) delete audit[key];
+  saveAudit();
+}
+
+function setNote(name, size, text) {
+  var key = auditKey(name, size);
+  text = (text || '').trim();
+  if (!audit[key]) audit[key] = {};
+  if (text) {
+    audit[key].note = text;
+    audit[key].processed = false; // new/edited comment resets to "to process"
+  } else {
+    delete audit[key].note;
+    delete audit[key].processed;
+    if (!audit[key].flagged) delete audit[key];
+  }
+  saveAudit();
+}
+
+function setProcessed(name, size, val) {
+  var key = auditKey(name, size);
+  if (!audit[key]) audit[key] = {};
+  if (val) {
+    audit[key].processed = true;
+  } else {
+    delete audit[key].processed;
+  }
+  saveAudit();
+}
+
+// Stoplight status: green=clean, yellow=to process, orange=needs review, red=blocked
+function getStatus(name, size) {
+  var entry = getAuditEntry(name, size);
+  if (entry.flagged) return 'red';
+  if (entry.note && !entry.processed) return 'yellow';
+  if (entry.note && entry.processed) return 'orange';
+  return 'green';
+}
+
+var STATUS_LABELS = {
+  green: 'No updates',
+  yellow: 'To process',
+  orange: 'Needs review',
+  red: 'Blocked'
+};
+
+// ============================================
+// Variant explorer
+// ============================================
+
+var variantGridLinesOn = false;
+
+function toggleVariantGridLines(btn) {
+  variantGridLinesOn = !variantGridLinesOn;
+  btn.classList.toggle('active');
+  document.getElementById('variantGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+}
+
+// ============================================
+// Section filtering — hide unrelated sections
+// when a widget/template is selected
+// ============================================
+
+function filterSections(source) {
+  var hideable = ['layouts', 'priority', 'grid', 'moleculesDivider', 'layoutsDivider', 'priorityDivider'];
+  if (!source) {
+    // No filter — show all, reset atom/molecule cards
+    hideable.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = ''; });
+    document.querySelectorAll('#atoms .component-card, #molecules .component-card').forEach(function(c) { c.style.display = ''; });
+    return;
+  }
+  // Hide widget examples, priority, and grid sections
+  hideable.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  // Detect which w- component classes are used in the source widget
+  var html = source.outerHTML;
+  document.querySelectorAll('#atoms .component-card, #molecules .component-card').forEach(function(card) {
+    var label = card.querySelector('.component-card__label');
+    if (!label) return;
+    var name = label.textContent.trim(); // e.g. "w-text", "w-badge", "w-row"
+    // Check if the source widget HTML contains this component class
+    var used = html.indexOf(name) !== -1;
+    card.style.display = used ? '' : 'none';
+  });
+}
 
 function showVariants() {
   var widgetVal = document.getElementById('widgetFilter').value;
@@ -1556,14 +1752,15 @@ function showVariants() {
   var divider = document.getElementById('variantDivider');
   var grid = document.getElementById('variantGrid');
   var desc = document.getElementById('variantDesc');
+  var count = document.getElementById('variantCount');
 
   if (!widgetVal && !templateVal) {
     explorer.style.display = 'none';
     divider.style.display = 'none';
+    filterSections(null);
     return;
   }
 
-  // Build selector
   var selector = '.w-shell';
   if (widgetVal) selector += '[data-widget="' + widgetVal + '"]';
   if (templateVal) selector += '[data-template="' + templateVal + '"]';
@@ -1576,36 +1773,342 @@ function showVariants() {
     return;
   }
 
+  filterSections(source);
+
+  var auditName = widgetVal || templateVal;
   var template = source.dataset.template;
-  var sizes = TEMPLATE_SIZES[template] || ['sm', 'med', 'lg'];
-  var widget = source.dataset.widget || '';
-  var label = widgetVal || templateVal;
-  desc.textContent = 'Showing ' + label + ' (' + template + ') at ' + sizes.length + ' valid sizes.';
+
+  desc.textContent = auditName + ' (' + template + ') — ' + ALL_SIZES.length + ' sizes. Right-click for options.';
 
   grid.innerHTML = '';
-  sizes.forEach(function(size) {
+  grid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+
+  ALL_SIZES.forEach(function(size) {
+    var entry = getAuditEntry(auditName, size);
+    var isFlagged = !!entry.flagged;
+    var hasNote = !!entry.note;
+    var status = getStatus(auditName, size);
+
     var clone = source.cloneNode(true);
-    // Strip any existing size and grid-span styles
     clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
     clone.style.cssText = '';
     clone.classList.add('w-shell--' + size);
 
     var wrapper = document.createElement('div');
-    wrapper.className = 'variant-item variant-item--' + size;
+    wrapper.className = 'variant-item variant-item--' + size +
+      (isFlagged ? ' variant-item--flagged' : '');
+    wrapper.dataset.auditName = auditName;
+    wrapper.dataset.size = size;
 
+    // Label with stoplight + comment count
     var lbl = document.createElement('div');
     lbl.className = 'variant-label';
-    lbl.textContent = size + ' (' + SIZE_LABELS[size] + ')';
+    lbl.dataset.auditName = auditName;
+    lbl.dataset.size = size;
+    var dot = document.createElement('span');
+    dot.className = 'variant-stoplight variant-stoplight--' + status;
+    dot.title = STATUS_LABELS[status];
+    lbl.appendChild(dot);
+    var lblText = document.createElement('span');
+    lblText.textContent = size + ' (' + SIZE_LABELS[size] + ')';
+    lbl.appendChild(lblText);
+    if (hasNote) {
+      var badge = document.createElement('span');
+      badge.className = 'variant-comment-count';
+      badge.textContent = '1';
+      badge.title = entry.note;
+      lbl.appendChild(badge);
+    }
+
+    // Blocked overlay
+    var blocked = document.createElement('div');
+    blocked.className = 'variant-blocked';
+    blocked.innerHTML = '<span>Blocked</span>';
 
     wrapper.appendChild(lbl);
+    wrapper.appendChild(blocked);
     wrapper.appendChild(clone);
     grid.appendChild(wrapper);
   });
+
+  updateStats();
+
+  renderAuditTable();
 
   explorer.style.display = '';
   divider.style.display = '';
   explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// ============================================
+// Right-click context menu
+// ============================================
+
+var ctxMenu = null;
+
+function showContextMenu(e, item) {
+  closeContextMenu();
+  var name = item.dataset.auditName;
+  var size = item.dataset.size;
+  var entry = getAuditEntry(name, size);
+  var isFlagged = !!entry.flagged;
+
+  var menu = document.createElement('div');
+  menu.className = 'variant-ctx-menu';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+
+  // Block / Unblock
+  var blockBtn = document.createElement('button');
+  blockBtn.className = 'variant-ctx-menu__item' + (!isFlagged ? ' variant-ctx-menu__item--danger' : '');
+  blockBtn.textContent = isFlagged ? 'Unblock' : 'Block';
+  blockBtn.addEventListener('click', function() {
+    toggleBlock(item, name, size);
+    closeContextMenu();
+  });
+  menu.appendChild(blockBtn);
+
+  // Divider
+  var divider = document.createElement('div');
+  divider.className = 'variant-ctx-menu__divider';
+  menu.appendChild(divider);
+
+  // Add / Edit comment
+  var commentBtn = document.createElement('button');
+  commentBtn.className = 'variant-ctx-menu__item';
+  commentBtn.textContent = entry.note ? 'Edit comment' : 'Add comment';
+  commentBtn.addEventListener('click', function() {
+    openComment(item, name, size);
+    closeContextMenu();
+  });
+  menu.appendChild(commentBtn);
+
+  // Progress actions based on stoplight status
+  var curStatus = getStatus(name, size);
+  if (curStatus === 'yellow') {
+    var div2 = document.createElement('div');
+    div2.className = 'variant-ctx-menu__divider';
+    menu.appendChild(div2);
+    var processBtn = document.createElement('button');
+    processBtn.className = 'variant-ctx-menu__item';
+    processBtn.textContent = 'Mark processed';
+    processBtn.addEventListener('click', function() {
+      setProcessed(name, size, true);
+      refreshVariantStatus(item, name, size);
+      renderAuditTable();
+      closeContextMenu();
+    });
+    menu.appendChild(processBtn);
+  }
+  if (curStatus === 'orange') {
+    var div3 = document.createElement('div');
+    div3.className = 'variant-ctx-menu__divider';
+    menu.appendChild(div3);
+    var approveBtn = document.createElement('button');
+    approveBtn.className = 'variant-ctx-menu__item';
+    approveBtn.textContent = 'Approve';
+    approveBtn.addEventListener('click', function() {
+      setNote(name, size, '');
+      setProcessed(name, size, false);
+      refreshVariantStatus(item, name, size);
+      renderAuditTable();
+      closeContextMenu();
+    });
+    menu.appendChild(approveBtn);
+  }
+
+  document.body.appendChild(menu);
+  ctxMenu = menu;
+
+  // Keep menu in viewport
+  var rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = (e.clientX - rect.width) + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+}
+
+function closeContextMenu() {
+  if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; }
+}
+
+function toggleBlock(item, name, size) {
+  var entry = getAuditEntry(name, size);
+  var nowFlagged = !entry.flagged;
+  setFlag(name, size, nowFlagged);
+  item.classList.toggle('variant-item--flagged', nowFlagged);
+  refreshVariantStatus(item, name, size);
+  renderAuditTable();
+}
+
+function refreshVariantStatus(item, name, size) {
+  var status = getStatus(name, size);
+  var entry = getAuditEntry(name, size);
+  // Update stoplight dot
+  var dot = item.querySelector('.variant-stoplight');
+  if (dot) { dot.className = 'variant-stoplight variant-stoplight--' + status; dot.title = STATUS_LABELS[status]; }
+  // Update comment count badge
+  var lbl = item.querySelector('.variant-label');
+  var badge = item.querySelector('.variant-comment-count');
+  if (entry.note && !badge && lbl) {
+    badge = document.createElement('span');
+    badge.className = 'variant-comment-count';
+    badge.textContent = '1';
+    badge.title = entry.note;
+    lbl.appendChild(badge);
+  } else if (!entry.note && badge) {
+    badge.remove();
+  }
+  updateStats();
+}
+
+function openComment(item, name, size) {
+  closeComment();
+  var entry = getAuditEntry(name, size);
+  var div = document.createElement('div');
+  div.className = 'variant-comment';
+  div.id = 'activeComment';
+  div.innerHTML =
+    '<textarea placeholder="How should this variant change?">' + (entry.note || '').replace(/</g, '&lt;') + '</textarea>' +
+    '<div class="variant-comment__footer"><span class="variant-comment__hint">Esc to close · auto-saves on blur</span></div>';
+
+  item.appendChild(div);
+  var ta = div.querySelector('textarea');
+  ta.focus();
+
+  ta.addEventListener('blur', function() {
+    setNote(name, size, ta.value);
+    updateNoteIndicator(name, size);
+    renderAuditTable();
+    setTimeout(closeComment, 50);
+  });
+
+  ta.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      setNote(name, size, ta.value);
+      updateNoteIndicator(name, size);
+      renderAuditTable();
+      closeComment();
+    }
+  });
+}
+
+function closeComment() {
+  var el = document.getElementById('activeComment');
+  if (el) el.remove();
+}
+
+function updateNoteIndicator(name, size) {
+  var items = document.querySelectorAll('.variant-item[data-audit-name="' + name + '"][data-size="' + size + '"]');
+  items.forEach(function(item) {
+    refreshVariantStatus(item, name, size);
+  });
+}
+
+function updateStats() {
+  var stats = { red: 0, yellow: 0, orange: 0 };
+  var keys = Object.keys(audit);
+  keys.forEach(function(k) {
+    var e = audit[k];
+    if (e.flagged) stats.red++;
+    else if (e.note && !e.processed) stats.yellow++;
+    else if (e.note && e.processed) stats.orange++;
+  });
+  var parts = [];
+  if (stats.red > 0) parts.push(stats.red + ' blocked');
+  if (stats.yellow > 0) parts.push(stats.yellow + ' to process');
+  if (stats.orange > 0) parts.push(stats.orange + ' needs review');
+  var count = document.getElementById('variantCount');
+  if (count) count.textContent = parts.join(' · ');
+}
+
+// Right-click → context menu
+document.addEventListener('contextmenu', function(e) {
+  var item = e.target.closest('.variant-item');
+  if (!item) { closeContextMenu(); return; }
+  if (e.target.tagName === 'TEXTAREA') return;
+  e.preventDefault();
+  showContextMenu(e, item);
+});
+
+// Close context menu on click outside
+document.addEventListener('click', function(e) {
+  if (ctxMenu && !ctxMenu.contains(e.target)) closeContextMenu();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeContextMenu();
+});
+
+// ============================================
+// Audit output table — flags + notes combined
+// ============================================
+
+function renderAuditTable() {
+  var output = document.getElementById('blacklistOutput');
+  if (!output) return;
+
+  var keys = Object.keys(audit).sort();
+  if (keys.length === 0) {
+    output.innerHTML = '';
+    return;
+  }
+
+  var html = '<h3 class="section__heading" style="font-size:var(--text-xs)">Audit Log</h3>';
+  html += '<table class="audit-table"><thead><tr><th>Widget / Template</th><th>Size</th><th>Grid</th><th>Status</th><th>Note</th></tr></thead><tbody>';
+
+  keys.forEach(function(key) {
+    var parts = key.split(':');
+    var name = parts[0];
+    var size = parts[1];
+    var entry = audit[key];
+    var status, statusClass;
+    if (entry.flagged) { status = 'Blocked'; statusClass = 'status--blocked'; }
+    else if (entry.note && entry.processed) { status = 'Needs review'; statusClass = 'status--review'; }
+    else if (entry.note) { status = 'To process'; statusClass = 'status--todo'; }
+    else { status = 'Clean'; statusClass = 'status--clean'; }
+    var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:' +
+      (entry.flagged ? '#ef4444' : entry.note && entry.processed ? '#f97316' : entry.note ? '#eab308' : '#22c55e') + '"></span>';
+    var note = entry.note ? '<span class="note-text">' + entry.note.replace(/</g, '&lt;') + '</span>' : '';
+    html += '<tr><td>' + name + '</td><td>' + size + '</td><td>' + (SIZE_LABELS[size] || size) + '</td><td class="' + statusClass + '">' + dot + status + '</td><td>' + note + '</td></tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '<div style="margin-top:var(--space-3);display:flex;gap:var(--space-2)">';
+  html += '<button class="w-btn w-btn--sm" onclick="exportAudit()">Copy as JSON</button>';
+  html += '<button class="w-btn w-btn--sm" onclick="clearAudit()">Clear all</button>';
+  html += '</div>';
+
+  output.innerHTML = html;
+}
+
+function exportAudit() {
+  var keys = Object.keys(audit).sort();
+  var data = keys.map(function(key) {
+    var parts = key.split(':');
+    var entry = audit[key];
+    var obj = { name: parts[0], size: parts[1], grid: SIZE_LABELS[parts[1]] || parts[1] };
+    if (entry.flagged) obj.status = 'blocked';
+    else if (entry.note && entry.processed) obj.status = 'needs-review';
+    else if (entry.note) obj.status = 'to-process';
+    else obj.status = 'clean';
+    if (entry.note) obj.note = entry.note;
+    return obj;
+  });
+  var json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(function() {
+    var btn = document.querySelector('#blacklistOutput .w-btn');
+    if (btn) { var orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = orig; }, 1500); }
+  });
+}
+
+function clearAudit() {
+  audit = {};
+  saveAudit();
+  renderAuditTable();
+  showVariants();
+}
+
+renderAuditTable();
 
 // ============================================
 // Image Enrichment Pipeline
