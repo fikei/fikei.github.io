@@ -358,7 +358,7 @@ class SystemicApp {
     // Handle sub-routes for docs view
     if (route.view === 'docs') {
       if (this.viewer?.designSystem && route.section) {
-        const foundations = ['color', 'typography', 'spacing', 'elevation'];
+        const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples'];
         if (foundations.includes(route.section)) {
           this.viewer.selectFoundation(route.section);
         } else if (route.section === 'component' && route.detail) {
@@ -450,6 +450,7 @@ class SystemicApp {
       <a href="#" class="docs-nav__link" data-section="typography">Typography</a>
       <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
       <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
+      <a href="#" class="docs-nav__link" data-section="examples">Examples</a>
       <span class="docs-nav__spacer"></span>
       <select class="docs-nav__select" id="component-select">
         <option value="">Component...</option>
