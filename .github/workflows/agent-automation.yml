@@ -794,10 +794,12 @@ jobs:
                       return True
                   else:
                       errors = response.get('errors', [])
-                      log(f"        ⚠️ Failed: {errors[0] if errors else 'unknown error'}")
+                      error = response.get('error', '')
+                      msg = errors[0] if errors else (error if error else f'unknown: {json.dumps(response)[:200]}')
+                      log(f"        ⚠️ Failed: {msg}")
                       return False
               except json.JSONDecodeError:
-                  log(f"        ⚠️ Failed: invalid response")
+                  log(f"        ⚠️ Failed: {result.stdout[:300] if result.stdout else 'no response'}")
                   return False
 
           # First pass
