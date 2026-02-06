@@ -2533,6 +2533,10 @@ body {
   background: var(--surface);
   border: 1px solid var(--subtle);
   padding: var(--space-4);
+}
+
+/* Grid-split layout: used by grid-split template (complete-the-look) */
+.widget-complete__body--grid-split {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
@@ -4380,8 +4384,10 @@ Return JSON:
 
   // Normalize wear items for widget generation
   function normalizeWearItems(links) {
+    // Category-agnostic: filter by current category, or return all if 'all'
+    const category = currentFilter || 'all';
     return links
-      .filter(l => l.category === 'wear' && !l.loading)
+      .filter(l => !l.loading && (category === 'all' || l.category === category))
       .map(l => ({
         id: l.id,
         title: l.title || '',
@@ -5233,10 +5239,24 @@ Return JSON:
     }
 
     // Group widgets by zone
+    const allHero = applicableWidgets.filter(w => w.zone === 'hero');
+    const allInline = applicableWidgets.filter(w => w.zone === 'inline');
+    const allFooter = applicableWidgets.filter(w => w.zone === 'footer');
+
+    // Hero rotation: show one hero widget at a time, cycling on each render
+    let heroRotationIndex = parseInt(localStorage.getItem('widget_hero_index') || '0', 10);
+    const selectedHero = allHero.length > 0
+      ? [allHero[heroRotationIndex % allHero.length]]
+      : [];
+    // Advance index for next render
+    if (allHero.length > 0) {
+      localStorage.setItem('widget_hero_index', String((heroRotationIndex + 1) % allHero.length));
+    }
+
     const widgetsByZone = {
-      hero: applicableWidgets.filter(w => w.zone === 'hero'),
-      inline: applicableWidgets.filter(w => w.zone === 'inline'),
-      footer: applicableWidgets.filter(w => w.zone === 'footer')
+      hero: selectedHero,
+      inline: allInline,
+      footer: allFooter
     };
 
     // Show loading state for hero zone if we have hero widgets
