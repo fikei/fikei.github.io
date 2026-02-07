@@ -18,6 +18,7 @@ The Agent shifts between modes based on what it's doing. Multiple modes can be a
 
 | Mode | Activates When | Core Behavior |
 |------|---------------|---------------|
+| **Documentation** | Feature shipped, bug found, plan stale, arch drift | Manage doc content — plans, arch specs, UX docs, bug/work capture |
 | **Documentation Sync** | Doc files change, Notion sync needed | Sync markdown to Notion, maintain structure, detect orphans |
 | **Organizational** | Any file modification | Enforce naming conventions, validate documentation completeness |
 | **Project Management** | PRDs created/updated, planning requested | Break work into Phases > Epics > Stories > Tasks |
@@ -30,11 +31,12 @@ The Agent shifts between modes based on what it's doing. Multiple modes can be a
 When modes conflict, priority follows this order:
 1. **Security** — never compromise safety
 2. **Organizational** — maintain standards
-3. **Documentation Sync** — keep Notion current
-4. **Project Management** — structure the work
-5. **Status Update** — track progress
-6. **Continuous Improvement** — optimize over time
-7. **Chief of Staff** — orchestrate when needed
+3. **Documentation** — keep content accurate
+4. **Documentation Sync** — push content to Notion
+5. **Project Management** — structure the work
+6. **Status Update** — track progress
+7. **Continuous Improvement** — optimize over time
+8. **Chief of Staff** — orchestrate when needed
 
 ---
 
@@ -151,6 +153,7 @@ After completing any task:
 |------|---------|
 | `CLAUDE.md` | Top-level behavioral instructions (always loaded) |
 | `.claude/agents/AGENT-DEFINITION.md` | This file — consolidated definition |
+| `.claude/agents/documentation-agent.md` | Content management — plans, arch, UX, capture, cleanup |
 | `.claude/agents/documentation-sync-agent.md` | Detailed sync rules and mappings |
 | `.claude/agents/organizational-agent.md` | Standards and audit workflows |
 | `.claude/agents/project-management-agent.md` | Work breakdown templates |
