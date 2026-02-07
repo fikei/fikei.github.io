@@ -83,7 +83,9 @@ Programmatic pin creation from external tools (Zapier, IFTTT, Make, Shortcuts, s
 
 ## Epic 8.3: Social Media Import
 
-Connect social accounts and pull in saved/liked content as pins.
+Connect social accounts and pull in saved/liked content as pins on an ongoing basis.
+
+> **Shared infra with Phase 9**: [Epic 9.2 (OAuth-Connected Imports)](./phase-9-bulk-import.md) builds the OAuth connection manager and `connected_accounts` table. Phase 8 reuses those same tokens for ongoing incremental sync — Phase 9 does the one-time bulk pull, Phase 8 does the daily/weekly check for new saves.
 
 | Story | Tasks | Status |
 |-------|-------|--------|

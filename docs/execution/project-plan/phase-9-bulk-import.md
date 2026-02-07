@@ -12,18 +12,32 @@ This phase turns ctrl.rodeo into the place you consolidate your scattered digita
 
 ---
 
+## Access Tiers
+
+Every platform import has three possible access methods. We prioritize the one with the least friction:
+
+| Tier | Friction | How It Works | Platforms |
+|------|----------|-------------|-----------|
+| **Tier 1: OAuth API** | One-click | Authorize → select what to import → done | Reddit, Spotify, Pinterest, YouTube (partial), Pocket |
+| **Tier 2: Browser Extension** | Low | Navigate to your saves page → extension captures data from the page's own API calls | Instagram, TikTok, Twitter/X |
+| **Tier 3: File Upload** | Medium | Export from platform → upload file to ctrl.rodeo | Browser bookmarks, Google Maps, Instapaper, Raindrop, Pinboard, generic CSV/JSON |
+
+File upload remains a universal fallback for all platforms — if OAuth is down or the extension isn't installed, users can always request their data export and upload it.
+
+---
+
 ## Epic 9.1: Import Infrastructure
 
-The pipeline that all import sources flow through. Handles queuing, deduplication, bulk enrichment, and progress tracking regardless of where the data came from.
+The shared pipeline that all import sources flow through regardless of access tier. Handles queuing, deduplication, bulk enrichment, and progress tracking.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
 | **Import Job Model** | | Pending |
-| | Create `import_jobs` table: `{ id, user_id, source, status, total_items, processed, enriched, failed, started_at, completed_at }` | Pending |
+| | Create `import_jobs` table: `{ id, user_id, source, access_tier, status, total_items, processed, enriched, failed, started_at, completed_at }` | Pending |
 | | Job state machine: `queued → parsing → deduplicating → enriching → review → complete` | Pending |
 | | RLS: users can only see their own import jobs | Pending |
 | **Bulk Import Edge Function** | | Pending |
-| | Create `bulk-import` edge function — accepts parsed items array or raw file upload | Pending |
+| | Create `bulk-import` edge function — accepts parsed items array, raw file upload, or OAuth token + platform ID | Pending |
 | | Rate-limited processing: 50 pins/batch, 2s pause between batches | Pending |
 | | Progress callback via Supabase Realtime (broadcast job status updates) | Pending |
 | | Graceful failure: individual pin failures don't stop the batch | Pending |
@@ -47,9 +61,154 @@ The pipeline that all import sources flow through. Handles queuing, deduplicatio
 
 ---
 
-## Epic 9.2: Structured File Imports
+## Epic 9.2: OAuth-Connected Imports (Tier 1)
 
-Platforms that export clean, parseable data — CSV, JSON, HTML. The easy wins.
+One-click imports via platform APIs. User authorizes, selects what to import, done. No file downloads, no waiting.
+
+> **Shared infra with Phase 8**: [Epic 8.3 (Social Media Import)](./phase-8-automated-pins.md) uses the same OAuth connections for ongoing sync. Build the OAuth flow once, use it for both bulk import (Phase 9) and continuous sync (Phase 8).
+
+### OAuth Infrastructure
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **OAuth Connection Manager** | | Pending |
+| | Create `connected_accounts` table: `{ user_id, platform, access_token_enc, refresh_token_enc, scopes, connected_at, last_used, status }` | Pending |
+| | Encrypt tokens at rest (Supabase Vault or application-level encryption) | Pending |
+| | Token refresh flow: auto-refresh before expiry, handle revocation gracefully | Pending |
+| | "Connected Accounts" section in user settings | Pending |
+| | Connect / disconnect per platform with confirmation | Pending |
+| | Show last sync date and item count per connected account | Pending |
+
+### Reddit (Free, excellent API)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Reddit OAuth & Import** | | Pending |
+| | Register Reddit OAuth app (type: web app) at reddit.com/prefs/apps | Pending |
+| | OAuth 2.0 flow with scopes: `identity`, `history`, `read` | Pending |
+| | Fetch `GET /user/{username}/saved` (paginated, 100 items/page) | Pending |
+| | Extract: link posts → URL pins, text posts → note pins, comments → note pins with parent URL | Pending |
+| | Map subreddit → category (AI-assisted: r/malefashionadvice → `wear`, r/food → `eat`) | Pending |
+| | Preserve Reddit score and save date as metadata | Pending |
+
+### Spotify (Free, comprehensive API)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Spotify OAuth & Import** | | Pending |
+| | Register Spotify app at developer.spotify.com/dashboard | Pending |
+| | OAuth 2.0 PKCE flow with scopes: `user-library-read`, `playlist-read-private` | Pending |
+| | Fetch `GET /v1/me/tracks` (liked songs, paginated 50/page) | Pending |
+| | Fetch `GET /v1/me/playlists` → `GET /v1/playlists/{id}/tracks` for each playlist | Pending |
+| | Map to pins: Spotify URL, track name + artist as title, album art as image | Pending |
+| | Map playlist names → categories, default unmatched to `follow` | Pending |
+
+### Pinterest (Free, open API v5)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Pinterest OAuth & Import** | | Pending |
+| | Register at developers.pinterest.com | Pending |
+| | OAuth 2.0 flow with scopes: `boards:read`, `pins:read`, `user_accounts:read` | Pending |
+| | Fetch `GET /v5/boards` → `GET /v5/boards/{id}/pins` for each board | Pending |
+| | Extract: pin source URL (if exists), description, image | Pending |
+| | Map Pinterest board names → categories | Pending |
+| | Handle image-only pins (no source URL) → import as image pins | Pending |
+
+### YouTube (Free, partial — liked videos + playlists, NOT Watch Later)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **YouTube OAuth & Import** | | Pending |
+| | Register Google Cloud project, enable YouTube Data API v3 | Pending |
+| | OAuth 2.0 flow with scope: `https://www.googleapis.com/auth/youtube.readonly` | Pending |
+| | Fetch liked videos: get `likes` playlist ID from channel, then `playlistItems.list` | Pending |
+| | Fetch user playlists: `playlists.list` → `playlistItems.list` for each | Pending |
+| | Map to pins: YouTube URL, title, channel name, thumbnail, duration | Pending |
+| | Map playlist names → categories | Pending |
+| | Note in UI: "Watch Later and Watch History are not accessible via YouTube's API — use Google Takeout for those" | Pending |
+
+### Pocket (Free API, alternative to file export)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Pocket OAuth & Import** | | Pending |
+| | Register at getpocket.com/developer | Pending |
+| | Pocket OAuth flow (non-standard: uses request token → redirect → access token) | Pending |
+| | Fetch `GET /v3/get` with `state=all` (paginated) | Pending |
+| | Map Pocket tags → categories (AI-assisted for unmapped tags) | Pending |
+| | Preserve read/unread status and favorite flag | Pending |
+
+---
+
+## Epic 9.3: Browser Extension Import (Tier 2)
+
+For platforms with no usable API (Instagram, TikTok) or prohibitively expensive APIs (Twitter/X at $200/mo). The browser extension intercepts the platform's own internal API calls while the user is logged in — yielding structured JSON data without scraping the DOM.
+
+> **Extends [Phase 7 Epic 7.1: Browser Extension](./phase-7-platform-expansion.md)**. The base extension (save to board) gets import capabilities added as a second mode.
+
+### Extension Import Infrastructure
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Network Interception Framework** | | Pending |
+| | Manifest V3 content script that injects a page-context script via `<script>` tag | Pending |
+| | Page-context script monkey-patches `window.fetch()` and `XMLHttpRequest` | Pending |
+| | Interceptor filters for platform-specific API URL patterns (e.g., Instagram GraphQL endpoints) | Pending |
+| | Captured JSON sent to content script via `window.postMessage()` | Pending |
+| | Content script forwards to service worker via `chrome.runtime.sendMessage()` | Pending |
+| | Service worker batches captured items and sends to ctrl.rodeo `bulk-import` endpoint | Pending |
+| **Import Mode UI (Extension Popup)** | | Pending |
+| | "Import" tab in extension popup alongside "Save" tab | Pending |
+| | Platform detection: auto-detect which site the user is on | Pending |
+| | Instructions per platform: "Scroll through your saves — we'll capture them as you go" | Pending |
+| | Live counter: "47 items captured so far..." | Pending |
+| | "Send to Board" button to push captured batch to ctrl.rodeo | Pending |
+| | Progress indicator during upload | Pending |
+
+### Instagram (No API for saved posts)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Instagram Saved Posts Import** | | Pending |
+| | `host_permissions`: `https://www.instagram.com/*` | Pending |
+| | Intercept Instagram GraphQL API calls for saved posts (`/graphql/query/?query_hash=...`) | Pending |
+| | Parse GraphQL response: extract post URL, caption, media URLs, post type (photo/video/carousel/reel) | Pending |
+| | AI caption analysis: extract locations, brands, product names, restaurant names from captions | Pending |
+| | Handle Reels: extract caption text, tagged location, mentioned accounts → structured pin metadata | Pending |
+| | Download media before CDN URLs expire (Instagram URLs expire ~48h) → store in Supabase Storage | Pending |
+| | Auto-scroll helper: extension can programmatically scroll the saved posts page to load more items | Pending |
+
+### TikTok (No consumer API)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **TikTok Favorites Import** | | Pending |
+| | `host_permissions`: `https://www.tiktok.com/*` | Pending |
+| | Intercept TikTok API calls when user navigates to their favorites/liked page | Pending |
+| | Parse response: extract video URL, description, creator, sounds, hashtags | Pending |
+| | AI content extraction from descriptions: product recs, restaurant names, locations, brand mentions | Pending |
+| | Map hashtags and content to categories | Pending |
+| | Download video thumbnails before they expire | Pending |
+
+### Twitter/X (API exists but costs $200/mo — extension is free)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Twitter/X Bookmarks Import** | | Pending |
+| | `host_permissions`: `https://x.com/*`, `https://twitter.com/*` | Pending |
+| | Intercept Twitter's internal GraphQL API calls for bookmarks endpoint | Pending |
+| | Parse response: extract tweet URL, text, quoted tweet URLs, media, author | Pending |
+| | Resolve t.co shortened URLs to real destinations | Pending |
+| | Thread detection: group chained tweets into a single pin | Pending |
+| | Extract URLs from tweet text → primary pin URL | Pending |
+| | Fallback: also support file-based import from Twitter data export (Epic 9.4) | Pending |
+
+---
+
+## Epic 9.4: File-Based Imports (Tier 3)
+
+Upload-and-parse imports for platforms that are inherently file-based (browser bookmarks) or where API/extension access isn't available. Universal fallback for everything.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
@@ -59,10 +218,12 @@ Platforms that export clean, parseable data — CSV, JSON, HTML. The easy wins.
 | | Handle nested folders: flatten with breadcrumb context ("Tech > JavaScript > Frameworks") | Pending |
 | | Import date preservation (ADD_DATE attribute → `addedAt`) | Pending |
 | | Preview: show folder tree, let user select which folders to import | Pending |
-| **Pocket** | | Pending |
-| | Parse Pocket HTML export (`ril_export.html` from getpocket.com/export) | Pending |
-| | Map Pocket tags → categories (AI-assisted for unmapped tags) | Pending |
-| | Preserve read/unread status as pin metadata | Pending |
+| **Google Takeout (Maps, Keep, YouTube Watch Later)** | | Pending |
+| | Guide: how to use Google Takeout (takeout.google.com) to export specific services | Pending |
+| | Parse Google Maps Saved Places CSV: place name, address, Google Maps URL, list label | Pending |
+| | Map Google Maps labels (Want to Go, Favorites, Starred) → categories | Pending |
+| | Parse Google Keep notes HTML: extract URLs, preserve note text as note pins | Pending |
+| | Parse YouTube Watch Later / Watch History (not available via API, only Takeout) | Pending |
 | **Instapaper** | | Pending |
 | | Parse Instapaper CSV export (URL, Title, Selection, Folder) | Pending |
 | | Map Instapaper folders → categories | Pending |
@@ -71,15 +232,21 @@ Platforms that export clean, parseable data — CSV, JSON, HTML. The easy wins.
 | | Parse Raindrop CSV export (or HTML) | Pending |
 | | Map Raindrop collections → categories | Pending |
 | | Preserve tags and notes | Pending |
-| **Pinterest** | | Pending |
-| | Parse Pinterest JSON data export (GDPR request: Settings > Privacy > Request data) | Pending |
-| | Extract pin URLs, board names, descriptions | Pending |
-| | Map Pinterest board names → categories | Pending |
-| | Handle image-only pins (no source URL) → import as image pins | Pending |
 | **Pinboard / del.icio.us** | | Pending |
 | | Parse Pinboard JSON export | Pending |
 | | Map tags → categories | Pending |
 | | Preserve descriptions and toread flag | Pending |
+| **Apple Data** | | Pending |
+| | Parse Safari Reading List from iCloud export (or `~/Library/Safari/Bookmarks.plist`) | Pending |
+| | Parse Apple Notes export: extract URLs, preserve note content | Pending |
+| **Twitter/X Data Export** (file fallback for Epic 9.3 extension) | | Pending |
+| | Parse `like.js` and `bookmark.js` from Twitter archive zip | Pending |
+| | Extract URLs from tweet text (t.co → resolve to real URL) | Pending |
+| | Thread detection: group tweet chains into single pins | Pending |
+| **Instagram Data Export** (file fallback for Epic 9.3 extension) | | Pending |
+| | Parse `saved_posts.json` / `saved_media.json` from Instagram data download zip | Pending |
+| | Handle expired CDN URLs — download and re-host during import window | Pending |
+| | AI caption analysis: extract locations, brands, recommendations from post text | Pending |
 | **Generic CSV / JSON** | | Pending |
 | | Column mapping UI: "Which column is the URL? Title? Category?" | Pending |
 | | Auto-detect columns by header name (url, link, title, name, category, tag, date) | Pending |
@@ -87,54 +254,9 @@ Platforms that export clean, parseable data — CSV, JSON, HTML. The easy wins.
 
 ---
 
-## Epic 9.3: Platform Data Exports
+## Epic 9.5: AI-Powered Content Extraction
 
-Using GDPR/data-download features platforms are legally required to provide. The data is technically accessible but buried in zip archives with weird structures.
-
-| Story | Tasks | Status |
-|-------|-------|--------|
-| **Instagram Data Export** | | Pending |
-| | Guide: how to request Instagram data download (Settings > Your Activity > Download Your Information) | Pending |
-| | Parse `saved_posts.json` / `saved_media.json` from export zip | Pending |
-| | Extract external URLs from captions (regex + NLP for "link in bio" references) | Pending |
-| | Map Instagram post types: Reel → video pin, Photo → image pin, Carousel → multiple pins | Pending |
-| | Handle expired CDN URLs (Instagram media URLs expire ~48h) — download and re-host during import window | Pending |
-| | AI caption analysis: extract locations, brands, recommendations from post text | Pending |
-| **Twitter/X Data Export** | | Pending |
-| | Guide: how to request Twitter archive (Settings > Your Account > Download Archive) | Pending |
-| | Parse `like.js` and `bookmark.js` from export archive | Pending |
-| | Extract URLs from tweet text (t.co → resolve to real URL) | Pending |
-| | Handle quote tweets: extract both the tweet URL and any URLs in the quoted content | Pending |
-| | Thread detection: group tweet chains into single pins | Pending |
-| **YouTube Takeout** | | Pending |
-| | Guide: how to use Google Takeout for YouTube data | Pending |
-| | Parse `watch-later.json`, `playlists/` from export | Pending |
-| | Map playlist names → categories | Pending |
-| | Extract video metadata: title, channel, duration, thumbnail URL | Pending |
-| **Reddit Data Export** | | Pending |
-| | Guide: how to request Reddit data (Settings > Request Your Data) | Pending |
-| | Parse saved posts and comments from CSV | Pending |
-| | Extract link posts as URL pins, text posts as note pins | Pending |
-| | Subreddit → category mapping (AI-assisted) | Pending |
-| **TikTok Data Export** | | Pending |
-| | Guide: how to request TikTok data (Settings > Account > Download Your Data) | Pending |
-| | Parse `Favorite Videos.json` from export | Pending |
-| | AI analysis of video descriptions: extract product recs, restaurant names, locations | Pending |
-| | Map creator name + description into structured pin metadata | Pending |
-| **Google Takeout (Keep, Maps)** | | Pending |
-| | Parse Google Keep notes: extract URLs, preserve note text as note pins | Pending |
-| | Parse Google Maps Saved Places: extract place name, address, URL, category | Pending |
-| | Map Google Maps labels (Want to Go, Favorites, Starred) → categories | Pending |
-| **Apple Data** | | Pending |
-| | Parse Safari Reading List from iCloud export (or `~/Library/Safari/Bookmarks.plist`) | Pending |
-| | Parse Apple Notes export: extract URLs, preserve note content | Pending |
-| | Parse Apple Maps favorites if available | Pending |
-
----
-
-## Epic 9.4: AI-Powered Content Extraction
-
-For the platforms where the data format is the problem. Content locked inside videos, screenshots, messages, and emails. AI does the heavy lifting to turn unstructured media into structured pins.
+For content locked inside hostile formats — screenshots of Instagram posts, forwarded emails, copy-pasted message threads. AI does the heavy lifting to turn unstructured media into structured pins.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
@@ -159,15 +281,10 @@ For the platforms where the data format is the problem. Content locked inside vi
 | | Fetch and parse the shared content | Pending |
 | | Extract all links with context from the document | Pending |
 | | Handle common list formats: bullet lists, numbered lists, tables of links | Pending |
-| **Social Media Profile Scan** | | Pending |
-| | Enter an Instagram/TikTok/Twitter profile URL | Pending |
-| | Scrape recent posts/bookmarks (public only, respecting robots.txt) | Pending |
-| | AI analysis: "This account posts about fashion and food — here are the product/place links" | Pending |
-| | Rate-limited, authenticated users only | Pending |
 
 ---
 
-## Epic 9.5: Onboarding Import Flow
+## Epic 9.6: Onboarding Import Flow
 
 Make bulk import the first thing new users do. Don't show them an empty board — show them a path to populating it from sources they already have.
 
@@ -175,11 +292,12 @@ Make bulk import the first thing new users do. Don't show them an empty board �
 |-------|-------|--------|
 | **"Import Your Digital Life" Wizard** | | Pending |
 | | First-run detection: if board is empty, show import wizard instead of empty state | Pending |
-| | Platform grid: show logos for importable platforms (browser, Instagram, Twitter, Pocket, etc.) | Pending |
-| | Difficulty indicators per platform: Easy (file upload), Medium (data request, ~24h wait), Hard (manual) | Pending |
-| | Step-by-step guide per platform: screenshots showing exactly where to click to export | Pending |
+| | Platform grid: show logos with access tier badges (Instant, Extension, Upload) | Pending |
+| | Tier 1 platforms: "Connect" button → OAuth flow → import | Pending |
+| | Tier 2 platforms: "Install Extension" prompt → guide to saves page → import | Pending |
+| | Tier 3 platforms: step-by-step export guide with annotated screenshots → file upload | Pending |
 | | "I'll do this later" skip option with reminder prompt after 3 manual pins | Pending |
-| **Platform Export Guides** | | Pending |
+| **Platform Export Guides** (Tier 3 fallback) | | Pending |
 | | One-page guide per platform with annotated screenshots | Pending |
 | | Deep links where possible (link directly to platform's export settings page) | Pending |
 | | Estimated wait times for data requests (Instagram: ~48h, Twitter: ~24h, etc.) | Pending |
@@ -191,13 +309,13 @@ Make bulk import the first thing new users do. Don't show them an empty board �
 | | "Looks good" button to accept all AI assignments and skip review | Pending |
 | **Import Dashboard** | | Pending |
 | | Persistent "Import" section in settings (not just onboarding) | Pending |
+| | Show connected accounts with sync status | Pending |
 | | Show past imports with source, date, count | Pending |
 | | "Import more" button — always accessible | Pending |
-| | Platform connection status: which exports are pending, which are done | Pending |
 
 ---
 
-## Epic 9.6: Bulk Organization
+## Epic 9.7: Bulk Organization
 
 After import, help users make sense of the flood. AI-driven organization for hundreds or thousands of pins.
 
@@ -240,21 +358,99 @@ This is distinct from [Phase 8: Automated Pin Creation](./phase-8-automated-pins
 | **User intent** | Set-and-forget automation | Active migration, requires review |
 | **Problem solved** | "Keep my board fresh" | "I need a starting point" |
 
+**Shared infrastructure**: Both phases use the same OAuth connections (build once in Phase 9, reuse in Phase 8 for ongoing sync) and the same `ingest-pin` / `bulk-import` edge functions.
+
 ---
 
 ## Architecture Notes
 
-### Shared Infrastructure with Phase 8
-
-Both phases use the same `ingest-pin` edge function and enrichment pipeline. The difference is volume and data quality:
+### Three-Tier Import Architecture
 
 ```
-Phase 8 (ongoing):     Source → ingest-pin → enrich → done
-Phase 9 (bulk):        File/AI → parse → deduplicate → batch-ingest → batch-enrich → review
-                                                         ↑
-                                            import job orchestrator
-                                            (rate limiting, progress, error handling)
+┌─────────────────────────────────────────────────────────────┐
+│                      TIER 1: OAuth API                       │
+│  Reddit, Spotify, Pinterest, YouTube, Pocket                │
+│                                                              │
+│  ctrl.rodeo server ──OAuth──► Platform API ──► parsed items │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────┼──────────────────────────────────┐
+│                      TIER 2: Browser Extension               │
+│  Instagram, TikTok, Twitter/X                                │
+│                                                              │
+│  Extension content script ──intercepts──► platform's own     │
+│  internal API calls (GraphQL, REST) ──► structured JSON      │
+│  ──► service worker ──► ctrl.rodeo bulk-import endpoint      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────┼──────────────────────────────────┐
+│                      TIER 3: File Upload                     │
+│  Bookmarks, Google Takeout, Instapaper, Raindrop, CSV/JSON  │
+│                                                              │
+│  User uploads file ──► client-side parser ──► parsed items   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+              ┌────────────────────────┐
+              │    IMPORT PIPELINE     │
+              │  (shared across tiers) │
+              │                        │
+              │  Deduplicate           │
+              │  Batch AI categorize   │
+              │  Batch enrich          │
+              │  Progress tracking     │
+              │  Review queue          │
+              └────────────────────────┘
 ```
+
+### Platform API Viability Matrix
+
+| Platform | API Access | Auth | Cost | Rate Limit | Saved Content Endpoint |
+|----------|-----------|------|------|------------|----------------------|
+| **Reddit** | Full | OAuth 2.0 | Free (<100 QPM) | 100 req/min | `GET /user/{name}/saved` |
+| **Spotify** | Full | OAuth 2.0 PKCE | Free | Rolling 30s window | `GET /v1/me/tracks`, `GET /v1/me/playlists` |
+| **Pinterest** | Full | OAuth 2.0 | Free | Standard | `GET /v5/boards`, `GET /v5/boards/{id}/pins` |
+| **YouTube** | Partial | OAuth 2.0 | Free (10K units/day) | Quota-based | Liked: yes, Watch Later: **NO** (since 2016) |
+| **Pocket** | Full | Custom OAuth | Free | Standard | `GET /v3/get` |
+| **Twitter/X** | Exists | OAuth 2.0 PKCE | **$200/mo minimum** | 180 req/15min | `GET /2/users/{id}/bookmarks` |
+| **Instagram** | **None** | N/A | N/A | N/A | No saved posts endpoint |
+| **TikTok** | Research only | OAuth 2.0 | Free (if approved) | Restricted | Research API only, no consumer access |
+| **Google Keep** | Enterprise only | OAuth 2.0 | Workspace license | N/A | Locked to Google Workspace admin |
+| **Google Maps** | **None** | N/A | N/A | N/A | No personal saved places endpoint |
+
+### Browser Extension Technical Approach
+
+**Network interception over DOM scraping**. Modern SPAs (Instagram, TikTok, Twitter) render with React and have constantly-changing class names. DOM scraping breaks on every deploy. Instead, the extension intercepts the platform's own internal API calls (GraphQL for Instagram, REST for TikTok) and captures the structured JSON before it reaches the DOM.
+
+```
+Manifest V3 Architecture:
+
+content_script.js (runs in page context)
+  │
+  ├─ Injects page_interceptor.js via <script> tag
+  │   └─ Monkey-patches window.fetch() and XMLHttpRequest
+  │   └─ Filters for platform API URL patterns
+  │   └─ Sends captured JSON via window.postMessage()
+  │
+  ├─ Receives postMessage, forwards via chrome.runtime.sendMessage()
+  │
+  └─ service_worker.js (background)
+      └─ Batches captured items
+      └─ Sends to ctrl.rodeo bulk-import endpoint via fetch()
+```
+
+**Why not just use the platform's API?**
+- Instagram: API has no saved posts endpoint at all
+- TikTok: API restricted to approved academic researchers
+- Twitter/X: API works but costs $200/month — extension is free
+
+### Shared OAuth Infrastructure with Phase 8
+
+The `connected_accounts` table and OAuth flows built here are reused by [Phase 8 Epic 8.3 (Social Media Import)](./phase-8-automated-pins.md) for ongoing automated sync. The difference:
+- **Phase 9**: one-time bulk pull ("import everything I've ever saved")
+- **Phase 8**: ongoing incremental sync ("check for new saves every day")
+
+Same tokens, same connection UI, different scheduling.
 
 ### Cost Considerations
 
@@ -262,16 +458,17 @@ Bulk import of 1,000 pins:
 - AI categorization: ~$0.10 (domain cache makes repeat domains near-free)
 - Image enrichment: ~$0.80 (most expensive — 1,000 scrape + search attempts)
 - Vision AI for screenshots: ~$0.01/screenshot (if using Claude Haiku)
+- OAuth API calls: free for all Tier 1 platforms
 - **Total estimate for a typical import: $0.50-$2.00**
 
 Domain profile caching is critical here — if someone imports 200 bookmarks and 50 are from youtube.com, only the first one triggers an AI classification call.
 
 ### Data Expiry Problem
 
-Platform data exports include CDN URLs that expire:
+Platform data exports and API responses include CDN URLs that expire:
 - Instagram media URLs: ~48 hours
 - Twitter image URLs: persistent but t.co links may rot
-- TikTok: variable
+- TikTok thumbnails: variable
 
 The import pipeline must download and re-host media assets during the import window, not just store the original CDN URL. Supabase Storage handles this.
 

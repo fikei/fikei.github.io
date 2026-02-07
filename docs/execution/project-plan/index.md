@@ -69,9 +69,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
 | Phase 7: Platform Expansion | 0 | 0 | 44 | 0 |
 | Phase 8: Automated Pins | 0 | 0 | 65 | 0 |
-| Phase 9: Bulk Import | 0 | 0 | 85 | 0 |
+| Phase 9: Bulk Import | 0 | 0 | 105 | 0 |
 | Backlog | 0 | 0 | 40 | 0 |
-| **TOTAL** | **88** | **16** | **473** | **2** |
+| **TOTAL** | **88** | **16** | **493** | **2** |
 
 ---
 

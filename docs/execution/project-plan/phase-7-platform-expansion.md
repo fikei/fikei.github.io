@@ -6,6 +6,8 @@
 
 ## Epic 7.1: Browser Extension
 
+> This extension is later extended with **import capabilities** in [Phase 9 Epic 9.3: Browser Extension Import](./phase-9-bulk-import.md#epic-93-browser-extension-import-tier-2) — network interception for importing saves from Instagram, TikTok, and Twitter/X.
+
 | Story | Tasks | Status |
 |-------|-------|--------|
 | **Chrome Extension** | | Pending |

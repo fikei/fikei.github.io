@@ -4,6 +4,16 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-07] - Phase 9: Restructure Around Access Tiers + CLAUDE.md Update
+
+### Changed
+- **`docs/execution/project-plan/phase-9-bulk-import.md`** — Major restructure: organized imports by access tier (OAuth API / Browser Extension / File Upload) instead of data format. Added: OAuth-Connected Imports epic (Reddit, Spotify, Pinterest, YouTube, Pocket with full API specs), Browser Extension Import epic (network interception for Instagram, TikTok, Twitter/X), Platform API Viability Matrix, Manifest V3 architecture docs. File-based imports become Tier 3 fallback. 7 epics total (up from 6).
+- **`docs/execution/project-plan/phase-8-automated-pins.md`** — Added shared infra cross-reference to Phase 9 OAuth connections.
+- **`docs/execution/project-plan/phase-7-platform-expansion.md`** — Added cross-reference noting Epic 7.1 extension is later extended by Phase 9 Epic 9.3 import capabilities.
+- **`CLAUDE.md`** — Added "work item" terminology: generic term for any project plan item that should be placed at the right fidelity level and prioritized.
+
+---
+
 ## [2026-02-07] - Phase 9: Bulk Import
 
 ### Added

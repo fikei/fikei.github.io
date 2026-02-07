@@ -27,6 +27,7 @@ When working on this project, always follow these guidelines:
    - Epics: Large features or initiatives
    - Stories: User-facing functionality
    - Tasks: Specific implementation steps
+   - **"Work item"** is the generic term for any project plan item that should be prioritized. When given a work item, determine the right fidelity level (Phase, Epic, Story, Task, Bug, or Backlog item) and place it in the correct location in the project plan. Prioritize and restructure the plan as necessary.
 
 2. **Always show content I need to copy and paste**
    - Provide complete code blocks, commands, or configuration
