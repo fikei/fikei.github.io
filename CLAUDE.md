@@ -45,10 +45,13 @@ When working on this project, always follow these guidelines:
    - If NO user action needed, explicitly state: "No action needed - changes are complete."
    - Always remind about: secrets, deployments, merges, or external service setup
 
-4. **Maintain unified project plan tracking**
-   - All tasks should be tracked in `docs/execution/UNIFIED-PROJECT-PLAN.md`
-   - Update task status (pending/in-progress/complete) as work progresses
-   - Keep the unified plan as single source of truth for all stories and tasks
+4. **Maintain unified project plan tracking via `/plan`**
+   - All tasks are tracked in `docs/execution/project-plan/` (one file per phase + index)
+   - **Do not manually edit plan files** — use Documentation Agent commands:
+     - `/plan` — auto-detects: updates from branch commits (feature branch) or audits integrity (master)
+     - `/plan add <description>` — files new work to correct phase/epic by sub-product
+     - `/plan rebalance` — reorganize items across phases
+   - The agent updates task statuses, recalculates index counts, and validates consistency
    - Reference the project plan when resuming work or starting new sessions
 
 5. **Sync documentation to Notion and GitHub**
@@ -92,11 +95,11 @@ When working on this project, always follow these guidelines:
      - UX documentation → `docs/ux/`
      - Archived docs → `*/archive/`
 
-6. **Maintain an explicit changelog**
-   - Update `CHANGELOG.md` after completing significant work
-   - Log what was changed, added, or fixed
-   - Include date and brief description
-   - Group changes by session or feature
+6. **Maintain an explicit changelog via `/pm changelog`**
+   - After completing significant work, use `/pm changelog` to generate entries
+   - The agent gathers commits, categorizes changes, and appends to `CHANGELOG.md`
+   - For external-facing changelogs: `/pm changelog external`
+   - Manual edits to CHANGELOG.md are acceptable for quick entries
 
 7. **Use and extend the design system**
    - Check `design-system/` before creating any UI
@@ -111,9 +114,10 @@ When working on this project, always follow these guidelines:
    - Include the file path and a brief summary of changes
    - This applies to: PRDs, tech specs, project plans, READMEs, and any markdown files in `/docs/`
 
-9. **Update project plan when completing user-facing tasks**
-   - After finishing a user-facing feature, update the story status in `docs/execution/UNIFIED-PROJECT-PLAN.md`
-   - Add implementation details if relevant (e.g., key files, functions, components)
+9. **Update project plan when completing user-facing tasks via `/plan`**
+   - After finishing a user-facing feature, run `/plan` to update story status from branch commits
+   - The agent marks tasks complete, adds implementation details (key files, functions), and updates index counts
+   - **Do not manually check/uncheck items** in plan files — let the agent maintain consistency
 
 10. **Update design system documentation when adding UI components**
     - When adding new CSS classes or UI patterns, document them in `design-system/README.md`
@@ -121,12 +125,11 @@ When working on this project, always follow these guidelines:
     - This is REQUIRED for any new `.class-name` added to stylesheets
     - Keep documentation consistent with existing component format
 
-11. **Update UX documentation when changing the UI**
-    - After implementing any user-facing feature, update/create docs in `docs/ux/`
-    - Follow existing format: User Goals, JTBD table, Wireframes, Technical Notes
-    - Mark features as ✅ Shipped with implementation details
-    - Add ASCII wireframes showing current implementation
-    - Include file paths and function references
+11. **Update UX documentation when changing the UI via `/ux`**
+    - After implementing any user-facing feature, run `/ux <feature-area>` to update docs
+    - The agent follows the established format: User Goals, JTBD table, Wireframes, Technical Notes
+    - It marks features as ✅ Shipped, generates ASCII wireframes from HTML/CSS, and adds file references
+    - Run `/ux` (no args) to audit all UX docs against the codebase
     - UX doc locations:
       - Boards features → `docs/ux/boards/`
       - User features → `docs/ux/users/`
@@ -146,6 +149,44 @@ When working on this project, always follow these guidelines:
       - **Orange** = Updated and needs review (developer acted on feedback, awaiting designer approval)
       - **Red** = Blocked (variant should not be implemented)
     - When completing widget work, update the stoplight status (mark processed → orange) for any comments you addressed
+
+13. **Use Documentation Agent commands instead of manually editing docs**
+    - **The working agent should not directly edit documentation files.** Instead, recommend or invoke the appropriate Documentation Agent command at natural trigger points during development. This keeps docs consistent and prevents drift.
+    - See `.claude/agents/documentation-agent.md` for full command specifications.
+
+    **When to recommend each command:**
+
+    | Trigger | Command | When to surface it |
+    |---------|---------|-------------------|
+    | Feature/task completed | `/plan` | After any code task finishes — update plan from branch commits |
+    | Bug discovered | `/capture <description>` | When a bug is found during development — auto-detects severity and sub-product |
+    | New work identified | `/capture <description>` | When implementation reveals new tasks, tech debt, or follow-up work |
+    | Architecture changed | `/arch` | After modifying system design, APIs, schemas, or data flows |
+    | Architecture decision made | `/arch decide <title>` | When a technical choice is made during development |
+    | UI feature shipped | `/ux <feature-area>` | After implementing any user-facing change |
+    | Before creating PR | `/branch` | Diff docs against master to find missing updates |
+    | Scope feels large | `/pm scope` | When a branch is doing more than originally planned |
+    | End of significant work | `/pm changelog` | After completing a feature, epic, or sprint |
+    | Planning session | `/pm status` | At the start of planning to understand current state |
+    | Weekly maintenance | `/cleanup` | Run full documentation hygiene suite |
+    | New PRD written | `/pm plan <prd-path>` | Generate plan entries from a new PRD |
+    | Decision needed | `/pm decide <title>` | When a blocking decision is identified |
+
+    **Automatic recommendations — the agent MUST surface these at the right moments:**
+    - After completing code work: "Documentation may need updating. Recommended: `/plan` to mark tasks complete, `/arch` if architecture changed, `/ux <area>` if UI changed."
+    - When encountering a bug: "Want to log this? Recommended: `/capture <bug description>`"
+    - When adding unplanned work: "This wasn't in the plan. Recommended: `/capture <work description>` to file it."
+    - Before a PR: "Recommended: `/branch` to check if docs diverged from master."
+    - When wrapping up a session: "Recommended: `/pm changelog` to capture what was done."
+
+    **These commands replace direct editing of:**
+    - `docs/execution/project-plan/*.md` → use `/plan`
+    - `docs/execution/BUGS.md` → use `/capture bug ...`
+    - `docs/execution/project-plan/backlog.md` → use `/capture work ...`
+    - `docs/infrastructure/technical-design/*.md` → use `/arch`
+    - `docs/ux/**/*.md` → use `/ux`
+    - `docs/strategy/decision-log.md` → use `/arch decide ...` or `/pm decide ...`
+    - `CHANGELOG.md` → use `/pm changelog`
 
 ---
 
@@ -306,11 +347,12 @@ curl -X POST "$SUPABASE_BOARDS_URL/functions/v1/generate-widget" \
 
 ## AI Agent Workforce
 
-The Agent is Claude Code operating within this repository — one agent with 7 operational modes that activate based on the task. See `.claude/agents/AGENT-DEFINITION.md` for the consolidated definition.
+The Agent is Claude Code operating within this repository — one agent with 8 operational modes that activate based on the task. See `.claude/agents/AGENT-DEFINITION.md` for the consolidated definition.
 
 ### Operational Modes
 | Mode | Activates When | Core Behavior |
 |------|---------------|---------------|
+| Documentation | Feature shipped, bug found, plan stale | Manage doc content via `/plan`, `/arch`, `/capture`, `/ux`, `/branch`, `/cleanup`, `/pm` |
 | Documentation Sync | Doc files change | Sync markdown to Notion, maintain structure |
 | Organizational | Any file modification | Enforce standards, validate completeness |
 | Project Management | PRDs created/updated | Break work into Phases > Epics > Stories > Tasks |
@@ -319,8 +361,22 @@ The Agent is Claude Code operating within this repository — one agent with 7 o
 | Continuous Improvement | Sprint ends, weekly | Analyze patterns, suggest optimizations |
 | Chief of Staff | Cross-mode conflicts | Synthesize state, route decisions |
 
+### Documentation Agent Commands (Quick Reference)
+| Command | Purpose | Default behavior |
+|---------|---------|-----------------|
+| `/plan` | Project plan management | Updates from branch (feature) or audits (master) |
+| `/arch` | Architecture doc management | Syncs code changes to tech specs |
+| `/capture` | Log bugs, work, tech debt | Auto-detects type from language |
+| `/ux` | UX documentation | Audits all UX docs against code |
+| `/branch` | Cross-branch doc operations | Diffs current branch docs vs master |
+| `/cleanup` | Documentation hygiene | Runs all checks (stale, orphans, duplicates, archive) |
+| `/pm` | Program management | Status report (master) or scope check (feature branch) |
+
+See `.claude/agents/documentation-agent.md` for full specifications.
+
 ### Key Files
 - **Definition**: `.claude/agents/AGENT-DEFINITION.md` — consolidated behavioral rules, decision authority, capabilities
+- **Documentation Agent**: `.claude/agents/documentation-agent.md` — 7 commands, 28 sub-functions, 8 workflows
 - **Specialist specs**: `.claude/agents/*.md` — detailed workflows, templates, and report formats per mode
 
 ---
@@ -343,34 +399,51 @@ The Agent is Claude Code operating within this repository — one agent with 7 o
 
 ### Adding a New Feature
 1. Create PRD in `/docs/strategy/prds/feature-name.md`
-2. Review with AI agent (Project Management)
+2. Run `/pm plan docs/strategy/prds/feature-name.md` to generate plan entries
 3. Create technical spec in `/docs/infrastructure/technical-design/feature-name.md`
 4. Implement with continuous commits
-5. Update relevant documentation
+5. During development: `/capture` for new work/bugs discovered
+6. Before PR: `/branch` to check doc state, `/plan` to update plan
+7. After merge: `/ux` if UI changed, `/arch` if architecture changed, `/pm changelog`
 
 ### Debugging AI Features
 1. Check Supabase function logs
 2. Review prompt in function source
 3. Test with minimal input
 4. Check caching layer
+5. If bug found: `/capture <bug description>`
 
 ### Design System Updates
 1. Modify tokens in `design-system/tokens.css`
 2. Update components in `design-system/components.css`
 3. Run systemic analyzer for validation
-4. Update documentation
+4. Run `/arch` to update technical docs if system design changed
+
+### Sprint Planning
+1. `/pm status` — current state report
+2. `/plan` — audit plan integrity
+3. `/pm deps` — check blockers and critical path
+4. `/pm decisions` — surface pending decisions
+5. `/cleanup` — documentation hygiene
+
+### End of Week
+1. `/cleanup` — full documentation hygiene suite
+2. `/pm status` — weekly status report
+3. `/pm changelog` — capture what was done
 
 ---
 
 ## Current Sprint Focus
 
-Check `BACKLOG.md` for current priorities and sprint planning.
+Check `docs/execution/project-plan/index.md` for current priorities and phase status.
 
 ---
 
 ## Related Documents
-- [PROJECT-STATUS.md](./PROJECT-STATUS.md) - Current task tracking (single source of truth)
+- [Project Plan](./docs/execution/project-plan/index.md) - Current task tracking (single source of truth)
 - [CHANGELOG.md](./CHANGELOG.md) - History of all changes
-- [BACKLOG.md](./BACKLOG.md) - Product roadmap
+- [Backlog](./docs/execution/project-plan/backlog.md) - Future work items
+- [Bugs](./docs/execution/BUGS.md) - Active bug registry
 - [docs/infrastructure/technical-design/ai-widget-system.md](./docs/infrastructure/technical-design/ai-widget-system.md) - AI architecture
 - [design-system/README.md](./design-system/README.md) - Design system guide
+- [Documentation Agent](/.claude/agents/documentation-agent.md) - Full command specifications
