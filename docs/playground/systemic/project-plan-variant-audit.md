@@ -1,182 +1,234 @@
 # Project Plan — Systemic Variant Audit
 
 **PRD:** [Variant Audit PRD](prd-variant-audit.md)
-**Status:** Planning
+**Status:** In Progress
 **Last Updated:** 2026-02-07
 
 ---
 
-## Phase 1: Extract & Modularize
+## Phase 1: Extract & Modularize ✅
 
-Extract the working prototype from `design-system/widgets.html` into standalone modules that can run inside Systemic.
+Extracted working prototype from `design-system/widgets.html` into standalone modules inside Systemic.
 
-### Epic 1.1: CSS Extraction
+### Epic 1.1: CSS Extraction ✅
 
-- **Story 1: Extract variant audit styles into `systemic/css/variant-audit.css`**
-  - Task 1: Extract all `.variant-*` classes from `widgets.html` `<style>` block — Pending
-  - Task 2: Extract `.variant-ctx-menu*` context menu styles — Pending
-  - Task 3: Extract `.variant-comment*` inline comment styles — Pending
-  - Task 4: Extract `.variant-stoplight*` stoplight indicator styles — Pending
-  - Task 5: Extract `.variant-blocked*` blocked section styles — Pending
-  - Task 6: Extract `.variant-grid--gridlines` grid overlay styles — Pending
-  - Task 7: Extract `.audit-table*` audit log table styles — Pending
-  - Task 8: Replace hardcoded colors with CTRL design token variables — Pending
-  - Task 9: Verify styles work when loaded alongside `systemic.css` — Pending
+- **Story 1: Extract variant audit styles into `systemic/css/variant-audit.css`** — Complete
+  - Extracted all variant, context menu, comment, stoplight, blocked, grid, and audit table styles
+  - Renamed classes from `.variant-*` to `.qa-*` namespace
+  - Replaced print-design grid overlay with Systemic viewer's 20px grid background
+  - Verified styles load alongside `systemic.css` and `viewer.css`
 
-### Epic 1.2: JavaScript Extraction
+### Epic 1.2: JavaScript Extraction ✅
 
-- **Story 2: Create `systemic/js/variant-audit.js` module**
-  - Task 1: Extract audit state CRUD (`loadAudit`, `saveAudit`, `getAuditEntry`, `setFlag`, `setNote`, `setProcessed`) — Pending
-  - Task 2: Extract status computation (`getStatus`, `STATUS_LABELS`, `SIZE_LABELS`, `ALL_SIZES`) — Pending
-  - Task 3: Extract variant rendering (`buildVariantItem`, `showVariants`) — Pending
-  - Task 4: Extract grid management (`reflowVariant`, `toggleBlockedSection`, `updateBlockedToggle`) — Pending
-  - Task 5: Extract context menu (`showContextMenu`, `closeContextMenu`, `toggleBlock`) — Pending
-  - Task 6: Extract comment system (`openComment`, `closeComment`, `updateNoteIndicator`) — Pending
-  - Task 7: Extract audit table (`renderAuditTable`, `exportAudit`, `clearAudit`) — Pending
-  - Task 8: Extract stats and filtering (`updateStats`, `filterSections`) — Pending
-  - Task 9: Extract state persistence (`saveFilterState`, `restoreFilterState`) — Pending
-  - Task 10: Wrap in a `VariantAudit` class with a public API — Pending
+- **Story 2: Create `systemic/js/variant-audit.js` module** — Complete
+  - All audit state CRUD, status computation, variant rendering, grid management, context menu, comment system, audit table, stats, and filter persistence extracted
+  - Wrapped in `VariantAudit` class with public API
 
-- **Story 3: Define the public API**
-  - Task 1: Define constructor: `new VariantAudit({ container, components, onExport })` — Pending
-  - Task 2: Define component registration: `audit.register(name, element, axes)` — Pending
-  - Task 3: Define programmatic methods: `audit.show(name)`, `audit.getReport()`, `audit.clearAll()` — Pending
-  - Task 4: Emit custom events for state changes (`audit:block`, `audit:comment`, `audit:approve`) — Pending
+- **Story 3: Define the public API** — Complete
+  - Constructor: `new VariantAudit({ container, systemId, onToast })`
+  - Registration: `registerComponents(...)`, `registerFromDesignSystem(ds)`
+  - Methods: `show(name)`, `getReport()`, `clearAudit()`, `init()`
+  - Namespaced localStorage: `variant-audit:{systemId}`, `variant-filter:{systemId}`
 
-### Epic 1.3: HTML Extraction
+### Epic 1.3: HTML Extraction ✅
 
-- **Story 4: Create audit view markup in `systemic/index.html`**
-  - Task 1: Add `#qa` route section to Systemic's view container — Pending
-  - Task 2: Add component/template filter dropdowns (populated dynamically) — Pending
-  - Task 3: Add variant toolbar (grid lines toggle, stats counter) — Pending
-  - Task 4: Add active variant grid container — Pending
-  - Task 5: Add blocked section with toggle button — Pending
-  - Task 6: Add audit log output container — Pending
-  - Task 7: Add nav link for "QA" alongside existing Audit/Systems/Docs — Pending
+- **Story 4: Create audit view markup in `systemic/index.html`** — Complete
+  - `#qa-view` section with toolbar, filters, grids, blocked section, audit output
+  - QA nav link in header
+  - Route handling in `app.js` with deep link support (`#qa/{component}`)
 
 ### Epic 1.4: Verify Extraction
 
 - **Story 5: Prototype still works after extraction**
-  - Task 1: Update `widgets.html` to import extracted CSS/JS instead of inline — Pending
-  - Task 2: Verify all interactions (block, unblock, comment, process, approve) — Pending
+  - Task 1: Update `widgets.html` to import extracted CSS/JS instead of inline — Deferred (keeping inline for now as independent prototype)
+  - Task 2: Verify all interactions in Systemic QA view — Pending
   - Task 3: Verify audit state persistence across refresh — Pending
   - Task 4: Verify grid overlay on both active and blocked grids — Pending
   - Task 5: Verify export produces correct JSON — Pending
 
 ---
 
-## Phase 2: Systemic Integration
+## Phase 2: Navigation & App Shell
+
+Fix navigation gaps, add system context awareness, and make the app usable end-to-end.
+
+### Epic 2.1: System Context Header
+
+The biggest nav gap: once you open a system, there's no indication of which system you're viewing, no way to switch, and no shared context across Docs/QA views.
+
+- **Story 6: Add system context bar below header**
+  - Task 1: Add a secondary header bar that shows when a system is loaded — Pending
+  - Task 2: Show system name + URL + date scanned — Pending
+  - Task 3: Add system switcher dropdown (populated from saved systems) — Pending
+  - Task 4: Persist selected system ID in URL hash or localStorage — Pending
+  - Task 5: When system changes, update both Viewer and QA with new data — Pending
+  - Task 6: Show empty state when no system loaded (with "Run a scan" CTA) — Pending
+
+- **Story 7: Unify system loading across views**
+  - Task 1: Extract system loading into a shared `loadSystem(id)` method — Pending
+  - Task 2: `loadSystem()` calls `viewer.load()` + `variantAudit.registerFromDesignSystem()` — Pending
+  - Task 3: Store `currentSystemId` on app instance — Pending
+  - Task 4: Auto-load last-used system on page load — Pending
+
+### Epic 2.2: Route State Persistence
+
+Refresh loses component selection. Bookmarks break. Fix the router.
+
+- **Story 8: Full route persistence on refresh**
+  - Task 1: Store last-visited hash in localStorage per system — Pending
+  - Task 2: On page load, if system exists but no hash, restore last hash — Pending
+  - Task 3: When navigating to `#docs` with no section, show system overview instead of defaulting to color — Pending
+  - Task 4: Ensure `#docs/component/{type}` restores the correct component after refresh — Pending
+
+- **Story 9: System overview landing page**
+  - Task 1: Create a system overview panel shown at `#docs` (no sub-route) — Pending
+  - Task 2: Show system stats: token count, component count, variant count — Pending
+  - Task 3: Show coverage summary from QA audit (if data exists) — Pending
+  - Task 4: List recently viewed components — Pending
+
+### Epic 2.3: Cross-View Linking
+
+Docs and QA are disconnected. Each view should link to the other.
+
+- **Story 10: Link Docs → QA**
+  - Task 1: Add "QA this component" button in Docs viewer context sidebar — Pending
+  - Task 2: Button navigates to `#qa/{component-type}` — Pending
+  - Task 3: Show stoplight dot next to component names in Docs sidebar — Pending
+
+- **Story 11: Link QA → Docs**
+  - Task 1: Add "View in Docs" link in QA variant label context menu — Pending
+  - Task 2: Link navigates to `#docs/component/{type}` — Pending
+
+### Epic 2.4: Collapsible Sidebar
+
+Context sidebar takes 360px permanently. Sidebar nav hidden on mobile.
+
+- **Story 12: Collapsible context sidebar (Docs view)**
+  - Task 1: Add collapse/expand toggle button to sidebar header — Pending
+  - Task 2: Collapsed state: sidebar shrinks to 48px, shows icons only — Pending
+  - Task 3: Persist collapsed state in localStorage — Pending
+  - Task 4: Keyboard shortcut to toggle (e.g., `]`) — Pending
+
+- **Story 13: Mobile component navigation**
+  - Task 1: Replace hidden sidebar with slide-out drawer on < 900px — Pending
+  - Task 2: Add hamburger toggle button in stage header — Pending
+  - Task 3: Drawer overlays content, closes on selection or outside click — Pending
+  - Task 4: Component search works in drawer mode — Pending
+
+### Epic 2.5: Header Nav Cleanup
+
+- **Story 14: Rationalize header navigation**
+  - Task 1: Add Audit as a proper nav link (currently only "Run a scan" button) — Pending
+  - Task 2: Visually distinguish active view more clearly (underline or bottom border) — Pending
+  - Task 3: Disable Docs and QA nav links when no system is loaded (show tooltip "Load a system first") — Pending
+  - Task 4: Move "Run a scan" into nav or make it a secondary action — Pending
+
+---
+
+## Phase 3: Systemic Integration
 
 Wire the extracted module into Systemic's existing architecture.
 
-### Epic 2.1: Route & View Management
+### Epic 3.1: Component Discovery
 
-- **Story 6: Add QA view to Systemic app**
-  - Task 1: Add `#qa` hash route in `app.js` `handleNavigation()` — Pending
-  - Task 2: Add view toggle logic (show/hide QA section) — Pending
-  - Task 3: Add "QA" nav item in Systemic header — Pending
-  - Task 4: Handle deep links (e.g., `#qa/watch-deadline`) — Pending
-
-### Epic 2.2: Component Discovery
-
-- **Story 7: Auto-populate component list from design system**
-  - Task 1: Scan loaded design system for component types (from Systemic's ComponentConsolidator output) — Pending
-  - Task 2: Populate widget dropdown with discovered components — Pending
+- **Story 15: Auto-populate component list from design system**
+  - Task 1: Scan loaded design system for component types (from ComponentConsolidator output) — Pending
+  - Task 2: Populate QA dropdown with discovered components — Pending
   - Task 3: Detect variant axes from component class names (e.g., `--sm`, `--lg` → size axis) — Pending
   - Task 4: Populate template dropdown from detected variant groups — Pending
   - Task 5: Fall back to manual axis definition if auto-detection fails — Pending
 
-- **Story 8: Support CTRL widget components specifically**
+- **Story 16: Support CTRL widget components specifically**
   - Task 1: Register all 15 CTRL widget sizes as the size axis — Pending
-  - Task 2: Register 8 CTRL widget templates as the template axis — Pending
+  - Task 2: Register 10 CTRL widget templates as the template axis — Pending
   - Task 3: Pre-populate widget dropdown with CTRL widget catalog — Pending
 
-### Epic 2.3: Audit State Namespacing
+### Epic 3.2: Audit State Namespacing
 
-- **Story 9: Namespace audit data per design system**
-  - Task 1: Prefix localStorage key with design system ID: `variant-audit:{systemId}` — Pending
-  - Task 2: Scope filter state per system: `filter-state:{systemId}` — Pending
+- **Story 17: Namespace audit data per design system**
+  - Task 1: Prefix localStorage key with design system ID: `variant-audit:{systemId}` — Complete
+  - Task 2: Scope filter state per system: `variant-filter:{systemId}` — Complete
   - Task 3: Handle migration from legacy un-namespaced keys — Pending
   - Task 4: Add system selector to QA view when multiple systems loaded — Pending
 
-### Epic 2.4: Viewer Integration
+### Epic 3.3: Viewer Integration
 
-- **Story 10: Connect audit status to Systemic's existing component viewer**
+- **Story 18: Connect audit status to Systemic's existing component viewer**
   - Task 1: Show stoplight dot next to component names in viewer sidebar — Pending
   - Task 2: Show audit summary (N blocked, N to process) in viewer header — Pending
-  - Task 3: Add "Open in QA" button from viewer to jump to `#qa/{component}` — Pending
+  - Task 3: Add "Open in QA" button from viewer to jump to `#qa/{component}` — Pending (see Story 10)
 
 ---
 
-## Phase 3: Generalization
+## Phase 4: Generalization
 
 Make the audit tool work with any component library, not just CTRL widgets.
 
-### Epic 3.1: Generic Variant Rendering
+### Epic 4.1: Generic Variant Rendering
 
-- **Story 11: Support arbitrary component variant generation**
+- **Story 19: Support arbitrary component variant generation**
   - Task 1: Accept component definitions as `{ name, element, axes }` — Pending
   - Task 2: Render variants by applying axis values via class swapping — Pending
   - Task 3: Render variants by applying axis values via CSS variable overrides — Pending
   - Task 4: Render variants by applying axis values via data attributes — Pending
   - Task 5: Support custom render functions for complex axis application — Pending
 
-- **Story 12: Multi-axis variant matrix**
+- **Story 20: Multi-axis variant matrix**
   - Task 1: UI for selecting which axes to cross (e.g., size × state) — Pending
   - Task 2: Generate matrix of all combinations — Pending
   - Task 3: Render matrix as a 2D grid (rows = axis 1, columns = axis 2) — Pending
   - Task 4: Limit combinatorial explosion (max 50 variants per view) — Pending
 
-### Epic 3.2: Custom Axis Definition
+### Epic 4.2: Custom Axis Definition
 
-- **Story 13: Manual axis editor**
+- **Story 21: Manual axis editor**
   - Task 1: UI for adding custom axes (name + values) — Pending
   - Task 2: Persist axis definitions in design system data — Pending
   - Task 3: Map axis values to CSS class patterns (e.g., `btn--{value}`) — Pending
   - Task 4: Support axis value aliases (e.g., "small" → `--sm`) — Pending
 
-### Epic 3.3: Import External Components
+### Epic 4.3: Import External Components
 
-- **Story 14: Load components from external sources**
+- **Story 22: Load components from external sources**
   - Task 1: Accept raw HTML + CSS as component input — Pending
   - Task 2: Render in sandboxed iframe for style isolation — Pending
-  - Task 3: Support loading components from a URL (via Systemic's existing CORS proxy) — Pending
+  - Task 3: Support loading components from a URL (via existing CORS proxy) — Pending
 
 ---
 
-## Phase 4: Export & CI Integration
+## Phase 5: Export & CI Integration
 
-### Epic 4.1: Export Formats
+### Epic 5.1: Export Formats
 
-- **Story 15: Expanded export capabilities**
+- **Story 23: Expanded export capabilities**
   - Task 1: JSON export (existing — verify schema) — Pending
   - Task 2: CSV export for spreadsheet workflows — Pending
   - Task 3: Markdown export for documentation (table format) — Pending
   - Task 4: YAML export for CI config files — Pending
 
-### Epic 4.2: CI/CD Gate
+### Epic 5.2: CI/CD Gate
 
-- **Story 16: Blocked variant enforcement**
+- **Story 24: Blocked variant enforcement**
   - Task 1: Define `.systemic-audit.json` config file format — Pending
   - Task 2: CLI script to check if blocked variants exist in production CSS — Pending
   - Task 3: GitHub Action that reads audit export and fails if violations found — Pending
-  - Task 4: Document CI setup in Systemic README — Pending
+  - Task 4: Document CI setup in README — Pending
 
 ---
 
-## Phase 5: Collaboration & AI
+## Phase 6: Collaboration & AI
 
-### Epic 5.1: Shared Audit State
+### Epic 6.1: Shared Audit State
 
-- **Story 17: Persist audit state to Supabase**
-  - Task 1: Create `audit_entries` table in Systemic Supabase project — Pending
+- **Story 25: Persist audit state to Supabase**
+  - Task 1: Create `audit_entries` table in Supabase project — Pending
   - Task 2: Sync localStorage ↔ Supabase on load/save — Pending
   - Task 3: Handle conflict resolution (last-write-wins) — Pending
   - Task 4: Add user attribution to comments — Pending
 
-### Epic 5.2: AI-Assisted Auditing
+### Epic 6.2: AI-Assisted Auditing
 
-- **Story 18: Auto-detect broken variants**
+- **Story 26: Auto-detect broken variants**
   - Task 1: Screenshot each variant using html2canvas or similar — Pending
   - Task 2: Detect text overflow, truncation, empty states — Pending
   - Task 3: Auto-flag variants that fail heuristic checks (yellow status) — Pending
@@ -211,3 +263,4 @@ Make the audit tool work with any component library, not just CTRL widgets.
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-02-07 | Initial project plan |
+| 1.1 | 2026-02-07 | Mark Phase 1 complete. Add Phase 2 (Navigation & App Shell). Renumber phases 3-6. |
