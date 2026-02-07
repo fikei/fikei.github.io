@@ -2,6 +2,8 @@
 
 All notable changes to ctrl.rodeo will be documented in this file.
 
+For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-changelog.md](docs/infrastructure/ops-changelog.md).
+
 ---
 
 ## [2026-02-07] - Branch Reconciliation: Widget Phase 2.5a/2.5b + Documentation Merge
