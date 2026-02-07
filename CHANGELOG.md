@@ -6,6 +6,38 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-07] - Config-Driven AI Prompts + Server-Side Validation
+
+### Added
+- **`config/design-system.ts`** — New module in generate-widget edge function embedding the template registry (10 templates, body modifiers, valid sizes, structure rules) and full class allowlist (130+ `w-*` classes).
+- **`buildDesignSystemPrompt()`** — Injects template-specific constraints into AI prompt: body modifier, required/optional atoms, allowed classes, valid sizes.
+- **`validateWidgetHtml()` / `sanitizeWidgetHtml()`** — Server-side class allowlist validation. Extracts all `w-*` classes from AI HTML output, compares against allowlist, strips unknown classes.
+- **`resolveTemplate()`** — Maps Boards template names (e.g., `grid-split`) to design system definitions (e.g., `split`).
+- **Discovery endpoint `designSystem` field** — Each discovered widget now includes its DS template mapping (templateName, bodyModifier, validSizes, structure).
+
+### Changed
+- **AI prompt construction** — Now includes a `DESIGN SYSTEM OUTPUT FORMAT` section between brand constraints and confidence instructions. AI is told which `w-*` classes to use for each widget's template.
+- **`WidgetMeta.validation`** — Extended with `unknownClasses`, `classesUsed`, `htmlSanitized` fields for DS compliance tracking.
+
+---
+
+## [2026-02-07] - Phase 2.5a Complete: Design System Transition
+
+### Added
+- **Widget feature flag** — All widgets hidden by default. Enable via `window.enableWidgetDS()` in browser console. Persists via localStorage once toggled on. Guards `generateWidgets()`, hides hero/footer sections, and disables `widgets.css` when off.
+- **Edge-case fixtures** — Added `edgeCases` arrays to all 10 templates in `template-registry.json`. Covers: empty data, single item, overflow (20+ items), very long text, missing optional fields, extreme positions.
+- **Source-of-truth documentation** — Added hierarchy diagram and rules to `design-system/README.md`: CSS files are authoritative, manifest is derived, registry is reference.
+- **Widget system documentation** — Replaced legacy `widget-complete` README section with current `w-*` class reference (atoms, molecules, body templates, grid sizes).
+
+### Removed
+- **733 lines of dead CSS** — Removed all legacy `widget-outfit__*`, `widget-style__*`, `widget-complete__*`, `widget-empty*`, `widget--loading*`, `widget-spectrum__*`, `widget-statrow__*`, `widget-quickadd__*` class definitions from `boards/index.html`. These were fully replaced by `w-*` design system classes in the template migration.
+
+### Changed
+- **`design-system/README.md`** — Updated file structure, added source-of-truth section, replaced legacy widget docs with `w-*` system reference.
+- **`design-system/template-registry.json`** — All 10 templates now have `fixture` + `edgeCases` for QA testing.
+
+---
+
 ## [2026-02-07] - Branch Reconciliation: Widget Phase 2.5a/2.5b + Documentation Merge
 
 ### Added
