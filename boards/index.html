@@ -2161,6 +2161,7 @@ body {
   right: var(--space-4);
   z-index: 200;
   background: var(--bg);
+  color: var(--fg);
   border: 2px solid var(--fg);
   padding: var(--space-2);
   display: none;
@@ -2190,6 +2191,7 @@ body {
   letter-spacing: 0.05em;
   text-align: left;
   background: none;
+  color: inherit;
   border: none;
   cursor: pointer;
 }
@@ -2858,6 +2860,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn" id="devEnrich">Run AI Enrichment Pipeline</button>
     <button class="dev-menu__btn" id="devClearCache">Clear AI Cache</button>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
+    <div class="dev-menu__divider"></div>
+    <button class="dev-menu__btn" id="devToggleWidgets">Widgets: OFF</button>
     <button class="dev-menu__btn dev-menu__btn--admin" id="devAdminPanel" style="display:none;">Admin Panel</button>
   </div>
 
@@ -7395,6 +7399,7 @@ Return JSON:
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
       $('devMenu').classList.toggle('dev-menu--visible');
+      $('devToggleWidgets').textContent = 'Widgets: ' + (widgetDSEnabled ? 'ON' : 'OFF');
     }
   };
 
@@ -7521,6 +7526,18 @@ Return JSON:
     saveCategoryCache(categoryCache);
     $('devMenu').classList.remove('dev-menu--visible');
     toast('AI category cache cleared');
+  };
+
+  $('devToggleWidgets').onclick = () => {
+    if (widgetDSEnabled) {
+      window.disableWidgetDS();
+      $('devToggleWidgets').textContent = 'Widgets: OFF';
+      toast('Widgets disabled');
+    } else {
+      window.enableWidgetDS();
+      $('devToggleWidgets').textContent = 'Widgets: ON';
+      toast('Widgets enabled');
+    }
   };
 
   $('devEnrich').onclick = async () => {
