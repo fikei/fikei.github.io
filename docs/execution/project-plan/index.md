@@ -31,16 +31,24 @@
 
 ## Recent Milestones
 
-### Widget Phase 2: Config-Generated Widgets 🔄
-**Started: 2026-02-05**
+### Widget Phase 2.5a: Design System Transition ⚡
+**Started: 2026-02-07**
+
+- **Design System Manifest**: `manifest.json` generated from CSS (all tokens, components, widget classes)
+- **Template Registry**: `template-registry.json` maps 10 canonical templates to Boards implementations
+- **Self-Scan**: Systemic loads local design system without crawling
+- **Next**: Migrate Boards templates from legacy `widget-*` to `w-*` classes, config-driven AI prompts, CI validation
+
+### Widget Phase 2: Config-Generated Widgets ✅
+**Completed: 2026-02-05**
 
 - **Widget Definition Schema**: TypeScript types in `config/schema.ts`
 - **Config-Driven Eligibility**: Rules defined declaratively, not in code
 - **Registry as Data**: `config/registry.ts` with runtime evaluators
 - **Two Widgets Migrated**: `complete-the-look`, `style-summary`
 - **180+ lines removed**: Hard-coded eligibility logic replaced with config
-
-**Remaining**: Category-agnostic matching, template selection engine, hot-reload
+- **Template Selection Engine**: Auto-select + fallback chain
+- **Hot-reload**: registerWidget() / unregisterWidget() / reloadWidget()
 
 ### Widget Phase 1: Rule-Driven Automation ✅
 **Completed: 2026-02-05**
@@ -77,7 +85,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |-------|------|------------|--------|
 | 0 | Deterministic MVP | Very Low | ~95% Complete |
 | 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
-| 2 | Config-Generated Widgets | Medium→High | **IN PROGRESS** |
+| 2 | Config-Generated Widgets | Medium→High | **COMPLETE** |
+| 2.5a | Design System Transition | Medium→High | **IN PROGRESS** ⚡ |
+| 2.5b | Rules-Based Widget Catalog | Medium→High | Pending (blocked by 2.5a) |
 | 3 | Self-Selecting Widgets | High | Pending |
 | 4 | Self-Optimizing System | Full | Pending |
 
