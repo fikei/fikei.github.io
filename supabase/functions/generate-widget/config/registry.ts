@@ -22,6 +22,9 @@ import { styleSummary } from './widgets/style-summary.ts'
 import { priceRadar } from './widgets/price-radar.ts'
 import { collectionStats } from './widgets/collection-stats.ts'
 import { gapFiller } from './widgets/gap-filler.ts'
+import { eatDecide } from './widgets/eat-decide.ts'
+import { useCompare } from './widgets/use-compare.ts'
+import { discoverMore } from './widgets/discover-more.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -35,6 +38,9 @@ const registry: WidgetRegistry = {
     'price-radar': priceRadar,
     'collection-stats': collectionStats,
     'gap-filler': gapFiller,
+    'eat-decide': eatDecide,
+    'use-compare': useCompare,
+    'discover-more': discoverMore,
   },
 
   defaults: {

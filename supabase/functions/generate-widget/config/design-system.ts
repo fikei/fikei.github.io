@@ -27,6 +27,10 @@ export const boardsTemplateMap: Record<string, string> = {
   'spectrum': 'spectrum',
   'stat-row': 'stats',
   'quick-add': 'suggestion',
+  'comparison': 'comparison',
+  'choices': 'choices',
+  'checklist': 'checklist',
+  'grouped': 'grouped',
 }
 
 export const templates: Record<string, TemplateDefinition> = {
@@ -101,6 +105,14 @@ export const templates: Record<string, TemplateDefinition> = {
     requiredAtoms: ['w-option'],
     optionalAtoms: ['w-text--title', 'w-badge', 'w-img--card'],
     structure: 'w-shell > w-header + w-body.w-body--choices > w-option*',
+  },
+  checklist: {
+    bodyModifier: 'w-body--checklist',
+    description: 'Interactive checklist with running total',
+    validSizes: ['sm', 'tall', 'med', 'lg'],
+    requiredAtoms: ['w-row', 'w-checkbox', 'w-text'],
+    optionalAtoms: ['w-text--value', 'w-badge'],
+    structure: 'w-shell > w-header + w-body.w-body--checklist > w-row* + w-footer',
   },
   grouped: {
     bodyModifier: 'w-body--grouped',
