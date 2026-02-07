@@ -10,7 +10,7 @@
       "optionalAtoms": ["w-text--meta", "w-img--hero"],
       "structure": "w-shell > w-header + w-body.w-body--verdict > w-headline + w-tag-group",
       "boardsTemplate": "hero-card",
-      "boardsStatus": "partial",
+      "boardsStatus": "migrated",
       "fixture": {
         "label": "Coastal Minimalism",
         "sublabel": "Your selections lean toward clean silhouettes and natural tones",
@@ -25,7 +25,7 @@
       "optionalAtoms": ["w-img--thumb", "w-badge", "w-bar"],
       "structure": "w-shell > w-header + w-body.w-body--list > w-row*",
       "boardsTemplate": "list",
-      "boardsStatus": "legacy",
+      "boardsStatus": "migrated",
       "fixture": {
         "items": [
           { "title": "Air Max 90", "subtitle": "Nike · $120", "indicator": "1" },
@@ -42,7 +42,7 @@
       "optionalAtoms": ["w-text--note"],
       "structure": "w-shell > w-header + w-body.w-body--spectrum > w-axis*",
       "boardsTemplate": "spectrum",
-      "boardsStatus": "legacy",
+      "boardsStatus": "migrated",
       "fixture": {
         "axes": [
           { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.7, "note": "Leans premium but not top-tier" },
@@ -59,7 +59,7 @@
       "optionalAtoms": ["w-text", "w-img", "w-badge"],
       "structure": "w-shell > w-header + w-body.w-body--split > w-column + w-divider--vertical + w-column",
       "boardsTemplate": "grid-split",
-      "boardsStatus": "legacy",
+      "boardsStatus": "migrated",
       "fixture": {
         "left": {
           "title": "Your Items",
@@ -85,7 +85,7 @@
       "optionalAtoms": ["w-text--title", "w-tag-group", "w-img--hero"],
       "structure": "w-shell > w-header + w-body.w-body--narrative > w-text--prose*",
       "boardsTemplate": "text-block",
-      "boardsStatus": "legacy",
+      "boardsStatus": "migrated",
       "fixture": {
         "title": "Style Notes",
         "paragraphs": [
@@ -165,7 +165,7 @@
       "optionalAtoms": ["w-text--meta", "w-badge", "w-btn", "w-text--note"],
       "structure": "w-shell > w-header + w-body.w-body--suggestion > w-img + w-headline + w-actions",
       "boardsTemplate": "quick-add",
-      "boardsStatus": "legacy",
+      "boardsStatus": "migrated",
       "fixture": {
         "name": "Common Projects Achilles Low",
         "brand": "Common Projects",
@@ -209,7 +209,7 @@
     "list": "list",
     "text-block": "narrative",
     "spectrum": "spectrum",
-    "stat-row": null,
+    "stat-row": "stats",
     "quick-add": "suggestion"
   },
   "legacyAliases": {
@@ -217,8 +217,8 @@
     "card": "hero-card"
   },
   "coverage": {
-    "implemented": ["verdict", "list", "spectrum", "split", "narrative", "suggestion"],
+    "migrated": ["verdict", "list", "spectrum", "split", "narrative", "suggestion", "stats"],
     "notImplemented": ["comparison", "choices", "checklist", "grouped"],
-    "boardsOnly": ["stat-row"]
+    "boardsOnly": []
   }
 }

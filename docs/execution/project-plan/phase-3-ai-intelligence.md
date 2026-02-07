@@ -191,30 +191,49 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Migrate existing template renderers** | | Pending |
-| | `hero-card` → verdict: replace `widget-style__*` classes with `w-headline`, `w-tag-group`, `w-badge` | Pending |
-| | `list` → list: replace `widget-complete__body` divs with `w-body--list > w-row*` | Pending |
-| | `spectrum` → spectrum: replace `widget-spectrum__*` classes with `w-axis`, `w-text--label` | Pending |
-| | `grid-split` → split: replace `widget-complete__body` grid with `w-body--split > w-column + w-divider` | Pending |
-| | `text-block` → narrative: replace inline styles with `w-body--narrative > w-text--prose` | Pending |
-| | `quick-add` → suggestion: replace `widget-quickadd__*` classes with `w-body--suggestion > w-img + w-headline + w-actions` | Pending |
-| | `stat-row` → stats: replace `widget-statrow__*` classes with `w-stat` molecules (add `w-body--stats` modifier or use grouped) | Pending |
-| | Remove legacy `widget-complete__header` → use `w-header > w-header__left + w-header__controls` | Pending |
-| | Remove legacy `widget-complete__body` → use `w-body` with body modifier class | Pending |
-| | Remove legacy `widget-complete__badge` → use `w-badge` | Pending |
-| **Update WIDGET_TEMPLATES object** | | Pending |
-| | Rename template keys to match design system names (grid-split → split, hero-card → verdict, etc.) | Pending |
-| | Update templateAliases to support old keys during transition | Pending |
-| | Render functions output `w-*` class HTML instead of `widget-*` classes | Pending |
+| **Migrate existing template renderers** | | Complete |
+| | `hero-card` → verdict: replace `widget-style__*` classes with `w-headline`, `w-tag-group`, `w-badge` | Complete |
+| | `list` → list: replace `widget-complete__body` divs with `w-body--list > w-row*` | Complete |
+| | `spectrum` → spectrum: replace `widget-spectrum__*` classes with `w-axis`, `w-text--label` | Complete |
+| | `grid-split` → split: replace `widget-complete__body` grid with `w-body > w-items + w-divider` | Complete |
+| | `text-block` → narrative: replace inline styles with `w-body--narrative > w-text--prose` | Complete |
+| | `quick-add` → suggestion: replace `widget-quickadd__*` classes with `w-body--suggestion > w-img + w-headline + w-action-bar` | Complete |
+| | `stat-row` → stats: replace `widget-statrow__*` classes with `w-stat` molecules + `w-body--stats` modifier | Complete |
+| | Remove legacy `widget-complete__header` → use `w-header > w-header__left + w-header__controls` | Complete |
+| | Remove legacy `widget-complete__body` → use `w-body` with body modifier class | Complete |
+| | Remove legacy `widget-complete__badge` → use `w-badge` | Complete |
+| | Add `renderWidgetHeader()` shared helper (DRY) | Complete |
+| | Add token bridge in Boards `:root` for DS token compatibility | Complete |
+| | Import `design-system/widgets.css` in Boards `<head>` | Complete |
+| **Update WIDGET_TEMPLATES object** | | Complete |
+| | Render functions output `w-*` class HTML instead of `widget-*` classes | Complete |
+| | Template keys preserved (grid-split, hero-card, etc.) for backward compatibility | Complete |
+| | Loading states migrated to `w-shell > w-body--loading > w-loader` | Complete |
+| **Design system extensions for migration** | | Complete |
+| | Add `w-items` atom (flex-wrap container for item cards) | Complete |
+| | Add `w-item` atom (fixed-width item card with hover lift + shadow) | Complete |
+| | Add `w-body--stats` body modifier (stat-row layout) | Complete |
+| | Add `w-divider__label` for labeled dividers | Complete |
+| | Update `w-axis__marker` to 10px circle (matches legacy visual) | Complete |
+| | Update `w-header` spacing to use margin-bottom (matches legacy) | Complete |
+| | Update `w-body--suggestion` to horizontal layout by default | Complete |
+| | Container query: `w-body--suggestion` stacks vertically < 280px | Complete |
+| | Container query: `w-item` responsive sizing at breakpoints | Complete |
 | **Add missing template renderers** | | Pending |
 | | Implement comparison renderer (w-option × 2 + w-divider--labeled) | Pending |
 | | Implement choices renderer (w-option × N) | Pending |
 | | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Pending |
 | | Implement grouped renderer (w-section × N with w-row × N) | Pending |
-| **Verify migration** | | Pending |
-| | All 7 existing widget types render correctly with new classes | Pending |
+| **Verify migration** | | In Progress |
+| | All 7 existing widget types render with new w-* classes | Complete |
 | | Visual diff: compare before/after screenshots at each valid size | Pending |
-| | Existing widget configs still resolve to correct templates | Pending |
+| | Existing widget configs still resolve to correct templates | Complete |
+| **Clean up legacy CSS** | | Pending |
+| | Remove dead `widget-complete__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-style__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-spectrum__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-statrow__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-quickadd__*` CSS from Boards inline styles | Pending |
 
 #### Config-Driven AI Prompts
 

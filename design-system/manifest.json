@@ -1,5 +1,5 @@
 {
-  "version": "2026-02-07T10:04:46.495Z",
+  "version": "2026-02-07T10:33:48.253Z",
   "source": "design-system/",
   "files": [
     "tokens.css",
@@ -360,6 +360,14 @@
           "sm"
         ]
       },
+      "w-items": {
+        "className": "w-items",
+        "modifiers": []
+      },
+      "w-item": {
+        "className": "w-item",
+        "modifiers": []
+      },
       "w-loader": {
         "className": "w-loader",
         "modifiers": []
@@ -505,6 +513,9 @@
           "tall",
           "lg"
         ]
+      },
+      "stats": {
+        "className": "w-body--stats"
       }
     },
     "sizes": {

@@ -177,7 +177,7 @@ function parseWidgets(css) {
     const modifier = cls.includes('--') ? cls.split('--').slice(1).join('--') : null;
 
     const atoms = ['w-text', 'w-badge', 'w-bar', 'w-icon', 'w-icon-btn', 'w-img',
-                   'w-divider', 'w-checkbox', 'w-btn', 'w-loader'];
+                   'w-divider', 'w-checkbox', 'w-btn', 'w-loader', 'w-item', 'w-items'];
     const molecules = ['w-headline', 'w-tag-group', 'w-stat', 'w-row',
                        'w-axis', 'w-option', 'w-section', 'w-column'];
     const structure = ['w-shell', 'w-header', 'w-body', 'w-footer',

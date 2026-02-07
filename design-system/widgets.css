@@ -61,8 +61,9 @@
 .w-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
+  margin-bottom: var(--space-3);
   flex-shrink: 0;
 }
 
@@ -329,6 +330,19 @@
   border: none;
   border-top: var(--border-thin) solid var(--border-subtle);
   margin: var(--space-2) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.w-divider__label {
+  font-family: var(--font-primary);
+  font-size: var(--text-lg);
+  color: var(--fg-muted);
+  background: var(--bg-surface);
+  padding: 0 var(--space-2);
+  position: relative;
+  top: -1px;
 }
 
 .w-divider--vertical {
@@ -514,10 +528,12 @@
 .w-axis__marker {
   position: absolute;
   top: 50%;
-  width: 2px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   background: var(--fg);
+  border-radius: 50%;
   transform: translate(-50%, -50%);
+  transition: left var(--duration-slower) var(--ease-default);
 }
 
 .w-axis__note { text-align: left; }
@@ -661,10 +677,9 @@
 /* Suggestion: featured single item */
 .w-body--suggestion {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  flex-direction: row;
+  gap: var(--space-4);
   align-items: flex-start;
-  justify-content: center;
 }
 
 /* Grouped: labeled sections */
@@ -672,6 +687,41 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* --- w-items --- */
+.w-items {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* --- w-item --- */
+.w-item {
+  flex: 0 0 auto;
+  width: 100px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  transition: transform var(--duration-normal) var(--ease-default),
+              box-shadow var(--duration-normal) var(--ease-default);
+}
+
+.w-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   BODY MODIFIER: Stats row
+   ============================================ */
+
+.w-body--stats {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-around;
 }
 
 /* ============================================
@@ -725,6 +775,10 @@
   .w-img--card { width: 48px; height: 48px; }
   .w-img--hero { aspect-ratio: 3 / 2; }
 
+  .w-item { width: 60px; }
+  .w-item .w-img { height: 60px; }
+  .w-items { gap: var(--space-2); }
+
   .w-body--list > .w-row { gap: var(--space-2); }
   .w-row__indicator { display: none; }
   .w-row__trailing  { display: none; }
@@ -771,6 +825,13 @@
     border-top: var(--border-thin) solid var(--border-subtle);
   }
 
+  .w-item { width: 80px; }
+  .w-item .w-img { height: 80px; }
+
+  .w-body--suggestion {
+    flex-direction: column;
+  }
+
   .w-body--narrative .w-tag-group { display: none; }
 
   .w-action-bar > .w-btn:not(:first-child) { display: none; }
@@ -790,6 +851,10 @@
 
   .w-body--spectrum { gap: var(--space-6); }
   .w-body--grouped  { gap: var(--space-6); }
+
+  .w-body--stats {
+    gap: var(--space-6);
+  }
 
   .w-body--choices {
     display: grid;
