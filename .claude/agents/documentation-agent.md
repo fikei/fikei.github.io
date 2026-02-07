@@ -74,7 +74,42 @@ Each sub-product maps to specific locations in the documentation tree:
 
 ---
 
-## Functions
+## Function Reference
+
+| Domain | Function | Purpose |
+|--------|----------|---------|
+| **Plan** | `plan:audit` | Scan plans for stale items, count mismatches, untracked work |
+| | `plan:add` | File new work item to correct phase/epic by sub-product |
+| | `plan:update` | Mark items complete from branch history, update counts |
+| | `plan:rebalance` | Move items between phases when scope shifts |
+| **Arch** | `arch:sync` | Update architecture docs to match recent code changes |
+| | `arch:audit` | Verify every claim in an architecture doc against code |
+| | `arch:add-adr` | Add Architecture Decision Record to decision log |
+| | `arch:update-spec` | Update specific section of a tech design doc |
+| **Capture** | `capture:bug` | Log bug to BUGS.md with severity, create plan task if critical |
+| | `capture:work` | Route new work to correct phase/backlog by sub-product + urgency |
+| | `capture:tech-debt` | Log tech debt with effort/risk, cross-ref to risks.md |
+| **UX** | `ux:update` | Update UX docs after feature ships (JTBD, wireframes, status) |
+| | `ux:audit` | Compare UX docs against code to find gaps |
+| | `ux:wireframe` | Generate ASCII wireframes from current HTML/CSS |
+| **Branch** | `branch:diff` | Compare doc state between branches, find missing updates |
+| | `branch:reconcile` | Merge doc changes between branches, resolve conflicts |
+| | `branch:cherry-pick-docs` | Pull specific doc updates from one branch to another |
+| **Cleanup** | `cleanup:stale` | Find docs that haven't kept up with code changes |
+| | `cleanup:orphans` | Find dead references and undocumented code |
+| | `cleanup:duplicates` | Find contradictions across multiple docs |
+| | `cleanup:archive` | Archive deprecated docs with proper redirects |
+| **PM** | `pm:scope-check` | Detect scope creep — planned vs actual on a branch |
+| | `pm:dependency-map` | Map blockers, critical path, risk items |
+| | `pm:status-report` | Generate stakeholder-ready status report |
+| | `pm:retro` | Retrospective analysis of completed work |
+| | `pm:decision-log` | Track, add, and resolve pending decisions |
+| | `pm:prd-to-plan` | Generate plan entries from a PRD |
+| | `pm:changelog` | Generate structured changelog from recent work |
+
+---
+
+## Functions — Detailed Specifications
 
 ### Domain 1: Plan — Project Plan Management
 
@@ -758,46 +793,504 @@ This moves 57 items across phases. Approve? [Y/N]
 
 ---
 
-## Cross-Branch Workflow
+### Domain 7: PM — Program Management Operations
 
-The agent is designed to work on any branch, with awareness of the documentation state on other branches.
+Functions inspired by what a PM/PgM would do: tracking scope creep, maintaining dependency awareness, generating status reports, managing decisions, and ensuring nothing falls through the cracks during active development.
 
-### Typical Flow: Feature Development
+#### `pm:scope-check`
+**Purpose**: Detect scope creep by comparing what was planned vs what's actually being built on a branch.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `branch` | string | Yes | Feature branch to analyze |
+| `prd` | string | No | PRD to compare against (auto-detected from branch name if omitted) |
+
+**Process**:
+1. Read the PRD and its associated plan items
+2. Analyze the branch's commits and changed files
+3. Identify work done that wasn't in the original plan (scope addition)
+4. Identify planned work that hasn't been started (scope gaps)
+5. Flag unplanned complexity (new files, new dependencies, new config)
+
+**Output**:
+```markdown
+## Scope Check — branch `feature/widget-variants`
+
+### Planned Work (from PRD + Plan)
+- 12 tasks across 3 stories
+
+### Actual Work Done
+- 18 distinct changes across 14 files
+
+### Scope Additions (not in plan)
+| Addition | Files | Effort | Recommendation |
+|----------|-------|--------|----------------|
+| Template registry system | 3 new files | Medium | Add to plan — valuable but unplanned |
+| Design system manifest generator | 2 new files | Large | Should have its own story |
+| Token bridge for CSS variables | 1 file | Small | Add as task under existing story |
+
+### Scope Gaps (planned but not started)
+- "Visual QA checklist" — still pending
+- "Legacy CSS cleanup" — still pending
+
+### Verdict: Scope expanded by ~50%. Consider splitting into two PRs.
+```
+
+---
+
+#### `pm:dependency-map`
+**Purpose**: Map dependencies between plan items, features, and sub-products to identify blockers and critical paths.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scope` | string | No | Phase, epic, or `"all"` |
+| `highlight` | string | No | `"blockers"` (show blocking chains), `"critical-path"` (longest chain), `"risks"` (items with most dependents) |
+
+**Process**:
+1. Parse plan items for dependency markers (references to other items, "blocked by", "requires")
+2. Analyze code imports/references to detect implicit dependencies
+3. Build dependency graph
+4. Identify: circular dependencies, long chains, single points of failure
+5. Calculate critical path (longest dependency chain to completion)
+
+**Output**:
+```markdown
+## Dependency Map — Phase 3
+
+### Critical Path (longest chain to "Phase 3 Complete")
+Widget Config Schema → Template Registry → Renderer Migration → Design System Transition → Visual QA → Legacy Cleanup → Config-Driven AI Prompts
+**Length**: 7 steps, estimated 3 weeks
+
+### Blocking Chains
+| Blocker | Blocks | Impact |
+|---------|--------|--------|
+| Design System Transition (in progress) | Rules-Based Widget Catalog, CI Validation | 2 epics waiting |
+| Resend API setup (human action) | Email invitations | 1 epic in Phase 4 |
+
+### Risk Items (most dependents)
+| Item | Dependent Items | Risk |
+|------|----------------|------|
+| Template Registry | 6 downstream tasks | If delayed, cascading delay |
+| Auth system (Phase 4) | 12 downstream tasks | Largest single dependency |
+
+### Circular Dependencies Found
+- None detected
+```
+
+---
+
+#### `pm:status-report`
+**Purpose**: Generate a structured status report suitable for stakeholder review — what shipped, what's in progress, what's blocked, and what's next.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `period` | string | No | `"daily"`, `"weekly"` (default), `"sprint"`, `"monthly"` |
+| `since` | string | No | Date or git ref to report from |
+| `sub_product` | string | No | Filter to specific sub-product or `"all"` |
+| `format` | string | No | `"full"` (default), `"summary"` (3-bullet), `"metrics-only"` |
+
+**Process**:
+1. Gather all commits, plan updates, bug changes, and doc changes since `since`
+2. Cross-reference against plan to determine velocity (tasks completed per period)
+3. Calculate burn rate (remaining work / current velocity = estimated completion)
+4. Identify trends (accelerating, decelerating, blocked)
+5. Highlight decisions needed and risks emerging
+
+**Output**:
+```markdown
+## Weekly Status Report — 2026-02-03 to 2026-02-07
+
+### Summary
+Widget Phase 2 completed. Design System Transition (Phase 2.5a) started and 60% done.
+Velocity: 15 tasks/week (up from 11 last week).
+
+### Shipped This Period
+| Item | Sub-Product | Impact |
+|------|------------|--------|
+| Config-driven widget eligibility | AI Widgets | 180 lines of hard-coded logic removed |
+| Template selection engine | AI Widgets | Widgets auto-select rendering template |
+| Design system manifest generation | Design System | CSS → JSON manifest for validation |
+
+### In Progress
+| Item | Owner | % Done | ETA |
+|------|-------|--------|-----|
+| Design System Transition | Agent | 60% | 2026-02-10 |
+| Template registry mapping | Agent | 80% | 2026-02-08 |
+
+### Blocked
+| Item | Blocker | Days Blocked | Action Needed |
+|------|---------|-------------|---------------|
+| Email invitations | Resend API setup | 14 days | Human setup required |
+
+### Risks
+- Phase 3 has 257 remaining tasks at current velocity → ~17 weeks to complete
+- No UX doc updates in 21 days — feature documentation falling behind
+
+### Decisions Needed
+- Collaborative pricing model (impacts Phase 4 scope)
+- Mobile app platform choice (impacts Phase 7 timeline)
+
+### Next Period Focus
+1. Complete Design System Transition (Phase 2.5a)
+2. Begin Rules-Based Widget Catalog (Phase 2.5b)
+3. Update stale UX documentation for widgets
+```
+
+---
+
+#### `pm:retro`
+**Purpose**: Generate a retrospective analysis of a completed epic, phase, or sprint — what went well, what didn't, and what to change.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scope` | string | Yes | Completed phase, epic, or date range to analyze |
+| `metrics` | boolean | No | Include quantitative metrics (default: true) |
+
+**Process**:
+1. Gather all commits, plan items, bugs, and doc changes for the scope
+2. Analyze: planned vs actual duration, scope changes, bugs introduced, rework
+3. Identify patterns: what types of tasks took longer than expected, what was underestimated
+4. Check documentation completeness at end vs beginning
+5. Generate actionable improvements for next iteration
+
+**Output**:
+```markdown
+## Retrospective — Widget Phase 2: Config-Generated Widgets
+
+### Timeline
+- **Planned**: 2026-01-28 to 2026-02-03 (7 days)
+- **Actual**: 2026-01-28 to 2026-02-05 (9 days, +29%)
+- **Scope at start**: 8 stories, 24 tasks
+- **Scope at end**: 10 stories, 31 tasks (+29% scope growth)
+
+### What Went Well
+- Config schema design was clean — no rework needed
+- 180 lines of hard-coded logic eliminated (measurable improvement)
+- Two widgets migrated successfully on first attempt
+
+### What Didn't Go Well
+- Template selection engine wasn't in original plan — emerged as necessary mid-sprint
+- Hot-reload capability added late — should have been planned from start
+- No UX documentation was updated during the phase
+
+### Metrics
+| Metric | Value |
+|--------|-------|
+| Tasks completed | 31 |
+| Bugs introduced | 2 (BUG-015, BUG-016) |
+| Bugs fixed | 1 |
+| Architecture docs updated | 1 of 3 affected |
+| UX docs updated | 0 of 2 affected |
+| Rework (tasks done then redone) | 3 tasks (10%) |
+
+### Recommendations
+1. Add "documentation update" task to every story template
+2. Scope template selection patterns during design phase, not mid-sprint
+3. Run `pm:scope-check` weekly during active development to catch creep early
+```
+
+---
+
+#### `pm:decision-log`
+**Purpose**: Track and surface pending decisions that are blocking or will block work.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action` | string | Yes | `"list"`, `"add"`, `"resolve"` |
+| `title` | string | No | Decision title (required for `add` and `resolve`) |
+| `context` | string | No | Why this decision is needed |
+| `options` | string[] | No | Available options |
+| `deadline` | string | No | When this must be decided by |
+| `impact` | string | No | What's blocked by this decision |
+| `resolution` | string | No | What was decided (for `resolve`) |
+
+**Process**:
+1. `list`: Scan plan for "Needs Decision" section + decision-log.md, return all open decisions with age and impact
+2. `add`: Add decision to both plan's "Needs Decision" table and `decision-log.md`
+3. `resolve`: Record the decision, update plan, create follow-up tasks if needed
+
+**Output**:
+```markdown
+## Open Decisions — 3 pending
+
+| # | Decision | Age | Impact | Deadline |
+|---|----------|-----|--------|----------|
+| 1 | Collaborative pricing model | 21 days | Blocks Phase 4 scoping | 2026-02-15 |
+| 2 | Mobile app platform | 14 days | Blocks Phase 7 planning | 2026-03-01 |
+| 3 | Analytics provider | 7 days | Blocks instrumentation epic | None set |
+
+### Overdue: None
+### Approaching Deadline: #1 (8 days remaining)
+```
+
+---
+
+#### `pm:prd-to-plan`
+**Purpose**: Take a new or updated PRD and generate/update project plan entries — epics, stories, and tasks.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `prd` | string | Yes | Path to PRD file |
+| `target_phase` | string | No | Which phase to add to (auto-determined if omitted) |
+| `estimation` | boolean | No | Include rough T-shirt size estimates (default: true) |
+
+**Process**:
+1. Read the PRD and extract: goals, requirements, success metrics, technical considerations
+2. Break into epics (major feature areas from PRD sections)
+3. Break epics into stories (user-facing capabilities)
+4. Break stories into tasks (implementation steps, referencing existing codebase patterns)
+5. Estimate effort using T-shirt sizes (S/M/L/XL) based on codebase complexity
+6. Identify dependencies on existing features/systems
+7. Add to target phase file and update index
+
+**Output**: The generated plan entries, plus a summary of what was created.
+
+---
+
+#### `pm:changelog`
+**Purpose**: Generate a structured changelog entry from recent work — what users and stakeholders care about, not implementation details.
+
+**Inputs**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `since` | string | No | Date or git ref (default: since last changelog entry) |
+| `audience` | string | No | `"internal"` (default — include tech details), `"external"` (user-facing only) |
+
+**Process**:
+1. Gather all commits since the reference point
+2. Categorize: features, improvements, bug fixes, infrastructure, documentation
+3. Filter out noise (formatting, typos, internal refactors) for external audience
+4. Cross-reference with plan items to add context
+5. Append to CHANGELOG.md
+
+**Output**: The changelog entry, written to CHANGELOG.md.
+
+---
+
+## Interconnected Workflows
+
+Functions call each other in chains. The `→` arrow means "automatically triggers".
+
+### Workflow 1: Feature Development (branch lifecycle)
 
 ```
-1. Developer starts feature branch from master
-2. As code is written:
-   - `capture:work` to log new tasks discovered during implementation
-   - `capture:bug` to log bugs found while building
-   - `arch:update-spec` to keep tech docs current with new code
-3. Before PR:
-   - `branch:diff base=master compare=feature-branch` to see what docs diverged
-   - `ux:update` to reflect any UI changes
-   - `plan:update from_branch=feature-branch` to mark completed tasks
-4. After merge to master:
-   - `cleanup:stale` to catch anything missed
-   - `plan:audit scope=affected-phase` to verify plan is consistent
+START: Developer begins feature branch
+│
+├─ During development:
+│   ├─ `capture:work` → `plan:add`           # New tasks discovered → filed to correct phase
+│   ├─ `capture:bug` → `plan:add`            # Bug found → filed + plan task if critical
+│   ├─ `capture:tech-debt`                    # Shortcuts noted for later
+│   └─ `arch:update-spec`                     # Keep tech docs current as code changes
+│
+├─ Before PR:
+│   ├─ `pm:scope-check`                       # Did we build more/less than planned?
+│   │   └─ → `capture:work` (for additions)   # Unplanned work gets captured to plan
+│   ├─ `branch:diff base=master`              # What docs diverged from master?
+│   │   └─ → `arch:sync` (for gaps)           # Code changed but arch doc didn't → fix
+│   ├─ `plan:update from_branch=current`      # Mark completed tasks, update counts
+│   ├─ `ux:update`                            # Reflect any UI changes
+│   └─ `pm:changelog`                         # Draft changelog entry
+│
+├─ After merge to master:
+│   ├─ `plan:audit scope=affected-phase`      # Verify plan consistency post-merge
+│   │   └─ → `plan:update` (count fixes)      # Fix any count mismatches found
+│   ├─ `cleanup:stale`                        # Catch any docs that fell behind
+│   │   └─ → `arch:sync` / `ux:update`        # Update stale docs identified
+│   └─ `pm:status-report format=summary`      # Quick status update
+│
+END: Documentation Sync agent pushes all changes to Notion
 ```
 
-### Typical Flow: Sprint Planning
+### Workflow 2: New PRD → Full Plan (inception to ready-to-build)
 
 ```
-1. `plan:audit scope=all` — get current state
-2. `cleanup:stale` — identify what needs updating before planning
-3. `plan:rebalance auto=true` — check if phases need reorg
-4. `capture:work` (multiple) — add new items from planning session
-5. `arch:audit doc=all depth=surface` — verify docs match what was actually built
+START: New PRD created or updated
+│
+├─ `pm:prd-to-plan`                           # Generate epics/stories/tasks from PRD
+│   ├─ → `plan:add` (multiple)                # Each generated item filed to correct phase
+│   └─ → `pm:dependency-map`                  # Map dependencies for new work
+│       └─ → `pm:decision-log action=add`     # Surface decisions needed before work starts
+│
+├─ `arch:add-adr`                             # Record architecture decisions from PRD
+│
+├─ `plan:rebalance`                           # Check if new work overloads a phase
+│   └─ → `plan:audit checks=counts`           # Verify counts after rebalance
+│
+END: Plan is ready, dependencies mapped, decisions logged
 ```
 
-### Typical Flow: Documentation Maintenance (Weekly)
+### Workflow 3: Sprint Planning
 
 ```
-1. `cleanup:stale threshold_days=14` — find everything behind
-2. `cleanup:orphans direction=both` — find disconnected docs/code
-3. `cleanup:duplicates scope=all` — find contradictions
-4. `ux:audit feature_area=all` — verify UX docs
-5. `arch:sync since=7-days-ago` — catch up arch docs
-6. `plan:audit checks=["counts","status-accuracy"]` — verify plan integrity
+START: Beginning of sprint/iteration
+│
+├─ `plan:audit scope=all`                     # Current state of all plans
+│   └─ → `plan:update` (fix stale statuses)   # Auto-fix items completed but not marked
+│
+├─ `cleanup:stale`                            # What docs need updating?
+│   └─ → `arch:sync` + `ux:audit`             # Update stale docs before planning
+│
+├─ `pm:dependency-map highlight=blockers`     # What's blocked? What's the critical path?
+│   └─ → `pm:decision-log action=list`        # Surface overdue decisions
+│
+├─ `pm:status-report period=sprint`           # Where did we end up last sprint?
+│   └─ → `pm:retro scope=last-sprint`         # What went well/badly?
+│
+├─ `plan:rebalance auto=true`                 # Do phases need reorganizing?
+│
+├─ `capture:work` (multiple)                  # Add new items from planning discussion
+│   └─ → `plan:add` (each item)               # File each to correct location
+│
+END: Sprint backlog is clear, blockers surfaced, docs current
+```
+
+### Workflow 4: Weekly Documentation Maintenance
+
+```
+START: Friday automated run (or manual trigger)
+│
+├─ PARALLEL:
+│   ├─ `cleanup:stale threshold_days=14`      # Docs behind their code
+│   ├─ `cleanup:orphans direction=both`        # Dead refs + undocumented code
+│   ├─ `cleanup:duplicates scope=all`          # Contradictions between docs
+│   └─ `ux:audit feature_area=all`             # UX docs vs live code
+│
+├─ SEQUENTIAL (from cleanup results):
+│   ├─ `arch:sync since=7-days-ago`           # Update arch docs identified as stale
+│   ├─ `ux:update` (for gaps found)            # Update UX docs identified as stale
+│   ├─ `cleanup:archive auto=true`             # Archive anything ready
+│   │   └─ updates notion-structure.json       # Remove archived pages from sync
+│   └─ `plan:audit checks=counts,status`      # Verify plan integrity
+│
+├─ `pm:status-report period=weekly`           # Weekly status report
+│   └─ → `pm:changelog`                       # Changelog from the week
+│
+END: Documentation Sync agent pushes updates to Notion
+```
+
+### Workflow 5: Bug Triage & Response
+
+```
+START: Bug reported (in conversation, PR, or testing)
+│
+├─ `capture:bug`                               # Log to BUGS.md with severity
+│   ├─ IF critical/high → `plan:add`           # Create task in current phase
+│   ├─ IF related to existing bug → flag       # Potential duplicate noted
+│   └─ → `pm:dependency-map`                   # Does this bug block other work?
+│
+├─ IF bug reveals architecture issue:
+│   ├─ `arch:audit doc=affected-spec`          # Is the arch doc wrong?
+│   │   └─ → `arch:update-spec`               # Fix doc if needed
+│   └─ `capture:tech-debt`                     # Log underlying issue
+│
+├─ IF bug in shipped feature:
+│   └─ `ux:update`                             # Update UX doc to note known issue
+│
+END: Bug tracked, plan updated, docs reflect reality
+```
+
+### Workflow 6: Phase/Epic Completion
+
+```
+START: Major milestone completed
+│
+├─ `pm:retro scope=completed-phase`            # What went well/badly?
+│   └─ captures lessons for future phases
+│
+├─ `plan:update`                               # Mark everything complete, update counts
+│   └─ → `plan:audit scope=completed-phase`    # Final consistency check
+│
+├─ `arch:audit doc=all depth=deep`             # Are all arch docs accurate?
+│   └─ → `arch:sync` (for gaps)                # Fix any drift found
+│
+├─ `ux:audit feature_area=all`                 # Are UX docs complete?
+│   └─ → `ux:update` (for gaps)                # Fill in missing docs
+│   └─ → `ux:wireframe` (for new features)     # Generate wireframes for undocumented UI
+│
+├─ `cleanup:archive`                           # Archive completed plan artifacts if applicable
+│
+├─ `pm:status-report period=monthly`           # Milestone status report
+│   └─ → `pm:changelog audience=external`      # User-facing changelog
+│
+├─ `pm:decision-log action=list`               # Any decisions still pending?
+│
+END: Phase fully documented, retrospective captured, clean slate for next phase
+```
+
+### Workflow 7: Cross-Branch Documentation Reconciliation
+
+```
+START: Multiple feature branches have doc changes, merge approaching
+│
+├─ `branch:diff base=master compare=branch-A`  # What did branch A change?
+├─ `branch:diff base=master compare=branch-B`  # What did branch B change?
+│
+├─ IF conflicts detected:
+│   └─ `branch:reconcile source=branch-A target=branch-B`
+│       └─ → `plan:audit` (verify consistency)  # Post-reconcile consistency check
+│
+├─ IF one branch is ahead on docs:
+│   └─ `branch:cherry-pick-docs source=ahead-branch target=behind-branch`
+│       └─ → `cleanup:orphans` (verify no broken refs)
+│
+END: Branches have consistent documentation, ready to merge
+```
+
+### Workflow 8: Architecture Decision
+
+```
+START: Technical decision made during development
+│
+├─ `arch:add-adr`                              # Record the decision
+│
+├─ `arch:update-spec`                          # Update affected tech specs
+│   └─ → `arch:audit doc=affected depth=surface` # Quick check: does spec still make sense?
+│
+├─ IF decision changes scope:
+│   ├─ `pm:decision-log action=resolve`         # Close the decision
+│   ├─ `plan:rebalance`                         # Adjust plan if scope changed
+│   └─ `capture:work` (for new tasks)           # Add tasks from decision
+│
+END: Decision recorded, specs updated, plan adjusted
+```
+
+### Function Call Graph
+
+Shows which functions can trigger other functions:
+
+```
+capture:bug ──────→ plan:add
+capture:work ─────→ plan:add
+capture:tech-debt → (backlog.md, risks.md)
+
+plan:add ─────────→ (updates index.md counts)
+plan:update ──────→ (updates index.md counts)
+plan:audit ───────→ plan:update (auto-fix counts)
+plan:rebalance ───→ plan:audit (verify after move)
+
+arch:sync ────────→ arch:update-spec (for each stale doc)
+arch:audit ───────→ arch:update-spec (fix contradictions)
+
+ux:audit ─────────→ ux:update (fix gaps found)
+                  → ux:wireframe (missing wireframes)
+
+cleanup:stale ────→ arch:sync, ux:update (update stale docs)
+cleanup:orphans ──→ cleanup:archive (for truly dead docs)
+
+pm:prd-to-plan ───→ plan:add (multiple), pm:dependency-map
+pm:scope-check ───→ capture:work (unplanned items)
+pm:status-report ─→ pm:changelog
+pm:retro ─────────→ capture:tech-debt (patterns found)
+pm:decision-log ──→ plan:rebalance (when decisions change scope)
+
+branch:diff ──────→ arch:sync, ux:update (for missing updates)
+branch:reconcile ─→ plan:audit (post-merge consistency)
 ```
 
 ---
@@ -850,6 +1343,23 @@ The agent is designed to work on any branch, with awareness of the documentation
 | **Status Update** | Status agent reads plan state that this agent keeps current |
 | **Security** | Security scans for secrets before this agent commits doc changes |
 | **Chief of Staff** | Escalation target when this agent needs decisions |
+
+### Relationship to NotionSync PRD (Pillar 2)
+
+The [NotionSync Platform PRD](../../docs/strategy/prds/notion-sync-platform.md) defines a "Doc Management Agent" under Pillar 2 (Documentation Management). That agent operates on the **Notion side** — health checks on Notion pages, comment-driven updates via `@agent` commands. This Documentation Agent operates on the **Git side** — managing content accuracy, plan integrity, and documentation hygiene in the repository.
+
+**Data flow**: Documentation Agent updates content in Git → Documentation Sync pushes to Notion → NotionSync Pillar 2 Phase B (future) processes Notion comments → changes flow back to Git.
+
+| Concern | NotionSync Pillar 2 | Documentation Agent |
+|---------|---------------------|---------------------|
+| Staleness detection | Notion page last-modified vs threshold | Git doc last-modified vs code last-modified |
+| Orphan detection | Notion pages not in structure.json | Docs referencing deleted code, code without docs |
+| Duplicate detection | Near-duplicate Notion pages | Same fact stated differently across multiple docs |
+| Content updates | Via Notion `@agent` comments (Phase B) | Via Git-side functions triggered by code changes |
+| Plan management | Not covered | Full coverage (audit, add, update, rebalance) |
+| Architecture sync | Not covered | Full coverage (sync, audit, ADR, spec updates) |
+| UX docs | Not covered | Full coverage (update, audit, wireframe) |
+| Cross-branch ops | Not covered | Full coverage (diff, reconcile, cherry-pick) |
 
 ---
 

@@ -137,6 +137,8 @@ Templates for individual documents within sections:
 
 An AI agent that continuously monitors, organizes, and improves documentation quality.
 
+> **See also**: [Documentation Agent](../../../.claude/agents/documentation-agent.md) — the Git-side content management agent that complements this Notion-side management. This PRD covers Notion page health and comment-driven interactions. The Documentation Agent covers repository content accuracy: project plan integrity, architecture doc sync, UX documentation currency, bug/work capture, and cross-branch operations.
+
 ### Phase A: Health Checks & Cleanup
 
 **Goal**: Detect and fix doc rot automatically
