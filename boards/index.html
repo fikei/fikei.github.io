@@ -2218,6 +2218,163 @@ body {
   margin: var(--space-2) 0;
 }
 
+/* Widget Inspector Overlay */
+.widget-inspector {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0,0,0,0.85);
+  overflow-y: auto;
+  display: none;
+  padding: var(--space-4);
+}
+
+.widget-inspector--visible {
+  display: block;
+}
+
+.widget-inspector__inner {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.widget-inspector__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--subtle);
+  padding-bottom: var(--space-2);
+}
+
+.widget-inspector__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+}
+
+.widget-inspector__close {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.widget-inspector__profile {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.widget-inspector__profile strong {
+  color: var(--fg);
+}
+
+.widget-inspector__card {
+  border: 1px solid var(--subtle);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+}
+
+.widget-inspector__card--eligible {
+  border-color: #4a9;
+}
+
+.widget-inspector__card--ineligible {
+  border-color: var(--subtle);
+  opacity: 0.6;
+}
+
+.widget-inspector__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.widget-inspector__card-name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+
+.widget-inspector__card-score {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+}
+
+.widget-inspector__card-score--high { color: #4a9; }
+.widget-inspector__card-score--mid { color: #f0c674; }
+.widget-inspector__card-score--low { color: #c66; }
+
+.widget-inspector__card-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.widget-inspector__rationale {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding-left: var(--space-3);
+}
+
+.widget-inspector__rationale li {
+  margin-bottom: 2px;
+}
+
+/* Widget header context menu (right-click) */
+.widget-context {
+  position: fixed;
+  z-index: 250;
+  background: var(--bg);
+  border: 1px solid var(--subtle);
+  padding: var(--space-3);
+  min-width: 240px;
+  max-width: 360px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.widget-context--visible {
+  display: block;
+}
+
+.widget-context__title {
+  color: var(--fg);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--subtle);
+}
+
+.widget-context__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.widget-context__label { color: var(--muted); }
+.widget-context__value { color: var(--fg); }
+
 /* Admin Panel */
 .admin-panel {
   max-width: 600px;
@@ -2862,8 +3019,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
     <div class="dev-menu__divider"></div>
     <button class="dev-menu__btn" id="devToggleWidgets">Widgets: OFF</button>
+    <button class="dev-menu__btn" id="devWidgetInspector">Widget Inspector</button>
     <button class="dev-menu__btn dev-menu__btn--admin" id="devAdminPanel" style="display:none;">Admin Panel</button>
   </div>
+
+  <!-- Widget Inspector Overlay -->
+  <div class="widget-inspector" id="widgetInspector">
+    <div class="widget-inspector__inner">
+      <div class="widget-inspector__header">
+        <span class="widget-inspector__title">Widget Inspector</span>
+        <button class="widget-inspector__close" id="widgetInspectorClose">&times;</button>
+      </div>
+      <div id="widgetInspectorProfile" class="widget-inspector__profile"></div>
+      <div id="widgetInspectorCards"></div>
+    </div>
+  </div>
+
+  <!-- Widget Context Menu (right-click on header) -->
+  <div class="widget-context" id="widgetContext"></div>
 
   <!-- Admin Panel Modal -->
   <div class="modal" id="adminModal">
@@ -3742,7 +3915,177 @@ Return JSON:
       }));
   }
 
-  // Check if widget criteria are met
+  // =============================================================================
+  // PIN PROFILING & WIDGET SCORING
+  // Analyzes pins to build a profile, then scores each widget's fit.
+  // =============================================================================
+
+  // Analyze a set of pins and return a profile object
+  function profilePins(items) {
+    const domains = {};
+    const words = {};
+    let hasImages = 0;
+    let hasDescriptions = 0;
+    let totalTitleLen = 0;
+
+    for (const item of items) {
+      // Domain frequency
+      try {
+        const host = new URL(item.url).hostname.replace(/^www\./, '');
+        domains[host] = (domains[host] || 0) + 1;
+      } catch {}
+
+      // Content quality signals
+      if (item.image) hasImages++;
+      if (item.description && item.description.length > 10) hasDescriptions++;
+      totalTitleLen += (item.title || '').length;
+
+      // Word frequency from titles (lowercase, skip short words)
+      const titleWords = (item.title || '').toLowerCase().split(/\s+/);
+      for (const w of titleWords) {
+        if (w.length > 3) words[w] = (words[w] || 0) + 1;
+      }
+    }
+
+    const domainCount = Object.keys(domains).length;
+    const topDomains = Object.entries(domains)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([d, count]) => ({ domain: d, count }));
+
+    // Detect if pins are product-like (e-commerce domains)
+    const productDomains = ['amazon', 'shopify', 'etsy', 'ebay', 'nike', 'zara', 'uniqlo', 'nordstrom', 'asos', 'ssense', 'farfetch', 'mrporter', 'grailed'];
+    const productPinCount = items.filter(item => {
+      try {
+        const host = new URL(item.url).hostname.toLowerCase();
+        return productDomains.some(d => host.includes(d));
+      } catch { return false; }
+    }).length;
+
+    // Detect content-like pins (articles, blogs, media)
+    const contentDomains = ['medium', 'substack', 'youtube', 'reddit', 'wikipedia', 'nytimes', 'theverge', 'arstechnica', 'techcrunch'];
+    const contentPinCount = items.filter(item => {
+      try {
+        const host = new URL(item.url).hostname.toLowerCase();
+        return contentDomains.some(d => host.includes(d));
+      } catch { return false; }
+    }).length;
+
+    return {
+      itemCount: items.length,
+      domainCount,
+      topDomains,
+      uniqueDomainRatio: items.length > 0 ? domainCount / items.length : 0,
+      imageRatio: items.length > 0 ? hasImages / items.length : 0,
+      descriptionRatio: items.length > 0 ? hasDescriptions / items.length : 0,
+      avgTitleLength: items.length > 0 ? totalTitleLen / items.length : 0,
+      productRatio: items.length > 0 ? productPinCount / items.length : 0,
+      contentRatio: items.length > 0 ? contentPinCount / items.length : 0,
+      topWords: Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([w, c]) => ({ word: w, count: c }))
+    };
+  }
+
+  // Score how well a widget fits the current pin profile
+  // Returns { score: 0-1, rationale: string[], signals: {} }
+  function scoreWidgetFit(widget, profile, currentCategory) {
+    const rationale = [];
+    const signals = {};
+    let score = 0;
+    let maxScore = 0;
+
+    const c = widget.criteria;
+
+    // --- Category match (weight: 0.3) ---
+    maxScore += 0.3;
+    if (c.category) {
+      const cats = Array.isArray(c.category) ? c.category : [c.category];
+      if (cats.includes(currentCategory) || cats.includes('all')) {
+        score += 0.3;
+        signals.categoryMatch = true;
+        rationale.push(`Category "${currentCategory}" matches`);
+      } else {
+        signals.categoryMatch = false;
+        rationale.push(`Category "${currentCategory}" not in [${cats.join(', ')}]`);
+      }
+    } else {
+      score += 0.3;
+      signals.categoryMatch = true;
+      rationale.push('No category restriction');
+    }
+
+    // --- Item count (weight: 0.25) ---
+    maxScore += 0.25;
+    const minItems = c.minItems || 1;
+    if (profile.itemCount >= minItems) {
+      // Graduated: more items past minimum = higher score
+      const surplus = Math.min((profile.itemCount - minItems) / Math.max(minItems, 3), 1);
+      const itemScore = 0.15 + (0.10 * surplus);
+      score += itemScore;
+      signals.itemCount = profile.itemCount;
+      signals.minItems = minItems;
+      rationale.push(`${profile.itemCount} items (need ${minItems}+)`);
+    } else {
+      signals.itemCount = profile.itemCount;
+      signals.minItems = minItems;
+      rationale.push(`Only ${profile.itemCount} items (need ${minItems}+)`);
+    }
+
+    // --- Domain diversity (weight: 0.15) ---
+    maxScore += 0.15;
+    if (profile.domainCount >= 2) {
+      const diversityScore = Math.min(profile.domainCount / 5, 1) * 0.15;
+      score += diversityScore;
+      signals.domainDiversity = profile.domainCount;
+      rationale.push(`${profile.domainCount} unique domains`);
+    } else {
+      signals.domainDiversity = profile.domainCount;
+      rationale.push('Low domain diversity');
+    }
+
+    // --- Content quality (weight: 0.15) ---
+    maxScore += 0.15;
+    const qualityScore = ((profile.imageRatio * 0.5) + (profile.descriptionRatio * 0.3) + (Math.min(profile.avgTitleLength / 30, 1) * 0.2)) * 0.15;
+    score += qualityScore;
+    signals.imageRatio = profile.imageRatio;
+    signals.descriptionRatio = profile.descriptionRatio;
+    rationale.push(`Content quality: ${(qualityScore / 0.15 * 100).toFixed(0)}%`);
+
+    // --- Content type affinity (weight: 0.15) ---
+    maxScore += 0.15;
+    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler'].includes(widget.id);
+    const isAnalyticsWidget = ['style-summary', 'collection-stats'].includes(widget.id);
+
+    if (isProductWidget && profile.productRatio > 0.3) {
+      const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;
+      score += affinity;
+      signals.contentAffinity = 'product';
+      rationale.push(`Product-heavy pins (${(profile.productRatio * 100).toFixed(0)}%) — good for ${widget.name}`);
+    } else if (isAnalyticsWidget && profile.itemCount >= 3) {
+      score += 0.12;
+      signals.contentAffinity = 'analytics';
+      rationale.push(`${profile.itemCount} items — enough for analysis`);
+    } else if (!isProductWidget && !isAnalyticsWidget) {
+      score += 0.08;
+      signals.contentAffinity = 'neutral';
+      rationale.push('General widget');
+    } else {
+      signals.contentAffinity = 'weak';
+      rationale.push(`Low affinity (product ratio: ${(profile.productRatio * 100).toFixed(0)}%)`);
+    }
+
+    const normalizedScore = maxScore > 0 ? score / maxScore : 0;
+
+    return {
+      score: Math.round(normalizedScore * 100) / 100,
+      rationale,
+      signals
+    };
+  }
+
+  // Store last scoring results for the inspector
+  let lastScoringResults = null;
+
+  // Check if widget criteria are met (hard gate — returns boolean)
   function checkWidgetCriteria(widget, items, currentCategory) {
     const c = widget.criteria;
     // Phase 2: Category-agnostic — category field can be a string or array
@@ -3756,20 +4099,41 @@ Return JSON:
     return true;
   }
 
-  // Get applicable widgets for current context
+  // Get applicable widgets for current context — scored and ranked
   function getApplicableWidgets(items, currentCategory) {
+    const profile = profilePins(items);
     const allWidgets = Object.values(WIDGET_REGISTRY);
-    return allWidgets
-      .filter(w => getWidgetStatus(w.id) === 'active') // Use effective status
-      .filter(w => shouldShowWidget(w.id)) // Respect user preferences (hidden/dismissed)
-      .filter(w => checkWidgetCriteria(w, items, currentCategory))
-      .sort((a, b) => {
-        // Favorites first, then alphabetical
-        const aFav = widgetPrefs.favorites[a.id] ? 0 : 1;
-        const bFav = widgetPrefs.favorites[b.id] ? 0 : 1;
-        if (aFav !== bFav) return aFav - bFav;
-        return a.id.localeCompare(b.id);
+    const scoringResults = [];
+
+    for (const widget of allWidgets) {
+      const active = getWidgetStatus(widget.id) === 'active';
+      const visible = shouldShowWidget(widget.id);
+      const meetsHardCriteria = checkWidgetCriteria(widget, items, currentCategory);
+      const fit = scoreWidgetFit(widget, profile, currentCategory);
+
+      scoringResults.push({
+        widget,
+        active,
+        visible,
+        meetsHardCriteria,
+        eligible: active && visible && meetsHardCriteria,
+        ...fit
       });
+    }
+
+    // Store for inspector
+    lastScoringResults = { profile, results: scoringResults, category: currentCategory, timestamp: Date.now() };
+
+    // Return eligible widgets sorted by score (highest first), favorites boosted
+    return scoringResults
+      .filter(r => r.eligible)
+      .sort((a, b) => {
+        const aFav = widgetPrefs.favorites[a.widget.id] ? 1 : 0;
+        const bFav = widgetPrefs.favorites[b.widget.id] ? 1 : 0;
+        if (aFav !== bFav) return bFav - aFav;
+        return b.score - a.score;
+      })
+      .map(r => r.widget);
   }
 
   // =============================================================================
@@ -7394,7 +7758,11 @@ Return JSON:
   });
 
   document.onkeydown = (e) => {
-    if (e.key === 'Escape') closeAll();
+    if (e.key === 'Escape') {
+      closeAll();
+      $('widgetInspector').classList.remove('widget-inspector--visible');
+      $('widgetContext').classList.remove('widget-context--visible');
+    }
     // Ctrl+Shift+D toggles dev menu
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
@@ -7539,6 +7907,129 @@ Return JSON:
       toast('Widgets enabled');
     }
   };
+
+  // =============================================================================
+  // WIDGET INSPECTOR
+  // =============================================================================
+  $('devWidgetInspector').onclick = () => {
+    $('devMenu').classList.remove('dev-menu--visible');
+
+    // Run scoring fresh
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const category = currentFilter || 'all';
+    const profile = profilePins(items);
+    const allWidgets = Object.values(WIDGET_REGISTRY);
+
+    const results = allWidgets.map(widget => {
+      const active = getWidgetStatus(widget.id) === 'active';
+      const visible = shouldShowWidget(widget.id);
+      const meetsHardCriteria = checkWidgetCriteria(widget, items, category);
+      const fit = scoreWidgetFit(widget, profile, category);
+      return { widget, active, visible, meetsHardCriteria, eligible: active && visible && meetsHardCriteria, ...fit };
+    }).sort((a, b) => b.score - a.score);
+
+    // Render profile summary
+    $('widgetInspectorProfile').innerHTML = `
+      <strong>Pin Profile</strong> — ${profile.itemCount} items, category: ${category}<br>
+      Domains: ${profile.domainCount} unique (${profile.topDomains.map(d => d.domain).join(', ')})<br>
+      Quality: ${(profile.imageRatio * 100).toFixed(0)}% images, ${(profile.descriptionRatio * 100).toFixed(0)}% descriptions<br>
+      Content: ${(profile.productRatio * 100).toFixed(0)}% product, ${(profile.contentRatio * 100).toFixed(0)}% editorial<br>
+      Top words: ${profile.topWords.slice(0, 6).map(w => w.word).join(', ')}
+    `;
+
+    // Render widget cards
+    let cardsHtml = '';
+    for (const r of results) {
+      const scoreClass = r.score >= 0.7 ? 'high' : r.score >= 0.4 ? 'mid' : 'low';
+      const eligClass = r.eligible ? 'eligible' : 'ineligible';
+      const statusParts = [];
+      if (!r.active) statusParts.push('inactive');
+      if (!r.visible) statusParts.push('hidden/dismissed');
+      if (!r.meetsHardCriteria) statusParts.push('fails criteria');
+      const statusText = r.eligible ? 'ELIGIBLE' : `BLOCKED: ${statusParts.join(', ')}`;
+
+      cardsHtml += `
+        <div class="widget-inspector__card widget-inspector__card--${eligClass}">
+          <div class="widget-inspector__card-header">
+            <span class="widget-inspector__card-name">${esc(r.widget.name)} <span style="color:var(--muted)">(${r.widget.zone})</span></span>
+            <span class="widget-inspector__card-score widget-inspector__card-score--${scoreClass}">${(r.score * 100).toFixed(0)}%</span>
+          </div>
+          <div class="widget-inspector__card-status" style="color:${r.eligible ? '#4a9' : '#c66'}">${statusText}</div>
+          <ul class="widget-inspector__rationale">
+            ${r.rationale.map(line => `<li>${esc(line)}</li>`).join('')}
+          </ul>
+        </div>`;
+    }
+    $('widgetInspectorCards').innerHTML = cardsHtml;
+
+    $('widgetInspector').classList.add('widget-inspector--visible');
+  };
+
+  $('widgetInspectorClose').onclick = () => {
+    $('widgetInspector').classList.remove('widget-inspector--visible');
+  };
+
+  $('widgetInspector').onclick = (e) => {
+    if (e.target === $('widgetInspector')) {
+      $('widgetInspector').classList.remove('widget-inspector--visible');
+    }
+  };
+
+  // =============================================================================
+  // WIDGET HEADER RIGHT-CLICK CONTEXT
+  // =============================================================================
+  document.addEventListener('contextmenu', (e) => {
+    const header = e.target.closest('.w-header');
+    if (!header) return;
+
+    const shell = header.closest('.w-shell');
+    if (!shell) return;
+
+    e.preventDefault();
+
+    // Find which widget this is
+    const widgetLabel = header.querySelector('.w-text--label');
+    const widgetName = widgetLabel ? widgetLabel.textContent.trim() : 'Unknown';
+    const widgetEntry = Object.values(WIDGET_REGISTRY).find(w => w.name === widgetName);
+
+    if (!widgetEntry) return;
+
+    // Get scoring data
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const category = currentFilter || 'all';
+    const profile = profilePins(items);
+    const fit = scoreWidgetFit(widgetEntry, profile, category);
+    const scoreClass = fit.score >= 0.7 ? '#4a9' : fit.score >= 0.4 ? '#f0c674' : '#c66';
+
+    const ctx = $('widgetContext');
+    ctx.innerHTML = `
+      <div class="widget-context__title">${esc(widgetName)}</div>
+      <div class="widget-context__row"><span class="widget-context__label">Score</span><span class="widget-context__value" style="color:${scoreClass}">${(fit.score * 100).toFixed(0)}%</span></div>
+      <div class="widget-context__row"><span class="widget-context__label">Zone</span><span class="widget-context__value">${widgetEntry.zone}</span></div>
+      <div class="widget-context__row"><span class="widget-context__label">Template</span><span class="widget-context__value">${widgetEntry.template?.name || '-'}</span></div>
+      <div class="widget-context__row"><span class="widget-context__label">Items</span><span class="widget-context__value">${profile.itemCount} (min: ${widgetEntry.criteria.minItems || 1})</span></div>
+      <div style="margin-top:8px;border-top:1px solid var(--subtle);padding-top:6px;font-size:10px;color:var(--muted)">
+        ${fit.rationale.map(r => `• ${esc(r)}`).join('<br>')}
+      </div>
+      <div style="margin-top:6px;font-size:9px;color:var(--muted)">
+        Signals: ${Object.entries(fit.signals).map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`).join(', ')}
+      </div>
+    `;
+
+    // Position near click
+    const x = Math.min(e.clientX, window.innerWidth - 380);
+    const y = Math.min(e.clientY, window.innerHeight - 300);
+    ctx.style.left = x + 'px';
+    ctx.style.top = y + 'px';
+    ctx.classList.add('widget-context--visible');
+  });
+
+  // Dismiss context menu on click anywhere
+  document.addEventListener('click', () => {
+    $('widgetContext').classList.remove('widget-context--visible');
+  });
 
   $('devEnrich').onclick = async () => {
     const links = getAllLinks();
