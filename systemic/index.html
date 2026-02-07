@@ -25,6 +25,19 @@
         <span class="tagline">Design System Generator</span>
       </div>
       <div class="header-actions">
+        <div class="dev-menu" id="dev-menu">
+          <button class="btn btn--ghost dev-menu__trigger" id="dev-menu-trigger" title="Dev tools">
+            <span class="icon">/</span>
+          </button>
+          <div class="dev-menu__dropdown" id="dev-menu-dropdown">
+            <button class="dev-menu__item" id="dev-cleanup-duplicates">Clean up duplicates</button>
+            <button class="dev-menu__item" id="dev-copy-debug-log">Copy debug log</button>
+            <button class="dev-menu__item" id="dev-download-debug-log">Download debug log</button>
+            <button class="dev-menu__item" id="dev-clear-debug-log">Clear debug log</button>
+            <div class="dev-menu__divider"></div>
+            <button class="dev-menu__item dev-menu__item--danger" id="dev-clear-all">Clear all data</button>
+          </div>
+        </div>
         <button class="btn btn--ghost" id="theme-toggle">
           <span class="icon">*</span>
         </button>

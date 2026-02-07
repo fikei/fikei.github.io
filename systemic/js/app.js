@@ -288,8 +288,9 @@ class SystemicApp {
       // Transform manifest into Systemic design system format
       const designSystem = this.transformManifestToDesignSystem(manifest, registry);
 
-      // Save it
-      this.saveDesignSystem(designSystem, false);
+      // Save it (update if already exists)
+      const isUpdate = this.designSystems.some(ds => ds.id === designSystem.id);
+      this.saveDesignSystem(designSystem, isUpdate);
 
       // Load into viewer and QA
       this.viewer.load(designSystem);
@@ -545,9 +546,12 @@ class SystemicApp {
     // Cancel audit
     this.cancelAuditBtn?.addEventListener('click', () => this.cancelAudit());
 
-    // Debug log export buttons
+    // Debug log export buttons (audit progress view)
     DOMUtils.$('#copy-debug-log')?.addEventListener('click', () => this.copyDebugLogs());
     DOMUtils.$('#download-debug-log')?.addEventListener('click', () => this.downloadDebugLogs());
+
+    // Dev menu
+    this.initDevMenu();
 
     // Auth type change
     this.authTypeSelect?.addEventListener('change', () => {
@@ -559,6 +563,59 @@ class SystemicApp {
 
     // Theme toggle
     this.themeToggle?.addEventListener('click', () => this.toggleTheme());
+  }
+
+  /**
+   * Initialize dev menu toggle and actions
+   */
+  initDevMenu() {
+    const trigger = DOMUtils.$('#dev-menu-trigger');
+    const dropdown = DOMUtils.$('#dev-menu-dropdown');
+    if (!trigger || !dropdown) return;
+
+    // Toggle dropdown
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+
+    // Close on outside click
+    document.addEventListener('click', () => dropdown.classList.remove('open'));
+    dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+    // Actions
+    DOMUtils.$('#dev-cleanup-duplicates')?.addEventListener('click', () => {
+      this.cleanupDuplicates();
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-copy-debug-log')?.addEventListener('click', () => {
+      this.copyDebugLogs();
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-download-debug-log')?.addEventListener('click', () => {
+      this.downloadDebugLogs();
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-clear-debug-log')?.addEventListener('click', () => {
+      this.clearDebugLogs();
+      this.showToast('Debug log cleared');
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-clear-all')?.addEventListener('click', () => {
+      if (confirm('Delete ALL design systems and debug data? This cannot be undone.')) {
+        this.designSystems.forEach(ds => localStorage.removeItem(`systemic-ds-${ds.id}`));
+        this.designSystems = [];
+        localStorage.removeItem('systemic-design-systems');
+        this.clearDebugLogs();
+        this.renderSystemsList();
+        this.showToast('All data cleared');
+      }
+      dropdown.classList.remove('open');
+    });
   }
 
   /**
@@ -1193,6 +1250,7 @@ class SystemicApp {
     } catch (error) {
       console.warn('Failed to save to localStorage:', error);
       this.debugLog('SAVE', 'ERROR saving to localStorage:', error);
+      this.showToast('Storage full — design system data could not be saved. Try deleting unused systems.', 'error');
     }
   }
 
@@ -1319,8 +1377,8 @@ class SystemicApp {
       </div>
     `).join('');
 
-    // Bind click events for opening design system
-    DOMUtils.$$('.system-card', this.systemsGrid).forEach(card => {
+    // Bind click events for opening design system (only cards with data-id)
+    DOMUtils.$$('.system-card[data-id]', this.systemsGrid).forEach(card => {
       card.addEventListener('click', (e) => {
         // Don't open if clicking delete button
         if (e.target.closest('.system-card-delete')) return;
@@ -1332,7 +1390,7 @@ class SystemicApp {
           this.variantAudit?.registerFromDesignSystem(fullSystem);
           window.location.hash = 'docs/color';
         } else {
-          this.showToast('Failed to load design system', 'error');
+          this.showToast('Could not load design system data — it may need to be re-scanned', 'error');
         }
       });
     });
