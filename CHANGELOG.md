@@ -4,6 +4,20 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-07] - Branch Reconciliation: Widget Phase 2.5a/2.5b + Documentation Merge
+
+### Added
+- **`docs/execution/project-plan/phase-3-ai-intelligence.md`** — Merged Widget Phase 2.5a (Design System Transition) and Phase 2.5b (Rules-Based Widget Catalog with 40 widgets) from `claude/ai-widget-phase-2-Lgjfd` branch. Phase 3 now contains the full widget ecosystem roadmap alongside Epic 3.5 Image Intelligence System.
+- **`docs/execution/project-plan/backlog.md`** — Added "Action Widget Templates" section (9 feedback-loop templates) from widget branch.
+
+### Changed
+- **`docs/execution/project-plan/index.md`** — Reconciled statistics from both branches: Phase 3 now ~113 complete / ~253 pending (up from 46/91), Phase 6 corrected to 1/26, Phase 7 corrected to 0/17 (after Epic 7.2 superseded). Added Widget Phase 2.5a milestone, Phase 2 marked COMPLETE, Phase 2.5a/2.5b added to widget ecosystem roadmap. Removed SERP API from "Needs Decision" (resolved). Total: 155 complete, 688 pending.
+- **Widget Phase 2 Template Selection Engine** — Updated template names to match implementation: `grid-split`, `hero-card`, `list`, `text-block` (was `product-grid`, `style-card`, `simple-list`, `text-summary`).
+- **`CHANGELOG.md`** — Merged changelog entries from widget branch (Server-Driven Widget Discovery, Widget Templates).
+- **`notion-structure.json`** — Added entries for widget branch PRDs and UX research docs.
+
+---
+
 ## [2026-02-07] - Phase 9: Restructure Around Access Tiers + CLAUDE.md Update
 
 ### Changed
@@ -23,6 +37,46 @@ All notable changes to ctrl.rodeo will be documented in this file.
 - **Phase 7 Epic 7.2 (Import/Export)** — Marked as superseded. All 6 tasks absorbed into Phase 9 Epics 9.1 and 9.2.
 - **`docs/execution/project-plan/index.md`** — Added Phase 9, updated Phase 7 pending count (50 → 44), new total 473 pending.
 - **`notion-structure.json`** — Added Phase 9 entry.
+
+---
+
+## [2026-02-06] - Server-Driven Widget Discovery
+
+### Added
+- **`discoverWidgetsFromServer(category, items)`** — Frontend calls server discovery endpoint before rendering widgets
+  - Server eligibility engine is now the source of truth for which widgets appear
+  - Graceful fallback: if server is unreachable, falls back to local `WIDGET_REGISTRY`
+  - Merges server metadata (zone, priority, eligibility) with local widget configs
+  - Server-only widgets auto-build temporary local entries from discovery response (prompt + template)
+- **Discovery endpoint enhanced** — Now returns `promptTemplate` and `constraints` per widget
+- **Loading state uses dynamic widget name** — No longer hard-coded "Style Summary"
+- **Action templates added to backlog** — 9 feedback-loop templates tracked for future implementation
+
+---
+
+## [2026-02-06] - Widget Templates: spectrum, stat-row, quick-add
+
+### Added
+- **`spectrum` template** — Labeled horizontal scales showing dimensional positioning (e.g. Budget <--*--> Luxury)
+  - Widget config: `price-radar` — positions user on budget/style/brand dimensions
+
+- **`stat-row` template** — Row of 2-4 key collection metrics with large values
+  - Widget config: `collection-stats` — brands count, style count, avg price
+
+- **`quick-add` action template** — Single high-confidence suggestion with "Add to board" button
+  - First action template with feedback loop: Add → item in board → future widgets exclude gap
+  - `handleQuickAdd()` — calls `addLink()` to mutate board state, tracks event, updates UI
+  - Widget config: `gap-filler` — AI identifies biggest collection gap, suggests one product
+
+- **3 new server-side widget configs**
+  - `config/widgets/price-radar.ts` — spectrum template, categories: wear/tech/home/all
+  - `config/widgets/collection-stats.ts` — stat-row template, all 12 categories
+  - `config/widgets/gap-filler.ts` — quick-add template, categories: wear/tech/home/fitness
+
+### Changed
+- `WIDGET_TEMPLATES` now has 7 templates (was 4)
+- `WIDGET_REGISTRY` now has 5 widgets (was 2)
+- Server registry imports 5 widget configs (was 2)
 
 ---
 
@@ -117,9 +171,9 @@ All notable changes to ctrl.rodeo will be documented in this file.
   - Frontend no longer hard-codes 'wear' — works with any category that has widgets
 
 - **Template Selection Engine**
-  - `WIDGET_TEMPLATES` registry with 4 templates: `product-grid`, `style-card`, `simple-list`, `text-summary`
+  - `WIDGET_TEMPLATES` registry with 4 templates: `grid-split`, `hero-card`, `list`, `text-block`
   - `renderWidgetWithTemplate(widget, items, aiResult)` - Selects template via widget config
-  - Fallback chain: primary template → fallback template → `simple-list`
+  - Fallback chain: primary template → fallback template → `list`
   - Each template has `name`, `version`, and `render()` function
   - Removed all hard-coded `if (widget.id === 'complete-the-look')` rendering branches
 

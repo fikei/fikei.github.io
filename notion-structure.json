@@ -66,6 +66,18 @@
               "source": "human"
             },
             {
+              "title": "AI Widgets",
+              "icon": "\ud83e\udd16",
+              "file": "docs/strategy/prds/ai-widgets.md",
+              "source": "ai"
+            },
+            {
+              "title": "Design System Validation Pipeline",
+              "icon": "\u2705",
+              "file": "docs/strategy/prds/design-system-validation-pipeline.md",
+              "source": "ai"
+            },
+            {
               "title": "NotionSync Platform",
               "icon": "\ud83d\udd04",
               "file": "docs/strategy/prds/notion-sync-platform.md",
@@ -199,6 +211,31 @@
               "title": "Admin Panel",
               "icon": "\ud83d\udee0\ufe0f",
               "file": "docs/ux/admin-panel.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Research",
+          "icon": "\ud83d\udd0d",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Widget Catalog",
+              "icon": "\ud83d\udcda",
+              "file": "docs/ux/research/widget-catalog.md",
+              "source": "ai"
+            },
+            {
+              "title": "Widget Design Components",
+              "icon": "\ud83e\udde9",
+              "file": "docs/ux/research/widget-design-components.md",
+              "source": "ai"
+            },
+            {
+              "title": "Widget Template Patterns",
+              "icon": "\ud83d\udcc4",
+              "file": "docs/ux/research/widget-template-patterns.md",
               "source": "ai"
             }
           ]
@@ -454,7 +491,21 @@
         {
           "title": "Systemic",
           "icon": "\ud83d\udd04",
-          "source": "human"
+          "source": "human",
+          "children": [
+            {
+              "title": "Variant Audit PRD",
+              "icon": "\ud83d\udccb",
+              "file": "docs/playground/systemic/prd-variant-audit.md",
+              "source": "ai"
+            },
+            {
+              "title": "Variant Audit Project Plan",
+              "icon": "\ud83d\udcca",
+              "file": "docs/playground/systemic/project-plan-variant-audit.md",
+              "source": "ai"
+            }
+          ]
         }
       ]
     },
