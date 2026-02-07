@@ -16,80 +16,33 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
+  <!-- CTRL Design System -->
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+
   <style>
 /* ============================================
-   Events Page — ctrl.rodeo
+   Events Page — page-specific styles only
+   (tokens.css + components.css handle the rest)
    ============================================ */
 
-:root {
-  --font-primary: "Space Grotesk", sans-serif;
-  --font-mono: "Space Grotesk", sans-serif;
-  --font-size-xs: 10px;
-  --font-size-sm: 10px;
-  --font-size-base: 10px;
-  --font-size-lg: 12px;
-  --font-size-xl: 14px;
-  --font-size-2xl: 18px;
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.6;
-
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-12: 48px;
-  --space-16: 64px;
-
-  --bg: #000;
-  --fg: #fff;
-  --surface: #111;
-  --border: #fff;
-  --muted: #888;
-  --subtle: #333;
-  --accent: #fff;
-}
-
-:root.light {
-  --bg: #fff;
-  --fg: #000;
-  --surface: #fafafa;
-  --border: #000;
-  --muted: #666;
-  --subtle: #e0e0e0;
-  --accent: #000;
-}
-
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html { font-size: 16px; }
-
 body {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
-  color: var(--fg);
-  background: var(--bg);
-  transition: background 0.3s ease, color 0.3s ease;
   min-height: 100vh;
+  transition: background var(--duration-slower) var(--ease-default),
+              color var(--duration-slower) var(--ease-default);
 }
 
 /* Header */
 .header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--z-sticky);
   background: var(--bg);
   padding: var(--space-4);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background 0.3s ease;
+  transition: background var(--duration-slower) var(--ease-default);
 }
 
 .header__inner {
@@ -109,52 +62,27 @@ body {
 
 .header__left a {
   text-decoration: none;
-  color: var(--muted);
+  color: var(--fg-muted);
   font-family: var(--font-primary);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
-  transition: color 0.2s;
+  transition: color var(--duration-normal) var(--ease-default);
 }
 
 .header__left a:hover { color: var(--fg); }
 
 .header__separator {
-  color: var(--subtle);
-  font-size: 10px;
+  color: var(--border-subtle);
+  font-size: var(--text-xs);
 }
 
 .site-title {
   font-family: var(--font-primary);
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: var(--tracking-widest);
   text-transform: uppercase;
-}
-
-.theme-toggle {
-  width: 32px;
-  height: 18px;
-  background: transparent;
-  border: 1px solid var(--fg);
-  cursor: pointer;
-  padding: 2px;
-  transition: background 0.2s ease;
-  flex-shrink: 0;
-}
-
-.theme-toggle__knob {
-  width: 12px;
-  height: 12px;
-  background: var(--fg);
-  transition: transform 0.2s ease;
-  transform: translateX(0);
-}
-
-:root.light .theme-toggle { background: var(--fg); }
-:root.light .theme-toggle__knob {
-  background: var(--bg);
-  transform: translateX(14px);
 }
 
 /* Container */
@@ -166,15 +94,15 @@ body {
 
 /* Page description */
 .page-description {
-  font-size: 10px;
-  color: var(--muted);
-  line-height: 1.8;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  line-height: var(--leading-relaxed);
   max-width: 480px;
   margin-bottom: var(--space-8);
   padding-top: var(--space-6);
 }
 
-/* Source Config */
+/* Sources bar */
 .sources-bar {
   display: flex;
   align-items: center;
@@ -184,64 +112,33 @@ body {
 }
 
 .sources-bar__label {
-  font-size: 10px;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-wider);
   margin-right: var(--space-1);
 }
 
-.source-chip {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 3px 8px;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.source-chip:hover {
-  border-color: var(--fg);
-  color: var(--fg);
-}
-
-.source-chip.active {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--bg);
-}
-
 .source-chip__count {
-  margin-left: 4px;
+  margin-left: var(--space-1);
   opacity: 0.6;
 }
 
-/* Add Source Button */
-.add-source-btn {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 3px 8px;
-  border: 1px dashed var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: all 0.15s ease;
+/* Add source: dashed border variant */
+.btn--dashed {
+  border-style: dashed;
+  border-color: var(--border-subtle);
+  color: var(--fg-muted);
 }
 
-.add-source-btn:hover {
-  border-color: var(--fg);
+.btn--dashed:hover {
+  border-color: var(--border);
   color: var(--fg);
+  background: transparent;
 }
 
-/* Filters */
-.filters {
+/* Events filter bar */
+.events-filters {
   display: flex;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
@@ -249,87 +146,17 @@ body {
   align-items: center;
 }
 
-.filter-input {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 6px 10px;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--fg);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: border-color 0.15s ease;
-  min-width: 0;
-}
-
-.filter-input::placeholder {
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.filter-input:focus {
-  outline: none;
-  border-color: var(--fg);
-}
-
-.filter-input--search { width: 200px; }
-.filter-input--date { width: 130px; }
-
-.filter-select {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 6px 24px 6px 10px;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--fg);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 5L0 0h8z' fill='%23888'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  min-width: 120px;
-}
-
-:root.light .filter-select {
-  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 5L0 0h8z' fill='%23666'/%3E%3C/svg%3E");
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: var(--fg);
-}
-
-.filter-select option {
-  background: var(--bg);
-  color: var(--fg);
-}
-
-.filter-clear {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: color 0.15s ease;
-}
-
-.filter-clear:hover { color: var(--fg); }
+.events-filters .input { width: auto; }
+.events-filters .input--search { width: 200px; }
+.events-filters .input--date { width: 130px; }
+.events-filters .select { min-width: 120px; }
 
 /* Stats bar */
 .stats-bar {
-  font-size: 10px;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-wider);
   margin-bottom: var(--space-3);
   display: flex;
   justify-content: space-between;
@@ -339,7 +166,7 @@ body {
 /* Table */
 .table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--subtle);
+  border: var(--border-thin) solid var(--border-subtle);
   margin-bottom: var(--space-8);
 }
 
@@ -347,21 +174,21 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-primary);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .events-table th {
   text-align: left;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--subtle);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
-  transition: color 0.15s ease;
+  transition: color var(--duration-normal) var(--ease-default);
   position: sticky;
   top: 0;
   background: var(--bg);
@@ -370,8 +197,8 @@ body {
 .events-table th:hover { color: var(--fg); }
 
 .events-table th .sort-arrow {
-  margin-left: 4px;
-  font-size: 8px;
+  margin-left: var(--space-1);
+  font-size: var(--text-2xs);
   opacity: 0.4;
 }
 
@@ -379,18 +206,18 @@ body {
 
 .events-table td {
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--subtle);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
   color: var(--fg);
   vertical-align: top;
-  line-height: 1.6;
+  line-height: var(--leading-normal);
 }
 
 .events-table tbody tr {
-  transition: background 0.1s ease;
+  transition: background var(--duration-fast) var(--ease-default);
 }
 
 .events-table tbody tr:hover {
-  background: var(--surface);
+  background: var(--bg-surface);
 }
 
 .events-table .col-date { width: 90px; white-space: nowrap; }
@@ -403,185 +230,73 @@ body {
 .event-link {
   color: var(--fg);
   text-decoration: none;
-  border-bottom: 1px solid var(--subtle);
-  transition: border-color 0.15s ease;
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  transition: border-color var(--duration-normal) var(--ease-default);
 }
 
 .event-link:hover { border-color: var(--fg); }
 
+/* Source tag in table (non-interactive token) */
 .source-tag {
-  font-size: 10px;
-  padding: 1px 6px;
-  border: 1px solid var(--subtle);
+  display: inline-block;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-thin) solid var(--border-subtle);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
   white-space: nowrap;
 }
 
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: var(--space-12) var(--space-4);
-  color: var(--muted);
-}
-
-.empty-state__title {
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: var(--space-2);
-}
-
-.empty-state__desc {
-  font-size: 10px;
-  line-height: 1.8;
-}
-
-/* Add Source Modal */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.8);
-  z-index: 200;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-overlay.open { display: flex; }
-
-.modal {
-  background: var(--bg);
-  border: 1px solid var(--subtle);
-  padding: var(--space-6);
-  width: 360px;
-  max-width: 90vw;
-}
-
-.modal__title {
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: var(--space-4);
-}
-
+/* Modal field layout */
 .modal__field {
   margin-bottom: var(--space-3);
 }
 
-.modal__label {
-  display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin-bottom: var(--space-1);
-}
-
-.modal__input {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 6px 10px;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--fg);
-  width: 100%;
-  letter-spacing: 0.05em;
-}
-
-.modal__input:focus {
-  outline: none;
-  border-color: var(--fg);
-}
-
-.modal__actions {
-  display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
-.modal__btn {
-  font-family: var(--font-primary);
-  font-size: 10px;
-  padding: 6px 14px;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  transition: all 0.15s ease;
-}
-
-.modal__btn:hover {
-  border-color: var(--fg);
-}
-
-.modal__btn--primary {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--bg);
-}
-
-.modal__btn--primary:hover {
-  opacity: 0.8;
-}
-
 .modal__hint {
-  font-size: 10px;
-  color: var(--muted);
-  line-height: 1.6;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  line-height: var(--leading-normal);
   margin-top: var(--space-2);
 }
 
 /* Loading state */
 .loading-indicator {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
   padding: var(--space-8);
-  color: var(--muted);
+  color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 10px;
-}
-
-.loading-indicator::after {
-  content: '';
-  animation: dots 1.5s steps(3, end) infinite;
-}
-
-@keyframes dots {
-  0% { content: ''; }
-  33% { content: '.'; }
-  66% { content: '..'; }
-  100% { content: '...'; }
+  letter-spacing: var(--tracking-wider);
+  font-size: var(--text-xs);
 }
 
 /* Footer */
 .footer {
   padding: var(--space-6) 0 var(--space-16);
-  border-top: 1px solid var(--subtle);
+  border-top: var(--border-thin) solid var(--border-subtle);
 }
 
 .footer-text {
-  font-size: 10px;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-wider);
 }
 
 /* Responsive */
 @media (max-width: 600px) {
-  .filters {
+  .events-filters {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .filter-input--search,
-  .filter-input--date,
-  .filter-select {
+  .events-filters .input--search,
+  .events-filters .input--date,
+  .events-filters .select {
     width: 100%;
   }
 
@@ -599,8 +314,8 @@ body {
         <span class="header__separator">/</span>
         <span class="site-title">Events</span>
       </div>
-      <button class="theme-toggle" aria-label="Toggle theme">
-        <div class="theme-toggle__knob"></div>
+      <button class="toggle" id="themeToggle" aria-label="Toggle theme">
+        <div class="toggle__knob"></div>
       </button>
     </div>
   </header>
@@ -612,21 +327,21 @@ body {
     <div class="sources-bar">
       <span class="sources-bar__label">Sources:</span>
       <div id="sourceChips"></div>
-      <button class="add-source-btn" id="addSourceBtn">+ Add Source</button>
+      <button class="btn btn--sm btn--dashed" id="addSourceBtn">+ Add Source</button>
     </div>
 
     <!-- Filters -->
-    <div class="filters">
-      <input type="text" class="filter-input filter-input--search" id="filterSearch" placeholder="Search events...">
-      <select class="filter-select" id="filterCity">
+    <div class="events-filters">
+      <input type="text" class="input input--search" id="filterSearch" placeholder="Search events..." autocomplete="off">
+      <select class="input select" id="filterCity">
         <option value="">All Cities</option>
       </select>
-      <select class="filter-select" id="filterSource">
+      <select class="input select" id="filterSource">
         <option value="">All Sources</option>
       </select>
-      <input type="date" class="filter-input filter-input--date" id="filterDateFrom" title="From date">
-      <input type="date" class="filter-input filter-input--date" id="filterDateTo" title="To date">
-      <button class="filter-clear" id="filterClear">Clear</button>
+      <input type="date" class="input input--date" id="filterDateFrom" title="From date">
+      <input type="date" class="input input--date" id="filterDateTo" title="To date">
+      <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
     </div>
 
     <!-- Stats -->
@@ -655,13 +370,16 @@ body {
 
     <!-- Empty state -->
     <div class="empty-state" id="emptyState" style="display: none;">
-      <div class="empty-state__title">No events found</div>
-      <div class="empty-state__desc">Try adjusting your filters or adding a new source.</div>
+      <div class="empty-state__box">
+        <p class="empty-state__text">No events match your filters</p>
+        <button class="empty-state__clear" id="emptyClear">Clear Filters</button>
+      </div>
     </div>
 
     <!-- Loading -->
     <div class="loading-indicator" id="loadingIndicator" style="display: none;">
-      Fetching events
+      <div class="spinner"></div>
+      <span>Fetching events</span>
     </div>
 
     <!-- Footer -->
@@ -671,31 +389,31 @@ body {
   </div>
 
   <!-- Add Source Modal -->
-  <div class="modal-overlay" id="addSourceModal">
-    <div class="modal">
-      <div class="modal__title">Add Event Source</div>
+  <div class="modal" id="addSourceModal">
+    <div class="modal__content">
+      <h2 class="modal__title">Add Event Source</h2>
       <div class="modal__field">
-        <label class="modal__label">Source Type</label>
-        <select class="modal__input" id="sourceType">
+        <label class="account-label">Source Type</label>
+        <select class="input select" id="sourceType">
           <option value="ical">iCal / .ics URL</option>
           <option value="json">JSON Feed URL</option>
           <option value="rss">RSS / Atom Feed</option>
         </select>
       </div>
       <div class="modal__field">
-        <label class="modal__label">Name</label>
-        <input type="text" class="modal__input" id="sourceName" placeholder="e.g. Community Calendar">
+        <label class="account-label">Name</label>
+        <input type="text" class="input" id="sourceName" placeholder="e.g. Community Calendar">
       </div>
       <div class="modal__field">
-        <label class="modal__label">URL</label>
-        <input type="text" class="modal__input" id="sourceUrl" placeholder="https://...">
+        <label class="account-label">URL</label>
+        <input type="text" class="input" id="sourceUrl" placeholder="https://...">
       </div>
       <div class="modal__hint">
         Supports iCal (.ics), JSON feeds, and RSS/Atom. Sources are saved in your browser.
       </div>
       <div class="modal__actions">
-        <button class="modal__btn" id="modalCancel">Cancel</button>
-        <button class="modal__btn modal__btn--primary" id="modalAdd">Add Source</button>
+        <button class="btn" id="modalCancel">Cancel</button>
+        <button class="btn btn--filled" id="modalAdd">Add Source</button>
       </div>
     </div>
   </div>
@@ -775,14 +493,12 @@ body {
   }
 
   // --- CORS Proxy ---
-  // For client-side fetching of external feeds on a static site, we use a
-  // public CORS proxy. Users can self-host one for reliability.
   const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
   // --- Fetch Sources ---
   async function fetchAllSources() {
     const el = document.getElementById('loadingIndicator');
-    el.style.display = 'block';
+    el.style.display = 'flex';
     state.events = [];
 
     const promises = state.sources.filter(s => s.enabled).map(async (source) => {
@@ -837,8 +553,6 @@ body {
       const summary = get('SUMMARY');
       const location = get('LOCATION');
       const url = get('URL') || '';
-
-      // Parse location into venue, address, city
       const loc = parseLocationString(location);
 
       events.push({
@@ -855,7 +569,6 @@ body {
   }
 
   function parseIcalDate(str) {
-    // Handle YYYYMMDD and YYYYMMDDTHHmmssZ formats
     const clean = str.replace(/[^0-9T]/g, '');
     if (clean.length >= 8) {
       const y = clean.substring(0, 4);
@@ -895,11 +608,8 @@ body {
     const xml = parser.parseFromString(text, 'text/xml');
 
     const events = [];
-
-    // Try RSS items
     let items = xml.querySelectorAll('item');
     if (items.length === 0) {
-      // Try Atom entries
       items = xml.querySelectorAll('entry');
     }
 
@@ -913,8 +623,6 @@ body {
       const link = getText('link') || (item.querySelector('link')?.getAttribute('href') || '');
       const pubDate = getText('pubDate') || getText('published') || getText('updated') || '';
       const description = getText('description') || getText('content') || getText('summary') || '';
-
-      // Try to extract location from description
       const loc = extractLocationFromHtml(description);
 
       let date = '';
@@ -942,8 +650,6 @@ body {
   function parseLocationString(str) {
     if (!str) return { venue: '', address: '', city: '' };
 
-    // Common patterns: "Venue Name, 123 Street, City, State"
-    // or "123 Street, City, State ZIP"
     const parts = str.split(',').map(s => s.trim());
 
     if (parts.length >= 3) {
@@ -953,7 +659,6 @@ body {
         city: parts[2].replace(/\s+\d{5}(-\d{4})?$/, '').trim(),
       };
     } else if (parts.length === 2) {
-      // Check if first part looks like an address (starts with number)
       if (/^\d/.test(parts[0])) {
         return { venue: '', address: parts[0], city: parts[1] };
       }
@@ -964,15 +669,11 @@ body {
   }
 
   function extractLocationFromHtml(html) {
-    // Strip HTML tags and try to find location patterns
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-
-    // Look for common patterns like "Location: ..." or "Where: ..."
     const locMatch = text.match(/(?:location|where|venue|place|address)\s*:\s*([^.]+)/i);
     if (locMatch) {
       return parseLocationString(locMatch[1].trim());
     }
-
     return { venue: '', address: '', city: '' };
   }
 
@@ -1012,14 +713,12 @@ body {
     // Stats
     const statsText = document.getElementById('statsText');
     const statsFiltered = document.getElementById('statsFiltered');
-    statsText.textContent = `${state.events.length} events from ${state.sources.filter(s => s.enabled).length} source${state.sources.filter(s => s.enabled).length !== 1 ? 's' : ''}`;
-    if (sorted.length !== state.events.length) {
-      statsFiltered.textContent = `Showing ${sorted.length}`;
-    } else {
-      statsFiltered.textContent = '';
-    }
+    const enabledCount = state.sources.filter(s => s.enabled).length;
+    statsText.textContent = `${state.events.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
+    statsFiltered.textContent = sorted.length !== state.events.length
+      ? `Showing ${sorted.length}`
+      : '';
 
-    // Source chips
     renderSourceChips();
 
     // Sort indicators
@@ -1039,12 +738,12 @@ body {
     const container = document.getElementById('sourceChips');
     container.innerHTML = state.sources.map(s => {
       const count = state.events.filter(e => e.source === s.id).length;
-      return `<button class="source-chip ${s.enabled ? 'active' : ''}" data-source-id="${escHtml(s.id)}">
+      return `<button class="token ${s.enabled ? 'token--active' : ''}" data-source-id="${escHtml(s.id)}">
         ${escHtml(s.name)}<span class="source-chip__count">${count}</span>
       </button>`;
     }).join('');
 
-    container.querySelectorAll('.source-chip').forEach(chip => {
+    container.querySelectorAll('.token').forEach(chip => {
       chip.addEventListener('click', () => {
         const id = chip.dataset.sourceId;
         const source = state.sources.find(s => s.id === id);
@@ -1058,7 +757,7 @@ body {
   }
 
   function formatDate(dateStr) {
-    if (!dateStr) return '—';
+    if (!dateStr) return '\u2014';
     try {
       const d = new Date(dateStr + 'T00:00:00');
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -1094,15 +793,23 @@ body {
     });
   }
 
+  function clearAllFilters() {
+    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '' };
+    document.getElementById('filterSearch').value = '';
+    document.getElementById('filterCity').value = '';
+    document.getElementById('filterSource').value = '';
+    document.getElementById('filterDateFrom').value = '';
+    document.getElementById('filterDateTo').value = '';
+    render();
+  }
+
   function updateFilters() {
-    // Populate city dropdown
     const cities = [...new Set(state.events.map(e => e.city).filter(Boolean))].sort();
     const citySelect = document.getElementById('filterCity');
     const currentCity = citySelect.value;
     citySelect.innerHTML = '<option value="">All Cities</option>' +
       cities.map(c => `<option value="${escHtml(c)}" ${c === currentCity ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
 
-    // Populate source dropdown
     const sourceSelect = document.getElementById('filterSource');
     const currentSource = sourceSelect.value;
     sourceSelect.innerHTML = '<option value="">All Sources</option>' +
@@ -1124,26 +831,24 @@ body {
     });
   }
 
-  // --- Events ---
+  // --- Event Binding ---
   function bindEvents() {
-    // Theme toggle
-    const toggle = document.querySelector('.theme-toggle');
+    // Theme toggle — uses DS .toggle / .toggle--active
+    const toggle = document.getElementById('themeToggle');
     const root = document.documentElement;
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') root.classList.add('light');
+    if (savedTheme === 'light') {
+      root.classList.add('light');
+      toggle.classList.add('toggle--active');
+    }
     toggle.addEventListener('click', () => {
       root.classList.toggle('light');
+      toggle.classList.toggle('toggle--active');
       localStorage.setItem('theme', root.classList.contains('light') ? 'light' : 'dark');
     });
 
     // Filters
     const filterSearch = document.getElementById('filterSearch');
-    const filterCity = document.getElementById('filterCity');
-    const filterSource = document.getElementById('filterSource');
-    const filterDateFrom = document.getElementById('filterDateFrom');
-    const filterDateTo = document.getElementById('filterDateTo');
-    const filterClear = document.getElementById('filterClear');
-
     let debounceTimer;
     filterSearch.addEventListener('input', () => {
       clearTimeout(debounceTimer);
@@ -1153,35 +858,28 @@ body {
       }, 150);
     });
 
-    filterCity.addEventListener('change', () => {
-      state.filters.city = filterCity.value;
+    document.getElementById('filterCity').addEventListener('change', (e) => {
+      state.filters.city = e.target.value;
       render();
     });
 
-    filterSource.addEventListener('change', () => {
-      state.filters.source = filterSource.value;
+    document.getElementById('filterSource').addEventListener('change', (e) => {
+      state.filters.source = e.target.value;
       render();
     });
 
-    filterDateFrom.addEventListener('change', () => {
-      state.filters.dateFrom = filterDateFrom.value;
+    document.getElementById('filterDateFrom').addEventListener('change', (e) => {
+      state.filters.dateFrom = e.target.value;
       render();
     });
 
-    filterDateTo.addEventListener('change', () => {
-      state.filters.dateTo = filterDateTo.value;
+    document.getElementById('filterDateTo').addEventListener('change', (e) => {
+      state.filters.dateTo = e.target.value;
       render();
     });
 
-    filterClear.addEventListener('click', () => {
-      state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '' };
-      filterSearch.value = '';
-      filterCity.value = '';
-      filterSource.value = '';
-      filterDateFrom.value = '';
-      filterDateTo.value = '';
-      render();
-    });
+    document.getElementById('filterClear').addEventListener('click', clearAllFilters);
+    document.getElementById('emptyClear').addEventListener('click', clearAllFilters);
 
     // Column sorting
     document.querySelectorAll('.events-table th[data-sort]').forEach(th => {
@@ -1197,21 +895,21 @@ body {
       });
     });
 
-    // Add Source modal
+    // Add Source modal — uses DS .modal / .modal--visible
     const modal = document.getElementById('addSourceModal');
     document.getElementById('addSourceBtn').addEventListener('click', () => {
-      modal.classList.add('open');
+      modal.classList.add('modal--visible');
       document.getElementById('sourceName').value = '';
       document.getElementById('sourceUrl').value = '';
       document.getElementById('sourceName').focus();
     });
 
     document.getElementById('modalCancel').addEventListener('click', () => {
-      modal.classList.remove('open');
+      modal.classList.remove('modal--visible');
     });
 
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.classList.remove('open');
+      if (e.target === modal) modal.classList.remove('modal--visible');
     });
 
     document.getElementById('modalAdd').addEventListener('click', () => {
@@ -1224,14 +922,13 @@ body {
       const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       state.sources.push({ id, name, type, url, enabled: true });
       saveSources();
-      modal.classList.remove('open');
+      modal.classList.remove('modal--visible');
       fetchAllSources();
     });
 
-    // Keyboard shortcut: Escape closes modal
+    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') modal.classList.remove('open');
-      // "/" focuses search
+      if (e.key === 'Escape') modal.classList.remove('modal--visible');
       if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
         e.preventDefault();
         filterSearch.focus();
