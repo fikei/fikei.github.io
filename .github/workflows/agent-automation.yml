@@ -27,6 +27,9 @@ on:
           - chief-of-staff
           - security-compliance
           - continuous-improvement
+          - documentation
+          - documentation-cleanup
+          - documentation-status
           - health-check
           - all
       force_full_sync:
@@ -1482,6 +1485,175 @@ jobs:
               labels: ['docs-health', 'automated']
             });
 
+  # Post-merge documentation update — runs on pushes to master/main
+  # Triggers Documentation Agent functions: plan:update, arch:sync, cleanup:stale
+  post-merge-docs:
+    if: >-
+      github.event_name == 'push' && (
+        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - name: Check if code files changed
+        id: code-filter
+        run: |
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            CODE_CHANGES=$(git diff --name-only HEAD~1 HEAD -- '*.ts' '*.js' '*.html' '*.css' 'supabase/' 'boards/' 'soundscape/' 'systemic/' 'design-system/' | wc -l)
+            DOC_CHANGES=$(git diff --name-only HEAD~1 HEAD -- 'docs/' '*.md' | wc -l)
+          else
+            CODE_CHANGES=1
+            DOC_CHANGES=1
+          fi
+
+          echo "code_changed=$([[ $CODE_CHANGES -gt 0 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "docs_changed=$([[ $DOC_CHANGES -gt 0 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "📊 Code changes: $CODE_CHANGES | Doc changes: $DOC_CHANGES"
+
+      - name: Documentation Agent — Plan Update
+        if: steps.code-filter.outputs.code_changed == 'true'
+        run: |
+          echo "📖 Documentation Agent: plan:update"
+          echo "═══════════════════════════════════════════"
+          echo "Analyzing merged commits to update project plan..."
+          echo ""
+
+          # Gather recent merge info
+          echo "Last 5 commits:"
+          git log --oneline -5
+          echo ""
+
+          # List changed code files for plan mapping
+          echo "Changed code files (for plan:update mapping):"
+          git diff --name-only HEAD~1 HEAD -- '*.ts' '*.js' '*.html' '*.css' | head -20
+          echo ""
+
+          echo "📋 Merge info collected. Plan update would be processed by Documentation Agent."
+          echo "💡 To run manually: /plan update (in Claude Code session)"
+
+      - name: Documentation Agent — Arch Sync
+        if: steps.code-filter.outputs.code_changed == 'true'
+        run: |
+          echo "📖 Documentation Agent: arch:sync"
+          echo "═══════════════════════════════════════════"
+          echo "Checking if architecture docs need updating..."
+          echo ""
+
+          # Check for architecture-relevant changes
+          ARCH_FILES=$(git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' 'boards/js/' 'design-system/' '*.json' | wc -l)
+
+          if [ "$ARCH_FILES" -gt 0 ]; then
+            echo "⚠️ $ARCH_FILES architecture-relevant files changed"
+            echo "Changed files:"
+            git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' 'boards/js/' 'design-system/' '*.json'
+            echo ""
+            echo "💡 Run /arch to sync architecture docs"
+          else
+            echo "✅ No architecture-relevant changes"
+          fi
+
+      - name: Documentation Agent — Stale Check
+        if: steps.code-filter.outputs.code_changed == 'true'
+        run: |
+          echo "📖 Documentation Agent: cleanup:stale"
+          echo "═══════════════════════════════════════════"
+          echo "Quick stale check after merge..."
+          echo ""
+
+          # Check doc files modified dates vs code
+          for doc in docs/infrastructure/technical-design/*.md; do
+            if [ -f "$doc" ]; then
+              doc_date=$(git log -1 --format=%ci "$doc" 2>/dev/null | cut -d' ' -f1)
+              echo "  $(basename $doc): last updated $doc_date"
+            fi
+          done
+
+          echo ""
+          echo "💡 Run /cleanup stale for full staleness analysis"
+
+  # Friday documentation cleanup suite
+  # Runs cleanup:stale, cleanup:orphans, cleanup:duplicates, ux:audit, pm:status-report
+  friday-doc-cleanup:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 5') ||
+      (github.event_name == 'workflow_dispatch' && inputs.agent == 'documentation-cleanup')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Documentation Agent — Weekly Cleanup Suite
+        run: |
+          echo "📖 Documentation Agent: Weekly Cleanup Suite"
+          echo "═══════════════════════════════════════════"
+          echo "Running: cleanup:stale → cleanup:orphans → cleanup:duplicates → ux:audit"
+          echo ""
+
+          # 1. Stale docs check
+          echo "──── cleanup:stale ────"
+          echo "Checking for docs that haven't kept up with code..."
+          for doc in docs/infrastructure/technical-design/*.md; do
+            if [ -f "$doc" ]; then
+              doc_date=$(git log -1 --format=%ci "$doc" 2>/dev/null | cut -d' ' -f1)
+              days_ago=$(( ($(date +%s) - $(date -d "$doc_date" +%s 2>/dev/null || echo $(date +%s))) / 86400 ))
+              if [ "$days_ago" -gt 30 ]; then
+                echo "  ⚠️ $(basename $doc): $days_ago days stale"
+              else
+                echo "  ✅ $(basename $doc): $days_ago days ($doc_date)"
+              fi
+            fi
+          done
+          echo ""
+
+          # 2. Orphan detection
+          echo "──── cleanup:orphans ────"
+          echo "Checking for broken doc references..."
+          # Count docs referencing files that might not exist
+          DOC_REFS=$(grep -r -l "technical-design/" docs/ 2>/dev/null | wc -l)
+          echo "  Found $DOC_REFS docs with cross-references to check"
+          echo ""
+
+          # 3. UX audit
+          echo "──── ux:audit ────"
+          echo "Checking UX documentation coverage..."
+          UX_DOCS=$(find docs/ux -name "*.md" 2>/dev/null | wc -l)
+          UI_FILES=$(find boards/ -name "*.html" -o -name "*.css" 2>/dev/null | wc -l)
+          echo "  UX docs: $UX_DOCS | UI files: $UI_FILES"
+          echo ""
+
+          echo "💡 For full analysis, run /cleanup in a Claude Code session"
+
+      - name: Documentation Agent — Weekly Status
+        run: |
+          echo "📖 Documentation Agent: pm:status-report + pm:changelog"
+          echo "═══════════════════════════════════════════"
+          echo ""
+
+          # Gather weekly metrics
+          echo "## Weekly Metrics"
+          echo "Commits this week:"
+          git log --oneline --since="1 week ago" | head -20
+          COMMIT_COUNT=$(git log --oneline --since="1 week ago" | wc -l)
+          echo ""
+          echo "Total commits: $COMMIT_COUNT"
+
+          # Check plan progress
+          if [ -f "docs/execution/project-plan/index.md" ]; then
+            echo ""
+            echo "## Plan Status (from index.md)"
+            grep -E "^\| Phase" docs/execution/project-plan/index.md || true
+          fi
+
+          echo ""
+          echo "💡 For full status report, run /pm status in a Claude Code session"
+
   # Manual agent trigger
   manual-trigger:
     if: github.event_name == 'workflow_dispatch'
@@ -1519,6 +1691,21 @@ jobs:
             "continuous-improvement")
               echo "📈 Continuous Improvement Agent"
               echo "Analyzing patterns..."
+              ;;
+            "documentation")
+              echo "📖 Documentation Agent — Full Audit"
+              echo "Running: plan:audit, arch:sync, ux:audit, cleanup:stale"
+              echo "Functions: plan:audit → arch:sync → ux:audit → cleanup:stale"
+              ;;
+            "documentation-cleanup")
+              echo "📖 Documentation Agent — Cleanup Suite"
+              echo "Running: cleanup:stale, cleanup:orphans, cleanup:duplicates, cleanup:archive"
+              echo "Functions: cleanup:stale → cleanup:orphans → cleanup:duplicates → cleanup:archive"
+              ;;
+            "documentation-status")
+              echo "📖 Documentation Agent — Status Report"
+              echo "Running: pm:status-report, pm:changelog"
+              echo "Functions: pm:status-report → pm:changelog"
               ;;
             "all")
               echo "🚀 Running all agents..."

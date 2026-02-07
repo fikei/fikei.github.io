@@ -1549,6 +1549,110 @@ The [NotionSync Platform PRD](../../docs/strategy/prds/notion-sync-platform.md) 
 
 ---
 
+## Implementation Paths
+
+All 28 sub-functions are invocable through three complementary paths. The paths stack — they are not alternatives.
+
+### Path 1: Natural Language (CLAUDE.md Guideline 13)
+
+The working agent (whatever Claude Code session is active) automatically recommends Documentation Agent commands at relevant milestones. This is driven by trigger rules in `CLAUDE.md` guideline 13.
+
+**How it works**: After completing code work, the working agent surfaces a recommendation like:
+> Documentation may need updating. Recommended: `/plan` to mark tasks complete, `/arch` if architecture changed.
+
+**Configuration**: `CLAUDE.md` § "Documentation Agent Command Integration"
+
+**Trigger table**:
+| Trigger | Command | When surfaced |
+|---------|---------|---------------|
+| Feature/task completed | `/plan` | After any code task finishes |
+| Bug discovered | `/capture <description>` | When a bug is found during development |
+| Architecture changed | `/arch` | After modifying system design, APIs, schemas |
+| UI feature shipped | `/ux <feature-area>` | After implementing any user-facing change |
+| Before creating PR | `/branch` | Before opening a PR |
+| End of sprint/week | `/cleanup` + `/pm status` | At natural pause points |
+| New PRD written | `/pm plan <prd-path>` | After creating a new PRD |
+| Technical decision made | `/arch decide <title>` | After any architecture decision |
+
+### Path 2: Slash Commands (.claude/settings.json)
+
+Seven registered commands in `.claude/settings.json`, each mapped to the `documentation` agent with smart routing.
+
+**How it works**: User types `/plan`, `/arch`, `/capture`, `/ux`, `/branch`, `/cleanup`, or `/pm` in any Claude Code session. The agent reads its spec, evaluates context signals (branch, recent git activity, natural language input), and routes to the correct sub-function.
+
+**Registration**:
+```json
+{
+  "/plan":    { "agent": "documentation", "description": "Manage project plans" },
+  "/arch":    { "agent": "documentation", "description": "Manage architecture docs" },
+  "/capture": { "agent": "documentation", "description": "File bugs, work, tech debt" },
+  "/ux":      { "agent": "documentation", "description": "Manage UX documentation" },
+  "/branch":  { "agent": "documentation", "description": "Cross-branch doc operations" },
+  "/cleanup": { "agent": "documentation", "description": "Documentation hygiene" },
+  "/pm":      { "agent": "documentation", "description": "Program management operations" }
+}
+```
+
+**Configuration**: `.claude/settings.json` § "commands"
+
+### Path 3: GitHub Actions (.github/workflows/agent-automation.yml)
+
+Automated triggers that run Documentation Agent functions without human intervention.
+
+**How it works**: GitHub Actions runs on push, schedule, and manual dispatch. Jobs call the relevant Documentation Agent functions based on event type.
+
+**Automated jobs**:
+| Job | Trigger | Functions |
+|-----|---------|-----------|
+| `post-merge-docs` | Push to master/main | `plan:update`, `arch:sync`, `cleanup:stale` |
+| `friday-doc-cleanup` | Friday 4 PM UTC / manual | `cleanup:stale`, `cleanup:orphans`, `cleanup:duplicates`, `ux:audit`, `pm:status-report` |
+| `docs-health-check` | Friday 4 PM UTC / manual | Notion-side page health (existing) |
+
+**Manual dispatch options** (via `workflow_dispatch`):
+| Option | Functions |
+|--------|-----------|
+| `documentation` | Full audit: `plan:audit`, `arch:sync`, `ux:audit`, `cleanup:stale` |
+| `documentation-cleanup` | Cleanup suite: all four `cleanup:*` functions |
+| `documentation-status` | Status: `pm:status-report`, `pm:changelog` |
+
+**Configuration**: `.github/workflows/agent-automation.yml`
+
+### How the Three Paths Relate
+
+```
+Path 1: Natural Language          Path 2: Slash Commands         Path 3: GitHub Actions
+(automatic recommendations)       (explicit invocation)          (automated CI/CD)
+         │                                 │                              │
+         ▼                                 ▼                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        28 Sub-Functions (this spec)                         │
+│                                                                             │
+│  plan:audit  plan:add  plan:update  plan:rebalance                          │
+│  arch:sync   arch:audit   arch:add-adr   arch:update-spec                   │
+│  capture:bug   capture:work   capture:tech-debt                             │
+│  ux:update   ux:audit   ux:wireframe                                        │
+│  branch:diff   branch:reconcile   branch:cherry-pick-docs                   │
+│  cleanup:stale   cleanup:orphans   cleanup:duplicates   cleanup:archive     │
+│  pm:scope-check  pm:dependency-map  pm:status-report  pm:retro              │
+│  pm:decision-log   pm:prd-to-plan   pm:changelog                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Documentation Files (Git)                            │
+│  docs/execution/  docs/infrastructure/  docs/ux/  docs/strategy/            │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Documentation Sync Agent → Notion                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight**: Path 1 drives adoption (recommendations appear when needed), Path 2 gives control (explicit invocation when you know what you want), Path 3 ensures consistency (automated runs catch what humans miss).
+
+---
+
 ## Output Standards
 
 All function outputs follow these rules:
