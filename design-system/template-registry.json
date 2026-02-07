@@ -15,7 +15,13 @@
         "label": "Coastal Minimalism",
         "sublabel": "Your selections lean toward clean silhouettes and natural tones",
         "traits": ["neutral palette", "relaxed fit", "linen + cotton", "understated"]
-      }
+      },
+      "edgeCases": [
+        { "name": "empty-traits", "label": "Urban Edge", "sublabel": "Based on 3 items", "traits": [] },
+        { "name": "long-label", "label": "Scandinavian-Inspired Minimalist Countryside Aesthetic", "sublabel": "Your 47 items suggest a strong preference for understated neutral tones", "traits": ["neutral", "relaxed"] },
+        { "name": "no-sublabel", "label": "Smart Casual", "traits": ["tailored", "comfortable"] },
+        { "name": "many-traits", "label": "Eclectic Mix", "sublabel": "Hard to pin down", "traits": ["bold color", "vintage", "streetwear", "preppy", "athletic", "bohemian", "grunge", "minimalist"] }
+      ]
     },
     "list": {
       "bodyModifier": "w-body--list",
@@ -32,7 +38,22 @@
           { "title": "Stan Smith", "subtitle": "Adidas · $85", "indicator": "2" },
           { "title": "Old Skool", "subtitle": "Vans · $65", "indicator": "3" }
         ]
-      }
+      },
+      "edgeCases": [
+        { "name": "empty-list", "items": [] },
+        { "name": "single-item", "items": [{ "title": "Lone item", "subtitle": "Only one" }] },
+        { "name": "long-list", "items": [
+          { "title": "Item 1" }, { "title": "Item 2" }, { "title": "Item 3" },
+          { "title": "Item 4" }, { "title": "Item 5" }, { "title": "Item 6" },
+          { "title": "Item 7" }, { "title": "Item 8" }, { "title": "Item 9" },
+          { "title": "Item 10" }, { "title": "Item 11" }, { "title": "Item 12" },
+          { "title": "Item 13" }, { "title": "Item 14" }, { "title": "Item 15" },
+          { "title": "Item 16" }, { "title": "Item 17" }, { "title": "Item 18" },
+          { "title": "Item 19" }, { "title": "Item 20" }
+        ] },
+        { "name": "long-title", "items": [{ "title": "Nike Air Max 90 Essential Limited Edition Collaboration with Off-White Virgil Abloh 2026", "subtitle": "Very long subtitle text that should be truncated at some point" }] },
+        { "name": "no-subtitle", "items": [{ "title": "Plain item" }, { "title": "Another plain item" }] }
+      ]
     },
     "spectrum": {
       "bodyModifier": "w-body--spectrum",
@@ -49,7 +70,19 @@
           { "leftLabel": "Classic", "rightLabel": "Trendy", "position": 0.4, "note": "Timeless with subtle updates" },
           { "leftLabel": "Casual", "rightLabel": "Formal", "position": 0.3 }
         ]
-      }
+      },
+      "edgeCases": [
+        { "name": "empty-axes", "axes": [] },
+        { "name": "single-axis", "axes": [{ "leftLabel": "Min", "rightLabel": "Max", "position": 0.5 }] },
+        { "name": "extreme-positions", "axes": [
+          { "leftLabel": "Left", "rightLabel": "Right", "position": 0.0 },
+          { "leftLabel": "Left", "rightLabel": "Right", "position": 1.0 }
+        ] },
+        { "name": "no-notes", "axes": [
+          { "leftLabel": "A", "rightLabel": "B", "position": 0.3 },
+          { "leftLabel": "C", "rightLabel": "D", "position": 0.8 }
+        ] }
+      ]
     },
     "split": {
       "bodyModifier": "w-body--split",
@@ -75,7 +108,11 @@
             { "name": "Sunglasses", "brand": "Ray-Ban" }
           ]
         }
-      }
+      },
+      "edgeCases": [
+        { "name": "empty-right", "left": { "title": "Your Items", "items": [{ "name": "Sneakers" }] }, "right": { "title": "Suggestions", "items": [] } },
+        { "name": "many-items", "left": { "title": "Yours", "items": [{ "name": "A" }, { "name": "B" }, { "name": "C" }, { "name": "D" }, { "name": "E" }] }, "right": { "title": "AI Picks", "items": [{ "name": "F" }, { "name": "G" }, { "name": "H" }, { "name": "I" }, { "name": "J" }] } }
+      ]
     },
     "narrative": {
       "bodyModifier": "w-body--narrative",
@@ -92,7 +129,12 @@
           "Your board has a strong coastal-casual vibe. The neutral palette anchored by white sneakers and blue denim creates a clean foundation.",
           "Consider adding a structured bag or a watch to introduce some polish without losing the relaxed feel."
         ]
-      }
+      },
+      "edgeCases": [
+        { "name": "empty-text", "paragraphs": [] },
+        { "name": "single-sentence", "paragraphs": ["Just one thought."] },
+        { "name": "very-long", "paragraphs": ["Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.", "Second paragraph with additional detail that extends the content further to test overflow and scroll behavior in smaller widget sizes."] }
+      ]
     },
     "comparison": {
       "bodyModifier": "w-body--comparison",
@@ -117,7 +159,11 @@
           "cons": ["Less iconic"]
         },
         "dividerLabel": "VS"
-      }
+      },
+      "edgeCases": [
+        { "name": "missing-cons", "optionA": { "title": "Option A", "price": "$50", "pros": ["Cheap"] }, "optionB": { "title": "Option B", "price": "$200", "pros": ["Quality"] }, "dividerLabel": "VS" },
+        { "name": "long-pros", "optionA": { "title": "A", "pros": ["Pro 1", "Pro 2", "Pro 3", "Pro 4", "Pro 5"], "cons": ["Con 1"] }, "optionB": { "title": "B", "pros": ["Pro 1"], "cons": ["Con 1", "Con 2", "Con 3", "Con 4", "Con 5"] }, "dividerLabel": "OR" }
+      ]
     },
     "choices": {
       "bodyModifier": "w-body--choices",
@@ -135,7 +181,15 @@
           { "title": "Streetwear", "description": "Bold graphics, oversized fits" },
           { "title": "Classic", "description": "Timeless pieces, quality fabrics" }
         ]
-      }
+      },
+      "edgeCases": [
+        { "name": "two-options", "question": "Pick one", "options": [{ "title": "A" }, { "title": "B" }] },
+        { "name": "many-options", "question": "What's your style?", "options": [
+          { "title": "Minimal" }, { "title": "Street" }, { "title": "Classic" },
+          { "title": "Sporty" }, { "title": "Bohemian" }, { "title": "Preppy" }
+        ] },
+        { "name": "no-description", "question": "Quick pick", "options": [{ "title": "Yes" }, { "title": "No" }, { "title": "Maybe" }] }
+      ]
     },
     "checklist": {
       "bodyModifier": "w-body--checklist",
@@ -155,7 +209,18 @@
           { "name": "Sunglasses", "price": "$150", "checked": false }
         ],
         "total": "$390"
-      }
+      },
+      "edgeCases": [
+        { "name": "empty", "items": [], "total": "$0" },
+        { "name": "all-checked", "items": [
+          { "name": "Item A", "price": "$10", "checked": true },
+          { "name": "Item B", "price": "$20", "checked": true }
+        ], "total": "$30" },
+        { "name": "none-checked", "items": [
+          { "name": "Item A", "price": "$10", "checked": false },
+          { "name": "Item B", "price": "$20", "checked": false }
+        ], "total": "$0" }
+      ]
     },
     "suggestion": {
       "bodyModifier": "w-body--suggestion",
@@ -172,7 +237,12 @@
         "price": "$410",
         "reason": "Matches your minimal aesthetic and white sneaker preference",
         "imageUrl": null
-      }
+      },
+      "edgeCases": [
+        { "name": "no-brand-no-price", "name": "Mystery Item", "reason": "You might like this" },
+        { "name": "long-reason", "name": "Nike Dunk Low", "brand": "Nike", "price": "$110", "reason": "Based on your preference for low-top sneakers in neutral colorways, combined with your recent saves from streetwear brands, this classic silhouette would complement your existing rotation perfectly" },
+        { "name": "all-fields", "name": "Casio F-91W", "brand": "Casio", "price": "$15", "reason": "Iconic minimal watch", "imageUrl": "https://example.com/watch.jpg" }
+      ]
     },
     "grouped": {
       "bodyModifier": "w-body--grouped",
@@ -200,7 +270,18 @@
             ]
           }
         ]
-      }
+      },
+      "edgeCases": [
+        { "name": "single-section", "sections": [{ "title": "Tops", "items": [{ "name": "T-shirt" }] }] },
+        { "name": "empty-section", "sections": [{ "title": "Empty Group", "items": [] }, { "title": "Has Items", "items": [{ "name": "Something" }] }] },
+        { "name": "many-sections", "sections": [
+          { "title": "Tops", "items": [{ "name": "A" }] },
+          { "title": "Bottoms", "items": [{ "name": "B" }] },
+          { "title": "Shoes", "items": [{ "name": "C" }] },
+          { "title": "Accessories", "items": [{ "name": "D" }] },
+          { "title": "Outerwear", "items": [{ "name": "E" }] }
+        ] }
+      ]
     }
   },
   "boardsTemplateMap": {

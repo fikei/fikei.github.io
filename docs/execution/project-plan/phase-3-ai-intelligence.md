@@ -228,12 +228,20 @@
 | | All 7 existing widget types render with new w-* classes | Complete |
 | | Visual diff: compare before/after screenshots at each valid size | Pending |
 | | Existing widget configs still resolve to correct templates | Complete |
-| **Clean up legacy CSS** | | Pending |
-| | Remove dead `widget-complete__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-style__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-spectrum__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-statrow__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-quickadd__*` CSS from Boards inline styles | Pending |
+| **Clean up legacy CSS** | | Complete |
+| | Remove dead `widget-complete__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-style__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-spectrum__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-statrow__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-quickadd__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-outfit__*`, `widget-empty*`, `widget--loading*` CSS | Complete |
+| **Widget feature flag** | | Complete |
+| | Gate all widget rendering behind `boards_widget_ds` localStorage flag | Complete |
+| | Default OFF, persist once enabled via `window.enableWidgetDS()` | Complete |
+| | Guard at top of `generateWidgets()`, hide hero/footer sections when off | Complete |
+| **Edge-case fixtures** | | Complete |
+| | Add `edgeCases` array to all 10 templates in template-registry.json | Complete |
+| | Covers: empty data, single item, overflow, long text, missing fields | Complete |
 
 #### Config-Driven AI Prompts
 
@@ -294,9 +302,9 @@
 | | ~~Option B: Deprecate stat-row~~ | N/A |
 | | Update template-registry.json with chosen approach | Complete |
 | | Update boardsTemplateMap to reflect decision | Complete |
-| **Add edge-case fixtures to template registry** | | Pending |
-| | Add `edgeCases` array to each template in template-registry.json | Pending |
-| | Edge cases: empty items array, single item, 20+ items (overflow), very long text, missing optional fields | Pending |
+| **Add edge-case fixtures to template registry** | | Complete |
+| | Add `edgeCases` array to each template in template-registry.json | Complete |
+| | Edge cases: empty items array, single item, 20+ items (overflow), very long text, missing optional fields | Complete |
 | | QA view renders edge-case fixtures alongside happy-path fixtures | Pending |
 | **Manifest/registry sync CI check** | | Pending |
 | | Script: parse manifest body modifiers, compare to registry template keys | Pending |
