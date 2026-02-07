@@ -20,6 +20,7 @@ class SystemicApp {
       supabaseKey: SUPABASE_ANON_KEY
     });
     this.viewer = null;
+    this.variantAudit = null;
     this.currentAudit = null;
     this.designSystems = [];
     this.debugMode = true; // Enable detailed logging
@@ -251,7 +252,249 @@ class SystemicApp {
     this.bindEvents();
     this.loadSavedSystems();
     this.initViewer();
+    this.initVariantAudit();
     this.initRouter();
+  }
+
+  /**
+   * Load local design system from manifest.json + template-registry.json
+   * This is "self-scan" — loads our own design system without crawling
+   */
+  async loadLocalDesignSystem() {
+    this.debugLog('LOCAL', '=== Loading Local Design System ===');
+
+    try {
+      // Fetch manifest and template registry in parallel
+      const [manifestRes, registryRes] = await Promise.all([
+        fetch('/design-system/manifest.json'),
+        fetch('/design-system/template-registry.json')
+      ]);
+
+      if (!manifestRes.ok) throw new Error(`Failed to load manifest: ${manifestRes.status}`);
+      if (!registryRes.ok) throw new Error(`Failed to load template registry: ${registryRes.status}`);
+
+      const manifest = await manifestRes.json();
+      const registry = await registryRes.json();
+
+      this.debugLog('LOCAL', 'Loaded manifest:', {
+        tokens: Object.keys(manifest.tokens),
+        components: Object.keys(manifest.components).length,
+        atoms: Object.keys(manifest.widgets.atoms).length,
+        molecules: Object.keys(manifest.widgets.molecules).length,
+        sizes: Object.keys(manifest.widgets.sizes).length,
+        bodyModifiers: Object.keys(manifest.widgets.bodyModifiers).length
+      });
+
+      // Transform manifest into Systemic design system format
+      const designSystem = this.transformManifestToDesignSystem(manifest, registry);
+
+      // Save it
+      this.saveDesignSystem(designSystem, false);
+
+      // Load into viewer and QA
+      this.viewer.load(designSystem);
+      this.variantAudit?.registerFromDesignSystem(designSystem);
+
+      this.showToast('Local design system loaded');
+      window.location.hash = 'docs/color';
+
+    } catch (error) {
+      this.debugLog('LOCAL', 'Error loading local design system:', error);
+      this.showToast(`Failed to load local design system: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Transform manifest.json + template-registry.json into Systemic's design system format
+   */
+  transformManifestToDesignSystem(manifest, registry) {
+    const id = 'local-ctrl-design-system';
+
+    // Build token data
+    const darkColors = manifest.tokens.colors.dark || {};
+    const tokens = {
+      colors: {
+        primary: { hex: darkColors['--fg'] || '#fff', role: 'primary' },
+        secondary: { hex: darkColors['--fg-muted'] || '#888', role: 'secondary' },
+        error: { hex: darkColors['--color-error'] || '#c00', role: 'error' },
+        success: { hex: darkColors['--color-success'] || '#0f0', role: 'success' },
+        warning: { hex: darkColors['--color-warning'] || '#f90', role: 'warning' },
+        neutral: [
+          { hex: darkColors['--gray-100'] || '#111' },
+          { hex: darkColors['--gray-200'] || '#1a1a1a' },
+          { hex: darkColors['--gray-300'] || '#222' },
+          { hex: darkColors['--gray-400'] || '#333' },
+          { hex: darkColors['--gray-500'] || '#666' },
+          { hex: darkColors['--gray-600'] || '#888' },
+          { hex: darkColors['--gray-700'] || '#999' },
+          { hex: darkColors['--gray-800'] || '#ccc' },
+          { hex: darkColors['--gray-900'] || '#e0e0e0' }
+        ],
+        surface: [
+          { hex: darkColors['--bg'] || '#111' },
+          { hex: darkColors['--bg-surface'] || '#1a1a1a' },
+          { hex: darkColors['--bg-elevated'] || '#222' }
+        ]
+      },
+      typography: {
+        primary: manifest.tokens.typography['--font-primary'] || 'Space Grotesk',
+        secondary: manifest.tokens.typography['--font-serif'] || 'Georgia',
+        typescale: Object.entries(manifest.tokens.typography)
+          .filter(([k]) => k.startsWith('--text-'))
+          .map(([k, v]) => ({
+            value: v,
+            materialRole: k.replace('--text-', ''),
+            token: k
+          }))
+      },
+      spacing: {
+        baseUnit: 4,
+        scale: Object.entries(manifest.tokens.spacing)
+          .map(([k, v]) => ({
+            value: parseInt(v),
+            normalized: parseInt(v),
+            token: k
+          }))
+          .sort((a, b) => a.value - b.value)
+      },
+      elevation: {
+        hasShadows: false
+      }
+    };
+
+    // Build components from manifest + registry
+    const components = [];
+
+    // Add UI components from components.css
+    for (const [name, comp] of Object.entries(manifest.components)) {
+      components.push({
+        type: name,
+        name: this.formatComponentName(name),
+        variants: comp.modifiers.length > 0
+          ? comp.modifiers.map(mod => ({
+              name: `${name}--${mod}`,
+              classes: [`${name}`, `${name}--${mod}`],
+              html: `<div class="${name} ${name}--${mod}">${this.formatComponentName(name)} (${mod})</div>`,
+              usageCount: 1
+            }))
+          : [{ name: 'default', classes: [name], html: `<div class="${name}">${this.formatComponentName(name)}</div>`, usageCount: 1 }],
+        totalUsage: comp.modifiers.length || 1,
+        states: {
+          hasDefault: true,
+          hasHover: comp.states.includes('hover'),
+          hasFocus: comp.states.includes('focus'),
+          hasDisabled: comp.states.includes('disabled')
+        },
+        source: 'components.css'
+      });
+    }
+
+    // Add widget atoms
+    for (const [name, atom] of Object.entries(manifest.widgets.atoms)) {
+      components.push({
+        type: name,
+        name: this.formatComponentName(name),
+        variants: atom.modifiers.length > 0
+          ? atom.modifiers.map(mod => ({
+              name: `${name}--${mod}`,
+              classes: [name, `${name}--${mod}`],
+              html: `<span class="${name} ${name}--${mod}">${this.formatComponentName(name)} (${mod})</span>`,
+              usageCount: 1
+            }))
+          : [{ name: 'default', classes: [name], html: `<span class="${name}">${this.formatComponentName(name)}</span>`, usageCount: 1 }],
+        totalUsage: atom.modifiers.length || 1,
+        source: 'widgets.css (atom)'
+      });
+    }
+
+    // Add widget molecules
+    for (const [name, mol] of Object.entries(manifest.widgets.molecules)) {
+      components.push({
+        type: name,
+        name: this.formatComponentName(name),
+        variants: mol.modifiers.length > 0
+          ? mol.modifiers.map(mod => ({
+              name: `${name}--${mod}`,
+              classes: [name, `${name}--${mod}`],
+              html: `<div class="${name} ${name}--${mod}">${this.formatComponentName(name)} (${mod})</div>`,
+              usageCount: 1
+            }))
+          : [{ name: 'default', classes: [name], html: `<div class="${name}">${this.formatComponentName(name)}</div>`, usageCount: 1 }],
+        totalUsage: mol.modifiers.length || 1,
+        source: 'widgets.css (molecule)'
+      });
+    }
+
+    // Add body modifier templates as components (from registry)
+    if (registry?.templates) {
+      for (const [name, tmpl] of Object.entries(registry.templates)) {
+        components.push({
+          type: `template-${name}`,
+          name: `Template: ${this.formatComponentName(name)}`,
+          variants: (tmpl.validSizes || []).map(size => ({
+            name: `${name} @ ${size}`,
+            classes: ['w-shell', `w-shell--${size}`, 'w-body', tmpl.bodyModifier],
+            html: this.generateTemplatePreviewHTML(name, size, tmpl),
+            usageCount: 1
+          })),
+          totalUsage: tmpl.validSizes?.length || 0,
+          guidelines: {
+            whenToUse: [tmpl.description],
+            whenNotToUse: tmpl.validSizes
+              ? [`Only use at sizes: ${tmpl.validSizes.join(', ')}`]
+              : []
+          },
+          source: 'template-registry.json',
+          boardsStatus: tmpl.boardsStatus
+        });
+      }
+    }
+
+    return {
+      id,
+      name: 'CTRL Design System',
+      sourceUrl: window.location.origin,
+      tokens,
+      components,
+      createdAt: manifest.version,
+      updatedAt: manifest.version,
+      manifest,
+      registry
+    };
+  }
+
+  /**
+   * Generate a preview HTML snippet for a template at a given size
+   */
+  generateTemplatePreviewHTML(templateName, size, tmpl) {
+    const sizeClass = `w-shell--${size}`;
+    const bodyMod = tmpl.bodyModifier;
+    const atoms = (tmpl.requiredAtoms || []).map(a =>
+      `<div class="${a}">${this.formatComponentName(a)}</div>`
+    ).join('\n          ');
+
+    return `<div class="w-shell ${sizeClass}">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text--label">${this.formatComponentName(templateName)}</span>
+            <span class="w-badge">AI</span>
+          </div>
+        </div>
+        <div class="w-body ${bodyMod}">
+          ${atoms}
+        </div>
+      </div>`;
+  }
+
+  /**
+   * Format component name for display (w-text--label → W Text Label)
+   */
+  formatComponentName(name) {
+    return name
+      .replace(/^w-/, '')
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   /**
@@ -372,6 +615,15 @@ class SystemicApp {
       }
     }
 
+    // Handle QA view
+    if (route.view === 'qa') {
+      this.variantAudit?.init();
+      // Deep link to a specific component: #qa/component-name
+      if (route.section && this.variantAudit) {
+        this.variantAudit.show(route.section);
+      }
+    }
+
     // Load systems list when switching to systems view
     if (route.view === 'systems') {
       this.renderSystemsList();
@@ -408,6 +660,17 @@ class SystemicApp {
             <a href="#systems" class="breadcrumb-link">Systems</a>
             <span class="breadcrumb-sep">/</span>
             <span class="breadcrumb-current">Audit</span>
+          </nav>
+          <span class="docs-nav__spacer"></span>
+        `;
+        break;
+
+      case 'qa':
+        this.appNav.innerHTML = `
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="#systems" class="breadcrumb-link">Systems</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">QA</span>
           </nav>
           <span class="docs-nav__spacer"></span>
         `;
@@ -490,6 +753,26 @@ class SystemicApp {
     const viewerContainer = DOMUtils.$('#docs-view');
     if (viewerContainer) {
       this.viewer = new DesignSystemViewer(viewerContainer);
+    }
+  }
+
+  /**
+   * Initialize the variant audit module
+   */
+  initVariantAudit() {
+    const qaContainer = DOMUtils.$('#qa-view');
+    if (qaContainer) {
+      this.variantAudit = new VariantAudit({
+        container: qaContainer,
+        systemId: 'default',
+        onToast: (msg) => this.showToast(msg)
+      });
+
+      // Wire blocked toggle button
+      const blockedToggle = DOMUtils.$('#qa-blocked-toggle');
+      if (blockedToggle) {
+        blockedToggle.addEventListener('click', () => this.variantAudit.toggleBlockedSection());
+      }
     }
   }
 
@@ -744,6 +1027,7 @@ class SystemicApp {
       // Switch to docs view after delay
       setTimeout(() => {
         this.viewer.load(designSystem);
+        this.variantAudit?.registerFromDesignSystem(designSystem);
         window.location.hash = 'docs/color';
         this.resetAuditForm();
       }, 1500);
@@ -984,14 +1268,31 @@ class SystemicApp {
         <div class="empty-state" id="no-systems">
           <div class="empty-icon">+</div>
           <h3>No design systems yet</h3>
-          <p>Start an audit to generate your first design system.</p>
-          <a class="btn btn--filled" href="#audit">Start Audit</a>
+          <p>Start an audit to generate your first design system, or load the local design system.</p>
+          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;justify-content:center;">
+            <a class="btn btn--filled" href="#audit">Start Audit</a>
+            <button class="btn" id="load-local-btn">Load Local System</button>
+          </div>
         </div>
       `;
+      DOMUtils.$('#load-local-btn')?.addEventListener('click', () => this.loadLocalDesignSystem());
       return;
     }
 
-    this.systemsGrid.innerHTML = this.designSystems.map(ds => `
+    // Check if local system is already loaded
+    const hasLocal = this.designSystems.some(ds => ds.id === 'local-ctrl-design-system');
+
+    this.systemsGrid.innerHTML = `
+      ${!hasLocal ? `<div class="system-card system-card--action" id="load-local-card">
+        <div class="system-card-header">
+          <h3 class="system-card-title">CTRL Design System</h3>
+        </div>
+        <div class="system-card-url">Local · design-system/manifest.json</div>
+        <div class="system-card-stats">
+          <button class="btn btn--filled btn--sm">Load Local System</button>
+        </div>
+      </div>` : ''}
+    ` + this.designSystems.map(ds => `
       <div class="system-card" data-id="${ds.id}">
         <div class="system-card-header">
           <h3 class="system-card-title">${ds.name}</h3>
@@ -1028,11 +1329,17 @@ class SystemicApp {
         const fullSystem = this.loadDesignSystem(id);
         if (fullSystem) {
           this.viewer.load(fullSystem);
+          this.variantAudit?.registerFromDesignSystem(fullSystem);
           window.location.hash = 'docs/color';
         } else {
           this.showToast('Failed to load design system', 'error');
         }
       });
+    });
+
+    // Bind local load card
+    DOMUtils.$('#load-local-card', this.systemsGrid)?.addEventListener('click', () => {
+      this.loadLocalDesignSystem();
     });
 
     // Bind delete button events

@@ -54,6 +54,12 @@
               "source": "human"
             },
             {
+              "title": "Design System Validation Pipeline",
+              "icon": "\u2705",
+              "file": "docs/strategy/prds/design-system-validation-pipeline.md",
+              "source": "ai"
+            },
+            {
               "title": "Widget Instrumentation",
               "icon": "\ud83d\udccb",
               "file": "docs/strategy/prds/widget-instrumentation.md",
@@ -436,7 +442,21 @@
         {
           "title": "Systemic",
           "icon": "\ud83d\udd04",
-          "source": "human"
+          "source": "human",
+          "children": [
+            {
+              "title": "Variant Audit PRD",
+              "icon": "\ud83d\udccb",
+              "file": "docs/playground/systemic/prd-variant-audit.md",
+              "source": "ai"
+            },
+            {
+              "title": "Variant Audit Project Plan",
+              "icon": "\ud83d\udcca",
+              "file": "docs/playground/systemic/project-plan-variant-audit.md",
+              "source": "ai"
+            }
+          ]
         }
       ]
     },

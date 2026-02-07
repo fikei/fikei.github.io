@@ -20,7 +20,7 @@
 |-------|--------|----------|
 | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 18/18 |
 | [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 12/12 |
-| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 40/100+ |
+| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 55/100 |
 | [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 8/90 |
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/10 |
@@ -31,16 +31,27 @@
 
 ## Recent Milestones
 
-### Widget Phase 2: Config-Generated Widgets 🔄
-**Started: 2026-02-05**
+### Widget Phase 2.5a: Design System Transition ⚡
+**Started: 2026-02-07**
+
+- **Design System Manifest**: `manifest.json` generated from CSS (12 atoms, 8 molecules, 11 body modifiers, 15 sizes)
+- **Template Registry**: `template-registry.json` maps 10 canonical templates to Boards implementations
+- **Self-Scan**: Systemic loads local design system without crawling
+- **Template Migration**: All 7 Boards renderers migrated from `widget-*` to `w-*` classes
+- **Design System Extensions**: Added `w-items`, `w-item`, `w-body--stats`, `w-divider__label`; updated marker, header, suggestion layout
+- **Token Bridge**: Boards `:root` maps DS token names to Boards values (visual parity preserved)
+- **Next**: Visual verification → legacy CSS cleanup → config-driven AI prompts → CI validation
+
+### Widget Phase 2: Config-Generated Widgets ✅
+**Completed: 2026-02-05**
 
 - **Widget Definition Schema**: TypeScript types in `config/schema.ts`
 - **Config-Driven Eligibility**: Rules defined declaratively, not in code
 - **Registry as Data**: `config/registry.ts` with runtime evaluators
 - **Two Widgets Migrated**: `complete-the-look`, `style-summary`
 - **180+ lines removed**: Hard-coded eligibility logic replaced with config
-
-**Remaining**: Category-agnostic matching, template selection engine, hot-reload
+- **Template Selection Engine**: Auto-select + fallback chain
+- **Hot-reload**: registerWidget() / unregisterWidget() / reloadWidget()
 
 ### Widget Phase 1: Rule-Driven Automation ✅
 **Completed: 2026-02-05**
@@ -61,13 +72,13 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 18 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 12 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 46 | 8 | 46 | 0 |
+| Phase 3: AI Intelligence | 55 | 8 | 37 | 0 |
 | Phase 4: Sharing & Collaboration | 8 | 8 | 72 | 2 |
 | Phase 5: UX Polish | 3 | 0 | 67 | 0 |
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
 | Phase 7: Platform Expansion | 0 | 0 | 50 | 0 |
 | Backlog | 0 | 0 | 40 | 0 |
-| **TOTAL** | **88** | **16** | **284** | **2** |
+| **TOTAL** | **97** | **16** | **275** | **2** |
 
 ---
 
@@ -77,7 +88,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |-------|------|------------|--------|
 | 0 | Deterministic MVP | Very Low | ~95% Complete |
 | 1 | Rule-Driven Automation | Low→Medium | **COMPLETE** |
-| 2 | Config-Generated Widgets | Medium→High | **IN PROGRESS** |
+| 2 | Config-Generated Widgets | Medium→High | **COMPLETE** |
+| 2.5a | Design System Transition | Medium→High | **IN PROGRESS** ⚡ |
+| 2.5b | Rules-Based Widget Catalog | Medium→High | Pending (blocked by 2.5a) |
 | 3 | Self-Selecting Widgets | High | Pending |
 | 4 | Self-Optimizing System | Full | Pending |
 

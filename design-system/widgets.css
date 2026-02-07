@@ -8,34 +8,42 @@
    Like iOS Home Screen widgets: defined sizes
    with sensible constraints per template.
 
-   Sizes (column x row):
-     sm    = 1x1  — glanceable summary
-     med   = 2x1  — comfortable horizontal
-     tall  = 1x2  — vertical detail
-     lg    = 2x2  — full featured
-     wide  = 3x1  — dashboard strip
-     xl    = 3x2  — maximum real estate
+   All sizes (column x row):
+          1 col    2 col    3 col    4 col
+   1 row  sm       med      wide     banner
+   2 row  tall     lg       xl       pano
+   3 row  col      poster   max      cinema
+   4 row  —        board    wall     full
 
-   Valid sizes per template:
+   Valid sizes per template (editable in showcase):
      verdict:    sm, med, lg
-     list:       sm(3 rows), tall, med, lg
-     spectrum:   sm(2 axes), tall, med, lg
+     list:       sm, med, tall, lg, wide
+     spectrum:   sm, med, lg
      split:      med, lg              (min 2 cols)
-     narrative:  med, lg, wide        (needs reading width)
+     narrative:  med, tall, lg
      comparison: med, lg              (min 2 cols)
-     choices:    sm(2 opts), tall, med, lg
-     checklist:  sm(3 rows), tall, med, lg
-     suggestion: sm, med
-     grouped:    tall, lg, xl         (needs vertical space)
+     choices:    sm, med, lg
+     checklist:  sm, tall, med, lg
+     suggestion: sm, med, tall, lg
+     grouped:    med, tall, lg
    ============================================ */
 
 /* --- Grid span classes --- */
-.w-shell--sm   { grid-column: span 1; grid-row: span 1; }
-.w-shell--med  { grid-column: span 2; grid-row: span 1; }
-.w-shell--tall { grid-column: span 1; grid-row: span 2; }
-.w-shell--lg   { grid-column: span 2; grid-row: span 2; }
-.w-shell--wide { grid-column: span 3; grid-row: span 1; }
-.w-shell--xl   { grid-column: span 3; grid-row: span 2; }
+.w-shell--sm     { grid-column: span 1; grid-row: span 1; }
+.w-shell--med    { grid-column: span 2; grid-row: span 1; }
+.w-shell--tall   { grid-column: span 1; grid-row: span 2; }
+.w-shell--lg     { grid-column: span 2; grid-row: span 2; }
+.w-shell--wide   { grid-column: span 3; grid-row: span 1; }
+.w-shell--xl     { grid-column: span 3; grid-row: span 2; }
+.w-shell--col    { grid-column: span 1; grid-row: span 3; }
+.w-shell--poster { grid-column: span 2; grid-row: span 3; }
+.w-shell--max    { grid-column: span 3; grid-row: span 3; }
+.w-shell--banner { grid-column: span 4; grid-row: span 1; }
+.w-shell--pano   { grid-column: span 4; grid-row: span 2; }
+.w-shell--cinema { grid-column: span 4; grid-row: span 3; }
+.w-shell--board  { grid-column: span 2; grid-row: span 4; }
+.w-shell--wall   { grid-column: span 3; grid-row: span 4; }
+.w-shell--full   { grid-column: span 4; grid-row: span 4; }
 
 /* ============================================
    Shell / Structure
@@ -53,8 +61,9 @@
 .w-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
+  margin-bottom: var(--space-3);
   flex-shrink: 0;
 }
 
@@ -321,6 +330,19 @@
   border: none;
   border-top: var(--border-thin) solid var(--border-subtle);
   margin: var(--space-2) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.w-divider__label {
+  font-family: var(--font-primary);
+  font-size: var(--text-lg);
+  color: var(--fg-muted);
+  background: var(--bg-surface);
+  padding: 0 var(--space-2);
+  position: relative;
+  top: -1px;
 }
 
 .w-divider--vertical {
@@ -499,7 +521,7 @@
 
 .w-axis__track {
   position: relative;
-  height: 4px;
+  height: 2px;
   background: var(--border-subtle);
 }
 
@@ -511,7 +533,7 @@
   background: var(--fg);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  transition: left 0.4s ease;
+  transition: left var(--duration-slower) var(--ease-default);
 }
 
 .w-axis__note { text-align: left; }
@@ -655,10 +677,9 @@
 /* Suggestion: featured single item */
 .w-body--suggestion {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  flex-direction: row;
+  gap: var(--space-4);
   align-items: flex-start;
-  justify-content: center;
 }
 
 /* Grouped: labeled sections */
@@ -666,6 +687,41 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* --- w-items --- */
+.w-items {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* --- w-item --- */
+.w-item {
+  flex: 0 0 auto;
+  width: 100px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  transition: transform var(--duration-normal) var(--ease-default),
+              box-shadow var(--duration-normal) var(--ease-default);
+}
+
+.w-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   BODY MODIFIER: Stats row
+   ============================================ */
+
+.w-body--stats {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-around;
 }
 
 /* ============================================
@@ -719,6 +775,10 @@
   .w-img--card { width: 48px; height: 48px; }
   .w-img--hero { aspect-ratio: 3 / 2; }
 
+  .w-item { width: 60px; }
+  .w-item .w-img { height: 60px; }
+  .w-items { gap: var(--space-2); }
+
   .w-body--list > .w-row { gap: var(--space-2); }
   .w-row__indicator { display: none; }
   .w-row__trailing  { display: none; }
@@ -765,6 +825,13 @@
     border-top: var(--border-thin) solid var(--border-subtle);
   }
 
+  .w-item { width: 80px; }
+  .w-item .w-img { height: 80px; }
+
+  .w-body--suggestion {
+    flex-direction: column;
+  }
+
   .w-body--narrative .w-tag-group { display: none; }
 
   .w-action-bar > .w-btn:not(:first-child) { display: none; }
@@ -784,6 +851,10 @@
 
   .w-body--spectrum { gap: var(--space-6); }
   .w-body--grouped  { gap: var(--space-6); }
+
+  .w-body--stats {
+    gap: var(--space-6);
+  }
 
   .w-body--choices {
     display: grid;

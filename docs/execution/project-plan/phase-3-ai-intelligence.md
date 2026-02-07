@@ -155,10 +155,170 @@
 | **Config-Driven Enrichment** | | Complete |
 | | Enrichment triggered by widget config, not hard-coded widget ID | Complete |
 
-### Widget Phase 2.5: Rules-Based Widget Catalog (Pending)
+### Widget Phase 2.5a: Design System Transition ⚡ HIGH PRIORITY
+
+**Automation Level**: Medium → High
+**Status**: In Progress
+**Reference**: [Design System Validation Pipeline PRD](/docs/strategy/prds/design-system-validation-pipeline.md), [Variant Audit Project Plan](/docs/playground/systemic/project-plan-variant-audit.md)
+
+> Complete the transition from legacy `widget-*` classes to the design system's `w-*` classes. This is the prerequisite for all Phase 2.5b work — until this is done, new widgets can't be validated and the design system can't enforce conformance.
+
+#### Design System Data Layer
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Design System Manifest** | | Complete |
+| | Build `scripts/parse-design-system.js` (CSS → manifest.json) | Complete |
+| | Parse tokens.css: 27 colors (dark), 10 light overrides, 22 typography, 10 spacing, 10 animation, 14 layout | Complete |
+| | Parse components.css: 25 component classes with modifiers and states | Complete |
+| | Parse widgets.css: 10 atoms, 8 molecules, 15 sizes, 10 body modifiers, 4 container breakpoints | Complete |
+| | Generate `design-system/manifest.json` — committed to repo for drift detection | Complete |
+| **Template Registry** | | Complete |
+| | Create `design-system/template-registry.json` with 10 canonical templates | Complete |
+| | Map each template: body modifier, valid sizes, required atoms, sample fixture | Complete |
+| | Map Boards templates to design system equivalents (boardsTemplateMap) | Complete |
+| | Track implementation status per template (legacy, partial, not-implemented) | Complete |
+| | Coverage summary: 6 implemented (legacy classes), 4 not-implemented | Complete |
+| **Self-Scan in Systemic** | | Complete |
+| | `app.js:loadLocalDesignSystem()` fetches manifest + registry | Complete |
+| | Transforms into Systemic viewer/QA format with components, variants, tokens | Complete |
+| | "Load Local System" card in My Systems view | Complete |
+| | Template previews rendered with actual `w-*` class markup | Complete |
+
+#### Template Migration (Legacy → w-* Classes)
+
+> Boards currently renders widgets using `widget-complete`, `widget-spectrum__axis`, etc. These must migrate to the design system's `w-shell`, `w-body--spectrum`, `w-axis` classes.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Migrate existing template renderers** | | Complete |
+| | `hero-card` → verdict: replace `widget-style__*` classes with `w-headline`, `w-tag-group`, `w-badge` | Complete |
+| | `list` → list: replace `widget-complete__body` divs with `w-body--list > w-row*` | Complete |
+| | `spectrum` → spectrum: replace `widget-spectrum__*` classes with `w-axis`, `w-text--label` | Complete |
+| | `grid-split` → split: replace `widget-complete__body` grid with `w-body > w-items + w-divider` | Complete |
+| | `text-block` → narrative: replace inline styles with `w-body--narrative > w-text--prose` | Complete |
+| | `quick-add` → suggestion: replace `widget-quickadd__*` classes with `w-body--suggestion > w-img + w-headline + w-action-bar` | Complete |
+| | `stat-row` → stats: replace `widget-statrow__*` classes with `w-stat` molecules + `w-body--stats` modifier | Complete |
+| | Remove legacy `widget-complete__header` → use `w-header > w-header__left + w-header__controls` | Complete |
+| | Remove legacy `widget-complete__body` → use `w-body` with body modifier class | Complete |
+| | Remove legacy `widget-complete__badge` → use `w-badge` | Complete |
+| | Add `renderWidgetHeader()` shared helper (DRY) | Complete |
+| | Add token bridge in Boards `:root` for DS token compatibility | Complete |
+| | Import `design-system/widgets.css` in Boards `<head>` | Complete |
+| **Update WIDGET_TEMPLATES object** | | Complete |
+| | Render functions output `w-*` class HTML instead of `widget-*` classes | Complete |
+| | Template keys preserved (grid-split, hero-card, etc.) for backward compatibility | Complete |
+| | Loading states migrated to `w-shell > w-body--loading > w-loader` | Complete |
+| **Design system extensions for migration** | | Complete |
+| | Add `w-items` atom (flex-wrap container for item cards) | Complete |
+| | Add `w-item` atom (fixed-width item card with hover lift + shadow) | Complete |
+| | Add `w-body--stats` body modifier (stat-row layout) | Complete |
+| | Add `w-divider__label` for labeled dividers | Complete |
+| | Update `w-axis__marker` to 10px circle (matches legacy visual) | Complete |
+| | Update `w-header` spacing to use margin-bottom (matches legacy) | Complete |
+| | Update `w-body--suggestion` to horizontal layout by default | Complete |
+| | Container query: `w-body--suggestion` stacks vertically < 280px | Complete |
+| | Container query: `w-item` responsive sizing at breakpoints | Complete |
+| **Add missing template renderers** | | Pending |
+| | Implement comparison renderer (w-option × 2 + w-divider--labeled) | Pending |
+| | Implement choices renderer (w-option × N) | Pending |
+| | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Pending |
+| | Implement grouped renderer (w-section × N with w-row × N) | Pending |
+| **Verify migration** | | In Progress |
+| | All 7 existing widget types render with new w-* classes | Complete |
+| | Visual diff: compare before/after screenshots at each valid size | Pending |
+| | Existing widget configs still resolve to correct templates | Complete |
+| **Clean up legacy CSS** | | Pending |
+| | Remove dead `widget-complete__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-style__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-spectrum__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-statrow__*` CSS from Boards inline styles | Pending |
+| | Remove dead `widget-quickadd__*` CSS from Boards inline styles | Pending |
+
+#### Config-Driven AI Prompts
+
+> `generate-widget` edge function reads from template registry instead of hardcoded prompt text. The AI generates HTML that conforms to the design system.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Read template registry in edge function** | | Pending |
+| | Fetch or embed `template-registry.json` in generate-widget function | Pending |
+| | Build prompt section: "Available templates" with body modifiers, required atoms, valid sizes | Pending |
+| | Build prompt section: "Structure rules" from registry structure field | Pending |
+| | Inject template constraints into system prompt per widget type | Pending |
+| **Constrained HTML output** | | Pending |
+| | AI system prompt specifies allowed classes from manifest | Pending |
+| | AI outputs `w-*` HTML instead of free-form markup | Pending |
+| | Validate AI output against class allowlist before returning to client | Pending |
+| | Reject and retry if AI outputs non-conforming HTML | Pending |
+| **Template-specific prompts** | | Pending |
+| | Each widget config references a template from the registry by name | Pending |
+| | Prompt includes only the atoms/molecules relevant to that template | Pending |
+| | Valid sizes from registry used to constrain rendering | Pending |
+
+#### Validation Pipeline (CI Gate)
+
+> Automated conformance checking on every PR. See [Design System Validation Pipeline PRD](/docs/strategy/prds/design-system-validation-pipeline.md) for full spec.
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Manifest drift detection** | | Pending |
+| | CI runs `parse-design-system.js`, diffs against committed `manifest.json` | Pending |
+| | Fail PR if manifest changed without being regenerated | Pending |
+| | Annotate PR with token/component changes | Pending |
+| **Template validation** | | Pending |
+| | Build `scripts/validate-widgets.js` with rule engine | Pending |
+| | Rules: unknown-class, missing-shell, missing-body-modifier, wrong-structure | Pending |
+| | Output `audit.json` with pass/warn/fail per template × size | Pending |
+| | GitHub Action posts check summary | Pending |
+| **Systemic QA integration** | | Pending |
+| | `VariantAudit.importValidationReport(audit.json)` maps results to stoplights | Pending |
+| | "Import from CI" button in QA toolbar | Pending |
+| | Coverage stats in QA header | Pending |
+
+#### Concerns & Mitigations
+
+| Concern | Impact | Fix | Status |
+|---------|--------|-----|--------|
+| **Legacy class gap** — Boards outputs `widget-*` classes, validation checks `w-*` classes | Validation can't validate current production widgets | Template migration (above) closes the gap. All 7 renderers + 3 loading states now output `w-*` classes. Legacy CSS is dead code pending cleanup. | **Resolved** |
+| **Manifest/registry sync** — `manifest.json` is generated, `template-registry.json` is manual. Body modifiers can drift apart. | A new `w-body--*` modifier added to CSS but missing from registry goes undetected | Add CI check: run `parse-design-system.js`, diff body modifier keys against registry template keys, fail on mismatch | Pending |
+| **`stat-row` has no design system equivalent** — exists in Boards but has no `w-body--stats` modifier in widgets.css | Template registry maps it to `null`. Can't validate or render through design system. | Resolved: added `w-body--stats` modifier to widgets.css. Template registry updated: `stat-row` → `stats`, `boardsTemplateMap` updated, coverage moved to `migrated`. | **Resolved** |
+| **Static fixture data** — sample fixtures in template-registry.json are hand-written, may miss edge cases | Visual QA catches empty/overflow cases but fixtures don't exercise them automatically | Extend each fixture in template-registry.json to include `fixture` (happy path) + `edgeCases` (empty data, long text, missing fields). QA view renders both. | Pending |
+| **No runtime enforcement** — manifest is build-time only, widget renderer doesn't check it | A widget could render non-conforming HTML if AI hallucinates classes | Intentional: no runtime latency cost. Enforcement is at prompt time (constrained output) + CI time (validation pipeline). Add server-side allowlist check as fallback. | Pending |
+| **Container query validation** — 4 breakpoints affect layout at runtime, headless DOM can't verify visually | Structural validation catches class issues but not visual overflow/truncation | Phase 1: structural validation only. Phase 2: screenshot-based visual regression using html2canvas (tracked in Variant Audit project plan Phase 6). | Deferred |
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Resolve stat-row template gap** | | Complete |
+| | ~~Option A: Add `w-body--stats` to widgets.css with `w-stat` flex grid layout~~ | **Complete (Option A chosen)** |
+| | ~~Option B: Deprecate stat-row~~ | N/A |
+| | Update template-registry.json with chosen approach | Complete |
+| | Update boardsTemplateMap to reflect decision | Complete |
+| **Add edge-case fixtures to template registry** | | Pending |
+| | Add `edgeCases` array to each template in template-registry.json | Pending |
+| | Edge cases: empty items array, single item, 20+ items (overflow), very long text, missing optional fields | Pending |
+| | QA view renders edge-case fixtures alongside happy-path fixtures | Pending |
+| **Manifest/registry sync CI check** | | Pending |
+| | Script: parse manifest body modifiers, compare to registry template keys | Pending |
+| | Fail CI if any modifier exists in manifest but not registry (or vice versa) | Pending |
+| | Add to `design-system-validation.yml` workflow | Pending |
+| **Server-side class allowlist fallback** | | Pending |
+| | In `generate-widget` edge function, after AI returns HTML, scan for `w-*` classes | Pending |
+| | Compare against manifest.json class inventory | Pending |
+| | Strip or reject unknown classes before returning to client | Pending |
+| | Log violations for monitoring | Pending |
+| **Improve parser auto-detection** | | Pending |
+| | Remove hardcoded atom/molecule/structure lists from `parse-design-system.js` | Pending |
+| | Auto-detect category from CSS comment section headers (`/* ATOMS */`, `/* MOLECULES */`) | Pending |
+| | Eliminates need to manually update parser when adding new `w-*` classes | Pending |
+
+---
+
+### Widget Phase 2.5b: Rules-Based Widget Catalog (Pending)
 
 **Automation Level**: Medium → High
 **Reference**: [PRD: AI Widgets](/docs/strategy/prds/ai-widgets.md)
+**Prerequisite**: Phase 2.5a (Design System Transition) must be complete — widget renderers must output `w-*` classes before new widgets are built on them.
 
 > 40 use-case-driven widgets, built from a shared component system (17 components, 11 body layouts). Rollout in tiers by trigger complexity.
 
@@ -166,6 +326,7 @@
 
 | Blocker | Impact | Status | Resolution |
 |---------|--------|--------|------------|
+| **Design System Transition (Phase 2.5a)** | All new widgets must use w-* classes | In Progress | Template migration **complete** (7/7 renderers). Config-driven prompts + validation pipeline still pending. |
 | **Fix handleQuickAdd cache key** | All action widgets silently fail | Pending | Align getCacheKey with cache storage (1 line) |
 | **Verify `created_at` in schema** | 5 time-based widgets can't evaluate triggers | Pending | Check Supabase items table |
 | **Add `last_interacted_at` column** | 4 staleness widgets blocked | Pending | Schema migration + click/view tracking |
@@ -193,27 +354,29 @@
 
 #### Design System Components
 
+> **Note**: Component CSS is already written in `design-system/widgets.css` and cataloged in `design-system/manifest.json`. The tasks below track adoption into Boards template renderers.
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Widget Component System** | | Pending |
-| | Define 6 atoms: w-text, w-badge, w-bar, w-icon-btn, w-divider, w-checkbox | Pending |
-| | Define 7 molecules: w-headline, w-tag-group, w-stat, w-row, w-axis, w-option, w-section | Pending |
-| | Define 11 body layout modifiers (verdict, list, stats, spectrum, split, narrative, comparison, choices, checklist, suggestion, grouped) | Pending |
-| | Define w-shell, w-header, w-body, w-footer structure | Pending |
-| | Write CSS for all components using design tokens | Pending |
-| | Migrate existing widget-complete to w-shell | Pending |
-| **Template Render Functions** | | Pending |
-| | Implement verdict renderer (w-headline + w-tag-group) | Pending |
-| | Implement list renderer (w-row × N) | Pending |
-| | Implement stats renderer (w-stat × N) | Pending |
-| | Implement spectrum renderer (w-axis × N) | Pending |
-| | Implement split renderer (w-column × 2 with w-row × N) | Pending |
-| | Implement narrative renderer (w-text--prose) | Pending |
-| | Implement comparison renderer (w-option × 2 + w-divider--labeled) | Pending |
-| | Implement choices renderer (w-option × N) | Pending |
-| | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Pending |
-| | Implement suggestion renderer (w-row featured + w-btn) | Pending |
-| | Implement grouped renderer (w-section × N with w-row × N) | Pending |
+| **Widget Component System** | | Complete |
+| | ~~Define 6 atoms: w-text, w-badge, w-bar, w-icon-btn, w-divider, w-checkbox~~ | Complete (in widgets.css) |
+| | ~~Define 7 molecules: w-headline, w-tag-group, w-stat, w-row, w-axis, w-option, w-section~~ | Complete (in widgets.css) |
+| | ~~Define 11 body layout modifiers~~ | Complete (in widgets.css) |
+| | ~~Define w-shell, w-header, w-body, w-footer structure~~ | Complete (in widgets.css) |
+| | ~~Write CSS for all components using design tokens~~ | Complete (in widgets.css) |
+| | ~~Migrate existing widget-complete to w-shell~~ | Complete (completed in Phase 2.5a) |
+| **Template Render Functions** | | In Progress |
+| | ~~Implement verdict renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement list renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement stats renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement spectrum renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement split renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement narrative renderer~~ | Complete (Phase 2.5a migration) |
+| | Implement comparison renderer | Pending |
+| | Implement choices renderer | Pending |
+| | Implement checklist renderer | Pending |
+| | ~~Implement suggestion renderer~~ | Complete (Phase 2.5a migration) |
+| | Implement grouped renderer | Pending |
 
 #### Dynamic AI-Evaluated Categories
 
