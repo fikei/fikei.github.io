@@ -257,6 +257,17 @@ class SystemicApp {
   }
 
   /**
+   * Lazy-load widgets.css for template preview rendering (idempotent)
+   */
+  loadWidgetStyles() {
+    if (document.querySelector('link[href*="widgets.css"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '../design-system/widgets.css';
+    document.head.appendChild(link);
+  }
+
+  /**
    * Load local design system from manifest.json + template-registry.json
    * This is "self-scan" — loads our own design system without crawling
    */
@@ -264,6 +275,9 @@ class SystemicApp {
     this.debugLog('LOCAL', '=== Loading Local Design System ===');
 
     try {
+      // Lazy-load widgets.css for template rendering (idempotent)
+      this.loadWidgetStyles();
+
       // Fetch manifest and template registry in parallel
       const [manifestRes, registryRes] = await Promise.all([
         fetch('/design-system/manifest.json'),
@@ -1325,6 +1339,10 @@ class SystemicApp {
     if (!fullSystem) return false;
 
     this.debugLog('RESTORE', `Restoring active system: ${activeId}`);
+    // Lazy-load widget styles if restoring the local design system
+    if (activeId === 'local-ctrl-design-system') {
+      this.loadWidgetStyles();
+    }
     this.viewer.load(fullSystem);
     this.variantAudit?.registerFromDesignSystem(fullSystem);
     return true;
