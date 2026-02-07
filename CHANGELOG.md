@@ -4,6 +4,21 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-07] - Config-Driven AI Prompts + Server-Side Validation
+
+### Added
+- **`config/design-system.ts`** — New module in generate-widget edge function embedding the template registry (10 templates, body modifiers, valid sizes, structure rules) and full class allowlist (130+ `w-*` classes).
+- **`buildDesignSystemPrompt()`** — Injects template-specific constraints into AI prompt: body modifier, required/optional atoms, allowed classes, valid sizes.
+- **`validateWidgetHtml()` / `sanitizeWidgetHtml()`** — Server-side class allowlist validation. Extracts all `w-*` classes from AI HTML output, compares against allowlist, strips unknown classes.
+- **`resolveTemplate()`** — Maps Boards template names (e.g., `grid-split`) to design system definitions (e.g., `split`).
+- **Discovery endpoint `designSystem` field** — Each discovered widget now includes its DS template mapping (templateName, bodyModifier, validSizes, structure).
+
+### Changed
+- **AI prompt construction** — Now includes a `DESIGN SYSTEM OUTPUT FORMAT` section between brand constraints and confidence instructions. AI is told which `w-*` classes to use for each widget's template.
+- **`WidgetMeta.validation`** — Extended with `unknownClasses`, `classesUsed`, `htmlSanitized` fields for DS compliance tracking.
+
+---
+
 ## [2026-02-07] - Phase 2.5a Complete: Design System Transition
 
 ### Added

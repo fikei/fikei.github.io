@@ -24,6 +24,15 @@ import {
 } from './config/registry.ts'
 import type { EligibilityContext, EligibilityDecision } from './config/schema.ts'
 
+// Phase 2.5a: Design system constraints for AI prompts
+import {
+  buildDesignSystemPrompt,
+  validateWidgetHtml,
+  sanitizeWidgetHtml,
+  resolveTemplate,
+  boardsTemplateMap,
+} from './config/design-system.ts'
+
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -949,6 +958,10 @@ interface WidgetMeta {
   validation: {
     brandsReplaced: number
     categoryCorrected: number
+    // Phase 2.5a: Design system class validation
+    unknownClasses?: string[]
+    classesUsed?: string[]
+    htmlSanitized?: boolean
   }
 }
 
@@ -1107,21 +1120,32 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({
-          widgets: discoveries.map(d => ({
-            widgetId: d.widgetId,
-            name: d.widget.name,
-            description: d.widget.description,
-            zone: d.widget.rendering.zone,
-            template: d.widget.rendering.template,
-            fallbackTemplate: d.widget.rendering.fallbackTemplate,
-            cssClass: d.widget.rendering.cssClass,
-            priority: d.widget.rendering.priority,
-            eligibility: d.eligibility,
-            // Include prompt template so the frontend can generate
-            // content for widgets not yet in its local registry
-            promptTemplate: d.widget.generation.promptTemplate,
-            constraints: d.widget.generation.constraints || []
-          })),
+          widgets: discoveries.map(d => {
+            const dsTemplate = resolveTemplate(d.widget.rendering.template)
+            const dsName = boardsTemplateMap[d.widget.rendering.template] || d.widget.rendering.template
+            return {
+              widgetId: d.widgetId,
+              name: d.widget.name,
+              description: d.widget.description,
+              zone: d.widget.rendering.zone,
+              template: d.widget.rendering.template,
+              fallbackTemplate: d.widget.rendering.fallbackTemplate,
+              cssClass: d.widget.rendering.cssClass,
+              priority: d.widget.rendering.priority,
+              eligibility: d.eligibility,
+              // Include prompt template so the frontend can generate
+              // content for widgets not yet in its local registry
+              promptTemplate: d.widget.generation.promptTemplate,
+              constraints: d.widget.generation.constraints || [],
+              // Phase 2.5a: Design system template mapping
+              designSystem: dsTemplate ? {
+                templateName: dsName,
+                bodyModifier: dsTemplate.bodyModifier,
+                validSizes: dsTemplate.validSizes,
+                structure: dsTemplate.structure,
+              } : null,
+            }
+          }),
           category,
           itemCount: items.length,
           timestamp: Date.now()
@@ -1264,7 +1288,15 @@ IMPORTANT: Include a "confidence" field (0.0 to 1.0) in your response indicating
 
 Example: "confidence": 0.85`
 
-    const fullPrompt = `${prompt}${brandConstraint}${confidenceInstruction}
+    // ==========================================================================
+    // PHASE 2.5a: DESIGN SYSTEM CONSTRAINTS
+    // Tell the AI about the widget's template structure and allowed classes
+    // ==========================================================================
+    const widgetDef = getWidget(widgetId)
+    const templateName = widgetDef?.rendering?.template || ''
+    const dsConstraint = buildDesignSystemPrompt(templateName)
+
+    const fullPrompt = `${prompt}${brandConstraint}${dsConstraint}${confidenceInstruction}
 
 Here are the items to analyze:
 
@@ -1441,6 +1473,30 @@ Respond with valid JSON only, no markdown or explanation.`
       meta.validation = {
         brandsReplaced: enrichmentResult.brandsReplaced,
         categoryCorrected: enrichmentResult.categoryCorrected
+      }
+    }
+
+    // ==========================================================================
+    // PHASE 2.5a: DESIGN SYSTEM VALIDATION
+    // If AI response contains HTML, validate w-* classes against allowlist
+    // ==========================================================================
+    if (content.html && typeof content.html === 'string') {
+      const validation = validateWidgetHtml(content.html)
+      if (!validation.valid) {
+        console.log('[generate-widget] Unknown w-* classes detected:', validation.unknownClasses)
+        content.html = sanitizeWidgetHtml(content.html)
+        meta.validation = {
+          ...meta.validation,
+          unknownClasses: validation.unknownClasses,
+          classesUsed: validation.classesUsed,
+          htmlSanitized: true,
+        }
+      } else {
+        meta.validation = {
+          ...meta.validation,
+          classesUsed: validation.classesUsed,
+          htmlSanitized: false,
+        }
       }
     }
 
