@@ -4211,13 +4211,20 @@ Return JSON:
     }
   };
 
-  // Design System feature flag
+  // Widget feature flag — all widgets hidden by default
+  // Enable via console: window.enableWidgetDS()
   const WIDGET_DS_KEY = 'boards_widget_ds';
-  let widgetDSEnabled = localStorage.getItem(WIDGET_DS_KEY) !== 'false'; // default ON
+  let widgetDSEnabled = localStorage.getItem(WIDGET_DS_KEY) === 'true'; // default OFF
   (function initWidgetDS() {
     const link = document.getElementById('ds-widgets-css');
     if (link) link.disabled = !widgetDSEnabled;
-    console.log('[ds] Widget Design System ' + (widgetDSEnabled ? 'ON' : 'OFF') + ' — toggle via window.enableWidgetDS() / disableWidgetDS()');
+    if (!widgetDSEnabled) {
+      const hero = document.getElementById('widgetSection');
+      const footer = document.getElementById('widgetFooter');
+      if (hero) hero.style.display = 'none';
+      if (footer) footer.style.display = 'none';
+    }
+    console.log('[widgets] ' + (widgetDSEnabled ? 'ON' : 'OFF — enable via window.enableWidgetDS()'));
   })();
 
   // Cache for widget AI results
@@ -5231,6 +5238,8 @@ Return JSON:
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
+    // Feature flag: skip all widget rendering when disabled
+    if (!widgetDSEnabled) return;
     // Prevent duplicate generation
     if (widgetGenerationInProgress) return;
     widgetGenerationInProgress = true;
@@ -5745,14 +5754,19 @@ Return JSON:
     console.log('[beta] Sub-tags bar disabled');
   };
 
-  // Dev toggle: Design System widget stylesheet
+  // Dev toggle: all AI widgets (hidden by default, persists once enabled)
   // Usage: window.enableWidgetDS() / window.disableWidgetDS() in console
   window.enableWidgetDS = function() {
     widgetDSEnabled = true;
     localStorage.setItem(WIDGET_DS_KEY, 'true');
     const link = document.getElementById('ds-widgets-css');
     if (link) link.disabled = false;
-    console.log('[ds] Widget Design System enabled — refresh to see full effect');
+    const hero = $('widgetSection');
+    const footer = $('widgetFooter');
+    if (hero) hero.style.display = '';
+    if (footer) footer.style.display = '';
+    generateWidgets();
+    console.log('[widgets] Enabled — widgets will render now');
   };
 
   window.disableWidgetDS = function() {
@@ -5760,7 +5774,13 @@ Return JSON:
     localStorage.setItem(WIDGET_DS_KEY, 'false');
     const link = document.getElementById('ds-widgets-css');
     if (link) link.disabled = true;
-    console.log('[ds] Widget Design System disabled — refresh to see full effect');
+    const hero = $('widgetSection');
+    const footer = $('widgetFooter');
+    if (hero) { hero.style.display = 'none'; hero.classList.remove('widget-section--visible'); }
+    if (footer) { footer.style.display = 'none'; footer.classList.remove('widget-section--visible'); }
+    inlineWidgetHtml = '';
+    renderGrid();
+    console.log('[widgets] Disabled — all widgets hidden');
   };
 
   // ============================================
