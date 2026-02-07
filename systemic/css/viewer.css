@@ -82,14 +82,6 @@
   border: var(--border-thin) solid var(--border-subtle);
 }
 
-/* Grid layout for widget template previews (w-shell sizing classes need a grid parent) */
-.preview-component--widget-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-auto-rows: minmax(160px, auto);
-  gap: var(--space-4);
-}
-
 /* Component Specs */
 .component-specs {
   padding: var(--space-4);

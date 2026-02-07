@@ -823,7 +823,7 @@ class DesignSystemViewer {
           <div class="variants-grid">
             ${variants.map((v, i) => `
               <div class="variant-preview-card ${i === variantIndex ? 'active' : ''}" data-index="${i}">
-                <div class="variant-preview-content${isTemplate ? ' preview-component--widget-grid' : ''}">
+                <div class="variant-preview-content">
                   ${v.html || '<span class="no-preview">No preview</span>'}
                 </div>
                 <div class="variant-preview-label">
@@ -837,14 +837,10 @@ class DesignSystemViewer {
       `;
     }
 
-    // Use grid layout for widget templates so w-shell sizing classes work
-    const isTemplate = component.type?.startsWith('template-');
-    const previewClass = isTemplate ? 'preview-component preview-component--widget-grid' : 'preview-component';
-
     // Create preview container
     this.componentPreview.innerHTML = `
       <div class="preview-main">
-        <div class="${previewClass}" data-variant="${variantIndex}">
+        <div class="preview-component" data-variant="${variantIndex}">
           ${currentVariant.html || '<p>No HTML preview available</p>'}
         </div>
         <div class="preview-info">

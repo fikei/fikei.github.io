@@ -257,17 +257,6 @@ class SystemicApp {
   }
 
   /**
-   * Lazy-load widgets.css for template preview rendering (idempotent)
-   */
-  loadWidgetStyles() {
-    if (document.querySelector('link[href*="widgets.css"]')) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '../design-system/widgets.css';
-    document.head.appendChild(link);
-  }
-
-  /**
    * Load local design system from manifest.json + template-registry.json
    * This is "self-scan" — loads our own design system without crawling
    */
@@ -275,8 +264,6 @@ class SystemicApp {
     this.debugLog('LOCAL', '=== Loading Local Design System ===');
 
     try {
-      // Lazy-load widgets.css for template rendering (idempotent)
-      this.loadWidgetStyles();
 
       // Fetch manifest and template registry in parallel
       const [manifestRes, registryRes] = await Promise.all([
@@ -478,25 +465,50 @@ class SystemicApp {
   }
 
   /**
-   * Generate a preview HTML snippet for a template at a given size
+   * Size grid dimensions (cols x rows) — matches widget grid system
+   */
+  static GRID_SIZES = {
+    sm:     [1, 1],
+    med:    [2, 1],
+    tall:   [1, 2],
+    lg:     [2, 2],
+    wide:   [3, 1],
+    xl:     [3, 2],
+    col:    [1, 3],
+    poster: [2, 3],
+    max:    [3, 3],
+    banner: [4, 1],
+    pano:   [4, 2],
+    cinema: [4, 3],
+    board:  [2, 4],
+    wall:   [3, 4],
+    full:   [4, 4],
+  };
+
+  /**
+   * Generate a self-contained preview HTML snippet for a template at a given size.
+   * Uses inline styles + design system token vars (no widgets.css dependency).
    */
   generateTemplatePreviewHTML(templateName, size, tmpl) {
-    const sizeClass = `w-shell--${size}`;
-    const bodyMod = tmpl.bodyModifier;
-    const atoms = (tmpl.requiredAtoms || []).map(a =>
-      `<div class="${a}">${this.formatComponentName(a)}</div>`
-    ).join('\n          ');
+    const [cols, rows] = SystemicApp.GRID_SIZES[size] || [2, 1];
+    const cellW = 140;
+    const cellH = 160;
+    const w = cols * cellW;
+    const h = rows * cellH;
 
-    return `<div class="w-shell ${sizeClass}">
-        <div class="w-header">
-          <div class="w-header__left">
-            <span class="w-text--label">${this.formatComponentName(templateName)}</span>
-            <span class="w-badge">AI</span>
-          </div>
+    const atoms = (tmpl.requiredAtoms || []).map(a =>
+      `<div style="font-size:var(--text-xs);color:var(--fg-muted);padding:var(--space-1) 0;">${this.formatComponentName(a)}</div>`
+    ).join('');
+
+    return `<div style="display:flex;flex-direction:column;width:${w}px;height:${h}px;overflow:hidden;border:1px solid var(--border-subtle);background:var(--bg-surface);">
+        <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3);flex-shrink:0;">
+          <span style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.formatComponentName(templateName)}</span>
+          <span style="font-size:9px;padding:1px 4px;border:1px solid var(--border-subtle);color:var(--fg-subtle);">AI</span>
         </div>
-        <div class="w-body ${bodyMod}">
+        <div style="flex:1;min-height:0;padding:var(--space-3);overflow:hidden;border-top:1px solid var(--border-subtle);">
           ${atoms}
         </div>
+        <div style="padding:var(--space-1) var(--space-3);font-size:9px;color:var(--fg-subtle);text-align:right;flex-shrink:0;">${size}</div>
       </div>`;
   }
 
@@ -1339,10 +1351,6 @@ class SystemicApp {
     if (!fullSystem) return false;
 
     this.debugLog('RESTORE', `Restoring active system: ${activeId}`);
-    // Lazy-load widget styles if restoring the local design system
-    if (activeId === 'local-ctrl-design-system') {
-      this.loadWidgetStyles();
-    }
     this.viewer.load(fullSystem);
     this.variantAudit?.registerFromDesignSystem(fullSystem);
     return true;
