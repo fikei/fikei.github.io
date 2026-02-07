@@ -228,12 +228,20 @@
 | | All 7 existing widget types render with new w-* classes | Complete |
 | | Visual diff: compare before/after screenshots at each valid size | Pending |
 | | Existing widget configs still resolve to correct templates | Complete |
-| **Clean up legacy CSS** | | Pending |
-| | Remove dead `widget-complete__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-style__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-spectrum__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-statrow__*` CSS from Boards inline styles | Pending |
-| | Remove dead `widget-quickadd__*` CSS from Boards inline styles | Pending |
+| **Clean up legacy CSS** | | Complete |
+| | Remove dead `widget-complete__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-style__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-spectrum__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-statrow__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-quickadd__*` CSS from Boards inline styles | Complete |
+| | Remove dead `widget-outfit__*`, `widget-empty*`, `widget--loading*` CSS | Complete |
+| **Widget feature flag** | | Complete |
+| | Gate all widget rendering behind `boards_widget_ds` localStorage flag | Complete |
+| | Default OFF, persist once enabled via `window.enableWidgetDS()` | Complete |
+| | Guard at top of `generateWidgets()`, hide hero/footer sections when off | Complete |
+| **Edge-case fixtures** | | Complete |
+| | Add `edgeCases` array to all 10 templates in template-registry.json | Complete |
+| | Covers: empty data, single item, overflow, long text, missing fields | Complete |
 
 #### Config-Driven AI Prompts
 
@@ -241,20 +249,22 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Read template registry in edge function** | | Pending |
-| | Fetch or embed `template-registry.json` in generate-widget function | Pending |
-| | Build prompt section: "Available templates" with body modifiers, required atoms, valid sizes | Pending |
-| | Build prompt section: "Structure rules" from registry structure field | Pending |
-| | Inject template constraints into system prompt per widget type | Pending |
-| **Constrained HTML output** | | Pending |
-| | AI system prompt specifies allowed classes from manifest | Pending |
-| | AI outputs `w-*` HTML instead of free-form markup | Pending |
-| | Validate AI output against class allowlist before returning to client | Pending |
+| **Read template registry in edge function** | | Complete |
+| | Create `config/design-system.ts` with embedded template definitions and class allowlist | Complete |
+| | `buildDesignSystemPrompt()` — body modifiers, required/optional atoms, valid sizes, structure | Complete |
+| | `resolveTemplate()` — maps Boards template names to DS template definitions | Complete |
+| | Inject template constraints into prompt per widget type (between brand + confidence sections) | Complete |
+| **Constrained HTML output** | | Complete |
+| | AI system prompt specifies allowed classes from manifest allowlist (130+ classes) | Complete |
+| | `validateWidgetHtml()` — extracts all `w-*` classes and checks against allowlist | Complete |
+| | `sanitizeWidgetHtml()` — strips unknown `w-*` classes, preserves non-w-* classes | Complete |
+| | Validation runs automatically when AI response contains `content.html` field | Complete |
 | | Reject and retry if AI outputs non-conforming HTML | Pending |
-| **Template-specific prompts** | | Pending |
-| | Each widget config references a template from the registry by name | Pending |
-| | Prompt includes only the atoms/molecules relevant to that template | Pending |
-| | Valid sizes from registry used to constrain rendering | Pending |
+| **Template-specific prompts** | | Complete |
+| | Each widget config's `rendering.template` resolves to DS template via `boardsTemplateMap` | Complete |
+| | Prompt includes only the atoms/molecules relevant to that template | Complete |
+| | Valid sizes from registry included in prompt constraints | Complete |
+| | Discovery endpoint returns `designSystem` object with template mapping per widget | Complete |
 
 #### Validation Pipeline (CI Gate)
 
@@ -294,19 +304,19 @@
 | | ~~Option B: Deprecate stat-row~~ | N/A |
 | | Update template-registry.json with chosen approach | Complete |
 | | Update boardsTemplateMap to reflect decision | Complete |
-| **Add edge-case fixtures to template registry** | | Pending |
-| | Add `edgeCases` array to each template in template-registry.json | Pending |
-| | Edge cases: empty items array, single item, 20+ items (overflow), very long text, missing optional fields | Pending |
+| **Add edge-case fixtures to template registry** | | Complete |
+| | Add `edgeCases` array to each template in template-registry.json | Complete |
+| | Edge cases: empty items array, single item, 20+ items (overflow), very long text, missing optional fields | Complete |
 | | QA view renders edge-case fixtures alongside happy-path fixtures | Pending |
 | **Manifest/registry sync CI check** | | Pending |
 | | Script: parse manifest body modifiers, compare to registry template keys | Pending |
 | | Fail CI if any modifier exists in manifest but not registry (or vice versa) | Pending |
 | | Add to `design-system-validation.yml` workflow | Pending |
-| **Server-side class allowlist fallback** | | Pending |
-| | In `generate-widget` edge function, after AI returns HTML, scan for `w-*` classes | Pending |
-| | Compare against manifest.json class inventory | Pending |
-| | Strip or reject unknown classes before returning to client | Pending |
-| | Log violations for monitoring | Pending |
+| **Server-side class allowlist fallback** | | Complete |
+| | In `generate-widget` edge function, after AI returns HTML, scan for `w-*` classes | Complete |
+| | Compare against 130+ class allowlist in `config/design-system.ts` | Complete |
+| | Strip unknown classes via `sanitizeWidgetHtml()` before returning to client | Complete |
+| | Log violations to console + include in `meta.validation` response | Complete |
 | **Improve parser auto-detection** | | Pending |
 | | Remove hardcoded atom/molecule/structure lists from `parse-design-system.js` | Pending |
 | | Auto-detect category from CSS comment section headers (`/* ATOMS */`, `/* MOLECULES */`) | Pending |

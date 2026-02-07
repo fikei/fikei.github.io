@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Design System widget components -->
-  <link rel="stylesheet" href="/design-system/widgets.css">
+  <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
+  <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
 
   <style>
 /* ============================================
@@ -2345,7 +2345,54 @@ body {
 .widget-inline {
   grid-column: 1 / -1;
   margin: var(--space-2) 0;
+  position: relative;
   /* No border/background - handled by inner widget-complete__body */
+}
+
+.widget-inline[draggable="true"] {
+  cursor: grab;
+}
+
+.widget-inline[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.widget-inline.dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+}
+
+.widget-inline__drag-handle {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+
+.widget-inline:hover .widget-inline__drag-handle {
+  opacity: 0.5;
+}
+
+.widget-inline__drag-handle:hover {
+  opacity: 1 !important;
+}
+
+.widget-inline__drag-handle::before {
+  content: '\2630';
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.widget-inline__drag-handle:active {
+  cursor: grabbing;
 }
 
 
@@ -2353,740 +2400,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-/* Outfit Builder Widget - extends .card pattern */
-.widget-outfit {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
-}
-
-.widget-outfit__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.widget-outfit__title {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-base);
-  color: var(--fg);
-}
-
-.widget-outfit__subtitle {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-}
-
-.widget-outfit__scroll {
-  display: flex;
-  gap: var(--space-3);
-  overflow-x: auto;
-  padding-bottom: var(--space-2);
-  scrollbar-width: thin;
-  scrollbar-color: var(--subtle) transparent;
-}
-
-.widget-outfit__scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.widget-outfit__scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.widget-outfit__scroll::-webkit-scrollbar-thumb {
-  background: var(--subtle);
-}
-
-.widget-outfit__item {
-  flex: 0 0 auto;
-  width: 120px;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.15s;
-}
-
-.widget-outfit__item:hover {
-  transform: translateY(-2px);
-}
-
-.widget-outfit__image-wrap {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  background: var(--subtle);
-  margin-bottom: var(--space-2);
-  overflow: hidden;
-}
-
-.widget-outfit__image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.widget-outfit__placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  color: var(--muted);
-  background: var(--subtle);
-}
-
-.widget-outfit__item-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.widget-outfit__item-meta {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Style Summary Widget - inner content (now nested in widget-complete) */
-.widget-style__content {
-  /* No border/background - handled by widget-complete outer wrapper */
-}
-
-.widget-style__label {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
-  color: var(--fg);
-  margin-bottom: var(--space-1);
-}
-
-.widget-style__sublabel {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-  margin-bottom: var(--space-3);
-}
-
-.widget-style__traits {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-/* Style trait uses .token pattern from design system */
-.widget-style__trait {
-  padding: var(--space-1) var(--space-3);
-  background: transparent;
-  border: 1px solid var(--fg);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--fg);
-}
-
-/* Widget Loading State */
-.widget--loading {
-  position: relative;
-  min-height: 100px;
-}
-
-.widget--loading::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.widget__loader {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-}
-
-/* Widget Empty State */
-.widget-empty {
-  padding: var(--space-4);
-  text-align: center;
-  border: 1px dashed var(--subtle);
-}
-
-.widget-empty__text {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-}
-
-/* Complete the Look v2 - Nested Card Layout */
-.widget-complete {
-  /* Outer wrapper - no border, contains header + content box */
-}
-
-.widget-complete__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.widget-complete__header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.widget-complete__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.widget-complete__badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 2px 6px;
-  background: transparent;
-  border: 1px solid var(--muted);
-  color: var(--muted);
-}
-
-.widget-complete__refresh-btn {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--muted);
-  transition: color 0.15s;
-  line-height: 1;
-}
-
-.widget-complete__refresh-btn:hover {
-  color: var(--fg);
-}
-
-.widget-complete__body {
-  background: var(--surface);
-  border: 1px solid var(--subtle);
-  padding: var(--space-4);
-}
-
-/* Grid-split layout: used by grid-split template (complete-the-look) */
-.widget-complete__body--grid-split {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.widget-complete__body--loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80px;
-}
-
-.widget-complete__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.widget-complete__section-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin-bottom: var(--space-1);
-}
-
-.widget-complete__divider {
-  width: 1px;
-  background: var(--subtle);
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.widget-complete__divider::after {
-  content: '+';
-  background: var(--surface);
-  padding: var(--space-2) 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
-  color: var(--muted);
-}
-
-.widget-complete__items {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.widget-complete__item {
-  flex: 0 0 auto;
-  width: 100px;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.15s;
-}
-
-.widget-complete__item:hover {
-  transform: translateY(-2px);
-}
-
-.widget-complete__item--suggestion {
-  cursor: pointer;
-}
-
-.widget-complete__image-wrap {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  background: var(--subtle);
-  margin-bottom: var(--space-2);
-  overflow: hidden;
-}
-
-.widget-complete__image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.widget-complete__placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  color: var(--muted);
-  background: var(--subtle);
-}
-
-.widget-complete__suggestion-icon {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
-  border: 1px dashed var(--fg);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--fg);
-  gap: var(--space-1);
-}
-
-.widget-complete__suggestion-icon::before {
-  content: '+';
-  font-size: var(--font-size-xl);
-}
-
-.widget-complete__item-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.widget-complete__item-meta {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.widget-complete__image-wrap--product {
-  background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg) 100%);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.widget-complete__product-icon {
-  font-size: 32px;
-  line-height: 1;
-}
-
-.widget-complete__product-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.widget-complete__item--suggestion {
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.widget-complete__item--suggestion:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.widget-complete__item--suggestion:hover .widget-complete__image-wrap--product {
-  border-color: var(--accent);
-}
-
-.widget-complete__item-brand {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-  margin-top: var(--space-1);
-}
-
-.widget-complete__item-reason {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.widget-complete__item-price {
-  font-weight: 600;
-  color: var(--fg);
-  font-style: normal;
-}
-
-.widget-complete__actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.widget-complete__action {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
-  transition: all 0.15s ease;
-}
-
-.widget-complete__action:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--bg-elevated);
-}
-
-.widget-complete__action--active {
-  color: #f59e0b;
-  border-color: #f59e0b;
-}
-
-.widget-complete__action--danger:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-}
-
-.widget-complete--favorite {
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
-}
-
-.widget-complete__refresh {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  transition: all 0.15s ease;
-}
-
-.widget-complete__refresh:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.widget-complete__feedback {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-top: 1px solid var(--border);
-  margin-top: var(--space-3);
-}
-
-.widget-complete__feedback-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-  margin-right: auto;
-}
-
-.widget-complete__feedback-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.15s ease;
-}
-
-.widget-complete__feedback-btn:hover {
-  border-color: var(--accent);
-  background: var(--bg-elevated);
-}
-
-.widget-complete__shop-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg);
-  text-decoration: none;
-  margin-top: var(--space-1);
-}
-
-.widget-complete__shop-link:hover {
-  text-decoration: underline;
-}
-
-/* Spectrum Template - Dimensional positioning scales */
-.widget-spectrum__axes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-2) 0;
-}
-
-.widget-spectrum__axis {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.widget-spectrum__labels {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-}
-
-.widget-spectrum__track {
-  position: relative;
-  height: 2px;
-  background: var(--subtle);
-  margin: var(--space-2) 0;
-}
-
-.widget-spectrum__marker {
-  position: absolute;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  background: var(--fg);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: left 0.4s ease;
-}
-
-.widget-spectrum__note {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  text-align: center;
-}
-
-/* Stat Row Template - Collection metrics */
-.widget-statrow__grid {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: space-around;
-  padding: var(--space-2) 0;
-}
-
-.widget-statrow__stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 60px;
-}
-
-.widget-statrow__value {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  color: var(--fg);
-  line-height: 1;
-}
-
-.widget-statrow__label {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-}
-
-/* Quick Add Template - Single suggestion with action */
-.widget-quickadd__content {
-  display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
-  padding: var(--space-2) 0;
-}
-
-.widget-quickadd__image {
-  flex: 0 0 80px;
-  width: 80px;
-  height: 80px;
-  background: var(--subtle);
-  overflow: hidden;
-}
-
-.widget-quickadd__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.widget-quickadd__image-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  color: var(--muted);
-}
-
-.widget-quickadd__details {
-  flex: 1;
-  min-width: 0;
-}
-
-.widget-quickadd__name {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--fg);
-  font-weight: 600;
-}
-
-.widget-quickadd__brand {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.widget-quickadd__price {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--fg);
-  margin-top: var(--space-1);
-}
-
-.widget-quickadd__reason {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  font-style: italic;
-  margin-top: var(--space-2);
-  line-height: 1.4;
-}
-
-.widget-quickadd__actions {
-  display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.widget-quickadd__btn {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: var(--space-1) var(--space-3);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  text-decoration: none;
-}
-
-.widget-quickadd__btn--primary {
-  background: var(--fg);
-  color: var(--bg);
-  border: 1px solid var(--fg);
-}
-
-.widget-quickadd__btn--primary:hover {
-  background: transparent;
-  color: var(--fg);
-}
-
-.widget-quickadd__btn--secondary {
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--subtle);
-}
-
-.widget-quickadd__btn--secondary:hover {
-  border-color: var(--fg);
-  color: var(--fg);
-}
-
-.widget-quickadd__added {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 /* Widget PRD Modal */
@@ -3490,6 +2803,18 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
               <span class="share-modal__option-text">
                 <strong>Snapshot</strong>
                 <small>Frozen at time of sharing</small>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="share-modal__section">
+          <label class="share-modal__label">Widgets</label>
+          <div class="share-modal__options">
+            <label class="share-modal__option">
+              <input type="checkbox" id="shareHideWidgets">
+              <span class="share-modal__option-text">
+                <strong>Hide AI widgets</strong>
+                <small>Don't show AI-generated widgets in shared view</small>
               </span>
             </label>
           </div>
@@ -4211,6 +3536,22 @@ Return JSON:
     }
   };
 
+  // Widget feature flag — all widgets hidden by default
+  // Enable via console: window.enableWidgetDS()
+  const WIDGET_DS_KEY = 'boards_widget_ds';
+  let widgetDSEnabled = localStorage.getItem(WIDGET_DS_KEY) === 'true'; // default OFF
+  (function initWidgetDS() {
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = !widgetDSEnabled;
+    if (!widgetDSEnabled) {
+      const hero = document.getElementById('widgetSection');
+      const footer = document.getElementById('widgetFooter');
+      if (hero) hero.style.display = 'none';
+      if (footer) footer.style.display = 'none';
+    }
+    console.log('[widgets] ' + (widgetDSEnabled ? 'ON' : 'OFF — enable via window.enableWidgetDS()'));
+  })();
+
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
   let widgetCache = {};
@@ -4304,6 +3645,26 @@ Return JSON:
     generateWidgets();
     console.log('[widget] Dismissed:', widgetId);
   };
+
+  // Widget positions in grid (persisted in localStorage)
+  const WIDGET_POSITIONS_KEY = 'boards_widget_positions';
+  let widgetPositions = {}; // { widgetId: gridIndex }
+
+  function loadWidgetPositions() {
+    try {
+      widgetPositions = JSON.parse(localStorage.getItem(WIDGET_POSITIONS_KEY) || '{}');
+    } catch { widgetPositions = {}; }
+  }
+
+  function saveWidgetPositions() {
+    try {
+      localStorage.setItem(WIDGET_POSITIONS_KEY, JSON.stringify(widgetPositions));
+    } catch {}
+  }
+
+  function getWidgetPosition(widgetId) {
+    return widgetPositions[widgetId] ?? INLINE_WIDGET_POSITION;
+  }
 
   // Permanently hide widget
   window.hideWidget = function(widgetId) {
@@ -5217,11 +4578,14 @@ Return JSON:
 
   // Store inline widgets for grid injection
   let inlineWidgetHtml = '';
-  const INLINE_WIDGET_POSITION = 8; // Insert inline widget after this many cards
+  let inlineWidgets = []; // Array of { id, html } for drag-and-drop support
+  const INLINE_WIDGET_POSITION = 8; // Default: insert inline widget after this many cards
   let widgetGenerationInProgress = false; // Mutex to prevent duplicate generation
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
+    // Feature flag: skip all widget rendering when disabled
+    if (!widgetDSEnabled) return;
     // Prevent duplicate generation
     if (widgetGenerationInProgress) return;
     widgetGenerationInProgress = true;
@@ -5234,6 +4598,7 @@ Return JSON:
     heroSection.classList.remove('widget-section--visible');
     footerSection.classList.remove('widget-section--visible');
     inlineWidgetHtml = '';
+    inlineWidgets = [];
 
     // Phase 2: Category-agnostic — show widgets for any category that has matching configs
     // The widget registry (server-side) defines which categories each widget supports
@@ -5329,10 +4694,13 @@ Return JSON:
       if (widget.zone === 'hero') {
         heroHtml += widgetHtml;
       } else if (widget.zone === 'inline') {
-        inlineWidgetHtml += `
-          <div class="widget-inline">
+        const widgetWrapHtml = `
+          <div class="widget-inline" data-widget-id="${esc(widget.id)}" draggable="true">
+            <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
             ${widgetHtml}
           </div>`;
+        inlineWidgetHtml += widgetWrapHtml;
+        inlineWidgets.push({ id: widget.id, html: widgetWrapHtml });
       } else if (widget.zone === 'footer') {
         footerHtml += widgetHtml;
       }
@@ -5388,9 +4756,10 @@ Return JSON:
     // Show loading state for this specific widget
     if (widget.zone === 'inline') {
       // Replace inline widget with loading state
-      const inlineContainer = document.querySelector('.widget-inline');
+      const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
+          <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
           <div class="w-shell">
             <div class="w-header">
               <div class="w-header__left">
@@ -5429,7 +4798,7 @@ Return JSON:
       console.log('[widget] Widget suppressed on refresh:', widgetId, aiResult.reason);
       // Hide the widget since it's no longer eligible
       if (widget.zone === 'inline') {
-        const inlineContainer = document.querySelector('.widget-inline');
+        const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
         if (inlineContainer) {
           inlineContainer.style.display = 'none';
         }
@@ -5448,16 +4817,21 @@ Return JSON:
 
     // Update only this widget's display
     if (widget.zone === 'inline') {
-      const inlineContainer = document.querySelector('.widget-inline');
+      const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.style.display = ''; // Ensure visible
-        inlineContainer.innerHTML = widgetHtml;
+        inlineContainer.innerHTML = `<div class="widget-inline__drag-handle" title="Drag to reposition"></div>${widgetHtml}`;
       }
       // Also update stored HTML for future grid re-renders
-      inlineWidgetHtml = `
-        <div class="widget-inline">
+      const updatedWrapHtml = `
+        <div class="widget-inline" data-widget-id="${esc(widgetId)}" draggable="true">
+          <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
           ${widgetHtml}
         </div>`;
+      inlineWidgetHtml = updatedWrapHtml;
+      // Update the inlineWidgets array entry
+      const iwIdx = inlineWidgets.findIndex(iw => iw.id === widgetId);
+      if (iwIdx >= 0) inlineWidgets[iwIdx].html = updatedWrapHtml;
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
       if (heroContent) {
@@ -5543,6 +4917,7 @@ Return JSON:
     loadWidgetStatus();
     loadWidgetPrefs();
     loadWidgetFeedback();
+    loadWidgetPositions();
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
@@ -5734,6 +5109,35 @@ Return JSON:
     renderSubTags();
     renderGrid();
     console.log('[beta] Sub-tags bar disabled');
+  };
+
+  // Dev toggle: all AI widgets (hidden by default, persists once enabled)
+  // Usage: window.enableWidgetDS() / window.disableWidgetDS() in console
+  window.enableWidgetDS = function() {
+    widgetDSEnabled = true;
+    localStorage.setItem(WIDGET_DS_KEY, 'true');
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = false;
+    const hero = $('widgetSection');
+    const footer = $('widgetFooter');
+    if (hero) hero.style.display = '';
+    if (footer) footer.style.display = '';
+    generateWidgets();
+    console.log('[widgets] Enabled — widgets will render now');
+  };
+
+  window.disableWidgetDS = function() {
+    widgetDSEnabled = false;
+    localStorage.setItem(WIDGET_DS_KEY, 'false');
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = true;
+    const hero = $('widgetSection');
+    const footer = $('widgetFooter');
+    if (hero) { hero.style.display = 'none'; hero.classList.remove('widget-section--visible'); }
+    if (footer) { footer.style.display = 'none'; footer.classList.remove('widget-section--visible'); }
+    inlineWidgetHtml = '';
+    renderGrid();
+    console.log('[widgets] Disabled — all widgets hidden');
   };
 
   // ============================================
@@ -7438,13 +6842,25 @@ Return JSON:
 
     let html = '';
     let cardCount = 0;
-    let inlineWidgetInserted = false;
+
+    // Build a map of widget positions for injection
+    const widgetsByPosition = {};
+    if (inlineWidgets.length > 0) {
+      for (const iw of inlineWidgets) {
+        const pos = getWidgetPosition(iw.id);
+        if (!widgetsByPosition[pos]) widgetsByPosition[pos] = [];
+        widgetsByPosition[pos].push(iw.html);
+      }
+    }
+    const widgetPositionKeys = Object.keys(widgetsByPosition).map(Number).sort((a, b) => a - b);
+    let widgetPosIdx = 0;
 
     for (const l of sorted) {
-      // Inject inline widget after INLINE_WIDGET_POSITION cards
-      if (!inlineWidgetInserted && inlineWidgetHtml && cardCount >= INLINE_WIDGET_POSITION) {
-        html += inlineWidgetHtml;
-        inlineWidgetInserted = true;
+      // Inject inline widgets at their configured positions
+      while (widgetPosIdx < widgetPositionKeys.length && cardCount >= widgetPositionKeys[widgetPosIdx]) {
+        const pos = widgetPositionKeys[widgetPosIdx];
+        html += widgetsByPosition[pos].join('');
+        widgetPosIdx++;
       }
       cardCount++;
 
@@ -7514,9 +6930,11 @@ Return JSON:
       }
     }
 
-    // Add inline widget at end if not yet inserted and we have one
-    if (!inlineWidgetInserted && inlineWidgetHtml) {
-      html += inlineWidgetHtml;
+    // Add remaining inline widgets at end if not yet inserted
+    while (widgetPosIdx < widgetPositionKeys.length) {
+      const pos = widgetPositionKeys[widgetPosIdx];
+      html += widgetsByPosition[pos].join('');
+      widgetPosIdx++;
     }
 
     grid.innerHTML = html;
@@ -7945,8 +7363,9 @@ Return JSON:
     }
   };
 
-  // Drag and drop reordering
+  // Drag and drop reordering (links + widgets)
   let draggedId = null;
+  let draggedWidgetId = null;
   let isDragging = false;
   let dropPosition = null; // 'before' or 'after'
 
@@ -7956,10 +7375,30 @@ Return JSON:
     });
   }
 
+  // Get the card index of a grid-item by counting preceding grid-items
+  function getCardIndex(gridItem) {
+    const items = Array.from(grid.querySelectorAll('.grid-item'));
+    return items.indexOf(gridItem);
+  }
+
   grid.ondragstart = (e) => {
+    // Handle widget drag
+    const widget = e.target.closest('.widget-inline');
+    if (widget && widget.dataset.widgetId) {
+      draggedWidgetId = widget.dataset.widgetId;
+      draggedId = null;
+      isDragging = true;
+      widget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', 'widget:' + draggedWidgetId);
+      return;
+    }
+
+    // Handle link card drag
     const item = e.target.closest('.grid-item');
     if (!item) return;
     draggedId = item.dataset.id;
+    draggedWidgetId = null;
     isDragging = true;
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
@@ -7969,8 +7408,11 @@ Return JSON:
   grid.ondragend = (e) => {
     const item = e.target.closest('.grid-item');
     if (item) item.classList.remove('dragging');
+    const widget = e.target.closest('.widget-inline');
+    if (widget) widget.classList.remove('dragging');
     clearDragClasses();
     draggedId = null;
+    draggedWidgetId = null;
     dropPosition = null;
     setTimeout(() => { isDragging = false; }, 100);
   };
@@ -7978,9 +7420,9 @@ Return JSON:
   grid.ondragover = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
     const item = e.target.closest('.grid-item');
     if (item && item.dataset.id !== draggedId) {
-      // Determine if dropping before or after based on mouse position
       const rect = item.getBoundingClientRect();
       const midX = rect.left + rect.width / 2;
       const isBefore = e.clientX < midX;
@@ -8000,13 +7442,28 @@ Return JSON:
 
   grid.ondrop = (e) => {
     e.preventDefault();
-    const targetItem = e.target.closest('.grid-item');
-    if (!targetItem || !draggedId) return;
     clearDragClasses();
-    const targetId = targetItem.dataset.id;
-    if (draggedId !== targetId) {
-      reorderLinks(draggedId, targetId, dropPosition);
+
+    const targetItem = e.target.closest('.grid-item');
+    if (!targetItem) return;
+
+    // Widget being dropped onto a grid position
+    if (draggedWidgetId) {
+      const targetIndex = getCardIndex(targetItem);
+      const newPosition = dropPosition === 'after' ? targetIndex + 1 : targetIndex;
+      widgetPositions[draggedWidgetId] = newPosition;
+      saveWidgetPositions();
       renderGrid();
+      return;
+    }
+
+    // Link card being reordered
+    if (draggedId) {
+      const targetId = targetItem.dataset.id;
+      if (draggedId !== targetId) {
+        reorderLinks(draggedId, targetId, dropPosition);
+        renderGrid();
+      }
     }
   };
 
@@ -8758,6 +8215,7 @@ Return JSON:
     shareCreateBtn.style.display = '';
     shareStopBtn.style.display = 'none';
     shareCreateBtn.textContent = 'Create Share Link';
+    $('shareHideWidgets').checked = false;
 
     // Check if already shared
     loadExistingShare(category);
@@ -8803,6 +8261,9 @@ Return JSON:
     // Set update mode radio
     const modeRadio = document.querySelector(`input[name="shareUpdateMode"][value="${share.update_mode}"]`);
     if (modeRadio) modeRadio.checked = true;
+
+    // Set hide widgets checkbox
+    $('shareHideWidgets').checked = !!share.hide_widgets;
 
     // Show link
     const shareUrl = `${window.location.origin}/boards/share.html?id=${share.slug}`;
@@ -8850,6 +8311,7 @@ Return JSON:
 
     const visibility = document.querySelector('input[name="shareVisibility"]:checked')?.value || 'link';
     const updateMode = document.querySelector('input[name="shareUpdateMode"]:checked')?.value || 'live';
+    const hideWidgets = $('shareHideWidgets').checked;
 
     shareCreateBtn.disabled = true;
     shareCreateBtn.textContent = currentShare ? 'Updating...' : 'Creating...';
@@ -8895,6 +8357,7 @@ Return JSON:
         snapshot_link_ids: snapshotIds,
         expanded_cards: expandedForShare,
         link_order: linkOrderForShare,
+        hide_widgets: hideWidgets,
         owner_email: currentUser.email,
         updated_at: new Date().toISOString()
       };

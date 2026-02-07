@@ -378,80 +378,45 @@ Button group for admin panel sections.
 - Wraps on narrow screens
 - Buttons match admin panel style
 
-### AI Widget Card
+### AI Widget System (`widgets.css`)
 
-Standardized container for AI-powered recommendation widgets. Header sits outside the content box.
-
-```html
-<div class="widget-complete" data-widget-id="widget-123">
-  <div class="widget-complete__header">
-    <div class="widget-complete__header-left">
-      <span class="widget-complete__title">Style Summary</span>
-      <span class="widget-complete__badge">AI</span>
-    </div>
-    <button class="widget-complete__refresh-btn" onclick="refreshWidget('widget-123')" title="Refresh suggestions">⟳</button>
-  </div>
-  <div class="widget-complete__body">
-    <!-- Widget-specific content goes here -->
-  </div>
-</div>
-```
-
-**Structure:**
-```
-WIDGET TITLE   [AI]                         ⟳   ← Header (outside box)
-┌─────────────────────────────────────────────┐
-│  Widget content                             │  ← Body (bordered box)
-└─────────────────────────────────────────────┘
-```
-
-**AI Widget Card behavior:**
-- Outer wrapper: no border, contains header + body
-- Header: Title (muted, xs) + AI badge (outline) + Refresh icon (16px, floating right)
-- AI badge: outline style (transparent bg, muted border), 9px uppercase
-- Refresh icon: ⟳ character, 16px, muted color, hover effect
-- Body: bordered box (--subtle border, --surface bg) holds widget content
-- Loading state: use `.widget-complete__body--loading` for centered loader
-
-**Loading state:**
-```html
-<div class="widget-complete__body widget-complete__body--loading">
-  <div class="widget__loader">Generating insights...</div>
-</div>
-```
-
-**Variants:**
+Grid-based widget framework for AI-powered recommendations. Uses `w-*` prefix classes.
 
 ```html
-<!-- Complete the Look Widget -->
-<div class="widget-complete" data-widget-id="complete-look">
-  <div class="widget-complete__header">...</div>
-  <div class="widget-complete__body">
-    <div class="widget-complete__section">
-      <div class="widget-complete__items"><!-- User's items --></div>
+<div class="w-shell w-shell--med" data-widget-id="widget-123">
+  <div class="w-header">
+    <div class="w-header__left">
+      <span class="w-text w-text--label">Style Summary</span>
+      <span class="w-badge">AI</span>
     </div>
-    <div class="widget-complete__divider"></div>
-    <div class="widget-complete__section">
-      <div class="widget-complete__items"><!-- AI suggestions --></div>
+    <div class="w-header__controls">
+      <button class="w-icon-btn" onclick="refreshWidget('widget-123')">&#x27F3;</button>
     </div>
   </div>
-</div>
-
-<!-- Style Summary Widget -->
-<div class="widget-complete" data-widget-id="style-summary">
-  <div class="widget-complete__header">...</div>
-  <div class="widget-complete__body">
-    <div class="widget-style__content">
-      <div class="widget-style__label">Minimal Modern</div>
-      <div class="widget-style__sublabel">Based on 12 items</div>
-      <div class="widget-style__traits">
-        <span class="widget-style__trait">Clean lines</span>
-        <span class="widget-style__trait">Neutral palette</span>
-      </div>
+  <div class="w-body w-body--verdict">
+    <div class="w-headline">
+      <span class="w-text w-text--display">Minimal Modern</span>
+      <span class="w-text w-text--meta">Based on 12 items</span>
+    </div>
+    <div class="w-tag-group">
+      <span class="w-badge">Clean lines</span>
+      <span class="w-badge">Neutral palette</span>
     </div>
   </div>
 </div>
 ```
+
+**Structure:** `w-shell > w-header + w-body + w-footer`
+
+**Body templates:** `w-body--verdict`, `w-body--list`, `w-body--spectrum`, `w-body--split`, `w-body--narrative`, `w-body--suggestion`, `w-body--stats`, `w-body--comparison`, `w-body--choices`, `w-body--grouped`
+
+**Atoms:** `w-text`, `w-badge`, `w-btn`, `w-img`, `w-icon`, `w-icon-btn`, `w-bar`
+
+**Molecules:** `w-headline`, `w-tag-group`, `w-row`, `w-stat`, `w-axis`, `w-items`, `w-item`, `w-divider`, `w-action-bar`
+
+**Grid sizes:** `w-shell--sm` (1x1), `w-shell--med` (2x1), `w-shell--lg` (2x2), `w-shell--wide` (3x1), `w-shell--full` (4x4), and more
+
+**Feature flag:** Widgets hidden by default. Enable via `window.enableWidgetDS()` in console.
 
 ## Light Mode
 
@@ -471,11 +436,46 @@ document.documentElement.classList.toggle('light');
 - **Board** — Link curation with Swiss grid aesthetic
 - **Soundscape** — Audio-reactive visualization controls
 
+## Source of Truth
+
+The CSS files are the single source of truth. Everything else is derived or supplementary.
+
+```
+┌─ SOURCE OF TRUTH (hand-edited) ────────────────────────┐
+│  tokens.css        Design tokens                       │
+│  components.css    UI components                       │
+│  widgets.css       Widget grid system + atoms/molecules│
+└────────────────────────────────────────────────────────┘
+        │
+        ▼  node scripts/parse-design-system.js
+┌─ DERIVED ──────────────────────────────────────────────┐
+│  manifest.json     Auto-generated index of all tokens, │
+│                    components, and widget classes       │
+└────────────────────────────────────────────────────────┘
+
+┌─ REFERENCE (hand-edited) ─────────────────────────────┐
+│  template-registry.json   Widget template definitions, │
+│                           Boards mappings, fixtures     │
+│  widgets.html             Interactive showcase / QA     │
+└────────────────────────────────────────────────────────┘
+```
+
+**Rules:**
+- Change styles → edit the CSS files
+- Regenerate manifest → `node scripts/parse-design-system.js`
+- Systemic does **not** read the local design system (it crawls external sites)
+- `manifest.json` is read-only; never hand-edit it
+
 ## File Structure
 
 ```
 /design-system/
-  tokens.css      # Design tokens (colors, typography, spacing)
-  components.css  # Reusable UI components
-  README.md       # Documentation
+  tokens.css              # Design tokens (colors, typography, spacing)
+  components.css          # Reusable UI components
+  widgets.css             # Widget system: grid, atoms, molecules, body templates
+  manifest.json           # Generated — token + component index for tooling
+  template-registry.json  # Widget template definitions + Boards mappings
+  widgets.html            # Interactive showcase with 44 widget instances
+  index.html              # Component browser
+  README.md               # This file
 ```
