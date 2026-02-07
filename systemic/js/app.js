@@ -20,6 +20,7 @@ class SystemicApp {
       supabaseKey: SUPABASE_ANON_KEY
     });
     this.viewer = null;
+    this.variantAudit = null;
     this.currentAudit = null;
     this.designSystems = [];
     this.debugMode = true; // Enable detailed logging
@@ -251,6 +252,7 @@ class SystemicApp {
     this.bindEvents();
     this.loadSavedSystems();
     this.initViewer();
+    this.initVariantAudit();
     this.initRouter();
   }
 
@@ -370,6 +372,15 @@ class SystemicApp {
       }
     }
 
+    // Handle QA view
+    if (route.view === 'qa') {
+      this.variantAudit?.init();
+      // Deep link to a specific component: #qa/component-name
+      if (route.section && this.variantAudit) {
+        this.variantAudit.show(route.section);
+      }
+    }
+
     // Load systems list when switching to systems view
     if (route.view === 'systems') {
       this.renderSystemsList();
@@ -399,6 +410,26 @@ class SystemicApp {
     const viewerContainer = DOMUtils.$('#docs-view');
     if (viewerContainer) {
       this.viewer = new DesignSystemViewer(viewerContainer);
+    }
+  }
+
+  /**
+   * Initialize the variant audit module
+   */
+  initVariantAudit() {
+    const qaContainer = DOMUtils.$('#qa-view');
+    if (qaContainer) {
+      this.variantAudit = new VariantAudit({
+        container: qaContainer,
+        systemId: 'default',
+        onToast: (msg) => this.showToast(msg)
+      });
+
+      // Wire blocked toggle button
+      const blockedToggle = DOMUtils.$('#qa-blocked-toggle');
+      if (blockedToggle) {
+        blockedToggle.addEventListener('click', () => this.variantAudit.toggleBlockedSection());
+      }
     }
   }
 
@@ -653,6 +684,7 @@ class SystemicApp {
       // Switch to docs view after delay
       setTimeout(() => {
         this.viewer.load(designSystem);
+        this.variantAudit?.registerFromDesignSystem(designSystem);
         window.location.hash = 'docs/color';
         this.resetAuditForm();
       }, 1500);
@@ -937,6 +969,7 @@ class SystemicApp {
         const fullSystem = this.loadDesignSystem(id);
         if (fullSystem) {
           this.viewer.load(fullSystem);
+          this.variantAudit?.registerFromDesignSystem(fullSystem);
           window.location.hash = 'docs/color';
         } else {
           this.showToast('Failed to load design system', 'error');

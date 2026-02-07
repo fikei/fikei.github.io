@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="../design-system/components.css">
   <link rel="stylesheet" href="css/systemic.css">
   <link rel="stylesheet" href="css/viewer.css">
+  <link rel="stylesheet" href="css/variant-audit.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -26,6 +27,7 @@
       <nav class="header-nav">
         <a class="nav-btn active" href="#systems">My Systems</a>
         <a class="nav-btn" href="#docs">Documentation</a>
+        <a class="nav-btn" href="#qa">QA</a>
       </nav>
       <div class="header-actions">
         <a class="btn btn--filled" href="#audit" id="run-scan-btn">Run a scan</a>
@@ -302,6 +304,39 @@
           </aside>
         </div>
       </section>
+
+      <!-- QA / Variant Audit View -->
+      <section class="view-panel" id="qa-view">
+        <div class="qa-container">
+          <div class="qa-header">
+            <h2>Variant Audit</h2>
+            <p class="qa-desc" id="qa-desc">Select a component to audit its variants.</p>
+          </div>
+
+          <div class="qa-toolbar">
+            <select id="qa-component-filter">
+              <option value="">— Select component —</option>
+            </select>
+            <select id="qa-variant-filter">
+              <option value="">All variants</option>
+            </select>
+            <button id="qa-gridlines-btn">Grid lines</button>
+            <span class="qa-toolbar__spacer"></span>
+            <span class="qa-stats" id="qa-stats"></span>
+          </div>
+
+          <div class="qa-content" id="qa-content">
+            <div class="qa-variant-grid" id="qa-grid"></div>
+
+            <div id="qa-blocked-section" style="display:none;margin-top:var(--space-6)">
+              <button class="qa-blocked-toggle" id="qa-blocked-toggle"></button>
+              <div class="qa-variant-grid" id="qa-blocked-grid" style="display:none"></div>
+            </div>
+
+            <div id="qa-audit-output" style="margin-top:var(--space-8)"></div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Toast Container -->
@@ -317,6 +352,7 @@
   <script src="js/component-consolidator.js"></script>
   <script src="js/doc-generator.js"></script>
   <script src="js/viewer.js"></script>
+  <script src="js/variant-audit.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
