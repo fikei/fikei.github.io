@@ -502,7 +502,7 @@ class SystemicApp {
    */
   bindElements() {
     // Navigation
-    this.navButtons = DOMUtils.$$('.nav-btn');
+    this.appNav = DOMUtils.$('#app-nav');
     this.viewPanels = DOMUtils.$$('.view-panel');
 
     // Audit view
@@ -595,11 +595,13 @@ class SystemicApp {
     // Switch to the correct view panel
     this.activateView(route.view);
 
+    // Render progressive nav for the current view
+    this.renderNav(route);
+
     // Handle sub-routes for docs view
     if (route.view === 'docs') {
-      // If a system is loaded and a section is specified, navigate to it
       if (this.viewer?.designSystem && route.section) {
-        const foundations = ['color', 'typography', 'spacing', 'elevation'];
+        const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples'];
         if (foundations.includes(route.section)) {
           this.viewer.selectFoundation(route.section);
         } else if (route.section === 'component' && route.detail) {
@@ -629,19 +631,119 @@ class SystemicApp {
   }
 
   /**
-   * Activate a view panel and update nav state
+   * Activate a view panel
    */
   activateView(view) {
-    // Update navigation links
-    this.navButtons.forEach(btn => {
-      const btnView = btn.getAttribute('href')?.slice(1) || btn.dataset.view;
-      btn.classList.toggle('active', btnView === view);
-    });
-
-    // Update panels
     this.viewPanels.forEach(panel => {
       panel.classList.toggle('active', panel.id === `${view}-view`);
     });
+  }
+
+  /**
+   * Render progressive navigation based on current route
+   */
+  renderNav(route) {
+    if (!this.appNav) return;
+
+    switch (route.view) {
+      case 'systems':
+        this.appNav.innerHTML = `
+          <a href="#systems" class="docs-nav__link active" data-nav="systems">My Systems</a>
+          <span class="docs-nav__spacer"></span>
+          <a class="btn btn--filled btn--sm" href="#audit">Run a scan</a>
+        `;
+        break;
+
+      case 'audit':
+        this.appNav.innerHTML = `
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="#systems" class="breadcrumb-link">Systems</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">Audit</span>
+          </nav>
+          <span class="docs-nav__spacer"></span>
+        `;
+        break;
+
+      case 'qa':
+        this.appNav.innerHTML = `
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="#systems" class="breadcrumb-link">Systems</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">QA</span>
+          </nav>
+          <span class="docs-nav__spacer"></span>
+        `;
+        break;
+
+      case 'docs':
+        this.renderDocsNav(route);
+        break;
+
+      default:
+        this.appNav.innerHTML = `
+          <a href="#systems" class="docs-nav__link">My Systems</a>
+          <span class="docs-nav__spacer"></span>
+        `;
+    }
+  }
+
+  /**
+   * Render the docs-specific navigation with foundation links and dropdowns
+   */
+  renderDocsNav(route) {
+    const systemName = this.viewer?.designSystem?.name || 'System';
+    const components = this.viewer?.designSystem?.components || [];
+
+    // Build component options
+    const componentOptions = components.map(c => {
+      const name = c.name || c.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      const count = c.variants?.length || 0;
+      return `<option value="${c.type}">${name} (${count})</option>`;
+    }).join('');
+
+    this.appNav.innerHTML = `
+      <nav class="breadcrumb" id="stage-breadcrumb" aria-label="Breadcrumb">
+        <a href="#systems" class="breadcrumb-link">Systems</a>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current" id="breadcrumb-system-name">${systemName}</span>
+      </nav>
+      <span class="docs-nav__divider"></span>
+      <a href="#" class="docs-nav__link" data-section="color">Color</a>
+      <a href="#" class="docs-nav__link" data-section="typography">Typography</a>
+      <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
+      <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
+      <a href="#" class="docs-nav__link" data-section="examples">Examples</a>
+      <span class="docs-nav__spacer"></span>
+      <select class="docs-nav__select" id="component-select">
+        <option value="">Component...</option>
+        ${componentOptions}
+      </select>
+      <select class="docs-nav__select" id="variant-select" hidden>
+        <option value="">Variant...</option>
+      </select>
+      <div class="state-toggles" id="state-toggles">
+        <button class="state-btn active" data-state="default" title="Default">○</button>
+        <button class="state-btn" data-state="hover" title="Hover">◉</button>
+        <button class="state-btn" data-state="focus" title="Focus">◎</button>
+        <button class="state-btn" data-state="disabled" title="Disabled">◌</button>
+      </div>
+      <div class="view-toggle">
+        <button class="toggle-btn active" data-context="design">Design</button>
+        <button class="toggle-btn" data-context="code">Code</button>
+      </div>
+    `;
+
+    // Rebind viewer events to the newly created nav elements
+    if (this.viewer) {
+      this.viewer.rebindNav(this.appNav);
+    }
+
+    // Set active foundation link if applicable
+    if (route.section) {
+      const activeLink = this.appNav.querySelector(`[data-section="${route.section}"]`);
+      if (activeLink) activeLink.classList.add('active');
+    }
   }
 
   /**

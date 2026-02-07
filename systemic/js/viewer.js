@@ -24,17 +24,9 @@ class DesignSystemViewer {
   }
 
   /**
-   * Bind DOM elements
+   * Bind DOM elements (stage + sidebar - nav is bound separately via rebindNav)
    */
   bindElements() {
-    // Docs nav bar
-    this.docsNav = DOMUtils.$('#docs-nav', this.container);
-    this.foundationLinks = DOMUtils.$$('.docs-nav__link', this.container);
-    this.componentSelect = DOMUtils.$('#component-select', this.container);
-    this.variantSelect = DOMUtils.$('#variant-select', this.container);
-    this.breadcrumb = DOMUtils.$('#stage-breadcrumb', this.container);
-    this.breadcrumbSystemName = DOMUtils.$('#breadcrumb-system-name', this.container);
-
     // Stage
     this.componentStage = DOMUtils.$('#component-stage', this.container);
     this.componentPreview = DOMUtils.$('#component-preview', this.container);
@@ -67,9 +59,34 @@ class DesignSystemViewer {
   }
 
   /**
-   * Bind event listeners
+   * Bind event listeners for stage + sidebar (not nav - that's rebindNav)
    */
   bindEvents() {
+    // Copy buttons
+    DOMUtils.$$('.copy-btn', this.container).forEach(btn => {
+      btn.addEventListener('click', () => this.copyCode(btn.dataset.copy));
+    });
+
+    // Mobile sidebar toggle
+    this.contextSidebar?.addEventListener('click', (e) => {
+      if (window.innerWidth <= 900 && e.target === this.contextSidebar) {
+        this.contextSidebar.classList.toggle('expanded');
+      }
+    });
+  }
+
+  /**
+   * Rebind nav elements after app.js rebuilds the nav bar
+   * Called by app.js after renderDocsNav()
+   */
+  rebindNav(navElement) {
+    // Cache nav element references
+    this.foundationLinks = DOMUtils.$$('.docs-nav__link[data-section]', navElement);
+    this.componentSelect = DOMUtils.$('#component-select', navElement);
+    this.variantSelect = DOMUtils.$('#variant-select', navElement);
+    this.breadcrumb = DOMUtils.$('#stage-breadcrumb', navElement);
+    this.breadcrumbSystemName = DOMUtils.$('#breadcrumb-system-name', navElement);
+
     // Foundation nav links
     this.foundationLinks.forEach(link => {
       link.addEventListener('click', (e) => {
@@ -87,12 +104,12 @@ class DesignSystemViewer {
     });
 
     // View toggle (Design / Code)
-    DOMUtils.$$('.toggle-btn', this.container).forEach(btn => {
+    DOMUtils.$$('.toggle-btn', navElement).forEach(btn => {
       btn.addEventListener('click', () => this.switchContext(btn.dataset.context));
     });
 
     // State toggles
-    DOMUtils.$$('.state-btn', this.container).forEach(btn => {
+    DOMUtils.$$('.state-btn', navElement).forEach(btn => {
       btn.addEventListener('click', () => this.switchState(btn.dataset.state));
     });
 
@@ -101,17 +118,17 @@ class DesignSystemViewer {
       this.selectVariant(e.target.value);
     });
 
-    // Copy buttons
-    DOMUtils.$$('.copy-btn', this.container).forEach(btn => {
-      btn.addEventListener('click', () => this.copyCode(btn.dataset.copy));
-    });
-
-    // Mobile sidebar toggle
-    this.contextSidebar?.addEventListener('click', (e) => {
-      if (window.innerWidth <= 900 && e.target === this.contextSidebar) {
-        this.contextSidebar.classList.toggle('expanded');
-      }
-    });
+    // Restore active states
+    if (this.currentContext) {
+      DOMUtils.$$('.toggle-btn', navElement).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.context === this.currentContext);
+      });
+    }
+    if (this.currentState) {
+      DOMUtils.$$('.state-btn', navElement).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.state === this.currentState);
+      });
+    }
   }
 
   /**
@@ -154,34 +171,11 @@ class DesignSystemViewer {
   }
 
   /**
-   * Render the navigation (populate component dropdown + update breadcrumb)
+   * Render navigation - now handled by app.js renderDocsNav()
+   * This just triggers the route to refresh the nav
    */
   renderNavigation() {
-    if (!this.designSystem) return;
-
-    // Update breadcrumb system name
-    if (this.breadcrumbSystemName) {
-      this.breadcrumbSystemName.textContent = this.designSystem.name || 'System';
-    }
-
-    // Populate component dropdown
-    if (this.componentSelect) {
-      const components = this.designSystem.components || [];
-
-      // Reset dropdown
-      this.componentSelect.innerHTML = '<option value="">Component...</option>';
-
-      if (components.length > 0) {
-        components.forEach(component => {
-          const variantCount = component.variants?.length || 0;
-          const name = component.name || this.formatName(component.type);
-          const option = document.createElement('option');
-          option.value = component.type;
-          option.textContent = `${name} (${variantCount})`;
-          this.componentSelect.appendChild(option);
-        });
-      }
-    }
+    // Nav is built by app.js; nothing to do here
   }
 
   /**
@@ -262,6 +256,9 @@ class DesignSystemViewer {
       case 'elevation':
         this.renderElevationFoundation();
         break;
+      case 'examples':
+        this.renderExamplesFoundation();
+        break;
       default:
         this.componentPreview.innerHTML = '<div class="preview-placeholder"><p>Select a section</p></div>';
     }
@@ -317,15 +314,16 @@ class DesignSystemViewer {
    * Update navigation active state
    */
   updateNavActiveState(activeId) {
-    // Update foundation link active states
-    this.foundationLinks.forEach(link => {
-      link.classList.toggle('active', link.dataset.section === activeId);
-    });
+    // Update foundation link active states (may not exist if nav not yet rendered)
+    if (this.foundationLinks) {
+      this.foundationLinks.forEach(link => {
+        link.classList.toggle('active', link.dataset.section === activeId);
+      });
+    }
 
     // Update component dropdown if a component is selected
     const foundations = ['color', 'typography', 'spacing', 'elevation'];
     if (foundations.includes(activeId)) {
-      // Deselect component dropdown when viewing a foundation
       if (this.componentSelect) this.componentSelect.value = '';
     } else if (this.componentSelect) {
       this.componentSelect.value = activeId;
@@ -542,6 +540,255 @@ class DesignSystemViewer {
     }
 
     html += '</div>';
+    this.componentPreview.innerHTML = html;
+    this.componentSpecs.hidden = true;
+  }
+
+  /**
+   * Render examples foundation - widgets.html showcase pattern with dummy content
+   */
+  renderExamplesFoundation() {
+    const tokens = this.designSystem?.tokens || {};
+    const colors = tokens.colors || {};
+    const typography = tokens.typography || {};
+
+    // Extract primary/secondary hex for inline styles
+    const primaryHex = colors.primary?.hex || '#ffffff';
+    const secondaryHex = colors.secondary?.hex || '#999999';
+    const fontPrimary = typography.primary || 'Space Grotesk, sans-serif';
+
+    let html = `
+      <div class="foundation-content" style="max-width: 1200px; --ex-primary: ${primaryHex}; --ex-secondary: ${secondaryHex};">
+
+        <!-- Atoms -->
+        <div class="ex-section" id="ex-atoms">
+          <h2 class="ex-section__heading">Atoms</h2>
+          <p class="ex-section__desc">Smallest visual units extracted from the design system.</p>
+
+          <div class="ex-grid">
+
+            <!-- Buttons -->
+            <div class="ex-card">
+              <div class="ex-card__label">Buttons</div>
+              <div class="ex-card__demo">
+                <div class="ex-variants-row">
+                  <button class="ex-btn">Default</button>
+                  <button class="ex-btn ex-btn--filled">Filled</button>
+                  <button class="ex-btn ex-btn--sm">Small</button>
+                </div>
+                <div class="ex-variants-row">
+                  <button class="ex-btn ex-btn--primary">Primary</button>
+                  <button class="ex-btn ex-btn--secondary">Secondary</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Badges -->
+            <div class="ex-card">
+              <div class="ex-card__label">Badges</div>
+              <div class="ex-card__demo">
+                <div class="ex-variants-row">
+                  <span class="ex-badge">Default</span>
+                  <span class="ex-badge ex-badge--filled">Filled</span>
+                  <span class="ex-badge ex-badge--accent">Accent</span>
+                </div>
+                <div class="ex-variants-row">
+                  <span class="ex-badge">New</span>
+                  <span class="ex-badge">v2.0</span>
+                  <span class="ex-badge ex-badge--filled">Beta</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Typography -->
+            <div class="ex-card">
+              <div class="ex-card__label">Typography</div>
+              <div class="ex-card__demo" style="font-family: ${fontPrimary};">
+                <span style="font-size: 24px; font-weight: 600;">Display</span>
+                <span style="font-size: 18px; font-weight: 500;">Title</span>
+                <span style="font-size: 14px; color: var(--fg);">Body text for paragraph content and descriptions.</span>
+                <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted);">Meta — supporting info</span>
+                <span style="font-size: 10px; font-style: italic; color: var(--fg-subtle);">Note — explanatory italic</span>
+              </div>
+            </div>
+
+            <!-- Colors -->
+            <div class="ex-card">
+              <div class="ex-card__label">Color Tokens</div>
+              <div class="ex-card__demo">
+                <div class="ex-variants-row">
+                  <div class="ex-color-dot" style="background: ${primaryHex};" title="Primary"></div>
+                  <div class="ex-color-dot" style="background: ${secondaryHex};" title="Secondary"></div>
+                  ${(colors.neutral || []).slice(0, 4).map(c =>
+                    `<div class="ex-color-dot" style="background: ${c.hex};" title="${c.hex}"></div>`
+                  ).join('')}
+                </div>
+                <div class="ex-variants-row">
+                  ${colors.error ? `<div class="ex-color-dot" style="background: ${colors.error.hex};" title="Error"></div>` : ''}
+                  ${colors.success ? `<div class="ex-color-dot" style="background: ${colors.success.hex};" title="Success"></div>` : ''}
+                  ${colors.warning ? `<div class="ex-color-dot" style="background: ${colors.warning.hex};" title="Warning"></div>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress Bars -->
+            <div class="ex-card">
+              <div class="ex-card__label">Progress</div>
+              <div class="ex-card__demo">
+                <div class="ex-bar" style="height: 4px;"><div class="ex-bar__fill" style="width: 25%;"></div></div>
+                <div class="ex-bar"><div class="ex-bar__fill" style="width: 67%;"></div></div>
+                <div class="ex-bar" style="height: 8px;"><div class="ex-bar__fill" style="width: 90%; background: ${primaryHex};"></div></div>
+              </div>
+            </div>
+
+            <!-- Inputs -->
+            <div class="ex-card">
+              <div class="ex-card__label">Form Inputs</div>
+              <div class="ex-card__demo">
+                <input class="ex-input" type="text" placeholder="Text input" readonly>
+                <input class="ex-input" type="text" value="Filled value" readonly>
+                <textarea class="ex-input ex-input--textarea" placeholder="Textarea" readonly></textarea>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <hr class="ex-divider">
+
+        <!-- Molecules -->
+        <div class="ex-section" id="ex-molecules">
+          <h2 class="ex-section__heading">Molecules</h2>
+          <p class="ex-section__desc">Composed patterns using the extracted tokens.</p>
+
+          <div class="ex-grid">
+
+            <!-- Card -->
+            <div class="ex-card">
+              <div class="ex-card__label">Card</div>
+              <div class="ex-card__demo">
+                <div class="ex-card-widget">
+                  <div class="ex-card-widget__media">320 × 180</div>
+                  <div class="ex-card-widget__body">
+                    <h3 class="ex-card-widget__title">Card Title</h3>
+                    <p class="ex-card-widget__text">Brief description or summary text that provides context about the card content.</p>
+                    <div class="ex-card-widget__footer">
+                      <span class="ex-badge">Category</span>
+                      <button class="ex-btn ex-btn--sm">Action</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- List Item -->
+            <div class="ex-card">
+              <div class="ex-card__label">List Items</div>
+              <div class="ex-card__demo">
+                <div class="ex-list-item">
+                  <div class="ex-avatar">AB</div>
+                  <div class="ex-list-item__content">
+                    <div class="ex-list-item__title">List Item Title</div>
+                    <div class="ex-list-item__meta">Supporting text · 2m ago</div>
+                  </div>
+                  <button class="ex-btn ex-btn--sm">View</button>
+                </div>
+                <div class="ex-list-item">
+                  <div class="ex-avatar">CD</div>
+                  <div class="ex-list-item__content">
+                    <div class="ex-list-item__title">Another Item</div>
+                    <div class="ex-list-item__meta">Description · 15m ago</div>
+                  </div>
+                  <span class="ex-badge ex-badge--accent">New</span>
+                </div>
+                <div class="ex-list-item">
+                  <div class="ex-avatar">EF</div>
+                  <div class="ex-list-item__content">
+                    <div class="ex-list-item__title">Third Item</div>
+                    <div class="ex-list-item__meta">More info · 1h ago</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Nav Bar -->
+            <div class="ex-card">
+              <div class="ex-card__label">Navigation</div>
+              <div class="ex-card__demo">
+                <div class="ex-variants-row">
+                  <span class="ex-nav-item ex-nav-item--active">Overview</span>
+                  <span class="ex-nav-item">Details</span>
+                  <span class="ex-nav-item">Settings</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form Group -->
+            <div class="ex-card">
+              <div class="ex-card__label">Form Group</div>
+              <div class="ex-card__demo">
+                <div>
+                  <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted); margin-bottom: var(--space-2);">Email Address</div>
+                  <input class="ex-input" type="text" placeholder="name@example.com" readonly>
+                </div>
+                <div>
+                  <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted); margin-bottom: var(--space-2);">Message</div>
+                  <textarea class="ex-input ex-input--textarea" placeholder="Enter your message..." readonly></textarea>
+                </div>
+                <div class="ex-variants-row" style="justify-content: flex-end;">
+                  <button class="ex-btn">Cancel</button>
+                  <button class="ex-btn ex-btn--primary">Submit</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="ex-card">
+              <div class="ex-card__label">Stats</div>
+              <div class="ex-card__demo">
+                <div style="display: flex; justify-content: space-around; text-align: center;">
+                  <div>
+                    <div style="font-size: 24px; font-weight: 600; color: var(--fg);">128</div>
+                    <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted);">Pages</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 24px; font-weight: 600; color: ${primaryHex};">42</div>
+                    <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted);">Tokens</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 24px; font-weight: 600; color: var(--fg);">16</div>
+                    <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg-muted);">Components</div>
+                  </div>
+                </div>
+                <div class="ex-bar"><div class="ex-bar__fill" style="width: 78%; background: ${primaryHex};"></div></div>
+              </div>
+            </div>
+
+            <!-- Card with Avatar -->
+            <div class="ex-card">
+              <div class="ex-card__label">User Card</div>
+              <div class="ex-card__demo">
+                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                  <div class="ex-avatar" style="width: 48px; height: 48px; font-size: var(--text-sm);">JD</div>
+                  <div>
+                    <div style="font-weight: 500; color: var(--fg);">Jane Doe</div>
+                    <div style="font-size: 11px; color: var(--fg-muted);">Product Designer</div>
+                  </div>
+                </div>
+                <p style="font-size: 12px; color: var(--fg-muted); margin: 0; line-height: 1.5;">Building interfaces that balance form and function. Currently working on design systems and component libraries.</p>
+                <div class="ex-variants-row">
+                  <button class="ex-btn ex-btn--primary ex-btn--sm">Follow</button>
+                  <button class="ex-btn ex-btn--sm">Message</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    `;
+
     this.componentPreview.innerHTML = html;
     this.componentSpecs.hidden = true;
   }
@@ -875,8 +1122,8 @@ class DesignSystemViewer {
   switchContext(context) {
     this.currentContext = context;
 
-    // Update toggle buttons
-    DOMUtils.$$('.toggle-btn', this.container).forEach(btn => {
+    // Update toggle buttons (in the app nav, not container)
+    DOMUtils.$$('.toggle-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.context === context);
     });
 
@@ -891,8 +1138,8 @@ class DesignSystemViewer {
   switchState(state) {
     this.currentState = state;
 
-    // Update state buttons
-    DOMUtils.$$('.state-btn', this.container).forEach(btn => {
+    // Update state buttons (in the app nav, not container)
+    DOMUtils.$$('.state-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.state === state);
     });
 

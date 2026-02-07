@@ -199,3 +199,38 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 | Reduced motion option | Pending |
 | Screen reader optimization | Pending |
 | Focus indicators | Pending |
+
+---
+
+## SystemicAI
+
+Design system analyzer and documentation generator.
+
+### Epic: Docs Viewer UX
+
+| Story | Status |
+|-------|--------|
+| **Hash-based routing** — `#systems`, `#docs/color`, `#docs/component/button` | Complete |
+| **Breadcrumb navigation** — Systems / CTRL / Color | Complete |
+| **Progressive universal nav** — Single nav bar adapts per view (systems, audit, docs) | Complete |
+| **Showcase layout** — widgets.html-style scrollable content area with grid texture | Complete |
+| **Examples section** — Atoms + Molecules showcase using extracted tokens | Complete |
+| **Left-hand sidebar navigation** — Collapsible sidebar for filtering foundations/components alongside top nav | Pending |
+| **Component search/filter** — Quick-filter components by name or type from sidebar | Pending |
+| **Responsive sidebar** — Drawer-based sidebar on mobile with toggle | Pending |
+
+### Epic: Documentation Generation
+
+| Story | Status |
+|-------|--------|
+| Auto-generate usage guidelines per component | Pending |
+| Export design system as static HTML report | Pending |
+| Diff two audits of the same system | Pending |
+
+### Epic: Crawler Improvements
+
+| Story | Status |
+|-------|--------|
+| SPA/JavaScript rendering support | Pending |
+| CSS-in-JS token extraction | Pending |
+| Multi-page crawl depth optimization | Pending |

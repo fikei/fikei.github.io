@@ -24,18 +24,19 @@
         <h1 class="logo">SystemicAI</h1>
         <span class="tagline">Design System Generator</span>
       </div>
-      <nav class="header-nav">
-        <a class="nav-btn active" href="#systems">My Systems</a>
-        <a class="nav-btn" href="#docs">Documentation</a>
-        <a class="nav-btn" href="#qa">QA</a>
-      </nav>
       <div class="header-actions">
-        <a class="btn btn--filled" href="#audit" id="run-scan-btn">Run a scan</a>
         <button class="btn btn--ghost" id="theme-toggle">
           <span class="icon">*</span>
         </button>
       </div>
     </header>
+
+    <!-- Universal Navigation Bar (progressive content based on view) -->
+    <nav class="docs-nav" id="app-nav">
+      <a href="#systems" class="docs-nav__link" data-nav="systems">My Systems</a>
+      <span class="docs-nav__spacer"></span>
+      <a class="btn btn--filled btn--sm" href="#audit" id="run-scan-btn">Run a scan</a>
+    </nav>
 
     <!-- Main Content -->
     <main class="systemic-main">
@@ -165,41 +166,10 @@
 
       <!-- Documentation / Viewer View -->
       <section class="view-panel" id="docs-view">
-        <!-- Sticky docs nav (widgets.html pattern) -->
-        <nav class="docs-nav" id="docs-nav">
-          <nav class="breadcrumb" id="stage-breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb-link">Systems</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current" id="breadcrumb-system-name">Select a system</span>
-          </nav>
-          <span class="docs-nav__divider"></span>
-          <a href="#" class="docs-nav__link" data-section="color">Color</a>
-          <a href="#" class="docs-nav__link" data-section="typography">Typography</a>
-          <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
-          <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
-          <span class="docs-nav__spacer"></span>
-          <select class="docs-nav__select" id="component-select">
-            <option value="">Component...</option>
-          </select>
-          <select class="docs-nav__select" id="variant-select" hidden>
-            <option value="">Variant...</option>
-          </select>
-          <div class="state-toggles" id="state-toggles">
-            <button class="state-btn active" data-state="default" title="Default">○</button>
-            <button class="state-btn" data-state="hover" title="Hover">◉</button>
-            <button class="state-btn" data-state="focus" title="Focus">◎</button>
-            <button class="state-btn" data-state="disabled" title="Disabled">◌</button>
-          </div>
-          <div class="view-toggle">
-            <button class="toggle-btn active" data-context="design">Design</button>
-            <button class="toggle-btn" data-context="code">Code</button>
-          </div>
-        </nav>
-
         <div class="viewer-container">
-          <!-- Component Stage -->
+          <!-- Component Stage (showcase-style scrollable area) -->
           <main class="component-stage" id="component-stage">
-            <div class="component-preview" id="component-preview">
+            <div class="showcase" id="component-preview">
               <div class="preview-placeholder">
                 <p>Select a foundation or component to preview</p>
               </div>
