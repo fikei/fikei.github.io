@@ -54,6 +54,12 @@
               "source": "human"
             },
             {
+              "title": "Design System Validation Pipeline",
+              "icon": "\u2705",
+              "file": "docs/strategy/prds/design-system-validation-pipeline.md",
+              "source": "ai"
+            },
+            {
               "title": "Widget Instrumentation",
               "icon": "\ud83d\udccb",
               "file": "docs/strategy/prds/widget-instrumentation.md",
