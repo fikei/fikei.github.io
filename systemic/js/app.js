@@ -546,9 +546,12 @@ class SystemicApp {
     // Cancel audit
     this.cancelAuditBtn?.addEventListener('click', () => this.cancelAudit());
 
-    // Debug log export buttons
+    // Debug log export buttons (audit progress view)
     DOMUtils.$('#copy-debug-log')?.addEventListener('click', () => this.copyDebugLogs());
     DOMUtils.$('#download-debug-log')?.addEventListener('click', () => this.downloadDebugLogs());
+
+    // Dev menu
+    this.initDevMenu();
 
     // Auth type change
     this.authTypeSelect?.addEventListener('change', () => {
@@ -560,6 +563,59 @@ class SystemicApp {
 
     // Theme toggle
     this.themeToggle?.addEventListener('click', () => this.toggleTheme());
+  }
+
+  /**
+   * Initialize dev menu toggle and actions
+   */
+  initDevMenu() {
+    const trigger = DOMUtils.$('#dev-menu-trigger');
+    const dropdown = DOMUtils.$('#dev-menu-dropdown');
+    if (!trigger || !dropdown) return;
+
+    // Toggle dropdown
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+
+    // Close on outside click
+    document.addEventListener('click', () => dropdown.classList.remove('open'));
+    dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+    // Actions
+    DOMUtils.$('#dev-cleanup-duplicates')?.addEventListener('click', () => {
+      this.cleanupDuplicates();
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-copy-debug-log')?.addEventListener('click', () => {
+      this.copyDebugLogs();
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-download-debug-log')?.addEventListener('click', () => {
+      this.downloadDebugLogs();
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-clear-debug-log')?.addEventListener('click', () => {
+      this.clearDebugLogs();
+      this.showToast('Debug log cleared');
+      dropdown.classList.remove('open');
+    });
+
+    DOMUtils.$('#dev-clear-all')?.addEventListener('click', () => {
+      if (confirm('Delete ALL design systems and debug data? This cannot be undone.')) {
+        this.designSystems.forEach(ds => localStorage.removeItem(`systemic-ds-${ds.id}`));
+        this.designSystems = [];
+        localStorage.removeItem('systemic-design-systems');
+        this.clearDebugLogs();
+        this.renderSystemsList();
+        this.showToast('All data cleared');
+      }
+      dropdown.classList.remove('open');
+    });
   }
 
   /**
