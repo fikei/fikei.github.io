@@ -49,7 +49,7 @@
     <nav class="docs-nav" id="app-nav">
       <a href="#systems" class="docs-nav__link" data-nav="systems">My Systems</a>
       <span class="docs-nav__spacer"></span>
-      <a class="btn btn--filled btn--sm" href="#audit" id="run-scan-btn">Run a scan</a>
+      <button class="btn btn--filled btn--sm" id="run-scan-btn">Run a scan</button>
     </nav>
 
     <!-- Main Content -->
@@ -302,6 +302,30 @@
         </div>
       </section>
     </main>
+
+    <!-- Scan Modal -->
+    <div class="scan-modal" id="scan-modal">
+      <div class="scan-modal__backdrop" id="scan-modal-backdrop"></div>
+      <div class="scan-modal__dialog">
+        <div class="scan-modal__header">
+          <h2>New Scan</h2>
+          <button class="scan-modal__close" id="scan-modal-close">&times;</button>
+        </div>
+        <div class="scan-modal__body">
+          <div class="scan-modal__option">
+            <div class="scan-modal__option-label">Scan a website</div>
+            <div class="scan-modal__option-row">
+              <input type="text" id="scan-url-input" class="input" placeholder="example.com">
+              <button class="btn btn--filled" id="scan-url-submit">Scan</button>
+            </div>
+          </div>
+          <div class="scan-modal__divider"><span>or</span></div>
+          <div class="scan-modal__option">
+            <button class="btn btn--ghost scan-modal__local-btn" id="scan-local-btn">Load local design system</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
