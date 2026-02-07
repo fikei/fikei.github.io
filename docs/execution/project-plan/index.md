@@ -20,7 +20,7 @@
 |-------|--------|----------|
 | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 18/18 |
 | [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 12/12 |
-| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 40/100+ |
+| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 55/100 |
 | [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 8/90 |
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/10 |
@@ -72,13 +72,13 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 18 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 12 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 46 | 8 | 46 | 0 |
+| Phase 3: AI Intelligence | 55 | 8 | 37 | 0 |
 | Phase 4: Sharing & Collaboration | 8 | 8 | 72 | 2 |
 | Phase 5: UX Polish | 3 | 0 | 67 | 0 |
 | Phase 6: Performance | 1 | 0 | 9 | 0 |
 | Phase 7: Platform Expansion | 0 | 0 | 50 | 0 |
 | Backlog | 0 | 0 | 40 | 0 |
-| **TOTAL** | **88** | **16** | **284** | **2** |
+| **TOTAL** | **97** | **16** | **275** | **2** |
 
 ---
 

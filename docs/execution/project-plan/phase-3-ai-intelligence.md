@@ -326,7 +326,7 @@
 
 | Blocker | Impact | Status | Resolution |
 |---------|--------|--------|------------|
-| **Design System Transition (Phase 2.5a)** | All new widgets must use w-* classes | In Progress | Complete template migration + config-driven prompts first |
+| **Design System Transition (Phase 2.5a)** | All new widgets must use w-* classes | In Progress | Template migration **complete** (7/7 renderers). Config-driven prompts + validation pipeline still pending. |
 | **Fix handleQuickAdd cache key** | All action widgets silently fail | Pending | Align getCacheKey with cache storage (1 line) |
 | **Verify `created_at` in schema** | 5 time-based widgets can't evaluate triggers | Pending | Check Supabase items table |
 | **Add `last_interacted_at` column** | 4 staleness widgets blocked | Pending | Schema migration + click/view tracking |
@@ -358,25 +358,25 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Widget Component System** | | In Progress |
+| **Widget Component System** | | Complete |
 | | ~~Define 6 atoms: w-text, w-badge, w-bar, w-icon-btn, w-divider, w-checkbox~~ | Complete (in widgets.css) |
 | | ~~Define 7 molecules: w-headline, w-tag-group, w-stat, w-row, w-axis, w-option, w-section~~ | Complete (in widgets.css) |
 | | ~~Define 11 body layout modifiers~~ | Complete (in widgets.css) |
 | | ~~Define w-shell, w-header, w-body, w-footer structure~~ | Complete (in widgets.css) |
 | | ~~Write CSS for all components using design tokens~~ | Complete (in widgets.css) |
-| | Migrate existing widget-complete to w-shell | Pending (tracked in Phase 2.5a) |
-| **Template Render Functions** | | Pending |
-| | ~~Implement verdict renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement list renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement stats renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement spectrum renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement split renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement narrative renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement comparison renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement choices renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement checklist renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement suggestion renderer~~ (tracked in Phase 2.5a migration) | Pending |
-| | ~~Implement grouped renderer~~ (tracked in Phase 2.5a migration) | Pending |
+| | ~~Migrate existing widget-complete to w-shell~~ | Complete (completed in Phase 2.5a) |
+| **Template Render Functions** | | In Progress |
+| | ~~Implement verdict renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement list renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement stats renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement spectrum renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement split renderer~~ | Complete (Phase 2.5a migration) |
+| | ~~Implement narrative renderer~~ | Complete (Phase 2.5a migration) |
+| | Implement comparison renderer | Pending |
+| | Implement choices renderer | Pending |
+| | Implement checklist renderer | Pending |
+| | ~~Implement suggestion renderer~~ | Complete (Phase 2.5a migration) |
+| | Implement grouped renderer | Pending |
 
 #### Dynamic AI-Evaluated Categories
 
