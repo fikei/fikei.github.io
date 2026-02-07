@@ -288,9 +288,11 @@ class SystemicApp {
 
       // Transform manifest into Systemic design system format
       const designSystem = this.transformManifestToDesignSystem(manifest, registry);
+      this.debugLog('LOCAL', `Transformed: ${designSystem.components?.length} components, first template HTML starts with: ${designSystem.components?.find(c => c.type?.startsWith('template-'))?.variants?.[0]?.html?.slice(0, 80)}...`);
 
       // Save it (update if already exists)
       const isUpdate = this.designSystems.some(ds => ds.id === designSystem.id);
+      this.debugLog('LOCAL', `Saving (isUpdate: ${isUpdate})`);
       this.saveDesignSystem(designSystem, isUpdate);
 
       // Load into viewer and QA
@@ -495,6 +497,7 @@ class SystemicApp {
     const cellH = 160;
     const w = cols * cellW;
     const h = rows * cellH;
+    this.debugLog('TEMPLATE', `Generating preview: ${templateName} @ ${size} (${w}x${h}px, atoms: ${tmpl.requiredAtoms?.join(', ') || 'none'})`);
 
     const atoms = (tmpl.requiredAtoms || []).map(a =>
       `<div style="font-size:var(--text-xs);color:var(--fg-muted);padding:var(--space-1) 0;">${this.formatComponentName(a)}</div>`
@@ -609,6 +612,11 @@ class SystemicApp {
     dropdown.addEventListener('click', (e) => e.stopPropagation());
 
     // Actions
+    DOMUtils.$('#dev-reload-local')?.addEventListener('click', () => {
+      this.loadLocalDesignSystem();
+      dropdown.classList.remove('open');
+    });
+
     DOMUtils.$('#dev-cleanup-duplicates')?.addEventListener('click', () => {
       this.cleanupDuplicates();
       dropdown.classList.remove('open');
