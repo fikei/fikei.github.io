@@ -25,6 +25,9 @@ import { gapFiller } from './widgets/gap-filler.ts'
 import { eatDecide } from './widgets/eat-decide.ts'
 import { useCompare } from './widgets/use-compare.ts'
 import { discoverMore } from './widgets/discover-more.ts'
+import { stylePick } from './widgets/style-pick.ts'
+import { outfitChecklist } from './widgets/outfit-checklist.ts'
+import { boardOverview } from './widgets/board-overview.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -41,6 +44,9 @@ const registry: WidgetRegistry = {
     'eat-decide': eatDecide,
     'use-compare': useCompare,
     'discover-more': discoverMore,
+    'style-pick': stylePick,
+    'outfit-checklist': outfitChecklist,
+    'board-overview': boardOverview,
   },
 
   defaults: {

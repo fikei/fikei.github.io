@@ -3698,7 +3698,7 @@ Return JSON:
       status: 'active',
       zone: 'inline',
       criteria: {
-        category: ['use', 'tech', 'home'],
+        category: ['use', 'tech', 'home', 'wear', 'all'],
         minItems: 1,
         maxItems: null
       },
@@ -3766,6 +3766,120 @@ Return JSON:
 }`,
       template: {
         name: 'quick-add',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'style-pick': {
+      id: 'style-pick',
+      version: '1.0',
+      name: 'Pick Your Favorite',
+      description: 'Shows your saved items as selectable cards — tap the one you\'d buy first.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: ['wear', 'all'],
+        minItems: 3,
+        maxItems: null
+      },
+      prompt: `You are a personal shopper. The user has saved these items. Present 3-4 of their best saved items as choices and ask them to pick their favorite.
+
+For each option, write a brief one-line reason why it stands out.
+
+Return JSON:
+{
+  "question": "Which would you grab first?",
+  "options": [
+    { "title": "Item name", "description": "Why this one stands out — 1 sentence" },
+    { "title": "Item name", "description": "Why this one stands out — 1 sentence" }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'choices',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'outfit-checklist': {
+      id: 'outfit-checklist',
+      version: '1.0',
+      name: 'Outfit Checklist',
+      description: 'Builds a complete outfit from your saves — check off what you already own.',
+      status: 'active',
+      zone: 'inline',
+      criteria: {
+        category: ['wear', 'all'],
+        minItems: 2,
+        maxItems: null
+      },
+      prompt: `You are a wardrobe stylist. From the user's saved items, build a complete outfit as a checklist.
+
+Include 4-6 items covering different categories (top, bottom, shoes, accessories). Use items from their saves where possible, and suggest missing pieces.
+
+For each item, indicate if the user already has it (checked) based on whether it appears in their saved items.
+
+Return JSON:
+{
+  "items": [
+    { "name": "White Oxford Shirt", "price": "$65", "checked": true },
+    { "name": "Dark Wash Jeans", "price": "$90", "checked": true },
+    { "name": "White Sneakers", "price": "$130", "checked": false },
+    { "name": "Leather Belt", "price": "$45", "checked": false }
+  ],
+  "total": "$330",
+  "confidence": 0.75
+}`,
+      template: {
+        name: 'checklist',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'board-overview': {
+      id: 'board-overview',
+      version: '1.0',
+      name: 'Board at a Glance',
+      description: 'Groups your saved items by theme or type so you can see the shape of your collection.',
+      status: 'active',
+      zone: 'footer',
+      criteria: {
+        category: 'all',
+        minItems: 4,
+        maxItems: null
+      },
+      prompt: `You are a collection analyst. Group the user's saved items into 2-4 meaningful themes or categories.
+
+RULES:
+- Don't just group by website — group by PURPOSE or TYPE
+- Each group needs a clear, descriptive title
+- Include the actual item names from the user's saves
+- 2-4 groups, each with 2-5 items
+
+Return JSON:
+{
+  "sections": [
+    {
+      "title": "Everyday Essentials",
+      "items": [
+        { "name": "Item name", "brand": "Brand" },
+        { "name": "Item name", "brand": "Brand" }
+      ]
+    },
+    {
+      "title": "Statement Pieces",
+      "items": [
+        { "name": "Item name", "brand": "Brand" }
+      ]
+    }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'grouped',
         fallback: 'list'
       },
       createdAt: '2026-02-07',
@@ -4171,8 +4285,8 @@ Return JSON:
 
     // --- Content type affinity (weight: 0.15) ---
     maxScore += 0.15;
-    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare'].includes(widget.id);
-    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more'].includes(widget.id);
+    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
+    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview'].includes(widget.id);
 
     if (isProductWidget && profile.productRatio > 0.3) {
       const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;

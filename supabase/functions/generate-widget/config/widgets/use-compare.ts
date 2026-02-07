@@ -20,7 +20,7 @@ export const useCompare: WidgetDefinition = {
         type: 'category_match',
         weight: 0.8,
         params: {
-          categories: ['use', 'tech', 'home', 'tools', 'software'],
+          categories: ['use', 'tech', 'home', 'wear', 'tools', 'software', 'all'],
           mode: 'any',
           fallbackToContent: true
         }
@@ -95,7 +95,7 @@ Return JSON:
     priority: 8
   },
 
-  categories: ['use', 'tech', 'home', 'tools', 'software'],
+  categories: ['use', 'tech', 'home', 'wear', 'tools', 'software', 'all'],
   tags: ['comparison', 'decision', 'ai', 'versus'],
   enabled: true,
 
