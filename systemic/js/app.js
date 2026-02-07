@@ -488,8 +488,8 @@ class SystemicApp {
   };
 
   /**
-   * Generate a self-contained preview HTML snippet for a template at a given size.
-   * Uses inline styles + design system token vars (no widgets.css dependency).
+   * Generate a self-contained preview HTML for a template at a given size.
+   * Each template type renders dummy content matching its real layout pattern.
    */
   generateTemplatePreviewHTML(templateName, size, tmpl) {
     const [cols, rows] = SystemicApp.GRID_SIZES[size] || [2, 1];
@@ -497,22 +497,129 @@ class SystemicApp {
     const cellH = 160;
     const w = cols * cellW;
     const h = rows * cellH;
-    this.debugLog('TEMPLATE', `Generating preview: ${templateName} @ ${size} (${w}x${h}px, atoms: ${tmpl.requiredAtoms?.join(', ') || 'none'})`);
 
-    const atoms = (tmpl.requiredAtoms || []).map(a =>
-      `<div style="font-size:var(--text-xs);color:var(--fg-muted);padding:var(--space-1) 0;">${this.formatComponentName(a)}</div>`
-    ).join('');
+    const s = {
+      label: 'font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-muted)',
+      meta: 'font-size:10px;color:var(--fg-subtle)',
+      title: 'font-size:13px;font-weight:500;color:var(--fg)',
+      display: 'font-size:18px;font-weight:600;color:var(--fg);line-height:1.2',
+      prose: 'font-size:11px;color:var(--fg-muted);line-height:1.5',
+      badge: 'font-size:9px;padding:2px 6px;border:1px solid var(--border-subtle);color:var(--fg-muted);display:inline-block',
+      badgeFilled: 'font-size:9px;padding:2px 6px;background:var(--fg);color:var(--bg);display:inline-block',
+      row: 'display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) 0;border-top:1px solid var(--border-subtle)',
+      thumb: 'width:28px;height:28px;background:var(--bg-elevated);flex-shrink:0',
+      axis: 'display:flex;flex-direction:column;gap:2px',
+      track: 'height:3px;background:var(--bg-elevated);position:relative',
+      marker: 'position:absolute;top:-2px;width:7px;height:7px;background:var(--fg);border-radius:50%',
+      col: 'flex:1;display:flex;flex-direction:column;gap:var(--space-2)',
+      divider: 'width:1px;background:var(--border-subtle);align-self:stretch',
+      dividerH: 'height:1px;background:var(--border-subtle)',
+      section: 'display:flex;flex-direction:column;gap:var(--space-1)',
+    };
+
+    const bodyContent = this.getTemplateBodyContent(templateName, s);
 
     return `<div style="display:flex;flex-direction:column;width:${w}px;height:${h}px;overflow:hidden;border:1px solid var(--border-subtle);background:var(--bg-surface);">
         <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3);flex-shrink:0;">
-          <span style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.formatComponentName(templateName)}</span>
-          <span style="font-size:9px;padding:1px 4px;border:1px solid var(--border-subtle);color:var(--fg-subtle);">AI</span>
+          <span style="${s.label};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${this.formatComponentName(templateName)}</span>
+          <span style="${s.badge}">AI</span>
         </div>
-        <div style="flex:1;min-height:0;padding:var(--space-3);overflow:hidden;border-top:1px solid var(--border-subtle);">
-          ${atoms}
+        <div style="flex:1;min-height:0;padding:var(--space-3);overflow:hidden;border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:var(--space-2);">
+          ${bodyContent}
         </div>
-        <div style="padding:var(--space-1) var(--space-3);font-size:9px;color:var(--fg-subtle);text-align:right;flex-shrink:0;">${size}</div>
       </div>`;
+  }
+
+  /**
+   * Get template-specific body content with dummy data matching the layout pattern
+   */
+  getTemplateBodyContent(name, s) {
+    switch (name) {
+      case 'verdict':
+        return `
+          <div style="text-align:center;flex:1;display:flex;flex-direction:column;justify-content:center;gap:var(--space-2)">
+            <div style="${s.display}">Bold vs Minimal</div>
+            <div style="${s.meta}">3 items lean warm, 2 lean cool</div>
+            <div style="display:flex;gap:var(--space-1);justify-content:center;flex-wrap:wrap;margin-top:var(--space-1)">
+              <span style="${s.badgeFilled}">Bold</span>
+              <span style="${s.badge}">vs</span>
+              <span style="${s.badgeFilled}">Minimal</span>
+            </div>
+          </div>`;
+
+      case 'narrative':
+        return `
+          <p style="${s.prose};margin:0">Your recent saves share an underlying theme: <strong style="color:var(--fg)">the tension between craft and convenience</strong>. You're drawn to handmade details but keep choosing mass-market.</p>
+          <div style="display:flex;gap:var(--space-1);flex-wrap:wrap;margin-top:auto">
+            <span style="${s.badge}">Craft</span>
+            <span style="${s.badge}">Design</span>
+          </div>`;
+
+      case 'list':
+        return `
+          <div style="${s.row};border-top:none;padding-top:0"><div style="${s.thumb}"></div><div><div style="${s.title}">Golden Gate Bridge</div><div style="${s.meta}">Start here — morning light</div></div></div>
+          <div style="${s.row}"><div style="${s.thumb}"></div><div><div style="${s.title}">Tartine Bakery</div><div style="${s.meta}">12 min drive — lunch stop</div></div></div>
+          <div style="${s.row}"><div style="${s.thumb}"></div><div><div style="${s.title}">SFMOMA</div><div style="${s.meta}">8 min walk — afternoon</div></div></div>`;
+
+      case 'spectrum':
+        return `
+          <div style="${s.axis}"><div style="display:flex;justify-content:space-between"><span style="${s.label}">Read</span><span style="${s.label}">Watch</span></div><div style="${s.track}"><div style="${s.marker};left:35%"></div></div></div>
+          <div style="${s.axis}"><div style="display:flex;justify-content:space-between"><span style="${s.label}">Browse</span><span style="${s.label}">Buy</span></div><div style="${s.track}"><div style="${s.marker};left:70%"></div></div></div>
+          <div style="${s.axis}"><div style="display:flex;justify-content:space-between"><span style="${s.label}">Solo</span><span style="${s.label}">Social</span></div><div style="${s.track}"><div style="${s.marker};left:25%"></div></div></div>
+          <div style="${s.meta};margin-top:auto">Based on 34 saves</div>`;
+
+      case 'split':
+        return `
+          <div style="display:flex;gap:var(--space-3);flex:1">
+            <div style="${s.col}"><div style="${s.label}">Your Items</div><div style="${s.title}">White sneakers</div><div style="${s.meta}">Nike</div><div style="${s.title}">Blue jeans</div><div style="${s.meta}">Levi's</div></div>
+            <div style="${s.divider}"></div>
+            <div style="${s.col}"><div style="${s.label}">Suggestions</div><div style="${s.title}">Canvas tote</div><div style="${s.meta}">Baggu</div><div style="${s.title}">Sunglasses</div><div style="${s.meta}">Ray-Ban</div></div>
+          </div>`;
+
+      case 'comparison':
+        return `
+          <div style="display:flex;gap:var(--space-2);flex:1;align-items:center">
+            <div style="${s.col};text-align:center"><div style="${s.title}">Notion</div><div style="${s.meta}">Your current pick</div><div style="display:flex;gap:2px;justify-content:center;margin-top:var(--space-1)"><span style="${s.badge}">Docs</span><span style="${s.badge}">Wiki</span></div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="${s.divider};height:24px"></div><span style="${s.label}">vs</span><div style="${s.divider};height:24px"></div></div>
+            <div style="${s.col};text-align:center"><div style="${s.title}">Obsidian</div><div style="${s.meta}">Worth trying</div><div style="display:flex;gap:2px;justify-content:center;margin-top:var(--space-1)"><span style="${s.badge}">Local</span><span style="${s.badge}">MD</span></div></div>
+          </div>`;
+
+      case 'choices':
+        return `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);flex:1">
+            <div style="border:1px solid var(--border-subtle);padding:var(--space-2);display:flex;flex-direction:column;gap:2px"><div style="${s.title}">Plan A</div><div style="${s.meta}">Quick & safe</div></div>
+            <div style="border:1px solid var(--border-subtle);padding:var(--space-2);display:flex;flex-direction:column;gap:2px"><div style="${s.title}">Plan B</div><div style="${s.meta}">Bold & risky</div></div>
+            <div style="border:1px solid var(--border-subtle);padding:var(--space-2);display:flex;flex-direction:column;gap:2px"><div style="${s.title}">Plan C</div><div style="${s.meta}">Balanced</div></div>
+          </div>`;
+
+      case 'checklist':
+        return `
+          <div style="${s.row};border-top:none;padding-top:0"><span style="width:12px;height:12px;border:1px solid var(--fg-muted);flex-shrink:0"></span><div style="${s.title}">Return running shoes</div></div>
+          <div style="${s.row}"><span style="width:12px;height:12px;border:1px solid var(--fg-muted);flex-shrink:0;background:var(--fg)"></span><div style="${s.title};text-decoration:line-through;color:var(--fg-subtle)">Cancel trial subscription</div></div>
+          <div style="${s.row}"><span style="width:12px;height:12px;border:1px solid var(--fg-muted);flex-shrink:0"></span><div style="${s.title}">Compare prices on jacket</div></div>
+          <div style="${s.meta};margin-top:auto">1 of 3 done</div>`;
+
+      case 'suggestion':
+        return `
+          <div style="height:48px;background:var(--bg-elevated);margin-bottom:var(--space-2)"></div>
+          <div style="${s.title}">Try this instead</div>
+          <div style="${s.prose}">Based on what you've been saving, this fits your style better than your current pick.</div>
+          <div style="display:flex;gap:var(--space-2);margin-top:auto">
+            <span style="${s.badgeFilled}">View</span>
+            <span style="${s.badge}">Skip</span>
+          </div>`;
+
+      case 'grouped':
+        return `
+          <div style="${s.section}"><div style="${s.label}">Morning</div><div style="${s.title}">Read: Morning Brew</div><div style="${s.meta}">5 min — from your saves</div></div>
+          <div style="${s.dividerH}"></div>
+          <div style="${s.section}"><div style="${s.label}">Afternoon</div><div style="${s.title}">Listen: Huberman Lab</div><div style="${s.meta}">Saved episode — 45 min</div></div>
+          <div style="${s.dividerH}"></div>
+          <div style="${s.section}"><div style="${s.label}">Evening</div><div style="${s.title}">Watch: Chef's Table</div><div style="${s.meta}">Next unwatched — S7E2</div></div>`;
+
+      default:
+        return `<div style="${s.meta}">Template preview</div>`;
+    }
   }
 
   /**
@@ -559,6 +666,14 @@ class SystemicApp {
 
     // Toast container
     this.toastContainer = DOMUtils.$('#toast-container');
+
+    // Scan modal
+    this.scanModal = DOMUtils.$('#scan-modal');
+    this.scanModalBackdrop = DOMUtils.$('#scan-modal-backdrop');
+    this.scanModalClose = DOMUtils.$('#scan-modal-close');
+    this.scanUrlInput = DOMUtils.$('#scan-url-input');
+    this.scanUrlSubmit = DOMUtils.$('#scan-url-submit');
+    this.scanLocalBtn = DOMUtils.$('#scan-local-btn');
   }
 
   /**
@@ -591,6 +706,43 @@ class SystemicApp {
 
     // Theme toggle
     this.themeToggle?.addEventListener('click', () => this.toggleTheme());
+
+    // Scan modal
+    this.scanModalClose?.addEventListener('click', () => this.closeScanModal());
+    this.scanModalBackdrop?.addEventListener('click', () => this.closeScanModal());
+    this.scanUrlSubmit?.addEventListener('click', () => {
+      const url = this.scanUrlInput?.value?.trim();
+      if (url) {
+        this.closeScanModal();
+        // Populate the audit form and navigate
+        const auditUrlInput = DOMUtils.$('#audit-url');
+        if (auditUrlInput) auditUrlInput.value = url;
+        this.navigateTo('audit');
+        // Auto-submit the audit form after a tick so the view is active
+        setTimeout(() => this.startAudit(), 100);
+      }
+    });
+    this.scanUrlInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.scanUrlSubmit?.click();
+      }
+    });
+    this.scanLocalBtn?.addEventListener('click', () => {
+      this.closeScanModal();
+      this.loadLocalDesignSystem();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.scanModal?.classList.contains('open')) {
+        this.closeScanModal();
+      }
+    });
+
+    // "Run a scan" button in initial HTML nav
+    DOMUtils.$('#run-scan-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.openScanModal();
+    });
   }
 
   /**
@@ -750,8 +902,9 @@ class SystemicApp {
         this.appNav.innerHTML = `
           <a href="#systems" class="docs-nav__link active" data-nav="systems">My Systems</a>
           <span class="docs-nav__spacer"></span>
-          <a class="btn btn--filled btn--sm" href="#audit">Run a scan</a>
+          <button class="btn btn--filled btn--sm" id="nav-run-scan-btn">Run a scan</button>
         `;
+        DOMUtils.$('#nav-run-scan-btn')?.addEventListener('click', () => this.openScanModal());
         break;
 
       case 'audit':
@@ -873,6 +1026,26 @@ class SystemicApp {
       if (blockedToggle) {
         blockedToggle.addEventListener('click', () => this.variantAudit.toggleBlockedSection());
       }
+    }
+  }
+
+  /**
+   * Open the scan modal
+   */
+  openScanModal() {
+    if (this.scanModal) {
+      this.scanModal.classList.add('open');
+      this.scanUrlInput?.focus();
+    }
+  }
+
+  /**
+   * Close the scan modal
+   */
+  closeScanModal() {
+    if (this.scanModal) {
+      this.scanModal.classList.remove('open');
+      if (this.scanUrlInput) this.scanUrlInput.value = '';
     }
   }
 
@@ -1407,31 +1580,15 @@ class SystemicApp {
         <div class="empty-state" id="no-systems">
           <div class="empty-icon">+</div>
           <h3>No design systems yet</h3>
-          <p>Start an audit to generate your first design system, or load the local design system.</p>
-          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;justify-content:center;">
-            <a class="btn btn--filled" href="#audit">Start Audit</a>
-            <button class="btn" id="load-local-btn">Load Local System</button>
-          </div>
+          <p>Scan a website or load a local design system to get started.</p>
+          <button class="btn btn--filled" id="empty-run-scan-btn">Run a scan</button>
         </div>
       `;
-      DOMUtils.$('#load-local-btn')?.addEventListener('click', () => this.loadLocalDesignSystem());
+      DOMUtils.$('#empty-run-scan-btn')?.addEventListener('click', () => this.openScanModal());
       return;
     }
 
-    // Check if local system is already loaded
-    const hasLocal = this.designSystems.some(ds => ds.id === 'local-ctrl-design-system');
-
-    this.systemsGrid.innerHTML = `
-      ${!hasLocal ? `<div class="system-card system-card--action" id="load-local-card">
-        <div class="system-card-header">
-          <h3 class="system-card-title">CTRL Design System</h3>
-        </div>
-        <div class="system-card-url">Local · design-system/manifest.json</div>
-        <div class="system-card-stats">
-          <button class="btn btn--filled btn--sm">Load Local System</button>
-        </div>
-      </div>` : ''}
-    ` + this.designSystems.map(ds => `
+    this.systemsGrid.innerHTML = this.designSystems.map(ds => `
       <div class="system-card" data-id="${ds.id}">
         <div class="system-card-header">
           <h3 class="system-card-title">${ds.name}</h3>
@@ -1473,11 +1630,6 @@ class SystemicApp {
           this.showToast('Could not load design system data — it may need to be re-scanned', 'error');
         }
       });
-    });
-
-    // Bind local load card
-    DOMUtils.$('#load-local-card', this.systemsGrid)?.addEventListener('click', () => {
-      this.loadLocalDesignSystem();
     });
 
     // Bind delete button events
