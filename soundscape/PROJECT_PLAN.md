@@ -752,6 +752,96 @@
 
 ---
 
+## Epic 6: Architecture Evolution (V2 Backlog) 🔮
+
+**Goal**: Ideas extracted from the `claude/soundscape-design-system-Cz849` branch review (2026-02-07). That branch attempted a full V2 rewrite and was killed — these are the concepts worth revisiting independently.
+**Priority**: BACKLOG
+**Decision Log**: `docs/strategy/decision-log-soundscape-v2-branch.md`
+
+---
+
+### Story 6.1: Composable Layer Model
+**As a** user
+**I want** to stack multiple element types in a single scene
+**So that** I'm not limited to one theme at a time
+
+**Background**: V2 proposed replacing the 5-theme system (LINEAR, NEON, GLITCH, STARS, WAVE) with stackable layers of 6 element primitives (LINES, POINTS, GRIDS, STARS, BLOBS + custom). Up to 10 layers with independent controls per layer. This is the single most valuable architectural idea from the V2 branch.
+
+**Acceptance Criteria**:
+- Users can add/remove visual layers
+- Each layer has independent element type, opacity, blend mode
+- Layers composite in order (painter's algorithm)
+- Performance stays above 30 FPS with 3+ layers
+- Backward-compatible with existing theme presets (themes become saved layer configurations)
+
+**Effort**: 20-30 hours (significant architecture change)
+**Priority**: BACKLOG — revisit when V1 is feature-complete
+
+#### Tasks:
+- [ ] Design layer data model and API
+- [ ] Implement LayerStack manager
+- [ ] Implement per-layer render pipeline
+- [ ] Convert existing themes to layer presets
+- [ ] Build layer management UI (add/remove/reorder)
+- [ ] Performance test with multiple active layers
+- [ ] Document migration path from V1 themes
+
+---
+
+### Story 6.2: Extended Cursor Interaction Modes
+**As a** user
+**I want** different ways my cursor affects the visualization
+**So that** I have more interactive control beyond just repelling elements
+
+**Background**: V1 LINEAR theme has REPEL cursor interaction only. V2 designed ATTRACT (pull elements toward cursor), ORBIT (elements circle the cursor), and DISPLACE (push elements along cursor velocity) modes, universally applicable to any element type.
+
+**Acceptance Criteria**:
+- ATTRACT mode pulls nearby elements toward cursor
+- ORBIT mode creates circular motion around cursor
+- DISPLACE mode pushes elements in cursor travel direction
+- Mode selector available per theme
+- Interaction radius configurable
+
+**Effort**: 4-6 hours
+**Priority**: LOW
+
+#### Tasks:
+- [ ] Implement ATTRACT cursor force calculation
+- [ ] Implement ORBIT cursor force calculation
+- [ ] Implement DISPLACE cursor velocity tracking
+- [ ] Add cursor mode selector to theme controls
+- [ ] Add interaction radius slider
+- [ ] Test with each theme's element type
+- [ ] Document cursor mode behaviors
+
+---
+
+### Story 6.3: Audio Opt-In Default
+**As a** user
+**I want** audio reactivity to be off by default
+**So that** I can enjoy the visualization without microphone permission prompts
+
+**Background**: V2 made audio reactivity opt-in rather than opt-out. Users see the visual first, then enable audio when ready. This avoids the browser permission prompt on first load.
+
+**Acceptance Criteria**:
+- Visualization loads and animates without audio
+- Clear "Enable Audio" button in UI
+- Microphone permission only requested on user action
+- All controls work in non-audio mode (time-based fallback)
+- Audio state persisted in localStorage
+
+**Effort**: 1-2 hours
+**Priority**: LOW
+
+#### Tasks:
+- [ ] Add audio enable/disable toggle to UI
+- [ ] Defer microphone permission to user action
+- [ ] Implement time-based fallback for audio-reactive controls
+- [ ] Persist audio preference in localStorage
+- [ ] Test all themes work without audio input
+
+---
+
 ## Summary & Roadmap
 
 ### Total Effort Breakdown
@@ -763,7 +853,8 @@
 | 3. Visual Controls | 9-12h | MEDIUM |
 | 4. Testing & QA | 8-12h | HIGH |
 | 5. Documentation | 4-6h | MEDIUM |
-| **TOTAL** | **58-80h** | - |
+| 6. Architecture Evolution (V2 Backlog) | 25-38h | BACKLOG |
+| **TOTAL (Epics 1-5)** | **58-80h** | - |
 
 ### Recommended Phases
 
@@ -827,5 +918,5 @@ Replace Stories 1.5, 1.6, 1.7 with Story 1.8:
 
 ---
 
-*Version: 1.0*
-*Last Updated: 2025-12-23*
+*Version: 1.1*
+*Last Updated: 2026-02-07*
