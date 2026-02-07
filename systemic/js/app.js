@@ -293,11 +293,10 @@ class SystemicApp {
       this.saveDesignSystem(designSystem, isUpdate);
 
       // Load into viewer and QA
-      this.viewer.load(designSystem);
-      this.variantAudit?.registerFromDesignSystem(designSystem);
+      this.setActiveSystem(designSystem);
 
       this.showToast('Local design system loaded');
-      window.location.hash = 'docs/color';
+      this.navigateTo('docs/color');
 
     } catch (error) {
       this.debugLog('LOCAL', 'Error loading local design system:', error);
@@ -649,6 +648,16 @@ class SystemicApp {
   handleRoute() {
     const route = this.parseHash();
 
+    // If navigating to docs/qa without a loaded system, try to restore the last-active one
+    if ((route.view === 'docs' || route.view === 'qa') && !this.viewer?.designSystem) {
+      const restored = this.restoreActiveSystem();
+      if (!restored) {
+        // No system to restore — redirect to systems list
+        window.location.hash = 'systems';
+        return;
+      }
+    }
+
     // Switch to the correct view panel
     this.activateView(route.view);
 
@@ -834,10 +843,21 @@ class SystemicApp {
   }
 
   /**
+   * Navigate to a hash route, forcing handleRoute even if hash is unchanged
+   */
+  navigateTo(hash) {
+    if (window.location.hash === `#${hash}`) {
+      this.handleRoute();
+    } else {
+      window.location.hash = hash;
+    }
+  }
+
+  /**
    * Switch between views by updating the URL hash
    */
   switchView(view) {
-    window.location.hash = view;
+    this.navigateTo(view);
   }
 
   /**
@@ -1083,9 +1103,8 @@ class SystemicApp {
 
       // Switch to docs view after delay
       setTimeout(() => {
-        this.viewer.load(designSystem);
-        this.variantAudit?.registerFromDesignSystem(designSystem);
-        window.location.hash = 'docs/color';
+        this.setActiveSystem(designSystem);
+        this.navigateTo('docs/color');
         this.resetAuditForm();
       }, 1500);
 
@@ -1284,6 +1303,34 @@ class SystemicApp {
   }
 
   /**
+   * Set the active design system (loads into viewer + persists ID for reload)
+   */
+  setActiveSystem(fullSystem) {
+    this.viewer.load(fullSystem);
+    this.variantAudit?.registerFromDesignSystem(fullSystem);
+    try {
+      localStorage.setItem('systemic-active-system', fullSystem.id);
+    } catch (e) { /* quota exceeded — non-critical */ }
+  }
+
+  /**
+   * Restore the last-active design system into the viewer (for page reload)
+   * Returns true if a system was restored, false otherwise
+   */
+  restoreActiveSystem() {
+    const activeId = localStorage.getItem('systemic-active-system');
+    if (!activeId) return false;
+
+    const fullSystem = this.loadDesignSystem(activeId);
+    if (!fullSystem) return false;
+
+    this.debugLog('RESTORE', `Restoring active system: ${activeId}`);
+    this.viewer.load(fullSystem);
+    this.variantAudit?.registerFromDesignSystem(fullSystem);
+    return true;
+  }
+
+  /**
    * Load full design system
    */
   loadDesignSystem(id) {
@@ -1386,9 +1433,8 @@ class SystemicApp {
         const id = card.dataset.id;
         const fullSystem = this.loadDesignSystem(id);
         if (fullSystem) {
-          this.viewer.load(fullSystem);
-          this.variantAudit?.registerFromDesignSystem(fullSystem);
-          window.location.hash = 'docs/color';
+          this.setActiveSystem(fullSystem);
+          this.navigateTo('docs/color');
         } else {
           this.showToast('Could not load design system data — it may need to be re-scanned', 'error');
         }
