@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Design System widget components -->
-  <link rel="stylesheet" href="/design-system/widgets.css">
+  <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
+  <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
 
   <style>
 /* ============================================
@@ -4211,6 +4211,15 @@ Return JSON:
     }
   };
 
+  // Design System feature flag
+  const WIDGET_DS_KEY = 'boards_widget_ds';
+  let widgetDSEnabled = localStorage.getItem(WIDGET_DS_KEY) !== 'false'; // default ON
+  (function initWidgetDS() {
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = !widgetDSEnabled;
+    console.log('[ds] Widget Design System ' + (widgetDSEnabled ? 'ON' : 'OFF') + ' — toggle via window.enableWidgetDS() / disableWidgetDS()');
+  })();
+
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
   let widgetCache = {};
@@ -5734,6 +5743,24 @@ Return JSON:
     renderSubTags();
     renderGrid();
     console.log('[beta] Sub-tags bar disabled');
+  };
+
+  // Dev toggle: Design System widget stylesheet
+  // Usage: window.enableWidgetDS() / window.disableWidgetDS() in console
+  window.enableWidgetDS = function() {
+    widgetDSEnabled = true;
+    localStorage.setItem(WIDGET_DS_KEY, 'true');
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = false;
+    console.log('[ds] Widget Design System enabled — refresh to see full effect');
+  };
+
+  window.disableWidgetDS = function() {
+    widgetDSEnabled = false;
+    localStorage.setItem(WIDGET_DS_KEY, 'false');
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = true;
+    console.log('[ds] Widget Design System disabled — refresh to see full effect');
   };
 
   // ============================================
