@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Design System widget components -->
-  <link rel="stylesheet" href="/design-system/widgets.css">
+  <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
+  <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
 
   <style>
 /* ============================================
@@ -4211,6 +4211,22 @@ Return JSON:
     }
   };
 
+  // Widget feature flag — all widgets hidden by default
+  // Enable via console: window.enableWidgetDS()
+  const WIDGET_DS_KEY = 'boards_widget_ds';
+  let widgetDSEnabled = localStorage.getItem(WIDGET_DS_KEY) === 'true'; // default OFF
+  (function initWidgetDS() {
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = !widgetDSEnabled;
+    if (!widgetDSEnabled) {
+      const hero = document.getElementById('widgetSection');
+      const footer = document.getElementById('widgetFooter');
+      if (hero) hero.style.display = 'none';
+      if (footer) footer.style.display = 'none';
+    }
+    console.log('[widgets] ' + (widgetDSEnabled ? 'ON' : 'OFF — enable via window.enableWidgetDS()'));
+  })();
+
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
   let widgetCache = {};
@@ -5222,6 +5238,8 @@ Return JSON:
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
+    // Feature flag: skip all widget rendering when disabled
+    if (!widgetDSEnabled) return;
     // Prevent duplicate generation
     if (widgetGenerationInProgress) return;
     widgetGenerationInProgress = true;
@@ -5734,6 +5752,35 @@ Return JSON:
     renderSubTags();
     renderGrid();
     console.log('[beta] Sub-tags bar disabled');
+  };
+
+  // Dev toggle: all AI widgets (hidden by default, persists once enabled)
+  // Usage: window.enableWidgetDS() / window.disableWidgetDS() in console
+  window.enableWidgetDS = function() {
+    widgetDSEnabled = true;
+    localStorage.setItem(WIDGET_DS_KEY, 'true');
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = false;
+    const hero = $('widgetSection');
+    const footer = $('widgetFooter');
+    if (hero) hero.style.display = '';
+    if (footer) footer.style.display = '';
+    generateWidgets();
+    console.log('[widgets] Enabled — widgets will render now');
+  };
+
+  window.disableWidgetDS = function() {
+    widgetDSEnabled = false;
+    localStorage.setItem(WIDGET_DS_KEY, 'false');
+    const link = document.getElementById('ds-widgets-css');
+    if (link) link.disabled = true;
+    const hero = $('widgetSection');
+    const footer = $('widgetFooter');
+    if (hero) { hero.style.display = 'none'; hero.classList.remove('widget-section--visible'); }
+    if (footer) { footer.style.display = 'none'; footer.classList.remove('widget-section--visible'); }
+    inlineWidgetHtml = '';
+    renderGrid();
+    console.log('[widgets] Disabled — all widgets hidden');
   };
 
   // ============================================

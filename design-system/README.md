@@ -471,11 +471,46 @@ document.documentElement.classList.toggle('light');
 - **Board** — Link curation with Swiss grid aesthetic
 - **Soundscape** — Audio-reactive visualization controls
 
+## Source of Truth
+
+The CSS files are the single source of truth. Everything else is derived or supplementary.
+
+```
+┌─ SOURCE OF TRUTH (hand-edited) ────────────────────────┐
+│  tokens.css        Design tokens                       │
+│  components.css    UI components                       │
+│  widgets.css       Widget grid system + atoms/molecules│
+└────────────────────────────────────────────────────────┘
+        │
+        ▼  node scripts/parse-design-system.js
+┌─ DERIVED ──────────────────────────────────────────────┐
+│  manifest.json     Auto-generated index of all tokens, │
+│                    components, and widget classes       │
+└────────────────────────────────────────────────────────┘
+
+┌─ REFERENCE (hand-edited) ─────────────────────────────┐
+│  template-registry.json   Widget template definitions, │
+│                           Boards mappings, fixtures     │
+│  widgets.html             Interactive showcase / QA     │
+└────────────────────────────────────────────────────────┘
+```
+
+**Rules:**
+- Change styles → edit the CSS files
+- Regenerate manifest → `node scripts/parse-design-system.js`
+- Systemic does **not** read the local design system (it crawls external sites)
+- `manifest.json` is read-only; never hand-edit it
+
 ## File Structure
 
 ```
 /design-system/
-  tokens.css      # Design tokens (colors, typography, spacing)
-  components.css  # Reusable UI components
-  README.md       # Documentation
+  tokens.css              # Design tokens (colors, typography, spacing)
+  components.css          # Reusable UI components
+  widgets.css             # Widget system: grid, atoms, molecules, body templates
+  manifest.json           # Generated — token + component index for tooling
+  template-registry.json  # Widget template definitions + Boards mappings
+  widgets.html            # Interactive showcase with 44 widget instances
+  index.html              # Component browser
+  README.md               # This file
 ```
