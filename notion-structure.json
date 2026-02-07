@@ -54,6 +54,12 @@
               "source": "human"
             },
             {
+              "title": "Design System Validation Pipeline",
+              "icon": "\u2705",
+              "file": "docs/strategy/prds/design-system-validation-pipeline.md",
+              "source": "ai"
+            },
+            {
               "title": "Widget Instrumentation",
               "icon": "\ud83d\udccb",
               "file": "docs/strategy/prds/widget-instrumentation.md",
@@ -458,6 +464,12 @@
               "title": "Notion Bidirectional Sync",
               "icon": "\ud83d\udd04",
               "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
+              "source": "ai"
+            },
+            {
+              "title": "Notion Sync Guide",
+              "icon": "\ud83d\udcd6",
+              "file": "docs/infrastructure/NOTION-SYNC-GUIDE.md",
               "source": "ai"
             }
           ]

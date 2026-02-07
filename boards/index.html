@@ -15,6 +15,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
+  <!-- Design System widget components -->
+  <link rel="stylesheet" href="/design-system/widgets.css">
+
   <style>
 /* ============================================
    Boards - Swiss Grid + Web 1.0 Typography
@@ -52,6 +55,52 @@
   --border: #fff;
   --muted: #888;
   --subtle: #333;
+
+  /* Design System token bridge — maps DS token names to Boards values */
+  --text-2xs: 8px;
+  --text-xs: var(--font-size-xs);
+  --text-sm: var(--font-size-sm);
+  --text-md: var(--font-size-base);
+  --text-lg: var(--font-size-lg);
+  --text-xl: var(--font-size-xl);
+  --text-2xl: var(--font-size-2xl);
+  --text-3xl: 40px;
+  --text-base: var(--font-size-sm);
+  --leading-none: 1;
+  --leading-tight: var(--line-height-tight);
+  --leading-normal: var(--line-height-normal);
+  --leading-relaxed: 1.8;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+  --tracking-widest: 0.3em;
+  --bg-surface: var(--surface);
+  --bg-elevated: #222;
+  --fg-muted: var(--muted);
+  --fg-subtle: #666;
+  --border-subtle: var(--subtle);
+  --interactive: var(--fg);
+  --interactive-hover: var(--bg);
+  --border-thin: 1px;
+  --border-medium: 2px;
+  --border-thick: 4px;
+  --duration-fast: 0.1s;
+  --duration-normal: 0.15s;
+  --duration-slow: 0.2s;
+  --duration-slower: 0.3s;
+  --duration-slowest: 0.5s;
+  --ease-default: ease;
+  --ease-linear: linear;
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-success: #0f0;
+  --color-error: #c00;
+  --color-warning: #f90;
+  --font-sans: var(--font-primary);
 }
 
 :root.light {
@@ -61,6 +110,15 @@
   --border: #000;
   --muted: #888;
   --subtle: #e0e0e0;
+
+  /* DS bridge — light mode overrides */
+  --bg-surface: var(--surface);
+  --bg-elevated: #f5f5f5;
+  --fg-muted: var(--muted);
+  --fg-subtle: #aaa;
+  --border-subtle: var(--subtle);
+  --interactive: var(--fg);
+  --interactive-hover: var(--bg);
 }
 
 /* Progress bar */
@@ -2533,6 +2591,10 @@ body {
   background: var(--surface);
   border: 1px solid var(--subtle);
   padding: var(--space-4);
+}
+
+/* Grid-split layout: used by grid-split template (complete-the-look) */
+.widget-complete__body--grid-split {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
@@ -2826,6 +2888,205 @@ body {
 
 .widget-complete__shop-link:hover {
   text-decoration: underline;
+}
+
+/* Spectrum Template - Dimensional positioning scales */
+.widget-spectrum__axes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+.widget-spectrum__axis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.widget-spectrum__labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.widget-spectrum__track {
+  position: relative;
+  height: 2px;
+  background: var(--subtle);
+  margin: var(--space-2) 0;
+}
+
+.widget-spectrum__marker {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  background: var(--fg);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 0.4s ease;
+}
+
+.widget-spectrum__note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Stat Row Template - Collection metrics */
+.widget-statrow__grid {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-around;
+  padding: var(--space-2) 0;
+}
+
+.widget-statrow__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 60px;
+}
+
+.widget-statrow__value {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--fg);
+  line-height: 1;
+}
+
+.widget-statrow__label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* Quick Add Template - Single suggestion with action */
+.widget-quickadd__content {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+}
+
+.widget-quickadd__image {
+  flex: 0 0 80px;
+  width: 80px;
+  height: 80px;
+  background: var(--subtle);
+  overflow: hidden;
+}
+
+.widget-quickadd__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.widget-quickadd__image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--muted);
+}
+
+.widget-quickadd__details {
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-quickadd__name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.widget-quickadd__brand {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.widget-quickadd__price {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  margin-top: var(--space-1);
+}
+
+.widget-quickadd__reason {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: var(--space-2);
+  line-height: 1.4;
+}
+
+.widget-quickadd__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.widget-quickadd__btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.widget-quickadd__btn--primary {
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+}
+
+.widget-quickadd__btn--primary:hover {
+  background: transparent;
+  color: var(--fg);
+}
+
+.widget-quickadd__btn--secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--subtle);
+}
+
+.widget-quickadd__btn--secondary:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.widget-quickadd__added {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* Widget PRD Modal */
@@ -3812,8 +4073,8 @@ Return JSON:
   ]
 }`,
       template: {
-        name: 'product-grid',
-        fallback: 'simple-list',
+        name: 'grid-split',
+        fallback: 'list',
         layout: 'two-column',
         sections: ['your-items', 'suggestions']
       },
@@ -3842,13 +4103,111 @@ Return JSON:
   "summary": "One sentence describing the overall aesthetic"
 }`,
       template: {
-        name: 'style-card',
-        fallback: 'text-summary',
+        name: 'hero-card',
+        fallback: 'text-block',
         layout: 'card',
         sections: ['label', 'traits']
       },
       createdAt: '2024-01-15',
       updatedAt: '2024-01-20'
+    },
+    'price-radar': {
+      id: 'price-radar',
+      version: '1.0',
+      name: 'Price Radar',
+      description: 'Shows where you fall on key dimensions like budget, style, and brand affinity.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: ['wear', 'tech', 'home', 'all'],
+        minItems: 3,
+        maxItems: null,
+        itemTypes: ['product']
+      },
+      prompt: `Analyze these saved items and position the user on 2-3 meaningful dimensions.
+
+Choose axes relevant to the content (e.g. Budget<->Luxury, Minimal<->Bold, Classic<->Trendy).
+For each axis, estimate where the user falls (0.0 = fully left, 1.0 = fully right).
+
+Return JSON:
+{
+  "axes": [
+    { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.35, "note": "You: $85 avg" },
+    { "leftLabel": "Minimal", "rightLabel": "Bold", "position": 0.2, "note": "Mostly neutrals" }
+  ],
+  "confidence": 0.75
+}`,
+      template: {
+        name: 'spectrum',
+        fallback: 'text-block'
+      },
+      createdAt: '2026-02-06',
+      updatedAt: '2026-02-06'
+    },
+    'collection-stats': {
+      id: 'collection-stats',
+      version: '1.0',
+      name: 'Collection Stats',
+      description: 'Key metrics about your saved items — brands, categories, price range, and more.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: ['wear', 'tech', 'home', 'eat', 'read', 'all'],
+        minItems: 3,
+        maxItems: null,
+        itemTypes: ['product']
+      },
+      prompt: `Analyze these saved items and extract 3-4 key metrics about the collection.
+
+Return JSON:
+{
+  "stats": [
+    { "value": "12", "label": "brands" },
+    { "value": "3", "label": "styles" },
+    { "value": "$85", "label": "avg price" }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'stat-row',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-06',
+      updatedAt: '2026-02-06'
+    },
+    'gap-filler': {
+      id: 'gap-filler',
+      version: '1.0',
+      name: 'You Might Want This',
+      description: 'AI identifies the biggest gap in your collection and suggests one item to fill it.',
+      status: 'active',
+      zone: 'inline',
+      criteria: {
+        category: ['wear', 'tech', 'home', 'fitness'],
+        minItems: 2,
+        maxItems: null,
+        itemTypes: ['product']
+      },
+      prompt: `Analyze these saved items and identify the single biggest gap in the user's collection.
+Suggest ONE specific product that would fill that gap.
+
+Return JSON:
+{
+  "suggestion": {
+    "name": "Product Name",
+    "brand": "Brand Name",
+    "price": "$XX.XX",
+    "reason": "Fills your category gap — you have X and Y but no Z.",
+    "searchQuery": "brand product name"
+  },
+  "confidence": 0.85
+}`,
+      template: {
+        name: 'quick-add',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-06',
+      updatedAt: '2026-02-06'
     }
   };
 
@@ -4083,8 +4442,10 @@ Return JSON:
 
   // Normalize wear items for widget generation
   function normalizeWearItems(links) {
+    // Category-agnostic: filter by current category, or return all if 'all'
+    const category = currentFilter || 'all';
     return links
-      .filter(l => l.category === 'wear' && !l.loading)
+      .filter(l => !l.loading && (category === 'all' || l.category === category))
       .map(l => ({
         id: l.id,
         title: l.title || '',
@@ -4123,6 +4484,102 @@ Return JSON:
         if (aFav !== bFav) return aFav - bFav;
         return a.id.localeCompare(b.id);
       });
+  }
+
+  // =============================================================================
+  // SERVER-DRIVEN WIDGET DISCOVERY
+  // Asks the server which widgets are eligible for the current context.
+  // Server eligibility rules (config/widgets/*.ts) are the source of truth.
+  // Falls back to local WIDGET_REGISTRY if the server is unreachable.
+  // =============================================================================
+
+  async function discoverWidgetsFromServer(category, items) {
+    try {
+      const itemsPayload = items.map(i => ({
+        id: i.id,
+        title: i.title,
+        description: i.description || '',
+        image: i.image || '',
+        url: i.url
+      }));
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          action: 'discover',
+          category: category,
+          items: itemsPayload
+        })
+      });
+
+      if (!response.ok) {
+        console.warn('[discovery] Server returned', response.status, '— falling back to local registry');
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[discovery] Server returned', data.widgets?.length, 'eligible widgets for', category);
+
+      // Map server widgets to local WIDGET_REGISTRY entries, merging server metadata.
+      // If a widget exists only on the server (not in local WIDGET_REGISTRY), build
+      // a temporary local entry from the discovery response so it can still render.
+      const discoveredWidgets = [];
+      for (const serverWidget of (data.widgets || [])) {
+        const localWidget = WIDGET_REGISTRY[serverWidget.widgetId];
+        if (localWidget) {
+          // Merge: use local prompt + template config, server zone/priority/eligibility
+          discoveredWidgets.push({
+            ...localWidget,
+            zone: serverWidget.zone || localWidget.zone,
+            _serverEligibility: serverWidget.eligibility,
+            _serverPriority: serverWidget.priority
+          });
+        } else if (serverWidget.promptTemplate) {
+          // Server-only widget — build a temporary entry from discovery data
+          console.log('[discovery] Building temp entry for server widget:', serverWidget.widgetId);
+          discoveredWidgets.push({
+            id: serverWidget.widgetId,
+            name: serverWidget.name,
+            description: serverWidget.description || '',
+            status: 'active',
+            zone: serverWidget.zone,
+            criteria: {},
+            prompt: serverWidget.promptTemplate + (serverWidget.constraints?.length
+              ? '\n\nADDITIONAL CONSTRAINTS:\n' + serverWidget.constraints.map(c => '- ' + c).join('\n')
+              : ''),
+            template: {
+              name: serverWidget.template,
+              fallback: serverWidget.fallbackTemplate || 'list'
+            },
+            _serverEligibility: serverWidget.eligibility,
+            _serverPriority: serverWidget.priority,
+            _serverOnly: true
+          });
+        } else {
+          console.log('[discovery] Server widget', serverWidget.widgetId, 'not in local registry and no prompt — skipping');
+        }
+      }
+
+      // Sort by server priority (lower = higher priority), then favorites
+      discoveredWidgets.sort((a, b) => {
+        const aFav = widgetPrefs.favorites[a.id] ? 0 : 1;
+        const bFav = widgetPrefs.favorites[b.id] ? 0 : 1;
+        if (aFav !== bFav) return aFav - bFav;
+        return (a._serverPriority || 99) - (b._serverPriority || 99);
+      });
+
+      // Respect user preferences (hidden/dismissed)
+      return discoveredWidgets.filter(w =>
+        getWidgetStatus(w.id) === 'active' && shouldShowWidget(w.id)
+      );
+    } catch (err) {
+      console.warn('[discovery] Network error — falling back to local registry:', err.message);
+      return null;
+    }
   }
 
   // Shuffle array randomly (Fisher-Yates)
@@ -4352,6 +4809,20 @@ Return JSON:
     return 'mainstream';
   }
 
+  // Shared widget shell header — w-* design system classes
+  function renderWidgetHeader(widget) {
+    return `
+      <div class="w-header">
+        <div class="w-header__left">
+          <span class="w-text w-text--label">${esc(widget.name)}</span>
+          <span class="w-badge">AI</span>
+        </div>
+        <div class="w-header__controls">
+          <button class="w-icon-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">&#x27F3;</button>
+        </div>
+      </div>`;
+  }
+
   // Unified Complete the Look widget - single component
   function renderCompleteTheLookWidget(widget, items, aiResult) {
     // Enrich items with category and brand tier
@@ -4395,15 +4866,15 @@ Return JSON:
       const hasImage = item.image && item.image.length > 0;
       const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
       userItemsHtml += `
-        <a href="${item.url}" target="_blank" rel="noopener" class="widget-complete__item">
-          <div class="widget-complete__image-wrap">
+        <a href="${item.url}" target="_blank" rel="noopener" class="w-item">
+          <div class="w-img">
             ${hasImage
-              ? `<img class="widget-complete__image" src="${secureImg(item.image)}" alt="" loading="lazy">`
-              : `<span class="widget-complete__placeholder">${initial}</span>`
+              ? `<img src="${secureImg(item.image)}" alt="" loading="lazy">`
+              : `<div class="w-img__placeholder">${initial}</div>`
             }
           </div>
-          <div class="widget-complete__item-title">${esc(item.title)}</div>
-          <div class="widget-complete__item-meta">${esc(item.domain)}</div>
+          <span class="w-text">${esc(item.title)}</span>
+          <span class="w-text w-text--meta">${esc(item.domain)}</span>
         </a>`;
     }
 
@@ -4447,61 +4918,51 @@ Return JSON:
 
       // Use vendor from enrichment if available
       const vendorName = sug.vendor || sug.brand;
-      const brandDisplay = vendorName ? `<div class="widget-complete__item-brand">${esc(vendorName)}</div>` : '';
-      const priceDisplay = sug.price ? `<span class="widget-complete__item-price">${esc(sug.price)}</span>` : '';
+      const brandDisplay = vendorName ? `<span class="w-text w-text--meta">${esc(vendorName)}</span>` : '';
+      const priceDisplay = sug.price ? `<span style="font-weight:600;color:var(--fg);font-style:normal">${esc(sug.price)}</span>` : '';
 
       // Use actual product image if available, otherwise show category icon
       const hasProductImage = sug.productImage && sug.productImage.length > 0;
       const imageContent = hasProductImage
-        ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
-        : `<span class="widget-complete__product-icon">${icon}</span>`;
+        ? `<img src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="w-img__placeholder" style="display:none">${icon}</div>`
+        : `<div class="w-img__placeholder">${icon}</div>`;
 
       // Render as link only if we have a valid URL, otherwise render as non-clickable card
       if (hasUrl) {
         // Phase 1: Track click for instrumentation
         const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion" onclick="${trackClick}">
-            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
+            <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
             ${brandDisplay}
-            <div class="widget-complete__item-title">${esc(sug.name)}</div>
-            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-            <span class="widget-complete__shop-link">Shop Now →</span>
+            <span class="w-text">${esc(sug.name)}</span>
+            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
+            <span class="w-btn w-btn--sm">Shop Now →</span>
           </a>`;
       } else {
         // No valid URL - render as non-clickable suggestion
         suggestionsHtml += `
-          <div class="widget-complete__item widget-complete__item--suggestion widget-complete__item--no-link">
-            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+          <div class="w-item">
+            <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
             ${brandDisplay}
-            <div class="widget-complete__item-title">${esc(sug.name)}</div>
-            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-            <span class="widget-complete__shop-link" style="opacity: 0.5">Search for this item</span>
+            <span class="w-text">${esc(sug.name)}</span>
+            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
+            <span class="w-btn w-btn--sm" style="opacity:0.5">Search for this item</span>
           </div>`;
       }
     }
 
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
-        <div class="widget-complete__header">
-          <div class="widget-complete__header-left">
-            <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__badge">AI</span>
-          </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
-        </div>
-        <div class="widget-complete__body">
-          <div class="widget-complete__section">
-            <div class="widget-complete__items">${userItemsHtml}</div>
-          </div>
-          <div class="widget-complete__divider"></div>
-          <div class="widget-complete__section">
-            <div class="widget-complete__items">${suggestionsHtml}</div>
-          </div>
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body">
+          <div class="w-items">${userItemsHtml}</div>
+          <div class="w-divider"><span class="w-divider__label">+</span></div>
+          <div class="w-items">${suggestionsHtml}</div>
         </div>
       </div>`;
   }
@@ -4523,23 +4984,17 @@ Return JSON:
       sublabel = `Based on ${items.length} item${items.length > 1 ? 's' : ''}`;
     }
 
-    const traitsHtml = traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
+    const traitsHtml = traits.map(t => `<span class="w-badge">${esc(t)}</span>`).join('');
 
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
-        <div class="widget-complete__header">
-          <div class="widget-complete__header-left">
-            <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__badge">AI</span>
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body w-body--verdict">
+          <div class="w-headline">
+            <span class="w-text w-text--display">${esc(label)}</span>
+            <span class="w-text w-text--meta">${esc(sublabel)}</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
-        </div>
-        <div class="widget-complete__body">
-          <div class="widget-style__content">
-            <div class="widget-style__label">${esc(label)}</div>
-            <div class="widget-style__sublabel">${esc(sublabel)}</div>
-            <div class="widget-style__traits">${traitsHtml}</div>
-          </div>
+          <div class="w-tag-group">${traitsHtml}</div>
         </div>
       </div>`;
   }
@@ -4551,75 +5006,167 @@ Return JSON:
   // ===========================================================================
 
   const WIDGET_TEMPLATES = {
-    // Template: product-grid
-    // Used by: complete-the-look
-    // Layout: user items on top, AI suggestions below, separated by divider
-    'product-grid': {
-      name: 'product-grid',
+    // Template: grid-split
+    // Two groups of thumbnail cards separated by a divider
+    'grid-split': {
+      name: 'grid-split',
       version: '1.0',
       render: function(widget, items, aiResult) {
         return renderCompleteTheLookWidget(widget, items, aiResult);
       }
     },
 
-    // Template: style-card
-    // Used by: style-summary
-    // Layout: style label + sublabel + trait pills
-    'style-card': {
-      name: 'style-card',
+    // Template: hero-card
+    // Centered headline + subtitle + tag pills
+    'hero-card': {
+      name: 'hero-card',
       version: '1.0',
       render: function(widget, items, aiResult) {
         return renderStyleSummaryWidget(widget, items, aiResult);
       }
     },
 
-    // Template: simple-list (fallback)
-    // Generic list rendering for any widget with suggestions
-    'simple-list': {
-      name: 'simple-list',
+    // Template: list (fallback)
+    // Stacked rows with separators
+    'list': {
+      name: 'list',
       version: '1.0',
       render: function(widget, items, aiResult) {
         if (!aiResult) return '';
         const listItems = (aiResult.suggestions || aiResult.traits || []).slice(0, 5);
         const listHtml = listItems.map(item => {
           const label = typeof item === 'string' ? item : (item.name || item.label || JSON.stringify(item));
-          return `<div style="padding: var(--space-1) 0; border-bottom: 1px solid var(--subtle);">${esc(label)}</div>`;
+          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span></div></div>`;
         }).join('');
 
         return `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">&#x27F3;</button>
-            </div>
-            <div class="widget-complete__body">
-              <div style="padding: var(--space-2);">${listHtml || '<div style="color:var(--muted);">No results</div>'}</div>
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--list">
+              ${listHtml || '<span class="w-text w-text--meta">No results</span>'}
             </div>
           </div>`;
       }
     },
 
-    // Template: text-summary (fallback for style-card)
-    // Plain text rendering of style analysis
-    'text-summary': {
-      name: 'text-summary',
+    // Template: text-block (fallback for hero-card)
+    // Single prose block in a card
+    'text-block': {
+      name: 'text-block',
       version: '1.0',
       render: function(widget, items, aiResult) {
         const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
         return `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--narrative">
+              <p class="w-text w-text--prose">${esc(text)}</p>
             </div>
-            <div class="widget-complete__body">
-              <div style="padding: var(--space-2); color: var(--muted);">${esc(text)}</div>
+          </div>`;
+      }
+    },
+
+    // Template: spectrum
+    // Labeled scales showing dimensional positioning (e.g. Budget <--*--> Luxury)
+    'spectrum': {
+      name: 'spectrum',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const axes = aiResult.axes || [];
+        if (axes.length === 0) return '';
+
+        const axesHtml = axes.slice(0, 4).map(axis => {
+          const position = Math.max(0, Math.min(1, axis.position || 0.5));
+          const pct = (position * 100).toFixed(1);
+          return `
+            <div class="w-axis">
+              <div class="w-axis__labels">
+                <span class="w-text w-text--label">${esc(axis.leftLabel || axis.left || '')}</span>
+                <span class="w-text w-text--label">${esc(axis.rightLabel || axis.right || '')}</span>
+              </div>
+              <div class="w-axis__track">
+                <div class="w-axis__marker" style="left: ${pct}%"></div>
+              </div>
+              ${axis.note ? `<div class="w-axis__note"><span class="w-text w-text--note">${esc(axis.note)}</span></div>` : ''}
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--spectrum">
+              ${axesHtml}
+            </div>
+          </div>`;
+      }
+    },
+
+    // Template: stat-row
+    // Row of 2-4 key metrics with large values and small labels
+    'stat-row': {
+      name: 'stat-row',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const stats = aiResult.stats || [];
+        if (stats.length === 0) return '';
+
+        const statsHtml = stats.slice(0, 4).map(stat => {
+          return `
+            <div class="w-stat">
+              <span class="w-text w-text--value">${esc(String(stat.value))}</span>
+              <span class="w-text w-text--label">${esc(stat.label)}</span>
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--stats">
+              ${statsHtml}
+            </div>
+          </div>`;
+      }
+    },
+
+    // Template: quick-add (action)
+    // Single high-confidence suggestion with "Add to board" action button
+    'quick-add': {
+      name: 'quick-add',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        if (!aiResult) return '';
+        const suggestion = aiResult.suggestion || aiResult.suggestions?.[0] || null;
+        if (!suggestion) return '';
+
+        const name = suggestion.name || 'Suggested item';
+        const brand = suggestion.brand || '';
+        const price = suggestion.price || '';
+        const reason = suggestion.reason || '';
+        const url = suggestion.url || suggestion.searchQuery ? `https://www.google.com/search?q=${encodeURIComponent(suggestion.searchQuery)}` : '#';
+        const imageUrl = suggestion.imageUrl || suggestion.image || '';
+        const widgetId = widget.id;
+
+        const imageHtml = imageUrl
+          ? `<img src="${esc(imageUrl)}" alt="${esc(name)}" onerror="this.parentElement.innerHTML='<div class=\\'w-img__placeholder\\'>+</div>'">`
+          : `<div class="w-img__placeholder">+</div>`;
+
+        return `
+          <div class="w-shell" data-widget-id="${widgetId}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--suggestion">
+              <div class="w-img w-img--card">${imageHtml}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)">
+                <span class="w-text" style="font-weight:600">${esc(name)}</span>
+                ${brand ? `<span class="w-text w-text--meta">${esc(brand)}</span>` : ''}
+                ${price ? `<span class="w-text">${esc(price)}</span>` : ''}
+                ${reason ? `<span class="w-text w-text--note">"${esc(reason)}"</span>` : ''}
+                <div class="w-action-bar" id="quickadd-actions-${widgetId}" style="margin-top:var(--space-2)">
+                  <button class="w-btn w-btn--filled" onclick="handleQuickAdd('${widgetId}', this)">+ Add to board</button>
+                  <a class="w-btn" href="${esc(url)}" target="_blank" rel="noopener">Visit site ›</a>
+                </div>
+              </div>
             </div>
           </div>`;
       }
@@ -4641,8 +5188,8 @@ Return JSON:
 
     // Map legacy layout names to template names
     const templateAliases = {
-      'two-column': 'product-grid',
-      'card': 'style-card'
+      'two-column': 'grid-split',
+      'card': 'hero-card'
     };
 
     const resolvedName = templateAliases[templateName] || templateName;
@@ -4664,8 +5211,8 @@ Return JSON:
       }
     }
 
-    // Last resort: simple-list
-    return WIDGET_TEMPLATES['simple-list'].render(widget, items, aiResult);
+    // Last resort: list
+    return WIDGET_TEMPLATES['list'].render(widget, items, aiResult);
   }
 
   // Store inline widgets for grid injection
@@ -4701,8 +5248,13 @@ Return JSON:
       return;
     }
 
-    // Get applicable widgets for the current category
-    const applicableWidgets = getApplicableWidgets(items, widgetCategory);
+    // Server-driven discovery: ask the server which widgets are eligible,
+    // fall back to local WIDGET_REGISTRY if server is unreachable.
+    let applicableWidgets = await discoverWidgetsFromServer(widgetCategory, items);
+    if (!applicableWidgets) {
+      console.log('[widget] Using local registry fallback');
+      applicableWidgets = getApplicableWidgets(items, widgetCategory);
+    }
 
     if (applicableWidgets.length === 0) {
       renderGrid();
@@ -4711,25 +5263,40 @@ Return JSON:
     }
 
     // Group widgets by zone
+    const allHero = applicableWidgets.filter(w => w.zone === 'hero');
+    const allInline = applicableWidgets.filter(w => w.zone === 'inline');
+    const allFooter = applicableWidgets.filter(w => w.zone === 'footer');
+
+    // Hero rotation: show one hero widget at a time, cycling on each render
+    let heroRotationIndex = parseInt(localStorage.getItem('widget_hero_index') || '0', 10);
+    const selectedHero = allHero.length > 0
+      ? [allHero[heroRotationIndex % allHero.length]]
+      : [];
+    // Advance index for next render
+    if (allHero.length > 0) {
+      localStorage.setItem('widget_hero_index', String((heroRotationIndex + 1) % allHero.length));
+    }
+
     const widgetsByZone = {
-      hero: applicableWidgets.filter(w => w.zone === 'hero'),
-      inline: applicableWidgets.filter(w => w.zone === 'inline'),
-      footer: applicableWidgets.filter(w => w.zone === 'footer')
+      hero: selectedHero,
+      inline: allInline,
+      footer: allFooter
     };
 
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
+      const firstHeroName = widgetsByZone.hero[0].name || 'Widget';
       heroSection.classList.add('widget-section--visible');
       heroContent.innerHTML = `
-        <div class="widget-complete">
-          <div class="widget-complete__header">
-            <div class="widget-complete__header-left">
-              <span class="widget-complete__title">Style Summary</span>
-              <span class="widget-complete__badge">AI</span>
+        <div class="w-shell">
+          <div class="w-header">
+            <div class="w-header__left">
+              <span class="w-text w-text--label">${esc(firstHeroName)}</span>
+              <span class="w-badge">AI</span>
             </div>
           </div>
-          <div class="widget-complete__body widget-complete__body--loading">
-            Generating insights...
+          <div class="w-body w-body--loading">
+            <span class="w-loader">Generating insights...</span>
           </div>
         </div>`;
     }
@@ -4824,15 +5391,15 @@ Return JSON:
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
-          <div class="widget-complete">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
+          <div class="w-shell">
+            <div class="w-header">
+              <div class="w-header__left">
+                <span class="w-text w-text--label">${esc(widget.name)}</span>
+                <span class="w-badge">AI</span>
               </div>
             </div>
-            <div class="widget-complete__body widget-complete__body--loading">
-              Refreshing suggestions...
+            <div class="w-body w-body--loading">
+              <span class="w-loader">Refreshing suggestions...</span>
             </div>
           </div>`;
       }
@@ -4840,15 +5407,15 @@ Return JSON:
       const heroContent = $('widgetContent');
       if (heroContent) {
         heroContent.innerHTML = `
-          <div class="widget-complete">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
+          <div class="w-shell">
+            <div class="w-header">
+              <div class="w-header__left">
+                <span class="w-text w-text--label">${esc(widget.name)}</span>
+                <span class="w-badge">AI</span>
               </div>
             </div>
-            <div class="widget-complete__body widget-complete__body--loading">
-              Refreshing...
+            <div class="w-body w-body--loading">
+              <span class="w-loader">Refreshing...</span>
             </div>
           </div>`;
       }
@@ -4899,6 +5466,75 @@ Return JSON:
     }
 
     console.log('[widget] Refresh complete for:', widgetId);
+  };
+
+  // Quick-add action handler — adds AI suggestion to the user's board
+  window.handleQuickAdd = function(widgetId, btnEl) {
+    // Find the widget element and extract suggestion data
+    const widgetEl = btnEl.closest('[data-widget-id]');
+    if (!widgetEl) return;
+
+    // Get the cached AI result for this widget
+    const widget = WIDGET_REGISTRY[widgetId];
+    if (!widget) return;
+
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const itemIds = items.map(i => i.id);
+    const cacheKey = getCacheKey(widgetId, itemIds);
+    const cached = widgetCache[cacheKey];
+    const aiResult = cached?.data;
+    const suggestion = aiResult?.suggestion || aiResult?.suggestions?.[0];
+
+    if (!suggestion) {
+      console.warn('[widget] No suggestion data for quick-add:', widgetId);
+      return;
+    }
+
+    // Build a link object from the suggestion
+    const linkUrl = suggestion.url || (suggestion.searchQuery
+      ? `https://www.google.com/search?q=${encodeURIComponent(suggestion.searchQuery)}`
+      : null);
+
+    if (!linkUrl) {
+      console.warn('[widget] No URL for quick-add suggestion');
+      return;
+    }
+
+    const newLink = {
+      id: 'link_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      url: linkUrl,
+      title: suggestion.name || 'AI Suggestion',
+      description: suggestion.reason || '',
+      image: suggestion.imageUrl || suggestion.image || '',
+      category: currentFilter || 'all',
+      domain: linkUrl.replace(/^https?:\/\//, '').split('/')[0],
+      source: 'ai-quick-add',
+      widgetId: widgetId
+    };
+
+    // Add to board
+    const result = addLink(newLink);
+    console.log('[widget] Quick-add result:', result);
+
+    // Track the action
+    trackWidgetEvent(WIDGET_EVENTS.CLICK, widgetId, {
+      action: 'quick-add',
+      suggestion: suggestion.name,
+      brand: suggestion.brand
+    });
+
+    // Update UI — replace button with confirmation
+    const actionsEl = document.getElementById(`quickadd-actions-${widgetId}`);
+    if (actionsEl) {
+      const visitUrl = linkUrl;
+      actionsEl.innerHTML = `
+        <span class="w-badge">&#x2713; Added</span>
+        <a class="w-btn" href="${esc(visitUrl)}" target="_blank" rel="noopener">Visit site ›</a>`;
+    }
+
+    // Re-render the grid to show the new item
+    renderGrid();
   };
 
   // Widget refresh button handler

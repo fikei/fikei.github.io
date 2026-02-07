@@ -55,9 +55,13 @@ When working on this project, always follow these guidelines:
    - When creating or updating PRDs, technical specs, or project plans:
      1. Write/update the markdown file in `docs/`
      2. Ensure the file is listed in `notion-structure.json` if new
-     3. Commit and push - **Notion syncs automatically** (triggers on master and claude/* branches)
-   - The GitHub Actions workflow (`agent-automation.yml`) auto-syncs on any push
-   - To manually trigger sync: `gh workflow run agent-automation.yml`
+     3. Commit and push to `master`/`main` — Notion sync triggers automatically when doc files change
+   - **Notion sync triggers:**
+     - `master`/`main`: Syncs when `.md` or `notion-structure.json` files changed
+     - `claude/*`: Syncs when doc files changed
+     - Manual: `gh workflow run agent-automation.yml -f force_full_sync=true`
+   - **Auto-discovery**: On every sync, untracked `.md` files in `docs/` are flagged via GitHub issue
+   - **Health check** runs weekly on Fridays and creates GitHub issues for stale/empty/orphaned pages
    - **When consolidating multiple docs into one:**
      1. Create the new consolidated doc
      2. Move old files to appropriate `archive/` folder using `git mv`
@@ -128,6 +132,20 @@ When working on this project, always follow these guidelines:
       - User features → `docs/ux/users/`
       - Widget features → `docs/ux/widgets/`
       - Pin features → `docs/ux/pins/`
+
+12. **Check widget design comments before working on widgets**
+    - At the start of every prompt involving widget work, check for existing design audit comments
+    - Read the audit state from `design-system/widgets.html` (localStorage key: `widget-variant-audit`)
+    - Export current audit data by opening `design-system/widgets.html` and clicking "Copy as JSON" in the Audit Log, or inspect the `widget-variant-audit` key in localStorage
+    - Alternatively, search `widgets.html` for hardcoded audit state or review the variant audit section
+    - Report findings: list any variants with status yellow (to process), orange (needs review), or red (blocked)
+    - Add audit items to your task checklist before starting implementation
+    - Stoplight status meanings:
+      - **Green** = No updates needed
+      - **Yellow** = Comment to process (designer left feedback, needs developer action)
+      - **Orange** = Updated and needs review (developer acted on feedback, awaiting designer approval)
+      - **Red** = Blocked (variant should not be implemented)
+    - When completing widget work, update the stoplight status (mark processed → orange) for any comments you addressed
 
 ---
 
@@ -288,17 +306,22 @@ curl -X POST "$SUPABASE_BOARDS_URL/functions/v1/generate-widget" \
 
 ## AI Agent Workforce
 
-This project implements a multi-agent system for automated management. See `.claude/agents/` for detailed specifications.
+The Agent is Claude Code operating within this repository — one agent with 7 operational modes that activate based on the task. See `.claude/agents/AGENT-DEFINITION.md` for the consolidated definition.
 
-### Agent Overview
-| Agent | Role | Trigger |
-|-------|------|---------|
-| Organizational | Documentation standards, data integrity | On file changes |
-| Project Management | Format content into phases/epics/tasks | On PRD updates |
-| Status Update | Track progress, flag blockers | Continuous |
-| Chief of Staff | Global view, decision routing | Cross-agent coordination |
-| Security & Compliance | Privacy and data safety audits | On sensitive changes |
-| Continuous Improvement | Process optimization suggestions | Weekly analysis |
+### Operational Modes
+| Mode | Activates When | Core Behavior |
+|------|---------------|---------------|
+| Documentation Sync | Doc files change | Sync markdown to Notion, maintain structure |
+| Organizational | Any file modification | Enforce standards, validate completeness |
+| Project Management | PRDs created/updated | Break work into Phases > Epics > Stories > Tasks |
+| Status Update | Progress check needed | Track completion, flag blockers |
+| Security & Compliance | Code/config changes | Scan for secrets, validate data handling |
+| Continuous Improvement | Sprint ends, weekly | Analyze patterns, suggest optimizations |
+| Chief of Staff | Cross-mode conflicts | Synthesize state, route decisions |
+
+### Key Files
+- **Definition**: `.claude/agents/AGENT-DEFINITION.md` — consolidated behavioral rules, decision authority, capabilities
+- **Specialist specs**: `.claude/agents/*.md` — detailed workflows, templates, and report formats per mode
 
 ---
 

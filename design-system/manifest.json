@@ -1,0 +1,590 @@
+{
+  "version": "2026-02-07T10:33:48.253Z",
+  "source": "design-system/",
+  "files": [
+    "tokens.css",
+    "components.css",
+    "widgets.css"
+  ],
+  "tokens": {
+    "colors": {
+      "dark": {
+        "--color-black": "#000",
+        "--color-white": "#fff",
+        "--gray-100": "#111",
+        "--gray-200": "#1a1a1a",
+        "--gray-300": "#222",
+        "--gray-400": "#333",
+        "--gray-500": "#666",
+        "--gray-600": "#888",
+        "--gray-700": "#999",
+        "--gray-800": "#ccc",
+        "--gray-900": "#e0e0e0",
+        "--color-success": "#0f0",
+        "--color-error": "#c00",
+        "--color-warning": "#f90",
+        "--overlay-light": "rgba(0, 0, 0, 0.5)",
+        "--overlay-medium": "rgba(0, 0, 0, 0.8)",
+        "--overlay-heavy": "rgba(0, 0, 0, 0.95)",
+        "--bg": "var(--gray-100)",
+        "--bg-surface": "var(--gray-200)",
+        "--bg-elevated": "var(--gray-300)",
+        "--fg": "var(--color-white)",
+        "--fg-muted": "var(--gray-600)",
+        "--fg-subtle": "var(--gray-500)",
+        "--border": "var(--color-white)",
+        "--border-subtle": "var(--gray-400)",
+        "--interactive": "var(--color-white)",
+        "--interactive-hover": "var(--color-black)"
+      },
+      "light": {
+        "--bg": "var(--color-white)",
+        "--bg-surface": "var(--color-white)",
+        "--bg-elevated": "var(--gray-900)",
+        "--fg": "var(--color-black)",
+        "--fg-muted": "var(--gray-600)",
+        "--fg-subtle": "var(--gray-500)",
+        "--border": "var(--color-black)",
+        "--border-subtle": "var(--gray-800)",
+        "--interactive": "var(--color-black)",
+        "--interactive-hover": "var(--color-white)"
+      }
+    },
+    "typography": {
+      "--font-primary": "\"Space Grotesk\", sans-serif",
+      "--font-serif": "Georgia, \"Times New Roman\", Times, serif",
+      "--font-mono": "\"Space Grotesk\", sans-serif",
+      "--font-sans": "\"Space Grotesk\", sans-serif",
+      "--text-base": "10px",
+      "--text-2xs": "8px",
+      "--text-xs": "10px",
+      "--text-sm": "10px",
+      "--text-md": "10px",
+      "--text-lg": "12px",
+      "--text-xl": "14px",
+      "--text-2xl": "18px",
+      "--text-3xl": "24px",
+      "--leading-none": "1",
+      "--leading-tight": "1.2",
+      "--leading-normal": "1.6",
+      "--leading-relaxed": "1.8",
+      "--tracking-tight": "-0.02em",
+      "--tracking-normal": "0",
+      "--tracking-wide": "0.05em",
+      "--tracking-wider": "0.1em",
+      "--tracking-widest": "0.3em"
+    },
+    "spacing": {
+      "--space-1": "4px",
+      "--space-2": "8px",
+      "--space-3": "12px",
+      "--space-4": "16px",
+      "--space-5": "20px",
+      "--space-6": "24px",
+      "--space-8": "32px",
+      "--space-10": "40px",
+      "--space-12": "48px",
+      "--space-16": "64px"
+    },
+    "animation": {
+      "--duration-fast": "0.1s",
+      "--duration-normal": "0.15s",
+      "--duration-slow": "0.2s",
+      "--duration-slower": "0.3s",
+      "--duration-slowest": "0.5s",
+      "--ease-default": "ease",
+      "--ease-linear": "linear",
+      "--ease-in": "ease-in",
+      "--ease-out": "ease-out",
+      "--ease-in-out": "ease-in-out"
+    },
+    "layout": {
+      "--radius-none": "0",
+      "--radius-sm": "2px",
+      "--radius-md": "4px",
+      "--radius-lg": "8px",
+      "--radius-full": "9999px",
+      "--border-thin": "1px",
+      "--border-medium": "2px",
+      "--border-thick": "4px",
+      "--z-base": "0",
+      "--z-dropdown": "10",
+      "--z-sticky": "50",
+      "--z-modal": "100",
+      "--z-overlay": "200",
+      "--z-toast": "300"
+    }
+  },
+  "components": {
+    "btn": {
+      "className": "btn",
+      "modifiers": [
+        "filled",
+        "danger",
+        "ghost",
+        "sm",
+        "lg",
+        "block"
+      ],
+      "states": [
+        "hover",
+        "disabled"
+      ]
+    },
+    "input": {
+      "className": "input",
+      "modifiers": [],
+      "states": [
+        "focus"
+      ]
+    },
+    "textarea": {
+      "className": "textarea",
+      "modifiers": [],
+      "states": []
+    },
+    "select": {
+      "className": "select",
+      "modifiers": [],
+      "states": []
+    },
+    "card": {
+      "className": "card",
+      "modifiers": [
+        "interactive"
+      ],
+      "states": [
+        "hover"
+      ]
+    },
+    "token": {
+      "className": "token",
+      "modifiers": [
+        "active"
+      ],
+      "states": [
+        "hover"
+      ]
+    },
+    "modal": {
+      "className": "modal",
+      "modifiers": [
+        "visible"
+      ],
+      "states": []
+    },
+    "toast": {
+      "className": "toast",
+      "modifiers": [
+        "error"
+      ],
+      "states": []
+    },
+    "progress": {
+      "className": "progress",
+      "modifiers": [],
+      "states": []
+    },
+    "grid": {
+      "className": "grid",
+      "modifiers": [
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "states": []
+    },
+    "toggle": {
+      "className": "toggle",
+      "modifiers": [
+        "active"
+      ],
+      "states": []
+    },
+    "range": {
+      "className": "range",
+      "modifiers": [],
+      "states": []
+    },
+    "status": {
+      "className": "status",
+      "modifiers": [],
+      "states": []
+    },
+    "tabs": {
+      "className": "tabs",
+      "modifiers": [],
+      "states": []
+    },
+    "tab": {
+      "className": "tab",
+      "modifiers": [
+        "active"
+      ],
+      "states": [
+        "hover"
+      ]
+    },
+    "user-menu": {
+      "className": "user-menu",
+      "modifiers": [],
+      "states": []
+    },
+    "user-menu__trigger": {
+      "className": "user-menu__trigger",
+      "modifiers": [],
+      "states": [
+        "hover"
+      ]
+    },
+    "user-menu__dropdown": {
+      "className": "user-menu__dropdown",
+      "modifiers": [
+        "visible"
+      ],
+      "states": []
+    },
+    "user-menu__item": {
+      "className": "user-menu__item",
+      "modifiers": [
+        "danger"
+      ],
+      "states": [
+        "last",
+        "hover"
+      ]
+    },
+    "account-section": {
+      "className": "account-section",
+      "modifiers": [],
+      "states": []
+    },
+    "account-label": {
+      "className": "account-label",
+      "modifiers": [],
+      "states": []
+    },
+    "account-value": {
+      "className": "account-value",
+      "modifiers": [
+        "mono"
+      ],
+      "states": []
+    },
+    "filters": {
+      "className": "filters",
+      "modifiers": [],
+      "states": []
+    },
+    "filter-token": {
+      "className": "filter-token",
+      "modifiers": [
+        "active"
+      ],
+      "states": [
+        "hover"
+      ]
+    },
+    "spinner": {
+      "className": "spinner",
+      "modifiers": [],
+      "states": []
+    }
+  },
+  "widgets": {
+    "atoms": {
+      "w-text": {
+        "className": "w-text",
+        "modifiers": [
+          "label",
+          "display",
+          "title",
+          "meta",
+          "value",
+          "note",
+          "prose"
+        ]
+      },
+      "w-badge": {
+        "className": "w-badge",
+        "modifiers": [
+          "filled",
+          "accent",
+          "success",
+          "error"
+        ]
+      },
+      "w-bar": {
+        "className": "w-bar",
+        "modifiers": [
+          "thick",
+          "thin"
+        ]
+      },
+      "w-icon": {
+        "className": "w-icon",
+        "modifiers": [
+          "sm"
+        ]
+      },
+      "w-icon-btn": {
+        "className": "w-icon-btn",
+        "modifiers": []
+      },
+      "w-img": {
+        "className": "w-img",
+        "modifiers": [
+          "wide",
+          "banner",
+          "thumb",
+          "card",
+          "hero"
+        ]
+      },
+      "w-divider": {
+        "className": "w-divider",
+        "modifiers": [
+          "vertical",
+          "labeled"
+        ]
+      },
+      "w-checkbox": {
+        "className": "w-checkbox",
+        "modifiers": []
+      },
+      "w-btn": {
+        "className": "w-btn",
+        "modifiers": [
+          "filled",
+          "sm"
+        ]
+      },
+      "w-items": {
+        "className": "w-items",
+        "modifiers": []
+      },
+      "w-item": {
+        "className": "w-item",
+        "modifiers": []
+      },
+      "w-loader": {
+        "className": "w-loader",
+        "modifiers": []
+      }
+    },
+    "molecules": {
+      "w-headline": {
+        "className": "w-headline",
+        "modifiers": []
+      },
+      "w-tag-group": {
+        "className": "w-tag-group",
+        "modifiers": [
+          "center"
+        ]
+      },
+      "w-stat": {
+        "className": "w-stat",
+        "modifiers": []
+      },
+      "w-row": {
+        "className": "w-row",
+        "modifiers": []
+      },
+      "w-axis": {
+        "className": "w-axis",
+        "modifiers": []
+      },
+      "w-option": {
+        "className": "w-option",
+        "modifiers": [
+          "selected"
+        ]
+      },
+      "w-section": {
+        "className": "w-section",
+        "modifiers": []
+      },
+      "w-column": {
+        "className": "w-column",
+        "modifiers": []
+      }
+    },
+    "shell": {
+      "className": "w-shell",
+      "modifiers": [
+        "sm",
+        "med",
+        "tall",
+        "lg",
+        "wide",
+        "xl",
+        "col",
+        "poster",
+        "max",
+        "banner",
+        "pano",
+        "cinema",
+        "board",
+        "wall",
+        "full"
+      ]
+    },
+    "bodyModifiers": {
+      "verdict": {
+        "className": "w-body--verdict",
+        "validSizes": [
+          "sm",
+          "med",
+          "lg"
+        ]
+      },
+      "list": {
+        "className": "w-body--list",
+        "validSizes": [
+          "sm",
+          "med",
+          "tall",
+          "lg",
+          "wide"
+        ]
+      },
+      "spectrum": {
+        "className": "w-body--spectrum",
+        "validSizes": [
+          "sm",
+          "med",
+          "lg"
+        ]
+      },
+      "split": {
+        "className": "w-body--split",
+        "validSizes": [
+          "med",
+          "lg"
+        ]
+      },
+      "narrative": {
+        "className": "w-body--narrative",
+        "validSizes": [
+          "med",
+          "tall",
+          "lg"
+        ]
+      },
+      "comparison": {
+        "className": "w-body--comparison",
+        "validSizes": [
+          "med",
+          "lg"
+        ]
+      },
+      "choices": {
+        "className": "w-body--choices",
+        "validSizes": [
+          "sm",
+          "med",
+          "lg"
+        ]
+      },
+      "checklist": {
+        "className": "w-body--checklist",
+        "validSizes": [
+          "sm",
+          "tall",
+          "med",
+          "lg"
+        ]
+      },
+      "suggestion": {
+        "className": "w-body--suggestion",
+        "validSizes": [
+          "sm",
+          "med",
+          "tall",
+          "lg"
+        ]
+      },
+      "grouped": {
+        "className": "w-body--grouped",
+        "validSizes": [
+          "med",
+          "tall",
+          "lg"
+        ]
+      },
+      "stats": {
+        "className": "w-body--stats"
+      }
+    },
+    "sizes": {
+      "sm": {
+        "gridColumn": 1,
+        "gridRow": 1
+      },
+      "med": {
+        "gridColumn": 2,
+        "gridRow": 1
+      },
+      "tall": {
+        "gridColumn": 1,
+        "gridRow": 2
+      },
+      "lg": {
+        "gridColumn": 2,
+        "gridRow": 2
+      },
+      "wide": {
+        "gridColumn": 3,
+        "gridRow": 1
+      },
+      "xl": {
+        "gridColumn": 3,
+        "gridRow": 2
+      },
+      "col": {
+        "gridColumn": 1,
+        "gridRow": 3
+      },
+      "poster": {
+        "gridColumn": 2,
+        "gridRow": 3
+      },
+      "max": {
+        "gridColumn": 3,
+        "gridRow": 3
+      },
+      "banner": {
+        "gridColumn": 4,
+        "gridRow": 1
+      },
+      "pano": {
+        "gridColumn": 4,
+        "gridRow": 2
+      },
+      "cinema": {
+        "gridColumn": 4,
+        "gridRow": 3
+      },
+      "board": {
+        "gridColumn": 2,
+        "gridRow": 4
+      },
+      "wall": {
+        "gridColumn": 3,
+        "gridRow": 4
+      },
+      "full": {
+        "gridColumn": 4,
+        "gridRow": 4
+      }
+    },
+    "containerBreakpoints": [
+      180,
+      280,
+      400,
+      560
+    ]
+  }
+}

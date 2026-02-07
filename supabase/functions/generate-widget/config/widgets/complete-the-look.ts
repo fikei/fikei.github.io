@@ -104,8 +104,8 @@ Return JSON format:
   // Rendering settings
   rendering: {
     zone: 'inline',
-    template: 'product-grid',
-    fallbackTemplate: 'simple-list',
+    template: 'grid-split',
+    fallbackTemplate: 'list',
     cssClass: 'widget-complete-look',
     priority: 10
   },

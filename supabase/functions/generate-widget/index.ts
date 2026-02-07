@@ -1110,12 +1110,17 @@ serve(async (req) => {
           widgets: discoveries.map(d => ({
             widgetId: d.widgetId,
             name: d.widget.name,
+            description: d.widget.description,
             zone: d.widget.rendering.zone,
             template: d.widget.rendering.template,
             fallbackTemplate: d.widget.rendering.fallbackTemplate,
             cssClass: d.widget.rendering.cssClass,
             priority: d.widget.rendering.priority,
-            eligibility: d.eligibility
+            eligibility: d.eligibility,
+            // Include prompt template so the frontend can generate
+            // content for widgets not yet in its local registry
+            promptTemplate: d.widget.generation.promptTemplate,
+            constraints: d.widget.generation.constraints || []
           })),
           category,
           itemCount: items.length,

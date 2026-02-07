@@ -81,8 +81,8 @@ Return JSON format:
   // Rendering settings
   rendering: {
     zone: 'hero',
-    template: 'style-card',
-    fallbackTemplate: 'text-summary',
+    template: 'hero-card',
+    fallbackTemplate: 'text-block',
     cssClass: 'widget-style-summary',
     priority: 5
   },

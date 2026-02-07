@@ -1,0 +1,2308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Widget Design System — ctrl.rodeo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <link rel="stylesheet" href="widgets.css">
+  <style>
+    /* === Showcase layout === */
+    .showcase { max-width: 1200px; margin: 0 auto; padding: var(--space-6); }
+
+    .section { margin-bottom: var(--space-16); }
+    .section__heading { font-family: var(--font-primary); font-size: var(--text-lg); text-transform: uppercase; letter-spacing: var(--tracking-wider); color: var(--fg); margin-bottom: var(--space-1); }
+    .section__desc { font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-6); }
+
+    .component-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-6); }
+    .component-card { border: var(--border-thin) solid var(--border-subtle); padding: var(--space-4); }
+    .component-card__label { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--fg-muted); margin-bottom: var(--space-3); padding-bottom: var(--space-2); border-bottom: var(--border-thin) solid var(--border-subtle); }
+    .component-card__demo { display: flex; flex-direction: column; gap: var(--space-3); }
+    .variants-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+
+    .section-divider { border: none; border-top: var(--border-thin) solid var(--border-subtle); margin: var(--space-16) 0; }
+
+    /* === Grid test beds === */
+    .grid-test { display: grid; gap: var(--space-4); grid-auto-rows: minmax(160px, auto); }
+    .grid-test--5col { grid-template-columns: repeat(5, 1fr); }
+    .grid-test--4col { grid-template-columns: repeat(4, 1fr); }
+    .grid-test--3col { grid-template-columns: repeat(3, 1fr); }
+
+    .grid-controls { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+    .grid-controls button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
+    .grid-controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+    /* Grid lines overlay */
+    .grid-test--lines { position: relative; }
+    .grid-test--lines::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background:
+        repeating-linear-gradient(to right, transparent, transparent calc(var(--grid-col-w, 20%) - var(--space-4)), var(--border-subtle) calc(var(--grid-col-w, 20%) - var(--space-4)), var(--border-subtle) var(--grid-col-w, 20%));
+    }
+    .grid-test--lines .w-shell {
+      outline: 1px dashed var(--border-subtle);
+      outline-offset: -1px;
+    }
+    .grid-test--lines.grid-test--5col { --grid-col-w: 20%; }
+    .grid-test--lines.grid-test--4col { --grid-col-w: 25%; }
+    .grid-test--lines.grid-test--3col { --grid-col-w: 33.333%; }
+    .grid-test--lines .w-shell::after {
+      content: attr(class);
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-family: var(--font-primary);
+      font-size: 8px;
+      color: var(--fg-muted);
+      opacity: 0.5;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 2;
+    }
+    .grid-test--lines .w-shell { position: relative; }
+
+    /* Nav */
+    .nav { position: sticky; top: 0; background: var(--bg); border-bottom: var(--border-thin) solid var(--border-subtle); z-index: var(--z-sticky); padding: var(--space-3) var(--space-6); display: flex; gap: var(--space-4); align-items: center; overflow-x: auto; }
+    .nav a { font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); text-decoration: none; white-space: nowrap; }
+    .nav a:hover { color: var(--fg); }
+    .nav__spacer { flex: 1; }
+    .nav select { font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); background: var(--bg); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-1) var(--space-3); cursor: pointer; white-space: nowrap; }
+    .nav select option { text-transform: none; letter-spacing: normal; }
+
+    /* Variant explorer */
+    .variant-grid { display: flex; flex-direction: column; gap: var(--space-6); align-items: start; }
+    .variant-item { display: flex; flex-direction: column; }
+    .variant-label { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--fg-muted); margin-bottom: var(--space-2); }
+    .variant-item .w-shell { min-width: 0; }
+    .variant-item--sm { width: 200px; }
+    .variant-item--med { width: 420px; }
+    .variant-item--tall { width: 200px; }
+    .variant-item--lg { width: 420px; }
+    .variant-item--wide { width: 640px; }
+    .variant-item--xl { width: 640px; }
+    .variant-item--col { width: 200px; }
+    .variant-item--poster { width: 420px; }
+    .variant-item--max { width: 640px; }
+    .variant-item--banner { width: 860px; }
+    .variant-item--pano { width: 860px; }
+    .variant-item--cinema { width: 860px; }
+    .variant-item--board { width: 420px; }
+    .variant-item--wall { width: 640px; }
+    .variant-item--full { width: 860px; }
+
+    /* Variant audit controls */
+    .variant-toolbar { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .variant-toolbar button { padding: var(--space-1) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: transparent; color: var(--fg-muted); border: var(--border-thin) solid var(--border-subtle); cursor: pointer; }
+    .variant-toolbar button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+    /* Overarching print-design grid overlay — columns + baselines across all variants */
+    .variant-grid--gridlines { position: relative; padding-top: var(--space-4); }
+    .variant-grid--gridlines::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: calc(100% / 12) 100%, 100% 40px;
+    }
+
+    /* Blocked state (triggered via right-click menu) */
+    .variant-item--flagged .w-shell { opacity: 0.2; }
+    .variant-item--flagged .variant-label { text-decoration: line-through; color: var(--color-error); }
+
+    /* Show/hide blocked toggle */
+    .variant-blocked-toggle { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--color-error); background: transparent; border: var(--border-thin) solid var(--border-subtle); cursor: pointer; margin-bottom: var(--space-4); }
+    .variant-blocked-toggle:hover { border-color: var(--color-error); }
+    .variant-blocked-toggle.active { border-color: var(--color-error); }
+    .variant-item { position: relative; }
+    .variant-blocked { display: none; position: absolute; top: 24px; left: 0; right: 0; bottom: 0; z-index: 5; align-items: center; justify-content: center; }
+    .variant-item--flagged .variant-blocked { display: flex; }
+    .variant-blocked span { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--color-error); padding: var(--space-1) var(--space-3); border: var(--border-thin) solid var(--color-error); }
+
+    /* Stoplight status indicator */
+    .variant-stoplight { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+    .variant-stoplight--green { background: #22c55e; }
+    .variant-stoplight--yellow { background: #eab308; }
+    .variant-stoplight--orange { background: #f97316; }
+    .variant-stoplight--red { background: #ef4444; }
+    .variant-label { display: flex; align-items: center; }
+    .variant-comment-count { font-size: 8px; color: var(--fg-muted); margin-left: auto; padding: 1px 5px; border: var(--border-thin) solid var(--border-subtle); }
+
+    /* Right-click context menu */
+    .variant-ctx-menu { position: fixed; z-index: 100; background: var(--bg); border: var(--border-thin) solid var(--border); min-width: 160px; padding: var(--space-1) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
+    .variant-ctx-menu__item { display: block; width: 100%; padding: var(--space-2) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg); background: transparent; border: none; cursor: pointer; text-align: left; }
+    .variant-ctx-menu__item:hover { background: var(--bg-surface); }
+    .variant-ctx-menu__item--danger { color: var(--color-error); }
+    .variant-ctx-menu__divider { height: 1px; background: var(--border-subtle); margin: var(--space-1) 0; }
+
+    /* Inline comment area (opens via context menu) */
+    .variant-comment { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--bg); border-top: var(--border-thin) solid var(--border); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+    .variant-comment textarea { font-family: var(--font-primary); font-size: var(--text-xs); background: var(--bg-surface); color: var(--fg); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-2); resize: vertical; min-height: 40px; line-height: var(--leading-normal); }
+    .variant-comment textarea:focus { outline: none; border-color: var(--fg); }
+    .variant-comment__footer { display: flex; justify-content: space-between; align-items: center; }
+    .variant-comment__hint { font-size: 8px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+
+    /* Blacklist table */
+    .audit-table { border-collapse: collapse; font-family: var(--font-primary); margin-top: var(--space-4); width: 100%; }
+    .audit-table th { font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg-muted); padding: var(--space-2); text-align: left; font-weight: normal; border-bottom: var(--border-thin) solid var(--border-subtle); }
+    .audit-table td { font-size: var(--text-xs); padding: var(--space-2); border-bottom: var(--border-thin) solid var(--border-subtle); color: var(--fg); vertical-align: top; }
+    .audit-table td.status--blocked { color: #ef4444; }
+    .audit-table td.status--todo { color: #eab308; }
+    .audit-table td.status--review { color: #f97316; }
+    .audit-table td.status--clean { color: #22c55e; }
+    .audit-table .note-text { font-style: italic; color: var(--fg-muted); max-width: 300px; }
+
+    @media (max-width: 900px) {
+      .grid-test--5col { grid-template-columns: repeat(3, 1fr); }
+      .grid-test--4col { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .grid-test--5col, .grid-test--4col, .grid-test--3col { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- SVG icon sprite — all icons in one place -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+  <symbol id="icon-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="icon-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="icon-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="icon-bookmark" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+  <symbol id="icon-map-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  <symbol id="icon-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
+  <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="icon-coffee" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></symbol>
+  <symbol id="icon-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></symbol>
+  <symbol id="icon-tv" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></symbol>
+  <symbol id="icon-shuffle" viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></symbol>
+  <symbol id="icon-external" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></symbol>
+  <symbol id="icon-user-x" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></symbol>
+</svg>
+
+<nav class="nav">
+  <a href="#atoms">Atoms</a>
+  <a href="#molecules">Molecules</a>
+  <a href="#layouts">Layouts</a>
+  <a href="#priority">Priority</a>
+  <a href="#grid">Grid Sizes</a>
+  <span class="nav__spacer"></span>
+  <select id="widgetFilter" onchange="lastFilter='widget';showVariants()">
+    <option value="">Widget...</option>
+    <optgroup label="Priority">
+      <option value="watch-deadline">#40 Upcoming Releases</option>
+      <option value="discover-eat">#41 Discover (eat)</option>
+      <option value="discover-watch">#41 Discover (watch)</option>
+      <option value="discover-read">#41 Discover (read)</option>
+      <option value="discover-home">#41 Discover (home)</option>
+      <option value="discover-wear">#41 Discover (wear)</option>
+    </optgroup>
+    <optgroup label="Catalog">
+      <option value="eat-decide">#1 Decide (eat)</option>
+      <option value="read-synthesize">#4 Synthesize (read)</option>
+      <option value="go-sequence">#6 Sequence (go)</option>
+      <option value="follow-decay">#8 Decay (follow)</option>
+      <option value="all-behavior">#15 Behavior (all)</option>
+      <option value="home-conflict">#17 Conflict (home)</option>
+      <option value="all-archaeologist">#20 Archaeologist (all)</option>
+      <option value="use-compare">#26 Compare (use)</option>
+      <option value="all-ritual">#33 Ritual (all)</option>
+      <option value="follow-proxy">#34 Proxy (follow)</option>
+      <option value="home-ladder">#36 Ladder (home)</option>
+    </optgroup>
+    <optgroup label="Content">
+      <option value="read-recommend">Article Recommendation</option>
+      <option value="read-digest">News Digest</option>
+      <option value="read-deep">Deep Read</option>
+    </optgroup>
+  </select>
+  <select id="templateFilter" onchange="lastFilter='template';showVariants()">
+    <option value="">Template...</option>
+    <option value="choices">Choices</option>
+    <option value="comparison">Comparison</option>
+    <option value="grouped">Grouped</option>
+    <option value="list">List</option>
+    <option value="narrative">Narrative</option>
+    <option value="spectrum">Spectrum</option>
+    <option value="suggestion">Suggestion</option>
+    <option value="verdict">Verdict</option>
+  </select>
+</nav>
+
+<div class="showcase">
+  <!-- ====== VARIANT EXPLORER (hidden until dropdown used) ====== -->
+  <div class="section" id="variants" style="display:none">
+    <h2 class="section__heading">Variant Audit</h2>
+    <p class="section__desc" id="variantDesc">All sizes for the selected widget. Right-click for options.</p>
+
+    <div class="variant-toolbar">
+      <button onclick="toggleVariantGridLines(this)">Grid lines</button>
+      <span class="w-text w-text--meta" id="variantCount"></span>
+    </div>
+
+    <div class="variant-grid" id="variantGrid"></div>
+
+    <!-- Blocked variants (collapsed by default) -->
+    <div id="blockedSection" style="display:none;margin-top:var(--space-6)">
+      <button class="variant-blocked-toggle" id="blockedToggle" onclick="toggleBlockedSection()"></button>
+      <div class="variant-grid" id="blockedGrid" style="display:none"></div>
+    </div>
+
+    <!-- Audit log -->
+    <div id="blacklistOutput" style="margin-top:var(--space-8)"></div>
+  </div>
+
+  <hr class="section-divider" id="variantDivider" style="display:none">
+
+  <!-- ====== ATOMS ====== -->
+  <div class="section" id="atoms">
+    <h2 class="section__heading">Atoms</h2>
+    <p class="section__desc">Smallest visual units.</p>
+
+    <div class="component-grid">
+
+      <!-- w-text -->
+      <div class="component-card">
+        <div class="component-card__label">w-text</div>
+        <div class="component-card__demo">
+          <span class="w-text w-text--display">Display</span>
+          <span class="w-text w-text--title">Title</span>
+          <span class="w-text w-text--meta">Meta — supporting info</span>
+          <span class="w-text w-text--label">Label</span>
+          <span class="w-text w-text--note">Note — explanatory italic</span>
+          <p class="w-text w-text--prose">Prose for narrative paragraphs. Your saved articles cluster around themes that reveal an evolving interest pattern.</p>
+        </div>
+      </div>
+
+      <!-- w-badge -->
+      <div class="component-card">
+        <div class="component-card__label">w-badge</div>
+        <div class="component-card__demo">
+          <div class="variants-row">
+            <span class="w-badge">Default</span>
+            <span class="w-badge">AI</span>
+            <span class="w-badge">Clean lines</span>
+          </div>
+          <div class="variants-row">
+            <span class="w-badge w-badge--filled">Filled</span>
+            <span class="w-badge w-badge--accent">Accent</span>
+            <span class="w-badge w-badge--success">Success</span>
+            <span class="w-badge w-badge--error">Error</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-icon + w-icon-btn -->
+      <div class="component-card">
+        <div class="component-card__label">w-icon + w-icon-btn</div>
+        <div class="component-card__demo">
+          <div class="variants-row">
+            <span class="w-icon"><svg><use href="#icon-refresh"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-x"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-arrow-right"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-check"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-plus"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-bookmark"/></svg></span>
+          </div>
+          <div class="variants-row">
+            <span class="w-icon"><svg><use href="#icon-clock"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-map-pin"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-play"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-book"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+            <span class="w-icon"><svg><use href="#icon-external"/></svg></span>
+          </div>
+          <span class="w-text w-text--label" style="margin-top:var(--space-2)">As buttons (equal sizing)</span>
+          <div class="variants-row">
+            <button class="w-icon-btn" title="Refresh"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn" title="Dismiss"><svg><use href="#icon-x"/></svg></button>
+            <button class="w-icon-btn" title="Navigate"><svg><use href="#icon-arrow-right"/></svg></button>
+            <button class="w-icon-btn" title="Save"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-img -->
+      <div class="component-card">
+        <div class="component-card__label">w-img</div>
+        <div class="component-card__demo">
+          <div class="variants-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/demo-thumb/80/80" alt="thumb demo"></div>
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/demo-card/160/160" alt="card demo"></div>
+          </div>
+          <div class="w-img w-img--hero"><img src="https://picsum.photos/seed/demo-hero/400/300" alt="hero demo"></div>
+          <div class="w-img w-img--banner"><img src="https://picsum.photos/seed/demo-banner/600/200" alt="banner demo"></div>
+        </div>
+      </div>
+
+      <!-- w-bar -->
+      <div class="component-card">
+        <div class="component-card__label">w-bar</div>
+        <div class="component-card__demo">
+          <div class="w-bar w-bar--thin" style="--fill:45%"><div class="w-bar__fill"></div></div>
+          <div class="w-bar" style="--fill:67%"><div class="w-bar__fill"></div></div>
+          <div class="w-bar w-bar--thick" style="--fill:80%"><div class="w-bar__fill"></div></div>
+        </div>
+      </div>
+
+      <!-- w-divider -->
+      <div class="component-card">
+        <div class="component-card__label">w-divider</div>
+        <div class="component-card__demo">
+          <div class="w-divider"></div>
+          <div class="w-divider w-divider--labeled">vs</div>
+          <div class="w-divider w-divider--labeled">or</div>
+          <div style="display:flex;align-items:center;height:40px;gap:var(--space-3)">
+            <span class="w-text w-text--meta">Left</span>
+            <div class="w-divider w-divider--vertical"></div>
+            <span class="w-text w-text--meta">Right</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-btn -->
+      <div class="component-card">
+        <div class="component-card__label">w-btn</div>
+        <div class="component-card__demo">
+          <div class="variants-row">
+            <button class="w-btn">Default</button>
+            <button class="w-btn w-btn--filled">Filled</button>
+            <button class="w-btn w-btn--sm">Small</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-checkbox -->
+      <div class="component-card">
+        <div class="component-card__label">w-checkbox</div>
+        <div class="component-card__demo">
+          <div class="variants-row">
+            <label class="w-checkbox"><input type="checkbox"><span class="w-checkbox__mark"></span></label>
+            <span class="w-text w-text--meta">Unchecked</span>
+          </div>
+          <div class="variants-row">
+            <label class="w-checkbox"><input type="checkbox" checked><span class="w-checkbox__mark"></span></label>
+            <span class="w-text w-text--meta">Checked</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider" id="atomsDivider">
+
+  <!-- ====== MOLECULES ====== -->
+  <div class="section" id="molecules">
+    <h2 class="section__heading">Molecules</h2>
+    <p class="section__desc">Atoms composed into recognizable patterns.</p>
+
+    <div class="component-grid">
+
+      <!-- w-headline -->
+      <div class="component-card">
+        <div class="component-card__label">w-headline</div>
+        <div class="component-card__demo">
+          <div class="w-headline">
+            <span class="w-text w-text--display">Minimal Modern</span>
+            <span class="w-text w-text--meta">Based on 12 items</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-tag-group -->
+      <div class="component-card">
+        <div class="component-card__label">w-tag-group</div>
+        <div class="component-card__demo">
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge">Monochrome</span>
+            <span class="w-badge">Texture</span>
+            <span class="w-badge">Clean lines</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-row with image -->
+      <div class="component-card">
+        <div class="component-card__label">w-row (with w-img)</div>
+        <div class="component-card__demo">
+          <div class="w-row" style="border:none;padding-top:0">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/chez-pascal/80/80" alt="Chez Pascal"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Chez Pascal</span>
+              <span class="w-text w-text--meta">French bistro — saved 3 weeks ago</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tacos-gordo/80/80" alt="Tacos El Gordo"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Tacos El Gordo</span>
+              <span class="w-text w-text--meta">Mexican street food — your most saved</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-axis -->
+      <div class="component-card">
+        <div class="component-card__label">w-axis</div>
+        <div class="component-card__demo">
+          <div class="w-axis">
+            <div class="w-axis__labels">
+              <span class="w-text w-text--label">Light</span>
+              <span class="w-text w-text--label">Heavy</span>
+            </div>
+            <div class="w-axis__track">
+              <div class="w-axis__marker" style="left:60%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-option -->
+      <div class="component-card">
+        <div class="component-card__label">w-option</div>
+        <div class="component-card__demo">
+          <div class="w-option">
+            <span class="w-text w-text--title">Option A</span>
+            <span class="w-text w-text--meta">French bistro — $$$</span>
+          </div>
+          <div class="w-option w-option--selected">
+            <span class="w-text w-text--title">Option B</span>
+            <span class="w-text w-text--meta">Selected state</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- w-actions (anchored) -->
+      <div class="component-card">
+        <div class="component-card__label">w-actions (anchored vs w-footer)</div>
+        <div class="component-card__demo">
+          <span class="w-text w-text--label">Anchored (inside body)</span>
+          <div style="border:var(--border-thin) solid var(--border-subtle)">
+            <div style="padding:var(--space-3)"><span class="w-text w-text--meta">Body content here</span></div>
+            <div class="w-actions" style="margin-top:0;border-left:0;border-right:0">
+              <button class="w-btn w-btn--filled">Pick this one</button>
+              <button class="w-btn">Not tonight</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider" id="moleculesDivider">
+
+  <!-- ====== BODY LAYOUTS AS FULL WIDGETS ====== -->
+  <div class="section" id="layouts">
+    <h2 class="section__heading">Widget Examples</h2>
+    <p class="section__desc">Real widgets with photos, SVG icons, anchored actions. One visual per row.</p>
+
+    <div class="component-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+
+      <!-- #1 eat-decide (choices + photos) -->
+      <div class="w-shell" data-widget="eat-decide" data-template="choices">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Pick one for tonight</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--choices">
+          <div class="w-option">
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/chez-pascal/80/80" alt="Chez Pascal"></div>
+              <div>
+                <span class="w-text w-text--title">Chez Pascal</span>
+                <span class="w-text w-text--meta">French bistro — you haven't tried French in 3 weeks</span>
+              </div>
+            </div>
+          </div>
+          <div class="w-option">
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tacos-gordo/80/80" alt="Tacos El Gordo"></div>
+              <div>
+                <span class="w-text w-text--title">Tacos El Gordo</span>
+                <span class="w-text w-text--meta">Mexican street — your most-saved cuisine</span>
+              </div>
+            </div>
+          </div>
+          <div class="w-option">
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/sushi-nakazawa/80/80" alt="Sushi Nakazawa"></div>
+              <div>
+                <span class="w-text w-text--title">Sushi Nakazawa</span>
+                <span class="w-text w-text--meta">Omakase — saved last week, still unvisited</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Pick for me</button>
+          <button class="w-btn">Not tonight</button>
+        </div>
+      </div>
+
+      <!-- #4 read-synthesize (narrative) -->
+      <div class="w-shell" data-widget="read-synthesize" data-template="narrative">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">The hidden thread</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--narrative">
+          <p class="w-text w-text--prose">Your 6 recent articles share an underlying theme: <strong>the tension between AI automation and human creativity</strong>. You're exploring whether tools like Copilot augment or replace the craft of writing code.</p>
+          <div class="w-tag-group" style="margin-top:var(--space-3)">
+            <span class="w-badge">AI ethics</span>
+            <span class="w-badge">Developer tools</span>
+            <span class="w-badge">Creativity</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">View articles</button>
+          <button class="w-btn">Find more</button>
+        </div>
+      </div>
+
+      <!-- #6 go-sequence (list + photos) -->
+      <div class="w-shell" data-widget="go-sequence" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Route these into a trip</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/golden-gate/80/80" alt="Golden Gate Bridge"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Golden Gate Bridge</span>
+              <span class="w-text w-text--meta">Start here — morning light</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tartine-bakery/80/80" alt="Tartine Bakery"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Tartine Bakery</span>
+              <span class="w-text w-text--meta">12 min drive — lunch stop</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/sfmoma-art/80/80" alt="SFMOMA"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">SFMOMA</span>
+              <span class="w-text w-text--meta">8 min walk — afternoon</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Open in Maps</button>
+          <button class="w-btn">Re-route</button>
+        </div>
+      </div>
+
+      <!-- Article recommendation (suggestion + hero) -->
+      <div class="w-shell" data-widget="read-recommend" data-template="suggestion">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Recommended read</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-img w-img--hero" style="width:100%"><img src="https://picsum.photos/seed/book-overthinking/400/300" alt="Book cover"></div>
+          <div>
+            <span class="w-text w-text--title">The Age of Magical Overthinking</span>
+            <span class="w-text w-text--meta" style="margin-top:var(--space-1)">Amanda Montell — Based on your saves about cognitive biases and decision-making</span>
+          </div>
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge">Psychology</span>
+            <span class="w-badge">Behavior</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Save to board</button>
+          <button class="w-btn">Not interested</button>
+        </div>
+      </div>
+
+      <!-- News digest (list with card images) -->
+      <div class="w-shell" data-widget="read-digest" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Your news digest</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/ai-chip/160/160" alt="AI article"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Claude 4.5 Benchmarks</span>
+              <span class="w-text w-text--meta">The Verge — 4 min read — Matches your AI tooling saves</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/design-grid/160/160" alt="Design article"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Design Systems at Scale</span>
+              <span class="w-text w-text--meta">Smashing Mag — 8 min read — Related to your design system research</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/remote-desk/160/160" alt="Work article"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">The Future of Remote Work</span>
+              <span class="w-text w-text--meta">Wired — 6 min read — Trending in your network</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">See all recommendations</button>
+        </div>
+      </div>
+
+      <!-- #26 use-compare (comparison) -->
+      <div class="w-shell" data-widget="use-compare" data-template="comparison">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Have you considered?</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--comparison">
+          <div class="w-option">
+            <div class="w-img w-img--wide" style="width:100%"><img src="https://picsum.photos/seed/figma-ui/400/225" alt="Figma"></div>
+            <span class="w-text w-text--title">Figma</span>
+            <span class="w-text w-text--meta">Your current tool</span>
+            <div class="w-tag-group">
+              <span class="w-badge">Collab</span>
+              <span class="w-badge">Web</span>
+            </div>
+          </div>
+          <div class="w-divider w-divider--labeled">vs</div>
+          <div class="w-option">
+            <div class="w-img w-img--wide" style="width:100%"><img src="https://picsum.photos/seed/penpot-ui/400/225" alt="Penpot"></div>
+            <span class="w-text w-text--title">Penpot</span>
+            <span class="w-text w-text--meta">Open-source alternative</span>
+            <div class="w-tag-group">
+              <span class="w-badge">Free</span>
+              <span class="w-badge">Self-host</span>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Keep Figma</button>
+          <button class="w-btn">Save Penpot</button>
+        </div>
+      </div>
+
+      <!-- #36 home-ladder (list with card images) -->
+      <div class="w-shell" data-widget="home-ladder" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Good / Better / Best</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/ikea-shelf/160/160" alt="IKEA KALLAX"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">IKEA KALLAX</span>
+              <span class="w-text w-text--meta">$79 — functional, modular, MDF</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/cb2-bookcase/160/160" alt="CB2 Stairway"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">CB2 Stairway</span>
+              <span class="w-text w-text--meta">$349 — solid wood, modern aesthetic</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--card"><img src="https://picsum.photos/seed/usm-haller/160/160" alt="USM Haller"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">USM Haller</span>
+              <span class="w-text w-text--meta">$1,200 — Swiss-made, lifetime piece</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Save all options</button>
+        </div>
+      </div>
+
+      <!-- #8 follow-decay (list with status icons) -->
+      <div class="w-shell" data-widget="follow-decay" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Who are you ignoring?</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <span class="w-icon" style="color:var(--color-error)"><svg><use href="#icon-alert"/></svg></span>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">@DesignTwit</span>
+              <span class="w-text w-text--meta">No interaction in 62 days</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-user-x"/></svg></button>
+          </div>
+          <div class="w-row">
+            <span class="w-icon" style="color:var(--color-warning)"><svg><use href="#icon-clock"/></svg></span>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">@TechBro42</span>
+              <span class="w-text w-text--meta">No interaction in 34 days</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-user-x"/></svg></button>
+          </div>
+          <div class="w-row">
+            <span class="w-icon" style="color:var(--color-warning)"><svg><use href="#icon-clock"/></svg></span>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">@VintageFinds</span>
+              <span class="w-text w-text--meta">No interaction in 30 days</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-user-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Unfollow all</button>
+          <button class="w-btn">Keep watching</button>
+        </div>
+      </div>
+
+      <!-- #17 home-conflict (verdict) -->
+      <div class="w-shell" data-widget="home-conflict" data-template="verdict">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">These styles clash</span>
+            <span class="w-badge">AI</span>
+            <span class="w-badge w-badge--accent">Conflict</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--verdict">
+          <div class="w-headline">
+            <span class="w-text w-text--display">Scandinavian vs Industrial</span>
+            <span class="w-text w-text--meta">3 items lean minimal birch, 4 items lean raw metal</span>
+          </div>
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge w-badge--filled">Scandinavian</span>
+            <span class="w-badge w-badge--accent">vs</span>
+            <span class="w-badge w-badge--filled">Industrial</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">See clashing items</button>
+          <button class="w-btn">It's intentional</button>
+        </div>
+      </div>
+
+      <!-- #40 watch-deadline (list with photos) -->
+      <div class="w-shell" data-widget="watch-deadline" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Upcoming releases</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/white-lotus/80/80" alt="White Lotus"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">White Lotus S3</span>
+              <span class="w-text w-text--meta">Premieres Feb 16 — 10 days</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/stranger-things/80/80" alt="Stranger Things"></div>
+            <div class="w-row__content">
+              <span class="w-text w-text--title">Stranger Things S5</span>
+              <span class="w-text w-text--meta">Expected Q3 2026</span>
+            </div>
+            <button class="w-icon-btn"><svg><use href="#icon-arrow-right"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Set reminders</button>
+        </div>
+      </div>
+
+      <!-- #33 all-ritual (grouped with icons) -->
+      <div class="w-shell" data-widget="all-ritual" data-template="grouped">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Daily ritual bundle</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-shuffle"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--grouped">
+          <div class="w-section">
+            <div class="w-section__title"><span class="w-text w-text--label">Morning</span></div>
+            <div class="w-row" style="border:none;padding-top:0">
+              <span class="w-icon"><svg><use href="#icon-book"/></svg></span>
+              <div class="w-row__content">
+                <span class="w-text w-text--title">Read: Morning Brew</span>
+                <span class="w-text w-text--meta">5 min — from your read saves</span>
+              </div>
+            </div>
+            <div class="w-row">
+              <span class="w-icon"><svg><use href="#icon-headphones"/></svg></span>
+              <div class="w-row__content">
+                <span class="w-text w-text--title">Listen: Huberman Lab</span>
+                <span class="w-text w-text--meta">Saved episode — 45 min</span>
+              </div>
+            </div>
+          </div>
+          <div class="w-divider"></div>
+          <div class="w-section">
+            <div class="w-section__title"><span class="w-text w-text--label">Wind-down</span></div>
+            <div class="w-row" style="border:none;padding-top:0">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <div class="w-row__content">
+                <span class="w-text w-text--title">Watch: Chef's Table</span>
+                <span class="w-text w-text--meta">Next unwatched — S7E2</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Start routine</button>
+          <button class="w-btn">Shuffle</button>
+        </div>
+      </div>
+
+      <!-- Deep-read article (narrative + banner) -->
+      <div class="w-shell" data-widget="read-deep" data-template="narrative">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Worth a deep read</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--narrative" style="padding:0">
+          <div class="w-img w-img--banner"><img src="https://picsum.photos/seed/indie-web/600/200" alt="Article banner"></div>
+          <div style="padding:var(--space-4)">
+            <p class="w-text w-text--prose">This longform piece from Anil Dash connects three of your saved themes — <strong>open source governance, creator economics, and platform decay</strong> — into a single argument about the future of the indie web.</p>
+            <span class="w-text w-text--meta" style="margin-top:var(--space-2)">anil.dash — 14 min read</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Read now</button>
+          <button class="w-btn">Save for later</button>
+        </div>
+      </div>
+
+      <!-- #20 all-archaeologist (verdict) -->
+      <div class="w-shell" data-widget="all-archaeologist" data-template="verdict">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Oldest forgotten save</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--verdict">
+          <div class="w-headline">
+            <span class="w-text w-text--display">The Mom Test</span>
+            <span class="w-text w-text--meta">Saved 147 days ago — never opened</span>
+          </div>
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge">Read</span>
+            <span class="w-badge">Business</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn w-btn--filled">Read now</button>
+          <button class="w-btn">Remove</button>
+        </div>
+      </div>
+
+      <!-- #34 follow-proxy (narrative) -->
+      <div class="w-shell" data-widget="follow-proxy" data-template="narrative">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">The influence chain</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--narrative">
+          <p class="w-text w-text--prose">You follow <strong>@dan_abramov</strong>, <strong>@swyx</strong>, and <strong>@kentcdodds</strong> — all in the React ecosystem. Dan influences Swyx's thinking, who shapes Kent's teaching. You're getting a filtered, amplified view of React core team opinions.</p>
+          <span class="w-text w-text--note" style="margin-top:var(--space-2)">Consider adding a contrarian voice like @RyanCarniato (Solid.js) for balance.</span>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">Add suggested</button>
+        </div>
+      </div>
+
+      <!-- #15 all-behavior (spectrum) -->
+      <div class="w-shell" data-widget="all-behavior" data-template="spectrum">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Your saving pattern</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--spectrum">
+          <div class="w-axis">
+            <div class="w-axis__labels"><span class="w-text w-text--label">Read</span><span class="w-text w-text--label">Watch</span></div>
+            <div class="w-axis__track"><div class="w-axis__marker" style="left:35%"></div></div>
+          </div>
+          <div class="w-axis">
+            <div class="w-axis__labels"><span class="w-text w-text--label">Browse</span><span class="w-text w-text--label">Buy</span></div>
+            <div class="w-axis__track"><div class="w-axis__marker" style="left:70%"></div></div>
+          </div>
+          <div class="w-axis">
+            <div class="w-axis__labels"><span class="w-text w-text--label">Solo</span><span class="w-text w-text--label">Social</span></div>
+            <div class="w-axis__track"><div class="w-axis__marker" style="left:25%"></div></div>
+          </div>
+          <span class="w-text w-text--note">Based on 34 saves over the last 30 days</span>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn">View by category</button>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div class="w-shell">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Generating</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--loading">
+          <span class="w-loader">Generating insights...</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="section-divider" id="layoutsDivider">
+
+  <!-- ====== PRIORITY WIDGETS ====== -->
+  <div class="section" id="priority">
+    <h2 class="section__heading">Priority Widgets</h2>
+    <p class="section__desc">User-validated high-value widgets. Build and ship first.</p>
+
+    <div class="component-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+
+      <!-- #40 Upcoming Releases — med (2x1) -->
+      <div class="w-shell" style="grid-column: span 2;" data-widget="watch-deadline" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Upcoming releases for you</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/severance-tv/80/80" alt="Severance"></div>
+              <div>
+                <span class="w-text w-text--title">Severance</span>
+                <span class="w-text w-text--meta">Season 3 — Expected Q3 2026</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--success">Soon</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/white-lotus/80/80" alt="The White Lotus"></div>
+              <div>
+                <span class="w-text w-text--title">The White Lotus</span>
+                <span class="w-text w-text--meta">Season 4 — Filming</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--muted">2027</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/squid-game/80/80" alt="Squid Game"></div>
+              <div>
+                <span class="w-text w-text--title">Squid Game</span>
+                <span class="w-text w-text--meta">Season 3 — Expected 2026</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--muted">2026</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/dune-desert/80/80" alt="Dune"></div>
+              <div>
+                <span class="w-text w-text--title">Dune: Part Three</span>
+                <span class="w-text w-text--meta">Feature film — No date announced</span>
+              </div>
+            </div>
+            <span class="w-badge w-badge--muted">TBD</span>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 8 saved shows</span>
+        </div>
+      </div>
+
+      <!-- #40 Upcoming Releases — sm (1x1, compact icons) -->
+      <div class="w-shell" data-widget="watch-deadline" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Upcoming releases</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <span class="w-text w-text--title">Severance S3</span>
+            </div>
+            <span class="w-badge w-badge--success">Soon</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <span class="w-text w-text--title">Squid Game S3</span>
+            </div>
+            <span class="w-badge w-badge--muted">2026</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- #41 Discover — eat variant (med) -->
+      <div class="w-shell" style="grid-column: span 2;" data-widget="discover-eat" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Restaurants you'd love</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/bar-chelou/80/80" alt="Bar Chelou"></div>
+              <div>
+                <span class="w-text w-text--title">Bar Chelou</span>
+                <span class="w-text w-text--meta">Natural wine bar — Similar vibe to Chez Pascal and your French saves</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/kismet-la/80/80" alt="Kismet"></div>
+              <div>
+                <span class="w-text w-text--title">Kismet</span>
+                <span class="w-text w-text--meta">Middle Eastern — Matches your preference for ingredient-driven cooking</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/petit-trois/80/80" alt="Petit Trois"></div>
+              <div>
+                <span class="w-text w-text--title">Petit Trois</span>
+                <span class="w-text w-text--meta">French bistro — Same price range and neighborhood feel as your top picks</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 6 saved restaurants</span>
+          <button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button>
+        </div>
+      </div>
+
+      <!-- #41 Discover — watch variant (med) -->
+      <div class="w-shell" style="grid-column: span 2;" data-widget="discover-watch" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Shows cut from the same cloth</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/pachinko-tv/80/80" alt="Pachinko"></div>
+              <div>
+                <span class="w-text w-text--title">Pachinko</span>
+                <span class="w-text w-text--meta">Multi-generational storytelling — you gravitate toward slow-burn drama</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center;flex:1">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/shogun-fx/80/80" alt="Shogun"></div>
+              <div>
+                <span class="w-text w-text--title">Shogun</span>
+                <span class="w-text w-text--meta">Period drama — similar production quality to your top-rated saves</span>
+              </div>
+            </div>
+            <button class="w-icon-btn" title="Visit"><svg><use href="#icon-external"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 5 saved shows</span>
+          <button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button>
+        </div>
+      </div>
+
+      <!-- #41 Discover — read variant (sm) -->
+      <div class="w-shell" data-widget="discover-read" data-template="suggestion">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Your next great read</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">The Myth of Normal</span>
+              <span class="w-text w-text--meta">You read a lot about systems thinking — this applies it to health</span>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> Read</button>
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button>
+        </div>
+      </div>
+
+      <!-- #41 Discover — home variant (sm) -->
+      <div class="w-shell" data-widget="discover-home" data-template="suggestion">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Pieces that fit your space</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-3);align-items:center">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/floyd-table/80/80" alt="Floyd Side Table"></div>
+              <div>
+                <span class="w-text w-text--title">Floyd Side Table</span>
+                <span class="w-text w-text--meta">Minimal — matches your saved aesthetic</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> View</button>
+          <button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button>
+        </div>
+      </div>
+
+      <!-- #41 Discover — wear variant (tall) -->
+      <div class="w-shell" data-widget="discover-wear" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left">
+            <span class="w-text w-text--label">Brands on your wavelength</span>
+            <span class="w-badge">AI</span>
+          </div>
+          <div class="w-header__controls">
+            <button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button>
+            <button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button>
+          </div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-img w-img--hero"><img src="https://picsum.photos/seed/fashion-minimal/400/300" alt="Fashion"></div>
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">Auralee</span>
+              <span class="w-text w-text--meta">Japanese minimalism — you save a lot of clean-cut pieces at this price point</span>
+            </div>
+          </div>
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">Studio Nicholson</span>
+              <span class="w-text w-text--meta">Architectural tailoring — overlaps with your Jil Sander and Lemaire saves</span>
+            </div>
+          </div>
+          <div class="w-row">
+            <div>
+              <span class="w-text w-text--title">Baserange</span>
+              <span class="w-text w-text--meta">Natural fabrics — complements the earthy palette in your wardrobe</span>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions">
+          <span class="w-text w-text--meta">Based on 14 saved items</span>
+          <button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="section-divider" id="priorityDivider">
+
+  <!-- ====== GRID SIZE PERMUTATIONS ====== -->
+  <div class="section" id="grid">
+    <h2 class="section__heading">Grid Size Permutations</h2>
+    <p class="section__desc">Same widgets at different grid sizes. Toggle columns to test responsiveness.</p>
+
+    <div class="grid-controls">
+      <button class="active" onclick="setGrid(5,this)">5 col</button>
+      <button onclick="setGrid(4,this)">4 col</button>
+      <button onclick="setGrid(3,this)">3 col</button>
+      <button onclick="toggleGridLines(this)">Grid lines</button>
+    </div>
+
+    <div class="grid-test grid-test--5col" id="sizeGrid">
+
+      <!-- sm (1x1) — verdict -->
+      <div class="w-shell w-shell--sm" data-widget="home-conflict" data-template="verdict">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Style clash</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--verdict">
+          <div class="w-headline">
+            <span class="w-text w-text--display">Scandi vs Industrial</span>
+          </div>
+          <div class="w-tag-group w-tag-group--center">
+            <span class="w-badge w-badge--filled">Scandi</span>
+            <span class="w-badge w-badge--filled">Industrial</span>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">View items</button></div>
+      </div>
+
+      <!-- sm (1x1) — choices compact -->
+      <div class="w-shell w-shell--sm" data-widget="eat-decide" data-template="choices">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Tonight?</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--choices">
+          <div class="w-option">
+            <span class="w-text w-text--title">Chez Pascal</span>
+            <span class="w-text w-text--meta">French bistro</span>
+          </div>
+          <div class="w-option">
+            <span class="w-text w-text--title">Tacos El Gordo</span>
+            <span class="w-text w-text--meta">Mexican street</span>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn w-btn--filled">Pick for me</button></div>
+      </div>
+
+      <!-- med (2x1) — narrative -->
+      <div class="w-shell w-shell--med" data-widget="read-synthesize" data-template="narrative">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">The hidden thread</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--narrative">
+          <p class="w-text w-text--prose">Your recent articles share an underlying theme: <strong>the tension between AI automation and human creativity</strong>.</p>
+          <div class="w-tag-group" style="margin-top:var(--space-3)">
+            <span class="w-badge">AI ethics</span>
+            <span class="w-badge">Dev tools</span>
+            <span class="w-badge">Creativity</span>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">View articles</button><button class="w-btn">Find more</button></div>
+      </div>
+
+      <!-- sm (1x1) — spectrum -->
+      <div class="w-shell w-shell--sm" data-widget="all-behavior" data-template="spectrum">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Pattern</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--spectrum">
+          <div class="w-axis"><div class="w-axis__labels"><span class="w-text w-text--label">Read</span><span class="w-text w-text--label">Watch</span></div><div class="w-axis__track"><div class="w-axis__marker" style="left:35%"></div></div></div>
+          <div class="w-axis"><div class="w-axis__labels"><span class="w-text w-text--label">Browse</span><span class="w-text w-text--label">Buy</span></div><div class="w-axis__track"><div class="w-axis__marker" style="left:70%"></div></div></div>
+        </div>
+      </div>
+
+      <!-- tall (1x2) — list + photos -->
+      <div class="w-shell w-shell--tall" data-widget="go-sequence" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Trip route</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/golden-gate/80/80" alt="Golden Gate"></div>
+            <div class="w-row__content"><span class="w-text w-text--title">Golden Gate</span><span class="w-text w-text--meta">Start — morning</span></div>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/tartine-bakery/80/80" alt="Tartine"></div>
+            <div class="w-row__content"><span class="w-text w-text--title">Tartine</span><span class="w-text w-text--meta">Lunch — 12 min</span></div>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/sfmoma-art/80/80" alt="SFMOMA"></div>
+            <div class="w-row__content"><span class="w-text w-text--title">SFMOMA</span><span class="w-text w-text--meta">Afternoon — 8 min</span></div>
+          </div>
+          <div class="w-row">
+            <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/dolores-park/80/80" alt="Dolores Park"></div>
+            <div class="w-row__content"><span class="w-text w-text--title">Dolores Park</span><span class="w-text w-text--meta">Sunset</span></div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn w-btn--filled">Open in Maps</button></div>
+      </div>
+
+      <!-- med (2x1) — comparison -->
+      <div class="w-shell w-shell--med" data-widget="use-compare" data-template="comparison">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Have you considered?</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--comparison">
+          <div class="w-option">
+            <span class="w-text w-text--title">Notion</span>
+            <span class="w-text w-text--meta">Your current pick</span>
+            <div class="w-tag-group"><span class="w-badge">Docs</span><span class="w-badge">Wiki</span></div>
+          </div>
+          <div class="w-divider w-divider--labeled">vs</div>
+          <div class="w-option">
+            <span class="w-text w-text--title">Obsidian</span>
+            <span class="w-text w-text--meta">Worth trying</span>
+            <div class="w-tag-group"><span class="w-badge">Markdown</span><span class="w-badge">Local</span></div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">Keep current</button><button class="w-btn">Try alternative</button></div>
+      </div>
+
+      <!-- lg (2x2) — news digest with banner -->
+      <div class="w-shell w-shell--lg" data-widget="read-digest" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Your news digest</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--narrative" style="padding:0">
+          <div class="w-img w-img--banner"><img src="https://picsum.photos/seed/tech-news/600/200" alt="Tech news"></div>
+          <div style="padding:var(--space-4)">
+            <span class="w-text w-text--title">Claude 4.5 Benchmarks Drop</span>
+            <p class="w-text w-text--prose" style="margin-top:var(--space-2)">The latest benchmarks show significant improvements in reasoning and tool use. This connects to your recent saves about AI-assisted development workflows.</p>
+            <span class="w-text w-text--meta" style="margin-top:var(--space-2)">The Verge — 4 min read</span>
+            <div class="w-divider" style="margin:var(--space-3) 0"></div>
+            <div class="w-row" style="border:none;padding-top:0">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/design-grid/80/80" alt="Design Systems"></div>
+              <div class="w-row__content"><span class="w-text w-text--title">Design Systems at Scale</span><span class="w-text w-text--meta">Smashing — 8 min read</span></div>
+              <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+            </div>
+            <div class="w-row">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/remote-desk/80/80" alt="Remote Work"></div>
+              <div class="w-row__content"><span class="w-text w-text--title">Future of Remote Work</span><span class="w-text w-text--meta">Wired — 6 min</span></div>
+              <button class="w-icon-btn"><svg><use href="#icon-bookmark"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn">See all</button></div>
+      </div>
+
+      <!-- sm (1x1) — suggestion -->
+      <div class="w-shell w-shell--sm" data-widget="discover-home" data-template="suggestion">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Workflow gap</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <span class="w-text w-text--title">Raycast</span>
+          <span class="w-text w-text--meta">Launcher + snippets for your Figma + VS Code workflow</span>
+        </div>
+        <div class="w-actions"><button class="w-btn w-btn--filled">Add to board</button></div>
+      </div>
+
+      <!-- med (2x1) — #40 Upcoming Releases -->
+      <div class="w-shell w-shell--med" data-widget="watch-deadline" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Upcoming releases</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <div><span class="w-text w-text--title">Severance S3</span><span class="w-text w-text--meta">Expected Q3 2026</span></div>
+            </div>
+            <span class="w-badge w-badge--success">Soon</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-tv"/></svg></span>
+              <div><span class="w-text w-text--title">Squid Game S3</span><span class="w-text w-text--meta">Expected 2026</span></div>
+            </div>
+            <span class="w-badge w-badge--muted">2026</span>
+          </div>
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center;flex:1">
+              <span class="w-icon"><svg><use href="#icon-play"/></svg></span>
+              <div><span class="w-text w-text--title">Dune: Part Three</span><span class="w-text w-text--meta">No date yet</span></div>
+            </div>
+            <span class="w-badge w-badge--muted">TBD</span>
+          </div>
+        </div>
+        <div class="w-actions"><span class="w-text w-text--meta">Based on 8 shows</span></div>
+      </div>
+
+      <!-- sm (1x1) — #41 Discover (eat) -->
+      <div class="w-shell w-shell--sm" data-widget="discover-eat" data-template="suggestion">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">You'd love</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--suggestion">
+          <div class="w-row">
+            <div style="display:flex;gap:var(--space-2);align-items:center">
+              <div class="w-img w-img--thumb"><img src="https://picsum.photos/seed/kismet-la/80/80" alt="Kismet"></div>
+              <div><span class="w-text w-text--title">Kismet</span><span class="w-text w-text--meta">Ingredient-driven — your style</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="w-actions"><button class="w-btn"><svg class="w-icon"><use href="#icon-external"/></svg> Visit</button><button class="w-btn"><svg class="w-icon"><use href="#icon-plus"/></svg> Save</button></div>
+      </div>
+
+      <!-- lg (2x2) — #41 Discover (wear) -->
+      <div class="w-shell w-shell--lg" data-widget="discover-wear" data-template="list">
+        <div class="w-header">
+          <div class="w-header__left"><span class="w-text w-text--label">Brands on your wavelength</span><span class="w-badge">AI</span></div>
+          <div class="w-header__controls"><button class="w-icon-btn"><svg><use href="#icon-refresh"/></svg></button><button class="w-icon-btn"><svg><use href="#icon-x"/></svg></button></div>
+        </div>
+        <div class="w-body w-body--list">
+          <div class="w-img w-img--hero"><img src="https://picsum.photos/seed/fashion-minimal/400/300" alt="Fashion"></div>
+          <div class="w-row">
+            <div><span class="w-text w-text--title">Auralee</span><span class="w-text w-text--meta">Japanese minimalism — clean-cut pieces at this price point</span></div>
+            <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div><span class="w-text w-text--title">Studio Nicholson</span><span class="w-text w-text--meta">Architectural tailoring — overlaps with Jil Sander saves</span></div>
+            <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
+          </div>
+          <div class="w-row">
+            <div><span class="w-text w-text--title">Baserange</span><span class="w-text w-text--meta">Natural fabrics — earthy palette</span></div>
+            <button class="w-icon-btn"><svg><use href="#icon-external"/></svg></button>
+          </div>
+        </div>
+        <div class="w-actions"><span class="w-text w-text--meta">Based on 14 items</span><button class="w-btn" style="margin-left:auto"><svg class="w-icon"><use href="#icon-plus"/></svg> Save all</button></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:var(--space-8) 0;color:var(--fg-muted)">
+    <span class="w-text w-text--label">ctrl.rodeo widget design system v2</span>
+    <br>
+    <span class="w-text w-text--meta">visual/narrative focus, photos, SVG icons, anchored actions</span>
+  </div>
+
+</div>
+
+<script src="../js/image-enrichment.js"></script>
+<script>
+function setGrid(cols, btn) {
+  var grid = document.getElementById('sizeGrid');
+  var hasLines = grid.classList.contains('grid-test--lines');
+  grid.className = 'grid-test grid-test--' + cols + 'col';
+  if (hasLines) grid.classList.add('grid-test--lines');
+  document.querySelectorAll('.grid-controls button:not(:last-child)').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+function toggleGridLines(btn) {
+  var grid = document.getElementById('sizeGrid');
+  grid.classList.toggle('grid-test--lines');
+  btn.classList.toggle('active');
+}
+
+// ============================================
+// Grid sizing — all 16 sizes (1x1 → 4x4)
+// ============================================
+
+var ALL_SIZES = [
+  'sm', 'med', 'wide', 'banner',
+  'tall', 'lg', 'xl', 'pano',
+  'col', 'poster', 'max', 'cinema',
+  'board', 'wall', 'full'
+];
+
+var SIZE_LABELS = {
+  sm: '1x1', med: '2x1', wide: '3x1', banner: '4x1',
+  tall: '1x2', lg: '2x2', xl: '3x2', pano: '4x2',
+  col: '1x3', poster: '2x3', max: '3x3', cinema: '4x3',
+  board: '2x4', wall: '3x4', full: '4x4'
+};
+
+// ============================================
+// Audit state — flags + notes in localStorage
+// ============================================
+
+var AUDIT_KEY = 'widget-variant-audit';
+
+// Structure: { "widget:size": { flagged: bool, note: string } }
+function loadAudit() {
+  try {
+    var saved = localStorage.getItem(AUDIT_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return {};
+}
+
+function saveAudit() {
+  try { localStorage.setItem(AUDIT_KEY, JSON.stringify(audit)); } catch (e) {}
+}
+
+var audit = loadAudit();
+
+function auditKey(name, size) { return name + ':' + size; }
+
+function getAuditEntry(name, size) {
+  return audit[auditKey(name, size)] || {};
+}
+
+function setFlag(name, size, flagged) {
+  var key = auditKey(name, size);
+  if (!audit[key]) audit[key] = {};
+  audit[key].flagged = flagged;
+  if (!flagged && !audit[key].note) delete audit[key];
+  saveAudit();
+}
+
+function setNote(name, size, text) {
+  var key = auditKey(name, size);
+  text = (text || '').trim();
+  if (!audit[key]) audit[key] = {};
+  if (text) {
+    audit[key].note = text;
+    audit[key].processed = false; // new/edited comment resets to "to process"
+  } else {
+    delete audit[key].note;
+    delete audit[key].processed;
+    if (!audit[key].flagged) delete audit[key];
+  }
+  saveAudit();
+}
+
+function setProcessed(name, size, val) {
+  var key = auditKey(name, size);
+  if (!audit[key]) audit[key] = {};
+  if (val) {
+    audit[key].processed = true;
+  } else {
+    delete audit[key].processed;
+  }
+  saveAudit();
+}
+
+// Stoplight status: green=clean, yellow=to process, orange=needs review, red=blocked
+function getStatus(name, size) {
+  var entry = getAuditEntry(name, size);
+  if (entry.flagged) return 'red';
+  if (entry.note && !entry.processed) return 'yellow';
+  if (entry.note && entry.processed) return 'orange';
+  return 'green';
+}
+
+var STATUS_LABELS = {
+  green: 'No updates',
+  yellow: 'To process',
+  orange: 'Needs review',
+  red: 'Blocked'
+};
+
+// ============================================
+// Variant explorer
+// ============================================
+
+var variantGridLinesOn = false;
+
+function toggleVariantGridLines(btn) {
+  variantGridLinesOn = !variantGridLinesOn;
+  btn.classList.toggle('active');
+  document.getElementById('variantGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+  document.getElementById('blockedGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+}
+
+// ============================================
+// Section filtering — hide unrelated sections
+// when a widget/template is selected
+// ============================================
+
+function filterSections(source) {
+  var hideable = ['layouts', 'priority', 'grid', 'moleculesDivider', 'layoutsDivider', 'priorityDivider'];
+  if (!source) {
+    // No filter — show all, reset atom/molecule cards
+    hideable.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = ''; });
+    document.querySelectorAll('#atoms .component-card, #molecules .component-card').forEach(function(c) { c.style.display = ''; });
+    return;
+  }
+  // Hide widget examples, priority, and grid sections
+  hideable.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  // Detect which w- component classes are used in the source widget
+  var html = source.outerHTML;
+  document.querySelectorAll('#atoms .component-card, #molecules .component-card').forEach(function(card) {
+    var label = card.querySelector('.component-card__label');
+    if (!label) return;
+    var name = label.textContent.trim(); // e.g. "w-text", "w-badge", "w-row"
+    // Check if the source widget HTML contains this component class
+    var used = html.indexOf(name) !== -1;
+    card.style.display = used ? '' : 'none';
+  });
+}
+
+var currentSource = null;
+var currentAuditName = null;
+var blockedSectionOpen = false;
+var lastFilter = 'widget'; // tracks which dropdown changed last
+
+function showVariants() {
+  var widgetVal = document.getElementById('widgetFilter').value;
+  var templateVal = document.getElementById('templateFilter').value;
+  var explorer = document.getElementById('variants');
+  var divider = document.getElementById('variantDivider');
+  var grid = document.getElementById('variantGrid');
+  var blockedGrid = document.getElementById('blockedGrid');
+  var blockedSection = document.getElementById('blockedSection');
+  var desc = document.getElementById('variantDesc');
+
+  if (!widgetVal && !templateVal) {
+    explorer.style.display = 'none';
+    divider.style.display = 'none';
+    filterSections(null);
+    currentSource = null;
+    currentAuditName = null;
+    saveFilterState();
+    return;
+  }
+
+  var selector = '.w-shell';
+  if (widgetVal) selector += '[data-widget="' + widgetVal + '"]';
+  if (templateVal) selector += '[data-template="' + templateVal + '"]';
+
+  var source = document.querySelector(selector);
+  var noMatchAlert = '';
+  if (!source && widgetVal && templateVal) {
+    // No intersection — fallback to most recently changed filter
+    var fallbackSelector = '.w-shell';
+    if (lastFilter === 'widget') {
+      fallbackSelector += '[data-widget="' + widgetVal + '"]';
+      noMatchAlert = 'No ' + templateVal + ' template for this widget. Showing all ' + widgetVal + ' variants.';
+    } else {
+      fallbackSelector += '[data-template="' + templateVal + '"]';
+      noMatchAlert = 'No ' + widgetVal + ' widget with this template. Showing all ' + templateVal + ' variants.';
+    }
+    source = document.querySelector(fallbackSelector);
+  }
+  if (!source) {
+    grid.innerHTML = '<p class="w-text w-text--meta" style="padding:var(--space-4)">No matching widget found.</p>';
+    blockedSection.style.display = 'none';
+    explorer.style.display = '';
+    divider.style.display = '';
+    return;
+  }
+
+  filterSections(source);
+  currentSource = source;
+  // Use fallback audit name based on what actually matched
+  if (noMatchAlert && lastFilter === 'widget') {
+    currentAuditName = widgetVal;
+  } else if (noMatchAlert && lastFilter === 'template') {
+    currentAuditName = templateVal;
+  } else {
+    currentAuditName = widgetVal || templateVal;
+  }
+  var template = source.dataset.template;
+  var activeCount = 0;
+  var blockedCount = 0;
+
+  grid.innerHTML = '';
+  blockedGrid.innerHTML = '';
+
+  // Show alert banner if no intersection
+  if (noMatchAlert) {
+    var alert = document.createElement('div');
+    alert.style.cssText = 'padding:var(--space-2) var(--space-3);border:var(--border-thin) solid var(--color-warning);color:var(--color-warning);font-family:var(--font-primary);font-size:var(--text-xs);margin-bottom:var(--space-4);';
+    alert.textContent = noMatchAlert;
+    grid.appendChild(alert);
+  }
+  grid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+  blockedGrid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+
+  ALL_SIZES.forEach(function(size) {
+    var entry = getAuditEntry(currentAuditName, size);
+    var isFlagged = !!entry.flagged;
+    var wrapper = buildVariantItem(source, currentAuditName, size);
+
+    if (isFlagged) {
+      blockedCount++;
+      blockedGrid.appendChild(wrapper);
+    } else {
+      activeCount++;
+      grid.appendChild(wrapper);
+    }
+  });
+
+  desc.textContent = currentAuditName + ' (' + template + ') — ' + activeCount + ' active' +
+    (blockedCount > 0 ? ', ' + blockedCount + ' blocked' : '') + '. Right-click for options.';
+
+  // Show/hide blocked section
+  if (blockedCount > 0) {
+    blockedSection.style.display = '';
+    updateBlockedToggle(blockedCount);
+  } else {
+    blockedSection.style.display = 'none';
+    blockedSectionOpen = false;
+  }
+
+  updateStats();
+  renderAuditTable();
+
+  explorer.style.display = '';
+  divider.style.display = '';
+  saveFilterState();
+  explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function buildVariantItem(source, auditName, size) {
+  var entry = getAuditEntry(auditName, size);
+  var isFlagged = !!entry.flagged;
+  var hasNote = !!entry.note;
+  var status = getStatus(auditName, size);
+
+  var clone = source.cloneNode(true);
+  clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
+  clone.style.cssText = '';
+  clone.classList.add('w-shell--' + size);
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'variant-item variant-item--' + size +
+    (isFlagged ? ' variant-item--flagged' : '');
+  wrapper.dataset.auditName = auditName;
+  wrapper.dataset.size = size;
+
+  // Label with stoplight + comment count
+  var lbl = document.createElement('div');
+  lbl.className = 'variant-label';
+  lbl.dataset.auditName = auditName;
+  lbl.dataset.size = size;
+  var dot = document.createElement('span');
+  dot.className = 'variant-stoplight variant-stoplight--' + status;
+  dot.title = STATUS_LABELS[status];
+  lbl.appendChild(dot);
+  var lblText = document.createElement('span');
+  lblText.textContent = size + ' (' + SIZE_LABELS[size] + ')';
+  lbl.appendChild(lblText);
+  if (hasNote) {
+    var badge = document.createElement('span');
+    badge.className = 'variant-comment-count';
+    badge.textContent = '1';
+    badge.title = entry.note;
+    lbl.appendChild(badge);
+  }
+
+  // Blocked overlay
+  var blocked = document.createElement('div');
+  blocked.className = 'variant-blocked';
+  blocked.innerHTML = '<span>Blocked</span>';
+
+  wrapper.appendChild(lbl);
+  wrapper.appendChild(blocked);
+  wrapper.appendChild(clone);
+  return wrapper;
+}
+
+function updateBlockedToggle(count) {
+  var btn = document.getElementById('blockedToggle');
+  if (!btn) return;
+  btn.textContent = (blockedSectionOpen ? 'Hide' : 'Show') + ' ' + count + ' blocked';
+  btn.classList.toggle('active', blockedSectionOpen);
+}
+
+function toggleBlockedSection() {
+  blockedSectionOpen = !blockedSectionOpen;
+  var blockedGrid = document.getElementById('blockedGrid');
+  blockedGrid.style.display = blockedSectionOpen ? '' : 'none';
+  var count = blockedGrid.querySelectorAll('.variant-item').length;
+  updateBlockedToggle(count);
+  saveFilterState();
+}
+
+// Reflow a variant between active and blocked grids
+function reflowVariant(item, name, size) {
+  var entry = getAuditEntry(name, size);
+  var isFlagged = !!entry.flagged;
+  var grid = document.getElementById('variantGrid');
+  var blockedGrid = document.getElementById('blockedGrid');
+  var blockedSection = document.getElementById('blockedSection');
+
+  if (isFlagged) {
+    // Move from active → blocked grid
+    blockedGrid.appendChild(item);
+  } else {
+    // Move from blocked → active grid, insert in correct position
+    var allItems = grid.querySelectorAll('.variant-item');
+    var sizeIdx = ALL_SIZES.indexOf(size);
+    var inserted = false;
+    for (var i = 0; i < allItems.length; i++) {
+      var itemIdx = ALL_SIZES.indexOf(allItems[i].dataset.size);
+      if (itemIdx > sizeIdx) {
+        grid.insertBefore(item, allItems[i]);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) grid.appendChild(item);
+    item.classList.remove('variant-item--flagged');
+  }
+
+  // Update blocked section visibility + toggle count
+  var blockedCount = blockedGrid.querySelectorAll('.variant-item').length;
+  var activeCount = grid.querySelectorAll('.variant-item').length;
+  if (blockedCount > 0) {
+    blockedSection.style.display = '';
+    updateBlockedToggle(blockedCount);
+  } else {
+    blockedSection.style.display = 'none';
+    blockedSectionOpen = false;
+  }
+
+  // Update description
+  var desc = document.getElementById('variantDesc');
+  if (desc && currentAuditName) {
+    desc.textContent = currentAuditName + ' — ' + activeCount + ' active' +
+      (blockedCount > 0 ? ', ' + blockedCount + ' blocked' : '') + '. Right-click for options.';
+  }
+}
+
+// ============================================
+// Right-click context menu
+// ============================================
+
+var ctxMenu = null;
+
+function showContextMenu(e, item) {
+  closeContextMenu();
+  var name = item.dataset.auditName;
+  var size = item.dataset.size;
+  var entry = getAuditEntry(name, size);
+  var isFlagged = !!entry.flagged;
+
+  var menu = document.createElement('div');
+  menu.className = 'variant-ctx-menu';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+
+  // Block / Unblock
+  var blockBtn = document.createElement('button');
+  blockBtn.className = 'variant-ctx-menu__item' + (!isFlagged ? ' variant-ctx-menu__item--danger' : '');
+  blockBtn.textContent = isFlagged ? 'Unblock' : 'Block';
+  blockBtn.addEventListener('click', function() {
+    toggleBlock(item, name, size);
+    closeContextMenu();
+  });
+  menu.appendChild(blockBtn);
+
+  // Divider
+  var divider = document.createElement('div');
+  divider.className = 'variant-ctx-menu__divider';
+  menu.appendChild(divider);
+
+  // Add / Edit comment
+  var commentBtn = document.createElement('button');
+  commentBtn.className = 'variant-ctx-menu__item';
+  commentBtn.textContent = entry.note ? 'Edit comment' : 'Add comment';
+  commentBtn.addEventListener('click', function() {
+    openComment(item, name, size);
+    closeContextMenu();
+  });
+  menu.appendChild(commentBtn);
+
+  // Progress actions based on stoplight status
+  var curStatus = getStatus(name, size);
+  if (curStatus === 'yellow') {
+    var div2 = document.createElement('div');
+    div2.className = 'variant-ctx-menu__divider';
+    menu.appendChild(div2);
+    var processBtn = document.createElement('button');
+    processBtn.className = 'variant-ctx-menu__item';
+    processBtn.textContent = 'Mark processed';
+    processBtn.addEventListener('click', function() {
+      setProcessed(name, size, true);
+      refreshVariantStatus(item, name, size);
+      renderAuditTable();
+      closeContextMenu();
+    });
+    menu.appendChild(processBtn);
+  }
+  if (curStatus === 'orange') {
+    var div3 = document.createElement('div');
+    div3.className = 'variant-ctx-menu__divider';
+    menu.appendChild(div3);
+    var approveBtn = document.createElement('button');
+    approveBtn.className = 'variant-ctx-menu__item';
+    approveBtn.textContent = 'Approve';
+    approveBtn.addEventListener('click', function() {
+      setNote(name, size, '');
+      setProcessed(name, size, false);
+      refreshVariantStatus(item, name, size);
+      renderAuditTable();
+      closeContextMenu();
+    });
+    menu.appendChild(approveBtn);
+  }
+
+  document.body.appendChild(menu);
+  ctxMenu = menu;
+
+  // Keep menu in viewport
+  var rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = (e.clientX - rect.width) + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top = (e.clientY - rect.height) + 'px';
+}
+
+function closeContextMenu() {
+  if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; }
+}
+
+function toggleBlock(item, name, size) {
+  var entry = getAuditEntry(name, size);
+  var nowFlagged = !entry.flagged;
+  setFlag(name, size, nowFlagged);
+  item.classList.toggle('variant-item--flagged', nowFlagged);
+  reflowVariant(item, name, size);
+  refreshVariantStatus(item, name, size);
+  renderAuditTable();
+}
+
+function refreshVariantStatus(item, name, size) {
+  var status = getStatus(name, size);
+  var entry = getAuditEntry(name, size);
+  // Update stoplight dot
+  var dot = item.querySelector('.variant-stoplight');
+  if (dot) { dot.className = 'variant-stoplight variant-stoplight--' + status; dot.title = STATUS_LABELS[status]; }
+  // Update comment count badge
+  var lbl = item.querySelector('.variant-label');
+  var badge = item.querySelector('.variant-comment-count');
+  if (entry.note && !badge && lbl) {
+    badge = document.createElement('span');
+    badge.className = 'variant-comment-count';
+    badge.textContent = '1';
+    badge.title = entry.note;
+    lbl.appendChild(badge);
+  } else if (!entry.note && badge) {
+    badge.remove();
+  }
+  updateStats();
+}
+
+function openComment(item, name, size) {
+  closeComment();
+  var entry = getAuditEntry(name, size);
+  var div = document.createElement('div');
+  div.className = 'variant-comment';
+  div.id = 'activeComment';
+  div.innerHTML =
+    '<textarea placeholder="How should this variant change?">' + (entry.note || '').replace(/</g, '&lt;') + '</textarea>' +
+    '<div class="variant-comment__footer"><span class="variant-comment__hint">Esc to close · auto-saves on blur</span></div>';
+
+  item.appendChild(div);
+  var ta = div.querySelector('textarea');
+  ta.focus();
+
+  ta.addEventListener('blur', function() {
+    setNote(name, size, ta.value);
+    updateNoteIndicator(name, size);
+    renderAuditTable();
+    setTimeout(closeComment, 50);
+  });
+
+  ta.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      setNote(name, size, ta.value);
+      updateNoteIndicator(name, size);
+      renderAuditTable();
+      closeComment();
+    }
+  });
+}
+
+function closeComment() {
+  var el = document.getElementById('activeComment');
+  if (el) el.remove();
+}
+
+function updateNoteIndicator(name, size) {
+  var items = document.querySelectorAll('.variant-item[data-audit-name="' + name + '"][data-size="' + size + '"]');
+  items.forEach(function(item) {
+    refreshVariantStatus(item, name, size);
+  });
+}
+
+function updateStats() {
+  var stats = { red: 0, yellow: 0, orange: 0 };
+  var keys = Object.keys(audit);
+  keys.forEach(function(k) {
+    var e = audit[k];
+    if (e.flagged) stats.red++;
+    else if (e.note && !e.processed) stats.yellow++;
+    else if (e.note && e.processed) stats.orange++;
+  });
+  var parts = [];
+  if (stats.red > 0) parts.push(stats.red + ' blocked');
+  if (stats.yellow > 0) parts.push(stats.yellow + ' to process');
+  if (stats.orange > 0) parts.push(stats.orange + ' needs review');
+  var count = document.getElementById('variantCount');
+  if (count) count.textContent = parts.join(' · ');
+}
+
+// Right-click → context menu
+document.addEventListener('contextmenu', function(e) {
+  var item = e.target.closest('.variant-item');
+  if (!item) { closeContextMenu(); return; }
+  if (e.target.tagName === 'TEXTAREA') return;
+  e.preventDefault();
+  showContextMenu(e, item);
+});
+
+// Close context menu on click outside
+document.addEventListener('click', function(e) {
+  if (ctxMenu && !ctxMenu.contains(e.target)) closeContextMenu();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeContextMenu();
+});
+
+// ============================================
+// Audit output table — flags + notes combined
+// ============================================
+
+function renderAuditTable() {
+  var output = document.getElementById('blacklistOutput');
+  if (!output) return;
+
+  var keys = Object.keys(audit).sort();
+  if (keys.length === 0) {
+    output.innerHTML = '';
+    return;
+  }
+
+  var html = '<h3 class="section__heading" style="font-size:var(--text-xs)">Audit Log</h3>';
+  html += '<table class="audit-table"><thead><tr><th>Widget / Template</th><th>Size</th><th>Grid</th><th>Status</th><th>Note</th></tr></thead><tbody>';
+
+  keys.forEach(function(key) {
+    var parts = key.split(':');
+    var name = parts[0];
+    var size = parts[1];
+    var entry = audit[key];
+    var status, statusClass;
+    if (entry.flagged) { status = 'Blocked'; statusClass = 'status--blocked'; }
+    else if (entry.note && entry.processed) { status = 'Needs review'; statusClass = 'status--review'; }
+    else if (entry.note) { status = 'To process'; statusClass = 'status--todo'; }
+    else { status = 'Clean'; statusClass = 'status--clean'; }
+    var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:' +
+      (entry.flagged ? '#ef4444' : entry.note && entry.processed ? '#f97316' : entry.note ? '#eab308' : '#22c55e') + '"></span>';
+    var note = entry.note ? '<span class="note-text">' + entry.note.replace(/</g, '&lt;') + '</span>' : '';
+    html += '<tr><td>' + name + '</td><td>' + size + '</td><td>' + (SIZE_LABELS[size] || size) + '</td><td class="' + statusClass + '">' + dot + status + '</td><td>' + note + '</td></tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '<div style="margin-top:var(--space-3);display:flex;gap:var(--space-2)">';
+  html += '<button class="w-btn w-btn--sm" onclick="exportAudit()">Copy as JSON</button>';
+  html += '<button class="w-btn w-btn--sm" onclick="clearAudit()">Clear all</button>';
+  html += '</div>';
+
+  output.innerHTML = html;
+}
+
+function exportAudit() {
+  var keys = Object.keys(audit).sort();
+  var data = keys.map(function(key) {
+    var parts = key.split(':');
+    var entry = audit[key];
+    var obj = { name: parts[0], size: parts[1], grid: SIZE_LABELS[parts[1]] || parts[1] };
+    if (entry.flagged) obj.status = 'blocked';
+    else if (entry.note && entry.processed) obj.status = 'needs-review';
+    else if (entry.note) obj.status = 'to-process';
+    else obj.status = 'clean';
+    if (entry.note) obj.note = entry.note;
+    return obj;
+  });
+  var json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(function() {
+    var btn = document.querySelector('#blacklistOutput .w-btn');
+    if (btn) { var orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = orig; }, 1500); }
+  });
+}
+
+function clearAudit() {
+  audit = {};
+  saveAudit();
+  renderAuditTable();
+  showVariants();
+}
+
+renderAuditTable();
+
+// ============================================
+// Persist filter state across refresh
+// ============================================
+
+var FILTER_KEY = 'widget-filter-state';
+
+function saveFilterState() {
+  try {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      widget: document.getElementById('widgetFilter').value,
+      template: document.getElementById('templateFilter').value,
+      lastFilter: lastFilter,
+      blockedOpen: blockedSectionOpen
+    }));
+  } catch (e) {}
+}
+
+function restoreFilterState() {
+  try {
+    var saved = localStorage.getItem(FILTER_KEY);
+    if (!saved) return;
+    var state = JSON.parse(saved);
+    if (state.widget) document.getElementById('widgetFilter').value = state.widget;
+    if (state.template) document.getElementById('templateFilter').value = state.template;
+    if (state.lastFilter) lastFilter = state.lastFilter;
+    if (state.widget || state.template) {
+      showVariants();
+      if (state.blockedOpen) toggleBlockedSection();
+    }
+  } catch (e) {}
+}
+
+restoreFilterState();
+
+// ============================================
+// Image Enrichment Pipeline
+// Uses js/image-enrichment.js module.
+// Strategy: picsum (MVP), upgradeable to
+// unsplash or enrich-link edge function.
+// ============================================
+
+var pipeline = ImageEnrichment({ strategy: 'picsum' });
+
+// Wire up all refresh buttons — reselect images on click
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.w-icon-btn');
+  if (!btn) return;
+  var svg = btn.querySelector('use');
+  if (!svg) return;
+  var href = svg.getAttribute('href') || svg.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+  if (href !== '#icon-refresh') return;
+
+  var shell = btn.closest('.w-shell');
+  if (shell) pipeline.applyToContainer(shell, true);
+});
+</script>
+
+</body>
+</html>
