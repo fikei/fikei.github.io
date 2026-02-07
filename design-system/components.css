@@ -86,6 +86,18 @@ body {
   border-color: var(--border);
 }
 
+.btn--dashed {
+  border-style: dashed;
+  border-color: var(--border-subtle);
+  color: var(--fg-muted);
+}
+
+.btn--dashed:hover {
+  border-color: var(--border);
+  color: var(--fg);
+  background: transparent;
+}
+
 /* Button sizes */
 .btn--sm {
   padding: var(--space-1) var(--space-3);
@@ -190,6 +202,17 @@ body {
 .token--active {
   background: var(--fg);
   color: var(--bg);
+}
+
+.token--static {
+  cursor: default;
+  border-color: var(--border-subtle);
+  color: var(--fg-muted);
+}
+
+.token--static:hover {
+  background: var(--bg);
+  color: var(--fg-muted);
 }
 
 /* ============================================
@@ -662,6 +685,266 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+/* ============================================
+   Page Header / Breadcrumb
+   Extracted from: systemic/css/systemic.css
+   Used by: Systemic, Favicon, Soundscape, Events
+   ============================================ */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.page-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.breadcrumb {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.breadcrumb__link {
+  color: var(--fg-muted);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  font-weight: 700;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.breadcrumb__link:hover {
+  color: var(--fg);
+}
+
+.breadcrumb__sep {
+  color: var(--fg-subtle);
+  user-select: none;
+}
+
+.breadcrumb__current {
+  color: var(--fg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+}
+
+/* ============================================
+   Form Group
+   Extracted from: favicon/css/favicon-generator.css,
+                   systemic/css/systemic.css
+   Used by: Favicon, Systemic, Boards, Events
+   ============================================ */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+}
+
+.form-hint {
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  line-height: var(--leading-normal);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+/* ============================================
+   Data Table
+   Extracted from: events/index.html,
+                   systemic/css/variant-audit.css
+   Used by: Events, Systemic
+   ============================================ */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+}
+
+.data-table th {
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+
+.data-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  color: var(--fg);
+  vertical-align: top;
+  line-height: var(--leading-normal);
+}
+
+.data-table tbody tr {
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-surface);
+}
+
+/* Sortable headers */
+.data-table th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--duration-normal) var(--ease-default);
+}
+
+.data-table th[data-sort]:hover {
+  color: var(--fg);
+}
+
+.data-table__sort {
+  margin-left: var(--space-1);
+  font-size: var(--text-2xs);
+  opacity: 0.4;
+}
+
+.data-table th.sorted .data-table__sort {
+  opacity: 1;
+}
+
+/* Table container for horizontal scroll */
+.data-table-wrap {
+  overflow-x: auto;
+  border: var(--border-thin) solid var(--border-subtle);
+}
+
+/* ============================================
+   Filter Bar (Form-based)
+   Extracted from: events/index.html,
+                   systemic/css/variant-audit.css
+   Used by: Events, Systemic
+   Note: distinct from .filters (token-based, horizontal-scroll)
+   ============================================ */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.filter-bar .input {
+  width: auto;
+}
+
+.filter-bar .select {
+  min-width: 120px;
+}
+
+/* ============================================
+   Section Header
+   Extracted from: systemic/css/systemic.css,
+                   favicon/css/favicon-generator.css
+   Used by: Systemic, Favicon
+   ============================================ */
+.section-header {
+  margin-bottom: var(--space-6);
+}
+
+.section-header__title {
+  font-family: var(--font-primary);
+  font-size: var(--text-xl);
+  font-weight: normal;
+  margin: 0 0 var(--space-2);
+}
+
+.section-header__desc {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin: 0;
+  max-width: 600px;
+  line-height: var(--leading-relaxed);
+}
+
+/* ============================================
+   Stat
+   Extracted from: systemic/css/systemic.css
+   Used by: Systemic, Events
+   ============================================ */
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat__value {
+  font-family: var(--font-primary);
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.stat__label {
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
 }
 
 /* ============================================
