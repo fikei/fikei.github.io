@@ -224,10 +224,14 @@ class DesignSystemViewer {
     // Update navigation active state
     this.updateNavActiveState(section);
 
-    // Update URL hash (without triggering re-route)
-    const newHash = `docs/${section}`;
-    if (window.location.hash !== `#${newHash}`) {
-      history.replaceState(null, '', `#${newHash}`);
+    // Update URL hash silently — only when already in docs view
+    // (avoids poisoning the hash before app.js navigates via location.hash)
+    const currentHash = window.location.hash.slice(1);
+    if (currentHash.startsWith('docs')) {
+      const newHash = `docs/${section}`;
+      if (window.location.hash !== `#${newHash}`) {
+        history.replaceState(null, '', `#${newHash}`);
+      }
     }
 
     // Update breadcrumb with system name
@@ -278,10 +282,13 @@ class DesignSystemViewer {
     // Update navigation active state
     this.updateNavActiveState(component.type);
 
-    // Update URL hash
-    const newHash = `docs/component/${component.type}`;
-    if (window.location.hash !== `#${newHash}`) {
-      history.replaceState(null, '', `#${newHash}`);
+    // Update URL hash silently — only when already in docs view
+    const currentHash = window.location.hash.slice(1);
+    if (currentHash.startsWith('docs')) {
+      const newHash = `docs/component/${component.type}`;
+      if (window.location.hash !== `#${newHash}`) {
+        history.replaceState(null, '', `#${newHash}`);
+      }
     }
 
     // Update breadcrumb with system name and stats
