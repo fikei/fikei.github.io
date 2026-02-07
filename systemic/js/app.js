@@ -288,8 +288,9 @@ class SystemicApp {
       // Transform manifest into Systemic design system format
       const designSystem = this.transformManifestToDesignSystem(manifest, registry);
 
-      // Save it
-      this.saveDesignSystem(designSystem, false);
+      // Save it (update if already exists)
+      const isUpdate = this.designSystems.some(ds => ds.id === designSystem.id);
+      this.saveDesignSystem(designSystem, isUpdate);
 
       // Load into viewer and QA
       this.viewer.load(designSystem);
@@ -1193,6 +1194,7 @@ class SystemicApp {
     } catch (error) {
       console.warn('Failed to save to localStorage:', error);
       this.debugLog('SAVE', 'ERROR saving to localStorage:', error);
+      this.showToast('Storage full — design system data could not be saved. Try deleting unused systems.', 'error');
     }
   }
 
@@ -1319,8 +1321,8 @@ class SystemicApp {
       </div>
     `).join('');
 
-    // Bind click events for opening design system
-    DOMUtils.$$('.system-card', this.systemsGrid).forEach(card => {
+    // Bind click events for opening design system (only cards with data-id)
+    DOMUtils.$$('.system-card[data-id]', this.systemsGrid).forEach(card => {
       card.addEventListener('click', (e) => {
         // Don't open if clicking delete button
         if (e.target.closest('.system-card-delete')) return;
@@ -1332,7 +1334,7 @@ class SystemicApp {
           this.variantAudit?.registerFromDesignSystem(fullSystem);
           window.location.hash = 'docs/color';
         } else {
-          this.showToast('Failed to load design system', 'error');
+          this.showToast('Could not load design system data — it may need to be re-scanned', 'error');
         }
       });
     });
