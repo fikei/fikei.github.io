@@ -269,6 +269,162 @@ Human writes comment                 Agent responds
 | B.5.3 | Handle approval/rejection responses | Medium | pending |
 | B.5.4 | Timeout handling (no response after X days) | Low | pending |
 
+### Phase C: Git-Side Documentation Agent (Edge Function)
+
+**Goal**: Ship the Documentation Agent as a Supabase Edge Function alongside `notion-sync`, providing HTTP API access to all 28 doc management functions. Each invocation is product-scoped — the agent only reads/writes documentation and code for the specified sub-product.
+
+> **Implementation**: [`supabase/functions/documentation-agent/`](../../../supabase/functions/documentation-agent/)
+> **Spec**: [`.claude/agents/documentation-agent.md`](../../../.claude/agents/documentation-agent.md)
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Ops Supabase Project                       │
+│                   (ycilriwjnmcelkspmfmg)                     │
+│                                                              │
+│  ┌──────────────────┐    ┌──────────────────────────────┐   │
+│  │   notion-sync    │    │    documentation-agent        │   │
+│  │                  │    │                               │   │
+│  │ • sync-structure │    │ • plan:audit    • arch:sync   │   │
+│  │ • update-page    │    │ • plan:update   • arch:audit  │   │
+│  │ • cleanup        │    │ • cleanup:stale • ...26 more  │   │
+│  │ • health-check   │    │                               │   │
+│  └───────┬──────────┘    └────────┬──────────────────────┘   │
+│          │                        │                          │
+│          │ Notion API             │ GitHub API + Claude API  │
+│          ▼                        ▼                          │
+│   ┌──────────┐            ┌────────────┐                    │
+│   │  Notion  │            │   GitHub   │                    │
+│   │Workspace │            │    Repo    │                    │
+│   └──────────┘            └────────────┘                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Product Scoping
+
+Every API call accepts an optional `product` parameter that restricts the agent's scope:
+
+```json
+{
+  "action": "plan:audit",
+  "params": { "product": "ai-widgets" }
+}
+```
+
+| Product Scope | Doc Paths | Code Paths | Related Products |
+|---------------|-----------|------------|------------------|
+| `boards` | PRD, UX, client-architecture | `boards/` | ai-widgets, content-types, design-system |
+| `ai-widgets` | PRDs, UX, widget tech specs | `generate-widget/`, `boards/js/widgets/` | boards, design-system |
+| `design-system` | PRD, README | `design-system/` | boards, ai-widgets, systemic |
+| `notion-sync` | PRD, sync guide, sync protocol | `notion-sync/`, `documentation-agent/` | — |
+| `systemic` | PRD | `systemic/` | design-system |
+| `soundscape` | PROJECT_PLAN | `soundscape/` | — |
+| `sharing` | PRD, UX, auth spec | `boards/js/auth/` | boards |
+| `content-types` | PRD, UX, tech spec | `boards/js/content-types/` | boards |
+
+When a product scope is specified, the agent:
+- Only reads/writes files in that product's doc and code paths
+- Appends an "I/O boundaries" section listing related products
+- Treats related products as external services (documented interfaces, not implementation details)
+
+#### I/O Contract (API Surface)
+
+**Endpoint**: `POST /functions/v1/documentation-agent`
+
+**Request**:
+```typescript
+interface DocAgentRequest {
+  action: DocAgentAction      // e.g. "plan:audit", "arch:sync"
+  params?: {
+    product?: string          // Scope to sub-product
+    threshold_days?: number   // For cleanup functions
+    [key: string]: unknown
+  }
+  branch?: string             // Git branch context
+  scope?: string              // Scope override
+  dryRun?: boolean            // Preview without writing
+}
+```
+
+**Response**:
+```typescript
+interface DocAgentResult {
+  success: boolean
+  action: DocAgentAction
+  report: string              // Markdown-formatted report
+  changes: FileChange[]       // What files were modified
+  errors: string[]
+  metrics: ResultMetrics      // Timing, API calls, files read
+  nextActions?: string[]      // Suggested follow-up commands
+}
+```
+
+#### Epic C.1: Core Edge Function
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.1.1 | Scaffold `documentation-agent/` with index.ts, types, logger | High | complete |
+| C.1.2 | GitHub API client (read files, commits, diffs) | High | complete |
+| C.1.3 | Claude analyzer (intelligent content comparison) | High | complete |
+| C.1.4 | Action router with handler registry | High | complete |
+| C.1.5 | Product scoping system with I/O boundaries | High | complete |
+| C.1.6 | CORS + error handling matching notion-sync patterns | Medium | complete |
+
+#### Epic C.2: Plan Domain Handlers
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.2.1 | `plan:audit` — scan plans for staleness, count mismatches | High | complete |
+| C.2.2 | `plan:update` — match commits to tasks, update statuses | High | complete |
+| C.2.3 | `plan:add` — file new work items to correct location | High | pending |
+| C.2.4 | `plan:rebalance` — reorganize items across phases | Medium | pending |
+
+#### Epic C.3: Architecture Domain Handlers
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.3.1 | `arch:sync` — compare code changes against tech specs | High | complete |
+| C.3.2 | `arch:audit` — deep verification of doc claims vs code | High | complete |
+| C.3.3 | `arch:add-adr` — add architecture decision records | Medium | pending |
+| C.3.4 | `arch:update-spec` — update specific doc sections | Medium | pending |
+
+#### Epic C.4: Cleanup Domain Handlers
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.4.1 | `cleanup:stale` — find docs behind their code | High | complete |
+| C.4.2 | `cleanup:orphans` — find dead refs and undocumented code | High | complete |
+| C.4.3 | `cleanup:duplicates` — find contradictions across docs | Medium | pending |
+| C.4.4 | `cleanup:archive` — archive deprecated docs | Medium | pending |
+
+#### Epic C.5: Remaining Domains
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.5.1 | Capture domain (bug, work, tech-debt) | High | pending |
+| C.5.2 | UX domain (update, audit, wireframe) | High | pending |
+| C.5.3 | Branch domain (diff, reconcile, cherry-pick) | Medium | pending |
+| C.5.4 | PM domain (scope-check, status-report, changelog, etc.) | Medium | pending |
+
+#### Epic C.6: GitHub Actions Integration
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.6.1 | Post-merge job calls edge function for plan:update, arch:sync | High | complete |
+| C.6.2 | Friday cleanup job calls edge function for cleanup suite | High | complete |
+| C.6.3 | Manual trigger routes documentation/cleanup/status to edge function | Medium | complete |
+| C.6.4 | Fallback to local checks when edge function not configured | Medium | complete |
+
+#### Epic C.7: Deployment
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| C.7.1 | Deploy to Ops Supabase project | High | pending |
+| C.7.2 | Configure GITHUB_TOKEN secret in Supabase | High | pending |
+| C.7.3 | Configure SUPABASE_OPS_URL + SUPABASE_SERVICE_KEY in GitHub Actions | High | pending |
+| C.7.4 | End-to-end test: GitHub Action → Edge Function → GitHub API → Report | High | pending |
+
 ---
 
 # Pillar 3: Documentation Sync

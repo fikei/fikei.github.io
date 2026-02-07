@@ -1,0 +1,318 @@
+// Documentation Agent - Cleanup Domain
+// Functions: cleanup:stale, cleanup:orphans
+
+import { createLogger } from './logger.ts'
+import type { GitHubClient } from './github.ts'
+import type { Analyzer } from './analyzer.ts'
+import type { DocAgentRequest, DocAgentResult, FileChange, StaleDoc, StaleReport } from './types.ts'
+
+const log = createLogger('cleanup')
+
+// Directories containing documentation that should track code
+const DOC_CODE_PAIRS: Array<{ doc: string; code: string[] }> = [
+  { doc: 'docs/infrastructure/technical-design/', code: ['supabase/functions/', 'boards/js/', 'design-system/'] },
+  { doc: 'docs/ux/', code: ['boards/', 'boards/index.html'] },
+  { doc: 'docs/execution/project-plan/', code: ['boards/', 'supabase/', 'design-system/'] },
+]
+
+// ═══════════════════════════════════════════════════════════════
+// CLEANUP:STALE
+// ═══════════════════════════════════════════════════════════════
+
+export async function cleanupStale(
+  github: GitHubClient,
+  _analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+  const changes: FileChange[] = []
+  const errors: string[] = []
+
+  const thresholdDays = (request.params?.threshold_days as number) || 30
+  log.info('Starting stale check', { thresholdDays })
+
+  // 1. Gather all documentation files
+  const techDesignFiles = await github.getDirectory('docs/infrastructure/technical-design')
+  const uxFiles = await github.getDirectory('docs/ux')
+  const planFiles = await github.getDirectory('docs/execution/project-plan')
+
+  const allDocFiles = [...techDesignFiles, ...uxFiles, ...planFiles]
+    .filter((f) => f.endsWith('.md'))
+
+  log.info(`Found ${allDocFiles.length} doc files to check`)
+
+  // 2. For each doc file, compare last doc update vs last code update
+  const staleResults: StaleDoc[] = []
+  let healthyCount = 0
+
+  for (const docFile of allDocFiles) {
+    const docLastUpdate = await github.getLastCommitDate(docFile)
+    if (!docLastUpdate) continue
+
+    // Find related code directories
+    const relatedCode = DOC_CODE_PAIRS
+      .filter((pair) => docFile.startsWith(pair.doc))
+      .flatMap((pair) => pair.code)
+
+    if (relatedCode.length === 0) {
+      healthyCount++
+      continue
+    }
+
+    // Get most recent code change across related directories
+    let latestCodeChange: string | null = null
+    let codeCommitCount = 0
+
+    for (const codeDir of relatedCode) {
+      const commits = await github.getCommits({
+        path: codeDir,
+        since: docLastUpdate,
+        limit: 50,
+      })
+      codeCommitCount += commits.length
+      if (commits.length > 0 && (!latestCodeChange || commits[0].date > latestCodeChange)) {
+        latestCodeChange = commits[0].date
+      }
+    }
+
+    if (latestCodeChange) {
+      const docDate = new Date(docLastUpdate)
+      const codeDate = new Date(latestCodeChange)
+      const gapDays = Math.floor((codeDate.getTime() - docDate.getTime()) / (1000 * 60 * 60 * 24))
+
+      if (gapDays > thresholdDays) {
+        const severity = gapDays > 60 ? 'critical' : gapDays > thresholdDays ? 'moderate' : 'healthy'
+        staleResults.push({
+          file: docFile,
+          lastDocUpdate: docLastUpdate.split('T')[0],
+          lastCodeChange: latestCodeChange.split('T')[0],
+          gapDays,
+          codeCommits: codeCommitCount,
+          severity,
+        })
+      } else {
+        healthyCount++
+      }
+    } else {
+      healthyCount++
+    }
+
+    // Rate limit protection
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+
+  // Sort by staleness severity
+  staleResults.sort((a, b) => b.gapDays - a.gapDays)
+
+  // 3. Generate report
+  const critical = staleResults.filter((s) => s.severity === 'critical')
+  const moderate = staleResults.filter((s) => s.severity === 'moderate')
+
+  const staleReport: StaleReport = {
+    critical,
+    moderate,
+    healthy: healthyCount,
+    totalDocs: allDocFiles.length,
+  }
+
+  let report = `## Stale Documentation Report — ${new Date().toISOString().split('T')[0]}\n\n`
+
+  report += `### Summary\n`
+  report += `- Total docs checked: ${staleReport.totalDocs}\n`
+  report += `- Healthy (up to date): ${staleReport.healthy}\n`
+  report += `- Moderate (${thresholdDays}–60 days behind): ${staleReport.moderate.length}\n`
+  report += `- Critical (60+ days behind): ${staleReport.critical.length}\n\n`
+
+  if (critical.length > 0) {
+    report += `### Critical (code changed significantly, doc very outdated)\n`
+    report += `| Doc | Last Updated | Code Last Changed | Gap |\n`
+    report += `|-----|-------------|-------------------|-----|\n`
+    for (const s of critical) {
+      report += `| \`${s.file.split('/').pop()}\` | ${s.lastDocUpdate} | ${s.lastCodeChange} | ${s.gapDays} days, ${s.codeCommits} commits |\n`
+    }
+    report += '\n'
+  }
+
+  if (moderate.length > 0) {
+    report += `### Moderate (minor code changes, doc slightly behind)\n`
+    report += `| Doc | Last Updated | Code Last Changed | Gap |\n`
+    report += `|-----|-------------|-------------------|-----|\n`
+    for (const s of moderate) {
+      report += `| \`${s.file.split('/').pop()}\` | ${s.lastDocUpdate} | ${s.lastCodeChange} | ${s.gapDays} days, ${s.codeCommits} commits |\n`
+    }
+    report += '\n'
+  }
+
+  if (critical.length === 0 && moderate.length === 0) {
+    report += `### ✅ All Clear\nAll ${healthyCount} documentation files are up to date.\n`
+  }
+
+  report += `\n### Recommended Actions\n`
+  if (critical.length > 0) {
+    report += `1. Prioritize updating ${critical.length} critically stale docs\n`
+    report += `2. Run \`arch:sync\` to auto-update architecture docs\n`
+  }
+  if (moderate.length > 0) {
+    report += `3. Review ${moderate.length} moderately stale docs during next sprint\n`
+  }
+  report += `4. Run \`cleanup:orphans\` to check for dead references\n`
+
+  for (const s of staleResults) {
+    changes.push({
+      file: s.file,
+      type: 'updated',
+      summary: `${s.gapDays} days stale (${s.codeCommits} code commits since last doc update)`,
+    })
+  }
+
+  const endTime = Date.now()
+
+  return {
+    success: true,
+    action: 'cleanup:stale',
+    report,
+    changes,
+    errors,
+    metrics: {
+      startTime,
+      endTime,
+      durationMs: endTime - startTime,
+      filesRead: allDocFiles.length,
+      filesChanged: 0,
+      apiCalls: github.apiCalls,
+    },
+    nextActions: [
+      critical.length > 0 ? '`arch:sync` to update stale architecture docs' : '',
+      '`cleanup:orphans` to check for dead references',
+      '`ux:audit` to check UX doc coverage',
+    ].filter(Boolean),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLEANUP:ORPHANS
+// ═══════════════════════════════════════════════════════════════
+
+export async function cleanupOrphans(
+  github: GitHubClient,
+  _analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+  const changes: FileChange[] = []
+  const errors: string[] = []
+
+  log.info('Starting orphan detection')
+
+  // 1. Read all doc files for cross-references
+  const techDesignFiles = await github.getDirectory('docs/infrastructure/technical-design')
+  const allDocFiles = [...techDesignFiles].filter((f) => f.endsWith('.md'))
+
+  const deadRefs: Array<{ doc: string; reference: string; status: string }> = []
+  const brokenLinks: Array<{ source: string; target: string; issue: string }> = []
+
+  for (const docPath of allDocFiles) {
+    const file = await github.getFile(docPath)
+    if (!file) continue
+
+    // Extract file path references from doc content
+    const pathRefs = file.content.match(/`([a-zA-Z][\w/.-]+\.(ts|js|html|css|json))`/g)
+    if (pathRefs) {
+      for (const ref of pathRefs) {
+        const cleanRef = ref.replace(/`/g, '')
+        const exists = await github.getFile(cleanRef)
+        if (!exists) {
+          deadRefs.push({
+            doc: docPath,
+            reference: cleanRef,
+            status: 'File not found',
+          })
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+    }
+
+    // Check internal markdown links
+    const linkRefs = file.content.match(/\[([^\]]+)\]\(([^)]+)\)/g)
+    if (linkRefs) {
+      for (const link of linkRefs) {
+        const match = link.match(/\[([^\]]+)\]\(([^)]+)\)/)
+        if (match) {
+          const target = match[2]
+          // Only check relative links (not http/https)
+          if (!target.startsWith('http') && !target.startsWith('#')) {
+            // Resolve relative path
+            const docDir = docPath.substring(0, docPath.lastIndexOf('/'))
+            const resolvedPath = target.startsWith('/')
+              ? target.substring(1)
+              : `${docDir}/${target}`.replace(/[^/]+\/\.\.\//g, '')
+
+            const exists = await github.getFile(resolvedPath.split('#')[0])
+            if (!exists) {
+              brokenLinks.push({
+                source: docPath,
+                target: resolvedPath,
+                issue: 'Target file not found',
+              })
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Generate report
+  let report = `## Orphan Report — ${new Date().toISOString().split('T')[0]}\n\n`
+
+  if (deadRefs.length > 0) {
+    report += `### Dead References in Docs (doc points to code that doesn't exist)\n`
+    report += `| Doc | References | Status |\n`
+    report += `|-----|-----------|--------|\n`
+    for (const ref of deadRefs) {
+      report += `| \`${ref.doc.split('/').pop()}\` | \`${ref.reference}\` | ${ref.status} |\n`
+    }
+    report += '\n'
+  }
+
+  if (brokenLinks.length > 0) {
+    report += `### Broken Internal Links\n`
+    report += `| Source Doc | Link Target | Issue |\n`
+    report += `|-----------|-------------|-------|\n`
+    for (const link of brokenLinks) {
+      report += `| \`${link.source.split('/').pop()}\` | \`${link.target}\` | ${link.issue} |\n`
+    }
+    report += '\n'
+  }
+
+  if (deadRefs.length === 0 && brokenLinks.length === 0) {
+    report += `### ✅ All Clear\nNo orphaned references or broken links found.\n`
+  }
+
+  report += `\n### Recommended Actions\n`
+  if (deadRefs.length > 0) {
+    report += `1. Update or remove ${deadRefs.length} dead code references\n`
+  }
+  if (brokenLinks.length > 0) {
+    report += `2. Fix ${brokenLinks.length} broken internal links\n`
+  }
+  report += `3. Run \`cleanup:archive\` to archive truly dead docs\n`
+
+  const endTime = Date.now()
+
+  return {
+    success: true,
+    action: 'cleanup:orphans',
+    report,
+    changes,
+    errors,
+    metrics: {
+      startTime,
+      endTime,
+      durationMs: endTime - startTime,
+      filesRead: allDocFiles.length * 2,
+      filesChanged: 0,
+      apiCalls: github.apiCalls,
+    },
+    nextActions: ['`cleanup:archive` for dead docs', '`cleanup:duplicates` to check for contradictions'],
+  }
+}

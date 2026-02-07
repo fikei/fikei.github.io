@@ -1496,12 +1496,52 @@ branch:reconcile ─→ plan:audit (post-merge consistency)
 
 ---
 
+## Product Scoping
+
+Every Documentation Agent invocation can be scoped to a specific sub-product. When scoped, the agent only reads/writes files within that product's boundaries and treats related products as external services with documented I/O interfaces.
+
+### Scope Definitions
+
+| Scope Key | Product | Doc Paths | Code Paths | Related Products |
+|-----------|---------|-----------|------------|------------------|
+| `boards` | Boards | PRD, UX boards, client-architecture spec | `boards/` | ai-widgets, content-types, design-system |
+| `ai-widgets` | AI Widgets | PRDs (2), UX widgets, widget tech specs (3) | `generate-widget/`, `boards/js/widgets/` | boards, design-system |
+| `design-system` | Design System | PRD, design-system/README | `design-system/` | boards, ai-widgets, systemic |
+| `notion-sync` | Notion Sync | PRD, sync guide, sync protocol spec | `notion-sync/`, `documentation-agent/` | — |
+| `systemic` | Systemic | PRD | `systemic/` | design-system |
+| `soundscape` | Soundscape | PROJECT_PLAN | `soundscape/` | — |
+| `sharing` | Sharing | PRD, UX sharing, auth spec | `boards/js/auth/`, `boards/js/sharing/` | boards |
+| `content-types` | Content Types | PRD, UX content-types, tech spec | `boards/js/content-types/` | boards |
+
+### How Scoping Works
+
+1. **Slash command**: `/plan --product=ai-widgets` or the agent infers product from the current branch name (e.g., `feature/widget-variants` → `ai-widgets`)
+2. **Edge function**: Pass `"params": { "product": "ai-widgets" }` in the request body
+3. **GitHub Actions**: Auto-detects from changed file paths in the push event
+
+### I/O Boundaries
+
+When the agent is scoped to a product:
+- **Internal**: Full read/write access to that product's doc and code paths
+- **Related products**: Read-only access. Treated as external dependencies with documented interfaces.
+- **Unrelated products**: No access. The agent doesn't read or modify files outside its scope.
+
+Reports include an "I/O boundaries" section listing related products and their interfaces:
+```markdown
+### Related Products (I/O boundaries)
+This report is scoped to **AI Widgets**. Related products:
+- **Boards**: Hosts the widget rendering layer (`boards/js/widgets/`)
+- **Design System**: Provides CSS tokens and component classes (`design-system/`)
+```
+
+---
+
 ## Configuration
 
 ```json
 {
   "agent": "documentation",
-  "version": "1.0",
+  "version": "2.0",
   "stale_threshold_days": 30,
   "critical_stale_days": 60,
   "auto_archive_days": 90,
@@ -1516,6 +1556,100 @@ branch:reconcile ─→ plan:audit (post-merge consistency)
   ]
 }
 ```
+
+---
+
+## Edge Function Deployment
+
+The Documentation Agent is deployed as a Supabase Edge Function alongside `notion-sync` in the Ops project.
+
+### Files
+
+```
+supabase/functions/documentation-agent/
+├── index.ts           # Main handler — action routing, product scoping, CORS
+├── types.ts           # All TypeScript interfaces + sub-product mapping
+├── github.ts          # GitHub API client — files, commits, diffs, writes
+├── analyzer.ts        # Claude API — content analysis, commit-task matching
+├── plan.ts            # Plan domain — audit, update
+├── arch.ts            # Architecture domain — sync, audit
+├── cleanup.ts         # Cleanup domain — stale, orphans
+└── logger.ts          # Structured logging (matches notion-sync pattern)
+```
+
+### Deployment Commands
+
+```bash
+# Link to Ops project
+supabase link --project-ref ycilriwjnmcelkspmfmg
+
+# Deploy
+supabase functions deploy documentation-agent
+
+# Set secrets
+supabase secrets set GITHUB_TOKEN=ghp_...
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+
+# View logs
+supabase functions logs documentation-agent --tail
+```
+
+### Testing
+
+```bash
+SUPABASE_OPS_URL=https://ycilriwjnmcelkspmfmg.supabase.co
+
+# Plan audit
+curl -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "plan:audit"}'
+
+# Arch sync scoped to AI Widgets
+curl -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "arch:sync", "params": {"product": "ai-widgets"}}'
+
+# Cleanup stale (dry run)
+curl -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "cleanup:stale", "dryRun": true}'
+```
+
+### Implementation Status
+
+| Action | Status | Handler |
+|--------|--------|---------|
+| `plan:audit` | ✅ Implemented | `plan.ts` |
+| `plan:update` | ✅ Implemented | `plan.ts` |
+| `plan:add` | ⏳ Planned | — |
+| `plan:rebalance` | ⏳ Planned | — |
+| `arch:sync` | ✅ Implemented | `arch.ts` |
+| `arch:audit` | ✅ Implemented | `arch.ts` |
+| `arch:add-adr` | ⏳ Planned | — |
+| `arch:update-spec` | ⏳ Planned | — |
+| `capture:bug` | ⏳ Planned | — |
+| `capture:work` | ⏳ Planned | — |
+| `capture:tech-debt` | ⏳ Planned | — |
+| `ux:update` | ⏳ Planned | — |
+| `ux:audit` | ⏳ Planned | — |
+| `ux:wireframe` | ⏳ Planned | — |
+| `branch:diff` | ⏳ Planned | — |
+| `branch:reconcile` | ⏳ Planned | — |
+| `branch:cherry-pick-docs` | ⏳ Planned | — |
+| `cleanup:stale` | ✅ Implemented | `cleanup.ts` |
+| `cleanup:orphans` | ✅ Implemented | `cleanup.ts` |
+| `cleanup:duplicates` | ⏳ Planned | — |
+| `cleanup:archive` | ⏳ Planned | — |
+| `pm:scope-check` | ⏳ Planned | — |
+| `pm:dependency-map` | ⏳ Planned | — |
+| `pm:status-report` | ⏳ Planned | — |
+| `pm:retro` | ⏳ Planned | — |
+| `pm:decision-log` | ⏳ Planned | — |
+| `pm:prd-to-plan` | ⏳ Planned | — |
+| `pm:changelog` | ⏳ Planned | — |
 
 ---
 

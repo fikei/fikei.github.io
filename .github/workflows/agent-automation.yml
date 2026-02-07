@@ -1517,64 +1517,111 @@ jobs:
 
       - name: Documentation Agent — Plan Update
         if: steps.code-filter.outputs.code_changed == 'true'
+        env:
+          SUPABASE_OPS_URL: ${{ secrets.SUPABASE_OPS_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           echo "📖 Documentation Agent: plan:update"
           echo "═══════════════════════════════════════════"
-          echo "Analyzing merged commits to update project plan..."
-          echo ""
 
-          # Gather recent merge info
-          echo "Last 5 commits:"
-          git log --oneline -5
-          echo ""
+          if [ -n "$SUPABASE_OPS_URL" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"action": "plan:update", "branch": "master"}')
 
-          # List changed code files for plan mapping
-          echo "Changed code files (for plan:update mapping):"
-          git diff --name-only HEAD~1 HEAD -- '*.ts' '*.js' '*.html' '*.css' | head -20
-          echo ""
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
 
-          echo "📋 Merge info collected. Plan update would be processed by Documentation Agent."
-          echo "💡 To run manually: /plan update (in Claude Code session)"
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Plan update completed"
+              echo "$BODY" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('report',''))" 2>/dev/null || echo "$BODY"
+            else
+              echo "⚠️ Plan update returned HTTP $HTTP_CODE"
+              echo "$BODY" | head -20
+            fi
+          else
+            echo "⏭️ Edge function not configured — running local check"
+            echo "Last 5 commits:"
+            git log --oneline -5
+            echo ""
+            echo "Changed code files:"
+            git diff --name-only HEAD~1 HEAD -- '*.ts' '*.js' '*.html' '*.css' | head -20
+            echo ""
+            echo "💡 To run the full agent: configure SUPABASE_OPS_URL and SUPABASE_SERVICE_KEY secrets"
+          fi
 
       - name: Documentation Agent — Arch Sync
         if: steps.code-filter.outputs.code_changed == 'true'
+        env:
+          SUPABASE_OPS_URL: ${{ secrets.SUPABASE_OPS_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           echo "📖 Documentation Agent: arch:sync"
           echo "═══════════════════════════════════════════"
-          echo "Checking if architecture docs need updating..."
-          echo ""
 
-          # Check for architecture-relevant changes
-          ARCH_FILES=$(git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' 'boards/js/' 'design-system/' '*.json' | wc -l)
+          if [ -n "$SUPABASE_OPS_URL" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"action": "arch:sync"}')
 
-          if [ "$ARCH_FILES" -gt 0 ]; then
-            echo "⚠️ $ARCH_FILES architecture-relevant files changed"
-            echo "Changed files:"
-            git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' 'boards/js/' 'design-system/' '*.json'
-            echo ""
-            echo "💡 Run /arch to sync architecture docs"
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Arch sync completed"
+              echo "$BODY" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('report',''))" 2>/dev/null || echo "$BODY"
+            else
+              echo "⚠️ Arch sync returned HTTP $HTTP_CODE"
+            fi
           else
-            echo "✅ No architecture-relevant changes"
+            echo "⏭️ Edge function not configured — running local check"
+            ARCH_FILES=$(git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' 'boards/js/' 'design-system/' '*.json' | wc -l)
+            if [ "$ARCH_FILES" -gt 0 ]; then
+              echo "⚠️ $ARCH_FILES architecture-relevant files changed"
+              git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' 'boards/js/' 'design-system/' '*.json'
+            else
+              echo "✅ No architecture-relevant changes"
+            fi
           fi
 
       - name: Documentation Agent — Stale Check
         if: steps.code-filter.outputs.code_changed == 'true'
+        env:
+          SUPABASE_OPS_URL: ${{ secrets.SUPABASE_OPS_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           echo "📖 Documentation Agent: cleanup:stale"
           echo "═══════════════════════════════════════════"
-          echo "Quick stale check after merge..."
-          echo ""
 
-          # Check doc files modified dates vs code
-          for doc in docs/infrastructure/technical-design/*.md; do
-            if [ -f "$doc" ]; then
-              doc_date=$(git log -1 --format=%ci "$doc" 2>/dev/null | cut -d' ' -f1)
-              echo "  $(basename $doc): last updated $doc_date"
+          if [ -n "$SUPABASE_OPS_URL" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"action": "cleanup:stale"}')
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Stale check completed"
+              echo "$BODY" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('report',''))" 2>/dev/null || echo "$BODY"
+            else
+              echo "⚠️ Stale check returned HTTP $HTTP_CODE"
             fi
-          done
-
-          echo ""
-          echo "💡 Run /cleanup stale for full staleness analysis"
+          else
+            echo "⏭️ Edge function not configured — running local check"
+            for doc in docs/infrastructure/technical-design/*.md; do
+              if [ -f "$doc" ]; then
+                doc_date=$(git log -1 --format=%ci "$doc" 2>/dev/null | cut -d' ' -f1)
+                echo "  $(basename $doc): last updated $doc_date"
+              fi
+            done
+          fi
 
   # Friday documentation cleanup suite
   # Runs cleanup:stale, cleanup:orphans, cleanup:duplicates, ux:audit, pm:status-report
@@ -1694,18 +1741,42 @@ jobs:
               ;;
             "documentation")
               echo "📖 Documentation Agent — Full Audit"
-              echo "Running: plan:audit, arch:sync, ux:audit, cleanup:stale"
-              echo "Functions: plan:audit → arch:sync → ux:audit → cleanup:stale"
+              for ACTION in "plan:audit" "arch:sync" "cleanup:stale"; do
+                echo "──── $ACTION ────"
+                if [ -n "$SUPABASE_OPS_URL" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+                  curl -s -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+                    -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"action\": \"$ACTION\"}" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('report','OK'))" 2>/dev/null || echo "⚠️ Call failed"
+                else
+                  echo "⏭️ Edge function not configured"
+                fi
+              done
               ;;
             "documentation-cleanup")
               echo "📖 Documentation Agent — Cleanup Suite"
-              echo "Running: cleanup:stale, cleanup:orphans, cleanup:duplicates, cleanup:archive"
-              echo "Functions: cleanup:stale → cleanup:orphans → cleanup:duplicates → cleanup:archive"
+              for ACTION in "cleanup:stale" "cleanup:orphans"; do
+                echo "──── $ACTION ────"
+                if [ -n "$SUPABASE_OPS_URL" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+                  curl -s -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+                    -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"action\": \"$ACTION\"}" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('report','OK'))" 2>/dev/null || echo "⚠️ Call failed"
+                else
+                  echo "⏭️ Edge function not configured"
+                fi
+              done
               ;;
             "documentation-status")
               echo "📖 Documentation Agent — Status Report"
-              echo "Running: pm:status-report, pm:changelog"
-              echo "Functions: pm:status-report → pm:changelog"
+              if [ -n "$SUPABASE_OPS_URL" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+                curl -s -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
+                  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+                  -H "Content-Type: application/json" \
+                  -d '{"action": "pm:status-report"}' | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('report','OK'))" 2>/dev/null || echo "⚠️ Call failed"
+              else
+                echo "⏭️ Edge function not configured"
+              fi
               ;;
             "all")
               echo "🚀 Running all agents..."

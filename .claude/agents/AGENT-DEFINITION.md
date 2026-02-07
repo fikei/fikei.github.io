@@ -135,15 +135,21 @@ After completing any task:
 - **Change Detection**: Hash-based content change tracking
 - **Workflow Integration**: GitHub Actions triggers on push, schedule, and manual dispatch
 
+### Working Now (Documentation Agent)
+- **Edge Function**: `supabase/functions/documentation-agent/` — HTTP API for all doc management functions
+- **Product Scoping**: Each invocation scoped to a sub-product (Boards, AI Widgets, etc.) with I/O boundaries to related products
+- **Implemented Actions**: `plan:audit`, `plan:update`, `arch:sync`, `arch:audit`, `cleanup:stale`, `cleanup:orphans`
+- **GitHub Actions Integration**: Post-merge and Friday cleanup jobs call the edge function
+- **Slash Commands**: 7 commands (`/plan`, `/arch`, `/capture`, `/ux`, `/branch`, `/cleanup`, `/pm`) with smart routing
+
 ### Planned (Not Yet Built)
+- Remaining Documentation Agent actions (16 of 28 functions)
 - Bidirectional Notion sync
 - Comment-driven updates (`@agent` commands in Notion)
 - Real-time Slack/Discord notifications
 - CI/CD pipeline security gates
-- Automated sprint planning from PRDs
 - Cross-agent communication protocol
 - Performance metric dashboards
-- Automated retrospective generation
 
 ---
 
@@ -154,6 +160,7 @@ After completing any task:
 | `CLAUDE.md` | Top-level behavioral instructions (always loaded) |
 | `.claude/agents/AGENT-DEFINITION.md` | This file — consolidated definition |
 | `.claude/agents/documentation-agent.md` | Content management — plans, arch, UX, capture, cleanup |
+| `supabase/functions/documentation-agent/` | Edge function — HTTP API for doc management |
 | `.claude/agents/documentation-sync-agent.md` | Detailed sync rules and mappings |
 | `.claude/agents/organizational-agent.md` | Standards and audit workflows |
 | `.claude/agents/project-management-agent.md` | Work breakdown templates |
