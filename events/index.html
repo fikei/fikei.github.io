@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events — ctrl.rodeo</title>
+  <meta name="description" content="Aggregated events from multiple sources with location filtering.">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
+  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
+
+  <!-- Space Grotesk Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+/* ============================================
+   Events Page — ctrl.rodeo
+   ============================================ */
+
+:root {
+  --font-primary: "Space Grotesk", sans-serif;
+  --font-mono: "Space Grotesk", sans-serif;
+  --font-size-xs: 10px;
+  --font-size-sm: 10px;
+  --font-size-base: 10px;
+  --font-size-lg: 12px;
+  --font-size-xl: 14px;
+  --font-size-2xl: 18px;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.6;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --bg: #000;
+  --fg: #fff;
+  --surface: #111;
+  --border: #fff;
+  --muted: #888;
+  --subtle: #333;
+  --accent: #fff;
+}
+
+:root.light {
+  --bg: #fff;
+  --fg: #000;
+  --surface: #fafafa;
+  --border: #000;
+  --muted: #666;
+  --subtle: #e0e0e0;
+  --accent: #000;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--fg);
+  background: var(--bg);
+  transition: background 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  padding: var(--space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+
+.header__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.header__left a {
+  text-decoration: none;
+  color: var(--muted);
+  font-family: var(--font-primary);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.header__left a:hover { color: var(--fg); }
+
+.header__separator {
+  color: var(--subtle);
+  font-size: 10px;
+}
+
+.site-title {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.theme-toggle {
+  width: 32px;
+  height: 18px;
+  background: transparent;
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  padding: 2px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.theme-toggle__knob {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+:root.light .theme-toggle { background: var(--fg); }
+:root.light .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
+}
+
+/* Container */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+/* Page description */
+.page-description {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.8;
+  max-width: 480px;
+  margin-bottom: var(--space-8);
+  padding-top: var(--space-6);
+}
+
+/* Source Config */
+.sources-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.sources-bar__label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-right: var(--space-1);
+}
+
+.source-chip {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.source-chip:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.source-chip.active {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.source-chip__count {
+  margin-left: 4px;
+  opacity: 0.6;
+}
+
+/* Add Source Button */
+.add-source-btn {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px dashed var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.15s ease;
+}
+
+.add-source-btn:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-input {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: border-color 0.15s ease;
+  min-width: 0;
+}
+
+.filter-input::placeholder {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+
+.filter-input--search { width: 200px; }
+.filter-input--date { width: 130px; }
+
+.filter-select {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 6px 24px 6px 10px;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 5L0 0h8z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  min-width: 120px;
+}
+
+:root.light .filter-select {
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 5L0 0h8z' fill='%23666'/%3E%3C/svg%3E");
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+
+.filter-select option {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.filter-clear {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.15s ease;
+}
+
+.filter-clear:hover { color: var(--fg); }
+
+/* Stats bar */
+.stats-bar {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Table */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--subtle);
+  margin-bottom: var(--space-8);
+}
+
+.events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-primary);
+  font-size: 10px;
+}
+
+.events-table th {
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--subtle);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+
+.events-table th:hover { color: var(--fg); }
+
+.events-table th .sort-arrow {
+  margin-left: 4px;
+  font-size: 8px;
+  opacity: 0.4;
+}
+
+.events-table th.sorted .sort-arrow { opacity: 1; }
+
+.events-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--subtle);
+  color: var(--fg);
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+.events-table tbody tr {
+  transition: background 0.1s ease;
+}
+
+.events-table tbody tr:hover {
+  background: var(--surface);
+}
+
+.events-table .col-date { width: 90px; white-space: nowrap; }
+.events-table .col-name { min-width: 180px; }
+.events-table .col-venue { min-width: 120px; }
+.events-table .col-address { min-width: 150px; }
+.events-table .col-city { min-width: 100px; white-space: nowrap; }
+.events-table .col-source { width: 90px; white-space: nowrap; }
+
+.event-link {
+  color: var(--fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--subtle);
+  transition: border-color 0.15s ease;
+}
+
+.event-link:hover { border-color: var(--fg); }
+
+.source-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: var(--space-12) var(--space-4);
+  color: var(--muted);
+}
+
+.empty-state__title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-2);
+}
+
+.empty-state__desc {
+  font-size: 10px;
+  line-height: 1.8;
+}
+
+/* Add Source Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--subtle);
+  padding: var(--space-6);
+  width: 360px;
+  max-width: 90vw;
+}
+
+.modal__title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-4);
+}
+
+.modal__field {
+  margin-bottom: var(--space-3);
+}
+
+.modal__label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
+
+.modal__input {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--fg);
+  width: 100%;
+  letter-spacing: 0.05em;
+}
+
+.modal__input:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+
+.modal__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.modal__btn {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all 0.15s ease;
+}
+
+.modal__btn:hover {
+  border-color: var(--fg);
+}
+
+.modal__btn--primary {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.modal__btn--primary:hover {
+  opacity: 0.8;
+}
+
+.modal__hint {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: var(--space-2);
+}
+
+/* Loading state */
+.loading-indicator {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+}
+
+.loading-indicator::after {
+  content: '';
+  animation: dots 1.5s steps(3, end) infinite;
+}
+
+@keyframes dots {
+  0% { content: ''; }
+  33% { content: '.'; }
+  66% { content: '..'; }
+  100% { content: '...'; }
+}
+
+/* Footer */
+.footer {
+  padding: var(--space-6) 0 var(--space-16);
+  border-top: 1px solid var(--subtle);
+}
+
+.footer-text {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-input--search,
+  .filter-input--date,
+  .filter-select {
+    width: 100%;
+  }
+
+  .events-table .col-address { display: none; }
+}
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header__inner">
+      <div class="header__left">
+        <a href="/" class="site-title">ctrl.rodeo</a>
+        <span class="header__separator">/</span>
+        <span class="site-title">Events</span>
+      </div>
+      <button class="theme-toggle" aria-label="Toggle theme">
+        <div class="theme-toggle__knob"></div>
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+    <p class="page-description">Aggregated events from multiple sources. Location data extracted into address and city columns for filtering.</p>
+
+    <!-- Sources bar -->
+    <div class="sources-bar">
+      <span class="sources-bar__label">Sources:</span>
+      <div id="sourceChips"></div>
+      <button class="add-source-btn" id="addSourceBtn">+ Add Source</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <input type="text" class="filter-input filter-input--search" id="filterSearch" placeholder="Search events...">
+      <select class="filter-select" id="filterCity">
+        <option value="">All Cities</option>
+      </select>
+      <select class="filter-select" id="filterSource">
+        <option value="">All Sources</option>
+      </select>
+      <input type="date" class="filter-input filter-input--date" id="filterDateFrom" title="From date">
+      <input type="date" class="filter-input filter-input--date" id="filterDateTo" title="To date">
+      <button class="filter-clear" id="filterClear">Clear</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <span id="statsText">0 events</span>
+      <span id="statsFiltered"></span>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table class="events-table" id="eventsTable">
+        <thead>
+          <tr>
+            <th class="col-date" data-sort="date">Date <span class="sort-arrow">&#9650;</span></th>
+            <th class="col-name" data-sort="name">Event <span class="sort-arrow">&#9650;</span></th>
+            <th class="col-venue" data-sort="venue">Venue <span class="sort-arrow">&#9650;</span></th>
+            <th class="col-address" data-sort="address">Address <span class="sort-arrow">&#9650;</span></th>
+            <th class="col-city" data-sort="city">City <span class="sort-arrow">&#9650;</span></th>
+            <th class="col-source" data-sort="source">Source <span class="sort-arrow">&#9650;</span></th>
+          </tr>
+        </thead>
+        <tbody id="eventsBody">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState" style="display: none;">
+      <div class="empty-state__title">No events found</div>
+      <div class="empty-state__desc">Try adjusting your filters or adding a new source.</div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+      Fetching events
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="footer-text">Built by Ian Fike</p>
+    </footer>
+  </div>
+
+  <!-- Add Source Modal -->
+  <div class="modal-overlay" id="addSourceModal">
+    <div class="modal">
+      <div class="modal__title">Add Event Source</div>
+      <div class="modal__field">
+        <label class="modal__label">Source Type</label>
+        <select class="modal__input" id="sourceType">
+          <option value="ical">iCal / .ics URL</option>
+          <option value="json">JSON Feed URL</option>
+          <option value="rss">RSS / Atom Feed</option>
+        </select>
+      </div>
+      <div class="modal__field">
+        <label class="modal__label">Name</label>
+        <input type="text" class="modal__input" id="sourceName" placeholder="e.g. Community Calendar">
+      </div>
+      <div class="modal__field">
+        <label class="modal__label">URL</label>
+        <input type="text" class="modal__input" id="sourceUrl" placeholder="https://...">
+      </div>
+      <div class="modal__hint">
+        Supports iCal (.ics), JSON feeds, and RSS/Atom. Sources are saved in your browser.
+      </div>
+      <div class="modal__actions">
+        <button class="modal__btn" id="modalCancel">Cancel</button>
+        <button class="modal__btn modal__btn--primary" id="modalAdd">Add Source</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// ============================================
+// Events Aggregator — ctrl.rodeo
+// Multi-source event aggregation with location filtering
+// ============================================
+
+(function() {
+  'use strict';
+
+  // --- State ---
+  const state = {
+    events: [],
+    sources: [],
+    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '' },
+    sort: { key: 'date', dir: 'asc' },
+  };
+
+  // --- Storage ---
+  const STORAGE_KEY = 'ctrl-rodeo-event-sources';
+
+  function loadSources() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        state.sources = JSON.parse(saved);
+      }
+    } catch (e) { /* ignore */ }
+
+    // Add demo sources if none exist
+    if (state.sources.length === 0) {
+      state.sources = [
+        { id: 'demo', name: 'Demo Events', type: 'demo', url: '', enabled: true },
+      ];
+      saveSources();
+    }
+  }
+
+  function saveSources() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
+  }
+
+  // --- Demo Data ---
+  function getDemoEvents() {
+    const today = new Date();
+    const d = (offset) => {
+      const dt = new Date(today);
+      dt.setDate(dt.getDate() + offset);
+      return dt.toISOString().split('T')[0];
+    };
+
+    return [
+      { date: d(1), name: 'Frontend Meetup', venue: 'The Hub', address: '123 Market St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(2), name: 'Design Systems Conf', venue: 'Moscone Center', address: '747 Howard St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(3), name: 'AI & ML Workshop', venue: 'TechSpace', address: '456 Broadway', city: 'New York', url: '#', source: 'demo' },
+      { date: d(4), name: 'Startup Pitch Night', venue: 'WeWork Downtown', address: '100 S King St', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(5), name: 'Open Source Friday', venue: 'GitHub HQ', address: '88 Colin P Kelly Jr St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(7), name: 'React Advanced', venue: 'Convention Center', address: '1 Dr Carlton B Goodlett Pl', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(8), name: 'UX Research Summit', venue: 'Columbia University', address: '116th St & Broadway', city: 'New York', url: '#', source: 'demo' },
+      { date: d(10), name: 'DevOps Days', venue: 'Bell Harbor Conf Center', address: '2211 Alaskan Way', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(12), name: 'CSS Art Exhibition', venue: 'SoMa Gallery', address: '550 Howard St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(14), name: 'Typescript Meetup', venue: 'Galvanize', address: '44 Tehama St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(15), name: 'Product Management Forum', venue: 'Grand Hyatt', address: '109 E 42nd St', city: 'New York', url: '#', source: 'demo' },
+      { date: d(18), name: 'Cloud Native Summit', venue: 'Amazon Meeting Center', address: '2031 7th Ave', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(20), name: 'Accessibility Workshop', venue: 'Lighthouse for the Blind', address: '214 Van Ness Ave', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(22), name: 'Data Viz Meetup', venue: 'Brooklyn Navy Yard', address: '63 Flushing Ave', city: 'New York', url: '#', source: 'demo' },
+      { date: d(25), name: 'Web Performance Conf', venue: 'Impact Hub', address: '220 2nd Ave S', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(-1), name: 'Rust Lang Meetup', venue: 'Hacker Dojo', address: '855 Maude Ave', city: 'Mountain View', url: '#', source: 'demo' },
+      { date: d(-3), name: 'GraphQL Summit', venue: 'Bespoke Events', address: '845 Market St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(6), name: 'Women in Tech Panel', venue: 'Civic Hall', address: '118 W 22nd St', city: 'New York', url: '#', source: 'demo' },
+      { date: d(9), name: 'Kubernetes Workshop', venue: 'Fremont Studios', address: '155 N 35th St', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(30), name: 'JS Nation', venue: 'Palace of Fine Arts', address: '3301 Lyon St', city: 'San Francisco', url: '#', source: 'demo' },
+    ];
+  }
+
+  // --- CORS Proxy ---
+  // For client-side fetching of external feeds on a static site, we use a
+  // public CORS proxy. Users can self-host one for reliability.
+  const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+  // --- Fetch Sources ---
+  async function fetchAllSources() {
+    const el = document.getElementById('loadingIndicator');
+    el.style.display = 'block';
+    state.events = [];
+
+    const promises = state.sources.filter(s => s.enabled).map(async (source) => {
+      try {
+        if (source.type === 'demo') {
+          return getDemoEvents();
+        } else if (source.type === 'ical') {
+          return await fetchIcal(source);
+        } else if (source.type === 'json') {
+          return await fetchJson(source);
+        } else if (source.type === 'rss') {
+          return await fetchRss(source);
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch source "${source.name}":`, err);
+        return [];
+      }
+    });
+
+    const results = await Promise.allSettled(promises);
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        state.events.push(...r.value);
+      }
+    });
+
+    el.style.display = 'none';
+    updateFilters();
+    render();
+  }
+
+  // --- iCal Parser ---
+  async function fetchIcal(source) {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(source.url));
+    const text = await resp.text();
+    return parseIcal(text, source.id);
+  }
+
+  function parseIcal(text, sourceId) {
+    const events = [];
+    const blocks = text.split('BEGIN:VEVENT');
+    for (let i = 1; i < blocks.length; i++) {
+      const block = blocks[i].split('END:VEVENT')[0];
+      const get = (key) => {
+        const re = new RegExp(key + '[^:]*:(.+)', 'i');
+        const m = block.match(re);
+        return m ? m[1].trim().replace(/\\n/g, ' ').replace(/\\,/g, ',') : '';
+      };
+
+      const dtstart = get('DTSTART');
+      const date = dtstart ? parseIcalDate(dtstart) : '';
+      const summary = get('SUMMARY');
+      const location = get('LOCATION');
+      const url = get('URL') || '';
+
+      // Parse location into venue, address, city
+      const loc = parseLocationString(location);
+
+      events.push({
+        date,
+        name: summary,
+        venue: loc.venue,
+        address: loc.address,
+        city: loc.city,
+        url,
+        source: sourceId,
+      });
+    }
+    return events;
+  }
+
+  function parseIcalDate(str) {
+    // Handle YYYYMMDD and YYYYMMDDTHHmmssZ formats
+    const clean = str.replace(/[^0-9T]/g, '');
+    if (clean.length >= 8) {
+      const y = clean.substring(0, 4);
+      const m = clean.substring(4, 6);
+      const d = clean.substring(6, 8);
+      return `${y}-${m}-${d}`;
+    }
+    return str;
+  }
+
+  // --- JSON Feed Parser ---
+  async function fetchJson(source) {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(source.url));
+    const data = await resp.json();
+    const items = Array.isArray(data) ? data : (data.events || data.items || data.results || []);
+    return items.map(item => {
+      const loc = parseLocationString(
+        item.location || item.venue || item.address || ''
+      );
+      return {
+        date: (item.date || item.start_date || item.startDate || item.start || '').substring(0, 10),
+        name: item.name || item.title || item.summary || '',
+        venue: item.venue?.name || item.venue_name || loc.venue,
+        address: item.venue?.address || item.address || loc.address,
+        city: item.venue?.city || item.city || loc.city,
+        url: item.url || item.link || '',
+        source: source.id,
+      };
+    });
+  }
+
+  // --- RSS/Atom Parser ---
+  async function fetchRss(source) {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(source.url));
+    const text = await resp.text();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'text/xml');
+
+    const events = [];
+
+    // Try RSS items
+    let items = xml.querySelectorAll('item');
+    if (items.length === 0) {
+      // Try Atom entries
+      items = xml.querySelectorAll('entry');
+    }
+
+    items.forEach(item => {
+      const getText = (tag) => {
+        const el = item.querySelector(tag);
+        return el ? el.textContent.trim() : '';
+      };
+
+      const title = getText('title');
+      const link = getText('link') || (item.querySelector('link')?.getAttribute('href') || '');
+      const pubDate = getText('pubDate') || getText('published') || getText('updated') || '';
+      const description = getText('description') || getText('content') || getText('summary') || '';
+
+      // Try to extract location from description
+      const loc = extractLocationFromHtml(description);
+
+      let date = '';
+      if (pubDate) {
+        try {
+          date = new Date(pubDate).toISOString().split('T')[0];
+        } catch (e) { date = pubDate.substring(0, 10); }
+      }
+
+      events.push({
+        date,
+        name: title,
+        venue: loc.venue,
+        address: loc.address,
+        city: loc.city,
+        url: link,
+        source: source.id,
+      });
+    });
+
+    return events;
+  }
+
+  // --- Location Parsing ---
+  function parseLocationString(str) {
+    if (!str) return { venue: '', address: '', city: '' };
+
+    // Common patterns: "Venue Name, 123 Street, City, State"
+    // or "123 Street, City, State ZIP"
+    const parts = str.split(',').map(s => s.trim());
+
+    if (parts.length >= 3) {
+      return {
+        venue: parts[0],
+        address: parts[1],
+        city: parts[2].replace(/\s+\d{5}(-\d{4})?$/, '').trim(),
+      };
+    } else if (parts.length === 2) {
+      // Check if first part looks like an address (starts with number)
+      if (/^\d/.test(parts[0])) {
+        return { venue: '', address: parts[0], city: parts[1] };
+      }
+      return { venue: parts[0], address: '', city: parts[1] };
+    }
+
+    return { venue: str, address: '', city: '' };
+  }
+
+  function extractLocationFromHtml(html) {
+    // Strip HTML tags and try to find location patterns
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+    // Look for common patterns like "Location: ..." or "Where: ..."
+    const locMatch = text.match(/(?:location|where|venue|place|address)\s*:\s*([^.]+)/i);
+    if (locMatch) {
+      return parseLocationString(locMatch[1].trim());
+    }
+
+    return { venue: '', address: '', city: '' };
+  }
+
+  // --- Render ---
+  function render() {
+    const filtered = getFilteredEvents();
+    const sorted = getSortedEvents(filtered);
+
+    const tbody = document.getElementById('eventsBody');
+    const empty = document.getElementById('emptyState');
+    const table = document.getElementById('eventsTable');
+
+    if (sorted.length === 0) {
+      table.style.display = 'none';
+      empty.style.display = 'block';
+    } else {
+      table.style.display = '';
+      empty.style.display = 'none';
+    }
+
+    tbody.innerHTML = sorted.map(ev => {
+      const sourceName = state.sources.find(s => s.id === ev.source)?.name || ev.source;
+      const nameCell = ev.url && ev.url !== '#'
+        ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener">${escHtml(ev.name)}</a>`
+        : escHtml(ev.name);
+
+      return `<tr>
+        <td class="col-date">${escHtml(formatDate(ev.date))}</td>
+        <td class="col-name">${nameCell}</td>
+        <td class="col-venue">${escHtml(ev.venue)}</td>
+        <td class="col-address">${escHtml(ev.address)}</td>
+        <td class="col-city">${escHtml(ev.city)}</td>
+        <td class="col-source"><span class="source-tag">${escHtml(sourceName)}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Stats
+    const statsText = document.getElementById('statsText');
+    const statsFiltered = document.getElementById('statsFiltered');
+    statsText.textContent = `${state.events.length} events from ${state.sources.filter(s => s.enabled).length} source${state.sources.filter(s => s.enabled).length !== 1 ? 's' : ''}`;
+    if (sorted.length !== state.events.length) {
+      statsFiltered.textContent = `Showing ${sorted.length}`;
+    } else {
+      statsFiltered.textContent = '';
+    }
+
+    // Source chips
+    renderSourceChips();
+
+    // Sort indicators
+    document.querySelectorAll('.events-table th').forEach(th => {
+      const key = th.dataset.sort;
+      th.classList.toggle('sorted', key === state.sort.key);
+      const arrow = th.querySelector('.sort-arrow');
+      if (arrow) {
+        arrow.innerHTML = key === state.sort.key
+          ? (state.sort.dir === 'asc' ? '&#9650;' : '&#9660;')
+          : '&#9650;';
+      }
+    });
+  }
+
+  function renderSourceChips() {
+    const container = document.getElementById('sourceChips');
+    container.innerHTML = state.sources.map(s => {
+      const count = state.events.filter(e => e.source === s.id).length;
+      return `<button class="source-chip ${s.enabled ? 'active' : ''}" data-source-id="${escHtml(s.id)}">
+        ${escHtml(s.name)}<span class="source-chip__count">${count}</span>
+      </button>`;
+    }).join('');
+
+    container.querySelectorAll('.source-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const id = chip.dataset.sourceId;
+        const source = state.sources.find(s => s.id === id);
+        if (source) {
+          source.enabled = !source.enabled;
+          saveSources();
+          fetchAllSources();
+        }
+      });
+    });
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // --- Filtering ---
+  function getFilteredEvents() {
+    return state.events.filter(ev => {
+      const { search, city, source, dateFrom, dateTo } = state.filters;
+
+      if (search) {
+        const q = search.toLowerCase();
+        const haystack = [ev.name, ev.venue, ev.address, ev.city].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+
+      if (city && ev.city !== city) return false;
+      if (source && ev.source !== source) return false;
+      if (dateFrom && ev.date < dateFrom) return false;
+      if (dateTo && ev.date > dateTo) return false;
+
+      return true;
+    });
+  }
+
+  function updateFilters() {
+    // Populate city dropdown
+    const cities = [...new Set(state.events.map(e => e.city).filter(Boolean))].sort();
+    const citySelect = document.getElementById('filterCity');
+    const currentCity = citySelect.value;
+    citySelect.innerHTML = '<option value="">All Cities</option>' +
+      cities.map(c => `<option value="${escHtml(c)}" ${c === currentCity ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+
+    // Populate source dropdown
+    const sourceSelect = document.getElementById('filterSource');
+    const currentSource = sourceSelect.value;
+    sourceSelect.innerHTML = '<option value="">All Sources</option>' +
+      state.sources.map(s => `<option value="${escHtml(s.id)}" ${s.id === currentSource ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('');
+  }
+
+  // --- Sorting ---
+  function getSortedEvents(events) {
+    const { key, dir } = state.sort;
+    return [...events].sort((a, b) => {
+      let aVal = a[key] || '';
+      let bVal = b[key] || '';
+      if (key === 'date') {
+        aVal = aVal || '9999-12-31';
+        bVal = bVal || '9999-12-31';
+      }
+      const cmp = aVal.localeCompare(bVal);
+      return dir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  // --- Events ---
+  function bindEvents() {
+    // Theme toggle
+    const toggle = document.querySelector('.theme-toggle');
+    const root = document.documentElement;
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') root.classList.add('light');
+    toggle.addEventListener('click', () => {
+      root.classList.toggle('light');
+      localStorage.setItem('theme', root.classList.contains('light') ? 'light' : 'dark');
+    });
+
+    // Filters
+    const filterSearch = document.getElementById('filterSearch');
+    const filterCity = document.getElementById('filterCity');
+    const filterSource = document.getElementById('filterSource');
+    const filterDateFrom = document.getElementById('filterDateFrom');
+    const filterDateTo = document.getElementById('filterDateTo');
+    const filterClear = document.getElementById('filterClear');
+
+    let debounceTimer;
+    filterSearch.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        state.filters.search = filterSearch.value;
+        render();
+      }, 150);
+    });
+
+    filterCity.addEventListener('change', () => {
+      state.filters.city = filterCity.value;
+      render();
+    });
+
+    filterSource.addEventListener('change', () => {
+      state.filters.source = filterSource.value;
+      render();
+    });
+
+    filterDateFrom.addEventListener('change', () => {
+      state.filters.dateFrom = filterDateFrom.value;
+      render();
+    });
+
+    filterDateTo.addEventListener('change', () => {
+      state.filters.dateTo = filterDateTo.value;
+      render();
+    });
+
+    filterClear.addEventListener('click', () => {
+      state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '' };
+      filterSearch.value = '';
+      filterCity.value = '';
+      filterSource.value = '';
+      filterDateFrom.value = '';
+      filterDateTo.value = '';
+      render();
+    });
+
+    // Column sorting
+    document.querySelectorAll('.events-table th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (state.sort.key === key) {
+          state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sort.key = key;
+          state.sort.dir = 'asc';
+        }
+        render();
+      });
+    });
+
+    // Add Source modal
+    const modal = document.getElementById('addSourceModal');
+    document.getElementById('addSourceBtn').addEventListener('click', () => {
+      modal.classList.add('open');
+      document.getElementById('sourceName').value = '';
+      document.getElementById('sourceUrl').value = '';
+      document.getElementById('sourceName').focus();
+    });
+
+    document.getElementById('modalCancel').addEventListener('click', () => {
+      modal.classList.remove('open');
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.remove('open');
+    });
+
+    document.getElementById('modalAdd').addEventListener('click', () => {
+      const name = document.getElementById('sourceName').value.trim();
+      const url = document.getElementById('sourceUrl').value.trim();
+      const type = document.getElementById('sourceType').value;
+
+      if (!name || !url) return;
+
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      state.sources.push({ id, name, type, url, enabled: true });
+      saveSources();
+      modal.classList.remove('open');
+      fetchAllSources();
+    });
+
+    // Keyboard shortcut: Escape closes modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') modal.classList.remove('open');
+      // "/" focuses search
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault();
+        filterSearch.focus();
+      }
+    });
+  }
+
+  // --- Init ---
+  function init() {
+    loadSources();
+    bindEvents();
+    fetchAllSources();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+  </script>
+</body>
+</html>
