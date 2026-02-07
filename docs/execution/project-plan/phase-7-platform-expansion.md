@@ -20,15 +20,17 @@
 
 ## Epic 7.2: Import/Export
 
+> **Superseded** — Absorbed into [Phase 9: Bulk Import](./phase-9-bulk-import.md), which expands this from 6 tasks into a full cold-start solution covering structured file imports, platform data exports, AI-powered content extraction, onboarding flows, and bulk organization.
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Import from Services** | | Pending |
-| | Import modal UI | Pending |
-| | Pocket export format | Pending |
-| | Instapaper export format | Pending |
-| | Raindrop.io export format | Pending |
-| | Browser bookmarks HTML | Pending |
-| | AI categorization on import | Pending |
+| **~~Import from Services~~** | | Superseded |
+| | ~~Import modal UI~~ | Superseded → Epic 9.1 Import Progress UI |
+| | ~~Pocket export format~~ | Superseded → Epic 9.2 Pocket |
+| | ~~Instapaper export format~~ | Superseded → Epic 9.2 Instapaper |
+| | ~~Raindrop.io export format~~ | Superseded → Epic 9.2 Raindrop.io |
+| | ~~Browser bookmarks HTML~~ | Superseded → Epic 9.2 Browser Bookmarks |
+| | ~~AI categorization on import~~ | Superseded → Epic 9.1 Bulk AI Categorization |
 
 ---
 

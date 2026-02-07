@@ -277,6 +277,12 @@
               "source": "ai"
             },
             {
+              "title": "Phase 9: Bulk Import",
+              "icon": "\ud83d\udce5",
+              "file": "docs/execution/project-plan/phase-9-bulk-import.md",
+              "source": "ai"
+            },
+            {
               "title": "Backlog",
               "icon": "\ud83d\udcdd",
               "file": "docs/execution/project-plan/backlog.md",

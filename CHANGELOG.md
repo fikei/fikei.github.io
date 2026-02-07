@@ -4,6 +4,18 @@ All notable changes to ctrl.rodeo will be documented in this file.
 
 ---
 
+## [2026-02-07] - Phase 9: Bulk Import
+
+### Added
+- **`docs/execution/project-plan/phase-9-bulk-import.md`** — New phase solving the cold start problem. 6 epics: Import Infrastructure (job pipeline, dedup, bulk AI categorization), Structured File Imports (bookmarks, Pocket, Instapaper, Raindrop, Pinterest, Pinboard, generic CSV/JSON), Platform Data Exports (Instagram, Twitter/X, YouTube, Reddit, TikTok, Google Takeout, Apple data), AI-Powered Content Extraction (screenshots via Vision AI, email forwarding, copy-paste blobs, shared list import), Onboarding Import Flow ("Import Your Digital Life" wizard), Bulk Organization (smart category suggestions, duplicate merge, bulk edit, source attribution). ~85 new tasks.
+
+### Changed
+- **Phase 7 Epic 7.2 (Import/Export)** — Marked as superseded. All 6 tasks absorbed into Phase 9 Epics 9.1 and 9.2.
+- **`docs/execution/project-plan/index.md`** — Added Phase 9, updated Phase 7 pending count (50 → 44), new total 473 pending.
+- **`notion-structure.json`** — Added Phase 9 entry.
+
+---
+
 ## [2026-02-06] - Epic 3.5: Image Intelligence System
 
 ### Added
