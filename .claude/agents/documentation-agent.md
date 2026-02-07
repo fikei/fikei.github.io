@@ -74,9 +74,195 @@ Each sub-product maps to specific locations in the documentation tree:
 
 ---
 
-## Function Reference
+## Slash Commands
 
-| Domain | Function | Purpose |
+Seven top-level commands. Each one infers which sub-functions to run based on context — what you say, what branch you're on, what changed recently. You can always force a specific sub-function with `/<command> <sub-function>`.
+
+### `/plan`
+
+**Manages project plans.** Infers intent from context:
+
+| You say / context | Sub-function triggered | What happens |
+|---|---|---|
+| `/plan` (no args, on feature branch) | `plan:update` | Infer completed tasks from branch commits, update counts |
+| `/plan` (no args, on master) | `plan:audit` | Full audit — counts, staleness, misplaced items |
+| `/plan add <description>` | `plan:add` | Determine type (task/story/epic/bug), sub-product, phase and file it |
+| `/plan rebalance` | `plan:rebalance` | Analyze phase sizes and propose moves |
+| `/plan audit` | `plan:audit` | Explicit audit |
+| `/plan update` | `plan:update` | Explicit update from current branch |
+
+**Inference rules:**
+1. If on a feature branch → assume you want to update plan from what you just built
+2. If on master → assume you want to audit plan integrity
+3. If input contains a description of work → route to `plan:add`, determine fidelity (task/story/epic) from size/complexity
+4. If input mentions "move", "rebalance", "reorganize" → route to `plan:rebalance`
+
+---
+
+### `/arch`
+
+**Manages architecture documentation.** Infers intent from context:
+
+| You say / context | Sub-function triggered | What happens |
+|---|---|---|
+| `/arch` (no args) | `arch:sync` | Compare last 50 commits against tech specs, update stale docs |
+| `/arch <file.md>` | `arch:audit` | Deep audit of specific doc against codebase |
+| `/arch decide <title>` | `arch:add-adr` | Add Architecture Decision Record |
+| `/arch update <doc> <what changed>` | `arch:update-spec` | Update specific section of a tech design doc |
+| `/arch sync` | `arch:sync` | Explicit sync |
+| `/arch audit` | `arch:audit doc=all` | Audit all arch docs |
+
+**Inference rules:**
+1. No args → sync (most common need: "are my docs current?")
+2. File path argument → audit that specific doc
+3. Description of a decision → `arch:add-adr`
+4. Description of a change → `arch:update-spec` on the most relevant doc
+
+---
+
+### `/capture`
+
+**Files new work, bugs, and tech debt.** Infers type from language:
+
+| You say | Sub-function triggered | What happens |
+|---|---|---|
+| `/capture <description>` | Auto-detect | Parse language to determine bug vs work vs tech-debt |
+| `/capture bug <description>` | `capture:bug` | Log bug with severity, create plan task if critical |
+| `/capture work <description>` | `capture:work` | File work item with auto-detected sub-product and urgency |
+| `/capture debt <description>` | `capture:tech-debt` | Log tech debt with effort/risk |
+
+**Inference rules — how type is auto-detected:**
+1. Words like "broken", "fails", "crash", "wrong", "error", "doesn't work" → `capture:bug`
+2. Words like "should", "add", "implement", "feature", "support", "need" → `capture:work`
+3. Words like "hack", "workaround", "temporary", "refactor", "cleanup", "tech debt", "brittle" → `capture:tech-debt`
+4. Ambiguous → default to `capture:work` (safest — work items can always be reclassified)
+
+**Severity auto-detection (for bugs):**
+- "crash", "data loss", "security", "can't use" → critical
+- "broken", "fails", "incorrect" → high
+- "slow", "ugly", "annoying", "inconsistent" → medium
+- "minor", "cosmetic", "edge case" → low
+
+**Sub-product auto-detection:**
+- References to widgets, AI, recommendations → AI Widgets
+- References to boards, pins, links, categories → Boards
+- References to auth, sharing, collaboration → Sharing
+- References to design system, CSS, components → Design System
+- References to sync, Notion → Notion Sync
+- Can't determine → ask
+
+---
+
+### `/ux`
+
+**Manages UX documentation.** Infers intent from context:
+
+| You say / context | Sub-function triggered | What happens |
+|---|---|---|
+| `/ux` (no args) | `ux:audit` | Audit all UX docs against current codebase |
+| `/ux <feature-area>` | `ux:update` | Update UX docs for that feature area from code changes |
+| `/ux wireframe <feature> <capability>` | `ux:wireframe` | Generate ASCII wireframe from current HTML/CSS |
+| `/ux audit` | `ux:audit` | Explicit full audit |
+
+**Inference rules:**
+1. No args → audit (discover what's out of date)
+2. Feature area name → update that area's docs
+3. "wireframe" keyword → generate wireframe
+4. On a feature branch with UI changes → auto-suggest which UX docs to update
+
+---
+
+### `/branch`
+
+**Cross-branch documentation operations.** Infers intent from branch state:
+
+| You say / context | Sub-function triggered | What happens |
+|---|---|---|
+| `/branch` (on feature branch) | `branch:diff` | Diff current branch docs against master |
+| `/branch` (on master, recent merges) | `branch:reconcile` | Reconcile doc changes from recently merged branches |
+| `/branch diff <base> <compare>` | `branch:diff` | Explicit diff between two branches |
+| `/branch reconcile <source> <target>` | `branch:reconcile` | Explicit reconcile |
+| `/branch pick <source> [files]` | `branch:cherry-pick-docs` | Cherry-pick specific doc updates |
+
+**Inference rules:**
+1. On feature branch → you probably want to see what diverged from master
+2. On master after merge → you probably want to reconcile
+3. Explicit branch names → use exactly what's specified
+
+---
+
+### `/cleanup`
+
+**Documentation hygiene.** Runs relevant checks based on context:
+
+| You say / context | Sub-function triggered | What happens |
+|---|---|---|
+| `/cleanup` (no args) | ALL four | Run full suite: stale → orphans → duplicates → archive candidates |
+| `/cleanup stale` | `cleanup:stale` | Find docs behind their code |
+| `/cleanup orphans` | `cleanup:orphans` | Find dead refs + undocumented code |
+| `/cleanup duplicates` | `cleanup:duplicates` | Find contradictions across docs |
+| `/cleanup archive` | `cleanup:archive` | Archive deprecated docs |
+
+**Inference rules:**
+1. No args → run everything (it's a cleanup, be thorough)
+2. Specific sub-command → run only that check
+3. Results from earlier checks feed into later ones (stale findings → archive candidates)
+
+---
+
+### `/pm`
+
+**Program management operations.** Infers intent from context:
+
+| You say / context | Sub-function triggered | What happens |
+|---|---|---|
+| `/pm` (no args) | `pm:status-report` | Generate weekly status report |
+| `/pm` (on feature branch) | `pm:scope-check` | Check scope creep on current branch |
+| `/pm status` | `pm:status-report` | Explicit status report |
+| `/pm scope` | `pm:scope-check` | Explicit scope check |
+| `/pm deps` | `pm:dependency-map` | Map dependencies and critical path |
+| `/pm retro <scope>` | `pm:retro` | Retrospective for completed work |
+| `/pm decide <title>` | `pm:decision-log action=add` | Add a pending decision |
+| `/pm decisions` | `pm:decision-log action=list` | List all pending decisions |
+| `/pm plan <prd-path>` | `pm:prd-to-plan` | Generate plan entries from PRD |
+| `/pm changelog` | `pm:changelog` | Generate changelog from recent work |
+
+**Inference rules:**
+1. On feature branch → scope check is most useful (are you building what was planned?)
+2. On master, no args → status report (most common need)
+3. "decide" or "decision" → decision log operations
+4. PRD file path → generate plan from PRD
+5. End of sprint/phase → retro
+
+---
+
+### Smart Routing — How It Works
+
+When a top-level command is invoked without a sub-function, the agent evaluates these signals to pick the right action:
+
+```
+Signals (checked in order):
+1. Explicit sub-command     → use it directly
+2. Current branch           → feature branch vs master changes default behavior
+3. Recent git activity      → what changed recently informs what needs attention
+4. Natural language input   → parse keywords for intent
+5. Last command run         → avoid repeating, suggest next logical step
+6. Time of week             → Friday → more likely to want cleanup/status
+```
+
+**Chaining**: After a top-level command finishes, it suggests the logical next command:
+- `/plan` → "Run `/arch` to check if tech docs match the plan updates?"
+- `/capture bug ...` → "Run `/plan` to verify the bug task was filed correctly?"
+- `/cleanup` → "Run `/pm status` to generate a report from cleanup findings?"
+- `/arch` → "Run `/ux` to check if UX docs need matching updates?"
+
+---
+
+## Sub-Function Reference
+
+The sub-functions are still individually addressable via `/<command> <sub-function>`. Full specifications follow.
+
+| Domain | Sub-function | Purpose |
 |--------|----------|---------|
 | **Plan** | `plan:audit` | Scan plans for stale items, count mismatches, untracked work |
 | | `plan:add` | File new work item to correct phase/epic by sub-product |
