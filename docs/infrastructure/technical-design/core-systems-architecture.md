@@ -226,6 +226,24 @@ Unsplash API for generic images when all else fails.
 **Strategy: Favicon**
 Google's favicon service at 128px as a last resort for tools/apps.
 
+#### Planned: Image Intelligence System
+
+> See [Epic 3.5: Image Intelligence](../../execution/project-plan/phase-3-ai-intelligence.md#epic-35-image-intelligence-system-pending) for full project plan.
+
+The current strategy chains above are hardcoded per content type. The planned evolution replaces them with a **configurable rules engine** where each content type × category combination gets its own priority chain — including two new AI-powered strategies:
+
+| Strategy | What It Does | When Used |
+|----------|-------------|-----------|
+| `scrape` | Server-side OG/meta/JSON-LD extraction | Default for most types (current) |
+| `platform` | Platform-specific API (YouTube, GitHub, etc.) | Video, music, repos (current) |
+| `search` | Unsplash/Google image search | Fallback when scrape fails (current) |
+| `favicon` | Google favicon at 128px | Tools/apps last resort (current) |
+| `template` | Category-colored placeholder | Ultimate fallback (current) |
+| `ai_edit` | Prompt-driven editing of an existing image | **Planned** — enhance, remove background, recolor |
+| `ai_generate` | Generate a new image from pin metadata | **Planned** — when no source image exists |
+
+The image pipeline will also be **decoupled from enrichment** into its own `resolve-image` edge function, allowing image resolution to run independently (on user request, on schedule, or as a separate retry when other enrichment succeeds but image fails).
+
 ### Enrichment Queue
 
 The client manages server-side enrichment requests through a queue with retry logic (`boards/index.html` ~line 5358):
@@ -478,4 +496,4 @@ All three systems share:
 
 ---
 
-*Last updated: 2026-02-05*
+*Last updated: 2026-02-06*

@@ -15,6 +15,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
+  <!-- Design System widget components -->
+  <link rel="stylesheet" href="/design-system/widgets.css">
+
   <style>
 /* ============================================
    Boards - Swiss Grid + Web 1.0 Typography
@@ -52,6 +55,52 @@
   --border: #fff;
   --muted: #888;
   --subtle: #333;
+
+  /* Design System token bridge — maps DS token names to Boards values */
+  --text-2xs: 8px;
+  --text-xs: var(--font-size-xs);
+  --text-sm: var(--font-size-sm);
+  --text-md: var(--font-size-base);
+  --text-lg: var(--font-size-lg);
+  --text-xl: var(--font-size-xl);
+  --text-2xl: var(--font-size-2xl);
+  --text-3xl: 40px;
+  --text-base: var(--font-size-sm);
+  --leading-none: 1;
+  --leading-tight: var(--line-height-tight);
+  --leading-normal: var(--line-height-normal);
+  --leading-relaxed: 1.8;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+  --tracking-widest: 0.3em;
+  --bg-surface: var(--surface);
+  --bg-elevated: #222;
+  --fg-muted: var(--muted);
+  --fg-subtle: #666;
+  --border-subtle: var(--subtle);
+  --interactive: var(--fg);
+  --interactive-hover: var(--bg);
+  --border-thin: 1px;
+  --border-medium: 2px;
+  --border-thick: 4px;
+  --duration-fast: 0.1s;
+  --duration-normal: 0.15s;
+  --duration-slow: 0.2s;
+  --duration-slower: 0.3s;
+  --duration-slowest: 0.5s;
+  --ease-default: ease;
+  --ease-linear: linear;
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-success: #0f0;
+  --color-error: #c00;
+  --color-warning: #f90;
+  --font-sans: var(--font-primary);
 }
 
 :root.light {
@@ -61,6 +110,15 @@
   --border: #000;
   --muted: #888;
   --subtle: #e0e0e0;
+
+  /* DS bridge — light mode overrides */
+  --bg-surface: var(--surface);
+  --bg-elevated: #f5f5f5;
+  --fg-muted: var(--muted);
+  --fg-subtle: #aaa;
+  --border-subtle: var(--subtle);
+  --interactive: var(--fg);
+  --interactive-hover: var(--bg);
 }
 
 /* Progress bar */
@@ -4751,6 +4809,20 @@ Return JSON:
     return 'mainstream';
   }
 
+  // Shared widget shell header — w-* design system classes
+  function renderWidgetHeader(widget) {
+    return `
+      <div class="w-header">
+        <div class="w-header__left">
+          <span class="w-text w-text--label">${esc(widget.name)}</span>
+          <span class="w-badge">AI</span>
+        </div>
+        <div class="w-header__controls">
+          <button class="w-icon-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">&#x27F3;</button>
+        </div>
+      </div>`;
+  }
+
   // Unified Complete the Look widget - single component
   function renderCompleteTheLookWidget(widget, items, aiResult) {
     // Enrich items with category and brand tier
@@ -4794,15 +4866,15 @@ Return JSON:
       const hasImage = item.image && item.image.length > 0;
       const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
       userItemsHtml += `
-        <a href="${item.url}" target="_blank" rel="noopener" class="widget-complete__item">
-          <div class="widget-complete__image-wrap">
+        <a href="${item.url}" target="_blank" rel="noopener" class="w-item">
+          <div class="w-img">
             ${hasImage
-              ? `<img class="widget-complete__image" src="${secureImg(item.image)}" alt="" loading="lazy">`
-              : `<span class="widget-complete__placeholder">${initial}</span>`
+              ? `<img src="${secureImg(item.image)}" alt="" loading="lazy">`
+              : `<div class="w-img__placeholder">${initial}</div>`
             }
           </div>
-          <div class="widget-complete__item-title">${esc(item.title)}</div>
-          <div class="widget-complete__item-meta">${esc(item.domain)}</div>
+          <span class="w-text">${esc(item.title)}</span>
+          <span class="w-text w-text--meta">${esc(item.domain)}</span>
         </a>`;
     }
 
@@ -4846,61 +4918,51 @@ Return JSON:
 
       // Use vendor from enrichment if available
       const vendorName = sug.vendor || sug.brand;
-      const brandDisplay = vendorName ? `<div class="widget-complete__item-brand">${esc(vendorName)}</div>` : '';
-      const priceDisplay = sug.price ? `<span class="widget-complete__item-price">${esc(sug.price)}</span>` : '';
+      const brandDisplay = vendorName ? `<span class="w-text w-text--meta">${esc(vendorName)}</span>` : '';
+      const priceDisplay = sug.price ? `<span style="font-weight:600;color:var(--fg);font-style:normal">${esc(sug.price)}</span>` : '';
 
       // Use actual product image if available, otherwise show category icon
       const hasProductImage = sug.productImage && sug.productImage.length > 0;
       const imageContent = hasProductImage
-        ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
-        : `<span class="widget-complete__product-icon">${icon}</span>`;
+        ? `<img src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="w-img__placeholder" style="display:none">${icon}</div>`
+        : `<div class="w-img__placeholder">${icon}</div>`;
 
       // Render as link only if we have a valid URL, otherwise render as non-clickable card
       if (hasUrl) {
         // Phase 1: Track click for instrumentation
         const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion" onclick="${trackClick}">
-            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
+            <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
             ${brandDisplay}
-            <div class="widget-complete__item-title">${esc(sug.name)}</div>
-            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-            <span class="widget-complete__shop-link">Shop Now →</span>
+            <span class="w-text">${esc(sug.name)}</span>
+            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
+            <span class="w-btn w-btn--sm">Shop Now →</span>
           </a>`;
       } else {
         // No valid URL - render as non-clickable suggestion
         suggestionsHtml += `
-          <div class="widget-complete__item widget-complete__item--suggestion widget-complete__item--no-link">
-            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
+          <div class="w-item">
+            <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
             ${brandDisplay}
-            <div class="widget-complete__item-title">${esc(sug.name)}</div>
-            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
-            <span class="widget-complete__shop-link" style="opacity: 0.5">Search for this item</span>
+            <span class="w-text">${esc(sug.name)}</span>
+            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
+            <span class="w-btn w-btn--sm" style="opacity:0.5">Search for this item</span>
           </div>`;
       }
     }
 
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
-        <div class="widget-complete__header">
-          <div class="widget-complete__header-left">
-            <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__badge">AI</span>
-          </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
-        </div>
-        <div class="widget-complete__body">
-          <div class="widget-complete__section">
-            <div class="widget-complete__items">${userItemsHtml}</div>
-          </div>
-          <div class="widget-complete__divider"></div>
-          <div class="widget-complete__section">
-            <div class="widget-complete__items">${suggestionsHtml}</div>
-          </div>
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body">
+          <div class="w-items">${userItemsHtml}</div>
+          <div class="w-divider"><span class="w-divider__label">+</span></div>
+          <div class="w-items">${suggestionsHtml}</div>
         </div>
       </div>`;
   }
@@ -4922,23 +4984,17 @@ Return JSON:
       sublabel = `Based on ${items.length} item${items.length > 1 ? 's' : ''}`;
     }
 
-    const traitsHtml = traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
+    const traitsHtml = traits.map(t => `<span class="w-badge">${esc(t)}</span>`).join('');
 
     return `
-      <div class="widget-complete" data-widget-id="${widget.id}">
-        <div class="widget-complete__header">
-          <div class="widget-complete__header-left">
-            <span class="widget-complete__title">${widget.name}</span>
-            <span class="widget-complete__badge">AI</span>
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body w-body--verdict">
+          <div class="w-headline">
+            <span class="w-text w-text--display">${esc(label)}</span>
+            <span class="w-text w-text--meta">${esc(sublabel)}</span>
           </div>
-          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
-        </div>
-        <div class="widget-complete__body">
-          <div class="widget-style__content">
-            <div class="widget-style__label">${esc(label)}</div>
-            <div class="widget-style__sublabel">${esc(sublabel)}</div>
-            <div class="widget-style__traits">${traitsHtml}</div>
-          </div>
+          <div class="w-tag-group">${traitsHtml}</div>
         </div>
       </div>`;
   }
@@ -4980,20 +5036,14 @@ Return JSON:
         const listItems = (aiResult.suggestions || aiResult.traits || []).slice(0, 5);
         const listHtml = listItems.map(item => {
           const label = typeof item === 'string' ? item : (item.name || item.label || JSON.stringify(item));
-          return `<div style="padding: var(--space-1) 0; border-bottom: 1px solid var(--subtle);">${esc(label)}</div>`;
+          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span></div></div>`;
         }).join('');
 
         return `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">&#x27F3;</button>
-            </div>
-            <div class="widget-complete__body">
-              <div style="padding: var(--space-2);">${listHtml || '<div style="color:var(--muted);">No results</div>'}</div>
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--list">
+              ${listHtml || '<span class="w-text w-text--meta">No results</span>'}
             </div>
           </div>`;
       }
@@ -5007,16 +5057,10 @@ Return JSON:
       render: function(widget, items, aiResult) {
         const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
         return `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
-            </div>
-            <div class="widget-complete__body">
-              <div style="padding: var(--space-2); color: var(--muted);">${esc(text)}</div>
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--narrative">
+              <p class="w-text w-text--prose">${esc(text)}</p>
             </div>
           </div>`;
       }
@@ -5036,29 +5080,23 @@ Return JSON:
           const position = Math.max(0, Math.min(1, axis.position || 0.5));
           const pct = (position * 100).toFixed(1);
           return `
-            <div class="widget-spectrum__axis">
-              <div class="widget-spectrum__labels">
-                <span>${esc(axis.leftLabel || axis.left || '')}</span>
-                <span>${esc(axis.rightLabel || axis.right || '')}</span>
+            <div class="w-axis">
+              <div class="w-axis__labels">
+                <span class="w-text w-text--label">${esc(axis.leftLabel || axis.left || '')}</span>
+                <span class="w-text w-text--label">${esc(axis.rightLabel || axis.right || '')}</span>
               </div>
-              <div class="widget-spectrum__track">
-                <div class="widget-spectrum__marker" style="left: ${pct}%"></div>
+              <div class="w-axis__track">
+                <div class="w-axis__marker" style="left: ${pct}%"></div>
               </div>
-              ${axis.note ? `<div class="widget-spectrum__note">${esc(axis.note)}</div>` : ''}
+              ${axis.note ? `<div class="w-axis__note"><span class="w-text w-text--note">${esc(axis.note)}</span></div>` : ''}
             </div>`;
         }).join('');
 
         return `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
-            </div>
-            <div class="widget-complete__body" style="display:block;">
-              <div class="widget-spectrum__axes">${axesHtml}</div>
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--spectrum">
+              ${axesHtml}
             </div>
           </div>`;
       }
@@ -5076,23 +5114,17 @@ Return JSON:
 
         const statsHtml = stats.slice(0, 4).map(stat => {
           return `
-            <div class="widget-statrow__stat">
-              <span class="widget-statrow__value">${esc(String(stat.value))}</span>
-              <span class="widget-statrow__label">${esc(stat.label)}</span>
+            <div class="w-stat">
+              <span class="w-text w-text--value">${esc(String(stat.value))}</span>
+              <span class="w-text w-text--label">${esc(stat.label)}</span>
             </div>`;
         }).join('');
 
         return `
-          <div class="widget-complete" data-widget-id="${widget.id}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh">&#x27F3;</button>
-            </div>
-            <div class="widget-complete__body" style="display:block;">
-              <div class="widget-statrow__grid">${statsHtml}</div>
+          <div class="w-shell" data-widget-id="${widget.id}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--stats">
+              ${statsHtml}
             </div>
           </div>`;
       }
@@ -5117,30 +5149,22 @@ Return JSON:
         const widgetId = widget.id;
 
         const imageHtml = imageUrl
-          ? `<img src="${esc(imageUrl)}" alt="${esc(name)}" onerror="this.parentElement.innerHTML='<div class=\\'widget-quickadd__image-placeholder\\'>+</div>'">`
-          : `<div class="widget-quickadd__image-placeholder">+</div>`;
+          ? `<img src="${esc(imageUrl)}" alt="${esc(name)}" onerror="this.parentElement.innerHTML='<div class=\\'w-img__placeholder\\'>+</div>'">`
+          : `<div class="w-img__placeholder">+</div>`;
 
         return `
-          <div class="widget-complete" data-widget-id="${widgetId}">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
-              </div>
-              <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widgetId}')" title="Refresh">&#x27F3;</button>
-            </div>
-            <div class="widget-complete__body" style="display:block;">
-              <div class="widget-quickadd__content">
-                <div class="widget-quickadd__image">${imageHtml}</div>
-                <div class="widget-quickadd__details">
-                  <div class="widget-quickadd__name">${esc(name)}</div>
-                  ${brand ? `<div class="widget-quickadd__brand">${esc(brand)}</div>` : ''}
-                  ${price ? `<div class="widget-quickadd__price">${esc(price)}</div>` : ''}
-                  ${reason ? `<div class="widget-quickadd__reason">"${esc(reason)}"</div>` : ''}
-                  <div class="widget-quickadd__actions" id="quickadd-actions-${widgetId}">
-                    <button class="widget-quickadd__btn widget-quickadd__btn--primary" onclick="handleQuickAdd('${widgetId}', this)">+ Add to board</button>
-                    <a class="widget-quickadd__btn widget-quickadd__btn--secondary" href="${esc(url)}" target="_blank" rel="noopener">Visit site ›</a>
-                  </div>
+          <div class="w-shell" data-widget-id="${widgetId}">
+            ${renderWidgetHeader(widget)}
+            <div class="w-body w-body--suggestion">
+              <div class="w-img w-img--card">${imageHtml}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)">
+                <span class="w-text" style="font-weight:600">${esc(name)}</span>
+                ${brand ? `<span class="w-text w-text--meta">${esc(brand)}</span>` : ''}
+                ${price ? `<span class="w-text">${esc(price)}</span>` : ''}
+                ${reason ? `<span class="w-text w-text--note">"${esc(reason)}"</span>` : ''}
+                <div class="w-action-bar" id="quickadd-actions-${widgetId}" style="margin-top:var(--space-2)">
+                  <button class="w-btn w-btn--filled" onclick="handleQuickAdd('${widgetId}', this)">+ Add to board</button>
+                  <a class="w-btn" href="${esc(url)}" target="_blank" rel="noopener">Visit site ›</a>
                 </div>
               </div>
             </div>
@@ -5264,15 +5288,15 @@ Return JSON:
       const firstHeroName = widgetsByZone.hero[0].name || 'Widget';
       heroSection.classList.add('widget-section--visible');
       heroContent.innerHTML = `
-        <div class="widget-complete">
-          <div class="widget-complete__header">
-            <div class="widget-complete__header-left">
-              <span class="widget-complete__title">${esc(firstHeroName)}</span>
-              <span class="widget-complete__badge">AI</span>
+        <div class="w-shell">
+          <div class="w-header">
+            <div class="w-header__left">
+              <span class="w-text w-text--label">${esc(firstHeroName)}</span>
+              <span class="w-badge">AI</span>
             </div>
           </div>
-          <div class="widget-complete__body widget-complete__body--loading">
-            Generating insights...
+          <div class="w-body w-body--loading">
+            <span class="w-loader">Generating insights...</span>
           </div>
         </div>`;
     }
@@ -5367,15 +5391,15 @@ Return JSON:
       const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
-          <div class="widget-complete">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
+          <div class="w-shell">
+            <div class="w-header">
+              <div class="w-header__left">
+                <span class="w-text w-text--label">${esc(widget.name)}</span>
+                <span class="w-badge">AI</span>
               </div>
             </div>
-            <div class="widget-complete__body widget-complete__body--loading">
-              Refreshing suggestions...
+            <div class="w-body w-body--loading">
+              <span class="w-loader">Refreshing suggestions...</span>
             </div>
           </div>`;
       }
@@ -5383,15 +5407,15 @@ Return JSON:
       const heroContent = $('widgetContent');
       if (heroContent) {
         heroContent.innerHTML = `
-          <div class="widget-complete">
-            <div class="widget-complete__header">
-              <div class="widget-complete__header-left">
-                <span class="widget-complete__title">${esc(widget.name)}</span>
-                <span class="widget-complete__badge">AI</span>
+          <div class="w-shell">
+            <div class="w-header">
+              <div class="w-header__left">
+                <span class="w-text w-text--label">${esc(widget.name)}</span>
+                <span class="w-badge">AI</span>
               </div>
             </div>
-            <div class="widget-complete__body widget-complete__body--loading">
-              Refreshing...
+            <div class="w-body w-body--loading">
+              <span class="w-loader">Refreshing...</span>
             </div>
           </div>`;
       }
@@ -5505,8 +5529,8 @@ Return JSON:
     if (actionsEl) {
       const visitUrl = linkUrl;
       actionsEl.innerHTML = `
-        <span class="widget-quickadd__added">&#x2713; Added</span>
-        <a class="widget-quickadd__btn widget-quickadd__btn--secondary" href="${esc(visitUrl)}" target="_blank" rel="noopener">Visit site ›</a>`;
+        <span class="w-badge">&#x2713; Added</span>
+        <a class="w-btn" href="${esc(visitUrl)}" target="_blank" rel="noopener">Visit site ›</a>`;
     }
 
     // Re-render the grid to show the new item

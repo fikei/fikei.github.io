@@ -11,8 +11,6 @@
   <style>
     /* === Showcase layout === */
     .showcase { max-width: 1200px; margin: 0 auto; padding: var(--space-6); }
-    .showcase__title { font-family: var(--font-serif); font-size: var(--text-3xl); margin-bottom: var(--space-1); }
-    .showcase__subtitle { font-family: var(--font-primary); font-size: var(--text-xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin-bottom: var(--space-8); }
 
     .section { margin-bottom: var(--space-16); }
     .section__heading { font-family: var(--font-primary); font-size: var(--text-lg); text-transform: uppercase; letter-spacing: var(--tracking-wider); color: var(--fg); margin-bottom: var(--space-1); }
@@ -78,7 +76,7 @@
     .nav select option { text-transform: none; letter-spacing: normal; }
 
     /* Variant explorer */
-    .variant-grid { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: start; }
+    .variant-grid { display: flex; flex-direction: column; gap: var(--space-6); align-items: start; }
     .variant-item { display: flex; flex-direction: column; }
     .variant-label { font-family: var(--font-primary); font-size: 9px; text-transform: uppercase; letter-spacing: var(--tracking-widest); color: var(--fg-muted); margin-bottom: var(--space-2); }
     .variant-item .w-shell { min-width: 0; }
@@ -120,6 +118,11 @@
     /* Blocked state (triggered via right-click menu) */
     .variant-item--flagged .w-shell { opacity: 0.2; }
     .variant-item--flagged .variant-label { text-decoration: line-through; color: var(--color-error); }
+
+    /* Show/hide blocked toggle */
+    .variant-blocked-toggle { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-family: var(--font-primary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--color-error); background: transparent; border: var(--border-thin) solid var(--border-subtle); cursor: pointer; margin-bottom: var(--space-4); }
+    .variant-blocked-toggle:hover { border-color: var(--color-error); }
+    .variant-blocked-toggle.active { border-color: var(--color-error); }
     .variant-item { position: relative; }
     .variant-blocked { display: none; position: absolute; top: 24px; left: 0; right: 0; bottom: 0; z-index: 5; align-items: center; justify-content: center; }
     .variant-item--flagged .variant-blocked { display: flex; }
@@ -198,7 +201,7 @@
   <a href="#priority">Priority</a>
   <a href="#grid">Grid Sizes</a>
   <span class="nav__spacer"></span>
-  <select id="widgetFilter" onchange="showVariants()">
+  <select id="widgetFilter" onchange="lastFilter='widget';showVariants()">
     <option value="">Widget...</option>
     <optgroup label="Priority">
       <option value="watch-deadline">#40 Upcoming Releases</option>
@@ -227,7 +230,7 @@
       <option value="read-deep">Deep Read</option>
     </optgroup>
   </select>
-  <select id="templateFilter" onchange="showVariants()">
+  <select id="templateFilter" onchange="lastFilter='template';showVariants()">
     <option value="">Template...</option>
     <option value="choices">Choices</option>
     <option value="comparison">Comparison</option>
@@ -241,13 +244,10 @@
 </nav>
 
 <div class="showcase">
-  <h1 class="showcase__title">Widget Components</h1>
-  <p class="showcase__subtitle">ctrl.rodeo design system — v2 with visual/narrative focus, photos, SVG icons, anchored actions</p>
-
   <!-- ====== VARIANT EXPLORER (hidden until dropdown used) ====== -->
   <div class="section" id="variants" style="display:none">
     <h2 class="section__heading">Variant Audit</h2>
-    <p class="section__desc" id="variantDesc">All sizes for the selected widget. Flag variants you want to blacklist.</p>
+    <p class="section__desc" id="variantDesc">All sizes for the selected widget. Right-click for options.</p>
 
     <div class="variant-toolbar">
       <button onclick="toggleVariantGridLines(this)">Grid lines</button>
@@ -256,7 +256,13 @@
 
     <div class="variant-grid" id="variantGrid"></div>
 
-    <!-- Blacklist output -->
+    <!-- Blocked variants (collapsed by default) -->
+    <div id="blockedSection" style="display:none;margin-top:var(--space-6)">
+      <button class="variant-blocked-toggle" id="blockedToggle" onclick="toggleBlockedSection()"></button>
+      <div class="variant-grid" id="blockedGrid" style="display:none"></div>
+    </div>
+
+    <!-- Audit log -->
     <div id="blacklistOutput" style="margin-top:var(--space-8)"></div>
   </div>
 
@@ -1716,6 +1722,7 @@ function toggleVariantGridLines(btn) {
   variantGridLinesOn = !variantGridLinesOn;
   btn.classList.toggle('active');
   document.getElementById('variantGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+  document.getElementById('blockedGrid').classList.toggle('variant-grid--gridlines', variantGridLinesOn);
 }
 
 // ============================================
@@ -1745,19 +1752,28 @@ function filterSections(source) {
   });
 }
 
+var currentSource = null;
+var currentAuditName = null;
+var blockedSectionOpen = false;
+var lastFilter = 'widget'; // tracks which dropdown changed last
+
 function showVariants() {
   var widgetVal = document.getElementById('widgetFilter').value;
   var templateVal = document.getElementById('templateFilter').value;
   var explorer = document.getElementById('variants');
   var divider = document.getElementById('variantDivider');
   var grid = document.getElementById('variantGrid');
+  var blockedGrid = document.getElementById('blockedGrid');
+  var blockedSection = document.getElementById('blockedSection');
   var desc = document.getElementById('variantDesc');
-  var count = document.getElementById('variantCount');
 
   if (!widgetVal && !templateVal) {
     explorer.style.display = 'none';
     divider.style.display = 'none';
     filterSections(null);
+    currentSource = null;
+    currentAuditName = null;
+    saveFilterState();
     return;
   }
 
@@ -1766,78 +1782,198 @@ function showVariants() {
   if (templateVal) selector += '[data-template="' + templateVal + '"]';
 
   var source = document.querySelector(selector);
+  var noMatchAlert = '';
+  if (!source && widgetVal && templateVal) {
+    // No intersection — fallback to most recently changed filter
+    var fallbackSelector = '.w-shell';
+    if (lastFilter === 'widget') {
+      fallbackSelector += '[data-widget="' + widgetVal + '"]';
+      noMatchAlert = 'No ' + templateVal + ' template for this widget. Showing all ' + widgetVal + ' variants.';
+    } else {
+      fallbackSelector += '[data-template="' + templateVal + '"]';
+      noMatchAlert = 'No ' + widgetVal + ' widget with this template. Showing all ' + templateVal + ' variants.';
+    }
+    source = document.querySelector(fallbackSelector);
+  }
   if (!source) {
-    grid.innerHTML = '<p class="w-text w-text--meta" style="padding:var(--space-4)">No matching widget found for this combination.</p>';
+    grid.innerHTML = '<p class="w-text w-text--meta" style="padding:var(--space-4)">No matching widget found.</p>';
+    blockedSection.style.display = 'none';
     explorer.style.display = '';
     divider.style.display = '';
     return;
   }
 
   filterSections(source);
-
-  var auditName = widgetVal || templateVal;
+  currentSource = source;
+  // Use fallback audit name based on what actually matched
+  if (noMatchAlert && lastFilter === 'widget') {
+    currentAuditName = widgetVal;
+  } else if (noMatchAlert && lastFilter === 'template') {
+    currentAuditName = templateVal;
+  } else {
+    currentAuditName = widgetVal || templateVal;
+  }
   var template = source.dataset.template;
-
-  desc.textContent = auditName + ' (' + template + ') — ' + ALL_SIZES.length + ' sizes. Right-click for options.';
+  var activeCount = 0;
+  var blockedCount = 0;
 
   grid.innerHTML = '';
+  blockedGrid.innerHTML = '';
+
+  // Show alert banner if no intersection
+  if (noMatchAlert) {
+    var alert = document.createElement('div');
+    alert.style.cssText = 'padding:var(--space-2) var(--space-3);border:var(--border-thin) solid var(--color-warning);color:var(--color-warning);font-family:var(--font-primary);font-size:var(--text-xs);margin-bottom:var(--space-4);';
+    alert.textContent = noMatchAlert;
+    grid.appendChild(alert);
+  }
   grid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
+  blockedGrid.classList.toggle('variant-grid--gridlines', variantGridLinesOn);
 
   ALL_SIZES.forEach(function(size) {
-    var entry = getAuditEntry(auditName, size);
+    var entry = getAuditEntry(currentAuditName, size);
     var isFlagged = !!entry.flagged;
-    var hasNote = !!entry.note;
-    var status = getStatus(auditName, size);
+    var wrapper = buildVariantItem(source, currentAuditName, size);
 
-    var clone = source.cloneNode(true);
-    clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
-    clone.style.cssText = '';
-    clone.classList.add('w-shell--' + size);
-
-    var wrapper = document.createElement('div');
-    wrapper.className = 'variant-item variant-item--' + size +
-      (isFlagged ? ' variant-item--flagged' : '');
-    wrapper.dataset.auditName = auditName;
-    wrapper.dataset.size = size;
-
-    // Label with stoplight + comment count
-    var lbl = document.createElement('div');
-    lbl.className = 'variant-label';
-    lbl.dataset.auditName = auditName;
-    lbl.dataset.size = size;
-    var dot = document.createElement('span');
-    dot.className = 'variant-stoplight variant-stoplight--' + status;
-    dot.title = STATUS_LABELS[status];
-    lbl.appendChild(dot);
-    var lblText = document.createElement('span');
-    lblText.textContent = size + ' (' + SIZE_LABELS[size] + ')';
-    lbl.appendChild(lblText);
-    if (hasNote) {
-      var badge = document.createElement('span');
-      badge.className = 'variant-comment-count';
-      badge.textContent = '1';
-      badge.title = entry.note;
-      lbl.appendChild(badge);
+    if (isFlagged) {
+      blockedCount++;
+      blockedGrid.appendChild(wrapper);
+    } else {
+      activeCount++;
+      grid.appendChild(wrapper);
     }
-
-    // Blocked overlay
-    var blocked = document.createElement('div');
-    blocked.className = 'variant-blocked';
-    blocked.innerHTML = '<span>Blocked</span>';
-
-    wrapper.appendChild(lbl);
-    wrapper.appendChild(blocked);
-    wrapper.appendChild(clone);
-    grid.appendChild(wrapper);
   });
 
-  updateStats();
+  desc.textContent = currentAuditName + ' (' + template + ') — ' + activeCount + ' active' +
+    (blockedCount > 0 ? ', ' + blockedCount + ' blocked' : '') + '. Right-click for options.';
 
+  // Show/hide blocked section
+  if (blockedCount > 0) {
+    blockedSection.style.display = '';
+    updateBlockedToggle(blockedCount);
+  } else {
+    blockedSection.style.display = 'none';
+    blockedSectionOpen = false;
+  }
+
+  updateStats();
   renderAuditTable();
 
   explorer.style.display = '';
   divider.style.display = '';
+  saveFilterState();
   explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function buildVariantItem(source, auditName, size) {
+  var entry = getAuditEntry(auditName, size);
+  var isFlagged = !!entry.flagged;
+  var hasNote = !!entry.note;
+  var status = getStatus(auditName, size);
+
+  var clone = source.cloneNode(true);
+  clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
+  clone.style.cssText = '';
+  clone.classList.add('w-shell--' + size);
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'variant-item variant-item--' + size +
+    (isFlagged ? ' variant-item--flagged' : '');
+  wrapper.dataset.auditName = auditName;
+  wrapper.dataset.size = size;
+
+  // Label with stoplight + comment count
+  var lbl = document.createElement('div');
+  lbl.className = 'variant-label';
+  lbl.dataset.auditName = auditName;
+  lbl.dataset.size = size;
+  var dot = document.createElement('span');
+  dot.className = 'variant-stoplight variant-stoplight--' + status;
+  dot.title = STATUS_LABELS[status];
+  lbl.appendChild(dot);
+  var lblText = document.createElement('span');
+  lblText.textContent = size + ' (' + SIZE_LABELS[size] + ')';
+  lbl.appendChild(lblText);
+  if (hasNote) {
+    var badge = document.createElement('span');
+    badge.className = 'variant-comment-count';
+    badge.textContent = '1';
+    badge.title = entry.note;
+    lbl.appendChild(badge);
+  }
+
+  // Blocked overlay
+  var blocked = document.createElement('div');
+  blocked.className = 'variant-blocked';
+  blocked.innerHTML = '<span>Blocked</span>';
+
+  wrapper.appendChild(lbl);
+  wrapper.appendChild(blocked);
+  wrapper.appendChild(clone);
+  return wrapper;
+}
+
+function updateBlockedToggle(count) {
+  var btn = document.getElementById('blockedToggle');
+  if (!btn) return;
+  btn.textContent = (blockedSectionOpen ? 'Hide' : 'Show') + ' ' + count + ' blocked';
+  btn.classList.toggle('active', blockedSectionOpen);
+}
+
+function toggleBlockedSection() {
+  blockedSectionOpen = !blockedSectionOpen;
+  var blockedGrid = document.getElementById('blockedGrid');
+  blockedGrid.style.display = blockedSectionOpen ? '' : 'none';
+  var count = blockedGrid.querySelectorAll('.variant-item').length;
+  updateBlockedToggle(count);
+  saveFilterState();
+}
+
+// Reflow a variant between active and blocked grids
+function reflowVariant(item, name, size) {
+  var entry = getAuditEntry(name, size);
+  var isFlagged = !!entry.flagged;
+  var grid = document.getElementById('variantGrid');
+  var blockedGrid = document.getElementById('blockedGrid');
+  var blockedSection = document.getElementById('blockedSection');
+
+  if (isFlagged) {
+    // Move from active → blocked grid
+    blockedGrid.appendChild(item);
+  } else {
+    // Move from blocked → active grid, insert in correct position
+    var allItems = grid.querySelectorAll('.variant-item');
+    var sizeIdx = ALL_SIZES.indexOf(size);
+    var inserted = false;
+    for (var i = 0; i < allItems.length; i++) {
+      var itemIdx = ALL_SIZES.indexOf(allItems[i].dataset.size);
+      if (itemIdx > sizeIdx) {
+        grid.insertBefore(item, allItems[i]);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) grid.appendChild(item);
+    item.classList.remove('variant-item--flagged');
+  }
+
+  // Update blocked section visibility + toggle count
+  var blockedCount = blockedGrid.querySelectorAll('.variant-item').length;
+  var activeCount = grid.querySelectorAll('.variant-item').length;
+  if (blockedCount > 0) {
+    blockedSection.style.display = '';
+    updateBlockedToggle(blockedCount);
+  } else {
+    blockedSection.style.display = 'none';
+    blockedSectionOpen = false;
+  }
+
+  // Update description
+  var desc = document.getElementById('variantDesc');
+  if (desc && currentAuditName) {
+    desc.textContent = currentAuditName + ' — ' + activeCount + ' active' +
+      (blockedCount > 0 ? ', ' + blockedCount + ' blocked' : '') + '. Right-click for options.';
+  }
 }
 
 // ============================================
@@ -1935,6 +2071,7 @@ function toggleBlock(item, name, size) {
   var nowFlagged = !entry.flagged;
   setFlag(name, size, nowFlagged);
   item.classList.toggle('variant-item--flagged', nowFlagged);
+  reflowVariant(item, name, size);
   refreshVariantStatus(item, name, size);
   renderAuditTable();
 }
@@ -2109,6 +2246,40 @@ function clearAudit() {
 }
 
 renderAuditTable();
+
+// ============================================
+// Persist filter state across refresh
+// ============================================
+
+var FILTER_KEY = 'widget-filter-state';
+
+function saveFilterState() {
+  try {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      widget: document.getElementById('widgetFilter').value,
+      template: document.getElementById('templateFilter').value,
+      lastFilter: lastFilter,
+      blockedOpen: blockedSectionOpen
+    }));
+  } catch (e) {}
+}
+
+function restoreFilterState() {
+  try {
+    var saved = localStorage.getItem(FILTER_KEY);
+    if (!saved) return;
+    var state = JSON.parse(saved);
+    if (state.widget) document.getElementById('widgetFilter').value = state.widget;
+    if (state.template) document.getElementById('templateFilter').value = state.template;
+    if (state.lastFilter) lastFilter = state.lastFilter;
+    if (state.widget || state.template) {
+      showVariants();
+      if (state.blockedOpen) toggleBlockedSection();
+    }
+  } catch (e) {}
+}
+
+restoreFilterState();
 
 // ============================================
 // Image Enrichment Pipeline
