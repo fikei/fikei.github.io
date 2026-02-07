@@ -280,20 +280,20 @@
 
 | Concern | Impact | Fix | Status |
 |---------|--------|-----|--------|
-| **Legacy class gap** — Boards outputs `widget-*` classes, validation checks `w-*` classes | Validation can't validate current production widgets | Template migration (above) closes the gap. During transition, validation runs against new-class output only. Legacy templates continue working until migrated. | Pending |
+| **Legacy class gap** — Boards outputs `widget-*` classes, validation checks `w-*` classes | Validation can't validate current production widgets | Template migration (above) closes the gap. All 7 renderers + 3 loading states now output `w-*` classes. Legacy CSS is dead code pending cleanup. | **Resolved** |
 | **Manifest/registry sync** — `manifest.json` is generated, `template-registry.json` is manual. Body modifiers can drift apart. | A new `w-body--*` modifier added to CSS but missing from registry goes undetected | Add CI check: run `parse-design-system.js`, diff body modifier keys against registry template keys, fail on mismatch | Pending |
-| **`stat-row` has no design system equivalent** — exists in Boards but has no `w-body--stats` modifier in widgets.css | Template registry maps it to `null`. Can't validate or render through design system. | Decision needed: add `w-body--stats` modifier to widgets.css, or deprecate `stat-row` in favor of `verdict` with `w-stat` molecules. Track as story below. | Pending |
+| **`stat-row` has no design system equivalent** — exists in Boards but has no `w-body--stats` modifier in widgets.css | Template registry maps it to `null`. Can't validate or render through design system. | Resolved: added `w-body--stats` modifier to widgets.css. Template registry updated: `stat-row` → `stats`, `boardsTemplateMap` updated, coverage moved to `migrated`. | **Resolved** |
 | **Static fixture data** — sample fixtures in template-registry.json are hand-written, may miss edge cases | Visual QA catches empty/overflow cases but fixtures don't exercise them automatically | Extend each fixture in template-registry.json to include `fixture` (happy path) + `edgeCases` (empty data, long text, missing fields). QA view renders both. | Pending |
 | **No runtime enforcement** — manifest is build-time only, widget renderer doesn't check it | A widget could render non-conforming HTML if AI hallucinates classes | Intentional: no runtime latency cost. Enforcement is at prompt time (constrained output) + CI time (validation pipeline). Add server-side allowlist check as fallback. | Pending |
 | **Container query validation** — 4 breakpoints affect layout at runtime, headless DOM can't verify visually | Structural validation catches class issues but not visual overflow/truncation | Phase 1: structural validation only. Phase 2: screenshot-based visual regression using html2canvas (tracked in Variant Audit project plan Phase 6). | Deferred |
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Resolve stat-row template gap** | | Pending |
-| | Option A: Add `w-body--stats` to widgets.css with `w-stat` flex grid layout | Pending |
-| | Option B: Deprecate stat-row, migrate to verdict template with stat molecules | Pending |
-| | Update template-registry.json with chosen approach | Pending |
-| | Update boardsTemplateMap to reflect decision | Pending |
+| **Resolve stat-row template gap** | | Complete |
+| | ~~Option A: Add `w-body--stats` to widgets.css with `w-stat` flex grid layout~~ | **Complete (Option A chosen)** |
+| | ~~Option B: Deprecate stat-row~~ | N/A |
+| | Update template-registry.json with chosen approach | Complete |
+| | Update boardsTemplateMap to reflect decision | Complete |
 | **Add edge-case fixtures to template registry** | | Pending |
 | | Add `edgeCases` array to each template in template-registry.json | Pending |
 | | Edge cases: empty items array, single item, 20+ items (overflow), very long text, missing optional fields | Pending |
@@ -307,6 +307,10 @@
 | | Compare against manifest.json class inventory | Pending |
 | | Strip or reject unknown classes before returning to client | Pending |
 | | Log violations for monitoring | Pending |
+| **Improve parser auto-detection** | | Pending |
+| | Remove hardcoded atom/molecule/structure lists from `parse-design-system.js` | Pending |
+| | Auto-detect category from CSS comment section headers (`/* ATOMS */`, `/* MOLECULES */`) | Pending |
+| | Eliminates need to manually update parser when adding new `w-*` classes | Pending |
 
 ---
 

@@ -34,10 +34,13 @@
 ### Widget Phase 2.5a: Design System Transition ⚡
 **Started: 2026-02-07**
 
-- **Design System Manifest**: `manifest.json` generated from CSS (all tokens, components, widget classes)
+- **Design System Manifest**: `manifest.json` generated from CSS (12 atoms, 8 molecules, 11 body modifiers, 15 sizes)
 - **Template Registry**: `template-registry.json` maps 10 canonical templates to Boards implementations
 - **Self-Scan**: Systemic loads local design system without crawling
-- **Next**: Migrate Boards templates from legacy `widget-*` to `w-*` classes, config-driven AI prompts, CI validation
+- **Template Migration**: All 7 Boards renderers migrated from `widget-*` to `w-*` classes
+- **Design System Extensions**: Added `w-items`, `w-item`, `w-body--stats`, `w-divider__label`; updated marker, header, suggestion layout
+- **Token Bridge**: Boards `:root` maps DS token names to Boards values (visual parity preserved)
+- **Next**: Visual verification → legacy CSS cleanup → config-driven AI prompts → CI validation
 
 ### Widget Phase 2: Config-Generated Widgets ✅
 **Completed: 2026-02-05**
