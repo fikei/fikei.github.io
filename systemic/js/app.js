@@ -757,9 +757,9 @@ class SystemicApp {
       case 'audit':
         this.appNav.innerHTML = `
           <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb-link">Systems</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current">Audit</span>
+            <a href="#systems" class="breadcrumb__link">Systems</a>
+            <span class="breadcrumb__sep">/</span>
+            <span class="breadcrumb__current">Audit</span>
           </nav>
           <span class="docs-nav__spacer"></span>
         `;
@@ -768,9 +768,9 @@ class SystemicApp {
       case 'qa':
         this.appNav.innerHTML = `
           <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb-link">Systems</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current">QA</span>
+            <a href="#systems" class="breadcrumb__link">Systems</a>
+            <span class="breadcrumb__sep">/</span>
+            <span class="breadcrumb__current">QA</span>
           </nav>
           <span class="docs-nav__spacer"></span>
         `;
@@ -804,9 +804,9 @@ class SystemicApp {
 
     this.appNav.innerHTML = `
       <nav class="breadcrumb" id="stage-breadcrumb" aria-label="Breadcrumb">
-        <a href="#systems" class="breadcrumb-link">Systems</a>
-        <span class="breadcrumb-sep">/</span>
-        <span class="breadcrumb-current" id="breadcrumb-system-name">${systemName}</span>
+        <a href="#systems" class="breadcrumb__link">Systems</a>
+        <span class="breadcrumb__sep">/</span>
+        <span class="breadcrumb__current" id="breadcrumb-system-name">${systemName}</span>
       </nav>
       <span class="docs-nav__divider"></span>
       <a href="#" class="docs-nav__link" data-section="color">Color</a>

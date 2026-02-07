@@ -35,8 +35,8 @@
         <!-- Input Section -->
         <section class="input-section">
           <div class="section-header">
-            <h2>Create Your Favicon</h2>
-            <p>Generate deployment-ready favicons from a text prompt, emoji, or custom design.</p>
+            <h2 class="section-header__title">Create Your Favicon</h2>
+            <p class="section-header__desc">Generate deployment-ready favicons from a text prompt, emoji, or custom design.</p>
           </div>
 
           <!-- Generation Mode Tabs -->
@@ -50,7 +50,7 @@
           <div class="mode-panel active" id="ai-mode">
             <form class="generator-form" id="ai-form">
               <div class="form-group">
-                <label for="ai-prompt">Describe your favicon</label>
+                <label class="form-label" for="ai-prompt">Describe your favicon</label>
                 <textarea
                   id="ai-prompt"
                   class="input"
@@ -61,7 +61,7 @@
 
               <div class="form-row">
                 <div class="form-group">
-                  <label for="ai-style">Style</label>
+                  <label class="form-label" for="ai-style">Style</label>
                   <select id="ai-style" class="input">
                     <option value="flat">Flat Design</option>
                     <option value="3d">3D Rendered</option>
@@ -72,7 +72,7 @@
                   </select>
                 </div>
                 <div class="form-group">
-                  <label for="ai-color">Primary Color</label>
+                  <label class="form-label" for="ai-color">Primary Color</label>
                   <input type="color" id="ai-color" class="input input-color" value="#ffffff">
                 </div>
               </div>
@@ -85,7 +85,7 @@
           <div class="mode-panel" id="text-mode">
             <form class="generator-form" id="text-form">
               <div class="form-group">
-                <label for="text-content">Text or Emoji</label>
+                <label class="form-label" for="text-content">Text or Emoji</label>
                 <input
                   type="text"
                   id="text-content"
@@ -113,18 +113,18 @@
 
               <div class="form-row">
                 <div class="form-group">
-                  <label for="text-bg-color">Background</label>
+                  <label class="form-label" for="text-bg-color">Background</label>
                   <input type="color" id="text-bg-color" class="input input-color" value="#000000">
                 </div>
                 <div class="form-group">
-                  <label for="text-fg-color">Foreground</label>
+                  <label class="form-label" for="text-fg-color">Foreground</label>
                   <input type="color" id="text-fg-color" class="input input-color" value="#ffffff">
                 </div>
               </div>
 
               <div class="form-row">
                 <div class="form-group">
-                  <label for="text-font">Font</label>
+                  <label class="form-label" for="text-font">Font</label>
                   <select id="text-font" class="input">
                     <option value="Space Grotesk">Space Grotesk</option>
                     <option value="Arial Black">Arial Black</option>
@@ -135,7 +135,7 @@
                   </select>
                 </div>
                 <div class="form-group">
-                  <label for="text-shape">Shape</label>
+                  <label class="form-label" for="text-shape">Shape</label>
                   <select id="text-shape" class="input">
                     <option value="square">Square</option>
                     <option value="rounded">Rounded</option>
@@ -173,8 +173,8 @@
         <!-- Preview Section -->
         <section class="preview-section">
           <div class="section-header">
-            <h2>Preview</h2>
-            <p>See how your favicon will appear across different contexts.</p>
+            <h2 class="section-header__title">Preview</h2>
+            <p class="section-header__desc">See how your favicon will appear across different contexts.</p>
           </div>
 
           <div class="preview-grid">
@@ -264,8 +264,8 @@
       <!-- Export Section (shown after generation) -->
       <section class="export-section" id="export-section" hidden>
         <div class="section-header">
-          <h2>Export & Deploy</h2>
-          <p>Download your favicon package with all required files and HTML code.</p>
+          <h2 class="section-header__title">Export & Deploy</h2>
+          <p class="section-header__desc">Download your favicon package with all required files and HTML code.</p>
         </div>
 
         <div class="export-grid">
@@ -324,9 +324,9 @@
 
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loading-overlay" hidden>
-      <div class="loading-content">
+      <div class="loading">
         <div class="spinner"></div>
-        <p id="loading-text">Generating favicon...</p>
+        <span id="loading-text">Generating favicon...</span>
       </div>
     </div>
   </div>
