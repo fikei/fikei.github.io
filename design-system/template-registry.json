@@ -1,0 +1,224 @@
+{
+  "version": "2026-02-07",
+  "description": "Widget template registry. Maps design system body modifiers to template definitions, sample data, and Boards implementation status.",
+  "templates": {
+    "verdict": {
+      "bodyModifier": "w-body--verdict",
+      "description": "Hero headline with verdict tags — bold statement + supporting evidence",
+      "validSizes": ["sm", "med", "lg"],
+      "requiredAtoms": ["w-text--display", "w-tag-group", "w-badge"],
+      "optionalAtoms": ["w-text--meta", "w-img--hero"],
+      "structure": "w-shell > w-header + w-body.w-body--verdict > w-headline + w-tag-group",
+      "boardsTemplate": "hero-card",
+      "boardsStatus": "partial",
+      "fixture": {
+        "label": "Coastal Minimalism",
+        "sublabel": "Your selections lean toward clean silhouettes and natural tones",
+        "traits": ["neutral palette", "relaxed fit", "linen + cotton", "understated"]
+      }
+    },
+    "list": {
+      "bodyModifier": "w-body--list",
+      "description": "Vertical stack of rows — ranked items, search results, feeds",
+      "validSizes": ["sm", "med", "tall", "lg", "wide"],
+      "requiredAtoms": ["w-row", "w-text"],
+      "optionalAtoms": ["w-img--thumb", "w-badge", "w-bar"],
+      "structure": "w-shell > w-header + w-body.w-body--list > w-row*",
+      "boardsTemplate": "list",
+      "boardsStatus": "legacy",
+      "fixture": {
+        "items": [
+          { "title": "Air Max 90", "subtitle": "Nike · $120", "indicator": "1" },
+          { "title": "Stan Smith", "subtitle": "Adidas · $85", "indicator": "2" },
+          { "title": "Old Skool", "subtitle": "Vans · $65", "indicator": "3" }
+        ]
+      }
+    },
+    "spectrum": {
+      "bodyModifier": "w-body--spectrum",
+      "description": "Dimensional positioning on labeled axes — style DNA visualization",
+      "validSizes": ["sm", "med", "lg"],
+      "requiredAtoms": ["w-axis", "w-text--label"],
+      "optionalAtoms": ["w-text--note"],
+      "structure": "w-shell > w-header + w-body.w-body--spectrum > w-axis*",
+      "boardsTemplate": "spectrum",
+      "boardsStatus": "legacy",
+      "fixture": {
+        "axes": [
+          { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.7, "note": "Leans premium but not top-tier" },
+          { "leftLabel": "Classic", "rightLabel": "Trendy", "position": 0.4, "note": "Timeless with subtle updates" },
+          { "leftLabel": "Casual", "rightLabel": "Formal", "position": 0.3 }
+        ]
+      }
+    },
+    "split": {
+      "bodyModifier": "w-body--split",
+      "description": "Two-column layout with vertical divider — side-by-side comparison or before/after",
+      "validSizes": ["med", "lg"],
+      "requiredAtoms": ["w-column", "w-divider--vertical"],
+      "optionalAtoms": ["w-text", "w-img", "w-badge"],
+      "structure": "w-shell > w-header + w-body.w-body--split > w-column + w-divider--vertical + w-column",
+      "boardsTemplate": "grid-split",
+      "boardsStatus": "legacy",
+      "fixture": {
+        "left": {
+          "title": "Your Items",
+          "items": [
+            { "name": "White sneakers", "brand": "Nike" },
+            { "name": "Blue jeans", "brand": "Levi's" }
+          ]
+        },
+        "right": {
+          "title": "Suggestions",
+          "items": [
+            { "name": "Canvas tote", "brand": "Baggu" },
+            { "name": "Sunglasses", "brand": "Ray-Ban" }
+          ]
+        }
+      }
+    },
+    "narrative": {
+      "bodyModifier": "w-body--narrative",
+      "description": "Long-form prose text — editorial commentary, style notes, explanations",
+      "validSizes": ["med", "tall", "lg"],
+      "requiredAtoms": ["w-text--prose"],
+      "optionalAtoms": ["w-text--title", "w-tag-group", "w-img--hero"],
+      "structure": "w-shell > w-header + w-body.w-body--narrative > w-text--prose*",
+      "boardsTemplate": "text-block",
+      "boardsStatus": "legacy",
+      "fixture": {
+        "title": "Style Notes",
+        "paragraphs": [
+          "Your board has a strong coastal-casual vibe. The neutral palette anchored by white sneakers and blue denim creates a clean foundation.",
+          "Consider adding a structured bag or a watch to introduce some polish without losing the relaxed feel."
+        ]
+      }
+    },
+    "comparison": {
+      "bodyModifier": "w-body--comparison",
+      "description": "Two options side by side with labeled divider — A vs B decision aid",
+      "validSizes": ["med", "lg"],
+      "requiredAtoms": ["w-option", "w-divider--labeled"],
+      "optionalAtoms": ["w-text", "w-badge", "w-btn"],
+      "structure": "w-shell > w-header + w-body.w-body--comparison > w-option + w-divider--labeled + w-option",
+      "boardsTemplate": null,
+      "boardsStatus": "not-implemented",
+      "fixture": {
+        "optionA": {
+          "title": "Nike Air Max 90",
+          "price": "$120",
+          "pros": ["Classic silhouette", "Comfort"],
+          "cons": ["Heavy"]
+        },
+        "optionB": {
+          "title": "New Balance 574",
+          "price": "$90",
+          "pros": ["Lightweight", "Value"],
+          "cons": ["Less iconic"]
+        },
+        "dividerLabel": "VS"
+      }
+    },
+    "choices": {
+      "bodyModifier": "w-body--choices",
+      "description": "Selectable option cards — quiz-style, preference picking",
+      "validSizes": ["sm", "med", "lg"],
+      "requiredAtoms": ["w-option"],
+      "optionalAtoms": ["w-text--title", "w-badge", "w-img--card"],
+      "structure": "w-shell > w-header + w-body.w-body--choices > w-option*",
+      "boardsTemplate": null,
+      "boardsStatus": "not-implemented",
+      "fixture": {
+        "question": "Which vibe fits your board?",
+        "options": [
+          { "title": "Minimalist", "description": "Clean lines, neutral palette" },
+          { "title": "Streetwear", "description": "Bold graphics, oversized fits" },
+          { "title": "Classic", "description": "Timeless pieces, quality fabrics" }
+        ]
+      }
+    },
+    "checklist": {
+      "bodyModifier": "w-body--checklist",
+      "description": "Interactive checklist with running total — outfit builder, shopping list",
+      "validSizes": ["sm", "tall", "med", "lg"],
+      "requiredAtoms": ["w-row", "w-checkbox", "w-text"],
+      "optionalAtoms": ["w-text--value", "w-badge"],
+      "structure": "w-shell > w-header + w-body.w-body--checklist > w-row* + w-footer",
+      "boardsTemplate": null,
+      "boardsStatus": "not-implemented",
+      "fixture": {
+        "title": "Complete the Look",
+        "items": [
+          { "name": "White sneakers", "price": "$120", "checked": true },
+          { "name": "Blue jeans", "price": "$85", "checked": true },
+          { "name": "Canvas tote", "price": "$35", "checked": false },
+          { "name": "Sunglasses", "price": "$150", "checked": false }
+        ],
+        "total": "$390"
+      }
+    },
+    "suggestion": {
+      "bodyModifier": "w-body--suggestion",
+      "description": "Featured single item recommendation — high-confidence pick with CTA",
+      "validSizes": ["sm", "med", "tall", "lg"],
+      "requiredAtoms": ["w-text--title", "w-img"],
+      "optionalAtoms": ["w-text--meta", "w-badge", "w-btn", "w-text--note"],
+      "structure": "w-shell > w-header + w-body.w-body--suggestion > w-img + w-headline + w-actions",
+      "boardsTemplate": "quick-add",
+      "boardsStatus": "legacy",
+      "fixture": {
+        "name": "Common Projects Achilles Low",
+        "brand": "Common Projects",
+        "price": "$410",
+        "reason": "Matches your minimal aesthetic and white sneaker preference",
+        "imageUrl": null
+      }
+    },
+    "grouped": {
+      "bodyModifier": "w-body--grouped",
+      "description": "Labeled sections with grouped content — categorized results, outfit breakdown",
+      "validSizes": ["med", "tall", "lg"],
+      "requiredAtoms": ["w-section", "w-text--title"],
+      "optionalAtoms": ["w-row", "w-badge", "w-divider"],
+      "structure": "w-shell > w-header + w-body.w-body--grouped > w-section*",
+      "boardsTemplate": null,
+      "boardsStatus": "not-implemented",
+      "fixture": {
+        "sections": [
+          {
+            "title": "Tops",
+            "items": [
+              { "name": "White tee", "brand": "Uniqlo" },
+              { "name": "Oxford shirt", "brand": "Brooks Brothers" }
+            ]
+          },
+          {
+            "title": "Bottoms",
+            "items": [
+              { "name": "Slim chinos", "brand": "J.Crew" },
+              { "name": "Blue jeans", "brand": "Levi's" }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "boardsTemplateMap": {
+    "grid-split": "split",
+    "hero-card": "verdict",
+    "list": "list",
+    "text-block": "narrative",
+    "spectrum": "spectrum",
+    "stat-row": null,
+    "quick-add": "suggestion"
+  },
+  "legacyAliases": {
+    "two-column": "grid-split",
+    "card": "hero-card"
+  },
+  "coverage": {
+    "implemented": ["verdict", "list", "spectrum", "split", "narrative", "suggestion"],
+    "notImplemented": ["comparison", "choices", "checklist", "grouped"],
+    "boardsOnly": ["stat-row"]
+  }
+}
