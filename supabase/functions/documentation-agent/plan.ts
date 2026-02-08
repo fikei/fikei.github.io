@@ -21,20 +21,23 @@ function parsePlanIndex(content: string): PlanPhase[] {
   const lines = content.split('\n')
 
   for (const line of lines) {
-    // Match table rows like: | Phase 3 | IN PROGRESS | 113/370 | ...
+    // Match table rows like:
+    // | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 18/18 |
+    // | [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | ~113/370 |
     const tableMatch = line.match(
-      /\|\s*\[?Phase\s+(\d+)[^\]]*\]?\([^)]*\)\s*\|\s*(\w[\w\s-]*\w)\s*\|\s*(\d+)\/(\d+)/i
+      /\|\s*\[Phase\s+(\d+)[^\]]*\]\(\.\/([^)]+)\)\s*\|\s*([^|]+)\|\s*~?(\d+)\/(\d+)/i
     )
     if (tableMatch) {
+      const statusText = tableMatch[3].trim().toLowerCase()
       phases.push({
-        file: `docs/execution/project-plan/phase-${tableMatch[1]}`,
+        file: `docs/execution/project-plan/${tableMatch[2]}`,
         name: `Phase ${tableMatch[1]}`,
         number: parseInt(tableMatch[1]),
-        status: tableMatch[2].toLowerCase().includes('ship') ? 'shipped'
-          : tableMatch[2].toLowerCase().includes('progress') ? 'in-progress'
+        status: statusText.includes('ship') ? 'shipped'
+          : statusText.includes('progress') ? 'in-progress'
           : 'pending',
-        completedTasks: parseInt(tableMatch[3]),
-        totalTasks: parseInt(tableMatch[4]),
+        completedTasks: parseInt(tableMatch[4]),
+        totalTasks: parseInt(tableMatch[5]),
         inProgressTasks: 0,
         pendingTasks: 0,
         blockedTasks: 0,
@@ -54,37 +57,82 @@ function parsePlanItems(content: string, file: string): PlanItem[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
-    // Track epic headers (### or #### level)
-    const epicMatch = line.match(/^#{2,3}\s+(?:Epic[:\s]*)?(.+)/i)
-    if (epicMatch) {
+    // Track epic headers: ## Epic 3.1: Content Type System
+    const epicMatch = line.match(/^#{2,3}\s+(?:Epic\s+[\d.]+[:\s]*)?(.+)/i)
+    if (epicMatch && !line.includes('|')) {
       currentEpic = epicMatch[1].trim()
       continue
     }
 
-    // Track story headers
-    const storyMatch = line.match(/^#{4,5}\s+(?:Story[:\s]*)?(.+)/i)
-    if (storyMatch) {
-      currentStory = storyMatch[1].trim()
-      continue
+    // Parse table rows for tasks
+    // Format: | | Task description | Complete |
+    // Format: | **Story Name** | | Complete |
+    // Format: | | ~~Superseded task~~ | Superseded → ... |
+    const tableRowMatch = line.match(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|/)
+    if (tableRowMatch) {
+      const col1 = tableRowMatch[1].trim()
+      const col2 = tableRowMatch[2].trim()
+      const col3 = tableRowMatch[3].trim()
+
+      // Skip header rows and separator rows
+      if (col1 === 'Story' || col1 === '---' || col3 === 'Status' || line.includes('------|')) {
+        continue
+      }
+
+      const statusText = col3.toLowerCase()
+
+      // Story row: | **Story Name** | | Status |
+      if (col1.startsWith('**') && col1.endsWith('**')) {
+        currentStory = col1.replace(/\*\*/g, '').trim()
+        // Stories themselves don't count as tasks — only sub-tasks do
+        continue
+      }
+
+      // Task row: | | Task description | Status |
+      if (col2 && statusText) {
+        const title = col2.replace(/~~(.*?)~~/g, '$1').trim()
+
+        // Skip empty task descriptions
+        if (!title) continue
+
+        let status: PlanItem['status'] = 'pending'
+        if (statusText.includes('complete')) {
+          status = 'complete'
+        } else if (statusText.includes('in progress') || statusText.includes('in-progress')) {
+          status = 'in-progress'
+        } else if (statusText.includes('blocked')) {
+          status = 'blocked'
+        } else if (statusText.includes('superseded') || statusText.includes('cut') || statusText.includes('deferred')) {
+          // Superseded/cut items count as complete (they're done — just not by building them)
+          status = 'complete'
+        } else if (statusText.includes('pending') || statusText.includes('planned')) {
+          status = 'pending'
+        }
+
+        items.push({
+          title,
+          status,
+          phase: file,
+          epic: currentEpic,
+          story: currentStory,
+          line: i + 1,
+          file,
+        })
+      }
     }
 
-    // Parse task checkboxes
-    const taskMatch = line.match(/^(\s*)-\s*\[([ xX])\]\s*(.+)/)
-    if (taskMatch) {
-      const checked = taskMatch[2].toLowerCase() === 'x'
-      const title = taskMatch[3].trim()
+    // Also support checkbox format (backlog.md might use this)
+    const checkboxMatch = line.match(/^(\s*)-\s*\[([ xX])\]\s*(.+)/)
+    if (checkboxMatch) {
+      const checked = checkboxMatch[2].toLowerCase() === 'x'
+      const title = checkboxMatch[3].trim()
 
-      // Check for status markers
       let status: PlanItem['status'] = checked ? 'complete' : 'pending'
-      if (title.includes('🔄') || title.toLowerCase().includes('in progress')) {
-        status = 'in-progress'
-      }
-      if (title.includes('🚫') || title.toLowerCase().includes('blocked')) {
-        status = 'blocked'
-      }
+      if (title.toLowerCase().includes('in progress')) status = 'in-progress'
+      if (title.toLowerCase().includes('blocked')) status = 'blocked'
 
       items.push({
-        title: title.replace(/[🔄🚫⚡✅]/g, '').trim(),
+        title,
         status,
         phase: file,
         epic: currentEpic,
