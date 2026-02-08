@@ -315,8 +315,14 @@ body {
     <!-- Loading — DS: .loading + .spinner -->
     <div class="loading" id="loadingIndicator" style="display: none;">
       <div class="spinner"></div>
-      <span>Fetching events</span>
+      <span id="loadingText">Fetching events</span>
     </div>
+
+    <!-- Debug log (visible) -->
+    <details id="debugLog" style="margin-bottom: var(--space-4);">
+      <summary style="font-size: var(--text-2xs); color: var(--fg-subtle); text-transform: uppercase; letter-spacing: var(--tracking-wider); cursor: pointer;">Fetch Log</summary>
+      <pre id="debugLogContent" style="font-size: var(--text-2xs); color: var(--fg-muted); background: var(--bg-surface); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); max-height: 200px; overflow-y: auto; white-space: pre-wrap;"></pre>
+    </details>
 
     <!-- Footer -->
     <footer class="footer">
@@ -375,6 +381,18 @@ body {
     calYear: new Date().getFullYear(),
   };
 
+  // --- Debug Logging ---
+  function log(msg, ...args) {
+    console.log(`[events] ${msg}`, ...args);
+    const el = document.getElementById('debugLogContent');
+    if (el) {
+      const ts = new Date().toLocaleTimeString();
+      const extra = args.length ? ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') : '';
+      el.textContent += `${ts} ${msg}${extra}\n`;
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
   const STORAGE_KEY = 'ctrl-rodeo-event-sources';
   const CORS_PROXIES = [
     'https://api.allorigins.win/raw?url=',
@@ -385,15 +403,30 @@ body {
   function loadSources() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) state.sources = JSON.parse(saved);
-    } catch (e) { /* ignore */ }
+      if (saved) {
+        state.sources = JSON.parse(saved);
+        log('Loaded sources from localStorage:', state.sources.map(s => s.name));
+      }
+    } catch (e) { log('Failed to parse saved sources: ' + e.message); }
 
+    // Migrate: remove old demo source, ensure 19hz exists
+    const hadDemo = state.sources.some(s => s.id === 'demo');
+    if (hadDemo) {
+      state.sources = state.sources.filter(s => s.id !== 'demo');
+      log('Removed legacy demo source');
+    }
+    const has19hz = state.sources.some(s => s.id === '19hz-bayarea');
+    if (!has19hz) {
+      state.sources.unshift({ id: '19hz-bayarea', name: '19hz Bay Area', type: 'auto', url: 'https://19hz.info/eventlisting_BayArea.php', enabled: true });
+      log('Added default 19hz Bay Area source');
+    }
     if (state.sources.length === 0) {
       state.sources = [
         { id: '19hz-bayarea', name: '19hz Bay Area', type: 'auto', url: 'https://19hz.info/eventlisting_BayArea.php', enabled: true }
       ];
-      saveSources();
     }
+    saveSources();
+    log('Active sources:', state.sources.filter(s => s.enabled).map(s => `${s.name} (${s.type})`));
   }
 
   function saveSources() {
@@ -412,11 +445,22 @@ body {
 
   // --- CORS Proxy Fetch with fallback ---
   async function proxyFetch(url) {
+    log(`Fetching via CORS proxy: ${url}`);
     for (const proxy of CORS_PROXIES) {
+      const proxyUrl = proxy + encodeURIComponent(url);
       try {
-        const resp = await fetch(proxy + encodeURIComponent(url));
-        if (resp.ok) return await resp.text();
-      } catch (e) { continue; }
+        log(`  Trying proxy: ${proxy.split('?')[0]}...`);
+        const resp = await fetch(proxyUrl);
+        log(`  Response: ${resp.status} ${resp.statusText} (${resp.headers.get('content-type') || 'unknown type'})`);
+        if (resp.ok) {
+          const text = await resp.text();
+          log(`  Got ${text.length} chars`);
+          return text;
+        }
+      } catch (e) {
+        log(`  Proxy failed: ${e.message}`);
+        continue;
+      }
     }
     throw new Error('All CORS proxies failed for ' + url);
   }
@@ -427,27 +471,39 @@ body {
     el.style.display = 'flex';
     state.events = [];
 
-    const promises = state.sources.filter(s => s.enabled).map(async (source) => {
+    const enabled = state.sources.filter(s => s.enabled);
+    log(`Fetching ${enabled.length} source(s)...`);
+    document.getElementById('loadingText').textContent = `Fetching ${enabled.length} source(s)...`;
+
+    const promises = enabled.map(async (source) => {
       try {
         const type = source.type === 'auto' ? detectSourceType(source.url) : source.type;
-        if (type === 'html') return await fetchHtml(source);
-        if (type === 'ical') return await fetchIcal(source);
-        if (type === 'json') return await fetchJson(source);
-        if (type === 'rss') return await fetchRss(source);
-        return [];
+        log(`Source "${source.name}": type=${type}, url=${source.url}`);
+        let events;
+        if (type === 'html') events = await fetchHtml(source);
+        else if (type === 'ical') events = await fetchIcal(source);
+        else if (type === 'json') events = await fetchJson(source);
+        else if (type === 'rss') events = await fetchRss(source);
+        else events = [];
+        log(`Source "${source.name}": parsed ${events.length} events`);
+        if (events.length > 0) log(`  Sample: ${events[0].name} on ${events[0].date}`);
+        return events;
       } catch (err) {
-        console.warn(`Failed to fetch "${source.name}":`, err);
+        log(`Source "${source.name}" FAILED: ${err.message}`);
         return [];
       }
     });
 
     const results = await Promise.allSettled(promises);
-    results.forEach(r => {
+    results.forEach((r, i) => {
       if (r.status === 'fulfilled' && Array.isArray(r.value)) {
         state.events.push(...r.value);
+      } else if (r.status === 'rejected') {
+        log(`Promise rejected for source ${i}: ${r.reason}`);
       }
     });
 
+    log(`Total events loaded: ${state.events.length}`);
     el.style.display = 'none';
     updateFilters();
     render();
@@ -461,14 +517,17 @@ body {
 
   function parseHtmlTable(html, sourceId, baseUrl) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const table = doc.querySelector('table');
-    if (!table) return [];
+    const tables = doc.querySelectorAll('table');
+    log(`HTML parser: found ${tables.length} table(s) in ${html.length} chars`);
+    const table = tables.length > 0 ? tables[0] : null;
+    if (!table) { log('HTML parser: no <table> found in response'); return []; }
 
     // Detect column headers
     const headers = [];
     table.querySelectorAll('thead th, tr:first-child th').forEach(th => {
       headers.push(th.textContent.trim().toLowerCase());
     });
+    log('HTML parser: headers = ' + JSON.stringify(headers));
 
     // Build column index map from header text
     const colMap = {};
@@ -490,8 +549,17 @@ body {
       else if (count >= 4) Object.assign(colMap, { date: 0, name: 1, location: 2, time: 3 });
     }
 
+    log('HTML parser: colMap = ' + JSON.stringify(colMap));
+
     const events = [];
-    const rows = table.querySelectorAll('tbody tr');
+    // Try tbody rows first, then all tr if no tbody
+    let rows = table.querySelectorAll('tbody tr');
+    if (rows.length === 0) {
+      rows = table.querySelectorAll('tr');
+      log(`HTML parser: no <tbody>, using all ${rows.length} <tr> rows`);
+    } else {
+      log(`HTML parser: found ${rows.length} <tbody> rows`);
+    }
 
     rows.forEach(row => {
       if (row.querySelector('th')) return; // skip header rows
