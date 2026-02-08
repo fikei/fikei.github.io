@@ -19,13 +19,13 @@ When designing features, widgets, or architecture:
 
 ## Primary Personas (Launch Audience)
 
-### 1. The Visual Collector — "Mara"
+### 1. The Visual Collector
 
-**Who:** Graphic designer, 28. Freelance. Pulls references from Instagram, Are.na, Behance, random blogs, physical bookstores, gallery shows. Has 40+ browser tabs open at any time.
+**Who:** Freelance graphic designer, late 20s. Pulls references from Instagram, Are.na, Behance, random blogs, physical bookstores, gallery shows. Has 40+ browser tabs open at any time.
 
-**Creative practice:** Brand identity work, editorial design, occasional illustration. Her output quality depends directly on the breadth of her reference library.
+**Creative practice:** Brand identity work, editorial design, occasional illustration. Output quality depends directly on the breadth of their reference library.
 
-**Core need:** A single place to throw everything — URLs, screenshots, products, inspiration — and have it organized without effort so she can find it when she needs it for a project.
+**Core need:** A single place to throw everything — URLs, screenshots, products, inspiration — and have it organized without effort so they can find it when they need it for a project.
 
 **Jobs To Be Done:**
 | When I... | I want to... | So I can... |
@@ -35,17 +35,17 @@ When designing features, widgets, or architecture:
 | See my collection growing | Understand what patterns emerge | Know my own taste better and articulate it to clients |
 | Need a specific reference I saved months ago | Search and find it fast | Pull it into a mood board or presentation |
 
-**Anti-patterns (what would drive her away):**
-- Forcing her to pick a category before saving
-- Ugly or cluttered interface that competes with her content
+**Anti-patterns (what would drive them away):**
+- Forcing them to pick a category before saving
+- Ugly or cluttered interface that competes with their content
 - Slow capture — anything more than paste-and-done
 - No visual browsing — text-only lists are useless for visual work
 
 ---
 
-### 2. The Sound & Scene Curator — "Jordan"
+### 2. The Sound & Scene Curator
 
-**Who:** Musician and DJ, 32. Produces electronic music, plays shows, runs a small label. Constantly scanning for new music, gear, venues, visual artists for collaborations, and events to attend or play.
+**Who:** Musician and DJ, early 30s. Produces electronic music, plays shows, runs a small label. Constantly scanning for new music, gear, venues, visual artists for collaborations, and events to attend or play.
 
 **Creative practice:** Music production, DJ sets, event curation. What they listen to, see, and experience directly feeds the music they make. The line between "consuming" and "creating" is blurred.
 
@@ -66,9 +66,34 @@ When designing features, widgets, or architecture:
 
 ---
 
-### 3. The Multidisciplinary Maker — "Alex"
+### 3. The DJ
 
-**Who:** Industrial designer turned creative technologist, 35. Works at the intersection of physical and digital. Saves material samples, fabrication techniques, code repos, design tools, exhibition photos, supplier links.
+**Who:** Working DJ, late 20s. Plays regular club nights, occasional festivals. Spends hours digging for tracks — on Bandcamp, SoundCloud, Discogs, YouTube, record store sites. Follows labels, promoters, and other DJs. Juggles day job income with music income.
+
+**Creative practice:** Building sets is a curatorial act. Every set tells a story through track selection, sequencing, and energy arc. The DJ's taste — and the ability to find what no one else is playing — is the entire value proposition.
+
+**Core need:** A single place to track music discoveries, set ideas, gig opportunities, and gear across every platform they use. Currently losing tracks in browser bookmarks, Spotify playlists, screenshot folders, and DM threads.
+
+**Jobs To Be Done:**
+| When I... | I want to... | So I can... |
+|-----------|-------------|-------------|
+| Find a track I want to play | Save it with source, BPM, key, and vibe tags | Find it again when building a set |
+| Prep for a gig | Browse all my saved tracks filtered by energy/mood/genre | Build a cohesive set without re-digging |
+| Hear something at a club or in a mix | Capture it quickly from my phone with minimal context | Identify and follow up later |
+| Track a label or artist releasing fire | Save and group their releases over time | Notice when they drop something new |
+| Look for gig opportunities | Save venue links, promoter contacts, event listings | Have everything in one place when I'm ready to pitch |
+
+**Anti-patterns:**
+- No mobile capture — discoveries happen at clubs, on commutes, in conversations
+- Forcing rigid categorization — music lives in vibes, not folders
+- No way to tag with DJ-specific metadata (BPM, energy, key, mood)
+- Desktop-only workflows — DJs are mobile-first
+
+---
+
+### 4. The Multidisciplinary Maker
+
+**Who:** Industrial designer turned creative technologist, mid 30s. Works at the intersection of physical and digital. Saves material samples, fabrication techniques, code repos, design tools, exhibition photos, supplier links.
 
 **Creative practice:** Prototyping, installations, product design. Inputs come from wildly different domains — a ceramics blog, a GitHub repo, a hardware store product page, a museum exhibition — and they all connect in the work.
 
@@ -91,11 +116,11 @@ When designing features, widgets, or architecture:
 
 ## Secondary Personas (Growth Audience)
 
-### 4. The Deep-Dive Enthusiast — "Priya"
+### 5. The Deep-Dive Enthusiast
 
-**Who:** Product manager by day, 30. Obsessive hobbyist — currently deep into specialty coffee, Japanese stationery, and rock climbing. Curates recommendations for friends. Maintains mental lists of "best of" across every interest.
+**Who:** Product manager by day, around 30. Obsessive hobbyist — currently deep into specialty coffee, Japanese stationery, and rock climbing. Curates recommendations for friends. Maintains mental lists of "best of" across every interest.
 
-**Core need:** Organize and surface knowledge across multiple passionate interests without mixing up contexts. She's essentially building personal databases for each hobby.
+**Core need:** Organize and surface knowledge across multiple passionate interests without mixing up contexts. Essentially building personal databases for each hobby.
 
 **Jobs To Be Done:**
 | When I... | I want to... | So I can... |
@@ -107,11 +132,11 @@ When designing features, widgets, or architecture:
 
 ---
 
-### 5. The Researcher — "David"
+### 6. The Researcher
 
-**Who:** Freelance strategist, 41. Reads 50+ articles a week across technology, culture, business, and design. Builds arguments and decks from curated evidence. His value is in synthesis — connecting dots others miss.
+**Who:** Freelance strategist, early 40s. Reads 50+ articles a week across technology, culture, business, and design. Builds arguments and decks from curated evidence. Their value is in synthesis — connecting dots others miss.
 
-**Core need:** Save, tag, and retrieve references fast — and see relationships between articles, reports, and ideas over time. His collection is a competitive advantage.
+**Core need:** Save, tag, and retrieve references fast — and see relationships between articles, reports, and ideas over time. Their collection is a competitive advantage.
 
 **Jobs To Be Done:**
 | When I... | I want to... | So I can... |
@@ -123,9 +148,9 @@ When designing features, widgets, or architecture:
 
 ---
 
-### 6. The Cultural Omnivore — "Kai"
+### 7. The Cultural Omnivore
 
-**Who:** Creative director, 37. Attends gallery openings, film festivals, concerts, pop-ups. Reads across art, food, travel, fashion, architecture. Their identity is their taste — and they want it visible and organized.
+**Who:** Creative director, late 30s. Attends gallery openings, film festivals, concerts, pop-ups. Reads across art, food, travel, fashion, architecture. Their identity is their taste — and they want it visible and organized.
 
 **Core need:** A living, visual map of everything they care about — not just links, but events attended, places visited, things owned, experiences had. A curated life, not just a curated feed.
 
@@ -139,35 +164,76 @@ When designing features, widgets, or architecture:
 
 ---
 
+### 8. The Design Technologist
+
+**Who:** Hybrid designer-developer, early 30s. Works in creative technology — generative art, interactive installations, creative tools, or design engineering at a studio or tech company. Lives in Figma, VS Code, and Arduino IDE equally. Follows open-source creative coding projects, shader artists, and hardware hackers.
+
+**Creative practice:** Builds things at the intersection of design and engineering. Prototypes with code, designs with constraints, and ships things that blur the line between art and product. Their reference library spans typography, algorithms, fabrication, interaction design, and electronics.
+
+**Core need:** A research hub that holds technical references (docs, repos, tutorials) alongside design inspiration (visual references, exhibitions, product teardowns) — because their work requires both simultaneously and they're always switching contexts.
+
+**Jobs To Be Done:**
+| When I... | I want to... | So I can... |
+|-----------|-------------|-------------|
+| Research a new technology or framework | Save docs, examples, and tutorials alongside visual precedents | Evaluate both feasibility and aesthetics together |
+| Start a creative coding project | Browse my saved shader examples, generative art, and algorithm references | Build on techniques I've collected over time |
+| Prototype an interaction | Find the hardware spec, the design pattern, and the code snippet in one search | Move fast between ideation and implementation |
+| See what's happening in creative tech | Track repos, artists, studios, and conferences I follow | Stay current across a fragmented landscape |
+| Share a technical + design reference set | Export a collection that includes both code and visual references | Onboard collaborators who think in both modes |
+
+**Anti-patterns:**
+- Treating code links and design links as separate worlds — they're the same project
+- No way to save or preview code snippets, repos, or technical documentation
+- Poor handling of diverse media types (images, videos, code, hardware specs)
+- No tagging system flexible enough for cross-domain work
+
+---
+
 ## Future Personas (Architecture Considerations)
 
 These personas don't drive current features but should not be blocked by architectural decisions:
 
-### 7. The Student — "Sam"
+### 9. The Student
 Organizing learning materials, career inspiration, course notes, and application resources. Needs simple capture, topic-based organization, and export capabilities.
 
-### 8. The Small Business Owner — "Lin"
+### 10. The Small Business Owner
 Tracking competitors, suppliers, industry trends, design inspiration for their brand, and product ideas. Needs collections that can be shared with a small team.
 
-### 9. The Planner — "Noor"
+### 11. The Planner
 Trip planning, event coordination, gift lists, home renovation research. Practical curation with a timeline component — things that have deadlines or locations attached.
 
 ---
 
 ## Persona-to-Feature Matrix
 
-| Feature Area | Mara | Jordan | Alex | Priya | David | Kai |
-|-------------|------|--------|------|-------|-------|-----|
-| Link capture & enrichment | **critical** | **critical** | **critical** | **critical** | **critical** | high |
-| AI categorization | **critical** | **critical** | **critical** | high | **critical** | high |
-| Visual grid browsing | **critical** | high | high | medium | low | **critical** |
-| Cross-category connections | high | **critical** | **critical** | medium | **critical** | **critical** |
-| Events integration | medium | **critical** | medium | medium | low | **critical** |
-| Mobile capture | **critical** | high | **critical** | high | medium | high |
-| Search & retrieval | high | medium | high | high | **critical** | medium |
-| Collection sharing | medium | high | **critical** | **critical** | high | high |
-| Taste/pattern surfacing | high | **critical** | high | medium | **critical** | **critical** |
-| Multi-format content | medium | **critical** | **critical** | medium | medium | high |
+### Core Needs Summary
+
+| Persona | Tier | Core Need |
+|---------|------|-----------|
+| Visual Collector | Primary | One place for all visual references, organized without effort, findable by mood/style |
+| Sound & Scene Curator | Primary | Track music, art, events, gear, and collaborators — see connections between them |
+| DJ | Primary | Track music discoveries, set ideas, gig opportunities across every platform |
+| Multidisciplinary Maker | Primary | Knowledge base without boundaries between work research and personal interest |
+| Deep-Dive Enthusiast | Secondary | Organize knowledge across multiple passionate hobbies without mixing contexts |
+| Researcher | Secondary | Save, tag, retrieve references fast — see relationships across ideas over time |
+| Cultural Omnivore | Secondary | Living visual map of everything — events, places, things, experiences |
+| Design Technologist | Secondary | Research hub holding technical references alongside design inspiration |
+
+### Feature Priority by Persona
+
+| Feature Area | Visual Collector | Sound & Scene Curator | DJ | Multidisciplinary Maker | Deep-Dive Enthusiast | Researcher | Cultural Omnivore | Design Technologist |
+|-------------|---|---|---|---|---|---|---|---|
+| Link capture & enrichment | **critical** | **critical** | **critical** | **critical** | **critical** | **critical** | high | **critical** |
+| AI categorization | **critical** | **critical** | high | **critical** | high | **critical** | high | high |
+| Visual grid browsing | **critical** | high | medium | high | medium | low | **critical** | high |
+| Cross-category connections | high | **critical** | high | **critical** | medium | **critical** | **critical** | **critical** |
+| Events integration | medium | **critical** | **critical** | medium | medium | low | **critical** | medium |
+| Mobile capture | **critical** | high | **critical** | **critical** | high | medium | high | medium |
+| Search & retrieval | high | medium | high | high | high | **critical** | medium | **critical** |
+| Collection sharing | medium | high | medium | **critical** | **critical** | high | high | high |
+| Taste/pattern surfacing | high | **critical** | **critical** | high | medium | **critical** | **critical** | high |
+| Multi-format content | medium | **critical** | **critical** | **critical** | medium | medium | high | **critical** |
+| Flexible tagging/metadata | medium | high | **critical** | high | high | high | medium | **critical** |
 
 ---
 

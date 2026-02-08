@@ -23,10 +23,10 @@ See [User Personas](./docs/ux/personas.md) for detailed personas with Jobs To Be
 5. **Expand with the user** — start simple, grow deep; progressive complexity
 
 ### Primary Audience: Creatives
-Artists, designers, musicians, writers, filmmakers — high-volume collectors whose creative output depends on input richness. See personas: Mara (visual collector), Jordan (sound & scene curator), Alex (multidisciplinary maker).
+Artists, designers, musicians, writers, filmmakers — high-volume collectors whose creative output depends on input richness. See personas: The Visual Collector, The Sound & Scene Curator, The DJ, The Multidisciplinary Maker.
 
 ### Growth Audiences
-Enthusiasts, researchers, cultural omnivores, knowledge workers, students, small business owners. Same core need: intentional curation of a complex life. See personas: Priya, David, Kai, and future personas Sam, Lin, Noor.
+Enthusiasts, researchers, cultural omnivores, knowledge workers, students, small business owners. Same core need: intentional curation of a complex life. See personas: The Deep-Dive Enthusiast, The Researcher, The Cultural Omnivore, The Design Technologist, and future personas The Student, The Small Business Owner, The Planner.
 
 ### Core Philosophy
 - **Vibe Coding**: Rapid, intuitive development with AI assistance
