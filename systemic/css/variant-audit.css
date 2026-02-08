@@ -147,6 +147,51 @@
   border: var(--border-thin) solid var(--border-subtle);
 }
 
+/* Variant action buttons (inline controls) */
+.qa-variant-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+
+.qa-variant-item:hover .qa-variant-actions {
+  opacity: 1;
+}
+
+.qa-action-btn {
+  padding: 1px 6px;
+  font-family: var(--font-primary);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  background: transparent;
+  color: var(--fg-muted);
+  border: var(--border-thin) solid var(--border-subtle);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.qa-action-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.qa-action-btn--active {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.qa-action-btn--block {
+  color: var(--color-error);
+  border-color: transparent;
+}
+
+.qa-action-btn--block:hover {
+  border-color: var(--color-error);
+}
+
 /* Blocked state */
 .qa-variant-item--flagged .qa-variant-preview { opacity: 0.2; }
 .qa-variant-item--flagged .qa-variant-label {

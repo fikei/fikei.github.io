@@ -243,6 +243,16 @@ class VariantAudit {
   // ============================================
 
   init() {
+    // Guard against duplicate init
+    if (this._initialized) {
+      // Just refresh filters and data
+      this.populateFilters();
+      this.restoreFilterState();
+      this.renderAuditTable();
+      return;
+    }
+    this._initialized = true;
+
     this.bindElements();
     this.populateFilters();
 
@@ -359,7 +369,7 @@ class VariantAudit {
 
     // Update description
     this.els.desc.textContent = comp.name + ' — ' + activeCount + ' active' +
-      (blockedCount > 0 ? ', ' + blockedCount + ' blocked' : '') + '. Right-click for options.';
+      (blockedCount > 0 ? ', ' + blockedCount + ' blocked' : '') + '. Hover for actions.';
 
     // Blocked section visibility
     if (blockedCount > 0) {
@@ -412,6 +422,59 @@ class VariantAudit {
       badge.title = entry.note;
       lbl.appendChild(badge);
     }
+
+    // Action buttons (visible controls instead of right-click only)
+    var actions = document.createElement('div');
+    actions.className = 'qa-variant-actions';
+
+    var commentBtn = document.createElement('button');
+    commentBtn.className = 'qa-action-btn' + (hasNote ? ' qa-action-btn--active' : '');
+    commentBtn.textContent = hasNote ? 'Edit' : 'Comment';
+    commentBtn.title = hasNote ? 'Edit comment' : 'Add comment';
+    commentBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openComment(wrapper, auditName, size);
+    });
+    actions.appendChild(commentBtn);
+
+    // Status action (depends on current stoplight)
+    if (status === 'yellow') {
+      var processBtn = document.createElement('button');
+      processBtn.className = 'qa-action-btn';
+      processBtn.textContent = 'Mark processed';
+      processBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.setProcessed(auditName, size, true);
+        this.refreshVariantStatus(wrapper, auditName, size);
+        this.renderAuditTable();
+        this.showVariants(); // rebuild to update action buttons
+      });
+      actions.appendChild(processBtn);
+    } else if (status === 'orange') {
+      var approveBtn = document.createElement('button');
+      approveBtn.className = 'qa-action-btn';
+      approveBtn.textContent = 'Approve';
+      approveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.setNote(auditName, size, '');
+        this.setProcessed(auditName, size, false);
+        this.refreshVariantStatus(wrapper, auditName, size);
+        this.renderAuditTable();
+        this.showVariants();
+      });
+      actions.appendChild(approveBtn);
+    }
+
+    var blockBtn = document.createElement('button');
+    blockBtn.className = 'qa-action-btn qa-action-btn--block';
+    blockBtn.textContent = isFlagged ? 'Unblock' : 'Block';
+    blockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleBlock(wrapper, auditName, size);
+    });
+    actions.appendChild(blockBtn);
+
+    lbl.appendChild(actions);
 
     // Blocked overlay
     var blockedOverlay = document.createElement('div');

@@ -612,6 +612,76 @@
   color: var(--fg-subtle);
 }
 
+/* ============================================
+   Stage Audit Controls (QA on Component Stage)
+   Reuses .qa-stoplight, .qa-action-btn from variant-audit.css
+   ============================================ */
+
+/* Show action buttons on hover */
+.variant-preview-card:hover .stage-audit-actions {
+  opacity: 1;
+}
+
+.stage-audit-actions {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-default);
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+/* Flagged/blocked variant card */
+.variant-preview-card--flagged .variant-preview-content {
+  opacity: 0.15;
+}
+
+.variant-preview-card--flagged .variant-name {
+  text-decoration: line-through;
+  color: var(--color-error) !important;
+}
+
+/* Stoplight dot in label row */
+.variant-preview-label .qa-stoplight {
+  flex-shrink: 0;
+}
+
+/* Comment count badge in label */
+.variant-preview-label .qa-comment-count {
+  margin-left: var(--space-1);
+}
+
+/* Inline comment on stage variant card */
+.variant-preview-card .qa-comment {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+/* Make variant card position relative for comment overlay */
+.variant-preview-card {
+  position: relative;
+}
+
+/* Stage audit log section */
+.stage-audit-log {
+  width: 100%;
+  max-width: 800px;
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: var(--border-thin) solid var(--border-subtle);
+}
+
+.stage-audit-log h4 {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  margin: 0 0 var(--space-3);
+}
+
 /* Foundation content */
 .foundation-content {
   width: 100%;

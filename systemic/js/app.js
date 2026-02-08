@@ -253,6 +253,10 @@ class SystemicApp {
     this.loadSavedSystems();
     this.initViewer();
     this.initVariantAudit();
+    // Connect viewer to audit so component stage can show QA controls
+    if (this.viewer && this.variantAudit) {
+      this.viewer.variantAudit = this.variantAudit;
+    }
     this.initRouter();
   }
 
