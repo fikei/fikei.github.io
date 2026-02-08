@@ -190,18 +190,19 @@
               </div>
             </div>
 
-            <div class="component-specs" id="component-specs" hidden>
-              <h4>Specifications</h4>
-              <div class="specs-grid" id="specs-grid">
-                <!-- Specs populated dynamically -->
-              </div>
-            </div>
           </main>
 
           <!-- Context Sidebar -->
           <aside class="context-sidebar" id="context-sidebar">
             <!-- Design Context -->
             <div class="context-panel active" id="design-context">
+              <div class="component-specs context-section" id="component-specs" hidden>
+                <h4>Specifications</h4>
+                <div class="specs-grid" id="specs-grid">
+                  <!-- Specs populated dynamically -->
+                </div>
+              </div>
+
               <div class="context-section">
                 <h4>Description</h4>
                 <p id="component-description">Select a component to view its documentation.</p>
@@ -292,6 +293,19 @@
             <div id="qa-blocked-section" style="display:none;margin-top:var(--space-6)">
               <button class="qa-blocked-toggle" id="qa-blocked-toggle"></button>
               <div class="qa-variant-grid" id="qa-blocked-grid" style="display:none"></div>
+            </div>
+
+            <!-- Grid Test — widgets at different column counts -->
+            <div class="qa-grid-test-section" id="qa-grid-test-section" style="display:none;margin-top:var(--space-8)">
+              <h3 class="qa-log-heading">Grid Size Permutations</h3>
+              <p class="qa-desc">Same widget at its valid grid sizes. Toggle columns to test responsiveness.</p>
+              <div class="qa-grid-controls">
+                <button class="active" data-cols="5">5 col</button>
+                <button data-cols="4">4 col</button>
+                <button data-cols="3">3 col</button>
+                <button id="qa-grid-test-lines-btn">Grid lines</button>
+              </div>
+              <div class="qa-grid-test qa-grid-test--5col" id="qa-grid-test"></div>
             </div>
 
             <div id="qa-audit-output" style="margin-top:var(--space-8)"></div>

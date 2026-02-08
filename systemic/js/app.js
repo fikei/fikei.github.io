@@ -912,24 +912,28 @@ class SystemicApp {
       case 'audit':
         this.appNav.innerHTML = `
           <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb__link">Systems</a>
-            <span class="breadcrumb__sep">/</span>
-            <span class="breadcrumb__current">Audit</span>
+            <a href="#systems" class="breadcrumb-link">Systems</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">Audit</span>
           </nav>
           <span class="docs-nav__spacer"></span>
         `;
         break;
 
-      case 'qa':
+      case 'qa': {
+        const qaSystemName = this.viewer?.designSystem?.name || 'System';
         this.appNav.innerHTML = `
           <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb__link">Systems</a>
-            <span class="breadcrumb__sep">/</span>
-            <span class="breadcrumb__current">QA</span>
+            <a href="#systems" class="breadcrumb-link">Systems</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="#docs/color" class="breadcrumb-link">${qaSystemName}</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">Variant Audit</span>
           </nav>
           <span class="docs-nav__spacer"></span>
         `;
         break;
+      }
 
       case 'docs':
         this.renderDocsNav(route);
@@ -959,9 +963,9 @@ class SystemicApp {
 
     this.appNav.innerHTML = `
       <nav class="breadcrumb" id="stage-breadcrumb" aria-label="Breadcrumb">
-        <a href="#systems" class="breadcrumb__link">Systems</a>
-        <span class="breadcrumb__sep">/</span>
-        <span class="breadcrumb__current" id="breadcrumb-system-name">${systemName}</span>
+        <a href="#systems" class="breadcrumb-link">Systems</a>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current" id="breadcrumb-system-name">${systemName}</span>
       </nav>
       <span class="docs-nav__divider"></span>
       <a href="#" class="docs-nav__link" data-section="color">Color</a>
@@ -969,6 +973,7 @@ class SystemicApp {
       <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
       <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
       <a href="#" class="docs-nav__link" data-section="examples">Examples</a>
+      <a href="#qa" class="docs-nav__link">QA</a>
       <span class="docs-nav__spacer"></span>
       <select class="docs-nav__select" id="component-select">
         <option value="">Component...</option>
@@ -1529,6 +1534,14 @@ class SystemicApp {
   restoreActiveSystem() {
     const activeId = localStorage.getItem('systemic-active-system');
     if (!activeId) return false;
+
+    // For local design system, always rebuild fresh from manifest
+    // so template previews use current code (not stale cached HTML)
+    if (activeId === 'local-ctrl-design-system') {
+      this.debugLog('RESTORE', 'Local system detected — rebuilding from manifest');
+      this.loadLocalDesignSystem();
+      return true;
+    }
 
     const fullSystem = this.loadDesignSystem(activeId);
     if (!fullSystem) return false;
