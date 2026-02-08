@@ -207,8 +207,9 @@ When validation identifies a gap, enrichment strategies fire based on what faile
 | Accuracy low, no scraped image | AI search with title + category keywords | AI generation with product prompt |
 | Visual quality low (resolution) | Re-scrape for higher-res variant (srcset, CDN params) | AI upscale existing image |
 | Visual quality low (aspect ratio) | AI smart crop to target ratio | Re-search with aspect ratio constraints |
+| Visual quality low (poor lighting/color) | AI edit: enhance brightness/contrast/color | AI search for better source image |
 | Aesthetic fit low (text/watermarks) | AI edit: remove text overlay | Re-search excluding stock sites |
-| Aesthetic fit low (clutter) | AI edit: background removal + clean composite | AI generation with minimal style prompt |
+| Aesthetic fit low (clutter/padding) | AI edit: smart crop or background removal | AI generation with minimal style prompt |
 | Distinctiveness low (logo/generic) | Full re-resolution from scratch (skip cache) | AI generation |
 | Safety failed | Block permanently, no retry | Styled text card |
 
@@ -318,17 +319,30 @@ Every pin image has one of three origins. Validation applies equally to all, but
 The image found by scraping the source URL's HTML (OG tags, JSON-LD, `<img>` tags).
 
 **Validation focus:**
-- Accuracy is the main concern — scraped images are often generic site assets, not the specific content
+- **Accuracy** — scraped images are often generic site assets, not the specific content
+- **Visual compliance** — even when the image is *correct*, it may not meet platform standards. Common issues with scraped images:
+  - Low-res product photo with excessive white padding
+  - Cluttered lifestyle/lookbook shot that doesn't read well at card size
+  - Watermarked or text-heavy promotional banners
+  - Inconsistent aspect ratios (extreme panoramic or tall/narrow)
+  - Dark, poorly lit, or color-cast product photography
 - Logo/placeholder filtering (already exists, extend with scoring)
 - Check if the scraped image is the actual product vs. a related/promotional image
 
-**Enrichment when scraped image fails:**
+**Enrichment when scraped image fails accuracy:**
 - Re-scrape with content-type-specific selectors:
   - Product: look for `[data-product-image]`, `.product-image`, Shopify CDN patterns
   - Article: look for `article img:first-of-type`, `.post-image`, `figure img`
   - Video: extract platform thumbnail via API
 - Try alternative scrape targets (srcset largest, data-src, lazy-load attributes)
 - Fall through to search or generation if re-scrape fails
+
+**Enrichment when scraped image fails visual compliance:**
+- Try higher-res variant from same source (srcset, CDN size params like `?w=800`)
+- AI edit: smart crop to remove excessive padding/whitespace
+- AI edit: background cleanup or removal for cluttered product shots
+- AI edit: remove text overlays or watermarks
+- If the source image is fundamentally low quality (dark, blurry, badly lit), skip editing and fall through to AI search or generation — editing can't fix a bad source
 
 ### 2. AI-Edited Image (Enhancement of existing)
 
