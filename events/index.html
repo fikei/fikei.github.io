@@ -1178,12 +1178,15 @@ body {
 
   async function fetchAllSourcesNetwork() {
     const el = document.getElementById('loadingIndicator');
-    el.style.display = 'flex';
-    state.events = [];
+    const isBackgroundRefresh = state.events.length > 0;
+    if (!isBackgroundRefresh) el.style.display = 'flex';
 
     const enabled = state.sources.filter(s => s.enabled);
-    log(`Fetching ${enabled.length} source(s)...`);
-    document.getElementById('loadingText').textContent = `Fetching ${enabled.length} source(s)...`;
+    log(`Fetching ${enabled.length} source(s)...${isBackgroundRefresh ? ' (background)' : ''}`);
+    if (!isBackgroundRefresh) document.getElementById('loadingText').textContent = `Fetching ${enabled.length} source(s)...`;
+
+    const failedSources = [];
+    const allEvents = [];
 
     const promises = enabled.map(async (source) => {
       try {
@@ -1197,21 +1200,22 @@ body {
         else events = [];
         log(`Source "${source.name}": parsed ${events.length} events`);
         if (events.length > 0) log(`  Sample: ${events[0].name} on ${events[0].date}`);
-        return events;
+        return { source, events, ok: true };
       } catch (err) {
         log(`Source "${source.name}" FAILED: ${err.message}`);
-        return [];
+        return { source, events: [], ok: false, error: err.message };
       }
     });
 
     const results = await Promise.allSettled(promises);
-    results.forEach((r, i) => {
-      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-        state.events.push(...r.value);
-      } else if (r.status === 'rejected') {
-        log(`Promise rejected for source ${i}: ${r.reason}`);
-      }
+    results.forEach(r => {
+      const res = r.status === 'fulfilled' ? r.value : { source: null, events: [], ok: false, error: r.reason };
+      if (res.events.length > 0) allEvents.push(...res.events);
+      if (!res.ok) failedSources.push(res.source?.name || 'Unknown');
     });
+
+    // Replace events with fresh data
+    state.events = allEvents;
 
     // Assign content type to each event from its source
     state.events.forEach(ev => {
@@ -1219,12 +1223,27 @@ body {
     });
 
     log(`Total events loaded: ${state.events.length}`);
+    if (failedSources.length > 0) log(`Failed sources: ${failedSources.join(', ')}`);
     el.style.display = 'none';
     saveEventCache();
     calAutoNavigate();
     updateFilters();
     updateContentTypeFilter();
     render();
+    showSourceWarnings(failedSources);
+  }
+
+  function showSourceWarnings(failedSources) {
+    const existing = document.getElementById('sourceWarning');
+    if (existing) existing.remove();
+    if (failedSources.length === 0) return;
+    const warn = document.createElement('div');
+    warn.id = 'sourceWarning';
+    warn.style.cssText = 'background:#1a1a00;border:1px solid #665500;color:#ffcc00;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;justify-content:space-between;';
+    warn.innerHTML = `<span>⚠ Could not load: ${failedSources.join(', ')}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#ffcc00;cursor:pointer;font-size:16px;padding:0 0 0 12px;">×</button>`;
+    const container = document.querySelector('.container');
+    const cal = document.getElementById('calendarView');
+    if (cal) container.insertBefore(warn, cal);
   }
 
   // --- HTML Table Scraper (works for 19hz and generic tables) ---
