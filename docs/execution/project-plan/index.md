@@ -27,11 +27,21 @@
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/17 |
 | [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/65 |
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/105 |
-| [Backlog](./backlog.md) | Future | 0/83 |
+| [Backlog](./backlog.md) | Future | 0/120 |
 
 ---
 
 ## Recent Milestones
+
+### Brand Positioning & Persona Framework ✅
+**Completed: 2026-02-08**
+
+- **Tagline**: "Your likes. Your saves. Your life — organized."
+- **5 brand principles** guiding all feature decisions (input shapes output, organize as you go, one place whole life, show don't decorate, expand with user)
+- **8 named personas** across primary (Visual Collector, Sound & Scene Curator, DJ, Multidisciplinary Maker) and secondary (Deep-Dive Enthusiast, Researcher, Cultural Omnivore, Design Technologist) tiers + 3 future personas
+- **Persona-to-feature matrix** mapping all personas against 11 feature areas
+- **Backlog expanded** with persona-driven epics: Taste & Pattern Intelligence, Flexible Tagging, Events & Venue Integration, Mobile Capture, Collection Export
+- See [Brand Positioning](../../strategy/brand-positioning.md) and [User Personas](../../ux/personas.md)
 
 ### Widget Phase 2.5a: Design System Transition ⚡
 **Started: 2026-02-07**
@@ -81,8 +91,8 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 7: Platform Expansion | 0 | 0 | 17 | 0 |
 | Phase 8: Automated Pins | 0 | 0 | 65 | 0 |
 | Phase 9: Bulk Import | 0 | 0 | 105 | 0 |
-| Backlog | 0 | 0 | 83 | 0 |
-| **TOTAL** | **155** | **11** | **688** | **2** |
+| Backlog | 0 | 0 | 120 | 0 |
+| **TOTAL** | **155** | **11** | **725** | **2** |
 
 ---
 
