@@ -48,8 +48,6 @@ class DesignSystemViewer {
     this.accessibilityNotes = DOMUtils.$('#accessibility-notes', this.container);
     this.statesSection = DOMUtils.$('#states-section', this.container);
     this.statesList = DOMUtils.$('#states-list', this.container);
-    this.variantsSection = DOMUtils.$('#variants-section', this.container);
-    this.variantsGallery = DOMUtils.$('#variants-gallery', this.container);
 
     // Code view elements
     this.tokenList = DOMUtils.$('#token-list', this.container);
@@ -909,7 +907,6 @@ class DesignSystemViewer {
     this.usageSection.hidden = true;
     this.dontUseSection.hidden = true;
     this.a11ySection.hidden = true;
-    this.variantsSection.hidden = true;
 
     // Code context - show token list
     this.updateTokenList(section);
@@ -957,40 +954,6 @@ class DesignSystemViewer {
 
     // States section
     this.renderStatesSection(component);
-
-    // Variants gallery with clickable previews
-    if (component.variants?.length > 1) {
-      this.variantsSection.hidden = false;
-      this.variantsGallery.innerHTML = component.variants
-        .map((v, i) => `
-          <div class="variant-thumb ${i === 0 ? 'active' : ''}" data-index="${i}">
-            <div class="variant-thumb-preview">${v.html || '<span>—</span>'}</div>
-            <span class="variant-thumb-name">${v.name || 'Variant ' + (i + 1)}</span>
-          </div>
-        `)
-        .join('');
-
-      // Bind click events for variant thumbs
-      this.variantsGallery.querySelectorAll('.variant-thumb').forEach(thumb => {
-        thumb.addEventListener('click', () => {
-          const index = parseInt(thumb.dataset.index);
-          // Update active state
-          this.variantsGallery.querySelectorAll('.variant-thumb').forEach(t => t.classList.remove('active'));
-          thumb.classList.add('active');
-          // Update variant select dropdown
-          if (this.variantSelect) this.variantSelect.value = index;
-          // Re-render preview with new variant
-          this.renderComponentPreview(component, index);
-          // Update code blocks
-          const variant = component.variants?.[index];
-          if (variant) {
-            this.updateCodeBlocksForComponent(component, variant);
-          }
-        });
-      });
-    } else {
-      this.variantsSection.hidden = true;
-    }
 
     // Update code context
     this.updateTokenListForComponent(component);
