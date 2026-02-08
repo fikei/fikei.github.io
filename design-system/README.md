@@ -408,15 +408,29 @@ Grid-based widget framework for AI-powered recommendations. Uses `w-*` prefix cl
 
 **Structure:** `w-shell > w-header + w-body + w-footer`
 
-**Body templates:** `w-body--verdict`, `w-body--list`, `w-body--spectrum`, `w-body--split`, `w-body--narrative`, `w-body--suggestion`, `w-body--stats`, `w-body--comparison`, `w-body--choices`, `w-body--grouped`
+**Body templates (11):**
 
-**Atoms:** `w-text`, `w-badge`, `w-btn`, `w-img`, `w-icon`, `w-icon-btn`, `w-bar`
+| Template | Body Modifier | Boards Name | Description |
+|----------|--------------|-------------|-------------|
+| verdict | `w-body--verdict` | hero-card | Hero headline with verdict tags |
+| list | `w-body--list` | list | Vertical stack of rows |
+| spectrum | `w-body--spectrum` | spectrum | Dimensional positioning on axes |
+| split | `w-body--split` | grid-split | Two-column layout with divider |
+| narrative | `w-body--narrative` | text-block | Long-form prose text |
+| suggestion | `w-body--suggestion` | quick-add | Single item recommendation with CTA |
+| stats | `w-body--stats` | stat-row | Row of key metrics |
+| comparison | `w-body--comparison` | comparison | Two options side by side (A vs B) |
+| choices | `w-body--choices` | choices | Selectable option cards |
+| checklist | `w-body--checklist` | checklist | Interactive checklist with running total |
+| grouped | `w-body--grouped` | grouped | Labeled sections with grouped content |
 
-**Molecules:** `w-headline`, `w-tag-group`, `w-row`, `w-stat`, `w-axis`, `w-items`, `w-item`, `w-divider`, `w-action-bar`
+**Atoms:** `w-text`, `w-badge`, `w-btn`, `w-img`, `w-icon`, `w-icon-btn`, `w-bar`, `w-checkbox`
+
+**Molecules:** `w-headline`, `w-tag-group`, `w-row`, `w-stat`, `w-axis`, `w-items`, `w-item`, `w-divider`, `w-option`, `w-section`, `w-action-bar`
 
 **Grid sizes:** `w-shell--sm` (1x1), `w-shell--med` (2x1), `w-shell--lg` (2x2), `w-shell--wide` (3x1), `w-shell--full` (4x4), and more
 
-**Feature flag:** Widgets hidden by default. Enable via `window.enableWidgetDS()` in console.
+**Feature flag:** Widgets hidden by default. Enable via `window.enableWidgetDS()` in console. Toggle in dev menu (Ctrl+Shift+D).
 
 ## Light Mode
 
