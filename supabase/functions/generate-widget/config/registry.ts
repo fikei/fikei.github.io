@@ -117,9 +117,12 @@ export function getEnabledWidgets(): WidgetDefinition[] {
 }
 
 export function getWidgetsForCategory(category: string): WidgetDefinition[] {
-  return getEnabledWidgets().filter(w =>
-    w.categories.includes(category) || w.categories.includes('all')
-  )
+  return getEnabledWidgets().filter(w => {
+    // Widget with only ['all'] is category-agnostic — matches any category
+    if (w.categories.length === 1 && w.categories[0] === 'all') return true
+    // Otherwise, match the specific requested category
+    return w.categories.includes(category)
+  })
 }
 
 export function getConfidenceConfig(widgetId: string): ConfidenceConfig {

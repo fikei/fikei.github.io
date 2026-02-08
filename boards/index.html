@@ -3921,7 +3921,8 @@ Return JSON:
   }
 
   function getCacheKey(widgetId, itemIds, includeRefresh = false) {
-    const base = `${widgetId}:${itemIds.sort().join(',')}`;
+    const category = currentFilter || 'all';
+    const base = `${widgetId}:${category}:${itemIds.sort().join(',')}`;
     const counter = widgetRefreshCounters[widgetId] || 0;
     return includeRefresh ? `${base}:v${counter}` : base;
   }
@@ -4852,19 +4853,20 @@ Return JSON:
 
   // Render Style Summary widget
   function renderStyleSummaryWidget(widget, items, aiResult) {
+    if (!aiResult) return '';
+
     let label, traits, sublabel;
 
-    if (aiResult && aiResult.label) {
+    if (aiResult.label) {
       label = aiResult.label;
       traits = aiResult.traits || [];
       sublabel = aiResult.summary || `Based on ${items.length} items`;
+    } else if (aiResult.styleProfile) {
+      label = aiResult.styleProfile.primaryStyle;
+      traits = aiResult.styleProfile.secondaryInfluences || [];
+      sublabel = aiResult.styleProfile.aestheticNotes || `Based on ${items.length} items`;
     } else {
-      // Fallback
-      const labels = ['Minimal Modern', 'Classic Refined', 'Streetwear Edge', 'Smart Casual', 'Urban Explorer'];
-      const fallbackTraits = ['Curated selection', 'Personal style', 'Versatile pieces'];
-      label = labels[Math.floor(Math.random() * labels.length)];
-      traits = fallbackTraits;
-      sublabel = `Based on ${items.length} item${items.length > 1 ? 's' : ''}`;
+      return '';
     }
 
     const traitsHtml = traits.map(t => `<span class="w-badge">${esc(t)}</span>`).join('');
@@ -5070,7 +5072,8 @@ Return JSON:
       name: 'text-block',
       version: '1.0',
       render: function(widget, items, aiResult) {
-        const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
+        if (!aiResult) return '';
+        const text = aiResult.summary || aiResult.styleNotes || aiResult.label || 'No summary available';
         return `
           <div class="w-shell" data-widget-id="${widget.id}">
             ${renderWidgetHeader(widget)}
@@ -5274,13 +5277,17 @@ Return JSON:
   let inlineWidgetHtml = '';
   const INLINE_WIDGET_POSITION = 8; // Insert inline widget after this many cards
   let widgetGenerationInProgress = false; // Mutex to prevent duplicate generation
+  let widgetRegenerationNeeded = false; // Queue regeneration if called while in progress
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
     // Feature flag: skip all widget rendering when disabled
     if (!widgetDSEnabled) return;
-    // Prevent duplicate generation
-    if (widgetGenerationInProgress) return;
+    // If already running, queue a regeneration for when it finishes
+    if (widgetGenerationInProgress) {
+      widgetRegenerationNeeded = true;
+      return;
+    }
     widgetGenerationInProgress = true;
     const heroSection = $('widgetSection');
     const heroContent = $('widgetContent');
@@ -5302,6 +5309,7 @@ Return JSON:
     if (items.length < 1) {
       renderGrid();
       widgetGenerationInProgress = false;
+      if (widgetRegenerationNeeded) { widgetRegenerationNeeded = false; generateWidgets(); }
       return;
     }
 
@@ -5316,6 +5324,7 @@ Return JSON:
     if (applicableWidgets.length === 0) {
       renderGrid();
       widgetGenerationInProgress = false;
+      if (widgetRegenerationNeeded) { widgetRegenerationNeeded = false; generateWidgets(); }
       return;
     }
 
@@ -5411,6 +5420,12 @@ Return JSON:
     // Re-render grid to inject inline widgets
     renderGrid();
     widgetGenerationInProgress = false;
+
+    // If another generateWidgets() was called while we were running, run again
+    if (widgetRegenerationNeeded) {
+      widgetRegenerationNeeded = false;
+      generateWidgets();
+    }
   }
 
   // Update checklist running total when checkbox is toggled
