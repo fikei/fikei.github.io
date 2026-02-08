@@ -121,6 +121,167 @@ body {
 /* Venue with city subtitle */
 .venue-city { font-size: var(--text-2xs); color: var(--fg-muted); }
 
+/* Content type filter chips */
+.type-filter {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.type-filter__chip {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  background: transparent;
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.type-filter__chip:hover { color: var(--fg); border-color: var(--border); }
+.type-filter__chip.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+/* Auth button */
+.auth-btn {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  background: transparent;
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.auth-btn:hover { color: var(--fg); border-color: var(--border); }
+
+.auth-user {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Onboarding */
+.onboarding {
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.onboarding__title {
+  font-family: var(--font-primary);
+  font-size: var(--text-lg);
+  font-weight: normal;
+  margin-bottom: var(--space-2);
+}
+
+.onboarding__desc {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-6);
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.onboarding__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+  text-align: left;
+  margin-bottom: var(--space-6);
+}
+
+.onboarding__source {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-thin) solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.onboarding__source:hover { border-color: var(--border); }
+.onboarding__source.selected { border-color: var(--fg); background: var(--bg-surface); }
+
+.onboarding__source input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--fg);
+}
+
+.onboarding__source-info { flex: 1; min-width: 0; }
+
+.onboarding__source-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.onboarding__source-meta {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+}
+
+.onboarding__category {
+  margin-bottom: var(--space-4);
+}
+
+.onboarding__category-label {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+/* Auth modal */
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.auth-modal--visible { display: flex; }
+
+.auth-modal__content {
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-6);
+  max-width: 360px;
+  width: 90%;
+}
+
+.auth-modal__title {
+  font-family: var(--font-primary);
+  font-size: var(--text-base);
+  font-weight: normal;
+  margin-bottom: var(--space-4);
+}
+
+.auth-modal__status {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin-top: var(--space-3);
+}
+
+.auth-modal__status--error { color: #c44; }
+
 /* Footer */
 .footer {
   padding: var(--space-6) 0 var(--space-16);
@@ -473,6 +634,11 @@ body {
         <span class="breadcrumb__current">Events</span>
       </nav>
       <div class="page-header__actions">
+        <div class="auth-user" id="authUser" style="display:none">
+          <span id="authEmail"></span>
+          <button class="auth-btn" id="authLogout">Logout</button>
+        </div>
+        <button class="auth-btn" id="authLoginBtn">Login</button>
         <button class="toggle" id="themeToggle" aria-label="Toggle theme">
           <div class="toggle__knob"></div>
         </button>
@@ -482,6 +648,19 @@ body {
 
   <div class="container">
     <p class="page-description">Aggregated events from multiple sources. Location data extracted into address and city columns for filtering.</p>
+
+    <!-- Onboarding (first visit) -->
+    <div id="onboarding" style="display:none">
+      <div class="onboarding">
+        <h2 class="onboarding__title">Choose Your Sources</h2>
+        <p class="onboarding__desc">Select event sources to aggregate. You can always add or remove sources later.</p>
+        <div id="onboardingGrid"></div>
+        <div style="display: flex; gap: var(--space-3); justify-content: center;">
+          <button class="btn btn--ghost" id="onboardingSkip">Skip</button>
+          <button class="btn btn--filled" id="onboardingStart">Get Started</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Sources bar -->
     <div class="sources-bar">
@@ -503,6 +682,9 @@ body {
       <input type="date" class="input input--date" id="filterDateTo" title="To date">
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
     </div>
+
+    <!-- Content type filter (populated dynamically, hidden when only 1 type) -->
+    <div class="type-filter" id="typeFilter" style="display:none"></div>
 
     <!-- Stats + View Toggle -->
     <div class="stats-bar">
@@ -607,6 +789,16 @@ body {
           <option value="html">HTML Page (scrape table)</option>
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="input select" id="sourceCategory">
+          <option value="music">Music</option>
+          <option value="film">Film</option>
+          <option value="comedy">Comedy</option>
+          <option value="theater">Theater</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
       <p class="form-hint">
         Paste any URL — type is auto-detected. Supports iCal, JSON, RSS/Atom, and HTML table scraping.
       </p>
@@ -617,6 +809,24 @@ body {
     </div>
   </div>
 
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="authModal">
+    <div class="auth-modal__content">
+      <h2 class="auth-modal__title">Login with Email</h2>
+      <div class="form-group">
+        <input type="email" class="input" id="authEmailInput" placeholder="you@example.com" required>
+      </div>
+      <div class="modal__actions">
+        <button class="btn" id="authModalCancel">Cancel</button>
+        <button class="btn btn--filled" id="authModalSend">Send Magic Link</button>
+      </div>
+      <p class="auth-modal__status" id="authStatus"></p>
+    </div>
+  </div>
+
+  <!-- Supabase JS (shared with boards) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
   <script>
 // ============================================
 // Events Aggregator — ctrl.rodeo
@@ -625,15 +835,76 @@ body {
 (function() {
   'use strict';
 
+  // ============================================
+  // Stock Sources Catalog
+  // ============================================
+  const STOCK_SOURCES = [
+    // Music / Nightlife
+    { id: '19hz-bayarea', name: '19hz Bay Area', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_BayArea.php', region: 'Bay Area', description: 'Electronic music & nightlife events' },
+    { id: '19hz-losangeles', name: '19hz Los Angeles', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_LosAngeles.php', region: 'Los Angeles', description: 'Electronic music & nightlife events' },
+    { id: '19hz-newyork', name: '19hz New York', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_NewYork.php', region: 'New York', description: 'Electronic music & nightlife events' },
+    { id: '19hz-seattle', name: '19hz Seattle', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_Seattle.php', region: 'Seattle', description: 'Electronic music & nightlife events' },
+    // Film
+    { id: 'roxie-sf', name: 'Roxie Theater', category: 'film', type: 'rss', url: 'https://roxie.com/feed/', region: 'San Francisco', description: 'Independent & arthouse cinema' },
+    // Comedy
+    { id: 'sf-punchline', name: 'Punchline SF', category: 'comedy', type: 'html', url: 'https://www.punchlinecomedyclub.com/events', region: 'San Francisco', description: 'Stand-up comedy shows' },
+    { id: 'cobbs-sf', name: "Cobb's Comedy Club", category: 'comedy', type: 'html', url: 'https://www.cobbscomedy.com/events', region: 'San Francisco', description: 'Stand-up & variety comedy' },
+  ];
+
+  const CONTENT_TYPES = {
+    music: 'Music',
+    film: 'Film',
+    comedy: 'Comedy',
+    theater: 'Theater',
+    other: 'Other',
+  };
+
+  // ============================================
+  // Supabase Auth (shared with ctrl.rodeo/boards)
+  // ============================================
+  const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+  const AUTH_STORAGE_KEY = 'sb-yfhudwakpgzswiylhfbh-auth-token';
+
+  let supabaseClient = null;
+  let currentUser = null;
+
+  function initSupabase() {
+    if (window.supabase) {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { detectSessionInUrl: true, flowType: 'implicit', autoRefreshToken: true, persistSession: true }
+      });
+      log('Supabase client initialized');
+    } else {
+      log('Supabase JS not loaded — auth disabled');
+    }
+  }
+
+  function getStoredAuth() {
+    try {
+      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) { return null; }
+  }
+
+  function getAccessToken() {
+    const auth = getStoredAuth();
+    return auth?.access_token || null;
+  }
+
+  // ============================================
+  // State
+  // ============================================
   const state = {
     events: [],
     sources: [],
-    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '' },
+    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' },
     sort: { key: 'date', dir: 'asc' },
     view: 'table',
     calMonth: new Date().getMonth(),
     calYear: new Date().getFullYear(),
     selectedDate: null,
+    onboarded: false,
   };
 
   // --- Debug Logging ---
@@ -649,6 +920,8 @@ body {
   }
 
   const STORAGE_KEY = 'ctrl-rodeo-event-sources';
+  const ONBOARDED_KEY = 'ctrl-rodeo-events-onboarded';
+  const SETTINGS_KEY = 'ctrl-rodeo-events-settings';
 
   // Each proxy: { url: template, json: boolean (if response wraps content in JSON) }
   const CORS_PROXIES = [
@@ -659,6 +932,8 @@ body {
 
   // --- Source Management ---
   function loadSources() {
+    state.onboarded = !!localStorage.getItem(ONBOARDED_KEY);
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -667,28 +942,68 @@ body {
       }
     } catch (e) { log('Failed to parse saved sources: ' + e.message); }
 
-    // Migrate: remove old demo source, ensure 19hz exists
+    // Migrate: remove old demo source
     const hadDemo = state.sources.some(s => s.id === 'demo');
     if (hadDemo) {
       state.sources = state.sources.filter(s => s.id !== 'demo');
       log('Removed legacy demo source');
     }
-    const has19hz = state.sources.some(s => s.id === '19hz-bayarea');
-    if (!has19hz) {
-      state.sources.unshift({ id: '19hz-bayarea', name: '19hz Bay Area', type: 'auto', url: 'https://19hz.info/eventlisting_BayArea.php', enabled: true });
-      log('Added default 19hz Bay Area source');
+
+    // Ensure existing sources have category from catalog
+    state.sources.forEach(s => {
+      if (!s.category) {
+        const stock = STOCK_SOURCES.find(ss => ss.id === s.id);
+        if (stock) s.category = stock.category;
+      }
+    });
+
+    // First visit: show onboarding if not yet done and no sources
+    if (!state.onboarded && state.sources.length === 0) {
+      // Will be handled by showOnboarding() in init
+      return;
     }
+
+    // Fallback: ensure at least 19hz exists
     if (state.sources.length === 0) {
-      state.sources = [
-        { id: '19hz-bayarea', name: '19hz Bay Area', type: 'auto', url: 'https://19hz.info/eventlisting_BayArea.php', enabled: true }
-      ];
+      const def = STOCK_SOURCES.find(s => s.id === '19hz-bayarea');
+      state.sources = [{ ...def, enabled: true }];
     }
+
     saveSources();
     log('Active sources:', state.sources.filter(s => s.enabled).map(s => `${s.name} (${s.type})`));
   }
 
   function saveSources() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
+    saveSettings();
+  }
+
+  function saveSettings() {
+    const settings = {
+      sources: state.sources,
+      view: state.view,
+      sort: state.sort,
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function loadSettings() {
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (settings.view) state.view = settings.view;
+        if (settings.sort) state.sort = settings.sort;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // Get category for a source
+  function getSourceCategory(sourceId) {
+    const src = state.sources.find(s => s.id === sourceId);
+    if (src?.category) return src.category;
+    const stock = STOCK_SOURCES.find(s => s.id === sourceId);
+    return stock?.category || 'other';
   }
 
   // --- Auto-detect source type from URL ---
@@ -770,10 +1085,16 @@ body {
       }
     });
 
+    // Assign content type to each event from its source
+    state.events.forEach(ev => {
+      ev.contentType = getSourceCategory(ev.source);
+    });
+
     log(`Total events loaded: ${state.events.length}`);
     el.style.display = 'none';
     calAutoNavigate();
     updateFilters();
+    updateContentTypeFilter();
     render();
   }
 
@@ -1506,10 +1827,11 @@ body {
   // --- Filtering ---
   function getFilteredEvents() {
     return state.events.filter(ev => {
-      const { search, city, source, dateFrom, dateTo } = state.filters;
+      const { search, city, source, dateFrom, dateTo, contentType } = state.filters;
       if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre, ev.promoter || '', ev.ages || ''].join(' ').toLowerCase().includes(q)) return false; }
       if (city && ev.city !== city) return false;
       if (source && ev.source !== source) return false;
+      if (contentType && ev.contentType !== contentType) return false;
       if (dateFrom && ev.date < dateFrom) return false;
       if (dateTo && ev.date > dateTo) return false;
       return true;
@@ -1517,13 +1839,45 @@ body {
   }
 
   function clearAllFilters() {
-    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '' };
+    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' };
     document.getElementById('filterSearch').value = '';
     document.getElementById('filterCity').value = '';
     document.getElementById('filterSource').value = '';
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
+    updateContentTypeFilter();
     render();
+  }
+
+  // --- Content Type Filter ---
+  function updateContentTypeFilter() {
+    const container = document.getElementById('typeFilter');
+    const types = [...new Set(state.events.map(e => e.contentType).filter(Boolean))];
+
+    // Hide if 0 or 1 type
+    if (types.length <= 1) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'flex';
+    const allActive = !state.filters.contentType;
+    let html = `<button class="type-filter__chip ${allActive ? 'active' : ''}" data-type="">All</button>`;
+    types.sort().forEach(t => {
+      const label = CONTENT_TYPES[t] || t;
+      const count = state.events.filter(e => e.contentType === t).length;
+      const active = state.filters.contentType === t;
+      html += `<button class="type-filter__chip ${active ? 'active' : ''}" data-type="${escHtml(t)}">${escHtml(label)} <span style="opacity:0.6">${count}</span></button>`;
+    });
+    container.innerHTML = html;
+
+    container.querySelectorAll('.type-filter__chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        state.filters.contentType = chip.dataset.type || '';
+        updateContentTypeFilter();
+        render();
+      });
+    });
   }
 
   function updateFilters() {
@@ -1609,11 +1963,12 @@ body {
     document.getElementById('modalAdd').addEventListener('click', () => {
       const url = document.getElementById('sourceUrl').value.trim();
       const type = document.getElementById('sourceType').value;
+      const category = document.getElementById('sourceCategory').value;
       if (!url) return;
       let name = document.getElementById('sourceName').value.trim();
       if (!name) { try { name = new URL(url).hostname; } catch (e) { name = url.substring(0, 30); } }
       const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      state.sources.push({ id, name, type, url, enabled: true });
+      state.sources.push({ id, name, type, url, category, enabled: true });
       saveSources(); modal.classList.remove('modal--visible'); fetchAllSources();
     });
 
@@ -1621,6 +1976,7 @@ body {
     document.querySelectorAll('.view-toggle__btn').forEach(btn => {
       btn.addEventListener('click', () => {
         state.view = btn.dataset.view;
+        saveSettings();
         render();
       });
     });
@@ -1655,18 +2011,190 @@ body {
     // Day detail close
     document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
 
+    // Auth
+    const authModal = document.getElementById('authModal');
+    document.getElementById('authLoginBtn').addEventListener('click', () => {
+      authModal.classList.add('auth-modal--visible');
+      document.getElementById('authEmailInput').value = '';
+      document.getElementById('authStatus').textContent = '';
+      document.getElementById('authEmailInput').focus();
+    });
+    document.getElementById('authModalCancel').addEventListener('click', () => authModal.classList.remove('auth-modal--visible'));
+    authModal.addEventListener('click', (e) => { if (e.target === authModal) authModal.classList.remove('auth-modal--visible'); });
+    document.getElementById('authModalSend').addEventListener('click', () => {
+      const email = document.getElementById('authEmailInput').value.trim();
+      if (email) handleLogin(email);
+    });
+    document.getElementById('authEmailInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const email = e.target.value.trim();
+        if (email) handleLogin(email);
+      }
+    });
+    document.getElementById('authLogout').addEventListener('click', handleLogout);
+
+    // Onboarding
+    document.getElementById('onboardingStart').addEventListener('click', () => {
+      const checked = Array.from(document.querySelectorAll('#onboardingGrid input[type="checkbox"]:checked')).map(cb => cb.value);
+      completeOnboarding(checked);
+    });
+    document.getElementById('onboardingSkip').addEventListener('click', () => {
+      completeOnboarding(['19hz-bayarea']);
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (state.selectedDate) { closeDayDetail(); return; }
+        authModal.classList.remove('auth-modal--visible');
         modal.classList.remove('modal--visible');
       }
       if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); filterSearch.focus(); }
     });
   }
 
+  // --- Onboarding ---
+  function showOnboarding() {
+    const container = document.getElementById('onboarding');
+    const grid = document.getElementById('onboardingGrid');
+    container.style.display = '';
+
+    // Group stock sources by category
+    const byCategory = {};
+    STOCK_SOURCES.forEach(s => {
+      if (!byCategory[s.category]) byCategory[s.category] = [];
+      byCategory[s.category].push(s);
+    });
+
+    let html = '';
+    Object.entries(byCategory).forEach(([cat, sources]) => {
+      const label = CONTENT_TYPES[cat] || cat;
+      html += `<div class="onboarding__category"><div class="onboarding__category-label">${escHtml(label)}</div><div class="onboarding__grid">`;
+      sources.forEach(s => {
+        html += `<label class="onboarding__source" data-source-id="${escHtml(s.id)}">
+          <input type="checkbox" value="${escHtml(s.id)}" ${s.id === '19hz-bayarea' ? 'checked' : ''}>
+          <div class="onboarding__source-info">
+            <div class="onboarding__source-name">${escHtml(s.name)}</div>
+            <div class="onboarding__source-meta">${escHtml(s.region)} &middot; ${escHtml(s.description)}</div>
+          </div>
+        </label>`;
+      });
+      html += '</div></div>';
+    });
+    grid.innerHTML = html;
+
+    // Toggle selected class on checkbox change
+    grid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        cb.closest('.onboarding__source').classList.toggle('selected', cb.checked);
+      });
+      // Init selected state
+      if (cb.checked) cb.closest('.onboarding__source').classList.add('selected');
+    });
+  }
+
+  function completeOnboarding(selectedIds) {
+    const selected = STOCK_SOURCES.filter(s => selectedIds.includes(s.id));
+    if (selected.length === 0) {
+      // Default to 19hz Bay Area
+      const def = STOCK_SOURCES.find(s => s.id === '19hz-bayarea');
+      selected.push(def);
+    }
+    state.sources = selected.map(s => ({ ...s, enabled: true }));
+    state.onboarded = true;
+    localStorage.setItem(ONBOARDED_KEY, '1');
+    saveSources();
+    document.getElementById('onboarding').style.display = 'none';
+    fetchAllSources();
+  }
+
+  // --- Auth ---
+  function initAuth() {
+    initSupabase();
+
+    // Check existing session
+    const stored = getStoredAuth();
+    if (stored?.user) {
+      currentUser = stored.user;
+      log('Auth: found existing session for ' + currentUser.email);
+    }
+    updateAuthUI();
+
+    // Listen for auth state changes
+    if (supabaseClient) {
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        log('Auth state change: ' + event);
+        const wasLoggedOut = !currentUser;
+        currentUser = session?.user || null;
+        updateAuthUI();
+
+        if (currentUser && wasLoggedOut) {
+          document.getElementById('authModal').classList.remove('auth-modal--visible');
+          log('Logged in as ' + currentUser.email);
+        }
+      });
+    }
+  }
+
+  function updateAuthUI() {
+    const loginBtn = document.getElementById('authLoginBtn');
+    const userEl = document.getElementById('authUser');
+    const emailEl = document.getElementById('authEmail');
+
+    if (currentUser) {
+      loginBtn.style.display = 'none';
+      userEl.style.display = 'flex';
+      emailEl.textContent = currentUser.email;
+    } else {
+      loginBtn.style.display = '';
+      userEl.style.display = 'none';
+    }
+  }
+
+  async function handleLogin(email) {
+    if (!supabaseClient) { log('Auth: Supabase not available'); return; }
+    const statusEl = document.getElementById('authStatus');
+    const sendBtn = document.getElementById('authModalSend');
+    sendBtn.disabled = true;
+    statusEl.textContent = 'Sending magic link...';
+    statusEl.className = 'auth-modal__status';
+
+    try {
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) throw error;
+      statusEl.textContent = 'Check your email for the magic link!';
+      sendBtn.disabled = false;
+    } catch (e) {
+      statusEl.textContent = e.message || 'Failed to send magic link';
+      statusEl.className = 'auth-modal__status auth-modal__status--error';
+      sendBtn.disabled = false;
+    }
+  }
+
+  async function handleLogout() {
+    if (supabaseClient) await supabaseClient.auth.signOut();
+    currentUser = null;
+    updateAuthUI();
+    log('Logged out');
+  }
+
   // --- Init ---
-  function init() { loadSources(); bindEvents(); fetchAllSources(); }
+  function init() {
+    loadSettings();
+    loadSources();
+    bindEvents();
+    initAuth();
+
+    if (!state.onboarded && state.sources.length === 0) {
+      showOnboarding();
+    } else {
+      fetchAllSources();
+    }
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
