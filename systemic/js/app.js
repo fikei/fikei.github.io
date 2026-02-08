@@ -433,22 +433,33 @@ class SystemicApp {
     }
 
     // Add body modifier templates as components (from registry)
+    // Generate a variant for ALL 15 grid sizes (like widgets.html),
+    // not just validSizes, so QA can audit every permutation.
+    const ALL_SIZES = [
+      'sm', 'med', 'wide', 'banner',
+      'tall', 'lg', 'xl', 'pano',
+      'col', 'poster', 'max', 'cinema',
+      'board', 'wall', 'full'
+    ];
+
     if (registry?.templates) {
       for (const [name, tmpl] of Object.entries(registry.templates)) {
+        const validSet = new Set(tmpl.validSizes || []);
         components.push({
           type: `template-${name}`,
           name: `Template: ${this.formatComponentName(name)}`,
-          variants: (tmpl.validSizes || []).map(size => ({
+          variants: ALL_SIZES.map(size => ({
             name: `${name} @ ${size}`,
             classes: ['w-shell', `w-shell--${size}`, 'w-body', tmpl.bodyModifier],
             html: this.generateTemplatePreviewHTML(name, size, tmpl),
-            usageCount: 1
+            usageCount: validSet.has(size) ? 1 : 0
           })),
-          totalUsage: tmpl.validSizes?.length || 0,
+          totalUsage: ALL_SIZES.length,
+          validSizes: tmpl.validSizes || [],
           guidelines: {
             whenToUse: [tmpl.description],
             whenNotToUse: tmpl.validSizes
-              ? [`Only use at sizes: ${tmpl.validSizes.join(', ')}`]
+              ? [`Recommended sizes: ${tmpl.validSizes.join(', ')}`]
               : []
           },
           source: 'template-registry.json',
