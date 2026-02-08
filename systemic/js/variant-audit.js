@@ -148,12 +148,28 @@ class VariantAudit {
     this.FILTER_KEY = `variant-filter:${this.systemId}`;
     this.loadAudit();
 
-    this.components = designSystem.components.map(comp => ({
-      name: comp.type || comp.name,
-      label: comp.name || comp.type,
-      variants: comp.variants || [],
-      element: comp.variants?.[0]?.html || null
-    }));
+    this.components = designSystem.components.map(comp => {
+      const isTemplate = comp.type?.startsWith('template-');
+      // For templates, build a size → HTML map so QA can render each size correctly
+      const variantsBySize = {};
+      if (isTemplate && comp.variants) {
+        comp.variants.forEach(v => {
+          const sizeMatch = v.name?.match(/@ (\w+)$/);
+          if (sizeMatch) variantsBySize[sizeMatch[1]] = v.html;
+        });
+      }
+      return {
+        name: comp.type || comp.name,
+        label: comp.name || comp.type,
+        variants: comp.variants || [],
+        element: comp.variants?.[0]?.html || null,
+        isTemplate,
+        variantsBySize,
+        validSizes: isTemplate
+          ? comp.variants?.map(v => v.name?.match(/@ (\w+)$/)?.[1]).filter(Boolean)
+          : null
+      };
+    });
 
     this.populateFilters();
   }
@@ -307,12 +323,12 @@ class VariantAudit {
       sourceNode = sourceHtml;
     }
 
-    // If no element available, render placeholders
-    var sizes = comp.axes?.size || this.ALL_SIZES;
+    // Use valid sizes for templates, all sizes otherwise
+    var sizes = comp.validSizes || comp.axes?.size || this.ALL_SIZES;
     sizes.forEach(size => {
       var entry = this.getAuditEntry(this.currentAuditName, size);
       var isFlagged = !!entry.flagged;
-      var wrapper = this.buildVariantItem(sourceNode, this.currentAuditName, size);
+      var wrapper = this.buildVariantItem(sourceNode, this.currentAuditName, size, comp);
 
       if (isFlagged) {
         blockedCount++;
@@ -345,7 +361,7 @@ class VariantAudit {
   // Build a single variant item
   // ============================================
 
-  buildVariantItem(sourceNode, auditName, size) {
+  buildVariantItem(sourceNode, auditName, size, comp) {
     var entry = this.getAuditEntry(auditName, size);
     var isFlagged = !!entry.flagged;
     var hasNote = !!entry.note;
@@ -387,7 +403,10 @@ class VariantAudit {
     var preview = document.createElement('div');
     preview.className = 'qa-variant-preview';
 
-    if (sourceNode) {
+    // For templates, use the pre-rendered size-specific HTML
+    if (comp?.isTemplate && comp.variantsBySize?.[size]) {
+      preview.innerHTML = comp.variantsBySize[size];
+    } else if (sourceNode) {
       var clone = sourceNode.cloneNode(true);
       // Strip existing size classes and apply the target size
       clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();

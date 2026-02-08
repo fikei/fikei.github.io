@@ -216,31 +216,7 @@
   color: var(--fg-muted);
 }
 
-/* Variants Gallery */
-.variants-gallery {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-2);
-}
 
-.variant-thumb {
-  aspect-ratio: 16/9;
-  background: var(--bg);
-  border: var(--border-thin) solid var(--border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--duration-normal) var(--ease-default);
-}
-
-.variant-thumb:hover {
-  border-color: var(--border);
-}
-
-.variant-thumb.active {
-  border-color: var(--fg);
-}
 
 /* Token List */
 .token-list {
@@ -719,73 +695,6 @@
 .state-indicator.css {
   background: #3b82f6;
   color: white;
-}
-
-/* Variant Thumbs with Previews */
-.variants-gallery {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.variant-thumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2);
-  border: var(--border-thin) solid var(--border-subtle);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-default);
-  overflow: hidden;
-}
-
-.variant-thumb:hover {
-  border-color: var(--border);
-  background: var(--bg-elevated);
-}
-
-.variant-thumb.active {
-  border-color: var(--fg-muted);
-  background: var(--bg-elevated);
-}
-
-.variant-thumb-preview {
-  flex-shrink: 0;
-  width: 60px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: var(--bg);
-  border-radius: 3px;
-  font-size: 10px;
-  transform: scale(0.7);
-  transform-origin: center;
-}
-
-.variant-thumb-preview > * {
-  max-width: 100%;
-  max-height: 100%;
-  pointer-events: none;
-}
-
-.variant-thumb-preview button,
-.variant-thumb-preview a,
-.variant-thumb-preview input {
-  font-size: 8px !important;
-  padding: 2px 6px !important;
-  min-height: auto !important;
-}
-
-.variant-thumb-name {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--fg-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ============================================
