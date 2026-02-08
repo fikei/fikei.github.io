@@ -88,12 +88,14 @@ body {
 /* Table overrides — column widths */
 .data-table-wrap { margin-bottom: var(--space-8); }
 .data-table .col-date { width: 90px; white-space: nowrap; }
-.data-table .col-date small { color: var(--fg-muted); font-size: var(--text-2xs); }
+.data-table .col-date small { color: var(--fg-muted); font-size: var(--text-2xs); display: block; }
 .data-table .col-name { min-width: 180px; }
 .data-table .col-venue { min-width: 120px; }
-.data-table .col-city { min-width: 100px; white-space: nowrap; }
-.data-table .col-genre { min-width: 100px; font-size: var(--text-2xs); color: var(--fg-muted); }
-.data-table .col-price { width: 80px; white-space: nowrap; }
+.data-table .col-city { min-width: 80px; white-space: nowrap; }
+.data-table .col-genre { min-width: 100px; }
+.data-table .col-price { width: 70px; white-space: nowrap; font-size: var(--text-2xs); }
+.data-table .col-ages { width: 50px; white-space: nowrap; font-size: var(--text-2xs); text-align: center; }
+.data-table .col-promoter { min-width: 80px; font-size: var(--text-2xs); color: var(--fg-muted); }
 .data-table .col-source { width: 90px; white-space: nowrap; }
 
 .event-link {
@@ -104,6 +106,20 @@ body {
 }
 
 .event-link:hover { border-color: var(--fg); }
+
+/* Genre tags inline */
+.genre-tag {
+  display: inline-block;
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: 0 var(--space-1);
+  margin: 0 2px 2px 0;
+  white-space: nowrap;
+}
+
+/* Venue with city subtitle */
+.venue-city { font-size: var(--text-2xs); color: var(--fg-muted); }
 
 /* Footer */
 .footer {
@@ -214,10 +230,16 @@ body {
 }
 
 /* Responsive */
+@media (max-width: 768px) {
+  .data-table .col-genre,
+  .data-table .col-ages,
+  .data-table .col-promoter { display: none; }
+}
 @media (max-width: 600px) {
   .data-table .col-genre,
-  .data-table .col-price { display: none; }
-
+  .data-table .col-price,
+  .data-table .col-ages,
+  .data-table .col-promoter { display: none; }
   .calendar__cell { min-height: 60px; }
   .calendar__event { font-size: 9px; }
 }
@@ -283,9 +305,10 @@ body {
             <th class="col-date" data-sort="date">Date <span class="data-table__sort">&#9650;</span></th>
             <th class="col-name" data-sort="name">Event <span class="data-table__sort">&#9650;</span></th>
             <th class="col-venue" data-sort="venue">Venue <span class="data-table__sort">&#9650;</span></th>
-            <th class="col-city" data-sort="city">City <span class="data-table__sort">&#9650;</span></th>
             <th class="col-genre" data-sort="genre">Genre <span class="data-table__sort">&#9650;</span></th>
             <th class="col-price" data-sort="price">Price <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-ages" data-sort="ages">Ages <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-promoter" data-sort="promoter">Promoter <span class="data-table__sort">&#9650;</span></th>
             <th class="col-source" data-sort="source">Source <span class="data-table__sort">&#9650;</span></th>
           </tr>
         </thead>
@@ -527,139 +550,248 @@ body {
     return parseHtmlTable(text, source.id, source.url);
   }
 
+  // ============================================
+  // HTML Table Parser — handles two known formats:
+  //
+  // FORMAT A (11-col raw, from 19hz DATA_HEADERS CSV):
+  //   date(0) name(1) genre(2) location(3) time(4)
+  //   price(5) ages(6) promoter(7) url1(8) url2(9) datetime(10)
+  //
+  // FORMAT B (6-col combined, from 19hz bootstrap redesign):
+  //   Date/Time(0) Event@Venue(1) Tags(2) Price|Age(3) Organizers(4) Links(5)
+  //
+  // Also handles arbitrary tables via header-text detection.
+  // ============================================
+
   function parseHtmlTable(html, sourceId, baseUrl) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const tables = doc.querySelectorAll('table');
+    // Prefer the largest table if there are multiple
+    const tables = Array.from(doc.querySelectorAll('table'));
     log(`HTML parser: found ${tables.length} table(s) in ${html.length} chars`);
-    const table = tables.length > 0 ? tables[0] : null;
-    if (!table) { log('HTML parser: no <table> found in response'); return []; }
+    if (tables.length === 0) { log('HTML parser: no <table> found'); return []; }
+    const table = tables.reduce((a, b) => (b.querySelectorAll('tr').length > a.querySelectorAll('tr').length ? b : a), tables[0]);
 
-    // Detect column headers
+    // --- Step 1: Detect headers ---
     const headers = [];
     table.querySelectorAll('thead th, tr:first-child th').forEach(th => {
-      headers.push(th.textContent.trim().toLowerCase());
+      headers.push(th.textContent.trim().toLowerCase().replace(/\s+/g, ' '));
     });
     log('HTML parser: headers = ' + JSON.stringify(headers));
 
-    // Build column index map from header text
+    // --- Step 2: Count columns from first data row ---
+    let rows = Array.from(table.querySelectorAll('tbody tr'));
+    if (rows.length === 0) rows = Array.from(table.querySelectorAll('tr')).filter(r => !r.querySelector('th'));
+    if (rows.length === 0) { log('HTML parser: no data rows'); return []; }
+    const colCount = rows[0].querySelectorAll('td').length;
+    log(`HTML parser: ${rows.length} data rows, ${colCount} cols`);
+
+    // --- Step 3: Build column map ---
+    // Strategy: try header-text matching first, then positional fallback
     const colMap = {};
-    headers.forEach((h, i) => {
-      if ((h.includes('date') || h.includes('time')) && !h.includes('datetime') && colMap.date === undefined) colMap.date = i;
-      else if ((h.includes('event') || h.includes('name') || h.includes('title') || h.includes('artist')) && colMap.name === undefined) colMap.name = i;
-      else if ((h.includes('genre') || h.includes('style') || h.includes('tag') || h.includes('music')) && colMap.genre === undefined) colMap.genre = i;
-      else if ((h.includes('venue') || h.includes('location')) && colMap.location === undefined) colMap.location = i;
-      else if (h === 'time' && colMap.time === undefined) colMap.time = i;
-      else if ((h.includes('price') || h.includes('cost') || h === '$') && colMap.price === undefined) colMap.price = i;
-      else if (h.includes('age') && colMap.ages === undefined) colMap.ages = i;
-      else if ((h.includes('promoter') || h.includes('organizer') || h.includes('host')) && colMap.promoter === undefined) colMap.promoter = i;
-      else if (h.includes('link') && colMap.links === undefined) colMap.links = i;
-    });
+    let format = 'unknown';
 
-    // Fallback: positional mapping for 19hz-style tables
-    // 19hz columns: date(0), name(1), genre(2), location(3), time(4), price(5), ages(6), promoter(7), url1(8), url2(9), datetime(10)
+    if (headers.length > 0) {
+      headers.forEach((h, i) => {
+        // Date/Time combined header
+        if ((/^date/.test(h) || h === 'date/time' || h === 'when') && colMap.date === undefined) colMap.date = i;
+        // Event/Name/Title
+        else if ((/event|name|title|artist/.test(h) && !/venue/.test(h)) && colMap.name === undefined) colMap.name = i;
+        // Genre/Tags/Style/Music
+        else if (/genre|tag|style|music|type/.test(h) && colMap.genre === undefined) colMap.genre = i;
+        // Venue/Location (only if separate from name)
+        else if (/venue|location|place/.test(h) && colMap.location === undefined) colMap.location = i;
+        // Standalone time column
+        else if (h === 'time' && colMap.time === undefined) colMap.time = i;
+        // Price (may be combined "Price | Age")
+        else if (/price|cost|\$/.test(h) && colMap.price === undefined) colMap.price = i;
+        // Ages
+        else if (/age/.test(h) && !(/price/.test(h)) && colMap.ages === undefined) colMap.ages = i;
+        // Promoter/Organizer
+        else if (/promoter|organizer|host|present/.test(h) && colMap.promoter === undefined) colMap.promoter = i;
+        // Links
+        else if (/link|url/.test(h) && colMap.links === undefined) colMap.links = i;
+      });
+      // Detect combined headers
+      const dateHeader = headers[colMap.date] || '';
+      if (dateHeader.includes('time') && colMap.time === undefined) colMap._dateHasTime = true;
+      const priceHeader = headers[colMap.price] || '';
+      if (priceHeader.includes('age') && colMap.ages === undefined) colMap._priceHasAge = true;
+      const nameHeader = headers[colMap.name] || '';
+      if (nameHeader.includes('venue') || nameHeader.includes('@')) colMap._nameHasVenue = true;
+      format = 'header-detected';
+    }
+
+    // Positional fallback
     if (colMap.date === undefined && colMap.name === undefined) {
-      const firstRow = table.querySelector('tbody tr, tr:nth-child(2)');
-      const count = firstRow?.querySelectorAll('td').length || 0;
-      log(`HTML parser: no header match, falling back to positional (${count} cols)`);
-      if (count >= 8) Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6, promoter: 7 });
-      else if (count >= 7) Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6 });
-      else if (count >= 4) Object.assign(colMap, { date: 0, name: 1, location: 2, time: 3 });
+      if (colCount >= 10) {
+        // FORMAT A: 11-col raw (19hz CSV)
+        Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6, promoter: 7 });
+        format = '11-col-raw';
+      } else if (colCount >= 7) {
+        // 8-col variant
+        Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6, promoter: 7 });
+        format = '8-col';
+      } else if (colCount === 6) {
+        // FORMAT B: 6-col combined (bootstrap)
+        Object.assign(colMap, { date: 0, name: 1, genre: 2, price: 3, promoter: 4, links: 5 });
+        colMap._dateHasTime = true;
+        colMap._nameHasVenue = true;
+        colMap._priceHasAge = true;
+        format = '6-col-combined';
+      } else if (colCount >= 4) {
+        Object.assign(colMap, { date: 0, name: 1, location: 2, time: 3 });
+        format = '4-col-minimal';
+      }
     }
 
-    log('HTML parser: colMap = ' + JSON.stringify(colMap));
+    log(`HTML parser: format=${format}, colMap=${JSON.stringify(colMap)}`);
 
+    // --- Step 4: Parse each row ---
     const events = [];
-    let rows = table.querySelectorAll('tbody tr');
-    if (rows.length === 0) {
-      rows = table.querySelectorAll('tr');
-      log(`HTML parser: no <tbody>, using all ${rows.length} <tr> rows`);
-    } else {
-      log(`HTML parser: found ${rows.length} <tbody> rows`);
-    }
-
     rows.forEach((row, rowIdx) => {
-      if (row.querySelector('th')) return; // skip header rows
       const cells = row.querySelectorAll('td');
       if (cells.length < 2) return;
 
+      // Helpers
       const getCell = (key) => colMap[key] !== undefined && cells[colMap[key]] ? cells[colMap[key]] : null;
-      const getText = (key) => { const c = getCell(key); return c ? c.textContent.trim() : ''; };
-
-      // Extract ALL links from a cell
-      const getLinks = (key) => {
+      const getText = (key) => { const c = getCell(key); return c ? c.textContent.replace(/\s+/g, ' ').trim() : ''; };
+      const getInnerHtml = (key) => { const c = getCell(key); return c ? c.innerHTML : ''; };
+      const getCellLinks = (key) => {
         const c = getCell(key);
         if (!c) return [];
         return Array.from(c.querySelectorAll('a')).map(a => ({
           href: a.getAttribute('href') || '',
           text: a.textContent.trim(),
-        })).filter(l => l.href);
+        })).filter(l => l.href && l.href !== '#' && !l.href.startsWith('javascript:'));
       };
 
-      // Extract all links from the entire row for URL extraction
-      const allRowLinks = Array.from(row.querySelectorAll('a'))
-        .map(a => a.getAttribute('href') || '')
-        .filter(h => h && h !== '#' && !h.startsWith('javascript:'));
+      // --- DATE column ---
+      // 19hz format: "Fri\nFeb 07" or "Fri: Feb 07" or "Sat: Nov 5-Sun: Nov 6 (Fri: 4:20pm-Sun: 4:20 pm)"
+      const rawDate = getText('date');
+      let date = '', time = '';
+      if (colMap._dateHasTime) {
+        // Combined: split on first parenthesized time group
+        const timeMatch = rawDate.match(/\(([^)]+)\)/);
+        if (timeMatch) {
+          time = timeMatch[1].trim();
+          date = parseFuzzyDate(rawDate.substring(0, rawDate.indexOf('(')).trim());
+        } else {
+          date = parseFuzzyDate(rawDate);
+        }
+      } else {
+        date = parseFuzzyDate(rawDate);
+        time = getText('time');
+      }
 
+      // --- NAME column ---
+      // May contain: "Event Title: Artists @ Venue Name (City)" or just "Event Name"
       const rawName = getText('name');
       if (!rawName) return;
 
-      // Parse "Event Title: Artists @ Venue (City)" format from name column
-      const parsed = parseEventName(rawName);
+      let eventTitle = rawName;
+      let venueFromName = '', cityFromName = '';
 
-      // Location column may have separate venue/city data
+      if (colMap._nameHasVenue || rawName.includes(' @ ')) {
+        const parsed = parseEventName(rawName);
+        eventTitle = parsed.title;
+        venueFromName = parsed.venue;
+        cityFromName = parsed.city;
+      }
+
+      // --- LOCATION column ---
+      // 19hz: separate venue/address field. May be "Venue Name, Address, City" or "Venue Name (City)"
       const rawLocation = getText('location');
-      const locParsed = rawLocation ? parseLocationString(rawLocation) : null;
-
-      // Merge: prefer parsed name parts, fill from location column
-      const venue = parsed.venue || (locParsed ? locParsed.venue : '') || '';
-      const city = parsed.city || (locParsed ? locParsed.city : '') || '';
-      const address = (locParsed ? locParsed.address : '') || '';
-
-      // Genre: from genre column, clean up
-      const genre = getText('genre');
-
-      // Price + ages: 19hz sometimes combines as "$10 | all ages" in one field
-      let price = getText('price');
-      let ages = getText('ages');
-      // If price contains age info (e.g. "free b4 7pm / $12.51 | 21+"), split it
-      if (!ages && price) {
-        const priceParts = price.split(/\s*\|\s*/);
-        if (priceParts.length >= 2) {
-          const lastPart = priceParts[priceParts.length - 1].trim();
-          if (/^\d+\+$|^all\s+ages$/i.test(lastPart)) {
-            ages = lastPart;
-            price = priceParts.slice(0, -1).join(' | ');
-          }
+      let locVenue = '', locAddress = '', locCity = '';
+      if (rawLocation) {
+        // Check for "(City)" at end first
+        const locCityMatch = rawLocation.match(/\(([^)]+)\)\s*$/);
+        if (locCityMatch) {
+          locCity = locCityMatch[1].trim();
+          const before = rawLocation.substring(0, rawLocation.lastIndexOf('(')).trim();
+          const locParts = before.split(',').map(s => s.trim());
+          locVenue = locParts[0] || '';
+          locAddress = locParts.slice(1).join(', ');
+        } else {
+          const locParsed = parseLocationString(rawLocation);
+          locVenue = locParsed.venue;
+          locAddress = locParsed.address;
+          locCity = locParsed.city;
         }
       }
 
-      // Best URL: prefer name links, then any row link
-      const nameLinks = getLinks('name');
-      const bestUrl = nameLinks.length > 0 ? nameLinks[0].href
-        : allRowLinks.length > 0 ? allRowLinks[0] : '';
+      // Merge venue/city: prefer location column (more structured), fill from name parsing
+      const venue = locVenue || venueFromName;
+      const city = locCity || cityFromName;
+      const address = locAddress;
+
+      // --- GENRE column ---
+      // May be comma-separated tags: "drum and bass, jungle, deep house"
+      // or tab-separated (bootstrap format has tab before genres)
+      let genre = getText('genre');
+      // Clean: remove duplicate of name that 19hz sometimes prepends
+      if (genre.startsWith(rawName)) genre = genre.substring(rawName.length).replace(/^\t+/, '').trim();
+      // Normalize separators
+      genre = genre.replace(/\t+/g, ', ').replace(/,\s*,/g, ',').replace(/^,\s*/, '').replace(/,\s*$/, '').trim();
+
+      // --- PRICE column ---
+      let price = getText('price');
+      let ages = getText('ages');
+      // Handle combined "Price | Age" or "Free | 21+" format
+      if (colMap._priceHasAge || (!ages && price && /\|/.test(price))) {
+        const parts = price.split(/\s*\|\s*/);
+        if (parts.length >= 2) {
+          const lastPart = parts[parts.length - 1].trim();
+          // Check if last part is an age restriction
+          if (/^\d+\+$|^all\s*ages?$/i.test(lastPart)) {
+            ages = lastPart;
+            price = parts.slice(0, -1).join(', ');
+          } else if (/age/i.test(lastPart)) {
+            ages = lastPart;
+            price = parts.slice(0, -1).join(', ');
+          }
+        }
+      }
+      // Clean price: trim whitespace, normalize "free" capitalization
+      price = price.trim();
+      if (/^free$/i.test(price)) price = 'Free';
+
+      // --- AGES column ---
+      ages = ages.trim();
+      // Normalize: "all ages" → "All Ages", "21+" stays
+      if (/^all\s*ages?$/i.test(ages)) ages = 'All Ages';
+
+      // --- PROMOTER column ---
+      let promoter = getText('promoter');
+      promoter = promoter.replace(/\t+/g, ' ').trim();
+
+      // --- URLS ---
+      // Collect all links: from name cell, links cell, and entire row
+      const nameLinks = getCellLinks('name');
+      const linksCellLinks = getCellLinks('links');
+      const allRowLinks = Array.from(row.querySelectorAll('a'))
+        .map(a => ({ href: a.getAttribute('href') || '', text: a.textContent.trim() }))
+        .filter(l => l.href && l.href !== '#' && !l.href.startsWith('javascript:'));
+
+      // Best URL: name link > links cell > any row link
+      let bestUrl = '';
+      if (nameLinks.length > 0) bestUrl = nameLinks[0].href;
+      else if (linksCellLinks.length > 0) bestUrl = linksCellLinks[0].href;
+      else if (allRowLinks.length > 0) bestUrl = allRowLinks[0].href;
 
       const ev = {
-        date: parseFuzzyDate(getText('date')),
-        time: getText('time'),
-        name: parsed.title,
-        venue,
-        address,
-        city,
-        genre,
-        price,
-        ages,
-        promoter: getText('promoter'),
+        date, time, name: eventTitle,
+        venue, address, city,
+        genre, price, ages,
+        promoter,
         url: resolveUrl(bestUrl, baseUrl),
         source: sourceId,
       };
 
-      // Log first few rows for debugging
-      if (rowIdx < 3) log(`  Row ${rowIdx}: "${ev.name}" @ ${ev.venue} (${ev.city}) [${ev.genre}] ${ev.date}`);
-
+      if (rowIdx < 3) log(`  Row ${rowIdx}: "${ev.name}" @ ${ev.venue} (${ev.city}) [${ev.genre}] $${ev.price} ${ev.ages} ${ev.date}`);
       events.push(ev);
     });
 
-    log(`HTML parser: extracted ${events.length} events`);
+    log(`HTML parser: extracted ${events.length} events (format: ${format})`);
     return events;
   }
 
@@ -669,14 +801,18 @@ body {
     let venue = '';
     let city = '';
 
-    // Extract city from trailing "(City Name)" — greedy, last parenthesized group
+    // Extract city from trailing "(City Name)" — but NOT from things like "(21+)" or "(doors at 9pm)"
     const cityMatch = raw.match(/\(([^)]+)\)\s*$/);
     if (cityMatch) {
-      city = cityMatch[1].trim();
-      raw = raw.substring(0, raw.lastIndexOf('(' + cityMatch[1])).trim();
+      const candidate = cityMatch[1].trim();
+      // Skip if it looks like age restriction, time, or price
+      if (!/^\d+\+$|^doors|^starts|^\$|^free|^all\s*ages/i.test(candidate)) {
+        city = candidate;
+        raw = raw.substring(0, raw.lastIndexOf('(' + candidate)).trim();
+      }
     }
 
-    // Split on " @ " to separate event from venue
+    // Split on " @ " to separate event from venue (use last occurrence)
     const atIdx = raw.lastIndexOf(' @ ');
     if (atIdx !== -1) {
       title = raw.substring(0, atIdx).trim();
@@ -684,6 +820,9 @@ body {
     } else {
       title = raw;
     }
+
+    // Clean title: remove trailing colons, extra whitespace
+    title = title.replace(/:\s*$/, '').trim();
 
     return { title, venue, city };
   }
@@ -879,14 +1018,19 @@ body {
       const nameCell = ev.url && ev.url !== '#'
         ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener">${escHtml(ev.name)}</a>`
         : escHtml(ev.name);
-      const dateDisplay = formatDate(ev.date) + (ev.time ? `<br><small>${escHtml(ev.time)}</small>` : '');
+      const dateDisplay = formatDate(ev.date) + (ev.time ? `<small>${escHtml(ev.time)}</small>` : '');
+      // Venue + city combined
+      const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
+      // Genre as inline tags
+      const genreHtml = ev.genre ? ev.genre.split(/,\s*/).slice(0, 4).map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('') : '';
       return `<tr>
         <td class="col-date">${dateDisplay}</td>
         <td class="col-name">${nameCell}</td>
-        <td class="col-venue">${escHtml(ev.venue)}</td>
-        <td class="col-city">${escHtml(ev.city)}</td>
-        <td class="col-genre">${escHtml(ev.genre)}</td>
+        <td class="col-venue">${venueHtml}</td>
+        <td class="col-genre">${genreHtml}</td>
         <td class="col-price">${escHtml(ev.price)}</td>
+        <td class="col-ages">${escHtml(ev.ages)}</td>
+        <td class="col-promoter">${escHtml(ev.promoter)}</td>
         <td class="col-source"><span class="token token--static">${escHtml(sourceName)}</span></td>
       </tr>`;
     }).join('');
