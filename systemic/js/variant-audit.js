@@ -202,7 +202,12 @@ class VariantAudit {
       blockedToggle: this.container.querySelector('#qa-blocked-toggle'),
       blockedGrid: this.container.querySelector('#qa-blocked-grid'),
       auditOutput: this.container.querySelector('#qa-audit-output'),
-      desc: this.container.querySelector('#qa-desc')
+      desc: this.container.querySelector('#qa-desc'),
+      // Grid test
+      gridTestSection: this.container.querySelector('#qa-grid-test-section'),
+      gridTest: this.container.querySelector('#qa-grid-test'),
+      gridTestLinesBtn: this.container.querySelector('#qa-grid-test-lines-btn'),
+      gridControls: this.container.querySelector('.qa-grid-controls')
     };
   }
 
@@ -258,6 +263,18 @@ class VariantAudit {
       this.els.gridLinesBtn.addEventListener('click', () => this.toggleGridLines());
     }
 
+    // Grid test controls
+    if (this.els.gridControls) {
+      this.els.gridControls.querySelectorAll('[data-cols]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.setGridTestCols(btn.dataset.cols, btn);
+        });
+      });
+    }
+    if (this.els.gridTestLinesBtn) {
+      this.els.gridTestLinesBtn.addEventListener('click', () => this.toggleGridTestLines());
+    }
+
     this.restoreFilterState();
     this.renderAuditTable();
   }
@@ -287,6 +304,7 @@ class VariantAudit {
       this.els.desc.textContent = 'Select a component to audit its variants.';
       this.currentComponent = null;
       this.currentAuditName = null;
+      this.populateGridTest(null);
       this.saveFilterState();
       return;
     }
@@ -354,6 +372,7 @@ class VariantAudit {
 
     this.updateStats();
     this.renderAuditTable();
+    this.populateGridTest(comp);
     this.saveFilterState();
   }
 
@@ -784,6 +803,63 @@ class VariantAudit {
     this.renderAuditTable();
     this.showVariants();
     this.onToast('Audit data cleared');
+  }
+
+  // ============================================
+  // Grid Test — column permutations
+  // ============================================
+
+  setGridTestCols(cols, btn) {
+    var grid = this.els.gridTest;
+    if (!grid) return;
+    var hasLines = grid.classList.contains('qa-grid-test--lines');
+    grid.className = 'qa-grid-test qa-grid-test--' + cols + 'col';
+    if (hasLines) grid.classList.add('qa-grid-test--lines');
+    // Update active button
+    this.els.gridControls?.querySelectorAll('[data-cols]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  toggleGridTestLines() {
+    var grid = this.els.gridTest;
+    if (!grid) return;
+    grid.classList.toggle('qa-grid-test--lines');
+    this.els.gridTestLinesBtn?.classList.toggle('active');
+  }
+
+  populateGridTest(comp) {
+    var section = this.els.gridTestSection;
+    var grid = this.els.gridTest;
+    if (!section || !grid) return;
+
+    if (!comp) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+    grid.innerHTML = '';
+
+    var sizes = comp.validSizes || this.ALL_SIZES;
+    sizes.forEach(size => {
+      if (comp.isTemplate && comp.variantsBySize?.[size]) {
+        // Template: use pre-rendered HTML wrapped in a shell-sized container
+        var wrapper = document.createElement('div');
+        wrapper.className = 'w-shell w-shell--' + size;
+        wrapper.innerHTML = comp.variantsBySize[size];
+        grid.appendChild(wrapper);
+      } else if (comp.element) {
+        // Non-template: clone the source element with size class
+        var temp = document.createElement('div');
+        temp.innerHTML = typeof comp.element === 'string' ? comp.element : comp.element.outerHTML;
+        var clone = temp.firstElementChild;
+        if (clone) {
+          clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
+          clone.classList.add('w-shell--' + size);
+          grid.appendChild(clone);
+        }
+      }
+    });
   }
 
   /**
