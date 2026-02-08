@@ -816,14 +816,15 @@ class DesignSystemViewer {
 
     // Build variants gallery if multiple
     let galleryHtml = '';
+    const isTemplate = component.type?.startsWith('template-');
     if (variants.length > 1) {
       galleryHtml = `
         <div class="variants-preview-gallery">
           <h4>All Variants (${variants.length})</h4>
-          <div class="variants-grid">
+          <div class="variants-grid ${isTemplate ? 'variants-grid--template' : ''}">
             ${variants.map((v, i) => `
-              <div class="variant-preview-card ${i === variantIndex ? 'active' : ''}" data-index="${i}">
-                <div class="variant-preview-content">
+              <div class="variant-preview-card ${isTemplate ? 'variant-preview-card--template' : ''} ${i === variantIndex ? 'active' : ''}" data-index="${i}">
+                <div class="variant-preview-content ${isTemplate ? 'variant-preview-content--template' : ''}">
                   ${v.html || '<span class="no-preview">No preview</span>'}
                 </div>
                 <div class="variant-preview-label">
