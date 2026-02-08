@@ -220,10 +220,10 @@
 | | Container query: `w-body--suggestion` stacks vertically < 280px | Complete |
 | | Container query: `w-item` responsive sizing at breakpoints | Complete |
 | **Add missing template renderers** | | Pending |
-| | Implement comparison renderer (w-option × 2 + w-divider--labeled) | Pending |
-| | Implement choices renderer (w-option × N) | Pending |
-| | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Pending |
-| | Implement grouped renderer (w-section × N with w-row × N) | Pending |
+| | Implement comparison renderer (w-option × 2 + w-divider--labeled) | Complete |
+| | Implement choices renderer (w-option × N) | Complete |
+| | Implement checklist renderer (w-row + w-checkbox × N + w-stat) | Complete |
+| | Implement grouped renderer (w-section × N with w-row × N) | Complete |
 | **Verify migration** | | In Progress |
 | | All 7 existing widget types render with new w-* classes | Complete |
 | | Visual diff: compare before/after screenshots at each valid size | Pending |
@@ -418,12 +418,12 @@ User-validated high-value widgets. Ship before standard tier rollout.
 | | Frontend WIDGET_REGISTRY entry | Pending |
 | | List body layout with w-row × N (release date + urgency indicator) | Pending |
 | | Phase 1: AI-inferred dates (ship now), Phase 2: TMDB API (later) | Pending |
-| **all: More Like Your Board (#41)** | | Pending |
-| | Server config: all-discover.ts (suggestion template, 3+ items in any category) | Pending |
-| | AI prompt: analyze saved items, recommend 2-3 new items with reasoning | Pending |
+| **all: More Like Your Board (#41)** | | In Progress |
+| | Server config: discover-more.ts (suggestion template, 3+ items in any category) | Complete |
+| | AI prompt: analyze saved items, recommend 1 new item with reasoning | Complete |
 | | Category-specific title variants (8 category-aware titles) | Pending |
-| | Frontend WIDGET_REGISTRY entry with category-dynamic title | Pending |
-| | Suggestion body layout with w-row × 2-3 + external link + save action | Pending |
+| | Frontend WIDGET_REGISTRY entry | Complete |
+| | Suggestion body layout (quick-add template) | Complete |
 | | Differentiation from "Add more pins" (trigger threshold, tone, placement) | Pending |
 | **Deploy & Test Priority Widgets** | | Pending |
 | | Test #40 with real watch items — verify AI release date inference quality | Pending |
@@ -436,11 +436,11 @@ Simple triggers — item count + category filter. Client-side evaluation only.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **eat: Decide (#1)** | | Pending |
-| | Server config: eat-decide.ts (pick-one template, 3+ eat items) | Pending |
-| | AI prompt: given restaurant names, pick 1 with reasoning | Pending |
-| | Frontend WIDGET_REGISTRY entry | Pending |
-| | Choices body layout with w-option × 2-3 | Pending |
+| **eat: Decide (#1)** | | Complete |
+| | Server config: eat-decide.ts (choices template, 3+ eat items) | Complete |
+| | AI prompt: given restaurant names, pick 1 with reasoning | Complete |
+| | Frontend WIDGET_REGISTRY entry | Complete |
+| | Choices body layout with w-option × 2-3 | Complete |
 | **home: Ladder (#36)** | | Pending |
 | | Server config: home-ladder.ts (list template, 1+ home item) | Pending |
 | | AI prompt: infer item type, suggest budget/mid/splurge alternatives | Pending |
@@ -451,11 +451,11 @@ Simple triggers — item count + category filter. Client-side evaluation only.
 | | AI prompt: identify shows, infer upcoming seasons/sequels | Pending |
 | | Frontend WIDGET_REGISTRY entry | Pending |
 | | List body layout with w-row × N (urgency color indicators) | Pending |
-| **use: Compare (#26)** | | Pending |
-| | Server config: use-compare.ts (swap template, 1+ use item) | Pending |
-| | AI prompt: identify tool category, suggest competitor with differentiator | Pending |
-| | Frontend WIDGET_REGISTRY entry | Pending |
-| | Comparison body layout with w-option × 2 + w-divider--labeled | Pending |
+| **use: Compare (#26)** | | Complete |
+| | Server config: use-compare.ts (comparison template, 1+ use item) | Complete |
+| | AI prompt: identify tool category, suggest competitor with differentiator | Complete |
+| | Frontend WIDGET_REGISTRY entry | Complete |
+| | Comparison body layout with w-option × 2 + w-divider--labeled | Complete |
 | **go: Sequence (#6)** | | Pending |
 | | Server config: go-sequence.ts (list template, 3+ go items) | Pending |
 | | AI prompt: given destinations, suggest optimal route order with durations | Pending |

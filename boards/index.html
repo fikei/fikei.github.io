@@ -2218,6 +2218,163 @@ body {
   margin: var(--space-2) 0;
 }
 
+/* Widget Inspector Overlay */
+.widget-inspector {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0,0,0,0.85);
+  overflow-y: auto;
+  display: none;
+  padding: var(--space-4);
+}
+
+.widget-inspector--visible {
+  display: block;
+}
+
+.widget-inspector__inner {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.widget-inspector__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--subtle);
+  padding-bottom: var(--space-2);
+}
+
+.widget-inspector__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+}
+
+.widget-inspector__close {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.widget-inspector__profile {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.widget-inspector__profile strong {
+  color: var(--fg);
+}
+
+.widget-inspector__card {
+  border: 1px solid var(--subtle);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+}
+
+.widget-inspector__card--eligible {
+  border-color: #4a9;
+}
+
+.widget-inspector__card--ineligible {
+  border-color: var(--subtle);
+  opacity: 0.6;
+}
+
+.widget-inspector__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.widget-inspector__card-name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+
+.widget-inspector__card-score {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+}
+
+.widget-inspector__card-score--high { color: #4a9; }
+.widget-inspector__card-score--mid { color: #f0c674; }
+.widget-inspector__card-score--low { color: #c66; }
+
+.widget-inspector__card-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.widget-inspector__rationale {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding-left: var(--space-3);
+}
+
+.widget-inspector__rationale li {
+  margin-bottom: 2px;
+}
+
+/* Widget header context menu (right-click) */
+.widget-context {
+  position: fixed;
+  z-index: 250;
+  background: var(--bg);
+  border: 1px solid var(--subtle);
+  padding: var(--space-3);
+  min-width: 240px;
+  max-width: 360px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.widget-context--visible {
+  display: block;
+}
+
+.widget-context__title {
+  color: var(--fg);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--subtle);
+}
+
+.widget-context__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.widget-context__label { color: var(--muted); }
+.widget-context__value { color: var(--fg); }
+
 /* Admin Panel */
 .admin-panel {
   max-width: 600px;
@@ -2921,8 +3078,24 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
     <div class="dev-menu__divider"></div>
     <button class="dev-menu__btn" id="devToggleWidgets">Widgets: OFF</button>
+    <button class="dev-menu__btn" id="devWidgetInspector">Widget Inspector</button>
     <button class="dev-menu__btn dev-menu__btn--admin" id="devAdminPanel" style="display:none;">Admin Panel</button>
   </div>
+
+  <!-- Widget Inspector Overlay -->
+  <div class="widget-inspector" id="widgetInspector">
+    <div class="widget-inspector__inner">
+      <div class="widget-inspector__header">
+        <span class="widget-inspector__title">Widget Inspector</span>
+        <button class="widget-inspector__close" id="widgetInspectorClose">&times;</button>
+      </div>
+      <div id="widgetInspectorProfile" class="widget-inspector__profile"></div>
+      <div id="widgetInspectorCards"></div>
+    </div>
+  </div>
+
+  <!-- Widget Context Menu (right-click on header) -->
+  <div class="widget-context" id="widgetContext"></div>
 
   <!-- Admin Panel Modal -->
   <div class="modal" id="adminModal">
@@ -3537,6 +3710,239 @@ Return JSON:
       },
       createdAt: '2026-02-06',
       updatedAt: '2026-02-06'
+    },
+    'eat-decide': {
+      id: 'eat-decide',
+      version: '1.0',
+      name: 'Decide',
+      description: 'Can\'t pick a restaurant? AI picks one from your saved spots with reasoning.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: 'eat',
+        minItems: 3,
+        maxItems: null
+      },
+      prompt: `You are a decisive dining advisor. The user has saved these restaurants/food spots and can't decide where to go.
+
+Pick the BEST option and explain why. Also present 2-3 runner-up choices.
+
+Return JSON:
+{
+  "question": "Where should you eat tonight?",
+  "options": [
+    {
+      "title": "Restaurant Name",
+      "description": "Why this is the top pick — specific reasoning based on the saved items"
+    },
+    {
+      "title": "Runner Up 1",
+      "description": "Brief reason this is a good alternative"
+    }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'choices',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'use-compare': {
+      id: 'use-compare',
+      version: '1.0',
+      name: 'Compare',
+      description: 'Compares a saved tool/product against its top competitor with pros and cons.',
+      status: 'active',
+      zone: 'inline',
+      criteria: {
+        category: ['use', 'tech', 'home', 'wear', 'all'],
+        minItems: 1,
+        maxItems: null
+      },
+      prompt: `You are a product comparison expert. Pick the most interesting item from the user's saved items and compare it against its top competitor.
+
+RULES:
+- Pick an item that has a clear, well-known competitor
+- List 2-3 specific pros and cons for each
+- Be objective and fair to both options
+
+Return JSON:
+{
+  "optionA": {
+    "title": "Saved Item Name",
+    "price": "$XX (if known)",
+    "pros": ["Specific advantage 1", "Specific advantage 2"],
+    "cons": ["Specific weakness"]
+  },
+  "optionB": {
+    "title": "Top Competitor",
+    "price": "$XX (if known)",
+    "pros": ["Specific advantage 1", "Specific advantage 2"],
+    "cons": ["Specific weakness"]
+  },
+  "dividerLabel": "VS",
+  "confidence": 0.75
+}`,
+      template: {
+        name: 'comparison',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'discover-more': {
+      id: 'discover-more',
+      version: '1.0',
+      name: 'More Like Your Board',
+      description: 'Analyzes your saved items and recommends something new you might like.',
+      status: 'active',
+      zone: 'footer',
+      criteria: {
+        category: 'all',
+        minItems: 3,
+        maxItems: null
+      },
+      prompt: `You are a discovery engine. Analyze the user's saved items and recommend ONE specific new thing they'd like.
+
+RULES:
+- The recommendation must be DIFFERENT from what they already have
+- It should complement their existing collection, not duplicate it
+- Be specific: real product names, real brands, real URLs
+- Explain WHY this fits based on patterns you see in their saves
+
+Return JSON:
+{
+  "suggestion": {
+    "name": "Specific Product or Thing",
+    "brand": "Brand if applicable",
+    "price": "$XX if applicable",
+    "reason": "Based on your saves, you clearly like X and Y — this combines both.",
+    "searchQuery": "search terms to find this item"
+  },
+  "confidence": 0.7
+}`,
+      template: {
+        name: 'quick-add',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'style-pick': {
+      id: 'style-pick',
+      version: '1.0',
+      name: 'Pick Your Favorite',
+      description: 'Shows your saved items as selectable cards — tap the one you\'d buy first.',
+      status: 'active',
+      zone: 'hero',
+      criteria: {
+        category: ['wear', 'all'],
+        minItems: 3,
+        maxItems: null
+      },
+      prompt: `You are a personal shopper. The user has saved these items. Present 3-4 of their best saved items as choices and ask them to pick their favorite.
+
+For each option, write a brief one-line reason why it stands out.
+
+Return JSON:
+{
+  "question": "Which would you grab first?",
+  "options": [
+    { "title": "Item name", "description": "Why this one stands out — 1 sentence" },
+    { "title": "Item name", "description": "Why this one stands out — 1 sentence" }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'choices',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'outfit-checklist': {
+      id: 'outfit-checklist',
+      version: '1.0',
+      name: 'Outfit Checklist',
+      description: 'Builds a complete outfit from your saves — check off what you already own.',
+      status: 'active',
+      zone: 'inline',
+      criteria: {
+        category: ['wear', 'all'],
+        minItems: 2,
+        maxItems: null
+      },
+      prompt: `You are a wardrobe stylist. From the user's saved items, build a complete outfit as a checklist.
+
+Include 4-6 items covering different categories (top, bottom, shoes, accessories). Use items from their saves where possible, and suggest missing pieces.
+
+For each item, indicate if the user already has it (checked) based on whether it appears in their saved items.
+
+Return JSON:
+{
+  "items": [
+    { "name": "White Oxford Shirt", "price": "$65", "checked": true },
+    { "name": "Dark Wash Jeans", "price": "$90", "checked": true },
+    { "name": "White Sneakers", "price": "$130", "checked": false },
+    { "name": "Leather Belt", "price": "$45", "checked": false }
+  ],
+  "total": "$330",
+  "confidence": 0.75
+}`,
+      template: {
+        name: 'checklist',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
+    },
+    'board-overview': {
+      id: 'board-overview',
+      version: '1.0',
+      name: 'Board at a Glance',
+      description: 'Groups your saved items by theme or type so you can see the shape of your collection.',
+      status: 'active',
+      zone: 'footer',
+      criteria: {
+        category: 'all',
+        minItems: 4,
+        maxItems: null
+      },
+      prompt: `You are a collection analyst. Group the user's saved items into 2-4 meaningful themes or categories.
+
+RULES:
+- Don't just group by website — group by PURPOSE or TYPE
+- Each group needs a clear, descriptive title
+- Include the actual item names from the user's saves
+- 2-4 groups, each with 2-5 items
+
+Return JSON:
+{
+  "sections": [
+    {
+      "title": "Everyday Essentials",
+      "items": [
+        { "name": "Item name", "brand": "Brand" },
+        { "name": "Item name", "brand": "Brand" }
+      ]
+    },
+    {
+      "title": "Statement Pieces",
+      "items": [
+        { "name": "Item name", "brand": "Brand" }
+      ]
+    }
+  ],
+  "confidence": 0.8
+}`,
+      template: {
+        name: 'grouped',
+        fallback: 'list'
+      },
+      createdAt: '2026-02-07',
+      updatedAt: '2026-02-07'
     }
   };
 
@@ -3821,7 +4227,177 @@ Return JSON:
       }));
   }
 
-  // Check if widget criteria are met
+  // =============================================================================
+  // PIN PROFILING & WIDGET SCORING
+  // Analyzes pins to build a profile, then scores each widget's fit.
+  // =============================================================================
+
+  // Analyze a set of pins and return a profile object
+  function profilePins(items) {
+    const domains = {};
+    const words = {};
+    let hasImages = 0;
+    let hasDescriptions = 0;
+    let totalTitleLen = 0;
+
+    for (const item of items) {
+      // Domain frequency
+      try {
+        const host = new URL(item.url).hostname.replace(/^www\./, '');
+        domains[host] = (domains[host] || 0) + 1;
+      } catch {}
+
+      // Content quality signals
+      if (item.image) hasImages++;
+      if (item.description && item.description.length > 10) hasDescriptions++;
+      totalTitleLen += (item.title || '').length;
+
+      // Word frequency from titles (lowercase, skip short words)
+      const titleWords = (item.title || '').toLowerCase().split(/\s+/);
+      for (const w of titleWords) {
+        if (w.length > 3) words[w] = (words[w] || 0) + 1;
+      }
+    }
+
+    const domainCount = Object.keys(domains).length;
+    const topDomains = Object.entries(domains)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([d, count]) => ({ domain: d, count }));
+
+    // Detect if pins are product-like (e-commerce domains)
+    const productDomains = ['amazon', 'shopify', 'etsy', 'ebay', 'nike', 'zara', 'uniqlo', 'nordstrom', 'asos', 'ssense', 'farfetch', 'mrporter', 'grailed'];
+    const productPinCount = items.filter(item => {
+      try {
+        const host = new URL(item.url).hostname.toLowerCase();
+        return productDomains.some(d => host.includes(d));
+      } catch { return false; }
+    }).length;
+
+    // Detect content-like pins (articles, blogs, media)
+    const contentDomains = ['medium', 'substack', 'youtube', 'reddit', 'wikipedia', 'nytimes', 'theverge', 'arstechnica', 'techcrunch'];
+    const contentPinCount = items.filter(item => {
+      try {
+        const host = new URL(item.url).hostname.toLowerCase();
+        return contentDomains.some(d => host.includes(d));
+      } catch { return false; }
+    }).length;
+
+    return {
+      itemCount: items.length,
+      domainCount,
+      topDomains,
+      uniqueDomainRatio: items.length > 0 ? domainCount / items.length : 0,
+      imageRatio: items.length > 0 ? hasImages / items.length : 0,
+      descriptionRatio: items.length > 0 ? hasDescriptions / items.length : 0,
+      avgTitleLength: items.length > 0 ? totalTitleLen / items.length : 0,
+      productRatio: items.length > 0 ? productPinCount / items.length : 0,
+      contentRatio: items.length > 0 ? contentPinCount / items.length : 0,
+      topWords: Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([w, c]) => ({ word: w, count: c }))
+    };
+  }
+
+  // Score how well a widget fits the current pin profile
+  // Returns { score: 0-1, rationale: string[], signals: {} }
+  function scoreWidgetFit(widget, profile, currentCategory) {
+    const rationale = [];
+    const signals = {};
+    let score = 0;
+    let maxScore = 0;
+
+    const c = widget.criteria;
+
+    // --- Category match (weight: 0.3) ---
+    maxScore += 0.3;
+    if (c.category) {
+      const cats = Array.isArray(c.category) ? c.category : [c.category];
+      if (cats.includes(currentCategory) || cats.includes('all')) {
+        score += 0.3;
+        signals.categoryMatch = true;
+        rationale.push(`Category "${currentCategory}" matches`);
+      } else {
+        signals.categoryMatch = false;
+        rationale.push(`Category "${currentCategory}" not in [${cats.join(', ')}]`);
+      }
+    } else {
+      score += 0.3;
+      signals.categoryMatch = true;
+      rationale.push('No category restriction');
+    }
+
+    // --- Item count (weight: 0.25) ---
+    maxScore += 0.25;
+    const minItems = c.minItems || 1;
+    if (profile.itemCount >= minItems) {
+      // Graduated: more items past minimum = higher score
+      const surplus = Math.min((profile.itemCount - minItems) / Math.max(minItems, 3), 1);
+      const itemScore = 0.15 + (0.10 * surplus);
+      score += itemScore;
+      signals.itemCount = profile.itemCount;
+      signals.minItems = minItems;
+      rationale.push(`${profile.itemCount} items (need ${minItems}+)`);
+    } else {
+      signals.itemCount = profile.itemCount;
+      signals.minItems = minItems;
+      rationale.push(`Only ${profile.itemCount} items (need ${minItems}+)`);
+    }
+
+    // --- Domain diversity (weight: 0.15) ---
+    maxScore += 0.15;
+    if (profile.domainCount >= 2) {
+      const diversityScore = Math.min(profile.domainCount / 5, 1) * 0.15;
+      score += diversityScore;
+      signals.domainDiversity = profile.domainCount;
+      rationale.push(`${profile.domainCount} unique domains`);
+    } else {
+      signals.domainDiversity = profile.domainCount;
+      rationale.push('Low domain diversity');
+    }
+
+    // --- Content quality (weight: 0.15) ---
+    maxScore += 0.15;
+    const qualityScore = ((profile.imageRatio * 0.5) + (profile.descriptionRatio * 0.3) + (Math.min(profile.avgTitleLength / 30, 1) * 0.2)) * 0.15;
+    score += qualityScore;
+    signals.imageRatio = profile.imageRatio;
+    signals.descriptionRatio = profile.descriptionRatio;
+    rationale.push(`Content quality: ${(qualityScore / 0.15 * 100).toFixed(0)}%`);
+
+    // --- Content type affinity (weight: 0.15) ---
+    maxScore += 0.15;
+    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
+    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview'].includes(widget.id);
+
+    if (isProductWidget && profile.productRatio > 0.3) {
+      const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;
+      score += affinity;
+      signals.contentAffinity = 'product';
+      rationale.push(`Product-heavy pins (${(profile.productRatio * 100).toFixed(0)}%) — good for ${widget.name}`);
+    } else if (isAnalyticsWidget && profile.itemCount >= 3) {
+      score += 0.12;
+      signals.contentAffinity = 'analytics';
+      rationale.push(`${profile.itemCount} items — enough for analysis`);
+    } else if (!isProductWidget && !isAnalyticsWidget) {
+      score += 0.08;
+      signals.contentAffinity = 'neutral';
+      rationale.push('General widget');
+    } else {
+      signals.contentAffinity = 'weak';
+      rationale.push(`Low affinity (product ratio: ${(profile.productRatio * 100).toFixed(0)}%)`);
+    }
+
+    const normalizedScore = maxScore > 0 ? score / maxScore : 0;
+
+    return {
+      score: Math.round(normalizedScore * 100) / 100,
+      rationale,
+      signals
+    };
+  }
+
+  // Store last scoring results for the inspector
+  let lastScoringResults = null;
+
+  // Check if widget criteria are met (hard gate — returns boolean)
   function checkWidgetCriteria(widget, items, currentCategory) {
     const c = widget.criteria;
     // Phase 2: Category-agnostic — category field can be a string or array
@@ -3835,20 +4411,41 @@ Return JSON:
     return true;
   }
 
-  // Get applicable widgets for current context
+  // Get applicable widgets for current context — scored and ranked
   function getApplicableWidgets(items, currentCategory) {
+    const profile = profilePins(items);
     const allWidgets = Object.values(WIDGET_REGISTRY);
-    return allWidgets
-      .filter(w => getWidgetStatus(w.id) === 'active') // Use effective status
-      .filter(w => shouldShowWidget(w.id)) // Respect user preferences (hidden/dismissed)
-      .filter(w => checkWidgetCriteria(w, items, currentCategory))
-      .sort((a, b) => {
-        // Favorites first, then alphabetical
-        const aFav = widgetPrefs.favorites[a.id] ? 0 : 1;
-        const bFav = widgetPrefs.favorites[b.id] ? 0 : 1;
-        if (aFav !== bFav) return aFav - bFav;
-        return a.id.localeCompare(b.id);
+    const scoringResults = [];
+
+    for (const widget of allWidgets) {
+      const active = getWidgetStatus(widget.id) === 'active';
+      const visible = shouldShowWidget(widget.id);
+      const meetsHardCriteria = checkWidgetCriteria(widget, items, currentCategory);
+      const fit = scoreWidgetFit(widget, profile, currentCategory);
+
+      scoringResults.push({
+        widget,
+        active,
+        visible,
+        meetsHardCriteria,
+        eligible: active && visible && meetsHardCriteria,
+        ...fit
       });
+    }
+
+    // Store for inspector
+    lastScoringResults = { profile, results: scoringResults, category: currentCategory, timestamp: Date.now() };
+
+    // Return eligible widgets sorted by score (highest first), favorites boosted
+    return scoringResults
+      .filter(r => r.eligible)
+      .sort((a, b) => {
+        const aFav = widgetPrefs.favorites[a.widget.id] ? 1 : 0;
+        const bFav = widgetPrefs.favorites[b.widget.id] ? 1 : 0;
+        if (aFav !== bFav) return bFav - aFav;
+        return b.score - a.score;
+      })
+      .map(r => r.widget);
   }
 
   // =============================================================================
@@ -4370,6 +4967,138 @@ Return JSON:
   // Adding a new widget appearance = adding a template + a widget config.
   // ===========================================================================
 
+  // Comparison renderer: two options side by side with labeled divider
+  function renderComparisonWidget(widget, items, aiResult) {
+    if (!aiResult) return '';
+    const a = aiResult.optionA || aiResult.options?.[0] || {};
+    const b = aiResult.optionB || aiResult.options?.[1] || {};
+    const label = aiResult.dividerLabel || 'VS';
+
+    function renderOption(opt) {
+      const prosHtml = (opt.pros || []).map(p => `<span class="w-text w-text--note" style="color:#4a9">+ ${esc(p)}</span>`).join('');
+      const consHtml = (opt.cons || []).map(c => `<span class="w-text w-text--note" style="color:#c66">− ${esc(c)}</span>`).join('');
+      return `
+        <div class="w-option">
+          <span class="w-text" style="font-weight:600">${esc(opt.title || 'Option')}</span>
+          ${opt.price ? `<span class="w-text w-text--meta">${esc(opt.price)}</span>` : ''}
+          ${prosHtml}${consHtml}
+        </div>`;
+    }
+
+    return `
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body w-body--comparison">
+          ${renderOption(a)}
+          <div class="w-divider--labeled">${esc(label)}</div>
+          ${renderOption(b)}
+        </div>
+      </div>`;
+  }
+
+  // Choices renderer: selectable option cards
+  function renderChoicesWidget(widget, items, aiResult) {
+    if (!aiResult) return '';
+    const question = aiResult.question || '';
+    const options = aiResult.options || aiResult.choices || [];
+    if (options.length === 0) return '';
+
+    const optionsHtml = options.slice(0, 6).map((opt, i) => {
+      const title = opt.title || opt.name || `Option ${i + 1}`;
+      const desc = opt.description || opt.reason || '';
+      return `
+        <div class="w-option" onclick="this.classList.toggle('w-option--selected')">
+          <span class="w-text" style="font-weight:600">${esc(title)}</span>
+          ${desc ? `<span class="w-text w-text--note">${esc(desc)}</span>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body w-body--choices">
+          ${question ? `<span class="w-text w-text--title" style="grid-column:1/-1;margin-bottom:var(--space-2)">${esc(question)}</span>` : ''}
+          ${optionsHtml}
+        </div>
+      </div>`;
+  }
+
+  // Checklist renderer: interactive rows with checkboxes + running total
+  function renderChecklistWidget(widget, items, aiResult) {
+    if (!aiResult) return '';
+    const checkItems = aiResult.items || [];
+    if (checkItems.length === 0) return '';
+    const total = aiResult.total || '';
+
+    const rowsHtml = checkItems.slice(0, 10).map((item, i) => {
+      const checked = item.checked ? 'checked' : '';
+      const name = item.name || item.title || `Item ${i + 1}`;
+      const price = item.price || item.value || '';
+      return `
+        <div class="w-row">
+          <label class="w-checkbox">
+            <input type="checkbox" ${checked} onchange="updateChecklistTotal(this)">
+            <span class="w-checkbox__mark"></span>
+          </label>
+          <div class="w-row__content" style="flex:1;display:flex;justify-content:space-between;align-items:center">
+            <span class="w-text">${esc(name)}</span>
+            ${price ? `<span class="w-text w-text--value">${esc(price)}</span>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body w-body--checklist">
+          ${rowsHtml}
+        </div>
+        ${total ? `
+          <div class="w-footer" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3);border-top:var(--border-thin) solid var(--border-subtle)">
+            <span class="w-text w-text--label">Total</span>
+            <span class="w-text w-text--value" data-checklist-total>${esc(total)}</span>
+          </div>` : ''}
+      </div>`;
+  }
+
+  // Grouped renderer: labeled sections with grouped content
+  function renderGroupedWidget(widget, items, aiResult) {
+    if (!aiResult) return '';
+    const sections = aiResult.sections || aiResult.groups || [];
+    if (sections.length === 0) return '';
+
+    const sectionsHtml = sections.slice(0, 8).map(section => {
+      const title = section.title || section.name || '';
+      const sectionItems = section.items || [];
+
+      const itemsHtml = sectionItems.slice(0, 10).map(item => {
+        const name = item.name || item.title || '';
+        const meta = item.brand || item.meta || item.description || '';
+        return `
+          <div class="w-row">
+            <div class="w-row__content">
+              <span class="w-text">${esc(name)}</span>
+              ${meta ? `<span class="w-text w-text--meta">${esc(meta)}</span>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="w-section">
+          <span class="w-text w-text--title w-section__title">${esc(title)}</span>
+          ${itemsHtml || '<span class="w-text w-text--meta">No items</span>'}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="w-shell" data-widget-id="${widget.id}">
+        ${renderWidgetHeader(widget)}
+        <div class="w-body w-body--grouped">
+          ${sectionsHtml}
+        </div>
+      </div>`;
+  }
+
   const WIDGET_TEMPLATES = {
     // Template: grid-split
     // Two groups of thumbnail cards separated by a divider
@@ -4534,6 +5263,46 @@ Return JSON:
               </div>
             </div>
           </div>`;
+      }
+    },
+
+    // Template: comparison
+    // Two options side by side with labeled divider (A vs B)
+    'comparison': {
+      name: 'comparison',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        return renderComparisonWidget(widget, items, aiResult);
+      }
+    },
+
+    // Template: choices
+    // Selectable option cards (quiz-style picking)
+    'choices': {
+      name: 'choices',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        return renderChoicesWidget(widget, items, aiResult);
+      }
+    },
+
+    // Template: checklist
+    // Interactive checklist with running total
+    'checklist': {
+      name: 'checklist',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        return renderChecklistWidget(widget, items, aiResult);
+      }
+    },
+
+    // Template: grouped
+    // Labeled sections with grouped content
+    'grouped': {
+      name: 'grouped',
+      version: '1.0',
+      render: function(widget, items, aiResult) {
+        return renderGroupedWidget(widget, items, aiResult);
       }
     }
   };
@@ -4727,6 +5496,27 @@ Return JSON:
     renderGrid();
     widgetGenerationInProgress = false;
   }
+
+  // Update checklist running total when checkbox is toggled
+  window.updateChecklistTotal = function(checkbox) {
+    const shell = checkbox.closest('.w-shell');
+    if (!shell) return;
+    const totalEl = shell.querySelector('[data-checklist-total]');
+    if (!totalEl) return;
+
+    // Sum prices of checked items
+    const rows = shell.querySelectorAll('.w-row');
+    let total = 0;
+    for (const row of rows) {
+      const input = row.querySelector('input[type="checkbox"]');
+      const valueEl = row.querySelector('.w-text--value');
+      if (input?.checked && valueEl) {
+        const num = parseFloat(valueEl.textContent.replace(/[^0-9.]/g, ''));
+        if (!isNaN(num)) total += num;
+      }
+    }
+    totalEl.textContent = '$' + total.toFixed(0);
+  };
 
   // Refresh a specific widget (called from widget refresh button)
   window.refreshWidget = async function(widgetId) {
@@ -7538,7 +8328,11 @@ Return JSON:
   });
 
   document.onkeydown = (e) => {
-    if (e.key === 'Escape') closeAll();
+    if (e.key === 'Escape') {
+      closeAll();
+      $('widgetInspector').classList.remove('widget-inspector--visible');
+      $('widgetContext').classList.remove('widget-context--visible');
+    }
     // Ctrl+Shift+D toggles dev menu
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
@@ -7683,6 +8477,129 @@ Return JSON:
       toast('Widgets enabled');
     }
   };
+
+  // =============================================================================
+  // WIDGET INSPECTOR
+  // =============================================================================
+  $('devWidgetInspector').onclick = () => {
+    $('devMenu').classList.remove('dev-menu--visible');
+
+    // Run scoring fresh
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const category = currentFilter || 'all';
+    const profile = profilePins(items);
+    const allWidgets = Object.values(WIDGET_REGISTRY);
+
+    const results = allWidgets.map(widget => {
+      const active = getWidgetStatus(widget.id) === 'active';
+      const visible = shouldShowWidget(widget.id);
+      const meetsHardCriteria = checkWidgetCriteria(widget, items, category);
+      const fit = scoreWidgetFit(widget, profile, category);
+      return { widget, active, visible, meetsHardCriteria, eligible: active && visible && meetsHardCriteria, ...fit };
+    }).sort((a, b) => b.score - a.score);
+
+    // Render profile summary
+    $('widgetInspectorProfile').innerHTML = `
+      <strong>Pin Profile</strong> — ${profile.itemCount} items, category: ${category}<br>
+      Domains: ${profile.domainCount} unique (${profile.topDomains.map(d => d.domain).join(', ')})<br>
+      Quality: ${(profile.imageRatio * 100).toFixed(0)}% images, ${(profile.descriptionRatio * 100).toFixed(0)}% descriptions<br>
+      Content: ${(profile.productRatio * 100).toFixed(0)}% product, ${(profile.contentRatio * 100).toFixed(0)}% editorial<br>
+      Top words: ${profile.topWords.slice(0, 6).map(w => w.word).join(', ')}
+    `;
+
+    // Render widget cards
+    let cardsHtml = '';
+    for (const r of results) {
+      const scoreClass = r.score >= 0.7 ? 'high' : r.score >= 0.4 ? 'mid' : 'low';
+      const eligClass = r.eligible ? 'eligible' : 'ineligible';
+      const statusParts = [];
+      if (!r.active) statusParts.push('inactive');
+      if (!r.visible) statusParts.push('hidden/dismissed');
+      if (!r.meetsHardCriteria) statusParts.push('fails criteria');
+      const statusText = r.eligible ? 'ELIGIBLE' : `BLOCKED: ${statusParts.join(', ')}`;
+
+      cardsHtml += `
+        <div class="widget-inspector__card widget-inspector__card--${eligClass}">
+          <div class="widget-inspector__card-header">
+            <span class="widget-inspector__card-name">${esc(r.widget.name)} <span style="color:var(--muted)">(${r.widget.zone})</span></span>
+            <span class="widget-inspector__card-score widget-inspector__card-score--${scoreClass}">${(r.score * 100).toFixed(0)}%</span>
+          </div>
+          <div class="widget-inspector__card-status" style="color:${r.eligible ? '#4a9' : '#c66'}">${statusText}</div>
+          <ul class="widget-inspector__rationale">
+            ${r.rationale.map(line => `<li>${esc(line)}</li>`).join('')}
+          </ul>
+        </div>`;
+    }
+    $('widgetInspectorCards').innerHTML = cardsHtml;
+
+    $('widgetInspector').classList.add('widget-inspector--visible');
+  };
+
+  $('widgetInspectorClose').onclick = () => {
+    $('widgetInspector').classList.remove('widget-inspector--visible');
+  };
+
+  $('widgetInspector').onclick = (e) => {
+    if (e.target === $('widgetInspector')) {
+      $('widgetInspector').classList.remove('widget-inspector--visible');
+    }
+  };
+
+  // =============================================================================
+  // WIDGET HEADER RIGHT-CLICK CONTEXT
+  // =============================================================================
+  document.addEventListener('contextmenu', (e) => {
+    const header = e.target.closest('.w-header');
+    if (!header) return;
+
+    const shell = header.closest('.w-shell');
+    if (!shell) return;
+
+    e.preventDefault();
+
+    // Find which widget this is
+    const widgetLabel = header.querySelector('.w-text--label');
+    const widgetName = widgetLabel ? widgetLabel.textContent.trim() : 'Unknown';
+    const widgetEntry = Object.values(WIDGET_REGISTRY).find(w => w.name === widgetName);
+
+    if (!widgetEntry) return;
+
+    // Get scoring data
+    const allLinks = getAllLinks();
+    const items = normalizeWearItems(allLinks);
+    const category = currentFilter || 'all';
+    const profile = profilePins(items);
+    const fit = scoreWidgetFit(widgetEntry, profile, category);
+    const scoreClass = fit.score >= 0.7 ? '#4a9' : fit.score >= 0.4 ? '#f0c674' : '#c66';
+
+    const ctx = $('widgetContext');
+    ctx.innerHTML = `
+      <div class="widget-context__title">${esc(widgetName)}</div>
+      <div class="widget-context__row"><span class="widget-context__label">Score</span><span class="widget-context__value" style="color:${scoreClass}">${(fit.score * 100).toFixed(0)}%</span></div>
+      <div class="widget-context__row"><span class="widget-context__label">Zone</span><span class="widget-context__value">${widgetEntry.zone}</span></div>
+      <div class="widget-context__row"><span class="widget-context__label">Template</span><span class="widget-context__value">${widgetEntry.template?.name || '-'}</span></div>
+      <div class="widget-context__row"><span class="widget-context__label">Items</span><span class="widget-context__value">${profile.itemCount} (min: ${widgetEntry.criteria.minItems || 1})</span></div>
+      <div style="margin-top:8px;border-top:1px solid var(--subtle);padding-top:6px;font-size:10px;color:var(--muted)">
+        ${fit.rationale.map(r => `• ${esc(r)}`).join('<br>')}
+      </div>
+      <div style="margin-top:6px;font-size:9px;color:var(--muted)">
+        Signals: ${Object.entries(fit.signals).map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`).join(', ')}
+      </div>
+    `;
+
+    // Position near click
+    const x = Math.min(e.clientX, window.innerWidth - 380);
+    const y = Math.min(e.clientY, window.innerHeight - 300);
+    ctx.style.left = x + 'px';
+    ctx.style.top = y + 'px';
+    ctx.classList.add('widget-context--visible');
+  });
+
+  // Dismiss context menu on click anywhere
+  document.addEventListener('click', () => {
+    $('widgetContext').classList.remove('widget-context--visible');
+  });
 
   $('devEnrich').onclick = async () => {
     const links = getAllLinks();
