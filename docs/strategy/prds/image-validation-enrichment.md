@@ -153,17 +153,34 @@ Is this a meaningful, content-specific image rather than a generic site asset?
 
 ### 5. Safety — "Is this appropriate to display?"
 
-Basic content safety for platform integrity.
+Content safety for platform integrity. The goal is to block exploitative and illegal content, not to sanitize the platform of all mature imagery. A fashion pin with nudity is fine; pornographic content is not.
 
 | Signal | Method | Weight |
 |--------|--------|--------|
-| NSFW content | AI content moderation API | Critical |
+| Pornographic content | AI content moderation: explicit sexual acts | Critical — hard block |
+| Child exploitation | AI content moderation: minors in sexual context | Critical — hard block |
+| Gore / extreme violence | AI content moderation: graphic injury, death | Critical — hard block |
 | Misleading content | Image misrepresents the linked content | High |
 | Broken/dead links | Image URL returns 404 or error | Critical |
 
+**Allowed content (not blocked):**
+- Artistic or editorial nudity (fashion, photography, fine art)
+- Swimwear, lingerie, underwear product shots
+- Medical/anatomical imagery
+- Violence in editorial/journalistic context (news, documentary)
+- Profanity or mature language in context
+
+**Content classification tiers:**
+
+| Tier | Examples | Action |
+|------|----------|--------|
+| **Blocked** | Pornography, CSAM, gore | Hard reject, never display, don't retry |
+| **Mature** | Nudity, graphic language, drug references | Display (platform is personal, not public-facing) |
+| **Safe** | Everything else | Display |
+
 **Scoring:**
-- `1.0` — Safe and appropriate
-- `0.0` — Unsafe, blocked from display
+- `1.0` — Safe or mature content, appropriate to display
+- `0.0` — Blocked content (pornography, CSAM, gore)
 
 ---
 
@@ -294,7 +311,12 @@ AI-powered evaluation for accuracy, aesthetics, and safety. Runs asynchronously 
   2. Does it contain text overlays or watermarks? (aesthetic: 0-1)
   3. Is it visually clean and minimal? (aesthetic: 0-1)
   4. Is it a generic stock/placeholder image? (distinctiveness: 0-1)
-  5. Is the content safe and appropriate? (safety: pass/fail)
+  5. Content safety classification (safety: "safe" | "mature" | "blocked"):
+     - "blocked": pornographic content, CSAM, or extreme gore
+     - "mature": nudity, graphic language, or mature themes
+     - "safe": everything else
+     Nudity alone is NOT grounds for blocking. Only block
+     exploitative, illegal, or explicitly pornographic content.
   Return JSON scores.
   ```
 - Cache results keyed by image URL (images don't change)
