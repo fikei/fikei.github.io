@@ -1,4 +1,10 @@
-# Widgets
+# Widget System
+
+> **Status:** ✅ Shipped
+> **Brand Principle:** Input shapes output
+> **Key Personas:** All
+>
+> Back to [UX Index](../index.md)
 
 Widgets are AI-generated recommendation cards that suggest products based on user preferences and context. They appear alongside pins to help users discover relevant content from trusted brands.
 
@@ -135,6 +141,7 @@ A widget is an AI-generated recommendation featuring:
 | Component | Description | See Details |
 |-----------|-------------|-------------|
 | **AI Recommendations** | How recommendations are generated and displayed | [AI Recommendations](./ai-recommendations.md) |
+| **Taste & Pattern Surfacing** | Surfacing collection patterns, trends, and connections | [Taste & Patterns](./taste-patterns.md) |
 | **Widget Preferences** | User controls for customizing widget behavior | [Widget Preferences](./widget-preferences.md) |
 
 ---

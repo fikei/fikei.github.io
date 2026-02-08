@@ -1,8 +1,12 @@
-# Search & Filter
+# Search & Retrieval
+
+> **Status:** ✅ Shipped
+> **Brand Principle:** One place, whole life
+> **Key Personas:** Researcher (critical), Design Technologist (critical), Deep-Dive Enthusiast (high)
+>
+> Back to [UX Index](../index.md)
 
 Find pins quickly with inline search and category filtering.
-
-**Implementation Status**: ✅ Shipped
 
 | Feature | Status | Notes |
 |---------|--------|-------|

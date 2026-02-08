@@ -1,8 +1,12 @@
 # Grid Layout & Display
 
-The visual presentation of pins in a responsive, masonry-style grid inspired by Swiss design principles.
+> **Status:** ✅ Shipped
+> **Brand Principle:** Show, don't decorate
+> **Key Personas:** Visual Collector (critical), Cultural Omnivore (critical), Design Technologist (high)
+>
+> Back to [UX Index](../index.md)
 
-**Implementation Status**: ✅ Shipped
+The visual presentation of pins in a responsive, masonry-style grid inspired by Swiss design principles. The user's content is the design — minimal chrome, maximum content density.
 
 | Feature | Status | Notes |
 |---------|--------|-------|

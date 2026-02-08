@@ -138,11 +138,14 @@ A board is a container for pins with:
 
 ## Board Components
 
-| Component | Description | See Details |
-|-----------|-------------|-------------|
-| **Categories & Filtering** | How to organize and filter pins within a board | [Categories & Filtering](./categories-filtering.md) |
-| **Grid Layout & Display** | Visual layout options and customization | [Grid Layout & Display](./grid-layout.md) |
-| **Sharing & Collaboration** | Share boards and work with others | [Sharing & Collaboration](./sharing.md) |
+| Component | Status | Description | See Details |
+|-----------|--------|-------------|-------------|
+| **Categories & Filtering** | ✅ Shipped | Organization system with AI categories and sub-tags | [Categories & Filtering](./categories-filtering.md) |
+| **Visual Grid Browsing** | ✅ Shipped | Responsive grid, card expansion, dense flow | [Grid Layout & Display](./grid-layout.md) |
+| **Search & Retrieval** | ✅ Shipped | Live search, category filter, sub-tag filter | [Search & Retrieval](./search.md) |
+| **Collection Sharing** | ⚠️ Partial | Export shipped; public boards planned | [Sharing & Collaboration](./sharing.md) |
+| **Cross-Category Connections** | ⚠️ Partial | Sub-tags + widget suggestions; explicit connections planned | [Cross-Category](./cross-category.md) |
+| **Events Integration** | ❌ Planned | Event/venue pins, calendar view | [Events](./events.md) |
 
 ---
 
