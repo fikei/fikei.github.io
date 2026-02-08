@@ -118,10 +118,108 @@ body {
   letter-spacing: var(--tracking-wider);
 }
 
+/* Calendar View */
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border-subtle);
+  border: var(--border-thin) solid var(--border-subtle);
+  margin-bottom: var(--space-8);
+}
+
+.calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.calendar__title {
+  font-family: var(--font-primary);
+  font-size: var(--text-lg);
+  font-weight: normal;
+}
+
+.calendar__nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.calendar__day-label {
+  background: var(--bg-surface);
+  padding: var(--space-2);
+  text-align: center;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+}
+
+.calendar__cell {
+  background: var(--bg);
+  min-height: 100px;
+  padding: var(--space-2);
+  vertical-align: top;
+  position: relative;
+}
+
+.calendar__cell--other {
+  opacity: 0.3;
+}
+
+.calendar__cell--today {
+  background: var(--bg-surface);
+}
+
+.calendar__date {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-1);
+}
+
+.calendar__cell--today .calendar__date {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.calendar__event {
+  display: block;
+  font-size: var(--text-2xs);
+  line-height: var(--leading-tight);
+  padding: 2px var(--space-1);
+  margin-bottom: 1px;
+  color: var(--fg);
+  text-decoration: none;
+  border-left: 2px solid var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.calendar__event:hover {
+  background: var(--bg-surface);
+}
+
+.calendar__more {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 2px var(--space-1);
+}
+
+.calendar__more:hover {
+  color: var(--fg);
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .data-table .col-genre,
   .data-table .col-price { display: none; }
+
+  .calendar__cell { min-height: 60px; }
+  .calendar__event { font-size: 9px; }
 }
   </style>
 </head>
@@ -167,10 +265,14 @@ body {
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
     </div>
 
-    <!-- Stats -->
+    <!-- Stats + View Toggle -->
     <div class="stats-bar">
       <span id="statsText">0 events</span>
       <span id="statsFiltered"></span>
+      <div class="view-toggle">
+        <button class="view-toggle__btn active" data-view="table">Table</button>
+        <button class="view-toggle__btn" data-view="calendar">Calendar</button>
+      </div>
     </div>
 
     <!-- Table — DS: .data-table-wrap + .data-table -->
@@ -192,6 +294,16 @@ body {
       </table>
     </div>
 
+    <!-- Calendar View -->
+    <div id="calendarView" style="display: none;">
+      <div class="calendar__header">
+        <button class="btn btn--ghost btn--sm" id="calPrev">&larr; Prev</button>
+        <span class="calendar__title" id="calTitle"></span>
+        <button class="btn btn--ghost btn--sm" id="calNext">Next &rarr;</button>
+      </div>
+      <div class="calendar" id="calendarGrid"></div>
+    </div>
+
     <!-- Empty state -->
     <div class="empty-state" id="emptyState" style="display: none;">
       <div class="empty-state__box">
@@ -203,8 +315,14 @@ body {
     <!-- Loading — DS: .loading + .spinner -->
     <div class="loading" id="loadingIndicator" style="display: none;">
       <div class="spinner"></div>
-      <span>Fetching events</span>
+      <span id="loadingText">Fetching events</span>
     </div>
+
+    <!-- Debug log (visible) -->
+    <details id="debugLog" style="margin-bottom: var(--space-4);">
+      <summary style="font-size: var(--text-2xs); color: var(--fg-subtle); text-transform: uppercase; letter-spacing: var(--tracking-wider); cursor: pointer;">Fetch Log</summary>
+      <pre id="debugLogContent" style="font-size: var(--text-2xs); color: var(--fg-muted); background: var(--bg-surface); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); max-height: 200px; overflow-y: auto; white-space: pre-wrap;"></pre>
+    </details>
 
     <!-- Footer -->
     <footer class="footer">
@@ -258,7 +376,22 @@ body {
     sources: [],
     filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '' },
     sort: { key: 'date', dir: 'asc' },
+    view: 'table',
+    calMonth: new Date().getMonth(),
+    calYear: new Date().getFullYear(),
   };
+
+  // --- Debug Logging ---
+  function log(msg, ...args) {
+    console.log(`[events] ${msg}`, ...args);
+    const el = document.getElementById('debugLogContent');
+    if (el) {
+      const ts = new Date().toLocaleTimeString();
+      const extra = args.length ? ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') : '';
+      el.textContent += `${ts} ${msg}${extra}\n`;
+      el.scrollTop = el.scrollHeight;
+    }
+  }
 
   const STORAGE_KEY = 'ctrl-rodeo-event-sources';
   const CORS_PROXIES = [
@@ -270,15 +403,30 @@ body {
   function loadSources() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) state.sources = JSON.parse(saved);
-    } catch (e) { /* ignore */ }
+      if (saved) {
+        state.sources = JSON.parse(saved);
+        log('Loaded sources from localStorage:', state.sources.map(s => s.name));
+      }
+    } catch (e) { log('Failed to parse saved sources: ' + e.message); }
 
+    // Migrate: remove old demo source, ensure 19hz exists
+    const hadDemo = state.sources.some(s => s.id === 'demo');
+    if (hadDemo) {
+      state.sources = state.sources.filter(s => s.id !== 'demo');
+      log('Removed legacy demo source');
+    }
+    const has19hz = state.sources.some(s => s.id === '19hz-bayarea');
+    if (!has19hz) {
+      state.sources.unshift({ id: '19hz-bayarea', name: '19hz Bay Area', type: 'auto', url: 'https://19hz.info/eventlisting_BayArea.php', enabled: true });
+      log('Added default 19hz Bay Area source');
+    }
     if (state.sources.length === 0) {
       state.sources = [
         { id: '19hz-bayarea', name: '19hz Bay Area', type: 'auto', url: 'https://19hz.info/eventlisting_BayArea.php', enabled: true }
       ];
-      saveSources();
     }
+    saveSources();
+    log('Active sources:', state.sources.filter(s => s.enabled).map(s => `${s.name} (${s.type})`));
   }
 
   function saveSources() {
@@ -297,11 +445,22 @@ body {
 
   // --- CORS Proxy Fetch with fallback ---
   async function proxyFetch(url) {
+    log(`Fetching via CORS proxy: ${url}`);
     for (const proxy of CORS_PROXIES) {
+      const proxyUrl = proxy + encodeURIComponent(url);
       try {
-        const resp = await fetch(proxy + encodeURIComponent(url));
-        if (resp.ok) return await resp.text();
-      } catch (e) { continue; }
+        log(`  Trying proxy: ${proxy.split('?')[0]}...`);
+        const resp = await fetch(proxyUrl);
+        log(`  Response: ${resp.status} ${resp.statusText} (${resp.headers.get('content-type') || 'unknown type'})`);
+        if (resp.ok) {
+          const text = await resp.text();
+          log(`  Got ${text.length} chars`);
+          return text;
+        }
+      } catch (e) {
+        log(`  Proxy failed: ${e.message}`);
+        continue;
+      }
     }
     throw new Error('All CORS proxies failed for ' + url);
   }
@@ -312,27 +471,39 @@ body {
     el.style.display = 'flex';
     state.events = [];
 
-    const promises = state.sources.filter(s => s.enabled).map(async (source) => {
+    const enabled = state.sources.filter(s => s.enabled);
+    log(`Fetching ${enabled.length} source(s)...`);
+    document.getElementById('loadingText').textContent = `Fetching ${enabled.length} source(s)...`;
+
+    const promises = enabled.map(async (source) => {
       try {
         const type = source.type === 'auto' ? detectSourceType(source.url) : source.type;
-        if (type === 'html') return await fetchHtml(source);
-        if (type === 'ical') return await fetchIcal(source);
-        if (type === 'json') return await fetchJson(source);
-        if (type === 'rss') return await fetchRss(source);
-        return [];
+        log(`Source "${source.name}": type=${type}, url=${source.url}`);
+        let events;
+        if (type === 'html') events = await fetchHtml(source);
+        else if (type === 'ical') events = await fetchIcal(source);
+        else if (type === 'json') events = await fetchJson(source);
+        else if (type === 'rss') events = await fetchRss(source);
+        else events = [];
+        log(`Source "${source.name}": parsed ${events.length} events`);
+        if (events.length > 0) log(`  Sample: ${events[0].name} on ${events[0].date}`);
+        return events;
       } catch (err) {
-        console.warn(`Failed to fetch "${source.name}":`, err);
+        log(`Source "${source.name}" FAILED: ${err.message}`);
         return [];
       }
     });
 
     const results = await Promise.allSettled(promises);
-    results.forEach(r => {
+    results.forEach((r, i) => {
       if (r.status === 'fulfilled' && Array.isArray(r.value)) {
         state.events.push(...r.value);
+      } else if (r.status === 'rejected') {
+        log(`Promise rejected for source ${i}: ${r.reason}`);
       }
     });
 
+    log(`Total events loaded: ${state.events.length}`);
     el.style.display = 'none';
     updateFilters();
     render();
@@ -346,14 +517,17 @@ body {
 
   function parseHtmlTable(html, sourceId, baseUrl) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const table = doc.querySelector('table');
-    if (!table) return [];
+    const tables = doc.querySelectorAll('table');
+    log(`HTML parser: found ${tables.length} table(s) in ${html.length} chars`);
+    const table = tables.length > 0 ? tables[0] : null;
+    if (!table) { log('HTML parser: no <table> found in response'); return []; }
 
     // Detect column headers
     const headers = [];
     table.querySelectorAll('thead th, tr:first-child th').forEach(th => {
       headers.push(th.textContent.trim().toLowerCase());
     });
+    log('HTML parser: headers = ' + JSON.stringify(headers));
 
     // Build column index map from header text
     const colMap = {};
@@ -375,8 +549,17 @@ body {
       else if (count >= 4) Object.assign(colMap, { date: 0, name: 1, location: 2, time: 3 });
     }
 
+    log('HTML parser: colMap = ' + JSON.stringify(colMap));
+
     const events = [];
-    const rows = table.querySelectorAll('tbody tr');
+    // Try tbody rows first, then all tr if no tbody
+    let rows = table.querySelectorAll('tbody tr');
+    if (rows.length === 0) {
+      rows = table.querySelectorAll('tr');
+      log(`HTML parser: no <tbody>, using all ${rows.length} <tr> rows`);
+    } else {
+      log(`HTML parser: found ${rows.length} <tbody> rows`);
+    }
 
     rows.forEach(row => {
       if (row.querySelector('th')) return; // skip header rows
@@ -562,13 +745,40 @@ body {
   function render() {
     const filtered = getFilteredEvents();
     const sorted = getSortedEvents(filtered);
-    const tbody = document.getElementById('eventsBody');
+    const tableWrap = document.querySelector('.data-table-wrap');
+    const calView = document.getElementById('calendarView');
     const empty = document.getElementById('emptyState');
     const table = document.getElementById('eventsTable');
 
-    if (sorted.length === 0) { table.style.display = 'none'; empty.style.display = 'block'; }
-    else { table.style.display = ''; empty.style.display = 'none'; }
+    // Toggle views
+    const isCalendar = state.view === 'calendar';
+    tableWrap.style.display = isCalendar ? 'none' : '';
+    calView.style.display = isCalendar ? '' : 'none';
 
+    if (isCalendar) {
+      renderCalendar(filtered);
+      empty.style.display = 'none';
+    } else {
+      if (sorted.length === 0) { table.style.display = 'none'; empty.style.display = 'block'; }
+      else { table.style.display = ''; empty.style.display = 'none'; }
+      renderTable(sorted);
+    }
+
+    // Stats
+    const enabledCount = state.sources.filter(s => s.enabled).length;
+    document.getElementById('statsText').textContent = `${state.events.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
+    document.getElementById('statsFiltered').textContent = sorted.length !== state.events.length ? `Showing ${sorted.length}` : '';
+
+    renderSourceChips();
+
+    // View toggle active state
+    document.querySelectorAll('.view-toggle__btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === state.view);
+    });
+  }
+
+  function renderTable(sorted) {
+    const tbody = document.getElementById('eventsBody');
     tbody.innerHTML = sorted.map(ev => {
       const sourceName = state.sources.find(s => s.id === ev.source)?.name || ev.source;
       const nameCell = ev.url && ev.url !== '#'
@@ -586,13 +796,6 @@ body {
       </tr>`;
     }).join('');
 
-    // Stats
-    const enabledCount = state.sources.filter(s => s.enabled).length;
-    document.getElementById('statsText').textContent = `${state.events.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
-    document.getElementById('statsFiltered').textContent = sorted.length !== state.events.length ? `Showing ${sorted.length}` : '';
-
-    renderSourceChips();
-
     // Sort indicators
     document.querySelectorAll('.data-table th').forEach(th => {
       const key = th.dataset.sort;
@@ -600,6 +803,87 @@ body {
       const arrow = th.querySelector('.data-table__sort');
       if (arrow) arrow.innerHTML = key === state.sort.key ? (state.sort.dir === 'asc' ? '&#9650;' : '&#9660;') : '&#9650;';
     });
+  }
+
+  // --- Calendar ---
+  function renderCalendar(events) {
+    const year = state.calYear;
+    const month = state.calMonth;
+    const grid = document.getElementById('calendarGrid');
+    const title = document.getElementById('calTitle');
+
+    title.textContent = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    // Build event map: dateStr -> [events]
+    const eventMap = {};
+    events.forEach(ev => {
+      if (!ev.date) return;
+      if (!eventMap[ev.date]) eventMap[ev.date] = [];
+      eventMap[ev.date].push(ev);
+    });
+
+    const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrev = new Date(year, month, 0).getDate();
+    const today = new Date().toISOString().split('T')[0];
+
+    const MAX_EVENTS_SHOWN = 3;
+    let html = '';
+
+    // Day labels
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayNames.forEach(d => { html += `<div class="calendar__day-label">${d}</div>`; });
+
+    // Previous month fill
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const day = daysInPrev - i;
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      const dateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      html += renderCalendarCell(day, dateStr, eventMap[dateStr], true, false, MAX_EVENTS_SHOWN);
+    }
+
+    // Current month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const isToday = dateStr === today;
+      html += renderCalendarCell(day, dateStr, eventMap[dateStr], false, isToday, MAX_EVENTS_SHOWN);
+    }
+
+    // Next month fill to complete the grid (6 rows max)
+    const totalCells = firstDay + daysInMonth;
+    const remaining = (Math.ceil(totalCells / 7) * 7) - totalCells;
+    for (let day = 1; day <= remaining; day++) {
+      const nextMonth = month === 11 ? 0 : month + 1;
+      const nextYear = month === 11 ? year + 1 : year;
+      const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      html += renderCalendarCell(day, dateStr, eventMap[dateStr], true, false, MAX_EVENTS_SHOWN);
+    }
+
+    grid.innerHTML = html;
+  }
+
+  function renderCalendarCell(day, dateStr, events, isOther, isToday, maxShown) {
+    const cls = ['calendar__cell'];
+    if (isOther) cls.push('calendar__cell--other');
+    if (isToday) cls.push('calendar__cell--today');
+
+    let inner = `<div class="calendar__date">${day}</div>`;
+    if (events && events.length > 0) {
+      const shown = events.slice(0, maxShown);
+      shown.forEach(ev => {
+        if (ev.url && ev.url !== '#') {
+          inner += `<a href="${escHtml(ev.url)}" class="calendar__event" target="_blank" rel="noopener" title="${escHtml(ev.name)}">${escHtml(ev.name)}</a>`;
+        } else {
+          inner += `<span class="calendar__event" title="${escHtml(ev.name)}">${escHtml(ev.name)}</span>`;
+        }
+      });
+      if (events.length > maxShown) {
+        inner += `<span class="calendar__more">+${events.length - maxShown} more</span>`;
+      }
+    }
+
+    return `<div class="${cls.join(' ')}">${inner}</div>`;
   }
 
   function renderSourceChips() {
@@ -729,6 +1013,26 @@ body {
       const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       state.sources.push({ id, name, type, url, enabled: true });
       saveSources(); modal.classList.remove('modal--visible'); fetchAllSources();
+    });
+
+    // View toggle
+    document.querySelectorAll('.view-toggle__btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.view = btn.dataset.view;
+        render();
+      });
+    });
+
+    // Calendar navigation
+    document.getElementById('calPrev').addEventListener('click', () => {
+      state.calMonth--;
+      if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+      render();
+    });
+    document.getElementById('calNext').addEventListener('click', () => {
+      state.calMonth++;
+      if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+      render();
     });
 
     // Keyboard shortcuts
