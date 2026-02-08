@@ -6,6 +6,24 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-08] - Pin Profiling, Widget Inspector & 6 New Widgets
+
+### Added
+- **Pin profiling** — `profilePins(items)` analyzes pins: domain diversity, content quality, product vs editorial ratio, word frequency.
+- **Widget scoring** — `scoreWidgetFit(widget, profile, category)` scores 0-1 with 5 weighted signals: category match, item count, domain diversity, content quality, content type affinity.
+- **Widget Inspector** — Dev menu overlay showing pin profile + all widgets with score %, eligibility, rationale.
+- **Right-click context menu** — Right-click widget header to see score, zone, template, signals.
+- **4 new template renderers** — `comparison`, `choices`, `checklist`, `grouped`. All 11 templates now implemented.
+- **6 new widgets** (Phase 2.5b): `eat-decide`, `use-compare`, `discover-more`, `style-pick`, `outfit-checklist`, `board-overview`. Total: 11 registered widgets.
+- **`updateChecklistTotal()`** — Recalculates running total on checkbox toggle.
+
+### Changed
+- **`getApplicableWidgets()`** — Now ranks by `scoreWidgetFit` (highest first, favorites boosted).
+- **Dev menu** — Fixed black text, added Widgets toggle + Widget Inspector button.
+- **`template-registry.json`** — All 11 templates `boardsStatus: "migrated"`, coverage complete.
+
+---
+
 ## [2026-02-07] - Config-Driven AI Prompts + Server-Side Validation
 
 ### Added

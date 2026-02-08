@@ -143,8 +143,8 @@
       "requiredAtoms": ["w-option", "w-divider--labeled"],
       "optionalAtoms": ["w-text", "w-badge", "w-btn"],
       "structure": "w-shell > w-header + w-body.w-body--comparison > w-option + w-divider--labeled + w-option",
-      "boardsTemplate": null,
-      "boardsStatus": "not-implemented",
+      "boardsTemplate": "comparison",
+      "boardsStatus": "migrated",
       "fixture": {
         "optionA": {
           "title": "Nike Air Max 90",
@@ -172,8 +172,8 @@
       "requiredAtoms": ["w-option"],
       "optionalAtoms": ["w-text--title", "w-badge", "w-img--card"],
       "structure": "w-shell > w-header + w-body.w-body--choices > w-option*",
-      "boardsTemplate": null,
-      "boardsStatus": "not-implemented",
+      "boardsTemplate": "choices",
+      "boardsStatus": "migrated",
       "fixture": {
         "question": "Which vibe fits your board?",
         "options": [
@@ -198,8 +198,8 @@
       "requiredAtoms": ["w-row", "w-checkbox", "w-text"],
       "optionalAtoms": ["w-text--value", "w-badge"],
       "structure": "w-shell > w-header + w-body.w-body--checklist > w-row* + w-footer",
-      "boardsTemplate": null,
-      "boardsStatus": "not-implemented",
+      "boardsTemplate": "checklist",
+      "boardsStatus": "migrated",
       "fixture": {
         "title": "Complete the Look",
         "items": [
@@ -251,8 +251,8 @@
       "requiredAtoms": ["w-section", "w-text--title"],
       "optionalAtoms": ["w-row", "w-badge", "w-divider"],
       "structure": "w-shell > w-header + w-body.w-body--grouped > w-section*",
-      "boardsTemplate": null,
-      "boardsStatus": "not-implemented",
+      "boardsTemplate": "grouped",
+      "boardsStatus": "migrated",
       "fixture": {
         "sections": [
           {
@@ -291,15 +291,19 @@
     "text-block": "narrative",
     "spectrum": "spectrum",
     "stat-row": "stats",
-    "quick-add": "suggestion"
+    "quick-add": "suggestion",
+    "comparison": "comparison",
+    "choices": "choices",
+    "checklist": "checklist",
+    "grouped": "grouped"
   },
   "legacyAliases": {
     "two-column": "grid-split",
     "card": "hero-card"
   },
   "coverage": {
-    "migrated": ["verdict", "list", "spectrum", "split", "narrative", "suggestion", "stats"],
-    "notImplemented": ["comparison", "choices", "checklist", "grouped"],
+    "migrated": ["verdict", "list", "spectrum", "split", "narrative", "suggestion", "stats", "comparison", "choices", "checklist", "grouped"],
+    "notImplemented": [],
     "boardsOnly": []
   }
 }
