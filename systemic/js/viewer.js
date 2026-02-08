@@ -799,6 +799,17 @@ class DesignSystemViewer {
   }
 
   /**
+   * Extract audit key (size) from a variant for audit lookups
+   */
+  getAuditSize(variant, isTemplate) {
+    if (isTemplate) {
+      const m = variant.name?.match(/@ (\w+)$/);
+      return m ? m[1] : variant.name;
+    }
+    return variant.name || 'default';
+  }
+
+  /**
    * Render component preview
    */
   renderComponentPreview(component, variantIndex = 0) {
@@ -815,25 +826,52 @@ class DesignSystemViewer {
     // Build variants gallery if multiple
     let galleryHtml = '';
     const isTemplate = component.type?.startsWith('template-');
+    const audit = this.variantAudit;
+    const compName = component.type;
+
     if (variants.length > 1) {
       galleryHtml = `
         <div class="variants-preview-gallery">
           <h4>All Variants (${variants.length})</h4>
           <div class="variants-grid ${isTemplate ? 'variants-grid--template' : ''}">
-            ${variants.map((v, i) => `
-              <div class="variant-preview-card ${isTemplate ? 'variant-preview-card--template' : ''} ${i === variantIndex ? 'active' : ''}" data-index="${i}">
+            ${variants.map((v, i) => {
+              const auditSize = this.getAuditSize(v, isTemplate);
+              const status = audit ? audit.getStatus(compName, auditSize) : 'green';
+              const entry = audit ? audit.getAuditEntry(compName, auditSize) : {};
+              const isFlagged = !!entry.flagged;
+              const hasNote = !!entry.note;
+              const statusLabel = audit?.STATUS_LABELS?.[status] || '';
+
+              return `
+              <div class="variant-preview-card ${isTemplate ? 'variant-preview-card--template' : ''} ${i === variantIndex ? 'active' : ''} ${isFlagged ? 'variant-preview-card--flagged' : ''}"
+                   data-index="${i}" data-audit-name="${compName}" data-audit-size="${auditSize}">
                 <div class="variant-preview-content ${isTemplate ? 'variant-preview-content--template' : ''}">
                   ${v.html || '<span class="no-preview">No preview</span>'}
                 </div>
                 <div class="variant-preview-label">
+                  <span class="qa-stoplight qa-stoplight--${status}" title="${statusLabel}"></span>
                   <span class="variant-name">${v.name}</span>
                   <span class="variant-usage">${v.usageCount || 0} uses</span>
+                  ${hasNote ? `<span class="qa-comment-count" title="${(entry.note || '').replace(/"/g, '&quot;')}">1</span>` : ''}
+                  <div class="qa-variant-actions stage-audit-actions">
+                    <button class="qa-action-btn${hasNote ? ' qa-action-btn--active' : ''}" data-action="comment">${hasNote ? 'Edit' : 'Comment'}</button>
+                    ${status === 'yellow' ? '<button class="qa-action-btn" data-action="process">Mark processed</button>' : ''}
+                    ${status === 'orange' ? '<button class="qa-action-btn" data-action="approve">Approve</button>' : ''}
+                    <button class="qa-action-btn qa-action-btn--block" data-action="block">${isFlagged ? 'Unblock' : 'Block'}</button>
+                  </div>
                 </div>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
         </div>
       `;
+    }
+
+    // Add inline audit log for this component
+    let auditLogHtml = '';
+    if (audit) {
+      auditLogHtml = this.renderStageAuditLog(compName, variants, isTemplate);
     }
 
     // Create preview container
@@ -848,19 +886,214 @@ class DesignSystemViewer {
         </div>
       </div>
       ${galleryHtml}
+      ${auditLogHtml}
     `;
 
-    // Bind click events for variant cards
+    // Bind click events for variant cards (not on action buttons)
     this.componentPreview.querySelectorAll('.variant-preview-card').forEach(card => {
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        // Don't select variant when clicking audit action buttons
+        if (e.target.closest('.qa-variant-actions')) return;
         const index = parseInt(card.dataset.index);
         this.variantSelect.value = index;
         this.renderComponentPreview(component, index);
       });
     });
 
+    // Bind audit action buttons
+    this.bindStageAuditActions(component, variantIndex);
+
     // Show specs
     this.showComponentSpecs(component, currentVariant);
+  }
+
+  /**
+   * Render inline audit log for the current component on the stage
+   */
+  renderStageAuditLog(compName, variants, isTemplate) {
+    const audit = this.variantAudit;
+    if (!audit) return '';
+
+    // Collect entries for this component
+    const entries = [];
+    variants.forEach(v => {
+      const size = this.getAuditSize(v, isTemplate);
+      const entry = audit.getAuditEntry(compName, size);
+      if (entry.flagged || entry.note) {
+        const status = audit.getStatus(compName, size);
+        entries.push({ size, entry, status });
+      }
+    });
+
+    if (entries.length === 0) return '';
+
+    const sizeLabels = audit.SIZE_LABELS || {};
+    let html = `
+      <div class="stage-audit-log">
+        <h4>Audit Log</h4>
+        <table class="qa-audit-table">
+          <thead><tr>
+            <th>Variant</th><th>Grid</th><th>Status</th><th>Note</th>
+          </tr></thead>
+          <tbody>
+    `;
+
+    entries.forEach(({ size, entry, status }) => {
+      const statusLabel = entry.flagged ? 'Blocked'
+        : entry.note && entry.processed ? 'Needs review'
+        : entry.note ? 'To process' : 'Clean';
+      const statusClass = entry.flagged ? 'status--blocked'
+        : entry.note && entry.processed ? 'status--review'
+        : entry.note ? 'status--todo' : 'status--clean';
+      const dotColor = entry.flagged ? '#ef4444'
+        : entry.note && entry.processed ? '#f97316'
+        : entry.note ? '#eab308' : '#22c55e';
+      const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:${dotColor}"></span>`;
+      const note = entry.note ? `<span class="note-text">${entry.note.replace(/</g, '&lt;')}</span>` : '';
+
+      html += `<tr>
+        <td>${size}</td>
+        <td>${sizeLabels[size] || size}</td>
+        <td class="${statusClass}">${dot}${statusLabel}</td>
+        <td>${note}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    html += `<div class="qa-actions">
+      <button class="stage-audit-export">Copy as JSON</button>
+    </div>`;
+    html += '</div>';
+
+    return html;
+  }
+
+  /**
+   * Bind audit action button events on the component stage
+   */
+  bindStageAuditActions(component, currentVariantIndex) {
+    const audit = this.variantAudit;
+    if (!audit) return;
+
+    const isTemplate = component.type?.startsWith('template-');
+
+    // Action buttons on variant cards
+    this.componentPreview.querySelectorAll('.stage-audit-actions .qa-action-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = btn.closest('.variant-preview-card');
+        if (!card) return;
+        const name = card.dataset.auditName;
+        const size = card.dataset.auditSize;
+        const action = btn.dataset.action;
+
+        switch (action) {
+          case 'comment':
+            this.openStageComment(card, name, size, component, currentVariantIndex);
+            break;
+          case 'process':
+            audit.setProcessed(name, size, true);
+            audit.renderAuditTable();
+            this.renderComponentPreview(component, currentVariantIndex);
+            break;
+          case 'approve':
+            audit.setNote(name, size, '');
+            audit.setProcessed(name, size, false);
+            audit.renderAuditTable();
+            this.renderComponentPreview(component, currentVariantIndex);
+            break;
+          case 'block':
+            const entry = audit.getAuditEntry(name, size);
+            audit.setFlag(name, size, !entry.flagged);
+            audit.renderAuditTable();
+            this.renderComponentPreview(component, currentVariantIndex);
+            break;
+        }
+      });
+    });
+
+    // Export button in audit log
+    this.componentPreview.querySelector('.stage-audit-export')?.addEventListener('click', () => {
+      const variants = component.variants || [];
+      const compName = component.type;
+      const data = [];
+
+      variants.forEach(v => {
+        const size = this.getAuditSize(v, isTemplate);
+        const entry = audit.getAuditEntry(compName, size);
+        if (entry.flagged || entry.note) {
+          const sizeLabels = audit.SIZE_LABELS || {};
+          data.push({
+            name: compName,
+            size,
+            grid: sizeLabels[size] || size,
+            status: entry.flagged ? 'blocked'
+              : entry.note && entry.processed ? 'needs-review'
+              : entry.note ? 'to-process' : 'clean',
+            note: entry.note || null
+          });
+        }
+      });
+
+      navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
+        this.showToast('Audit data copied to clipboard');
+      });
+    });
+  }
+
+  /**
+   * Open inline comment on a variant card in the stage
+   */
+  openStageComment(card, name, size, component, currentVariantIndex) {
+    const audit = this.variantAudit;
+    if (!audit) return;
+
+    // Close any existing comment
+    this.closeStageComment();
+
+    const entry = audit.getAuditEntry(name, size);
+    const div = document.createElement('div');
+    div.className = 'qa-comment stage-comment-active';
+    div.innerHTML =
+      '<textarea placeholder="How should this variant change?">' +
+      (entry.note || '').replace(/</g, '&lt;') +
+      '</textarea>' +
+      '<div class="qa-comment__footer">' +
+      '<span class="qa-comment__hint">Esc to close · auto-saves on blur</span>' +
+      '</div>';
+
+    card.appendChild(div);
+    const ta = div.querySelector('textarea');
+    ta.focus();
+
+    const save = () => {
+      audit.setNote(name, size, ta.value);
+      audit.renderAuditTable();
+    };
+
+    ta.addEventListener('blur', () => {
+      save();
+      setTimeout(() => {
+        this.closeStageComment();
+        this.renderComponentPreview(component, currentVariantIndex);
+      }, 50);
+    });
+
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        save();
+        this.closeStageComment();
+        this.renderComponentPreview(component, currentVariantIndex);
+      }
+    });
+  }
+
+  /**
+   * Close the active stage comment
+   */
+  closeStageComment() {
+    const el = this.componentPreview?.querySelector('.stage-comment-active');
+    if (el) el.remove();
   }
 
   /**
