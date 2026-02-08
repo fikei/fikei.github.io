@@ -907,6 +907,40 @@ body {
 }
 
 /* ============================================
+   View Toggle (segmented control)
+   Extracted from: systemic/css/systemic.css
+   Used by: Systemic, Events
+   ============================================ */
+.view-toggle {
+  display: inline-flex;
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.view-toggle__btn {
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-default);
+}
+
+.view-toggle__btn:hover {
+  color: var(--fg);
+}
+
+.view-toggle__btn.active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ============================================
    Section Header
    Extracted from: systemic/css/systemic.css,
                    favicon/css/favicon-generator.css
