@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Split-Context Viewer
+ * Systemic - Split-Context Viewer
  * Interactive documentation viewer with designer/developer views
  */
 

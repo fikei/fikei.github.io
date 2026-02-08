@@ -1,5 +1,5 @@
 /**
- * SystemicAI - DOM Utilities
+ * Systemic - DOM Utilities
  * Helper functions for DOM manipulation and style extraction
  */
 

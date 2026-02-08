@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Main Application
+ * Systemic - Main Application
  * Design System Generator powered by AI
  */
 
@@ -36,7 +36,7 @@ class SystemicApp {
     if (!this.debugMode) return;
 
     const timestamp = new Date().toISOString();
-    const prefix = `[SystemicAI:${category}]`;
+    const prefix = `[Systemic:${category}]`;
 
     // Store for export
     this.debugLogs.push({

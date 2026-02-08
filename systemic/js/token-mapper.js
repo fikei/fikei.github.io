@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Token Mapper
+ * Systemic - Token Mapper
  * Maps extracted styles to semantic design tokens with Material Design integration
  */
 

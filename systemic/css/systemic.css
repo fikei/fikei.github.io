@@ -1,8 +1,8 @@
-/* SystemicAI Core Styles
+/* Systemic Core Styles
    Uses CTRL Design System tokens
    ============================================ */
 
-/* CSS Custom Properties - SystemicAI specific */
+/* CSS Custom Properties - Systemic specific */
 :root {
   --systemic-sidebar-width: 280px;
   --systemic-header-height: 64px;
