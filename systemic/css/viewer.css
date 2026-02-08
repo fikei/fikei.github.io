@@ -532,6 +532,10 @@
   border-top: var(--border-thin) solid var(--border-subtle);
 }
 
+.variants-preview-gallery:has(.variants-grid--template) {
+  max-width: 100%;
+}
+
 .variants-preview-gallery h4 {
   font-family: var(--font-primary);
   font-size: var(--text-xs);
@@ -545,6 +549,28 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--space-3);
+}
+
+/* Template variants: flex layout so each card sizes to its content width */
+.variants-grid--template {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.variant-preview-card--template {
+  width: fit-content;
+}
+
+.variant-preview-content--template {
+  padding: 0;
+  min-height: 0;
+}
+
+.variant-preview-content--template > * {
+  transform: none;
+  max-width: none;
 }
 
 .variant-preview-card {
