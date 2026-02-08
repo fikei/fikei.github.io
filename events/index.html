@@ -1127,9 +1127,38 @@ body {
     return 'html';
   }
 
-  // --- CORS Proxy Fetch with fallback ---
+  // --- Fetch via Edge Function (primary) then CORS proxies (fallback) ---
+  const FETCH_SOURCE_URL = SUPABASE_URL + '/functions/v1/fetch-source';
+
   async function proxyFetch(url) {
-    log(`Fetching via CORS proxy: ${url}`);
+    log(`Fetching: ${url}`);
+
+    // Try edge function first — server-side fetch with proper headers
+    try {
+      log('  Trying edge function...');
+      const resp = await fetch(FETCH_SOURCE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ url }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.content && data.status >= 200 && data.status < 400) {
+          log(`  Edge function: ${data.content.length} chars (upstream ${data.status})`);
+          return data.content;
+        }
+        log(`  Edge function: upstream returned ${data.status}, falling back`);
+      } else {
+        log(`  Edge function: ${resp.status} ${resp.statusText}, falling back`);
+      }
+    } catch (e) {
+      log(`  Edge function failed: ${e.message}, falling back`);
+    }
+
+    // Fallback to CORS proxies
     for (const proxy of CORS_PROXIES) {
       const proxyUrl = proxy.url + encodeURIComponent(url);
       const label = new URL(proxy.url).hostname;
@@ -1140,7 +1169,6 @@ body {
         if (!resp.ok) continue;
 
         if (proxy.json) {
-          // allorigins-style: response is JSON with { contents: "html..." }
           const data = await resp.json();
           const text = data.contents || '';
           log(`  Got ${text.length} chars (JSON-wrapped)`);
@@ -1155,7 +1183,7 @@ body {
         continue;
       }
     }
-    throw new Error('All CORS proxies failed for ' + url);
+    throw new Error('All fetch methods failed for ' + url);
   }
 
   // --- Fetch All Sources ---
