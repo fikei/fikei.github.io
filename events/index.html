@@ -590,6 +590,194 @@ body {
   padding-top: 4px;
 }
 
+/* Week View */
+.week-view { margin-bottom: var(--space-8); }
+
+.week-view__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border-subtle);
+  border: var(--border-thin) solid var(--border-subtle);
+}
+
+.week-view__day {
+  background: var(--bg);
+  min-height: 200px;
+}
+
+.week-view__day-header {
+  padding: var(--space-2);
+  background: var(--bg-surface);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  text-align: center;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.week-view__day-header:hover { background: var(--bg-hover); }
+
+.week-view__day--today .week-view__day-header {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.week-view__day--weekend .week-view__day-header {
+  color: var(--fg-subtle);
+}
+
+.week-view__day-num {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: normal;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.week-view__day-events {
+  padding: var(--space-1);
+}
+
+.week-view__event {
+  display: block;
+  font-size: var(--text-2xs);
+  line-height: var(--leading-tight);
+  padding: 3px var(--space-1);
+  margin-bottom: 2px;
+  color: var(--fg);
+  text-decoration: none;
+  border-left: 2px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.week-view__event:hover {
+  background: var(--bg-surface);
+  border-left-color: var(--fg);
+}
+
+.week-view__event-time {
+  color: var(--fg-subtle);
+  font-size: 9px;
+}
+
+.week-view__more {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 2px var(--space-1);
+  text-align: center;
+  margin-top: 2px;
+}
+
+.week-view__more:hover { color: var(--fg); }
+
+/* Day View */
+.day-view { margin-bottom: var(--space-8); }
+
+.day-view__date-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.day-view__weekday {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+}
+
+.day-view__full-date {
+  font-size: var(--text-lg);
+  font-family: var(--font-primary);
+}
+
+.day-view__event-count {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin-left: auto;
+}
+
+.day-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.day-view__item {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  align-items: start;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.day-view__item:last-child { border-bottom: none; }
+.day-view__item:hover { background: var(--bg-surface); }
+
+.day-view__time {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.day-view__info { min-width: 0; }
+
+.day-view__name {
+  font-size: var(--text-sm);
+  margin-bottom: 2px;
+}
+
+.day-view__name a {
+  color: var(--fg);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.day-view__name a:hover { color: var(--fg-muted); }
+
+.day-view__meta {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.day-view__meta span:not(:last-child)::after {
+  content: '\00b7';
+  margin-left: var(--space-2);
+  color: var(--fg-subtle);
+}
+
+.day-view__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.day-view__empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
 /* ---- Responsive: Tablet (768px) ---- */
 @media (max-width: 768px) {
   .data-table .col-genre,
@@ -618,6 +806,23 @@ body {
   /* Day detail: drop tags column */
   .day-detail__tags { display: none; }
   .day-detail__item { grid-template-columns: 70px 1fr; }
+
+  /* Week view: stack days vertically on tablet */
+  .week-view__grid { grid-template-columns: 1fr; }
+  .week-view__day { min-height: auto; }
+  .week-view__day-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+  }
+  .week-view__day-num { display: inline; font-size: var(--text-sm); }
+  .week-view__day-events { padding: var(--space-1) var(--space-3); }
+
+  /* Day view: tighter on tablet */
+  .day-view__item { grid-template-columns: 70px 1fr; }
+  .day-view__tags { display: none; }
 }
 
 /* ---- Responsive: Mobile (480px) ---- */
@@ -654,6 +859,12 @@ body {
   .day-detail__name { font-size: var(--text-xs); }
   .day-detail__title { font-size: var(--text-xs); }
   .day-detail__count { font-size: var(--text-2xs); }
+
+  /* Day view: tighter on mobile */
+  .day-view__item { grid-template-columns: 56px 1fr; padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .day-view__time { font-size: var(--text-2xs); }
+  .day-view__name { font-size: var(--text-xs); }
+  .day-view__full-date { font-size: var(--text-base); }
 
   /* Filter bar: stack */
   .filter-bar { gap: var(--space-2); }
@@ -758,7 +969,9 @@ body {
       <span id="statsFiltered"></span>
       <div class="view-toggle">
         <button class="view-toggle__btn active" data-view="table">Table</button>
-        <button class="view-toggle__btn" data-view="calendar">Calendar</button>
+        <button class="view-toggle__btn" data-view="day">Day</button>
+        <button class="view-toggle__btn" data-view="week">Week</button>
+        <button class="view-toggle__btn" data-view="calendar">Month</button>
       </div>
     </div>
 
@@ -782,7 +995,35 @@ body {
       </table>
     </div>
 
-    <!-- Calendar View -->
+    <!-- Day View -->
+    <div id="dayView" style="display: none;">
+      <div class="calendar__header">
+        <div class="calendar__nav">
+          <button class="btn btn--ghost btn--sm" id="dayPrev">&larr;</button>
+          <button class="btn btn--ghost btn--sm" id="dayToday">Today</button>
+          <button class="btn btn--ghost btn--sm" id="dayNext">&rarr;</button>
+        </div>
+        <span class="calendar__title" id="dayTitle"></span>
+        <span class="text-xs text-muted" id="dayStats"></span>
+      </div>
+      <div class="day-view" id="dayViewContent"></div>
+    </div>
+
+    <!-- Week View -->
+    <div id="weekView" style="display: none;">
+      <div class="calendar__header">
+        <div class="calendar__nav">
+          <button class="btn btn--ghost btn--sm" id="weekPrev">&larr;</button>
+          <button class="btn btn--ghost btn--sm" id="weekToday">Today</button>
+          <button class="btn btn--ghost btn--sm" id="weekNext">&rarr;</button>
+        </div>
+        <span class="calendar__title" id="weekTitle"></span>
+        <span class="text-xs text-muted" id="weekStats"></span>
+      </div>
+      <div class="week-view" id="weekViewContent"></div>
+    </div>
+
+    <!-- Month/Calendar View -->
     <div id="calendarView" style="display: none;">
       <div class="calendar__header">
         <div class="calendar__nav">
@@ -985,6 +1226,7 @@ body {
     view: 'table',
     calMonth: new Date().getMonth(),
     calYear: new Date().getFullYear(),
+    calDate: new Date().toISOString().split('T')[0], // anchor date for day/week views
     selectedDate: null,
     onboarded: false,
   };
@@ -1711,17 +1953,22 @@ body {
     const sorted = getSortedEvents(filtered);
     const tableWrap = document.querySelector('.data-table-wrap');
     const calView = document.getElementById('calendarView');
+    const dayViewEl = document.getElementById('dayView');
+    const weekViewEl = document.getElementById('weekView');
     const empty = document.getElementById('emptyState');
     const table = document.getElementById('eventsTable');
+    const v = state.view;
 
-    // Toggle views
-    const isCalendar = state.view === 'calendar';
-    tableWrap.style.display = isCalendar ? 'none' : '';
-    calView.style.display = isCalendar ? '' : 'none';
+    // Hide all views first
+    tableWrap.style.display = 'none';
+    calView.style.display = 'none';
+    dayViewEl.style.display = 'none';
+    weekViewEl.style.display = 'none';
+    empty.style.display = 'none';
 
-    if (isCalendar) {
+    if (v === 'calendar') {
+      calView.style.display = '';
       renderCalendar(filtered);
-      // Re-open day detail if a date is selected and still visible
       if (state.selectedDate) {
         const monthPrefix = `${state.calYear}-${String(state.calMonth + 1).padStart(2, '0')}`;
         if (state.selectedDate.startsWith(monthPrefix)) {
@@ -1730,11 +1977,18 @@ body {
           closeDayDetail();
         }
       }
-      empty.style.display = 'none';
+    } else if (v === 'week') {
+      weekViewEl.style.display = '';
+      renderWeekView(filtered);
+    } else if (v === 'day') {
+      dayViewEl.style.display = '';
+      renderDayView(filtered);
     } else {
+      // table view
+      tableWrap.style.display = '';
       closeDayDetail();
       if (sorted.length === 0) { table.style.display = 'none'; empty.style.display = 'block'; }
-      else { table.style.display = ''; empty.style.display = 'none'; }
+      else { table.style.display = ''; }
       renderTable(sorted);
     }
 
@@ -1904,6 +2158,142 @@ body {
     return `<div class="${cls.join(' ')}" data-date="${dateStr}" style="cursor: pointer;">${inner}</div>`;
   }
 
+  // --- Day View ---
+  function renderDayView(events) {
+    const dateStr = state.calDate;
+    const d = new Date(dateStr + 'T00:00:00');
+    const container = document.getElementById('dayViewContent');
+    const title = document.getElementById('dayTitle');
+    const stats = document.getElementById('dayStats');
+
+    title.textContent = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    const dayEvents = events.filter(ev => ev.date === dateStr);
+    dayEvents.sort((a, b) => (a.time || 'zzz').localeCompare(b.time || 'zzz'));
+    stats.textContent = `${dayEvents.length} event${dayEvents.length !== 1 ? 's' : ''}`;
+
+    if (dayEvents.length === 0) {
+      container.innerHTML = '<div class="day-view__empty">No events on this day</div>';
+      return;
+    }
+
+    container.innerHTML = '<ul class="day-view__list">' + dayEvents.map(ev => {
+      const nameHtml = ev.url && ev.url !== '#'
+        ? `<a href="${escHtml(ev.url)}" target="_blank" rel="noopener">${escHtml(ev.name)}</a>`
+        : escHtml(ev.name);
+      const metaParts = [];
+      if (ev.venue) metaParts.push(`<span>${escHtml(ev.venue)}</span>`);
+      if (ev.city) metaParts.push(`<span>${escHtml(ev.city)}</span>`);
+      if (ev.price) metaParts.push(`<span>${escHtml(ev.price)}</span>`);
+      if (ev.ages) metaParts.push(`<span>${escHtml(ev.ages)}</span>`);
+      if (ev.promoter) metaParts.push(`<span>${escHtml(ev.promoter)}</span>`);
+      const genreHtml = ev.genre
+        ? ev.genre.split(/,\s*/).slice(0, 6).map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('')
+        : '';
+      return `<li class="day-view__item">
+        <div class="day-view__time">${escHtml(ev.time || '\u2014')}</div>
+        <div class="day-view__info">
+          <div class="day-view__name">${nameHtml}</div>
+          <div class="day-view__meta">${metaParts.join('')}</div>
+          ${genreHtml ? `<div class="day-view__tags">${genreHtml}</div>` : ''}
+        </div>
+      </li>`;
+    }).join('') + '</ul>';
+  }
+
+  // --- Week View ---
+  function getWeekStart(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay(); // 0=Sun
+    d.setDate(d.getDate() - day);
+    return d.toISOString().split('T')[0];
+  }
+
+  function addDays(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().split('T')[0];
+  }
+
+  function renderWeekView(events) {
+    const weekStart = getWeekStart(state.calDate);
+    const container = document.getElementById('weekViewContent');
+    const title = document.getElementById('weekTitle');
+    const stats = document.getElementById('weekStats');
+    const today = new Date().toISOString().split('T')[0];
+
+    // Build event map
+    const eventMap = {};
+    events.forEach(ev => {
+      if (!ev.date) return;
+      if (!eventMap[ev.date]) eventMap[ev.date] = [];
+      eventMap[ev.date].push(ev);
+    });
+
+    // Week date range for title
+    const weekEnd = addDays(weekStart, 6);
+    const startDate = new Date(weekStart + 'T00:00:00');
+    const endDate = new Date(weekEnd + 'T00:00:00');
+    const sameMonth = startDate.getMonth() === endDate.getMonth();
+    if (sameMonth) {
+      title.textContent = `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} \u2013 ${endDate.getDate()}, ${endDate.getFullYear()}`;
+    } else {
+      title.textContent = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} \u2013 ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+
+    // Count events this week
+    let weekEventCount = 0;
+    const MAX_SHOWN = 8;
+    let html = '<div class="week-view__grid">';
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    for (let i = 0; i < 7; i++) {
+      const dateStr = addDays(weekStart, i);
+      const d = new Date(dateStr + 'T00:00:00');
+      const dayEvents = eventMap[dateStr] || [];
+      dayEvents.sort((a, b) => (a.time || 'zzz').localeCompare(b.time || 'zzz'));
+      weekEventCount += dayEvents.length;
+
+      const isToday = dateStr === today;
+      const isWeekend = (i === 0 || i === 6);
+      const cls = ['week-view__day'];
+      if (isToday) cls.push('week-view__day--today');
+      if (isWeekend) cls.push('week-view__day--weekend');
+
+      html += `<div class="${cls.join(' ')}" data-date="${dateStr}">`;
+      html += `<div class="week-view__day-header" data-date="${dateStr}">`;
+      html += `<span>${dayNames[i]}</span>`;
+      html += `<span class="week-view__day-num">${d.getDate()}</span>`;
+      if (dayEvents.length > 0) html += ` <span style="font-size:9px;color:var(--fg-subtle);">(${dayEvents.length})</span>`;
+      html += '</div>';
+      html += '<div class="week-view__day-events">';
+
+      const shown = dayEvents.slice(0, MAX_SHOWN);
+      shown.forEach(ev => {
+        const tip = [ev.name, ev.venue ? '@ ' + ev.venue : '', ev.time].filter(Boolean).join(' \u2014 ');
+        const timeHtml = ev.time ? `<span class="week-view__event-time">${escHtml(ev.time.split('-')[0].split('(')[0].trim().substring(0, 7))}</span> ` : '';
+        if (ev.url && ev.url !== '#') {
+          html += `<a href="${escHtml(ev.url)}" class="week-view__event" target="_blank" rel="noopener" title="${escHtml(tip)}">${timeHtml}${escHtml(ev.name)}</a>`;
+        } else {
+          html += `<span class="week-view__event" title="${escHtml(tip)}">${timeHtml}${escHtml(ev.name)}</span>`;
+        }
+      });
+      if (dayEvents.length > MAX_SHOWN) {
+        html += `<span class="week-view__more">+${dayEvents.length - MAX_SHOWN} more</span>`;
+      }
+      if (dayEvents.length === 0) {
+        html += '<div style="padding:var(--space-2);color:var(--fg-subtle);font-size:var(--text-2xs);text-align:center;">\u2014</div>';
+      }
+
+      html += '</div></div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+    stats.textContent = `${weekEventCount} event${weekEventCount !== 1 ? 's' : ''} this week`;
+  }
+
   // Auto-navigate calendar to the month with the most events
   function calAutoNavigate() {
     if (state.events.length === 0) return;
@@ -1918,6 +2308,13 @@ body {
       const [y, m] = best[0].split('-').map(Number);
       state.calYear = y;
       state.calMonth = m - 1;
+      // Also set calDate to today if it's in the best month, otherwise first of that month
+      const today = new Date().toISOString().split('T')[0];
+      if (today.startsWith(best[0])) {
+        state.calDate = today;
+      } else {
+        state.calDate = `${y}-${String(m).padStart(2, '0')}-01`;
+      }
     }
   }
 
@@ -2191,16 +2588,34 @@ body {
       if (added) { modal.classList.remove('modal--visible'); fetchAllSources(); }
     });
 
-    // View toggle
+    // View toggle — sync dates across views when switching
     document.querySelectorAll('.view-toggle__btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.view = btn.dataset.view;
+        const newView = btn.dataset.view;
+        const oldView = state.view;
+        // Sync calDate from month view context
+        if (oldView === 'calendar' && (newView === 'day' || newView === 'week')) {
+          // If a day was selected in month view, use that date
+          if (state.selectedDate) {
+            state.calDate = state.selectedDate;
+          } else {
+            // Default to 1st of current month
+            state.calDate = `${state.calYear}-${String(state.calMonth + 1).padStart(2, '0')}-01`;
+          }
+        }
+        // Sync month view from calDate
+        if ((oldView === 'day' || oldView === 'week') && newView === 'calendar') {
+          const d = new Date(state.calDate + 'T00:00:00');
+          state.calYear = d.getFullYear();
+          state.calMonth = d.getMonth();
+        }
+        state.view = newView;
         saveSettings();
         render();
       });
     });
 
-    // Calendar navigation
+    // Month navigation
     document.getElementById('calPrev').addEventListener('click', () => {
       state.calMonth--;
       if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
@@ -2219,16 +2634,56 @@ body {
 
     // Calendar cell click → open day detail
     document.getElementById('calendarGrid').addEventListener('click', (e) => {
-      // Find the calendar cell that was clicked (walk up from target)
       const cell = e.target.closest('.calendar__cell');
       if (!cell || !cell.dataset.date) return;
-      // Don't intercept link clicks
       if (e.target.tagName === 'A') return;
       openDayDetail(cell.dataset.date);
     });
 
     // Day detail close
     document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
+
+    // Day view navigation
+    document.getElementById('dayPrev').addEventListener('click', () => {
+      state.calDate = addDays(state.calDate, -1);
+      render();
+    });
+    document.getElementById('dayNext').addEventListener('click', () => {
+      state.calDate = addDays(state.calDate, 1);
+      render();
+    });
+    document.getElementById('dayToday').addEventListener('click', () => {
+      state.calDate = new Date().toISOString().split('T')[0];
+      render();
+    });
+
+    // Week view navigation
+    document.getElementById('weekPrev').addEventListener('click', () => {
+      state.calDate = addDays(state.calDate, -7);
+      render();
+    });
+    document.getElementById('weekNext').addEventListener('click', () => {
+      state.calDate = addDays(state.calDate, 7);
+      render();
+    });
+    document.getElementById('weekToday').addEventListener('click', () => {
+      state.calDate = new Date().toISOString().split('T')[0];
+      render();
+    });
+
+    // Week view: click day header → switch to day view
+    document.getElementById('weekViewContent').addEventListener('click', (e) => {
+      const header = e.target.closest('.week-view__day-header');
+      if (header && header.dataset.date) {
+        state.calDate = header.dataset.date;
+        state.view = 'day';
+        saveSettings();
+        render();
+        return;
+      }
+      // Don't intercept link clicks
+      if (e.target.tagName === 'A') return;
+    });
 
     // Auth
     const authModal = document.getElementById('authModal');
