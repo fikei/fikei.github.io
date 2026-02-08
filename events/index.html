@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events — ctrl.rodeo</title>
+  <meta name="description" content="Aggregated events from multiple sources with location filtering.">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
+  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
+
+  <!-- Space Grotesk Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- CTRL Design System -->
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+
+  <style>
+/* ============================================
+   Events Page — page-specific overrides only
+   DS handles: page-header, breadcrumb, filter-bar,
+   data-table, token--static, form-group, loading,
+   btn--dashed, modal, toggle, spinner, empty-state
+   ============================================ */
+
+body {
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.page-description {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  line-height: var(--leading-relaxed);
+  max-width: 480px;
+  margin-bottom: var(--space-8);
+  padding-top: var(--space-6);
+}
+
+/* Sources bar */
+.sources-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.sources-bar__label {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-right: var(--space-1);
+}
+
+.source-chip__count {
+  margin-left: var(--space-1);
+  opacity: 0.6;
+}
+
+/* Filter bar overrides — input widths */
+.filter-bar { margin-bottom: var(--space-4); }
+.filter-bar .input--search { width: 200px; }
+.filter-bar .input--date { width: 130px; }
+
+/* Stats bar */
+.stats-bar {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Table overrides — column widths */
+.data-table-wrap { margin-bottom: var(--space-8); }
+.data-table .col-date { width: 90px; white-space: nowrap; }
+.data-table .col-name { min-width: 180px; }
+.data-table .col-venue { min-width: 120px; }
+.data-table .col-address { min-width: 150px; }
+.data-table .col-city { min-width: 100px; white-space: nowrap; }
+.data-table .col-source { width: 90px; white-space: nowrap; }
+
+.event-link {
+  color: var(--fg);
+  text-decoration: none;
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+  transition: border-color var(--duration-normal) var(--ease-default);
+}
+
+.event-link:hover { border-color: var(--fg); }
+
+/* Footer */
+.footer {
+  padding: var(--space-6) 0 var(--space-16);
+  border-top: var(--border-thin) solid var(--border-subtle);
+}
+
+.footer-text {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-bar .input--search,
+  .filter-bar .input--date,
+  .filter-bar .select {
+    width: 100%;
+  }
+
+  .data-table .col-address { display: none; }
+}
+  </style>
+</head>
+<body>
+
+  <!-- Header — DS: .page-header + .breadcrumb -->
+  <header class="page-header">
+    <div class="page-header__inner">
+      <nav class="breadcrumb">
+        <a href="/" class="breadcrumb__link">ctrl.rodeo</a>
+        <span class="breadcrumb__sep">/</span>
+        <span class="breadcrumb__current">Events</span>
+      </nav>
+      <div class="page-header__actions">
+        <button class="toggle" id="themeToggle" aria-label="Toggle theme">
+          <div class="toggle__knob"></div>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <p class="page-description">Aggregated events from multiple sources. Location data extracted into address and city columns for filtering.</p>
+
+    <!-- Sources bar -->
+    <div class="sources-bar">
+      <span class="sources-bar__label">Sources:</span>
+      <div id="sourceChips"></div>
+      <button class="btn btn--sm btn--dashed" id="addSourceBtn">+ Add Source</button>
+    </div>
+
+    <!-- Filters — DS: .filter-bar -->
+    <div class="filter-bar">
+      <input type="text" class="input input--search" id="filterSearch" placeholder="Search events..." autocomplete="off">
+      <select class="input select" id="filterCity">
+        <option value="">All Cities</option>
+      </select>
+      <select class="input select" id="filterSource">
+        <option value="">All Sources</option>
+      </select>
+      <input type="date" class="input input--date" id="filterDateFrom" title="From date">
+      <input type="date" class="input input--date" id="filterDateTo" title="To date">
+      <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <span id="statsText">0 events</span>
+      <span id="statsFiltered"></span>
+    </div>
+
+    <!-- Table — DS: .data-table-wrap + .data-table -->
+    <div class="data-table-wrap">
+      <table class="data-table" id="eventsTable">
+        <thead>
+          <tr>
+            <th class="col-date" data-sort="date">Date <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-name" data-sort="name">Event <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-venue" data-sort="venue">Venue <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-address" data-sort="address">Address <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-city" data-sort="city">City <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-source" data-sort="source">Source <span class="data-table__sort">&#9650;</span></th>
+          </tr>
+        </thead>
+        <tbody id="eventsBody">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState" style="display: none;">
+      <div class="empty-state__box">
+        <p class="empty-state__text">No events match your filters</p>
+        <button class="empty-state__clear" id="emptyClear">Clear Filters</button>
+      </div>
+    </div>
+
+    <!-- Loading — DS: .loading + .spinner -->
+    <div class="loading" id="loadingIndicator" style="display: none;">
+      <div class="spinner"></div>
+      <span>Fetching events</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="footer-text">Built by Ian Fike</p>
+    </footer>
+  </div>
+
+  <!-- Add Source Modal — DS: .modal + .form-group + .form-label + .form-hint -->
+  <div class="modal" id="addSourceModal">
+    <div class="modal__content">
+      <h2 class="modal__title">Add Event Source</h2>
+      <div class="form-group">
+        <label class="form-label">Source Type</label>
+        <select class="input select" id="sourceType">
+          <option value="ical">iCal / .ics URL</option>
+          <option value="json">JSON Feed URL</option>
+          <option value="rss">RSS / Atom Feed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input type="text" class="input" id="sourceName" placeholder="e.g. Community Calendar">
+      </div>
+      <div class="form-group">
+        <label class="form-label">URL</label>
+        <input type="text" class="input" id="sourceUrl" placeholder="https://...">
+      </div>
+      <p class="form-hint">
+        Supports iCal (.ics), JSON feeds, and RSS/Atom. Sources are saved in your browser.
+      </p>
+      <div class="modal__actions">
+        <button class="btn" id="modalCancel">Cancel</button>
+        <button class="btn btn--filled" id="modalAdd">Add Source</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// ============================================
+// Events Aggregator — ctrl.rodeo
+// ============================================
+
+(function() {
+  'use strict';
+
+  const state = {
+    events: [],
+    sources: [],
+    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '' },
+    sort: { key: 'date', dir: 'asc' },
+  };
+
+  const STORAGE_KEY = 'ctrl-rodeo-event-sources';
+
+  function loadSources() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) state.sources = JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+
+    if (state.sources.length === 0) {
+      state.sources = [{ id: 'demo', name: 'Demo Events', type: 'demo', url: '', enabled: true }];
+      saveSources();
+    }
+  }
+
+  function saveSources() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
+  }
+
+  // --- Demo Data ---
+  function getDemoEvents() {
+    const today = new Date();
+    const d = (offset) => {
+      const dt = new Date(today);
+      dt.setDate(dt.getDate() + offset);
+      return dt.toISOString().split('T')[0];
+    };
+
+    return [
+      { date: d(1), name: 'Frontend Meetup', venue: 'The Hub', address: '123 Market St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(2), name: 'Design Systems Conf', venue: 'Moscone Center', address: '747 Howard St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(3), name: 'AI & ML Workshop', venue: 'TechSpace', address: '456 Broadway', city: 'New York', url: '#', source: 'demo' },
+      { date: d(4), name: 'Startup Pitch Night', venue: 'WeWork Downtown', address: '100 S King St', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(5), name: 'Open Source Friday', venue: 'GitHub HQ', address: '88 Colin P Kelly Jr St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(7), name: 'React Advanced', venue: 'Convention Center', address: '1 Dr Carlton B Goodlett Pl', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(8), name: 'UX Research Summit', venue: 'Columbia University', address: '116th St & Broadway', city: 'New York', url: '#', source: 'demo' },
+      { date: d(10), name: 'DevOps Days', venue: 'Bell Harbor Conf Center', address: '2211 Alaskan Way', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(12), name: 'CSS Art Exhibition', venue: 'SoMa Gallery', address: '550 Howard St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(14), name: 'Typescript Meetup', venue: 'Galvanize', address: '44 Tehama St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(15), name: 'Product Management Forum', venue: 'Grand Hyatt', address: '109 E 42nd St', city: 'New York', url: '#', source: 'demo' },
+      { date: d(18), name: 'Cloud Native Summit', venue: 'Amazon Meeting Center', address: '2031 7th Ave', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(20), name: 'Accessibility Workshop', venue: 'Lighthouse for the Blind', address: '214 Van Ness Ave', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(22), name: 'Data Viz Meetup', venue: 'Brooklyn Navy Yard', address: '63 Flushing Ave', city: 'New York', url: '#', source: 'demo' },
+      { date: d(25), name: 'Web Performance Conf', venue: 'Impact Hub', address: '220 2nd Ave S', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(-1), name: 'Rust Lang Meetup', venue: 'Hacker Dojo', address: '855 Maude Ave', city: 'Mountain View', url: '#', source: 'demo' },
+      { date: d(-3), name: 'GraphQL Summit', venue: 'Bespoke Events', address: '845 Market St', city: 'San Francisco', url: '#', source: 'demo' },
+      { date: d(6), name: 'Women in Tech Panel', venue: 'Civic Hall', address: '118 W 22nd St', city: 'New York', url: '#', source: 'demo' },
+      { date: d(9), name: 'Kubernetes Workshop', venue: 'Fremont Studios', address: '155 N 35th St', city: 'Seattle', url: '#', source: 'demo' },
+      { date: d(30), name: 'JS Nation', venue: 'Palace of Fine Arts', address: '3301 Lyon St', city: 'San Francisco', url: '#', source: 'demo' },
+    ];
+  }
+
+  // --- CORS Proxy ---
+  const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+  // --- Fetch Sources ---
+  async function fetchAllSources() {
+    const el = document.getElementById('loadingIndicator');
+    el.style.display = 'flex';
+    state.events = [];
+
+    const promises = state.sources.filter(s => s.enabled).map(async (source) => {
+      try {
+        if (source.type === 'demo') return getDemoEvents();
+        if (source.type === 'ical') return await fetchIcal(source);
+        if (source.type === 'json') return await fetchJson(source);
+        if (source.type === 'rss') return await fetchRss(source);
+      } catch (err) {
+        console.warn(`Failed to fetch source "${source.name}":`, err);
+        return [];
+      }
+    });
+
+    const results = await Promise.allSettled(promises);
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        state.events.push(...r.value);
+      }
+    });
+
+    el.style.display = 'none';
+    updateFilters();
+    render();
+  }
+
+  // --- iCal Parser ---
+  async function fetchIcal(source) {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(source.url));
+    const text = await resp.text();
+    return parseIcal(text, source.id);
+  }
+
+  function parseIcal(text, sourceId) {
+    const events = [];
+    const blocks = text.split('BEGIN:VEVENT');
+    for (let i = 1; i < blocks.length; i++) {
+      const block = blocks[i].split('END:VEVENT')[0];
+      const get = (key) => {
+        const re = new RegExp(key + '[^:]*:(.+)', 'i');
+        const m = block.match(re);
+        return m ? m[1].trim().replace(/\\n/g, ' ').replace(/\\,/g, ',') : '';
+      };
+      const dtstart = get('DTSTART');
+      const loc = parseLocationString(get('LOCATION'));
+      events.push({
+        date: dtstart ? parseIcalDate(dtstart) : '',
+        name: get('SUMMARY'),
+        venue: loc.venue, address: loc.address, city: loc.city,
+        url: get('URL') || '',
+        source: sourceId,
+      });
+    }
+    return events;
+  }
+
+  function parseIcalDate(str) {
+    const clean = str.replace(/[^0-9T]/g, '');
+    if (clean.length >= 8) return `${clean.substring(0,4)}-${clean.substring(4,6)}-${clean.substring(6,8)}`;
+    return str;
+  }
+
+  // --- JSON Feed Parser ---
+  async function fetchJson(source) {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(source.url));
+    const data = await resp.json();
+    const items = Array.isArray(data) ? data : (data.events || data.items || data.results || []);
+    return items.map(item => {
+      const loc = parseLocationString(item.location || item.venue || item.address || '');
+      return {
+        date: (item.date || item.start_date || item.startDate || item.start || '').substring(0, 10),
+        name: item.name || item.title || item.summary || '',
+        venue: item.venue?.name || item.venue_name || loc.venue,
+        address: item.venue?.address || item.address || loc.address,
+        city: item.venue?.city || item.city || loc.city,
+        url: item.url || item.link || '',
+        source: source.id,
+      };
+    });
+  }
+
+  // --- RSS/Atom Parser ---
+  async function fetchRss(source) {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(source.url));
+    const text = await resp.text();
+    const xml = new DOMParser().parseFromString(text, 'text/xml');
+    const events = [];
+    let items = xml.querySelectorAll('item');
+    if (items.length === 0) items = xml.querySelectorAll('entry');
+
+    items.forEach(item => {
+      const getText = (tag) => { const el = item.querySelector(tag); return el ? el.textContent.trim() : ''; };
+      const pubDate = getText('pubDate') || getText('published') || getText('updated') || '';
+      const loc = extractLocationFromHtml(getText('description') || getText('content') || getText('summary') || '');
+      let date = '';
+      if (pubDate) { try { date = new Date(pubDate).toISOString().split('T')[0]; } catch (e) { date = pubDate.substring(0, 10); } }
+      events.push({
+        date, name: getText('title'),
+        venue: loc.venue, address: loc.address, city: loc.city,
+        url: getText('link') || (item.querySelector('link')?.getAttribute('href') || ''),
+        source: source.id,
+      });
+    });
+    return events;
+  }
+
+  // --- Location Parsing ---
+  function parseLocationString(str) {
+    if (!str) return { venue: '', address: '', city: '' };
+    const parts = str.split(',').map(s => s.trim());
+    if (parts.length >= 3) return { venue: parts[0], address: parts[1], city: parts[2].replace(/\s+\d{5}(-\d{4})?$/, '').trim() };
+    if (parts.length === 2) {
+      if (/^\d/.test(parts[0])) return { venue: '', address: parts[0], city: parts[1] };
+      return { venue: parts[0], address: '', city: parts[1] };
+    }
+    return { venue: str, address: '', city: '' };
+  }
+
+  function extractLocationFromHtml(html) {
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const m = text.match(/(?:location|where|venue|place|address)\s*:\s*([^.]+)/i);
+    return m ? parseLocationString(m[1].trim()) : { venue: '', address: '', city: '' };
+  }
+
+  // --- Render ---
+  function render() {
+    const filtered = getFilteredEvents();
+    const sorted = getSortedEvents(filtered);
+    const tbody = document.getElementById('eventsBody');
+    const empty = document.getElementById('emptyState');
+    const table = document.getElementById('eventsTable');
+
+    if (sorted.length === 0) { table.style.display = 'none'; empty.style.display = 'block'; }
+    else { table.style.display = ''; empty.style.display = 'none'; }
+
+    tbody.innerHTML = sorted.map(ev => {
+      const sourceName = state.sources.find(s => s.id === ev.source)?.name || ev.source;
+      const nameCell = ev.url && ev.url !== '#'
+        ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener">${escHtml(ev.name)}</a>`
+        : escHtml(ev.name);
+      return `<tr>
+        <td class="col-date">${escHtml(formatDate(ev.date))}</td>
+        <td class="col-name">${nameCell}</td>
+        <td class="col-venue">${escHtml(ev.venue)}</td>
+        <td class="col-address">${escHtml(ev.address)}</td>
+        <td class="col-city">${escHtml(ev.city)}</td>
+        <td class="col-source"><span class="token token--static">${escHtml(sourceName)}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Stats
+    const enabledCount = state.sources.filter(s => s.enabled).length;
+    document.getElementById('statsText').textContent = `${state.events.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
+    document.getElementById('statsFiltered').textContent = sorted.length !== state.events.length ? `Showing ${sorted.length}` : '';
+
+    renderSourceChips();
+
+    // Sort indicators
+    document.querySelectorAll('.data-table th').forEach(th => {
+      const key = th.dataset.sort;
+      th.classList.toggle('sorted', key === state.sort.key);
+      const arrow = th.querySelector('.data-table__sort');
+      if (arrow) arrow.innerHTML = key === state.sort.key ? (state.sort.dir === 'asc' ? '&#9650;' : '&#9660;') : '&#9650;';
+    });
+  }
+
+  function renderSourceChips() {
+    const container = document.getElementById('sourceChips');
+    container.innerHTML = state.sources.map(s => {
+      const count = state.events.filter(e => e.source === s.id).length;
+      return `<button class="token ${s.enabled ? 'token--active' : ''}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span></button>`;
+    }).join('');
+
+    container.querySelectorAll('.token').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const source = state.sources.find(s => s.id === chip.dataset.sourceId);
+        if (source) { source.enabled = !source.enabled; saveSources(); fetchAllSources(); }
+      });
+    });
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '\u2014';
+    try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+    catch (e) { return dateStr; }
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // --- Filtering ---
+  function getFilteredEvents() {
+    return state.events.filter(ev => {
+      const { search, city, source, dateFrom, dateTo } = state.filters;
+      if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.address, ev.city].join(' ').toLowerCase().includes(q)) return false; }
+      if (city && ev.city !== city) return false;
+      if (source && ev.source !== source) return false;
+      if (dateFrom && ev.date < dateFrom) return false;
+      if (dateTo && ev.date > dateTo) return false;
+      return true;
+    });
+  }
+
+  function clearAllFilters() {
+    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '' };
+    document.getElementById('filterSearch').value = '';
+    document.getElementById('filterCity').value = '';
+    document.getElementById('filterSource').value = '';
+    document.getElementById('filterDateFrom').value = '';
+    document.getElementById('filterDateTo').value = '';
+    render();
+  }
+
+  function updateFilters() {
+    const cities = [...new Set(state.events.map(e => e.city).filter(Boolean))].sort();
+    const citySelect = document.getElementById('filterCity');
+    const cc = citySelect.value;
+    citySelect.innerHTML = '<option value="">All Cities</option>' + cities.map(c => `<option value="${escHtml(c)}" ${c === cc ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+
+    const sourceSelect = document.getElementById('filterSource');
+    const cs = sourceSelect.value;
+    sourceSelect.innerHTML = '<option value="">All Sources</option>' + state.sources.map(s => `<option value="${escHtml(s.id)}" ${s.id === cs ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('');
+  }
+
+  // --- Sorting ---
+  function getSortedEvents(events) {
+    const { key, dir } = state.sort;
+    return [...events].sort((a, b) => {
+      let aVal = a[key] || '', bVal = b[key] || '';
+      if (key === 'date') { aVal = aVal || '9999-12-31'; bVal = bVal || '9999-12-31'; }
+      const cmp = aVal.localeCompare(bVal);
+      return dir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  // --- Event Binding ---
+  function bindEvents() {
+    // Theme toggle
+    const toggle = document.getElementById('themeToggle');
+    const root = document.documentElement;
+    if (localStorage.getItem('theme') === 'light') { root.classList.add('light'); toggle.classList.add('toggle--active'); }
+    toggle.addEventListener('click', () => {
+      root.classList.toggle('light'); toggle.classList.toggle('toggle--active');
+      localStorage.setItem('theme', root.classList.contains('light') ? 'light' : 'dark');
+    });
+
+    // Filters
+    const filterSearch = document.getElementById('filterSearch');
+    let debounceTimer;
+    filterSearch.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { state.filters.search = filterSearch.value; render(); }, 150); });
+    document.getElementById('filterCity').addEventListener('change', (e) => { state.filters.city = e.target.value; render(); });
+    document.getElementById('filterSource').addEventListener('change', (e) => { state.filters.source = e.target.value; render(); });
+    document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
+    document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
+    document.getElementById('filterClear').addEventListener('click', clearAllFilters);
+    document.getElementById('emptyClear').addEventListener('click', clearAllFilters);
+
+    // Column sorting
+    document.querySelectorAll('.data-table th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (state.sort.key === key) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+        else { state.sort.key = key; state.sort.dir = 'asc'; }
+        render();
+      });
+    });
+
+    // Add Source modal
+    const modal = document.getElementById('addSourceModal');
+    document.getElementById('addSourceBtn').addEventListener('click', () => { modal.classList.add('modal--visible'); document.getElementById('sourceName').value = ''; document.getElementById('sourceUrl').value = ''; document.getElementById('sourceName').focus(); });
+    document.getElementById('modalCancel').addEventListener('click', () => modal.classList.remove('modal--visible'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('modal--visible'); });
+
+    document.getElementById('modalAdd').addEventListener('click', () => {
+      const name = document.getElementById('sourceName').value.trim();
+      const url = document.getElementById('sourceUrl').value.trim();
+      const type = document.getElementById('sourceType').value;
+      if (!name || !url) return;
+      state.sources.push({ id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, type, url, enabled: true });
+      saveSources(); modal.classList.remove('modal--visible'); fetchAllSources();
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') modal.classList.remove('modal--visible');
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); filterSearch.focus(); }
+    });
+  }
+
+  // --- Init ---
+  function init() { loadSources(); bindEvents(); fetchAllSources(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+  </script>
+</body>
+</html>

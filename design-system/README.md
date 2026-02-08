@@ -13,8 +13,10 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 
 ### Used By
 - **Boards** - Link curation app
+- **Events** - Event aggregator with location filtering
 - **Soundscape** - Audio visualization
 - **Systemic** - Design system generator
+- **Favicon** - AI favicon generator
 
 ### Human TODO
 
@@ -92,6 +94,12 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 <!-- Danger button -->
 <button class="btn btn--danger">Delete</button>
 
+<!-- Ghost (borderless until hover) -->
+<button class="btn btn--ghost">Ghost</button>
+
+<!-- Dashed (add-new affordance) -->
+<button class="btn btn--sm btn--dashed">+ Add Source</button>
+
 <!-- Small button -->
 <button class="btn btn--sm">Small</button>
 
@@ -130,6 +138,9 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 ```html
 <button class="token">Category</button>
 <button class="token token--active">Active</button>
+
+<!-- Non-interactive (read-only badge in tables, etc.) -->
+<span class="token token--static">Source Name</span>
 ```
 
 ### Filter Bar
@@ -282,10 +293,124 @@ Form-like display sections for account information.
 <div class="progress__status">Loading 5/10...</div>
 ```
 
-### Spinner
+### Spinner / Loading
 
 ```html
+<!-- Spinner only -->
 <div class="spinner"></div>
+
+<!-- Spinner with text label -->
+<div class="loading">
+  <div class="spinner"></div>
+  <span>Fetching events</span>
+</div>
+```
+
+### Page Header / Breadcrumb
+
+Sticky header with breadcrumb navigation and action slot. Extracted from Systemic.
+
+```html
+<header class="page-header">
+  <div class="page-header__inner">
+    <nav class="breadcrumb">
+      <a href="/" class="breadcrumb__link">ctrl.rodeo</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__current">Events</span>
+    </nav>
+    <div class="page-header__actions">
+      <button class="toggle"><div class="toggle__knob"></div></button>
+    </div>
+  </div>
+</header>
+```
+
+### Form Group
+
+Label + input + hint pattern for forms and modals. Extracted from Favicon and Systemic.
+
+```html
+<div class="form-group">
+  <label class="form-label">Field Name</label>
+  <input type="text" class="input" placeholder="Enter value">
+  <span class="form-hint">Optional helper text</span>
+</div>
+
+<!-- Side-by-side fields -->
+<div class="form-row">
+  <div class="form-group">
+    <label class="form-label">Width</label>
+    <input type="number" class="input">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Height</label>
+    <input type="number" class="input">
+  </div>
+</div>
+```
+
+### Data Table
+
+Sortable table with sticky headers and row hover. Extracted from Events and Systemic.
+
+```html
+<div class="data-table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th data-sort="date">Date <span class="data-table__sort">&#9650;</span></th>
+        <th data-sort="name">Name <span class="data-table__sort">&#9650;</span></th>
+        <th data-sort="city">City <span class="data-table__sort">&#9650;</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Feb 8</td><td>Event Name</td><td>San Francisco</td></tr>
+    </tbody>
+  </table>
+</div>
+```
+
+**Data table behavior:**
+- Sticky `thead` on scroll
+- `th[data-sort]` gets pointer cursor and hover highlight
+- `.sorted .data-table__sort` shows full opacity arrow
+- Row hover highlights with `--bg-surface`
+- Wrap in `.data-table-wrap` for horizontal scroll overflow
+
+### Filter Bar (Form-based)
+
+Wrapping flex bar for form inputs, selects, and buttons. Distinct from `.filters` (token-based, horizontal-scroll).
+
+```html
+<div class="filter-bar">
+  <input type="text" class="input" placeholder="Search...">
+  <select class="input select">
+    <option value="">All Cities</option>
+  </select>
+  <button class="btn btn--ghost btn--sm">Clear</button>
+</div>
+```
+
+### Section Header
+
+Title + description block for page sections. Extracted from Systemic and Favicon.
+
+```html
+<div class="section-header">
+  <h2 class="section-header__title">Section Title</h2>
+  <p class="section-header__desc">Brief description of this section.</p>
+</div>
+```
+
+### Stat
+
+Vertical label + value for statistics. Extracted from Systemic.
+
+```html
+<div class="stat">
+  <span class="stat__value">42</span>
+  <span class="stat__label">Events</span>
+</div>
 ```
 
 ### Grid
