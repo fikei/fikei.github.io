@@ -544,27 +544,31 @@ body {
     // Build column index map from header text
     const colMap = {};
     headers.forEach((h, i) => {
-      if (h.includes('date') && colMap.date === undefined) colMap.date = i;
-      else if ((h.includes('event') || h.includes('name') || h.includes('title')) && colMap.name === undefined) colMap.name = i;
-      else if ((h.includes('genre') || h.includes('style') || h.includes('type')) && colMap.genre === undefined) colMap.genre = i;
+      if ((h.includes('date') || h.includes('time')) && !h.includes('datetime') && colMap.date === undefined) colMap.date = i;
+      else if ((h.includes('event') || h.includes('name') || h.includes('title') || h.includes('artist')) && colMap.name === undefined) colMap.name = i;
+      else if ((h.includes('genre') || h.includes('style') || h.includes('tag') || h.includes('music')) && colMap.genre === undefined) colMap.genre = i;
       else if ((h.includes('venue') || h.includes('location')) && colMap.location === undefined) colMap.location = i;
-      else if (h.includes('time') && colMap.time === undefined) colMap.time = i;
+      else if (h === 'time' && colMap.time === undefined) colMap.time = i;
       else if ((h.includes('price') || h.includes('cost') || h === '$') && colMap.price === undefined) colMap.price = i;
       else if (h.includes('age') && colMap.ages === undefined) colMap.ages = i;
-      else if ((h.includes('promoter') || h.includes('organizer')) && colMap.promoter === undefined) colMap.promoter = i;
+      else if ((h.includes('promoter') || h.includes('organizer') || h.includes('host')) && colMap.promoter === undefined) colMap.promoter = i;
+      else if (h.includes('link') && colMap.links === undefined) colMap.links = i;
     });
 
-    // Fallback: positional mapping for 19hz-style tables (date, name, genre, location, time, price, ages, promoter)
+    // Fallback: positional mapping for 19hz-style tables
+    // 19hz columns: date(0), name(1), genre(2), location(3), time(4), price(5), ages(6), promoter(7), url1(8), url2(9), datetime(10)
     if (colMap.date === undefined && colMap.name === undefined) {
-      const count = table.querySelector('tbody tr, tr:nth-child(2)')?.querySelectorAll('td').length || 0;
-      if (count >= 7) Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6 });
+      const firstRow = table.querySelector('tbody tr, tr:nth-child(2)');
+      const count = firstRow?.querySelectorAll('td').length || 0;
+      log(`HTML parser: no header match, falling back to positional (${count} cols)`);
+      if (count >= 8) Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6, promoter: 7 });
+      else if (count >= 7) Object.assign(colMap, { date: 0, name: 1, genre: 2, location: 3, time: 4, price: 5, ages: 6 });
       else if (count >= 4) Object.assign(colMap, { date: 0, name: 1, location: 2, time: 3 });
     }
 
     log('HTML parser: colMap = ' + JSON.stringify(colMap));
 
     const events = [];
-    // Try tbody rows first, then all tr if no tbody
     let rows = table.querySelectorAll('tbody tr');
     if (rows.length === 0) {
       rows = table.querySelectorAll('tr');
@@ -573,42 +577,115 @@ body {
       log(`HTML parser: found ${rows.length} <tbody> rows`);
     }
 
-    rows.forEach(row => {
+    rows.forEach((row, rowIdx) => {
       if (row.querySelector('th')) return; // skip header rows
       const cells = row.querySelectorAll('td');
       if (cells.length < 2) return;
 
       const getCell = (key) => colMap[key] !== undefined && cells[colMap[key]] ? cells[colMap[key]] : null;
       const getText = (key) => { const c = getCell(key); return c ? c.textContent.trim() : ''; };
-      const getLink = (key) => {
+
+      // Extract ALL links from a cell
+      const getLinks = (key) => {
         const c = getCell(key);
-        if (!c) return '';
-        const a = c.querySelector('a');
-        return a ? (a.getAttribute('href') || '') : '';
+        if (!c) return [];
+        return Array.from(c.querySelectorAll('a')).map(a => ({
+          href: a.getAttribute('href') || '',
+          text: a.textContent.trim(),
+        })).filter(l => l.href);
       };
 
-      const name = getText('name');
-      if (!name) return; // skip empty rows
+      // Extract all links from the entire row for URL extraction
+      const allRowLinks = Array.from(row.querySelectorAll('a'))
+        .map(a => a.getAttribute('href') || '')
+        .filter(h => h && h !== '#' && !h.startsWith('javascript:'));
 
-      const location = getText('location');
-      const loc = parseLocationString(location);
+      const rawName = getText('name');
+      if (!rawName) return;
 
-      events.push({
+      // Parse "Event Title: Artists @ Venue (City)" format from name column
+      const parsed = parseEventName(rawName);
+
+      // Location column may have separate venue/city data
+      const rawLocation = getText('location');
+      const locParsed = rawLocation ? parseLocationString(rawLocation) : null;
+
+      // Merge: prefer parsed name parts, fill from location column
+      const venue = parsed.venue || (locParsed ? locParsed.venue : '') || '';
+      const city = parsed.city || (locParsed ? locParsed.city : '') || '';
+      const address = (locParsed ? locParsed.address : '') || '';
+
+      // Genre: from genre column, clean up
+      const genre = getText('genre');
+
+      // Price + ages: 19hz sometimes combines as "$10 | all ages" in one field
+      let price = getText('price');
+      let ages = getText('ages');
+      // If price contains age info (e.g. "free b4 7pm / $12.51 | 21+"), split it
+      if (!ages && price) {
+        const priceParts = price.split(/\s*\|\s*/);
+        if (priceParts.length >= 2) {
+          const lastPart = priceParts[priceParts.length - 1].trim();
+          if (/^\d+\+$|^all\s+ages$/i.test(lastPart)) {
+            ages = lastPart;
+            price = priceParts.slice(0, -1).join(' | ');
+          }
+        }
+      }
+
+      // Best URL: prefer name links, then any row link
+      const nameLinks = getLinks('name');
+      const bestUrl = nameLinks.length > 0 ? nameLinks[0].href
+        : allRowLinks.length > 0 ? allRowLinks[0] : '';
+
+      const ev = {
         date: parseFuzzyDate(getText('date')),
         time: getText('time'),
-        name,
-        venue: loc.venue || location,
-        address: loc.address,
-        city: loc.city,
-        genre: getText('genre'),
-        price: getText('price'),
-        ages: getText('ages'),
-        url: resolveUrl(getLink('name') || getLink('date'), baseUrl),
+        name: parsed.title,
+        venue,
+        address,
+        city,
+        genre,
+        price,
+        ages,
+        promoter: getText('promoter'),
+        url: resolveUrl(bestUrl, baseUrl),
         source: sourceId,
-      });
+      };
+
+      // Log first few rows for debugging
+      if (rowIdx < 3) log(`  Row ${rowIdx}: "${ev.name}" @ ${ev.venue} (${ev.city}) [${ev.genre}] ${ev.date}`);
+
+      events.push(ev);
     });
 
+    log(`HTML parser: extracted ${events.length} events`);
     return events;
+  }
+
+  // Parse "Event Title: Artists @ Venue Name (City)" or "Event @ Venue (City)"
+  function parseEventName(raw) {
+    let title = raw;
+    let venue = '';
+    let city = '';
+
+    // Extract city from trailing "(City Name)" — greedy, last parenthesized group
+    const cityMatch = raw.match(/\(([^)]+)\)\s*$/);
+    if (cityMatch) {
+      city = cityMatch[1].trim();
+      raw = raw.substring(0, raw.lastIndexOf('(' + cityMatch[1])).trim();
+    }
+
+    // Split on " @ " to separate event from venue
+    const atIdx = raw.lastIndexOf(' @ ');
+    if (atIdx !== -1) {
+      title = raw.substring(0, atIdx).trim();
+      venue = raw.substring(atIdx + 3).trim();
+    } else {
+      title = raw;
+    }
+
+    return { title, venue, city };
   }
 
   // --- iCal Parser ---
@@ -714,16 +791,15 @@ body {
   // --- Date Helpers ---
   function parseFuzzyDate(str) {
     if (!str) return '';
+    // Normalize whitespace (19hz uses \n between day-of-week and date)
+    str = str.replace(/\s+/g, ' ').trim();
+
     // ISO format
     const isoMatch = str.match(/(\d{4})-(\d{2})-(\d{2})/);
     if (isoMatch) return isoMatch[0];
-    // Try native Date
-    try {
-      const d = new Date(str);
-      if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return d.toISOString().split('T')[0];
-    } catch (e) {}
-    // Month-day: "Feb 8", "Feb 8, 2025", "Sat Feb 08"
-    const monthMatch = str.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s.]+(\d{1,2})(?:\s*,?\s*(\d{4}))?/i);
+
+    // Month-day patterns: "Feb 8", "Feb 08", "Sat Feb 08", "February 8, 2025", "Fri: Feb 07"
+    const monthMatch = str.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s.:]+(\d{1,2})(?:\s*,?\s*(\d{4}))?/i);
     if (monthMatch) {
       const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
       const month = months[monthMatch[1].substring(0,3).toLowerCase()];
@@ -731,6 +807,13 @@ body {
       const year = monthMatch[3] || new Date().getFullYear().toString();
       return `${year}-${month}-${day}`;
     }
+
+    // Try native Date as last resort
+    try {
+      const d = new Date(str);
+      if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return d.toISOString().split('T')[0];
+    } catch (e) {}
+
     return str;
   }
 
@@ -828,11 +911,15 @@ body {
 
     // Build event map: dateStr -> [events]
     const eventMap = {};
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    let matchCount = 0;
     events.forEach(ev => {
       if (!ev.date) return;
       if (!eventMap[ev.date]) eventMap[ev.date] = [];
       eventMap[ev.date].push(ev);
+      if (ev.date.startsWith(monthPrefix)) matchCount++;
     });
+    log(`Calendar: ${events.length} events, ${Object.keys(eventMap).length} unique dates, ${matchCount} in ${monthPrefix}`);
 
     const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -917,7 +1004,7 @@ body {
   function getFilteredEvents() {
     return state.events.filter(ev => {
       const { search, city, source, dateFrom, dateTo } = state.filters;
-      if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre].join(' ').toLowerCase().includes(q)) return false; }
+      if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre, ev.promoter || '', ev.ages || ''].join(' ').toLowerCase().includes(q)) return false; }
       if (city && ev.city !== city) return false;
       if (source && ev.source !== source) return false;
       if (dateFrom && ev.date < dateFrom) return false;
