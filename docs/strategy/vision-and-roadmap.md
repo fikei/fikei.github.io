@@ -6,7 +6,9 @@
 
 ## Vision
 
-**ctrl.rodeo** is a unified personal platform combining multiple micro-applications with AI integration. The goal is to create a cohesive ecosystem of tools that help users collect, organize, and create.
+**ctrl.rodeo** is a personal curation platform that helps people collect, organize, and build on everything that matters to them. What you experience informs what you create — ctrl.rodeo makes that connection visible, searchable, and actionable. It starts with creatives and expands to anyone whose life is richer when intentionally curated.
+
+See [Brand Positioning](./brand-positioning.md) for the full positioning statement and [User Personas](../ux/personas.md) for detailed audience segments.
 
 ### Core Principles
 
