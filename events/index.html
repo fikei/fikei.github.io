@@ -383,29 +383,82 @@ body {
   padding-top: 4px;
 }
 
-@media (max-width: 600px) {
-  .day-detail__item {
-    grid-template-columns: 60px 1fr;
-  }
-  .day-detail__tags { display: none; }
-}
-
-/* Responsive */
+/* ---- Responsive: Tablet (768px) ---- */
 @media (max-width: 768px) {
   .data-table .col-genre,
   .data-table .col-ages,
   .data-table .col-promoter { display: none; }
+
+  /* Calendar: compact grid — hide event text, rely on day detail */
+  .calendar { margin-bottom: var(--space-4); }
+  .calendar__cell { min-height: 64px; padding: var(--space-1); }
+  .calendar__event { display: none; }
+  .calendar__more { display: none; }
+  .calendar__event-time { display: none; }
+  .calendar__date { justify-content: center; margin-bottom: 0; }
+  .calendar__count {
+    display: block;
+    margin: var(--space-1) auto 0;
+    text-align: center;
+    font-size: var(--text-2xs);
+    width: fit-content;
+  }
+
+  /* Calendar header: keep inline but tighten */
+  .calendar__header { margin-bottom: var(--space-3); }
+  .calendar__title { font-size: var(--text-base); }
+
+  /* Day detail: drop tags column */
+  .day-detail__tags { display: none; }
+  .day-detail__item { grid-template-columns: 70px 1fr; }
 }
-@media (max-width: 600px) {
+
+/* ---- Responsive: Mobile (480px) ---- */
+@media (max-width: 480px) {
+  .container { padding: 0 var(--space-2); }
+
+  /* Calendar: ultra-compact */
+  .calendar__cell { min-height: 44px; }
+  .calendar__day-label {
+    padding: var(--space-1);
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+  .calendar__date { font-size: 11px; }
+  .calendar__count { font-size: 9px; padding: 0 3px; }
+
+  /* Calendar header: stack nav and title */
+  .calendar__header {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .calendar__nav { order: 1; width: 100%; justify-content: space-between; }
+  .calendar__title { order: 2; font-size: var(--text-sm); }
+  #calStats { order: 3; width: 100%; }
+
+  /* Day detail: tighter layout */
+  .day-detail__header { padding: var(--space-2) var(--space-3); }
+  .day-detail__item {
+    grid-template-columns: 56px 1fr;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+  }
+  .day-detail__time { font-size: var(--text-2xs); }
+  .day-detail__name { font-size: var(--text-xs); }
+  .day-detail__title { font-size: var(--text-xs); }
+  .day-detail__count { font-size: var(--text-2xs); }
+
+  /* Filter bar: stack */
+  .filter-bar { gap: var(--space-2); }
+
+  /* Table columns */
   .data-table .col-genre,
   .data-table .col-price,
   .data-table .col-ages,
   .data-table .col-promoter { display: none; }
-  .calendar__cell { min-height: 50px; padding: var(--space-1); }
-  .calendar__event { font-size: 9px; padding: 1px 2px; }
-  .calendar__event-time { display: none; }
-  .calendar__count { font-size: 8px; padding: 0 2px; }
-  .calendar__date { font-size: 10px; }
+
+  /* Stats bar: stack */
+  .stats-bar { flex-wrap: wrap; gap: var(--space-2); }
 }
   </style>
 </head>
