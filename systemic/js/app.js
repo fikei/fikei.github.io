@@ -467,24 +467,28 @@ class SystemicApp {
   }
 
   /**
-   * Size grid dimensions (cols x rows) — matches widget grid system
+   * Size pixel widths — matches widgets.html variant-item widths
+   * Row height is ~160px (content fills naturally)
    */
-  static GRID_SIZES = {
-    sm:     [1, 1],
-    med:    [2, 1],
-    tall:   [1, 2],
-    lg:     [2, 2],
-    wide:   [3, 1],
-    xl:     [3, 2],
-    col:    [1, 3],
-    poster: [2, 3],
-    max:    [3, 3],
-    banner: [4, 1],
-    pano:   [4, 2],
-    cinema: [4, 3],
-    board:  [2, 4],
-    wall:   [3, 4],
-    full:   [4, 4],
+  static SIZE_WIDTHS = {
+    sm: 200,   med: 420,   wide: 640,   banner: 860,
+    tall: 200, lg: 420,    xl: 640,     pano: 860,
+    col: 200,  poster: 420, max: 640,   cinema: 860,
+    board: 420, wall: 640,  full: 860,
+  };
+
+  static SIZE_ROWS = {
+    sm: 1,   med: 1,   wide: 1,   banner: 1,
+    tall: 2, lg: 2,    xl: 2,     pano: 2,
+    col: 3,  poster: 3, max: 3,   cinema: 3,
+    board: 4, wall: 4,  full: 4,
+  };
+
+  static SIZE_LABELS = {
+    sm: '1x1', med: '2x1', wide: '3x1', banner: '4x1',
+    tall: '1x2', lg: '2x2', xl: '3x2', pano: '4x2',
+    col: '1x3', poster: '2x3', max: '3x3', cinema: '4x3',
+    board: '2x4', wall: '3x4', full: '4x4',
   };
 
   /**
@@ -492,11 +496,9 @@ class SystemicApp {
    * Each template type renders dummy content matching its real layout pattern.
    */
   generateTemplatePreviewHTML(templateName, size, tmpl) {
-    const [cols, rows] = SystemicApp.GRID_SIZES[size] || [2, 1];
-    const cellW = 140;
-    const cellH = 160;
-    const w = cols * cellW;
-    const h = rows * cellH;
+    const w = SystemicApp.SIZE_WIDTHS[size] || 420;
+    const rows = SystemicApp.SIZE_ROWS[size] || 1;
+    const h = rows * 160;
 
     const s = {
       label: 'font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-muted)',
