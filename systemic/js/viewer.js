@@ -197,7 +197,7 @@ class DesignSystemViewer {
       const isLast = i === items.length - 1;
 
       if (isLast) {
-        let html = `<span class="breadcrumb-current">${item.label}</span>`;
+        let html = `<span class="breadcrumb__current">${item.label}</span>`;
         if (item.meta) {
           html += `<span class="breadcrumb-meta">${item.meta}</span>`;
         }
@@ -205,13 +205,13 @@ class DesignSystemViewer {
       }
 
       if (item.hash) {
-        return `<a href="${item.hash}" class="breadcrumb-link">${item.label}</a>`;
+        return `<a href="${item.hash}" class="breadcrumb__link">${item.label}</a>`;
       }
 
       return `<span class="breadcrumb-text">${item.label}</span>`;
     });
 
-    this.breadcrumb.innerHTML = parts.join('<span class="breadcrumb-sep">/</span>');
+    this.breadcrumb.innerHTML = parts.join('<span class="breadcrumb__sep">/</span>');
   }
 
   /**

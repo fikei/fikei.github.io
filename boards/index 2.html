@@ -15,9 +15,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
-  <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
-
   <style>
 /* ============================================
    Boards - Swiss Grid + Web 1.0 Typography
@@ -55,52 +52,6 @@
   --border: #fff;
   --muted: #888;
   --subtle: #333;
-
-  /* Design System token bridge — maps DS token names to Boards values */
-  --text-2xs: 8px;
-  --text-xs: var(--font-size-xs);
-  --text-sm: var(--font-size-sm);
-  --text-md: var(--font-size-base);
-  --text-lg: var(--font-size-lg);
-  --text-xl: var(--font-size-xl);
-  --text-2xl: var(--font-size-2xl);
-  --text-3xl: 40px;
-  --text-base: var(--font-size-sm);
-  --leading-none: 1;
-  --leading-tight: var(--line-height-tight);
-  --leading-normal: var(--line-height-normal);
-  --leading-relaxed: 1.8;
-  --tracking-tight: -0.02em;
-  --tracking-normal: 0;
-  --tracking-wide: 0.05em;
-  --tracking-wider: 0.1em;
-  --tracking-widest: 0.3em;
-  --bg-surface: var(--surface);
-  --bg-elevated: #222;
-  --fg-muted: var(--muted);
-  --fg-subtle: #666;
-  --border-subtle: var(--subtle);
-  --interactive: var(--fg);
-  --interactive-hover: var(--bg);
-  --border-thin: 1px;
-  --border-medium: 2px;
-  --border-thick: 4px;
-  --duration-fast: 0.1s;
-  --duration-normal: 0.15s;
-  --duration-slow: 0.2s;
-  --duration-slower: 0.3s;
-  --duration-slowest: 0.5s;
-  --ease-default: ease;
-  --ease-linear: linear;
-  --ease-in: ease-in;
-  --ease-out: ease-out;
-  --ease-in-out: ease-in-out;
-  --color-white: #fff;
-  --color-black: #000;
-  --color-success: #0f0;
-  --color-error: #c00;
-  --color-warning: #f90;
-  --font-sans: var(--font-primary);
 }
 
 :root.light {
@@ -110,15 +61,6 @@
   --border: #000;
   --muted: #888;
   --subtle: #e0e0e0;
-
-  /* DS bridge — light mode overrides */
-  --bg-surface: var(--surface);
-  --bg-elevated: #f5f5f5;
-  --fg-muted: var(--muted);
-  --fg-subtle: #aaa;
-  --border-subtle: var(--subtle);
-  --interactive: var(--fg);
-  --interactive-hover: var(--bg);
 }
 
 /* Progress bar */
@@ -2161,7 +2103,6 @@ body {
   right: var(--space-4);
   z-index: 200;
   background: var(--bg);
-  color: var(--fg);
   border: 2px solid var(--fg);
   padding: var(--space-2);
   display: none;
@@ -2191,7 +2132,6 @@ body {
   letter-spacing: 0.05em;
   text-align: left;
   background: none;
-  color: inherit;
   border: none;
   cursor: pointer;
 }
@@ -2217,163 +2157,6 @@ body {
   background: var(--subtle);
   margin: var(--space-2) 0;
 }
-
-/* Widget Inspector Overlay */
-.widget-inspector {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: rgba(0,0,0,0.85);
-  overflow-y: auto;
-  display: none;
-  padding: var(--space-4);
-}
-
-.widget-inspector--visible {
-  display: block;
-}
-
-.widget-inspector__inner {
-  max-width: 640px;
-  margin: 0 auto;
-}
-
-.widget-inspector__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--subtle);
-  padding-bottom: var(--space-2);
-}
-
-.widget-inspector__title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--fg);
-}
-
-.widget-inspector__close {
-  background: none;
-  border: none;
-  color: var(--fg);
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.widget-inspector__profile {
-  margin-bottom: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid var(--subtle);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.widget-inspector__profile strong {
-  color: var(--fg);
-}
-
-.widget-inspector__card {
-  border: 1px solid var(--subtle);
-  margin-bottom: var(--space-3);
-  padding: var(--space-3);
-}
-
-.widget-inspector__card--eligible {
-  border-color: #4a9;
-}
-
-.widget-inspector__card--ineligible {
-  border-color: var(--subtle);
-  opacity: 0.6;
-}
-
-.widget-inspector__card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-2);
-}
-
-.widget-inspector__card-name {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--fg);
-}
-
-.widget-inspector__card-score {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-weight: bold;
-}
-
-.widget-inspector__card-score--high { color: #4a9; }
-.widget-inspector__card-score--mid { color: #f0c674; }
-.widget-inspector__card-score--low { color: #c66; }
-
-.widget-inspector__card-status {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--space-2);
-}
-
-.widget-inspector__rationale {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  line-height: 1.6;
-  padding-left: var(--space-3);
-}
-
-.widget-inspector__rationale li {
-  margin-bottom: 2px;
-}
-
-/* Widget header context menu (right-click) */
-.widget-context {
-  position: fixed;
-  z-index: 250;
-  background: var(--bg);
-  border: 1px solid var(--subtle);
-  padding: var(--space-3);
-  min-width: 240px;
-  max-width: 360px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  line-height: 1.6;
-  display: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-}
-
-.widget-context--visible {
-  display: block;
-}
-
-.widget-context__title {
-  color: var(--fg);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--space-2);
-  padding-bottom: var(--space-1);
-  border-bottom: 1px solid var(--subtle);
-}
-
-.widget-context__row {
-  display: flex;
-  justify-content: space-between;
-  padding: 2px 0;
-}
-
-.widget-context__label { color: var(--muted); }
-.widget-context__value { color: var(--fg); }
 
 /* Admin Panel */
 .admin-panel {
@@ -2504,54 +2287,7 @@ body {
 .widget-inline {
   grid-column: 1 / -1;
   margin: var(--space-2) 0;
-  position: relative;
   /* No border/background - handled by inner widget-complete__body */
-}
-
-.widget-inline[draggable="true"] {
-  cursor: grab;
-}
-
-.widget-inline[draggable="true"]:active {
-  cursor: grabbing;
-}
-
-.widget-inline.dragging {
-  opacity: 0.4;
-  transform: scale(0.98);
-}
-
-.widget-inline__drag-handle {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 2;
-}
-
-.widget-inline:hover .widget-inline__drag-handle {
-  opacity: 0.5;
-}
-
-.widget-inline__drag-handle:hover {
-  opacity: 1 !important;
-}
-
-.widget-inline__drag-handle::before {
-  content: '\2630';
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.widget-inline__drag-handle:active {
-  cursor: grabbing;
 }
 
 
@@ -2559,6 +2295,537 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* Outfit Builder Widget - extends .card pattern */
+.widget-outfit {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
+}
+
+.widget-outfit__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.widget-outfit__title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-base);
+  color: var(--fg);
+}
+
+.widget-outfit__subtitle {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.widget-outfit__scroll {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--subtle) transparent;
+}
+
+.widget-outfit__scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.widget-outfit__scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.widget-outfit__scroll::-webkit-scrollbar-thumb {
+  background: var(--subtle);
+}
+
+.widget-outfit__item {
+  flex: 0 0 auto;
+  width: 120px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s;
+}
+
+.widget-outfit__item:hover {
+  transform: translateY(-2px);
+}
+
+.widget-outfit__image-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  background: var(--subtle);
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+}
+
+.widget-outfit__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.widget-outfit__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--muted);
+  background: var(--subtle);
+}
+
+.widget-outfit__item-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.widget-outfit__item-meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Style Summary Widget - inner content (now nested in widget-complete) */
+.widget-style__content {
+  /* No border/background - handled by widget-complete outer wrapper */
+}
+
+.widget-style__label {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  color: var(--fg);
+  margin-bottom: var(--space-1);
+}
+
+.widget-style__sublabel {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+}
+
+.widget-style__traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Style trait uses .token pattern from design system */
+.widget-style__trait {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+}
+
+/* Widget Loading State */
+.widget--loading {
+  position: relative;
+  min-height: 100px;
+}
+
+.widget--loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget__loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+/* Widget Empty State */
+.widget-empty {
+  padding: var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--subtle);
+}
+
+.widget-empty__text {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+/* Complete the Look v2 - Nested Card Layout */
+.widget-complete {
+  /* Outer wrapper - no border, contains header + content box */
+}
+
+.widget-complete__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.widget-complete__header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.widget-complete__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.widget-complete__badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+}
+
+.widget-complete__refresh-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--muted);
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.widget-complete__refresh-btn:hover {
+  color: var(--fg);
+}
+
+.widget-complete__body {
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.widget-complete__body--loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80px;
+}
+
+.widget-complete__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.widget-complete__section-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
+
+.widget-complete__divider {
+  width: 1px;
+  background: var(--subtle);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-complete__divider::after {
+  content: '+';
+  background: var(--surface);
+  padding: var(--space-2) 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  color: var(--muted);
+}
+
+.widget-complete__items {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.widget-complete__item {
+  flex: 0 0 auto;
+  width: 100px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s;
+}
+
+.widget-complete__item:hover {
+  transform: translateY(-2px);
+}
+
+.widget-complete__item--suggestion {
+  cursor: pointer;
+}
+
+.widget-complete__image-wrap {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  background: var(--subtle);
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+}
+
+.widget-complete__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.widget-complete__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--muted);
+  background: var(--subtle);
+}
+
+.widget-complete__suggestion-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px dashed var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  gap: var(--space-1);
+}
+
+.widget-complete__suggestion-icon::before {
+  content: '+';
+  font-size: var(--font-size-xl);
+}
+
+.widget-complete__item-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.widget-complete__item-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.widget-complete__image-wrap--product {
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg) 100%);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-complete__product-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.widget-complete__product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.widget-complete__item--suggestion {
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.widget-complete__item--suggestion:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.widget-complete__item--suggestion:hover .widget-complete__image-wrap--product {
+  border-color: var(--accent);
+}
+
+.widget-complete__item-brand {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-top: var(--space-1);
+}
+
+.widget-complete__item-reason {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.widget-complete__item-price {
+  font-weight: 600;
+  color: var(--fg);
+  font-style: normal;
+}
+
+.widget-complete__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.widget-complete__action {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.widget-complete__action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.widget-complete__action--active {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.widget-complete__action--danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.widget-complete--favorite {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+.widget-complete__refresh {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
+}
+
+.widget-complete__refresh:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.widget-complete__feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-3);
+}
+
+.widget-complete__feedback-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: auto;
+}
+
+.widget-complete__feedback-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.widget-complete__feedback-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.widget-complete__shop-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg);
+  text-decoration: none;
+  margin-top: var(--space-1);
+}
+
+.widget-complete__shop-link:hover {
+  text-decoration: underline;
 }
 
 /* Widget PRD Modal */
@@ -2966,18 +3233,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             </label>
           </div>
         </div>
-        <div class="share-modal__section">
-          <label class="share-modal__label">Widgets</label>
-          <div class="share-modal__options">
-            <label class="share-modal__option">
-              <input type="checkbox" id="shareHideWidgets">
-              <span class="share-modal__option-text">
-                <strong>Hide AI widgets</strong>
-                <small>Don't show AI-generated widgets in shared view</small>
-              </span>
-            </label>
-          </div>
-        </div>
         <div class="share-modal__section share-modal__link-section" id="shareLinkSection" style="display:none;">
           <label class="share-modal__label">Share Link</label>
           <div class="share-modal__link-row">
@@ -3076,26 +3331,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn" id="devEnrich">Run AI Enrichment Pipeline</button>
     <button class="dev-menu__btn" id="devClearCache">Clear AI Cache</button>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
-    <div class="dev-menu__divider"></div>
-    <button class="dev-menu__btn" id="devToggleWidgets">Widgets: OFF</button>
-    <button class="dev-menu__btn" id="devWidgetInspector">Widget Inspector</button>
     <button class="dev-menu__btn dev-menu__btn--admin" id="devAdminPanel" style="display:none;">Admin Panel</button>
   </div>
-
-  <!-- Widget Inspector Overlay -->
-  <div class="widget-inspector" id="widgetInspector">
-    <div class="widget-inspector__inner">
-      <div class="widget-inspector__header">
-        <span class="widget-inspector__title">Widget Inspector</span>
-        <button class="widget-inspector__close" id="widgetInspectorClose">&times;</button>
-      </div>
-      <div id="widgetInspectorProfile" class="widget-inspector__profile"></div>
-      <div id="widgetInspectorCards"></div>
-    </div>
-  </div>
-
-  <!-- Widget Context Menu (right-click on header) -->
-  <div class="widget-context" id="widgetContext"></div>
 
   <!-- Admin Panel Modal -->
   <div class="modal" id="adminModal">
@@ -3575,8 +3812,6 @@ Return JSON:
   ]
 }`,
       template: {
-        name: 'grid-split',
-        fallback: 'list',
         layout: 'two-column',
         sections: ['your-items', 'suggestions']
       },
@@ -3605,362 +3840,13 @@ Return JSON:
   "summary": "One sentence describing the overall aesthetic"
 }`,
       template: {
-        name: 'hero-card',
-        fallback: 'text-block',
         layout: 'card',
         sections: ['label', 'traits']
       },
       createdAt: '2024-01-15',
       updatedAt: '2024-01-20'
-    },
-    'price-radar': {
-      id: 'price-radar',
-      version: '1.0',
-      name: 'Price Radar',
-      description: 'Shows where you fall on key dimensions like budget, style, and brand affinity.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'all'],
-        minItems: 3,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and position the user on 2-3 meaningful dimensions.
-
-Choose axes relevant to the content (e.g. Budget<->Luxury, Minimal<->Bold, Classic<->Trendy).
-For each axis, estimate where the user falls (0.0 = fully left, 1.0 = fully right).
-
-Return JSON:
-{
-  "axes": [
-    { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.35, "note": "You: $85 avg" },
-    { "leftLabel": "Minimal", "rightLabel": "Bold", "position": 0.2, "note": "Mostly neutrals" }
-  ],
-  "confidence": 0.75
-}`,
-      template: {
-        name: 'spectrum',
-        fallback: 'text-block'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
-    },
-    'collection-stats': {
-      id: 'collection-stats',
-      version: '1.0',
-      name: 'Collection Stats',
-      description: 'Key metrics about your saved items — brands, categories, price range, and more.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'eat', 'read', 'all'],
-        minItems: 3,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and extract 3-4 key metrics about the collection.
-
-Return JSON:
-{
-  "stats": [
-    { "value": "12", "label": "brands" },
-    { "value": "3", "label": "styles" },
-    { "value": "$85", "label": "avg price" }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'stat-row',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
-    },
-    'gap-filler': {
-      id: 'gap-filler',
-      version: '1.0',
-      name: 'You Might Want This',
-      description: 'AI identifies the biggest gap in your collection and suggests one item to fill it.',
-      status: 'active',
-      zone: 'inline',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'fitness'],
-        minItems: 2,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and identify the single biggest gap in the user's collection.
-Suggest ONE specific product that would fill that gap.
-
-Return JSON:
-{
-  "suggestion": {
-    "name": "Product Name",
-    "brand": "Brand Name",
-    "price": "$XX.XX",
-    "reason": "Fills your category gap — you have X and Y but no Z.",
-    "searchQuery": "brand product name"
-  },
-  "confidence": 0.85
-}`,
-      template: {
-        name: 'quick-add',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
-    },
-    'eat-decide': {
-      id: 'eat-decide',
-      version: '1.0',
-      name: 'Decide',
-      description: 'Can\'t pick a restaurant? AI picks one from your saved spots with reasoning.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: 'eat',
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a decisive dining advisor. The user has saved these restaurants/food spots and can't decide where to go.
-
-Pick the BEST option and explain why. Also present 2-3 runner-up choices.
-
-Return JSON:
-{
-  "question": "Where should you eat tonight?",
-  "options": [
-    {
-      "title": "Restaurant Name",
-      "description": "Why this is the top pick — specific reasoning based on the saved items"
-    },
-    {
-      "title": "Runner Up 1",
-      "description": "Brief reason this is a good alternative"
-    }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'choices',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'use-compare': {
-      id: 'use-compare',
-      version: '1.0',
-      name: 'Compare',
-      description: 'Compares a saved tool/product against its top competitor with pros and cons.',
-      status: 'active',
-      zone: 'inline',
-      criteria: {
-        category: ['use', 'tech', 'home', 'wear', 'all'],
-        minItems: 1,
-        maxItems: null
-      },
-      prompt: `You are a product comparison expert. Pick the most interesting item from the user's saved items and compare it against its top competitor.
-
-RULES:
-- Pick an item that has a clear, well-known competitor
-- List 2-3 specific pros and cons for each
-- Be objective and fair to both options
-
-Return JSON:
-{
-  "optionA": {
-    "title": "Saved Item Name",
-    "price": "$XX (if known)",
-    "pros": ["Specific advantage 1", "Specific advantage 2"],
-    "cons": ["Specific weakness"]
-  },
-  "optionB": {
-    "title": "Top Competitor",
-    "price": "$XX (if known)",
-    "pros": ["Specific advantage 1", "Specific advantage 2"],
-    "cons": ["Specific weakness"]
-  },
-  "dividerLabel": "VS",
-  "confidence": 0.75
-}`,
-      template: {
-        name: 'comparison',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'discover-more': {
-      id: 'discover-more',
-      version: '1.0',
-      name: 'More Like Your Board',
-      description: 'Analyzes your saved items and recommends something new you might like.',
-      status: 'active',
-      zone: 'footer',
-      criteria: {
-        category: 'all',
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a discovery engine. Analyze the user's saved items and recommend ONE specific new thing they'd like.
-
-RULES:
-- The recommendation must be DIFFERENT from what they already have
-- It should complement their existing collection, not duplicate it
-- Be specific: real product names, real brands, real URLs
-- Explain WHY this fits based on patterns you see in their saves
-
-Return JSON:
-{
-  "suggestion": {
-    "name": "Specific Product or Thing",
-    "brand": "Brand if applicable",
-    "price": "$XX if applicable",
-    "reason": "Based on your saves, you clearly like X and Y — this combines both.",
-    "searchQuery": "search terms to find this item"
-  },
-  "confidence": 0.7
-}`,
-      template: {
-        name: 'quick-add',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'style-pick': {
-      id: 'style-pick',
-      version: '1.0',
-      name: 'Pick Your Favorite',
-      description: 'Shows your saved items as selectable cards — tap the one you\'d buy first.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'all'],
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a personal shopper. The user has saved these items. Present 3-4 of their best saved items as choices and ask them to pick their favorite.
-
-For each option, write a brief one-line reason why it stands out.
-
-Return JSON:
-{
-  "question": "Which would you grab first?",
-  "options": [
-    { "title": "Item name", "description": "Why this one stands out — 1 sentence" },
-    { "title": "Item name", "description": "Why this one stands out — 1 sentence" }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'choices',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'outfit-checklist': {
-      id: 'outfit-checklist',
-      version: '1.0',
-      name: 'Outfit Checklist',
-      description: 'Builds a complete outfit from your saves — check off what you already own.',
-      status: 'active',
-      zone: 'inline',
-      criteria: {
-        category: ['wear', 'all'],
-        minItems: 2,
-        maxItems: null
-      },
-      prompt: `You are a wardrobe stylist. From the user's saved items, build a complete outfit as a checklist.
-
-Include 4-6 items covering different categories (top, bottom, shoes, accessories). Use items from their saves where possible, and suggest missing pieces.
-
-For each item, indicate if the user already has it (checked) based on whether it appears in their saved items.
-
-Return JSON:
-{
-  "items": [
-    { "name": "White Oxford Shirt", "price": "$65", "checked": true },
-    { "name": "Dark Wash Jeans", "price": "$90", "checked": true },
-    { "name": "White Sneakers", "price": "$130", "checked": false },
-    { "name": "Leather Belt", "price": "$45", "checked": false }
-  ],
-  "total": "$330",
-  "confidence": 0.75
-}`,
-      template: {
-        name: 'checklist',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'board-overview': {
-      id: 'board-overview',
-      version: '1.0',
-      name: 'Board at a Glance',
-      description: 'Groups your saved items by theme or type so you can see the shape of your collection.',
-      status: 'active',
-      zone: 'footer',
-      criteria: {
-        category: 'all',
-        minItems: 4,
-        maxItems: null
-      },
-      prompt: `You are a collection analyst. Group the user's saved items into 2-4 meaningful themes or categories.
-
-RULES:
-- Don't just group by website — group by PURPOSE or TYPE
-- Each group needs a clear, descriptive title
-- Include the actual item names from the user's saves
-- 2-4 groups, each with 2-5 items
-
-Return JSON:
-{
-  "sections": [
-    {
-      "title": "Everyday Essentials",
-      "items": [
-        { "name": "Item name", "brand": "Brand" },
-        { "name": "Item name", "brand": "Brand" }
-      ]
-    },
-    {
-      "title": "Statement Pieces",
-      "items": [
-        { "name": "Item name", "brand": "Brand" }
-      ]
-    }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'grouped',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
     }
   };
-
-  // Widget feature flag — all widgets hidden by default
-  // Enable via console: window.enableWidgetDS()
-  const WIDGET_DS_KEY = 'boards_widget_ds';
-  let widgetDSEnabled = localStorage.getItem(WIDGET_DS_KEY) === 'true'; // default OFF
-  (function initWidgetDS() {
-    const link = document.getElementById('ds-widgets-css');
-    if (link) link.disabled = !widgetDSEnabled;
-    if (!widgetDSEnabled) {
-      const hero = document.getElementById('widgetSection');
-      const footer = document.getElementById('widgetFooter');
-      if (hero) hero.style.display = 'none';
-      if (footer) footer.style.display = 'none';
-    }
-    console.log('[widgets] ' + (widgetDSEnabled ? 'ON' : 'OFF — enable via window.enableWidgetDS()'));
-  })();
 
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
@@ -4055,26 +3941,6 @@ Return JSON:
     generateWidgets();
     console.log('[widget] Dismissed:', widgetId);
   };
-
-  // Widget positions in grid (persisted in localStorage)
-  const WIDGET_POSITIONS_KEY = 'boards_widget_positions';
-  let widgetPositions = {}; // { widgetId: gridIndex }
-
-  function loadWidgetPositions() {
-    try {
-      widgetPositions = JSON.parse(localStorage.getItem(WIDGET_POSITIONS_KEY) || '{}');
-    } catch { widgetPositions = {}; }
-  }
-
-  function saveWidgetPositions() {
-    try {
-      localStorage.setItem(WIDGET_POSITIONS_KEY, JSON.stringify(widgetPositions));
-    } catch {}
-  }
-
-  function getWidgetPosition(widgetId) {
-    return widgetPositions[widgetId] ?? INLINE_WIDGET_POSITION;
-  }
 
   // Permanently hide widget
   window.hideWidget = function(widgetId) {
@@ -4213,10 +4079,8 @@ Return JSON:
 
   // Normalize wear items for widget generation
   function normalizeWearItems(links) {
-    // Category-agnostic: filter by current category, or return all if 'all'
-    const category = currentFilter || 'all';
     return links
-      .filter(l => !l.loading && (category === 'all' || l.category === category))
+      .filter(l => l.category === 'wear' && !l.loading)
       .map(l => ({
         id: l.id,
         title: l.title || '',
@@ -4227,321 +4091,29 @@ Return JSON:
       }));
   }
 
-  // =============================================================================
-  // PIN PROFILING & WIDGET SCORING
-  // Analyzes pins to build a profile, then scores each widget's fit.
-  // =============================================================================
-
-  // Analyze a set of pins and return a profile object
-  function profilePins(items) {
-    const domains = {};
-    const words = {};
-    let hasImages = 0;
-    let hasDescriptions = 0;
-    let totalTitleLen = 0;
-
-    for (const item of items) {
-      // Domain frequency
-      try {
-        const host = new URL(item.url).hostname.replace(/^www\./, '');
-        domains[host] = (domains[host] || 0) + 1;
-      } catch {}
-
-      // Content quality signals
-      if (item.image) hasImages++;
-      if (item.description && item.description.length > 10) hasDescriptions++;
-      totalTitleLen += (item.title || '').length;
-
-      // Word frequency from titles (lowercase, skip short words)
-      const titleWords = (item.title || '').toLowerCase().split(/\s+/);
-      for (const w of titleWords) {
-        if (w.length > 3) words[w] = (words[w] || 0) + 1;
-      }
-    }
-
-    const domainCount = Object.keys(domains).length;
-    const topDomains = Object.entries(domains)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([d, count]) => ({ domain: d, count }));
-
-    // Detect if pins are product-like (e-commerce domains)
-    const productDomains = ['amazon', 'shopify', 'etsy', 'ebay', 'nike', 'zara', 'uniqlo', 'nordstrom', 'asos', 'ssense', 'farfetch', 'mrporter', 'grailed'];
-    const productPinCount = items.filter(item => {
-      try {
-        const host = new URL(item.url).hostname.toLowerCase();
-        return productDomains.some(d => host.includes(d));
-      } catch { return false; }
-    }).length;
-
-    // Detect content-like pins (articles, blogs, media)
-    const contentDomains = ['medium', 'substack', 'youtube', 'reddit', 'wikipedia', 'nytimes', 'theverge', 'arstechnica', 'techcrunch'];
-    const contentPinCount = items.filter(item => {
-      try {
-        const host = new URL(item.url).hostname.toLowerCase();
-        return contentDomains.some(d => host.includes(d));
-      } catch { return false; }
-    }).length;
-
-    return {
-      itemCount: items.length,
-      domainCount,
-      topDomains,
-      uniqueDomainRatio: items.length > 0 ? domainCount / items.length : 0,
-      imageRatio: items.length > 0 ? hasImages / items.length : 0,
-      descriptionRatio: items.length > 0 ? hasDescriptions / items.length : 0,
-      avgTitleLength: items.length > 0 ? totalTitleLen / items.length : 0,
-      productRatio: items.length > 0 ? productPinCount / items.length : 0,
-      contentRatio: items.length > 0 ? contentPinCount / items.length : 0,
-      topWords: Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([w, c]) => ({ word: w, count: c }))
-    };
-  }
-
-  // Score how well a widget fits the current pin profile
-  // Returns { score: 0-1, rationale: string[], signals: {} }
-  function scoreWidgetFit(widget, profile, currentCategory) {
-    const rationale = [];
-    const signals = {};
-    let score = 0;
-    let maxScore = 0;
-
-    const c = widget.criteria;
-
-    // --- Category match (weight: 0.3) ---
-    maxScore += 0.3;
-    if (c.category) {
-      const cats = Array.isArray(c.category) ? c.category : [c.category];
-      if (cats.includes(currentCategory) || cats.includes('all')) {
-        score += 0.3;
-        signals.categoryMatch = true;
-        rationale.push(`Category "${currentCategory}" matches`);
-      } else {
-        signals.categoryMatch = false;
-        rationale.push(`Category "${currentCategory}" not in [${cats.join(', ')}]`);
-      }
-    } else {
-      score += 0.3;
-      signals.categoryMatch = true;
-      rationale.push('No category restriction');
-    }
-
-    // --- Item count (weight: 0.25) ---
-    maxScore += 0.25;
-    const minItems = c.minItems || 1;
-    if (profile.itemCount >= minItems) {
-      // Graduated: more items past minimum = higher score
-      const surplus = Math.min((profile.itemCount - minItems) / Math.max(minItems, 3), 1);
-      const itemScore = 0.15 + (0.10 * surplus);
-      score += itemScore;
-      signals.itemCount = profile.itemCount;
-      signals.minItems = minItems;
-      rationale.push(`${profile.itemCount} items (need ${minItems}+)`);
-    } else {
-      signals.itemCount = profile.itemCount;
-      signals.minItems = minItems;
-      rationale.push(`Only ${profile.itemCount} items (need ${minItems}+)`);
-    }
-
-    // --- Domain diversity (weight: 0.15) ---
-    maxScore += 0.15;
-    if (profile.domainCount >= 2) {
-      const diversityScore = Math.min(profile.domainCount / 5, 1) * 0.15;
-      score += diversityScore;
-      signals.domainDiversity = profile.domainCount;
-      rationale.push(`${profile.domainCount} unique domains`);
-    } else {
-      signals.domainDiversity = profile.domainCount;
-      rationale.push('Low domain diversity');
-    }
-
-    // --- Content quality (weight: 0.15) ---
-    maxScore += 0.15;
-    const qualityScore = ((profile.imageRatio * 0.5) + (profile.descriptionRatio * 0.3) + (Math.min(profile.avgTitleLength / 30, 1) * 0.2)) * 0.15;
-    score += qualityScore;
-    signals.imageRatio = profile.imageRatio;
-    signals.descriptionRatio = profile.descriptionRatio;
-    rationale.push(`Content quality: ${(qualityScore / 0.15 * 100).toFixed(0)}%`);
-
-    // --- Content type affinity (weight: 0.15) ---
-    maxScore += 0.15;
-    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
-    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview'].includes(widget.id);
-
-    if (isProductWidget && profile.productRatio > 0.3) {
-      const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;
-      score += affinity;
-      signals.contentAffinity = 'product';
-      rationale.push(`Product-heavy pins (${(profile.productRatio * 100).toFixed(0)}%) — good for ${widget.name}`);
-    } else if (isAnalyticsWidget && profile.itemCount >= 3) {
-      score += 0.12;
-      signals.contentAffinity = 'analytics';
-      rationale.push(`${profile.itemCount} items — enough for analysis`);
-    } else if (!isProductWidget && !isAnalyticsWidget) {
-      score += 0.08;
-      signals.contentAffinity = 'neutral';
-      rationale.push('General widget');
-    } else {
-      signals.contentAffinity = 'weak';
-      rationale.push(`Low affinity (product ratio: ${(profile.productRatio * 100).toFixed(0)}%)`);
-    }
-
-    const normalizedScore = maxScore > 0 ? score / maxScore : 0;
-
-    return {
-      score: Math.round(normalizedScore * 100) / 100,
-      rationale,
-      signals
-    };
-  }
-
-  // Store last scoring results for the inspector
-  let lastScoringResults = null;
-
-  // Check if widget criteria are met (hard gate — returns boolean)
+  // Check if widget criteria are met
   function checkWidgetCriteria(widget, items, currentCategory) {
     const c = widget.criteria;
-    // Phase 2: Category-agnostic — category field can be a string or array
-    if (c.category) {
-      const widgetCategories = Array.isArray(c.category) ? c.category : [c.category];
-      const matchesCategory = widgetCategories.includes(currentCategory) || widgetCategories.includes('all');
-      if (!matchesCategory) return false;
-    }
+    if (c.category && c.category !== currentCategory) return false;
     if (c.minItems && items.length < c.minItems) return false;
     if (c.maxItems && items.length > c.maxItems) return false;
     return true;
   }
 
-  // Get applicable widgets for current context — scored and ranked
+  // Get applicable widgets for current context
   function getApplicableWidgets(items, currentCategory) {
-    const profile = profilePins(items);
     const allWidgets = Object.values(WIDGET_REGISTRY);
-    const scoringResults = [];
-
-    for (const widget of allWidgets) {
-      const active = getWidgetStatus(widget.id) === 'active';
-      const visible = shouldShowWidget(widget.id);
-      const meetsHardCriteria = checkWidgetCriteria(widget, items, currentCategory);
-      const fit = scoreWidgetFit(widget, profile, currentCategory);
-
-      scoringResults.push({
-        widget,
-        active,
-        visible,
-        meetsHardCriteria,
-        eligible: active && visible && meetsHardCriteria,
-        ...fit
-      });
-    }
-
-    // Store for inspector
-    lastScoringResults = { profile, results: scoringResults, category: currentCategory, timestamp: Date.now() };
-
-    // Return eligible widgets sorted by score (highest first), favorites boosted
-    return scoringResults
-      .filter(r => r.eligible)
+    return allWidgets
+      .filter(w => getWidgetStatus(w.id) === 'active') // Use effective status
+      .filter(w => shouldShowWidget(w.id)) // Respect user preferences (hidden/dismissed)
+      .filter(w => checkWidgetCriteria(w, items, currentCategory))
       .sort((a, b) => {
-        const aFav = widgetPrefs.favorites[a.widget.id] ? 1 : 0;
-        const bFav = widgetPrefs.favorites[b.widget.id] ? 1 : 0;
-        if (aFav !== bFav) return bFav - aFav;
-        return b.score - a.score;
-      })
-      .map(r => r.widget);
-  }
-
-  // =============================================================================
-  // SERVER-DRIVEN WIDGET DISCOVERY
-  // Asks the server which widgets are eligible for the current context.
-  // Server eligibility rules (config/widgets/*.ts) are the source of truth.
-  // Falls back to local WIDGET_REGISTRY if the server is unreachable.
-  // =============================================================================
-
-  async function discoverWidgetsFromServer(category, items) {
-    try {
-      const itemsPayload = items.map(i => ({
-        id: i.id,
-        title: i.title,
-        description: i.description || '',
-        image: i.image || '',
-        url: i.url
-      }));
-
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          action: 'discover',
-          category: category,
-          items: itemsPayload
-        })
-      });
-
-      if (!response.ok) {
-        console.warn('[discovery] Server returned', response.status, '— falling back to local registry');
-        return null;
-      }
-
-      const data = await response.json();
-      console.log('[discovery] Server returned', data.widgets?.length, 'eligible widgets for', category);
-
-      // Map server widgets to local WIDGET_REGISTRY entries, merging server metadata.
-      // If a widget exists only on the server (not in local WIDGET_REGISTRY), build
-      // a temporary local entry from the discovery response so it can still render.
-      const discoveredWidgets = [];
-      for (const serverWidget of (data.widgets || [])) {
-        const localWidget = WIDGET_REGISTRY[serverWidget.widgetId];
-        if (localWidget) {
-          // Merge: use local prompt + template config, server zone/priority/eligibility
-          discoveredWidgets.push({
-            ...localWidget,
-            zone: serverWidget.zone || localWidget.zone,
-            _serverEligibility: serverWidget.eligibility,
-            _serverPriority: serverWidget.priority
-          });
-        } else if (serverWidget.promptTemplate) {
-          // Server-only widget — build a temporary entry from discovery data
-          console.log('[discovery] Building temp entry for server widget:', serverWidget.widgetId);
-          discoveredWidgets.push({
-            id: serverWidget.widgetId,
-            name: serverWidget.name,
-            description: serverWidget.description || '',
-            status: 'active',
-            zone: serverWidget.zone,
-            criteria: {},
-            prompt: serverWidget.promptTemplate + (serverWidget.constraints?.length
-              ? '\n\nADDITIONAL CONSTRAINTS:\n' + serverWidget.constraints.map(c => '- ' + c).join('\n')
-              : ''),
-            template: {
-              name: serverWidget.template,
-              fallback: serverWidget.fallbackTemplate || 'list'
-            },
-            _serverEligibility: serverWidget.eligibility,
-            _serverPriority: serverWidget.priority,
-            _serverOnly: true
-          });
-        } else {
-          console.log('[discovery] Server widget', serverWidget.widgetId, 'not in local registry and no prompt — skipping');
-        }
-      }
-
-      // Sort by server priority (lower = higher priority), then favorites
-      discoveredWidgets.sort((a, b) => {
+        // Favorites first, then alphabetical
         const aFav = widgetPrefs.favorites[a.id] ? 0 : 1;
         const bFav = widgetPrefs.favorites[b.id] ? 0 : 1;
         if (aFav !== bFav) return aFav - bFav;
-        return (a._serverPriority || 99) - (b._serverPriority || 99);
+        return a.id.localeCompare(b.id);
       });
-
-      // Respect user preferences (hidden/dismissed)
-      return discoveredWidgets.filter(w =>
-        getWidgetStatus(w.id) === 'active' && shouldShowWidget(w.id)
-      );
-    } catch (err) {
-      console.warn('[discovery] Network error — falling back to local registry:', err.message);
-      return null;
-    }
   }
 
   // Shuffle array randomly (Fisher-Yates)
@@ -4771,20 +4343,6 @@ Return JSON:
     return 'mainstream';
   }
 
-  // Shared widget shell header — w-* design system classes
-  function renderWidgetHeader(widget) {
-    return `
-      <div class="w-header">
-        <div class="w-header__left">
-          <span class="w-text w-text--label">${esc(widget.name)}</span>
-          <span class="w-badge">AI</span>
-        </div>
-        <div class="w-header__controls">
-          <button class="w-icon-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">&#x27F3;</button>
-        </div>
-      </div>`;
-  }
-
   // Unified Complete the Look widget - single component
   function renderCompleteTheLookWidget(widget, items, aiResult) {
     // Enrich items with category and brand tier
@@ -4828,15 +4386,15 @@ Return JSON:
       const hasImage = item.image && item.image.length > 0;
       const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
       userItemsHtml += `
-        <a href="${item.url}" target="_blank" rel="noopener" class="w-item">
-          <div class="w-img">
+        <a href="${item.url}" target="_blank" rel="noopener" class="widget-complete__item">
+          <div class="widget-complete__image-wrap">
             ${hasImage
-              ? `<img src="${secureImg(item.image)}" alt="" loading="lazy">`
-              : `<div class="w-img__placeholder">${initial}</div>`
+              ? `<img class="widget-complete__image" src="${secureImg(item.image)}" alt="" loading="lazy">`
+              : `<span class="widget-complete__placeholder">${initial}</span>`
             }
           </div>
-          <span class="w-text">${esc(item.title)}</span>
-          <span class="w-text w-text--meta">${esc(item.domain)}</span>
+          <div class="widget-complete__item-title">${esc(item.title)}</div>
+          <div class="widget-complete__item-meta">${esc(item.domain)}</div>
         </a>`;
     }
 
@@ -4880,51 +4438,61 @@ Return JSON:
 
       // Use vendor from enrichment if available
       const vendorName = sug.vendor || sug.brand;
-      const brandDisplay = vendorName ? `<span class="w-text w-text--meta">${esc(vendorName)}</span>` : '';
-      const priceDisplay = sug.price ? `<span style="font-weight:600;color:var(--fg);font-style:normal">${esc(sug.price)}</span>` : '';
+      const brandDisplay = vendorName ? `<div class="widget-complete__item-brand">${esc(vendorName)}</div>` : '';
+      const priceDisplay = sug.price ? `<span class="widget-complete__item-price">${esc(sug.price)}</span>` : '';
 
       // Use actual product image if available, otherwise show category icon
       const hasProductImage = sug.productImage && sug.productImage.length > 0;
       const imageContent = hasProductImage
-        ? `<img src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="w-img__placeholder" style="display:none">${icon}</div>`
-        : `<div class="w-img__placeholder">${icon}</div>`;
+        ? `<img class="widget-complete__product-image" src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="widget-complete__product-icon" style="display:none">${icon}</span>`
+        : `<span class="widget-complete__product-icon">${icon}</span>`;
 
       // Render as link only if we have a valid URL, otherwise render as non-clickable card
       if (hasUrl) {
         // Phase 1: Track click for instrumentation
         const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
-            <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
+          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="widget-complete__item widget-complete__item--suggestion" onclick="${trackClick}">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
               ${imageContent}
             </div>
             ${brandDisplay}
-            <span class="w-text">${esc(sug.name)}</span>
-            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
-            <span class="w-btn w-btn--sm">Shop Now →</span>
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link">Shop Now →</span>
           </a>`;
       } else {
         // No valid URL - render as non-clickable suggestion
         suggestionsHtml += `
-          <div class="w-item">
-            <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
+          <div class="widget-complete__item widget-complete__item--suggestion widget-complete__item--no-link">
+            <div class="widget-complete__image-wrap widget-complete__image-wrap--product">
               ${imageContent}
             </div>
             ${brandDisplay}
-            <span class="w-text">${esc(sug.name)}</span>
-            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
-            <span class="w-btn w-btn--sm" style="opacity:0.5">Search for this item</span>
+            <div class="widget-complete__item-title">${esc(sug.name)}</div>
+            <div class="widget-complete__item-reason">${esc(sug.reason || '')} ${priceDisplay}</div>
+            <span class="widget-complete__shop-link" style="opacity: 0.5">Search for this item</span>
           </div>`;
       }
     }
 
     return `
-      <div class="w-shell" data-widget-id="${widget.id}">
-        ${renderWidgetHeader(widget)}
-        <div class="w-body">
-          <div class="w-items">${userItemsHtml}</div>
-          <div class="w-divider"><span class="w-divider__label">+</span></div>
-          <div class="w-items">${suggestionsHtml}</div>
+      <div class="widget-complete" data-widget-id="${widget.id}">
+        <div class="widget-complete__header">
+          <div class="widget-complete__header-left">
+            <span class="widget-complete__title">${widget.name}</span>
+            <span class="widget-complete__badge">AI</span>
+          </div>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
+        </div>
+        <div class="widget-complete__body">
+          <div class="widget-complete__section">
+            <div class="widget-complete__items">${userItemsHtml}</div>
+          </div>
+          <div class="widget-complete__divider"></div>
+          <div class="widget-complete__section">
+            <div class="widget-complete__items">${suggestionsHtml}</div>
+          </div>
         </div>
       </div>`;
   }
@@ -4946,419 +4514,34 @@ Return JSON:
       sublabel = `Based on ${items.length} item${items.length > 1 ? 's' : ''}`;
     }
 
-    const traitsHtml = traits.map(t => `<span class="w-badge">${esc(t)}</span>`).join('');
+    const traitsHtml = traits.map(t => `<span class="widget-style__trait">${esc(t)}</span>`).join('');
 
     return `
-      <div class="w-shell" data-widget-id="${widget.id}">
-        ${renderWidgetHeader(widget)}
-        <div class="w-body w-body--verdict">
-          <div class="w-headline">
-            <span class="w-text w-text--display">${esc(label)}</span>
-            <span class="w-text w-text--meta">${esc(sublabel)}</span>
+      <div class="widget-complete" data-widget-id="${widget.id}">
+        <div class="widget-complete__header">
+          <div class="widget-complete__header-left">
+            <span class="widget-complete__title">${widget.name}</span>
+            <span class="widget-complete__badge">AI</span>
           </div>
-          <div class="w-tag-group">${traitsHtml}</div>
+          <button class="widget-complete__refresh-btn" onclick="refreshWidget('${widget.id}')" title="Refresh suggestions">⟳</button>
         </div>
-      </div>`;
-  }
-
-  // ===========================================================================
-  // PHASE 2: TEMPLATE SELECTION ENGINE
-  // Templates are registered by name and selected via widget config.
-  // Adding a new widget appearance = adding a template + a widget config.
-  // ===========================================================================
-
-  // Comparison renderer: two options side by side with labeled divider
-  function renderComparisonWidget(widget, items, aiResult) {
-    if (!aiResult) return '';
-    const a = aiResult.optionA || aiResult.options?.[0] || {};
-    const b = aiResult.optionB || aiResult.options?.[1] || {};
-    const label = aiResult.dividerLabel || 'VS';
-
-    function renderOption(opt) {
-      const prosHtml = (opt.pros || []).map(p => `<span class="w-text w-text--note" style="color:#4a9">+ ${esc(p)}</span>`).join('');
-      const consHtml = (opt.cons || []).map(c => `<span class="w-text w-text--note" style="color:#c66">− ${esc(c)}</span>`).join('');
-      return `
-        <div class="w-option">
-          <span class="w-text" style="font-weight:600">${esc(opt.title || 'Option')}</span>
-          ${opt.price ? `<span class="w-text w-text--meta">${esc(opt.price)}</span>` : ''}
-          ${prosHtml}${consHtml}
-        </div>`;
-    }
-
-    return `
-      <div class="w-shell" data-widget-id="${widget.id}">
-        ${renderWidgetHeader(widget)}
-        <div class="w-body w-body--comparison">
-          ${renderOption(a)}
-          <div class="w-divider--labeled">${esc(label)}</div>
-          ${renderOption(b)}
-        </div>
-      </div>`;
-  }
-
-  // Choices renderer: selectable option cards
-  function renderChoicesWidget(widget, items, aiResult) {
-    if (!aiResult) return '';
-    const question = aiResult.question || '';
-    const options = aiResult.options || aiResult.choices || [];
-    if (options.length === 0) return '';
-
-    const optionsHtml = options.slice(0, 6).map((opt, i) => {
-      const title = opt.title || opt.name || `Option ${i + 1}`;
-      const desc = opt.description || opt.reason || '';
-      return `
-        <div class="w-option" onclick="this.classList.toggle('w-option--selected')">
-          <span class="w-text" style="font-weight:600">${esc(title)}</span>
-          ${desc ? `<span class="w-text w-text--note">${esc(desc)}</span>` : ''}
-        </div>`;
-    }).join('');
-
-    return `
-      <div class="w-shell" data-widget-id="${widget.id}">
-        ${renderWidgetHeader(widget)}
-        <div class="w-body w-body--choices">
-          ${question ? `<span class="w-text w-text--title" style="grid-column:1/-1;margin-bottom:var(--space-2)">${esc(question)}</span>` : ''}
-          ${optionsHtml}
-        </div>
-      </div>`;
-  }
-
-  // Checklist renderer: interactive rows with checkboxes + running total
-  function renderChecklistWidget(widget, items, aiResult) {
-    if (!aiResult) return '';
-    const checkItems = aiResult.items || [];
-    if (checkItems.length === 0) return '';
-    const total = aiResult.total || '';
-
-    const rowsHtml = checkItems.slice(0, 10).map((item, i) => {
-      const checked = item.checked ? 'checked' : '';
-      const name = item.name || item.title || `Item ${i + 1}`;
-      const price = item.price || item.value || '';
-      return `
-        <div class="w-row">
-          <label class="w-checkbox">
-            <input type="checkbox" ${checked} onchange="updateChecklistTotal(this)">
-            <span class="w-checkbox__mark"></span>
-          </label>
-          <div class="w-row__content" style="flex:1;display:flex;justify-content:space-between;align-items:center">
-            <span class="w-text">${esc(name)}</span>
-            ${price ? `<span class="w-text w-text--value">${esc(price)}</span>` : ''}
+        <div class="widget-complete__body">
+          <div class="widget-style__content">
+            <div class="widget-style__label">${esc(label)}</div>
+            <div class="widget-style__sublabel">${esc(sublabel)}</div>
+            <div class="widget-style__traits">${traitsHtml}</div>
           </div>
-        </div>`;
-    }).join('');
-
-    return `
-      <div class="w-shell" data-widget-id="${widget.id}">
-        ${renderWidgetHeader(widget)}
-        <div class="w-body w-body--checklist">
-          ${rowsHtml}
-        </div>
-        ${total ? `
-          <div class="w-footer" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3);border-top:var(--border-thin) solid var(--border-subtle)">
-            <span class="w-text w-text--label">Total</span>
-            <span class="w-text w-text--value" data-checklist-total>${esc(total)}</span>
-          </div>` : ''}
-      </div>`;
-  }
-
-  // Grouped renderer: labeled sections with grouped content
-  function renderGroupedWidget(widget, items, aiResult) {
-    if (!aiResult) return '';
-    const sections = aiResult.sections || aiResult.groups || [];
-    if (sections.length === 0) return '';
-
-    const sectionsHtml = sections.slice(0, 8).map(section => {
-      const title = section.title || section.name || '';
-      const sectionItems = section.items || [];
-
-      const itemsHtml = sectionItems.slice(0, 10).map(item => {
-        const name = item.name || item.title || '';
-        const meta = item.brand || item.meta || item.description || '';
-        return `
-          <div class="w-row">
-            <div class="w-row__content">
-              <span class="w-text">${esc(name)}</span>
-              ${meta ? `<span class="w-text w-text--meta">${esc(meta)}</span>` : ''}
-            </div>
-          </div>`;
-      }).join('');
-
-      return `
-        <div class="w-section">
-          <span class="w-text w-text--title w-section__title">${esc(title)}</span>
-          ${itemsHtml || '<span class="w-text w-text--meta">No items</span>'}
-        </div>`;
-    }).join('');
-
-    return `
-      <div class="w-shell" data-widget-id="${widget.id}">
-        ${renderWidgetHeader(widget)}
-        <div class="w-body w-body--grouped">
-          ${sectionsHtml}
         </div>
       </div>`;
-  }
-
-  const WIDGET_TEMPLATES = {
-    // Template: grid-split
-    // Two groups of thumbnail cards separated by a divider
-    'grid-split': {
-      name: 'grid-split',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        return renderCompleteTheLookWidget(widget, items, aiResult);
-      }
-    },
-
-    // Template: hero-card
-    // Centered headline + subtitle + tag pills
-    'hero-card': {
-      name: 'hero-card',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        return renderStyleSummaryWidget(widget, items, aiResult);
-      }
-    },
-
-    // Template: list (fallback)
-    // Stacked rows with separators
-    'list': {
-      name: 'list',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        if (!aiResult) return '';
-        const listItems = (aiResult.suggestions || aiResult.traits || []).slice(0, 5);
-        const listHtml = listItems.map(item => {
-          const label = typeof item === 'string' ? item : (item.name || item.label || JSON.stringify(item));
-          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span></div></div>`;
-        }).join('');
-
-        return `
-          <div class="w-shell" data-widget-id="${widget.id}">
-            ${renderWidgetHeader(widget)}
-            <div class="w-body w-body--list">
-              ${listHtml || '<span class="w-text w-text--meta">No results</span>'}
-            </div>
-          </div>`;
-      }
-    },
-
-    // Template: text-block (fallback for hero-card)
-    // Single prose block in a card
-    'text-block': {
-      name: 'text-block',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
-        return `
-          <div class="w-shell" data-widget-id="${widget.id}">
-            ${renderWidgetHeader(widget)}
-            <div class="w-body w-body--narrative">
-              <p class="w-text w-text--prose">${esc(text)}</p>
-            </div>
-          </div>`;
-      }
-    },
-
-    // Template: spectrum
-    // Labeled scales showing dimensional positioning (e.g. Budget <--*--> Luxury)
-    'spectrum': {
-      name: 'spectrum',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        if (!aiResult) return '';
-        const axes = aiResult.axes || [];
-        if (axes.length === 0) return '';
-
-        const axesHtml = axes.slice(0, 4).map(axis => {
-          const position = Math.max(0, Math.min(1, axis.position || 0.5));
-          const pct = (position * 100).toFixed(1);
-          return `
-            <div class="w-axis">
-              <div class="w-axis__labels">
-                <span class="w-text w-text--label">${esc(axis.leftLabel || axis.left || '')}</span>
-                <span class="w-text w-text--label">${esc(axis.rightLabel || axis.right || '')}</span>
-              </div>
-              <div class="w-axis__track">
-                <div class="w-axis__marker" style="left: ${pct}%"></div>
-              </div>
-              ${axis.note ? `<div class="w-axis__note"><span class="w-text w-text--note">${esc(axis.note)}</span></div>` : ''}
-            </div>`;
-        }).join('');
-
-        return `
-          <div class="w-shell" data-widget-id="${widget.id}">
-            ${renderWidgetHeader(widget)}
-            <div class="w-body w-body--spectrum">
-              ${axesHtml}
-            </div>
-          </div>`;
-      }
-    },
-
-    // Template: stat-row
-    // Row of 2-4 key metrics with large values and small labels
-    'stat-row': {
-      name: 'stat-row',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        if (!aiResult) return '';
-        const stats = aiResult.stats || [];
-        if (stats.length === 0) return '';
-
-        const statsHtml = stats.slice(0, 4).map(stat => {
-          return `
-            <div class="w-stat">
-              <span class="w-text w-text--value">${esc(String(stat.value))}</span>
-              <span class="w-text w-text--label">${esc(stat.label)}</span>
-            </div>`;
-        }).join('');
-
-        return `
-          <div class="w-shell" data-widget-id="${widget.id}">
-            ${renderWidgetHeader(widget)}
-            <div class="w-body w-body--stats">
-              ${statsHtml}
-            </div>
-          </div>`;
-      }
-    },
-
-    // Template: quick-add (action)
-    // Single high-confidence suggestion with "Add to board" action button
-    'quick-add': {
-      name: 'quick-add',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        if (!aiResult) return '';
-        const suggestion = aiResult.suggestion || aiResult.suggestions?.[0] || null;
-        if (!suggestion) return '';
-
-        const name = suggestion.name || 'Suggested item';
-        const brand = suggestion.brand || '';
-        const price = suggestion.price || '';
-        const reason = suggestion.reason || '';
-        const url = suggestion.url || suggestion.searchQuery ? `https://www.google.com/search?q=${encodeURIComponent(suggestion.searchQuery)}` : '#';
-        const imageUrl = suggestion.imageUrl || suggestion.image || '';
-        const widgetId = widget.id;
-
-        const imageHtml = imageUrl
-          ? `<img src="${esc(imageUrl)}" alt="${esc(name)}" onerror="this.parentElement.innerHTML='<div class=\\'w-img__placeholder\\'>+</div>'">`
-          : `<div class="w-img__placeholder">+</div>`;
-
-        return `
-          <div class="w-shell" data-widget-id="${widgetId}">
-            ${renderWidgetHeader(widget)}
-            <div class="w-body w-body--suggestion">
-              <div class="w-img w-img--card">${imageHtml}</div>
-              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)">
-                <span class="w-text" style="font-weight:600">${esc(name)}</span>
-                ${brand ? `<span class="w-text w-text--meta">${esc(brand)}</span>` : ''}
-                ${price ? `<span class="w-text">${esc(price)}</span>` : ''}
-                ${reason ? `<span class="w-text w-text--note">"${esc(reason)}"</span>` : ''}
-                <div class="w-action-bar" id="quickadd-actions-${widgetId}" style="margin-top:var(--space-2)">
-                  <button class="w-btn w-btn--filled" onclick="handleQuickAdd('${widgetId}', this)">+ Add to board</button>
-                  <a class="w-btn" href="${esc(url)}" target="_blank" rel="noopener">Visit site ›</a>
-                </div>
-              </div>
-            </div>
-          </div>`;
-      }
-    },
-
-    // Template: comparison
-    // Two options side by side with labeled divider (A vs B)
-    'comparison': {
-      name: 'comparison',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        return renderComparisonWidget(widget, items, aiResult);
-      }
-    },
-
-    // Template: choices
-    // Selectable option cards (quiz-style picking)
-    'choices': {
-      name: 'choices',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        return renderChoicesWidget(widget, items, aiResult);
-      }
-    },
-
-    // Template: checklist
-    // Interactive checklist with running total
-    'checklist': {
-      name: 'checklist',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        return renderChecklistWidget(widget, items, aiResult);
-      }
-    },
-
-    // Template: grouped
-    // Labeled sections with grouped content
-    'grouped': {
-      name: 'grouped',
-      version: '1.0',
-      render: function(widget, items, aiResult) {
-        return renderGroupedWidget(widget, items, aiResult);
-      }
-    }
-  };
-
-  /**
-   * Select and render a widget using the template engine.
-   * Tries the primary template, falls back to fallbackTemplate, then simple-list.
-   * @param {object} widget - Widget definition from WIDGET_REGISTRY
-   * @param {Array} items - User's items
-   * @param {object} aiResult - AI-generated content
-   * @returns {string} Rendered HTML
-   */
-  function renderWidgetWithTemplate(widget, items, aiResult) {
-    // Determine template name from widget config
-    const templateName = widget.template?.name || widget.template?.layout || null;
-    const fallbackName = widget.template?.fallback || null;
-
-    // Map legacy layout names to template names
-    const templateAliases = {
-      'two-column': 'grid-split',
-      'card': 'hero-card'
-    };
-
-    const resolvedName = templateAliases[templateName] || templateName;
-    const resolvedFallback = templateAliases[fallbackName] || fallbackName;
-
-    // Try primary template
-    let template = WIDGET_TEMPLATES[resolvedName];
-    if (template) {
-      const html = template.render(widget, items, aiResult);
-      if (html) return html;
-    }
-
-    // Try fallback template
-    if (resolvedFallback) {
-      template = WIDGET_TEMPLATES[resolvedFallback];
-      if (template) {
-        const html = template.render(widget, items, aiResult);
-        if (html) return html;
-      }
-    }
-
-    // Last resort: list
-    return WIDGET_TEMPLATES['list'].render(widget, items, aiResult);
   }
 
   // Store inline widgets for grid injection
   let inlineWidgetHtml = '';
-  let inlineWidgets = []; // Array of { id, html } for drag-and-drop support
-  const INLINE_WIDGET_POSITION = 8; // Default: insert inline widget after this many cards
+  const INLINE_WIDGET_POSITION = 8; // Insert inline widget after this many cards
   let widgetGenerationInProgress = false; // Mutex to prevent duplicate generation
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
-    // Feature flag: skip all widget rendering when disabled
-    if (!widgetDSEnabled) return;
     // Prevent duplicate generation
     if (widgetGenerationInProgress) return;
     widgetGenerationInProgress = true;
@@ -5371,11 +4554,13 @@ Return JSON:
     heroSection.classList.remove('widget-section--visible');
     footerSection.classList.remove('widget-section--visible');
     inlineWidgetHtml = '';
-    inlineWidgets = [];
 
-    // Phase 2: Category-agnostic — show widgets for any category that has matching configs
-    // The widget registry (server-side) defines which categories each widget supports
-    const widgetCategory = currentFilter || 'all';
+    // Only show widgets when filtering to 'wear' category
+    if (currentFilter !== 'wear') {
+      renderGrid();
+      widgetGenerationInProgress = false;
+      return;
+    }
 
     const allLinks = getAllLinks();
     const items = normalizeWearItems(allLinks);
@@ -5386,13 +4571,8 @@ Return JSON:
       return;
     }
 
-    // Server-driven discovery: ask the server which widgets are eligible,
-    // fall back to local WIDGET_REGISTRY if server is unreachable.
-    let applicableWidgets = await discoverWidgetsFromServer(widgetCategory, items);
-    if (!applicableWidgets) {
-      console.log('[widget] Using local registry fallback');
-      applicableWidgets = getApplicableWidgets(items, widgetCategory);
-    }
+    // Get applicable widgets
+    const applicableWidgets = getApplicableWidgets(items, 'wear');
 
     if (applicableWidgets.length === 0) {
       renderGrid();
@@ -5401,40 +4581,25 @@ Return JSON:
     }
 
     // Group widgets by zone
-    const allHero = applicableWidgets.filter(w => w.zone === 'hero');
-    const allInline = applicableWidgets.filter(w => w.zone === 'inline');
-    const allFooter = applicableWidgets.filter(w => w.zone === 'footer');
-
-    // Hero rotation: show one hero widget at a time, cycling on each render
-    let heroRotationIndex = parseInt(localStorage.getItem('widget_hero_index') || '0', 10);
-    const selectedHero = allHero.length > 0
-      ? [allHero[heroRotationIndex % allHero.length]]
-      : [];
-    // Advance index for next render
-    if (allHero.length > 0) {
-      localStorage.setItem('widget_hero_index', String((heroRotationIndex + 1) % allHero.length));
-    }
-
     const widgetsByZone = {
-      hero: selectedHero,
-      inline: allInline,
-      footer: allFooter
+      hero: applicableWidgets.filter(w => w.zone === 'hero'),
+      inline: applicableWidgets.filter(w => w.zone === 'inline'),
+      footer: applicableWidgets.filter(w => w.zone === 'footer')
     };
 
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
-      const firstHeroName = widgetsByZone.hero[0].name || 'Widget';
       heroSection.classList.add('widget-section--visible');
       heroContent.innerHTML = `
-        <div class="w-shell">
-          <div class="w-header">
-            <div class="w-header__left">
-              <span class="w-text w-text--label">${esc(firstHeroName)}</span>
-              <span class="w-badge">AI</span>
+        <div class="widget-complete">
+          <div class="widget-complete__header">
+            <div class="widget-complete__header-left">
+              <span class="widget-complete__title">Style Summary</span>
+              <span class="widget-complete__badge">AI</span>
             </div>
           </div>
-          <div class="w-body w-body--loading">
-            <span class="w-loader">Generating insights...</span>
+          <div class="widget-complete__body widget-complete__body--loading">
+            Generating insights...
           </div>
         </div>`;
     }
@@ -5445,8 +4610,8 @@ Return JSON:
 
     for (const widget of applicableWidgets) {
       // Get AI content via Edge Function (handles API key server-side)
-      // Phase 2: Pass current category for config-driven eligibility checking
-      const aiResult = await generateWidgetContent(widget, items, widgetCategory);
+      // Phase 1: Pass category for eligibility checking
+      const aiResult = await generateWidgetContent(widget, items, currentFilter);
 
       // Phase 1: Handle suppressed widgets
       if (aiResult && aiResult._suppressed) {
@@ -5455,8 +4620,12 @@ Return JSON:
         continue;
       }
 
-      // Phase 2: Template Selection Engine — route via widget.template config
-      let widgetHtml = renderWidgetWithTemplate(widget, items, aiResult);
+      let widgetHtml = '';
+      if (widget.id === 'complete-the-look') {
+        widgetHtml = renderCompleteTheLookWidget(widget, items, aiResult);
+      } else if (widget.id === 'style-summary') {
+        widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
+      }
 
       // Skip if no HTML was generated
       if (!widgetHtml) {
@@ -5467,13 +4636,10 @@ Return JSON:
       if (widget.zone === 'hero') {
         heroHtml += widgetHtml;
       } else if (widget.zone === 'inline') {
-        const widgetWrapHtml = `
-          <div class="widget-inline" data-widget-id="${esc(widget.id)}" draggable="true">
-            <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
+        inlineWidgetHtml += `
+          <div class="widget-inline">
             ${widgetHtml}
           </div>`;
-        inlineWidgetHtml += widgetWrapHtml;
-        inlineWidgets.push({ id: widget.id, html: widgetWrapHtml });
       } else if (widget.zone === 'footer') {
         footerHtml += widgetHtml;
       }
@@ -5496,27 +4662,6 @@ Return JSON:
     renderGrid();
     widgetGenerationInProgress = false;
   }
-
-  // Update checklist running total when checkbox is toggled
-  window.updateChecklistTotal = function(checkbox) {
-    const shell = checkbox.closest('.w-shell');
-    if (!shell) return;
-    const totalEl = shell.querySelector('[data-checklist-total]');
-    if (!totalEl) return;
-
-    // Sum prices of checked items
-    const rows = shell.querySelectorAll('.w-row');
-    let total = 0;
-    for (const row of rows) {
-      const input = row.querySelector('input[type="checkbox"]');
-      const valueEl = row.querySelector('.w-text--value');
-      if (input?.checked && valueEl) {
-        const num = parseFloat(valueEl.textContent.replace(/[^0-9.]/g, ''));
-        if (!isNaN(num)) total += num;
-      }
-    }
-    totalEl.textContent = '$' + total.toFixed(0);
-  };
 
   // Refresh a specific widget (called from widget refresh button)
   window.refreshWidget = async function(widgetId) {
@@ -5550,19 +4695,18 @@ Return JSON:
     // Show loading state for this specific widget
     if (widget.zone === 'inline') {
       // Replace inline widget with loading state
-      const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
+      const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.innerHTML = `
-          <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
-          <div class="w-shell">
-            <div class="w-header">
-              <div class="w-header__left">
-                <span class="w-text w-text--label">${esc(widget.name)}</span>
-                <span class="w-badge">AI</span>
+          <div class="widget-complete">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
               </div>
             </div>
-            <div class="w-body w-body--loading">
-              <span class="w-loader">Refreshing suggestions...</span>
+            <div class="widget-complete__body widget-complete__body--loading">
+              Refreshing suggestions...
             </div>
           </div>`;
       }
@@ -5570,15 +4714,15 @@ Return JSON:
       const heroContent = $('widgetContent');
       if (heroContent) {
         heroContent.innerHTML = `
-          <div class="w-shell">
-            <div class="w-header">
-              <div class="w-header__left">
-                <span class="w-text w-text--label">${esc(widget.name)}</span>
-                <span class="w-badge">AI</span>
+          <div class="widget-complete">
+            <div class="widget-complete__header">
+              <div class="widget-complete__header-left">
+                <span class="widget-complete__title">${esc(widget.name)}</span>
+                <span class="widget-complete__badge">AI</span>
               </div>
             </div>
-            <div class="w-body w-body--loading">
-              <span class="w-loader">Refreshing...</span>
+            <div class="widget-complete__body widget-complete__body--loading">
+              Refreshing...
             </div>
           </div>`;
       }
@@ -5592,7 +4736,7 @@ Return JSON:
       console.log('[widget] Widget suppressed on refresh:', widgetId, aiResult.reason);
       // Hide the widget since it's no longer eligible
       if (widget.zone === 'inline') {
-        const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
+        const inlineContainer = document.querySelector('.widget-inline');
         if (inlineContainer) {
           inlineContainer.style.display = 'none';
         }
@@ -5606,26 +4750,25 @@ Return JSON:
       return;
     }
 
-    // Phase 2: Template Selection Engine — route via widget.template config
-    let widgetHtml = renderWidgetWithTemplate(widget, items, aiResult);
+    let widgetHtml = '';
+    if (widget.id === 'complete-the-look') {
+      widgetHtml = renderCompleteTheLookWidget(widget, items, aiResult);
+    } else if (widget.id === 'style-summary') {
+      widgetHtml = renderStyleSummaryWidget(widget, items, aiResult);
+    }
 
     // Update only this widget's display
     if (widget.zone === 'inline') {
-      const inlineContainer = document.querySelector(`.widget-inline[data-widget-id="${widgetId}"]`) || document.querySelector('.widget-inline');
+      const inlineContainer = document.querySelector('.widget-inline');
       if (inlineContainer) {
         inlineContainer.style.display = ''; // Ensure visible
-        inlineContainer.innerHTML = `<div class="widget-inline__drag-handle" title="Drag to reposition"></div>${widgetHtml}`;
+        inlineContainer.innerHTML = widgetHtml;
       }
       // Also update stored HTML for future grid re-renders
-      const updatedWrapHtml = `
-        <div class="widget-inline" data-widget-id="${esc(widgetId)}" draggable="true">
-          <div class="widget-inline__drag-handle" title="Drag to reposition"></div>
+      inlineWidgetHtml = `
+        <div class="widget-inline">
           ${widgetHtml}
         </div>`;
-      inlineWidgetHtml = updatedWrapHtml;
-      // Update the inlineWidgets array entry
-      const iwIdx = inlineWidgets.findIndex(iw => iw.id === widgetId);
-      if (iwIdx >= 0) inlineWidgets[iwIdx].html = updatedWrapHtml;
     } else if (widget.zone === 'hero') {
       const heroContent = $('widgetContent');
       if (heroContent) {
@@ -5636,82 +4779,12 @@ Return JSON:
     console.log('[widget] Refresh complete for:', widgetId);
   };
 
-  // Quick-add action handler — adds AI suggestion to the user's board
-  window.handleQuickAdd = function(widgetId, btnEl) {
-    // Find the widget element and extract suggestion data
-    const widgetEl = btnEl.closest('[data-widget-id]');
-    if (!widgetEl) return;
-
-    // Get the cached AI result for this widget
-    const widget = WIDGET_REGISTRY[widgetId];
-    if (!widget) return;
-
-    const allLinks = getAllLinks();
-    const items = normalizeWearItems(allLinks);
-    const itemIds = items.map(i => i.id);
-    const cacheKey = getCacheKey(widgetId, itemIds);
-    const cached = widgetCache[cacheKey];
-    const aiResult = cached?.data;
-    const suggestion = aiResult?.suggestion || aiResult?.suggestions?.[0];
-
-    if (!suggestion) {
-      console.warn('[widget] No suggestion data for quick-add:', widgetId);
-      return;
-    }
-
-    // Build a link object from the suggestion
-    const linkUrl = suggestion.url || (suggestion.searchQuery
-      ? `https://www.google.com/search?q=${encodeURIComponent(suggestion.searchQuery)}`
-      : null);
-
-    if (!linkUrl) {
-      console.warn('[widget] No URL for quick-add suggestion');
-      return;
-    }
-
-    const newLink = {
-      id: 'link_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-      url: linkUrl,
-      title: suggestion.name || 'AI Suggestion',
-      description: suggestion.reason || '',
-      image: suggestion.imageUrl || suggestion.image || '',
-      category: currentFilter || 'all',
-      domain: linkUrl.replace(/^https?:\/\//, '').split('/')[0],
-      source: 'ai-quick-add',
-      widgetId: widgetId
-    };
-
-    // Add to board
-    const result = addLink(newLink);
-    console.log('[widget] Quick-add result:', result);
-
-    // Track the action
-    trackWidgetEvent(WIDGET_EVENTS.CLICK, widgetId, {
-      action: 'quick-add',
-      suggestion: suggestion.name,
-      brand: suggestion.brand
-    });
-
-    // Update UI — replace button with confirmation
-    const actionsEl = document.getElementById(`quickadd-actions-${widgetId}`);
-    if (actionsEl) {
-      const visitUrl = linkUrl;
-      actionsEl.innerHTML = `
-        <span class="w-badge">&#x2713; Added</span>
-        <a class="w-btn" href="${esc(visitUrl)}" target="_blank" rel="noopener">Visit site ›</a>`;
-    }
-
-    // Re-render the grid to show the new item
-    renderGrid();
-  };
-
   // Widget refresh button handler
   function initWidgetSystem() {
     loadWidgetCache();
     loadWidgetStatus();
     loadWidgetPrefs();
     loadWidgetFeedback();
-    loadWidgetPositions();
 
     const refreshBtn = $('widgetRefresh');
     if (refreshBtn) {
@@ -5903,35 +4976,6 @@ Return JSON:
     renderSubTags();
     renderGrid();
     console.log('[beta] Sub-tags bar disabled');
-  };
-
-  // Dev toggle: all AI widgets (hidden by default, persists once enabled)
-  // Usage: window.enableWidgetDS() / window.disableWidgetDS() in console
-  window.enableWidgetDS = function() {
-    widgetDSEnabled = true;
-    localStorage.setItem(WIDGET_DS_KEY, 'true');
-    const link = document.getElementById('ds-widgets-css');
-    if (link) link.disabled = false;
-    const hero = $('widgetSection');
-    const footer = $('widgetFooter');
-    if (hero) hero.style.display = '';
-    if (footer) footer.style.display = '';
-    generateWidgets();
-    console.log('[widgets] Enabled — widgets will render now');
-  };
-
-  window.disableWidgetDS = function() {
-    widgetDSEnabled = false;
-    localStorage.setItem(WIDGET_DS_KEY, 'false');
-    const link = document.getElementById('ds-widgets-css');
-    if (link) link.disabled = true;
-    const hero = $('widgetSection');
-    const footer = $('widgetFooter');
-    if (hero) { hero.style.display = 'none'; hero.classList.remove('widget-section--visible'); }
-    if (footer) { footer.style.display = 'none'; footer.classList.remove('widget-section--visible'); }
-    inlineWidgetHtml = '';
-    renderGrid();
-    console.log('[widgets] Disabled — all widgets hidden');
   };
 
   // ============================================
@@ -7636,25 +6680,13 @@ Return JSON:
 
     let html = '';
     let cardCount = 0;
-
-    // Build a map of widget positions for injection
-    const widgetsByPosition = {};
-    if (inlineWidgets.length > 0) {
-      for (const iw of inlineWidgets) {
-        const pos = getWidgetPosition(iw.id);
-        if (!widgetsByPosition[pos]) widgetsByPosition[pos] = [];
-        widgetsByPosition[pos].push(iw.html);
-      }
-    }
-    const widgetPositionKeys = Object.keys(widgetsByPosition).map(Number).sort((a, b) => a - b);
-    let widgetPosIdx = 0;
+    let inlineWidgetInserted = false;
 
     for (const l of sorted) {
-      // Inject inline widgets at their configured positions
-      while (widgetPosIdx < widgetPositionKeys.length && cardCount >= widgetPositionKeys[widgetPosIdx]) {
-        const pos = widgetPositionKeys[widgetPosIdx];
-        html += widgetsByPosition[pos].join('');
-        widgetPosIdx++;
+      // Inject inline widget after INLINE_WIDGET_POSITION cards
+      if (!inlineWidgetInserted && inlineWidgetHtml && cardCount >= INLINE_WIDGET_POSITION) {
+        html += inlineWidgetHtml;
+        inlineWidgetInserted = true;
       }
       cardCount++;
 
@@ -7724,11 +6756,9 @@ Return JSON:
       }
     }
 
-    // Add remaining inline widgets at end if not yet inserted
-    while (widgetPosIdx < widgetPositionKeys.length) {
-      const pos = widgetPositionKeys[widgetPosIdx];
-      html += widgetsByPosition[pos].join('');
-      widgetPosIdx++;
+    // Add inline widget at end if not yet inserted and we have one
+    if (!inlineWidgetInserted && inlineWidgetHtml) {
+      html += inlineWidgetHtml;
     }
 
     grid.innerHTML = html;
@@ -8157,9 +7187,8 @@ Return JSON:
     }
   };
 
-  // Drag and drop reordering (links + widgets)
+  // Drag and drop reordering
   let draggedId = null;
-  let draggedWidgetId = null;
   let isDragging = false;
   let dropPosition = null; // 'before' or 'after'
 
@@ -8169,30 +7198,10 @@ Return JSON:
     });
   }
 
-  // Get the card index of a grid-item by counting preceding grid-items
-  function getCardIndex(gridItem) {
-    const items = Array.from(grid.querySelectorAll('.grid-item'));
-    return items.indexOf(gridItem);
-  }
-
   grid.ondragstart = (e) => {
-    // Handle widget drag
-    const widget = e.target.closest('.widget-inline');
-    if (widget && widget.dataset.widgetId) {
-      draggedWidgetId = widget.dataset.widgetId;
-      draggedId = null;
-      isDragging = true;
-      widget.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', 'widget:' + draggedWidgetId);
-      return;
-    }
-
-    // Handle link card drag
     const item = e.target.closest('.grid-item');
     if (!item) return;
     draggedId = item.dataset.id;
-    draggedWidgetId = null;
     isDragging = true;
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
@@ -8202,11 +7211,8 @@ Return JSON:
   grid.ondragend = (e) => {
     const item = e.target.closest('.grid-item');
     if (item) item.classList.remove('dragging');
-    const widget = e.target.closest('.widget-inline');
-    if (widget) widget.classList.remove('dragging');
     clearDragClasses();
     draggedId = null;
-    draggedWidgetId = null;
     dropPosition = null;
     setTimeout(() => { isDragging = false; }, 100);
   };
@@ -8214,9 +7220,9 @@ Return JSON:
   grid.ondragover = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-
     const item = e.target.closest('.grid-item');
     if (item && item.dataset.id !== draggedId) {
+      // Determine if dropping before or after based on mouse position
       const rect = item.getBoundingClientRect();
       const midX = rect.left + rect.width / 2;
       const isBefore = e.clientX < midX;
@@ -8236,28 +7242,13 @@ Return JSON:
 
   grid.ondrop = (e) => {
     e.preventDefault();
-    clearDragClasses();
-
     const targetItem = e.target.closest('.grid-item');
-    if (!targetItem) return;
-
-    // Widget being dropped onto a grid position
-    if (draggedWidgetId) {
-      const targetIndex = getCardIndex(targetItem);
-      const newPosition = dropPosition === 'after' ? targetIndex + 1 : targetIndex;
-      widgetPositions[draggedWidgetId] = newPosition;
-      saveWidgetPositions();
+    if (!targetItem || !draggedId) return;
+    clearDragClasses();
+    const targetId = targetItem.dataset.id;
+    if (draggedId !== targetId) {
+      reorderLinks(draggedId, targetId, dropPosition);
       renderGrid();
-      return;
-    }
-
-    // Link card being reordered
-    if (draggedId) {
-      const targetId = targetItem.dataset.id;
-      if (draggedId !== targetId) {
-        reorderLinks(draggedId, targetId, dropPosition);
-        renderGrid();
-      }
     }
   };
 
@@ -8328,16 +7319,11 @@ Return JSON:
   });
 
   document.onkeydown = (e) => {
-    if (e.key === 'Escape') {
-      closeAll();
-      $('widgetInspector').classList.remove('widget-inspector--visible');
-      $('widgetContext').classList.remove('widget-context--visible');
-    }
+    if (e.key === 'Escape') closeAll();
     // Ctrl+Shift+D toggles dev menu
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
       $('devMenu').classList.toggle('dev-menu--visible');
-      $('devToggleWidgets').textContent = 'Widgets: ' + (widgetDSEnabled ? 'ON' : 'OFF');
     }
   };
 
@@ -8465,141 +7451,6 @@ Return JSON:
     $('devMenu').classList.remove('dev-menu--visible');
     toast('AI category cache cleared');
   };
-
-  $('devToggleWidgets').onclick = () => {
-    if (widgetDSEnabled) {
-      window.disableWidgetDS();
-      $('devToggleWidgets').textContent = 'Widgets: OFF';
-      toast('Widgets disabled');
-    } else {
-      window.enableWidgetDS();
-      $('devToggleWidgets').textContent = 'Widgets: ON';
-      toast('Widgets enabled');
-    }
-  };
-
-  // =============================================================================
-  // WIDGET INSPECTOR
-  // =============================================================================
-  $('devWidgetInspector').onclick = () => {
-    $('devMenu').classList.remove('dev-menu--visible');
-
-    // Run scoring fresh
-    const allLinks = getAllLinks();
-    const items = normalizeWearItems(allLinks);
-    const category = currentFilter || 'all';
-    const profile = profilePins(items);
-    const allWidgets = Object.values(WIDGET_REGISTRY);
-
-    const results = allWidgets.map(widget => {
-      const active = getWidgetStatus(widget.id) === 'active';
-      const visible = shouldShowWidget(widget.id);
-      const meetsHardCriteria = checkWidgetCriteria(widget, items, category);
-      const fit = scoreWidgetFit(widget, profile, category);
-      return { widget, active, visible, meetsHardCriteria, eligible: active && visible && meetsHardCriteria, ...fit };
-    }).sort((a, b) => b.score - a.score);
-
-    // Render profile summary
-    $('widgetInspectorProfile').innerHTML = `
-      <strong>Pin Profile</strong> — ${profile.itemCount} items, category: ${category}<br>
-      Domains: ${profile.domainCount} unique (${profile.topDomains.map(d => d.domain).join(', ')})<br>
-      Quality: ${(profile.imageRatio * 100).toFixed(0)}% images, ${(profile.descriptionRatio * 100).toFixed(0)}% descriptions<br>
-      Content: ${(profile.productRatio * 100).toFixed(0)}% product, ${(profile.contentRatio * 100).toFixed(0)}% editorial<br>
-      Top words: ${profile.topWords.slice(0, 6).map(w => w.word).join(', ')}
-    `;
-
-    // Render widget cards
-    let cardsHtml = '';
-    for (const r of results) {
-      const scoreClass = r.score >= 0.7 ? 'high' : r.score >= 0.4 ? 'mid' : 'low';
-      const eligClass = r.eligible ? 'eligible' : 'ineligible';
-      const statusParts = [];
-      if (!r.active) statusParts.push('inactive');
-      if (!r.visible) statusParts.push('hidden/dismissed');
-      if (!r.meetsHardCriteria) statusParts.push('fails criteria');
-      const statusText = r.eligible ? 'ELIGIBLE' : `BLOCKED: ${statusParts.join(', ')}`;
-
-      cardsHtml += `
-        <div class="widget-inspector__card widget-inspector__card--${eligClass}">
-          <div class="widget-inspector__card-header">
-            <span class="widget-inspector__card-name">${esc(r.widget.name)} <span style="color:var(--muted)">(${r.widget.zone})</span></span>
-            <span class="widget-inspector__card-score widget-inspector__card-score--${scoreClass}">${(r.score * 100).toFixed(0)}%</span>
-          </div>
-          <div class="widget-inspector__card-status" style="color:${r.eligible ? '#4a9' : '#c66'}">${statusText}</div>
-          <ul class="widget-inspector__rationale">
-            ${r.rationale.map(line => `<li>${esc(line)}</li>`).join('')}
-          </ul>
-        </div>`;
-    }
-    $('widgetInspectorCards').innerHTML = cardsHtml;
-
-    $('widgetInspector').classList.add('widget-inspector--visible');
-  };
-
-  $('widgetInspectorClose').onclick = () => {
-    $('widgetInspector').classList.remove('widget-inspector--visible');
-  };
-
-  $('widgetInspector').onclick = (e) => {
-    if (e.target === $('widgetInspector')) {
-      $('widgetInspector').classList.remove('widget-inspector--visible');
-    }
-  };
-
-  // =============================================================================
-  // WIDGET HEADER RIGHT-CLICK CONTEXT
-  // =============================================================================
-  document.addEventListener('contextmenu', (e) => {
-    const header = e.target.closest('.w-header');
-    if (!header) return;
-
-    const shell = header.closest('.w-shell');
-    if (!shell) return;
-
-    e.preventDefault();
-
-    // Find which widget this is
-    const widgetLabel = header.querySelector('.w-text--label');
-    const widgetName = widgetLabel ? widgetLabel.textContent.trim() : 'Unknown';
-    const widgetEntry = Object.values(WIDGET_REGISTRY).find(w => w.name === widgetName);
-
-    if (!widgetEntry) return;
-
-    // Get scoring data
-    const allLinks = getAllLinks();
-    const items = normalizeWearItems(allLinks);
-    const category = currentFilter || 'all';
-    const profile = profilePins(items);
-    const fit = scoreWidgetFit(widgetEntry, profile, category);
-    const scoreClass = fit.score >= 0.7 ? '#4a9' : fit.score >= 0.4 ? '#f0c674' : '#c66';
-
-    const ctx = $('widgetContext');
-    ctx.innerHTML = `
-      <div class="widget-context__title">${esc(widgetName)}</div>
-      <div class="widget-context__row"><span class="widget-context__label">Score</span><span class="widget-context__value" style="color:${scoreClass}">${(fit.score * 100).toFixed(0)}%</span></div>
-      <div class="widget-context__row"><span class="widget-context__label">Zone</span><span class="widget-context__value">${widgetEntry.zone}</span></div>
-      <div class="widget-context__row"><span class="widget-context__label">Template</span><span class="widget-context__value">${widgetEntry.template?.name || '-'}</span></div>
-      <div class="widget-context__row"><span class="widget-context__label">Items</span><span class="widget-context__value">${profile.itemCount} (min: ${widgetEntry.criteria.minItems || 1})</span></div>
-      <div style="margin-top:8px;border-top:1px solid var(--subtle);padding-top:6px;font-size:10px;color:var(--muted)">
-        ${fit.rationale.map(r => `• ${esc(r)}`).join('<br>')}
-      </div>
-      <div style="margin-top:6px;font-size:9px;color:var(--muted)">
-        Signals: ${Object.entries(fit.signals).map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`).join(', ')}
-      </div>
-    `;
-
-    // Position near click
-    const x = Math.min(e.clientX, window.innerWidth - 380);
-    const y = Math.min(e.clientY, window.innerHeight - 300);
-    ctx.style.left = x + 'px';
-    ctx.style.top = y + 'px';
-    ctx.classList.add('widget-context--visible');
-  });
-
-  // Dismiss context menu on click anywhere
-  document.addEventListener('click', () => {
-    $('widgetContext').classList.remove('widget-context--visible');
-  });
 
   $('devEnrich').onclick = async () => {
     const links = getAllLinks();
@@ -9149,7 +8000,6 @@ Return JSON:
     shareCreateBtn.style.display = '';
     shareStopBtn.style.display = 'none';
     shareCreateBtn.textContent = 'Create Share Link';
-    $('shareHideWidgets').checked = false;
 
     // Check if already shared
     loadExistingShare(category);
@@ -9195,9 +8045,6 @@ Return JSON:
     // Set update mode radio
     const modeRadio = document.querySelector(`input[name="shareUpdateMode"][value="${share.update_mode}"]`);
     if (modeRadio) modeRadio.checked = true;
-
-    // Set hide widgets checkbox
-    $('shareHideWidgets').checked = !!share.hide_widgets;
 
     // Show link
     const shareUrl = `${window.location.origin}/boards/share.html?id=${share.slug}`;
@@ -9245,7 +8092,6 @@ Return JSON:
 
     const visibility = document.querySelector('input[name="shareVisibility"]:checked')?.value || 'link';
     const updateMode = document.querySelector('input[name="shareUpdateMode"]:checked')?.value || 'live';
-    const hideWidgets = $('shareHideWidgets').checked;
 
     shareCreateBtn.disabled = true;
     shareCreateBtn.textContent = currentShare ? 'Updating...' : 'Creating...';
@@ -9291,7 +8137,6 @@ Return JSON:
         snapshot_link_ids: snapshotIds,
         expanded_cards: expandedForShare,
         link_order: linkOrderForShare,
-        hide_widgets: hideWidgets,
         owner_email: currentUser.email,
         updated_at: new Date().toISOString()
       };

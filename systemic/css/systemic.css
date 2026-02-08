@@ -123,39 +123,25 @@
   border-color: var(--border);
 }
 
-/* Breadcrumb (inside nav) */
+/* Breadcrumb overrides (DS base in components.css) */
 .breadcrumb {
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
   color: var(--fg-muted);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: nowrap;
-  white-space: nowrap;
 }
 
-.breadcrumb-link {
-  color: var(--fg-muted);
-  text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-default);
-}
-
-.breadcrumb-link:hover {
-  color: var(--fg);
-}
-
-.breadcrumb-sep {
-  color: var(--fg-subtle);
+.breadcrumb__sep {
   padding: 0 var(--space-1);
-  user-select: none;
 }
 
-.breadcrumb-current {
-  color: var(--fg);
+.breadcrumb__link {
+  font-weight: normal;
+}
+
+.breadcrumb__current {
   font-weight: 500;
 }
 
+/* Systemic-specific breadcrumb extensions */
 .breadcrumb-text {
   color: var(--fg-muted);
 }
@@ -228,24 +214,9 @@
   padding: var(--space-8);
 }
 
-.section-header {
-  margin-bottom: var(--space-6);
-}
-
-.section-header h2 {
-  font-family: var(--font-primary);
-  font-size: var(--text-xl);
-  font-weight: normal;
-  margin: 0 0 var(--space-2);
-}
-
-.section-header p {
-  font-family: var(--font-primary);
+/* Section header uses DS base; override desc to text-sm */
+.section-header__desc {
   font-size: var(--text-sm);
-  color: var(--fg-muted);
-  margin: 0;
-  max-width: 600px;
-  line-height: var(--leading-relaxed);
 }
 
 /* Audit Form */
@@ -255,23 +226,7 @@
   padding: var(--space-6);
 }
 
-.form-group {
-  margin-bottom: var(--space-4);
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
-.form-group label {
-  display: block;
-  font-family: var(--font-primary);
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  color: var(--fg-muted);
-  margin-bottom: var(--space-2);
-}
+/* Form group uses DS base (components.css) */
 
 .input-with-action {
   display: flex;
@@ -352,24 +307,7 @@
   text-align: center;
 }
 
-.stat {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-value {
-  font-family: var(--font-primary);
-  font-size: var(--text-xl);
-  font-weight: 600;
-}
-
-.stat-label {
-  font-family: var(--font-primary);
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  color: var(--fg-muted);
-}
+/* Stat uses DS base .stat / .stat__value / .stat__label (components.css) */
 
 .crawl-log {
   background: var(--bg-surface);
@@ -557,25 +495,6 @@
   font-size: var(--text-xs);
 }
 
-/* Button variants using design system */
-.btn-filled {
-  background: var(--fg);
-  color: var(--bg);
-}
-
-.btn-filled:hover {
-  background: var(--bg);
-  color: var(--fg);
-}
-
-.btn-ghost {
-  border-color: transparent;
-}
-
-.btn-ghost:hover {
-  border-color: var(--border);
-}
-
 /* Dev Menu */
 .dev-menu {
   position: relative;
@@ -632,6 +551,105 @@
   height: 1px;
   background: var(--border-subtle);
   margin: var(--space-2) 0;
+}
+
+/* Scan Modal */
+.scan-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
+.scan-modal.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.scan-modal__dialog {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-surface);
+  border: var(--border-thin) solid var(--border);
+  margin: var(--space-4);
+}
+
+.scan-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.scan-modal__header h2 {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin: 0;
+}
+
+.scan-modal__close {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: var(--text-lg);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.scan-modal__close:hover {
+  color: var(--fg);
+}
+
+.scan-modal__body {
+  padding: var(--space-4);
+}
+
+.scan-modal__option-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--fg-muted);
+  margin-bottom: var(--space-2);
+}
+
+.scan-modal__option-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.scan-modal__option-row .input {
+  flex: 1;
+}
+
+.scan-modal__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+}
+
+.scan-modal__divider::before,
+.scan-modal__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.scan-modal__local-btn {
+  width: 100%;
 }
 
 /* Utility Classes */

@@ -691,7 +691,7 @@ class VariantAudit {
     }
 
     var html = '<h3 class="qa-log-heading">Audit Log</h3>';
-    html += '<table class="qa-audit-table"><thead><tr>' +
+    html += '<table class="data-table"><thead><tr>' +
       '<th>Component</th><th>Size</th><th>Grid</th><th>Status</th><th>Note</th>' +
       '</tr></thead><tbody>';
 

@@ -13,10 +13,8 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 
 ### Used By
 - **Boards** - Link curation app
-- **Events** - Event aggregator with location filtering
 - **Soundscape** - Audio visualization
 - **Systemic** - Design system generator
-- **Favicon** - AI favicon generator
 
 ### Human TODO
 
@@ -94,12 +92,6 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 <!-- Danger button -->
 <button class="btn btn--danger">Delete</button>
 
-<!-- Ghost (borderless until hover) -->
-<button class="btn btn--ghost">Ghost</button>
-
-<!-- Dashed (add-new affordance) -->
-<button class="btn btn--sm btn--dashed">+ Add Source</button>
-
 <!-- Small button -->
 <button class="btn btn--sm">Small</button>
 
@@ -138,9 +130,6 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 ```html
 <button class="token">Category</button>
 <button class="token token--active">Active</button>
-
-<!-- Non-interactive (read-only badge in tables, etc.) -->
-<span class="token token--static">Source Name</span>
 ```
 
 ### Filter Bar
@@ -293,124 +282,10 @@ Form-like display sections for account information.
 <div class="progress__status">Loading 5/10...</div>
 ```
 
-### Spinner / Loading
+### Spinner
 
 ```html
-<!-- Spinner only -->
 <div class="spinner"></div>
-
-<!-- Spinner with text label -->
-<div class="loading">
-  <div class="spinner"></div>
-  <span>Fetching events</span>
-</div>
-```
-
-### Page Header / Breadcrumb
-
-Sticky header with breadcrumb navigation and action slot. Extracted from Systemic.
-
-```html
-<header class="page-header">
-  <div class="page-header__inner">
-    <nav class="breadcrumb">
-      <a href="/" class="breadcrumb__link">ctrl.rodeo</a>
-      <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__current">Events</span>
-    </nav>
-    <div class="page-header__actions">
-      <button class="toggle"><div class="toggle__knob"></div></button>
-    </div>
-  </div>
-</header>
-```
-
-### Form Group
-
-Label + input + hint pattern for forms and modals. Extracted from Favicon and Systemic.
-
-```html
-<div class="form-group">
-  <label class="form-label">Field Name</label>
-  <input type="text" class="input" placeholder="Enter value">
-  <span class="form-hint">Optional helper text</span>
-</div>
-
-<!-- Side-by-side fields -->
-<div class="form-row">
-  <div class="form-group">
-    <label class="form-label">Width</label>
-    <input type="number" class="input">
-  </div>
-  <div class="form-group">
-    <label class="form-label">Height</label>
-    <input type="number" class="input">
-  </div>
-</div>
-```
-
-### Data Table
-
-Sortable table with sticky headers and row hover. Extracted from Events and Systemic.
-
-```html
-<div class="data-table-wrap">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th data-sort="date">Date <span class="data-table__sort">&#9650;</span></th>
-        <th data-sort="name">Name <span class="data-table__sort">&#9650;</span></th>
-        <th data-sort="city">City <span class="data-table__sort">&#9650;</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>Feb 8</td><td>Event Name</td><td>San Francisco</td></tr>
-    </tbody>
-  </table>
-</div>
-```
-
-**Data table behavior:**
-- Sticky `thead` on scroll
-- `th[data-sort]` gets pointer cursor and hover highlight
-- `.sorted .data-table__sort` shows full opacity arrow
-- Row hover highlights with `--bg-surface`
-- Wrap in `.data-table-wrap` for horizontal scroll overflow
-
-### Filter Bar (Form-based)
-
-Wrapping flex bar for form inputs, selects, and buttons. Distinct from `.filters` (token-based, horizontal-scroll).
-
-```html
-<div class="filter-bar">
-  <input type="text" class="input" placeholder="Search...">
-  <select class="input select">
-    <option value="">All Cities</option>
-  </select>
-  <button class="btn btn--ghost btn--sm">Clear</button>
-</div>
-```
-
-### Section Header
-
-Title + description block for page sections. Extracted from Systemic and Favicon.
-
-```html
-<div class="section-header">
-  <h2 class="section-header__title">Section Title</h2>
-  <p class="section-header__desc">Brief description of this section.</p>
-</div>
-```
-
-### Stat
-
-Vertical label + value for statistics. Extracted from Systemic.
-
-```html
-<div class="stat">
-  <span class="stat__value">42</span>
-  <span class="stat__label">Events</span>
-</div>
 ```
 
 ### Grid
@@ -503,45 +378,80 @@ Button group for admin panel sections.
 - Wraps on narrow screens
 - Buttons match admin panel style
 
-### AI Widget System (`widgets.css`)
+### AI Widget Card
 
-Grid-based widget framework for AI-powered recommendations. Uses `w-*` prefix classes.
+Standardized container for AI-powered recommendation widgets. Header sits outside the content box.
 
 ```html
-<div class="w-shell w-shell--med" data-widget-id="widget-123">
-  <div class="w-header">
-    <div class="w-header__left">
-      <span class="w-text w-text--label">Style Summary</span>
-      <span class="w-badge">AI</span>
+<div class="widget-complete" data-widget-id="widget-123">
+  <div class="widget-complete__header">
+    <div class="widget-complete__header-left">
+      <span class="widget-complete__title">Style Summary</span>
+      <span class="widget-complete__badge">AI</span>
     </div>
-    <div class="w-header__controls">
-      <button class="w-icon-btn" onclick="refreshWidget('widget-123')">&#x27F3;</button>
-    </div>
+    <button class="widget-complete__refresh-btn" onclick="refreshWidget('widget-123')" title="Refresh suggestions">⟳</button>
   </div>
-  <div class="w-body w-body--verdict">
-    <div class="w-headline">
-      <span class="w-text w-text--display">Minimal Modern</span>
-      <span class="w-text w-text--meta">Based on 12 items</span>
-    </div>
-    <div class="w-tag-group">
-      <span class="w-badge">Clean lines</span>
-      <span class="w-badge">Neutral palette</span>
-    </div>
+  <div class="widget-complete__body">
+    <!-- Widget-specific content goes here -->
   </div>
 </div>
 ```
 
-**Structure:** `w-shell > w-header + w-body + w-footer`
+**Structure:**
+```
+WIDGET TITLE   [AI]                         ⟳   ← Header (outside box)
+┌─────────────────────────────────────────────┐
+│  Widget content                             │  ← Body (bordered box)
+└─────────────────────────────────────────────┘
+```
 
-**Body templates:** `w-body--verdict`, `w-body--list`, `w-body--spectrum`, `w-body--split`, `w-body--narrative`, `w-body--suggestion`, `w-body--stats`, `w-body--comparison`, `w-body--choices`, `w-body--grouped`
+**AI Widget Card behavior:**
+- Outer wrapper: no border, contains header + body
+- Header: Title (muted, xs) + AI badge (outline) + Refresh icon (16px, floating right)
+- AI badge: outline style (transparent bg, muted border), 9px uppercase
+- Refresh icon: ⟳ character, 16px, muted color, hover effect
+- Body: bordered box (--subtle border, --surface bg) holds widget content
+- Loading state: use `.widget-complete__body--loading` for centered loader
 
-**Atoms:** `w-text`, `w-badge`, `w-btn`, `w-img`, `w-icon`, `w-icon-btn`, `w-bar`
+**Loading state:**
+```html
+<div class="widget-complete__body widget-complete__body--loading">
+  <div class="widget__loader">Generating insights...</div>
+</div>
+```
 
-**Molecules:** `w-headline`, `w-tag-group`, `w-row`, `w-stat`, `w-axis`, `w-items`, `w-item`, `w-divider`, `w-action-bar`
+**Variants:**
 
-**Grid sizes:** `w-shell--sm` (1x1), `w-shell--med` (2x1), `w-shell--lg` (2x2), `w-shell--wide` (3x1), `w-shell--full` (4x4), and more
+```html
+<!-- Complete the Look Widget -->
+<div class="widget-complete" data-widget-id="complete-look">
+  <div class="widget-complete__header">...</div>
+  <div class="widget-complete__body">
+    <div class="widget-complete__section">
+      <div class="widget-complete__items"><!-- User's items --></div>
+    </div>
+    <div class="widget-complete__divider"></div>
+    <div class="widget-complete__section">
+      <div class="widget-complete__items"><!-- AI suggestions --></div>
+    </div>
+  </div>
+</div>
 
-**Feature flag:** Widgets hidden by default. Enable via `window.enableWidgetDS()` in console.
+<!-- Style Summary Widget -->
+<div class="widget-complete" data-widget-id="style-summary">
+  <div class="widget-complete__header">...</div>
+  <div class="widget-complete__body">
+    <div class="widget-style__content">
+      <div class="widget-style__label">Minimal Modern</div>
+      <div class="widget-style__sublabel">Based on 12 items</div>
+      <div class="widget-style__traits">
+        <span class="widget-style__trait">Clean lines</span>
+        <span class="widget-style__trait">Neutral palette</span>
+      </div>
+    </div>
+  </div>
+</div>
+```
 
 ## Light Mode
 
@@ -561,46 +471,11 @@ document.documentElement.classList.toggle('light');
 - **Board** — Link curation with Swiss grid aesthetic
 - **Soundscape** — Audio-reactive visualization controls
 
-## Source of Truth
-
-The CSS files are the single source of truth. Everything else is derived or supplementary.
-
-```
-┌─ SOURCE OF TRUTH (hand-edited) ────────────────────────┐
-│  tokens.css        Design tokens                       │
-│  components.css    UI components                       │
-│  widgets.css       Widget grid system + atoms/molecules│
-└────────────────────────────────────────────────────────┘
-        │
-        ▼  node scripts/parse-design-system.js
-┌─ DERIVED ──────────────────────────────────────────────┐
-│  manifest.json     Auto-generated index of all tokens, │
-│                    components, and widget classes       │
-└────────────────────────────────────────────────────────┘
-
-┌─ REFERENCE (hand-edited) ─────────────────────────────┐
-│  template-registry.json   Widget template definitions, │
-│                           Boards mappings, fixtures     │
-│  widgets.html             Interactive showcase / QA     │
-└────────────────────────────────────────────────────────┘
-```
-
-**Rules:**
-- Change styles → edit the CSS files
-- Regenerate manifest → `node scripts/parse-design-system.js`
-- Systemic does **not** read the local design system (it crawls external sites)
-- `manifest.json` is read-only; never hand-edit it
-
 ## File Structure
 
 ```
 /design-system/
-  tokens.css              # Design tokens (colors, typography, spacing)
-  components.css          # Reusable UI components
-  widgets.css             # Widget system: grid, atoms, molecules, body templates
-  manifest.json           # Generated — token + component index for tooling
-  template-registry.json  # Widget template definitions + Boards mappings
-  widgets.html            # Interactive showcase with 44 widget instances
-  index.html              # Component browser
-  README.md               # This file
+  tokens.css      # Design tokens (colors, typography, spacing)
+  components.css  # Reusable UI components
+  README.md       # Documentation
 ```

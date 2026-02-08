@@ -71,23 +71,11 @@
 }
 
 /* ============================================
-   Sections
+   Section Header overrides (DS base in components.css)
    ============================================ */
-.section-header {
-  margin-bottom: var(--space-6);
-}
-
-.section-header h2 {
+.section-header__title {
   font-family: var(--font-serif);
   font-size: var(--text-2xl);
-  font-weight: normal;
-  margin: 0 0 var(--space-2) 0;
-}
-
-.section-header p {
-  color: var(--fg-muted);
-  margin: 0;
-  font-size: var(--text-xs);
 }
 
 /* ============================================
@@ -145,29 +133,9 @@
   gap: var(--space-4);
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.form-group label {
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-widest);
-  color: var(--fg-muted);
-}
-
-.form-hint {
-  font-size: var(--text-2xs);
-  color: var(--fg-subtle);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+/* DS form-group override: remove margin when inside flex-gap container */
+.generator-form .form-group {
+  margin-bottom: 0;
 }
 
 /* Input extensions */
@@ -567,28 +535,10 @@ textarea.input {
   z-index: var(--z-overlay);
 }
 
-.loading-content {
-  text-align: center;
-}
-
-.spinner {
+/* Loading overlay uses DS .loading + .spinner; override spinner size */
+.loading-overlay .spinner {
   width: 32px;
   height: 32px;
-  border: 2px solid var(--border-subtle);
-  border-top-color: var(--fg);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto var(--space-4);
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-#loading-text {
-  margin: 0;
-  color: var(--fg-muted);
-  font-size: var(--text-xs);
 }
 
 /* ============================================

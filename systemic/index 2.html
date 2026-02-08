@@ -13,7 +13,6 @@
   <link rel="stylesheet" href="../design-system/components.css">
   <link rel="stylesheet" href="css/systemic.css">
   <link rel="stylesheet" href="css/viewer.css">
-  <link rel="stylesheet" href="css/variant-audit.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -24,49 +23,33 @@
         <h1 class="logo">SystemicAI</h1>
         <span class="tagline">Design System Generator</span>
       </div>
+      <nav class="header-nav">
+        <button class="nav-btn" data-view="systems">My Systems</button>
+        <button class="nav-btn" data-view="docs">Documentation</button>
+      </nav>
       <div class="header-actions">
-        <div class="dev-menu" id="dev-menu">
-          <button class="btn btn--ghost dev-menu__trigger" id="dev-menu-trigger" title="Dev tools">
-            <span class="icon">/</span>
-          </button>
-          <div class="dev-menu__dropdown" id="dev-menu-dropdown">
-            <button class="dev-menu__item" id="dev-reload-local">Reload local system</button>
-            <button class="dev-menu__item" id="dev-cleanup-duplicates">Clean up duplicates</button>
-            <button class="dev-menu__item" id="dev-copy-debug-log">Copy debug log</button>
-            <button class="dev-menu__item" id="dev-download-debug-log">Download debug log</button>
-            <button class="dev-menu__item" id="dev-clear-debug-log">Clear debug log</button>
-            <div class="dev-menu__divider"></div>
-            <button class="dev-menu__item dev-menu__item--danger" id="dev-clear-all">Clear all data</button>
-          </div>
-        </div>
+        <button class="btn btn--filled" data-view="audit" id="run-scan-btn">Run a scan</button>
         <button class="btn btn--ghost" id="theme-toggle">
           <span class="icon">*</span>
         </button>
       </div>
     </header>
 
-    <!-- Universal Navigation Bar (progressive content based on view) -->
-    <nav class="docs-nav" id="app-nav">
-      <a href="#systems" class="docs-nav__link" data-nav="systems">My Systems</a>
-      <span class="docs-nav__spacer"></span>
-      <button class="btn btn--filled btn--sm" id="run-scan-btn">Run a scan</button>
-    </nav>
-
     <!-- Main Content -->
     <main class="systemic-main">
-      <!-- Audit View -->
-      <section class="view-panel" id="audit-view">
+      <!-- Audit View (Default) -->
+      <section class="view-panel active" id="audit-view">
         <div class="audit-container">
           <!-- Start Audit Form -->
           <div class="audit-form-section" id="audit-form-section">
             <div class="section-header">
-              <h2 class="section-header__title">Analyze a Website</h2>
-              <p class="section-header__desc">Enter a URL to reverse-engineer its design system. SystemicAI will crawl the site, extract design tokens, and generate Material Design-compliant documentation.</p>
+              <h2>Analyze a Website</h2>
+              <p>Enter a URL to reverse-engineer its design system. SystemicAI will crawl the site, extract design tokens, and generate Material Design-compliant documentation.</p>
             </div>
 
             <form class="audit-form" id="audit-form">
               <div class="form-group">
-                <label class="form-label" for="audit-url">Website URL</label>
+                <label for="audit-url">Website URL</label>
                 <div class="input-with-action">
                   <input
                     type="text"
@@ -86,19 +69,19 @@
                 <summary>Advanced Options</summary>
                 <div class="options-grid">
                   <div class="form-group">
-                    <label class="form-label" for="audit-name">Audit Name</label>
+                    <label for="audit-name">Audit Name</label>
                     <input type="text" id="audit-name" name="name" placeholder="My Design System" class="input">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="max-pages">Max Pages</label>
+                    <label for="max-pages">Max Pages</label>
                     <input type="number" id="max-pages" name="maxPages" value="50" min="1" max="200" class="input">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="crawl-depth">Crawl Depth</label>
+                    <label for="crawl-depth">Crawl Depth</label>
                     <input type="number" id="crawl-depth" name="crawlDepth" value="3" min="1" max="10" class="input">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="auth-type">Authentication</label>
+                    <label for="auth-type">Authentication</label>
                     <select id="auth-type" name="authType" class="input">
                       <option value="none">None</option>
                       <option value="cookie-inject">Cookie Injection</option>
@@ -106,11 +89,11 @@
                     </select>
                   </div>
                   <div class="form-group full-width" id="auth-data-group" hidden>
-                    <label class="form-label" for="auth-data">Authentication Data</label>
+                    <label for="auth-data">Authentication Data</label>
                     <textarea id="auth-data" name="authData" placeholder="Paste cookies or token here..." class="input"></textarea>
                   </div>
                   <div class="form-group full-width">
-                    <label class="form-label" for="exclude-patterns">Exclude URL Patterns (one per line)</label>
+                    <label for="exclude-patterns">Exclude URL Patterns (one per line)</label>
                     <textarea id="exclude-patterns" name="excludePatterns" placeholder="/api/*&#10;/admin/*&#10;*.pdf" class="input"></textarea>
                   </div>
                 </div>
@@ -121,8 +104,8 @@
           <!-- Audit Progress -->
           <div class="audit-progress-section" id="audit-progress-section" hidden>
             <div class="section-header">
-              <h2 class="section-header__title">Analyzing <span id="audit-url-display"></span></h2>
-              <p class="section-header__desc" id="audit-status-text">Starting audit...</p>
+              <h2>Analyzing <span id="audit-url-display"></span></h2>
+              <p id="audit-status-text">Starting audit...</p>
             </div>
 
             <div class="progress-container">
@@ -131,16 +114,16 @@
               </div>
               <div class="progress-stats">
                 <div class="stat">
-                  <span class="stat__value" id="pages-crawled">0</span>
-                  <span class="stat__label">Pages Crawled</span>
+                  <span class="stat-value" id="pages-crawled">0</span>
+                  <span class="stat-label">Pages Crawled</span>
                 </div>
                 <div class="stat">
-                  <span class="stat__value" id="tokens-extracted">0</span>
-                  <span class="stat__label">Tokens Found</span>
+                  <span class="stat-value" id="tokens-extracted">0</span>
+                  <span class="stat-label">Tokens Found</span>
                 </div>
                 <div class="stat">
-                  <span class="stat__value" id="components-found">0</span>
-                  <span class="stat__label">Components</span>
+                  <span class="stat-value" id="components-found">0</span>
+                  <span class="stat-label">Components</span>
                 </div>
               </div>
             </div>
@@ -158,12 +141,12 @@
         </div>
       </section>
 
-      <!-- Systems View (Default) -->
-      <section class="view-panel active" id="systems-view">
+      <!-- Systems View -->
+      <section class="view-panel" id="systems-view">
         <div class="systems-container">
           <div class="section-header">
-            <h2 class="section-header__title">My Design Systems</h2>
-            <p class="section-header__desc">Previously generated design systems from your audits.</p>
+            <h2>My Design Systems</h2>
+            <p>Previously generated design systems from your audits.</p>
           </div>
 
           <div class="systems-grid" id="systems-grid">
@@ -172,7 +155,7 @@
               <div class="empty-icon">📐</div>
               <h3>No design systems yet</h3>
               <p>Start an audit to generate your first design system.</p>
-              <a class="btn btn--filled" href="#audit">Start Audit</a>
+              <button class="btn btn--filled" data-action="go-to-audit">Start Audit</button>
             </div>
           </div>
         </div>
@@ -181,11 +164,53 @@
       <!-- Documentation / Viewer View -->
       <section class="view-panel" id="docs-view">
         <div class="viewer-container">
-          <!-- Component Stage (showcase-style scrollable area) -->
+          <!-- Component Navigation -->
+          <aside class="component-nav" id="component-nav">
+            <div class="nav-header">
+              <h3>Components</h3>
+              <input type="search" placeholder="Search..." class="input input-sm" id="component-search">
+            </div>
+            <div class="nav-sections">
+              <div class="nav-section">
+                <h4 class="nav-section-title">Foundations</h4>
+                <ul class="nav-list" id="foundations-list">
+                  <li><a href="#" data-section="color">Color</a></li>
+                  <li><a href="#" data-section="typography">Typography</a></li>
+                  <li><a href="#" data-section="spacing">Spacing</a></li>
+                  <li><a href="#" data-section="elevation">Elevation</a></li>
+                </ul>
+              </div>
+              <div class="nav-section">
+                <h4 class="nav-section-title">Components</h4>
+                <ul class="nav-list" id="components-list">
+                  <!-- Populated dynamically -->
+                </ul>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Component Stage -->
           <main class="component-stage" id="component-stage">
-            <div class="showcase" id="component-preview">
+            <div class="stage-header">
+              <div class="breadcrumb" id="stage-breadcrumb">
+                <span>Select a component</span>
+              </div>
+              <div class="variant-controls" id="variant-controls" hidden>
+                <select class="input input-sm" id="variant-select">
+                  <!-- Variants populated dynamically -->
+                </select>
+                <div class="state-toggles">
+                  <button class="state-btn" data-state="default" title="Default">○</button>
+                  <button class="state-btn" data-state="hover" title="Hover">◉</button>
+                  <button class="state-btn" data-state="focus" title="Focus">◎</button>
+                  <button class="state-btn" data-state="disabled" title="Disabled">◌</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="component-preview" id="component-preview">
               <div class="preview-placeholder">
-                <p>Select a foundation or component to preview</p>
+                <p>Select a component from the sidebar to preview</p>
               </div>
             </div>
 
@@ -199,6 +224,13 @@
 
           <!-- Context Sidebar -->
           <aside class="context-sidebar" id="context-sidebar">
+            <div class="sidebar-header">
+              <div class="view-toggle">
+                <button class="toggle-btn active" data-context="design">Design</button>
+                <button class="toggle-btn" data-context="code">Code</button>
+              </div>
+            </div>
+
             <!-- Design Context -->
             <div class="context-panel active" id="design-context">
               <div class="context-section">
@@ -268,64 +300,7 @@
           </aside>
         </div>
       </section>
-
-      <!-- QA / Variant Audit View -->
-      <section class="view-panel" id="qa-view">
-        <div class="qa-container">
-          <div class="qa-header">
-            <h2>Variant Audit</h2>
-            <p class="qa-desc" id="qa-desc">Select a component to audit its variants.</p>
-          </div>
-
-          <div class="filter-bar">
-            <select class="input select" id="qa-component-filter">
-              <option value="">— Select component —</option>
-            </select>
-            <select class="input select" id="qa-variant-filter">
-              <option value="">All variants</option>
-            </select>
-            <button class="btn" id="qa-gridlines-btn">Grid lines</button>
-            <span class="filter-bar__spacer"></span>
-            <span class="filter-bar__stats" id="qa-stats"></span>
-          </div>
-
-          <div class="qa-content" id="qa-content">
-            <div class="qa-variant-grid" id="qa-grid"></div>
-
-            <div id="qa-blocked-section" style="display:none;margin-top:var(--space-6)">
-              <button class="qa-blocked-toggle" id="qa-blocked-toggle"></button>
-              <div class="qa-variant-grid" id="qa-blocked-grid" style="display:none"></div>
-            </div>
-
-            <div id="qa-audit-output" style="margin-top:var(--space-8)"></div>
-          </div>
-        </div>
-      </section>
     </main>
-
-    <!-- Scan Modal -->
-    <div class="scan-modal" id="scan-modal">
-      <div class="scan-modal__backdrop" id="scan-modal-backdrop"></div>
-      <div class="scan-modal__dialog">
-        <div class="scan-modal__header">
-          <h2>New Scan</h2>
-          <button class="scan-modal__close" id="scan-modal-close">&times;</button>
-        </div>
-        <div class="scan-modal__body">
-          <div class="scan-modal__option">
-            <div class="scan-modal__option-label">Scan a website</div>
-            <div class="scan-modal__option-row">
-              <input type="text" id="scan-url-input" class="input" placeholder="example.com">
-              <button class="btn btn--filled" id="scan-url-submit">Scan</button>
-            </div>
-          </div>
-          <div class="scan-modal__divider"><span>or</span></div>
-          <div class="scan-modal__option">
-            <button class="btn btn--ghost scan-modal__local-btn" id="scan-local-btn">Load local design system</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
@@ -340,7 +315,6 @@
   <script src="js/component-consolidator.js"></script>
   <script src="js/doc-generator.js"></script>
   <script src="js/viewer.js"></script>
-  <script src="js/variant-audit.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
