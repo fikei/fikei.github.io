@@ -538,6 +538,12 @@
               "source": "ai"
             },
             {
+              "title": "Documentation",
+              "icon": "\ud83d\udcd6",
+              "file": ".claude/agents/documentation-agent.md",
+              "source": "ai"
+            },
+            {
               "title": "Documentation Sync",
               "icon": "\ud83d\udcda",
               "file": ".claude/agents/documentation-sync-agent.md",

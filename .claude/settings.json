@@ -18,7 +18,8 @@
       "status-update",
       "chief-of-staff",
       "security-compliance",
-      "continuous-improvement"
+      "continuous-improvement",
+      "documentation"
     ],
     "definitions": {
       "organizational": {
@@ -50,6 +51,11 @@
         "file": "./agents/continuous-improvement-agent.md",
         "triggers": ["scheduled", "sprint_end", "metric_change", "incident", "manual"],
         "priority": 3
+      },
+      "documentation": {
+        "file": "./agents/documentation-agent.md",
+        "triggers": ["file_change", "merge", "prd_change", "scheduled", "manual"],
+        "priority": 2
       }
     }
   },
@@ -77,12 +83,17 @@
       "async": true
     },
     "onPRDChange": {
-      "agents": ["project-management", "organizational"],
+      "agents": ["project-management", "organizational", "documentation"],
       "notify": ["chief-of-staff"],
       "async": true
     },
     "onCommit": {
       "agents": ["status-update", "security-compliance"],
+      "async": true
+    },
+    "onMerge": {
+      "agents": ["documentation"],
+      "functions": ["plan:update", "arch:sync", "cleanup:stale"],
       "async": true
     },
     "dailySynthesis": {
@@ -92,8 +103,9 @@
     },
     "weeklyReview": {
       "schedule": "Friday 16:00",
-      "agents": ["continuous-improvement", "chief-of-staff"],
-      "inputs": ["status-update", "project-management"]
+      "agents": ["continuous-improvement", "chief-of-staff", "documentation"],
+      "inputs": ["status-update", "project-management"],
+      "functions": ["cleanup:stale", "cleanup:orphans", "cleanup:duplicates", "ux:audit", "pm:status-report", "pm:changelog"]
     }
   },
   "commands": {
@@ -102,8 +114,8 @@
       "description": "Run documentation and standards audit"
     },
     "/plan": {
-      "agent": "project-management",
-      "description": "Generate task breakdown from PRD"
+      "agent": "documentation",
+      "description": "Manage project plans — audit, add, update, rebalance (smart routing)"
     },
     "/status": {
       "agent": "status-update",
@@ -120,6 +132,30 @@
     "/improve": {
       "agent": "continuous-improvement",
       "description": "Analyze for improvement opportunities"
+    },
+    "/arch": {
+      "agent": "documentation",
+      "description": "Manage architecture docs — sync, audit, ADRs, update specs (smart routing)"
+    },
+    "/capture": {
+      "agent": "documentation",
+      "description": "File bugs, work items, and tech debt to correct locations (auto-detects type)"
+    },
+    "/ux": {
+      "agent": "documentation",
+      "description": "Manage UX documentation — update, audit, generate wireframes (smart routing)"
+    },
+    "/branch": {
+      "agent": "documentation",
+      "description": "Cross-branch doc operations — diff, reconcile, cherry-pick docs (smart routing)"
+    },
+    "/cleanup": {
+      "agent": "documentation",
+      "description": "Documentation hygiene — stale, orphans, duplicates, archive (runs all by default)"
+    },
+    "/pm": {
+      "agent": "documentation",
+      "description": "Program management — status, scope check, deps, retro, decisions, changelog (smart routing)"
     }
   },
   "preferences": {
