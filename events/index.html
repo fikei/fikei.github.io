@@ -394,9 +394,12 @@ body {
   }
 
   const STORAGE_KEY = 'ctrl-rodeo-event-sources';
+
+  // Each proxy: { url: template, json: boolean (if response wraps content in JSON) }
   const CORS_PROXIES = [
-    'https://api.allorigins.win/raw?url=',
-    'https://corsproxy.io/?',
+    { url: 'https://api.allorigins.win/get?url=', json: true },       // returns { contents: "..." }
+    { url: 'https://api.codetabs.com/v1/proxy?quest=', json: false },
+    { url: 'https://corsproxy.io/?', json: false },
   ];
 
   // --- Source Management ---
@@ -447,18 +450,27 @@ body {
   async function proxyFetch(url) {
     log(`Fetching via CORS proxy: ${url}`);
     for (const proxy of CORS_PROXIES) {
-      const proxyUrl = proxy + encodeURIComponent(url);
+      const proxyUrl = proxy.url + encodeURIComponent(url);
+      const label = new URL(proxy.url).hostname;
       try {
-        log(`  Trying proxy: ${proxy.split('?')[0]}...`);
+        log(`  Trying ${label}...`);
         const resp = await fetch(proxyUrl);
-        log(`  Response: ${resp.status} ${resp.statusText} (${resp.headers.get('content-type') || 'unknown type'})`);
-        if (resp.ok) {
+        log(`  Response: ${resp.status} ${resp.statusText}`);
+        if (!resp.ok) continue;
+
+        if (proxy.json) {
+          // allorigins-style: response is JSON with { contents: "html..." }
+          const data = await resp.json();
+          const text = data.contents || '';
+          log(`  Got ${text.length} chars (JSON-wrapped)`);
+          return text;
+        } else {
           const text = await resp.text();
           log(`  Got ${text.length} chars`);
           return text;
         }
       } catch (e) {
-        log(`  Proxy failed: ${e.message}`);
+        log(`  ${label} failed: ${e.message}`);
         continue;
       }
     }
