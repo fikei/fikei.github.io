@@ -3884,6 +3884,240 @@ Return JSON:
       },
       createdAt: '2026-02-07',
       updatedAt: '2026-02-07'
+    },
+
+    // =========================================================================
+    // PROFILERS — generic { label, traits, summary } → hero-card
+    // =========================================================================
+
+    'design-dna': {
+      id: 'design-dna',
+      version: '1.0',
+      name: 'Design DNA',
+      description: 'Analyzes your home saves to identify your interior design aesthetic.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'home', minItems: 3 },
+      prompt: `You are an interior design analyst. Analyze these saved home items and identify the user's design aesthetic.
+
+Consider:
+- Color temperature and palette (warm vs cool, neutral vs bold)
+- Material preferences (wood, metal, fabric, ceramic, glass)
+- Design era or movement (mid-century, Scandinavian, industrial, Japandi)
+- Spatial style (minimal, maximalist, eclectic, curated)
+
+Return JSON:
+{
+  "label": "Design identity (e.g., 'Japandi Warmth', 'Industrial Minimalist')",
+  "traits": ["2-4 descriptive traits like 'Natural materials', 'Muted earth tones'"],
+  "summary": "One sentence describing their overall home aesthetic"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'viewer-profile': {
+      id: 'viewer-profile',
+      version: '1.0',
+      name: 'Viewer Profile',
+      description: 'Analyzes your watch saves to identify your viewing taste.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'watch', minItems: 3 },
+      prompt: `You are a film and TV analyst. Analyze these saved watch items and identify the user's viewing identity.
+
+Consider:
+- Genre preferences and blends
+- Mood and tone (dark, uplifting, cerebral, visceral)
+- Pacing preferences (slow burn vs fast-paced)
+- Era and origin (classic, contemporary, international)
+- Director or creator sensibility
+
+Return JSON:
+{
+  "label": "Viewer identity (e.g., 'Atmospheric Slow Burns', 'Genre-Bending Thrill Seeker')",
+  "traits": ["2-4 descriptive traits like 'Non-linear narratives', 'Moody cinematography'"],
+  "summary": "One sentence describing their overall viewing taste"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'setup-profile': {
+      id: 'setup-profile',
+      version: '1.0',
+      name: 'Setup Profile',
+      description: 'Analyzes your use/tech saves to identify your tool philosophy.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'use', minItems: 3 },
+      prompt: `You are a technology analyst. Analyze these saved tools, gadgets, and tech items and identify the user's setup identity.
+
+Consider:
+- Tool philosophy (power user, minimalist, all-in-one, best-of-breed)
+- Ecosystem preference (Apple, open-source, cross-platform)
+- Complexity level (simple, prosumer, professional)
+- Workflow style (creative, productivity, development, hybrid)
+
+Return JSON:
+{
+  "label": "Setup identity (e.g., 'Creative Pro', 'Open-Source Minimalist')",
+  "traits": ["2-4 descriptive traits like 'Apple ecosystem', 'Keyboard-driven workflow'"],
+  "summary": "One sentence describing their overall tech philosophy"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'flavor-profile': {
+      id: 'flavor-profile',
+      version: '1.0',
+      name: 'Flavor Profile',
+      description: 'Analyzes your eat saves to identify your culinary identity.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'eat', minItems: 3 },
+      prompt: `You are a culinary analyst. Analyze these saved food, recipe, and restaurant items and identify the user's culinary identity.
+
+Consider:
+- Cuisine regions and traditions
+- Flavor preferences (spicy, umami, sweet, herbaceous)
+- Cooking complexity (quick meals, elaborate projects, restaurant-level)
+- Dietary patterns and ingredient preferences
+
+Return JSON:
+{
+  "label": "Culinary identity (e.g., 'Southeast Asian Fusion', 'Rustic Mediterranean')",
+  "traits": ["2-4 descriptive traits like 'Bold spices', 'Farm-to-table ingredients'"],
+  "summary": "One sentence describing their overall food taste"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'traveler-type': {
+      id: 'traveler-type',
+      version: '1.0',
+      name: 'Traveler Type',
+      description: 'Analyzes your go saves to identify your travel identity.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'go', minItems: 3 },
+      prompt: `You are a travel analyst. Analyze these saved destinations, experiences, and travel items and identify the user's travel identity.
+
+Consider:
+- Destination types (urban, nature, coastal, cultural)
+- Travel pace (slow travel, adventure, city-hopping)
+- Experience style (luxury, budget, off-the-beaten-path)
+- Cultural engagement level (tourist, explorer, immersive)
+
+Return JSON:
+{
+  "label": "Travel identity (e.g., 'Cultural Flaneur', 'Adventure Minimalist')",
+  "traits": ["2-4 descriptive traits like 'Off-grid destinations', 'Local food focus'"],
+  "summary": "One sentence describing their overall travel style"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'fan-profile': {
+      id: 'fan-profile',
+      version: '1.0',
+      name: 'Fan Profile',
+      description: 'Analyzes your follow saves to identify your interest identity.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'follow', minItems: 3 },
+      prompt: `You are a cultural analyst. Analyze these saved creators, accounts, and people the user follows and identify their interest identity.
+
+Consider:
+- Content domains (music, art, tech, fashion, food, politics)
+- Creator types (independent, institutional, niche, mainstream)
+- Community and scene alignment
+- Depth vs breadth of interests
+
+Return JSON:
+{
+  "label": "Interest identity (e.g., 'Experimental Audio + Visual Art', 'Indie Tech Scene')",
+  "traits": ["2-4 descriptive traits like 'Underground music', 'Design-engineering crossover'"],
+  "summary": "One sentence describing the world they follow"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'reader-identity': {
+      id: 'reader-identity',
+      version: '1.0',
+      name: 'Reader Identity',
+      description: 'Analyzes your read saves to identify your intellectual identity.',
+      status: 'active',
+      zone: 'hero',
+      criteria: { category: 'read', minItems: 3 },
+      prompt: `You are a literary and intellectual analyst. Analyze these saved articles, books, and reading material and identify the user's reader identity.
+
+Consider:
+- Subject domains (technology, philosophy, business, science, culture)
+- Thinking style (analytical, creative, strategic, narrative)
+- Format preferences (long-form, quick reads, academic, journalistic)
+- Perspective and worldview tendencies
+
+Return JSON:
+{
+  "label": "Reader identity (e.g., 'Systems Thinker', 'Cultural Critic')",
+  "traits": ["2-4 descriptive traits like 'Long-form essays', 'Cross-disciplinary synthesis'"],
+  "summary": "One sentence describing their intellectual taste"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    // =========================================================================
+    // UPCOMING RELEASES — forward-looking widget
+    // =========================================================================
+
+    'upcoming-releases': {
+      id: 'upcoming-releases',
+      version: '1.0',
+      name: 'Upcoming Releases',
+      description: 'Predicts upcoming releases, drops, and launches from brands and creators in your collection.',
+      status: 'active',
+      zone: 'inline',
+      criteria: { category: 'all', minItems: 3 },
+      prompt: `You are a trend forecaster. Based on the user's saved items, identify brands, creators, studios, or publishers represented in their collection.
+
+For each, predict or note upcoming releases, drops, new products, or launches that the user would care about based on their saves.
+
+RULES:
+- Focus on brands/creators that appear in the saved items
+- Be specific about WHAT is coming (product names, seasons, release windows)
+- If you don't know exact dates, give a general timeframe (e.g., "Spring 2026", "Q2 2026")
+- Include 3-5 items, ranked by relevance to the user's collection
+- Only include things that are plausibly upcoming — don't fabricate releases
+
+Return JSON:
+{
+  "items": [
+    {
+      "brand": "Brand or creator name",
+      "release": "What's coming",
+      "when": "Timeframe (e.g., 'March 2026', 'This spring')",
+      "relevance": "Why this matters for their collection"
+    }
+  ],
+  "confidence": 0.7
+}`,
+      template: { name: 'list', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     }
   };
 
@@ -4287,7 +4521,7 @@ Return JSON:
     // --- Content type affinity (weight: 0.15) ---
     maxScore += 0.15;
     const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
-    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview'].includes(widget.id);
+    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview', 'design-dna', 'viewer-profile', 'setup-profile', 'flavor-profile', 'traveler-type', 'fan-profile', 'reader-identity', 'upcoming-releases'].includes(widget.id);
 
     if (isProductWidget && profile.productRatio > 0.3) {
       const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;
@@ -4851,8 +5085,8 @@ Return JSON:
       </div>`;
   }
 
-  // Render Style Summary widget
-  function renderStyleSummaryWidget(widget, items, aiResult) {
+  // Generic profiler renderer — works for any { label, traits, summary } response
+  function renderProfilerWidget(widget, items, aiResult) {
     if (!aiResult) return '';
 
     let label, traits, sublabel;
@@ -5039,7 +5273,7 @@ Return JSON:
       name: 'hero-card',
       version: '1.0',
       render: function(widget, items, aiResult) {
-        return renderStyleSummaryWidget(widget, items, aiResult);
+        return renderProfilerWidget(widget, items, aiResult);
       }
     },
 
@@ -5050,10 +5284,15 @@ Return JSON:
       version: '1.0',
       render: function(widget, items, aiResult) {
         if (!aiResult) return '';
-        const listItems = (aiResult.suggestions || aiResult.traits || []).slice(0, 5);
+        const listItems = (aiResult.items || aiResult.suggestions || aiResult.traits || []).slice(0, 5);
         const listHtml = listItems.map(item => {
-          const label = typeof item === 'string' ? item : (item.name || item.label || JSON.stringify(item));
-          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span></div></div>`;
+          if (typeof item === 'string') {
+            return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(item)}</span></div></div>`;
+          }
+          const label = item.name || item.label || item.release || JSON.stringify(item);
+          const meta = item.when || item.brand || item.price || '';
+          const detail = item.relevance || item.reason || '';
+          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span>${meta ? `<span class="w-text w-text--meta">${esc(meta)}</span>` : ''}${detail ? `<span class="w-text w-text--note">${esc(detail)}</span>` : ''}</div></div>`;
         }).join('');
 
         return `

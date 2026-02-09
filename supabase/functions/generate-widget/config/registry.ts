@@ -28,6 +28,14 @@ import { discoverMore } from './widgets/discover-more.ts'
 import { stylePick } from './widgets/style-pick.ts'
 import { outfitChecklist } from './widgets/outfit-checklist.ts'
 import { boardOverview } from './widgets/board-overview.ts'
+import { designDna } from './widgets/design-dna.ts'
+import { viewerProfile } from './widgets/viewer-profile.ts'
+import { setupProfile } from './widgets/setup-profile.ts'
+import { flavorProfile } from './widgets/flavor-profile.ts'
+import { travelerType } from './widgets/traveler-type.ts'
+import { fanProfile } from './widgets/fan-profile.ts'
+import { readerIdentity } from './widgets/reader-identity.ts'
+import { upcomingReleases } from './widgets/upcoming-releases.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -47,6 +55,14 @@ const registry: WidgetRegistry = {
     'style-pick': stylePick,
     'outfit-checklist': outfitChecklist,
     'board-overview': boardOverview,
+    'design-dna': designDna,
+    'viewer-profile': viewerProfile,
+    'setup-profile': setupProfile,
+    'flavor-profile': flavorProfile,
+    'traveler-type': travelerType,
+    'fan-profile': fanProfile,
+    'reader-identity': readerIdentity,
+    'upcoming-releases': upcomingReleases,
   },
 
   defaults: {
