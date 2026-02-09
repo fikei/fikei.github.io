@@ -6263,9 +6263,18 @@ Return JSON:
         const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?]+)/)?.[1];
         console.log('%c[PLATFORM] YouTube detected, videoId:', 'color: #e67e22', videoId);
         if (videoId) {
-          const imageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-          console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
-          return { imageUrl, source: 'platform_api' };
+          // Try hqdefault first, fall back to mqdefault (more reliably available)
+          for (const quality of ['hqdefault', 'mqdefault']) {
+            const imageUrl = `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
+            try {
+              const check = await fetchWithTimeout(imageUrl, 3000);
+              if (check.ok) {
+                console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
+                return { imageUrl, source: 'platform_api' };
+              }
+            } catch (e) { /* try next quality */ }
+          }
+          console.log('%c[PLATFORM] YouTube thumbnail not found (video may be deleted/private)', 'color: #e74c3c', videoId);
         }
       }
 
@@ -7778,7 +7787,30 @@ Return JSON:
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        console.error('[sync] Upload failed:', res.status);
+        const body = await res.text().catch(() => '');
+        console.error('[sync] Upload failed:', res.status, body);
+
+        // If 400, retry without enrichment fields (table may not have these columns yet)
+        if (res.status === 400 && (payload.content_type !== undefined || payload.image_scores !== undefined)) {
+          console.log('[sync] Retrying without enrichment fields...');
+          const { content_type, type_confidence, image_source, image_scores, ...corePayload } = payload;
+          const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(corePayload)
+          });
+          if (retry.ok) {
+            console.log('[sync] Uploaded (core fields only):', link.url);
+          } else {
+            const retryBody = await retry.text().catch(() => '');
+            console.error('[sync] Core retry also failed:', retry.status, retryBody);
+          }
+        }
       } else {
         console.log('[sync] Uploaded:', link.url);
       }
@@ -8444,7 +8476,7 @@ Return JSON:
           : l.category;
         html += `<article class="grid-item${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
-          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy" onerror="this.style.display='none'">
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${detailsHtml}
