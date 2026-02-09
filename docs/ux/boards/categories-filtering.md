@@ -220,6 +220,14 @@ Filter: Wear → Footwear
 Filter: Wear → Other
 └── Shows: "Wear" pins that don't match any sub-tag keywords
 
+Filter: Listen
+└── Shows: Only pins in "Listen" category (music, podcasts, mixes)
+└── Sub-tags: Albums, Tracks, Playlists, Podcasts, Artists, Mixes, Other
+
+Filter: Listen → Albums
+└── Shows: Only "Listen" pins matching album keywords
+└── Keywords: album, lp, ep, deluxe, record, vinyl, release, reissue
+
 Multiple filters: Not supported (single select per level)
 ```
 
@@ -248,6 +256,14 @@ Multiple filters: Not supported (single select per level)
 - `outdoor`: tent, camping, hiking, bike, kayak, ski
 - `office`: pen, notebook, planner, stapler, stationery
 - `travel`: luggage, suitcase, carry-on, adapter, toiletry
+
+**Listen:**
+- `albums`: album, lp, ep, deluxe, record, vinyl, release, reissue
+- `tracks`: song, track, single, remix, beat, instrumental, feat
+- `playlists`: playlist, compilation, curated, collection, best of
+- `podcasts`: podcast, episode, pod, interview, talk, hosted by
+- `artists`: artist, band, singer, rapper, producer, dj, musician, composer
+- `mixes`: mix, set, live, session, boiler room, essential mix, radio
 
 ---
 

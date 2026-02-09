@@ -6,6 +6,27 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-09] - Listen Category: Music as First-Class Content
+
+### Added
+- **`listen` category** — 9th category, splits music out of `watch`. Keywords: music, album, song, playlist, track, artist, band, concert, podcast, dj, remix, mix, vinyl. Domains: spotify.com, soundcloud.com, bandcamp.com, music.apple.com, tidal.com, deezer.com, music.youtube.com, last.fm, genius.com, pitchfork.com.
+- **Listen sub-tags** — albums, tracks, playlists, podcasts, artists, mixes with keyword detection.
+- **`extractMusicMetadata()`** — Structured music metadata extraction: artist, trackTitle, albumTitle, genre, duration, releaseDate, contentFormat, platformId, isExplicit. Populates 9/12 fields without OAuth via oEmbed APIs + og:music tag scraping.
+- **Spotify/SoundCloud oEmbed** in `resolvePlatformImage()` — Album art resolution for music platforms.
+- **oEmbed response cache** (`fetchOembed()`) — Shared between image resolver and metadata extractor, eliminates duplicate API calls.
+- **og:music tag extraction** in `fetchMetadata()` — Scrapes `og:music:duration`, `og:music:album`, `og:music:release_date`, `og:music:musician`, genre from already-fetched HTML.
+- **watch→listen migration** — One-time `migrateWatchToListen()` moves music links from watch, clears domain cache for music domains.
+- **Sound Shelf widget** — Visual album art grid for listen category (hero zone, 4+ items).
+- **Listen Next widget** — AI-picked listening queue of 3 items (inline zone, 3+ items).
+
+### Changed
+- **`watch` category** — Trimmed to video-only: movie, film, series, show, documentary, trailer, animation, clip, cinema, tv.
+- **`BUILTIN_TYPES`** — Reordered music before video so `music.youtube.com` matches music content type before `youtube.com` matches video.
+- **Music content type domains** — Added music.apple.com, tidal.com, deezer.com, music.youtube.com, audiomack.com.
+- **Widget registry** — 2 new widgets registered (server + client): sound-shelf, listen-next. Total: 13 widgets.
+
+---
+
 ## [2026-02-08] - Pin Profiling, Widget Inspector & 6 New Widgets
 
 ### Added
