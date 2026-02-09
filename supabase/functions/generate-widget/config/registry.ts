@@ -20,7 +20,6 @@ import type {
 import { completeTheLook } from './widgets/complete-the-look.ts'
 import { styleSummary } from './widgets/style-summary.ts'
 import { priceRadar } from './widgets/price-radar.ts'
-import { collectionStats } from './widgets/collection-stats.ts'
 import { gapFiller } from './widgets/gap-filler.ts'
 import { eatDecide } from './widgets/eat-decide.ts'
 import { useCompare } from './widgets/use-compare.ts'
@@ -47,7 +46,6 @@ const registry: WidgetRegistry = {
     'complete-the-look': completeTheLook,
     'style-summary': styleSummary,
     'price-radar': priceRadar,
-    'collection-stats': collectionStats,
     'gap-filler': gapFiller,
     'eat-decide': eatDecide,
     'use-compare': useCompare,

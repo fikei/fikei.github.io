@@ -3587,37 +3587,6 @@ Return JSON:
       createdAt: '2026-02-06',
       updatedAt: '2026-02-06'
     },
-    'collection-stats': {
-      id: 'collection-stats',
-      version: '1.0',
-      name: 'Collection Stats',
-      description: 'Key metrics about your saved items — brands, categories, price range, and more.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'eat', 'read', 'all'],
-        minItems: 3,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and extract 3-4 key metrics about the collection.
-
-Return JSON:
-{
-  "stats": [
-    { "value": "12", "label": "brands" },
-    { "value": "3", "label": "styles" },
-    { "value": "$85", "label": "avg price" }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'stat-row',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
-    },
     'gap-filler': {
       id: 'gap-filler',
       version: '1.0',
@@ -4521,7 +4490,7 @@ Return JSON:
     // --- Content type affinity (weight: 0.15) ---
     maxScore += 0.15;
     const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
-    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview', 'design-dna', 'viewer-profile', 'setup-profile', 'flavor-profile', 'traveler-type', 'fan-profile', 'reader-identity', 'upcoming-releases'].includes(widget.id);
+    const isAnalyticsWidget = ['style-summary', 'eat-decide', 'discover-more', 'style-pick', 'board-overview', 'design-dna', 'viewer-profile', 'setup-profile', 'flavor-profile', 'traveler-type', 'fan-profile', 'reader-identity', 'upcoming-releases'].includes(widget.id);
 
     if (isProductWidget && profile.productRatio > 0.3) {
       const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;

@@ -191,6 +191,14 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 
 ---
 
+## Standard UI Enhancements
+
+| Story | Status |
+|-------|--------|
+| **Collection stats in standard UI** — Move collection stats (item count, domain count, brand count, price range) out of the AI widget system and into the standard category UI. Show as a persistent stats bar or summary row visible for every category, not gated behind AI. Stats should update instantly on add/remove without an AI call. | Pending |
+
+---
+
 ## Accessibility
 
 | Story | Status |
