@@ -35,6 +35,8 @@ import { travelerType } from './widgets/traveler-type.ts'
 import { fanProfile } from './widgets/fan-profile.ts'
 import { readerIdentity } from './widgets/reader-identity.ts'
 import { upcomingReleases } from './widgets/upcoming-releases.ts'
+import { soundShelf } from './widgets/sound-shelf.ts'
+import { listenNext } from './widgets/listen-next.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -61,6 +63,8 @@ const registry: WidgetRegistry = {
     'fan-profile': fanProfile,
     'reader-identity': readerIdentity,
     'upcoming-releases': upcomingReleases,
+    'sound-shelf': soundShelf,
+    'listen-next': listenNext,
   },
 
   defaults: {

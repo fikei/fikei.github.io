@@ -31,7 +31,7 @@ Primary pin storage. One row per saved URL per user.
 | `description` | text | | From meta tags |
 | `image` | text | | Hero image URL |
 | `domain` | text | | Extracted hostname |
-| `category` | text | | home, wear, watch, use, eat, go, follow, read |
+| `category` | text | | home, wear, watch, listen, use, eat, go, follow, read |
 | `confidence` | numeric | | Category confidence (0-1) |
 | `created_at` | timestamptz | | When pin was added |
 | `updated_at` | timestamptz | | Last modification |

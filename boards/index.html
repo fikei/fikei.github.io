@@ -3288,8 +3288,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const BUILTIN_TYPES = [
     { name: 'product', keywords: ['buy', 'price', 'cart', 'shop', 'store'], domains: ['amazon.com', 'ebay.com', 'etsy.com'] },
     { name: 'article', keywords: ['read', 'blog', 'post', 'article', 'story'], domains: ['medium.com', 'substack.com'], patterns: ['/blog/', '/post/', '/article/'] },
+    { name: 'music', keywords: ['listen', 'track', 'album', 'playlist', 'song', 'artist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'music.youtube.com', 'audiomack.com'] },
     { name: 'video', keywords: ['watch', 'video', 'stream'], domains: ['youtube.com', 'youtu.be', 'vimeo.com', 'tiktok.com'] },
-    { name: 'music', keywords: ['listen', 'track', 'album', 'playlist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com'] },
     { name: 'repository', keywords: ['code', 'repo', 'commit', 'fork'], domains: ['github.com', 'gitlab.com', 'bitbucket.org'] },
     { name: 'social', keywords: ['tweet', 'post', 'profile'], domains: ['twitter.com', 'x.com', 'linkedin.com', 'instagram.com', 'threads.net'] },
     { name: 'document', keywords: ['document', 'pdf', 'doc'], patterns: ['.pdf', '.doc', '.xls', 'docs.google.com'] },
@@ -3532,6 +3532,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     go:     { domain: 'travel',              noun: 'destinations and experiences',     analyst: 'travel expert' },
     follow: { domain: 'culture & creators',   noun: 'creators and accounts',           analyst: 'cultural analyst' },
     read:   { domain: 'intellectual',         noun: 'articles, books, and reading',    analyst: 'literary analyst' },
+    listen: { domain: 'music',               noun: 'music, albums, and playlists',    analyst: 'music curator' },
     all:    { domain: 'general',              noun: 'saved items',                     analyst: 'collection analyst' }
   };
 
@@ -3543,16 +3544,18 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
   // the server has a matching config (or update WIDGET_SERVER_MAP).
   // ==========================================================================
   const WIDGET_CATEGORY_MAP = {
-    'profiler':          ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read'],
+    'profiler':          ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen'],
     'completer':         ['wear'],
     'pick':              ['wear', 'eat'],
     'spectrum':          ['wear'],
     'gap-finder':        ['wear'],
     'compare':           ['use'],
     'buy-checklist':     ['wear'],
-    'discover-more':     ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read'],
-    'upcoming-releases': ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read'],
-    'board-overview':    ['all', 'wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read']
+    'discover-more':     ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen'],
+    'upcoming-releases': ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen'],
+    'sound-shelf':       ['listen'],
+    'listen-next':       ['listen'],
+    'board-overview':    ['all', 'wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen']
   };
 
   // ==========================================================================
@@ -3565,7 +3568,7 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     'profiler': {
       wear: 'style-summary', home: 'design-dna', watch: 'viewer-profile',
       use: 'setup-profile', eat: 'flavor-profile', go: 'traveler-type',
-      follow: 'fan-profile', read: 'reader-identity'
+      follow: 'fan-profile', read: 'reader-identity', listen: 'sound-shelf'
     },
     'completer':         { _default: 'complete-the-look' },
     'pick':              { eat: 'eat-decide', _default: 'style-pick' },
@@ -3575,7 +3578,9 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     'buy-checklist':     { _default: 'outfit-checklist' },
     'discover-more':     { _default: 'discover-more' },
     'upcoming-releases': { _default: 'upcoming-releases' },
-    'board-overview':    { _default: 'board-overview' }
+    'board-overview':    { _default: 'board-overview' },
+    'sound-shelf':       { _default: 'sound-shelf' },
+    'listen-next':       { _default: 'listen-next' }
   };
 
   // Build reverse map: server widget ID → generic widget ID
@@ -6192,6 +6197,22 @@ Return JSON:
     return null;
   }
 
+  // oEmbed response cache — shared between resolvePlatformImage and extractMusicMetadata
+  const oembedCache = {};
+
+  async function fetchOembed(oembedUrl, cacheKey) {
+    if (oembedCache[cacheKey]) return oembedCache[cacheKey];
+    try {
+      const resp = await fetch(oembedUrl);
+      if (resp.ok) {
+        const data = await resp.json();
+        oembedCache[cacheKey] = data;
+        return data;
+      }
+    } catch (e) { console.warn('[oembed] Fetch failed:', cacheKey, e.message); }
+    return null;
+  }
+
   async function resolvePlatformImage(url) {
     try {
       const domain = new URL(url).hostname;
@@ -6219,6 +6240,26 @@ Return JSON:
             console.log('%c[PLATFORM] Vimeo thumbnail:', 'color: #27ae60', data[0]?.thumbnail_large);
             return { imageUrl: data[0]?.thumbnail_large, source: 'platform_api' };
           }
+        }
+      }
+
+      // Spotify (oEmbed — cached)
+      if (domain.includes('spotify.com')) {
+        console.log('%c[PLATFORM] Spotify detected', 'color: #e67e22');
+        const oembedData = await fetchOembed(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, `spotify:${url}`);
+        if (oembedData?.thumbnail_url) {
+          console.log('%c[PLATFORM] Spotify thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
+          return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
+        }
+      }
+
+      // SoundCloud (oEmbed — cached)
+      if (domain.includes('soundcloud.com')) {
+        console.log('%c[PLATFORM] SoundCloud detected', 'color: #e67e22');
+        const oembedData = await fetchOembed(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, `soundcloud:${url}`);
+        if (oembedData?.thumbnail_url) {
+          console.log('%c[PLATFORM] SoundCloud thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
+          return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
         }
       }
 
@@ -6262,6 +6303,140 @@ Return JSON:
     }
 
     return null;
+  }
+
+  // ============================================
+  // Music Metadata Extraction
+  // ============================================
+  // Extracts structured music metadata from platform oEmbed APIs.
+  // Returns a music object to persist on the link for future rendering.
+  // Fields: artist, trackTitle, albumTitle, genre, duration, bpm,
+  //         releaseDate, contentFormat, platformId, isExplicit, key, label
+  // musicTags: optional og:music tags already scraped by fetchMetadata (avoids re-fetching)
+  async function extractMusicMetadata(url, title, description, musicTags) {
+    const meta = {
+      artist: null,
+      trackTitle: null,
+      albumTitle: null,
+      genre: null,
+      duration: null,       // seconds
+      bpm: null,
+      releaseDate: null,
+      contentFormat: null,  // 'track' | 'album' | 'playlist' | 'podcast-episode' | 'artist' | 'mix'
+      platformId: null,
+      isExplicit: null,
+      key: null,            // musical key (e.g. "Cm", "F#")
+      label: null
+    };
+
+    try {
+      const domain = new URL(url).hostname;
+      const path = new URL(url).pathname;
+
+      // ── Step 1: Apply og:music tags from HTML scrape (free, already fetched) ──
+      if (musicTags) {
+        if (musicTags.duration) meta.duration = musicTags.duration;
+        if (musicTags.albumTitle) meta.albumTitle = musicTags.albumTitle;
+        if (musicTags.releaseDate) meta.releaseDate = musicTags.releaseDate;
+        if (musicTags.musician) meta.artist = musicTags.musician;
+        if (musicTags.genre) meta.genre = musicTags.genre;
+        // Infer contentFormat from og:type if present
+        if (musicTags.ogType) {
+          const ogTypeMap = { 'music.song': 'track', 'music.album': 'album', 'music.playlist': 'playlist', 'music.radio_station': 'mix' };
+          meta.contentFormat = ogTypeMap[musicTags.ogType] || null;
+        }
+      }
+
+      // ── Step 2: Infer contentFormat from URL structure ──
+      if (!meta.contentFormat) {
+        if (/\/track[\/s]/.test(path)) meta.contentFormat = 'track';
+        else if (/\/album[\/s]/.test(path)) meta.contentFormat = 'album';
+        else if (/\/playlist[\/s]/.test(path)) meta.contentFormat = 'playlist';
+        else if (/\/episode[\/s]/.test(path) || /\/podcast/.test(path)) meta.contentFormat = 'podcast-episode';
+        else if (/\/artist[\/s]/.test(path)) meta.contentFormat = 'artist';
+        else if (/\/sets?[\/]/.test(path) && domain.includes('soundcloud.com')) meta.contentFormat = 'mix';
+      }
+
+      // ── Step 3: Platform-specific oEmbed (uses shared cache) ──
+
+      // Spotify
+      if (domain.includes('spotify.com')) {
+        const spotifyMatch = path.match(/\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
+        if (spotifyMatch) {
+          meta.platformId = `spotify:${spotifyMatch[1]}:${spotifyMatch[2]}`;
+          meta.contentFormat = meta.contentFormat || spotifyMatch[1].replace('show', 'podcast-episode');
+        }
+        const d = await fetchOembed(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, `spotify:${url}`);
+        if (d) {
+          meta.artist = meta.artist || (d.provider_name === 'Spotify' ? (d.author_name || null) : null);
+          meta.trackTitle = meta.trackTitle || d.title || null;
+        }
+      }
+
+      // SoundCloud
+      if (domain.includes('soundcloud.com')) {
+        const scSlug = path.split('/').filter(Boolean);
+        if (scSlug.length >= 1) meta.platformId = `soundcloud:${scSlug.join('/')}`;
+        const d = await fetchOembed(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, `soundcloud:${url}`);
+        if (d) {
+          meta.artist = meta.artist || d.author_name || null;
+          meta.trackTitle = meta.trackTitle || d.title || null;
+        }
+      }
+
+      // Bandcamp (parse from URL structure + title)
+      if (domain.includes('bandcamp.com')) {
+        const bcArtist = domain.replace('.bandcamp.com', '');
+        meta.artist = meta.artist || bcArtist;
+        meta.platformId = `bandcamp:${bcArtist}${path}`;
+        if (/\/album\//.test(path)) meta.contentFormat = meta.contentFormat || 'album';
+        else if (/\/track\//.test(path)) meta.contentFormat = meta.contentFormat || 'track';
+      }
+
+      // Apple Music (parse URL)
+      if (domain.includes('music.apple.com')) {
+        const amMatch = path.match(/\/(album|playlist|artist|station)\/[^\/]+\/(\d+)/);
+        if (amMatch) {
+          meta.platformId = `apple-music:${amMatch[1]}:${amMatch[2]}`;
+          meta.contentFormat = meta.contentFormat || amMatch[1];
+        }
+      }
+
+      // YouTube Music
+      if (domain.includes('music.youtube.com')) {
+        const ytmId = url.match(/[?&]v=([^&]+)/)?.[1] || url.match(/[?&]list=([^&]+)/)?.[1];
+        if (ytmId) meta.platformId = `youtube-music:${ytmId}`;
+        if (/[?&]list=/.test(url)) meta.contentFormat = meta.contentFormat || 'playlist';
+        else meta.contentFormat = meta.contentFormat || 'track';
+      }
+
+      // ── Step 4: Fallback parsing from page title ──
+      if (!meta.artist && title) {
+        // Common patterns: "Artist - Track" or "Track by Artist" or "Track | Artist"
+        const dashSplit = title.match(/^(.+?)\s*[-–—]\s*(.+?)(?:\s*\|.*)?$/);
+        const bySplit = title.match(/^(.+?)\s+by\s+(.+?)(?:\s*\|.*)?$/i);
+        if (dashSplit) {
+          meta.artist = meta.artist || dashSplit[1].trim();
+          meta.trackTitle = meta.trackTitle || dashSplit[2].trim();
+        } else if (bySplit) {
+          meta.trackTitle = meta.trackTitle || bySplit[1].trim();
+          meta.artist = meta.artist || bySplit[2].trim();
+        }
+      }
+
+      // Detect explicit from title
+      if (title && /\[E\]|\(Explicit\)/i.test(title)) {
+        meta.isExplicit = true;
+      }
+
+      console.log('%c[music-meta] Extracted:', 'color: #1DB954', meta);
+    } catch (e) {
+      console.warn('[music-meta] Extraction failed:', e.message);
+    }
+
+    // Return null if we got nothing useful
+    const hasData = meta.artist || meta.trackTitle || meta.platformId || meta.contentFormat;
+    return hasData ? meta : null;
   }
 
   async function resolveFavicon(url) {
@@ -6734,6 +6909,34 @@ Return JSON:
           meta.image = img;
         }
       }
+      // Extract og:music tags for music metadata (free — already have the HTML)
+      const musicDuration = html.match(/<meta[^>]*property=["'](?:og:)?music:duration["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:duration["']/i);
+      const musicAlbum = html.match(/<meta[^>]*property=["'](?:og:)?music:album["'][^>]*content=["']([^"']*)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:album["']/i);
+      const musicReleaseDate = html.match(/<meta[^>]*property=["'](?:og:)?music:release_date["'][^>]*content=["']([^"']*)["']/i) ||
+                               html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:release_date["']/i);
+      const musicMusician = html.match(/<meta[^>]*property=["'](?:og:)?music:musician["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:musician["']/i);
+      const ogType = html.match(/<meta[^>]*property=["']og:type["'][^>]*content=["']([^"']*)["']/i) ||
+                     html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:type["']/i);
+
+      // Bandcamp/SoundCloud genre from tags or structured data
+      const genreTag = html.match(/<meta[^>]*(?:name|property)=["'](?:genre|music:genre)["'][^>]*content=["']([^"']*)["']/i) ||
+                       html.match(/["']genre["']\s*:\s*["']([^"']+)["']/i) ||
+                       html.match(/<a[^>]*class=["'][^"']*genre[^"']*["'][^>]*>([^<]+)<\/a>/i);
+
+      if (musicDuration || musicAlbum || musicReleaseDate || musicMusician || genreTag || (ogType && ogType[1]?.startsWith('music'))) {
+        meta.musicTags = {};
+        if (musicDuration) meta.musicTags.duration = parseInt(musicDuration[1], 10) || null;
+        if (musicAlbum) meta.musicTags.albumTitle = decodeEntities(musicAlbum[1]);
+        if (musicReleaseDate) meta.musicTags.releaseDate = musicReleaseDate[1];
+        if (musicMusician) meta.musicTags.musician = decodeEntities(musicMusician[1]);
+        if (genreTag) meta.musicTags.genre = decodeEntities(genreTag[1]).trim();
+        if (ogType) meta.musicTags.ogType = ogType[1];
+        console.log('%c[FETCH] og:music tags found:', 'color: #1DB954', meta.musicTags);
+      }
+
     } catch (parseErr) {
       // Parse error - continue with defaults
     }
@@ -6761,7 +6964,7 @@ Return JSON:
   // ============================================
   const AI_CATEGORIZE_ENDPOINT = `${SUPABASE_URL}/functions/v1/categorize`;
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
-  const CATEGORIES = ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read'];
+  const CATEGORIES = ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read'];
 
   // Sub-tags for each category - shown when filtering by category
   const SUB_TAGS = {
@@ -6796,6 +6999,17 @@ Return JSON:
         outdoor: ['tent', 'camping', 'hiking', 'bike', 'bicycle', 'kayak', 'ski', 'snowboard', 'fishing'],
         office: ['pen', 'notebook', 'planner', 'stapler', 'organizer', 'desk', 'stationery'],
         travel: ['luggage', 'suitcase', 'carry-on', 'passport', 'adapter', 'toiletry', 'packing']
+      }
+    },
+    listen: {
+      tags: ['albums', 'tracks', 'playlists', 'podcasts', 'artists', 'mixes'],
+      keywords: {
+        albums: ['album', 'lp', 'ep', 'deluxe', 'record', 'vinyl', 'release', 'reissue'],
+        tracks: ['song', 'track', 'single', 'remix', 'beat', 'instrumental', 'feat'],
+        playlists: ['playlist', 'compilation', 'curated', 'collection', 'best of'],
+        podcasts: ['podcast', 'episode', 'pod', 'interview', 'talk', 'hosted by'],
+        artists: ['artist', 'band', 'singer', 'rapper', 'producer', 'dj', 'musician', 'composer'],
+        mixes: ['mix', 'set', 'live', 'session', 'boiler room', 'essential mix', 'radio']
       }
     }
   };
@@ -6988,6 +7202,63 @@ Return JSON:
   }
 
   // ============================================
+  // Migration: watch → listen for music links
+  // ============================================
+  // Domains that should be 'listen' instead of 'watch'
+  const LISTEN_DOMAINS = ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com'];
+  const LISTEN_MIGRATION_KEY = 'boards-listen-migration-v1';
+
+  function migrateWatchToListen() {
+    if (localStorage.getItem(LISTEN_MIGRATION_KEY)) return; // Already ran
+
+    const allLinks = getAllLinks();
+    let updated = 0;
+
+    for (const link of allLinks) {
+      if (link.category !== 'watch') continue;
+
+      const domain = (link.domain || '').toLowerCase();
+      const url = (link.url || '').toLowerCase();
+      const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
+
+      // Check if domain is a music platform
+      let isMusic = LISTEN_DOMAINS.some(d => domain.includes(d) || url.includes(d));
+
+      // If not a clear domain match, check music keywords (require 2+ for confidence)
+      if (!isMusic) {
+        const musicKw = ['music', 'album', 'song', 'playlist', 'track', 'artist', 'band', 'concert', 'listen', 'podcast', 'dj', 'remix', 'mix', 'vinyl', 'record', 'ep', 'single'];
+        const hits = musicKw.filter(k => text.includes(k)).length;
+        isMusic = hits >= 2;
+      }
+
+      if (isMusic) {
+        updateLink(link.id, { category: 'listen' });
+        updated++;
+        console.log(`%c[migrate-listen] ${link.domain}: watch → listen`, 'color: #1DB954', link.title);
+      }
+    }
+
+    // Clear cached domain→category entries for music domains
+    const cache = loadCategoryCache();
+    for (const d of LISTEN_DOMAINS) {
+      for (const key of Object.keys(cache)) {
+        if (key.includes(d)) {
+          delete cache[key];
+        }
+      }
+    }
+    saveCategoryCache(cache);
+
+    localStorage.setItem(LISTEN_MIGRATION_KEY, Date.now().toString());
+
+    if (updated > 0) {
+      console.log(`%c[migrate-listen] Migrated ${updated} links from watch → listen`, 'color: #1DB954; font-weight: bold');
+      renderFilters();
+      renderGrid();
+    }
+  }
+
+  // ============================================
   // Rule-based Categorizer (fallback)
   // ============================================
   const PATTERNS = {
@@ -7000,8 +7271,12 @@ Return JSON:
       domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com', 'mejuri.com', 'catbirdnyc.com', 'auratenewyork.com', 'stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com', 'amiparis.com', 'apc.fr', 'acnestudios.com', 'cos.com', 'arket.com', 'toteme-studio.com', 'lemaire.fr', 'therow.com', 'jilsander.com', 'maison-margiela.com', 'loewe.com', 'bottegaveneta.com', 'celine.com', 'pfrankstore.com', 'eckhauslatta.com', 'ourlegacy.com', 'stussy.com', 'palace.com', 'supremenewyork.com', 'kith.com', 'nordstrom.com', 'shopbop.com', 'revolve.com', 'asos.com', 'zara.com', 'hm.com', 'uniqlo.com', 'everlane.com', 'madewell.com']
     },
     watch: {
-      kw: ['video', 'music', 'podcast', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'playlist', 'track', 'artist', 'band', 'concert', 'episode', 'series', 'show'],
-      domains: ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com', 'vimeo.com', 'bandcamp.com', 'tiktok.com', 'netflix.com']
+      kw: ['video', 'movie', 'film', 'stream', 'episode', 'series', 'show', 'documentary', 'trailer', 'animation', 'clip', 'cinema', 'tv'],
+      domains: ['youtube.com', 'youtu.be', 'vimeo.com', 'tiktok.com', 'netflix.com', 'hulu.com', 'twitch.tv', 'disneyplus.com', 'hbomax.com']
+    },
+    listen: {
+      kw: ['music', 'album', 'song', 'playlist', 'track', 'artist', 'band', 'concert', 'listen', 'podcast', 'dj', 'remix', 'mix', 'vinyl', 'record', 'ep', 'single', 'lyrics', 'genre', 'beat', 'producer', 'rapper', 'singer', 'songwriter', 'audio'],
+      domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com']
     },
     use: {
       kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer', 'utility', 'product'],
@@ -8095,8 +8370,14 @@ Return JSON:
           const contentType = classifyByRules(url, meta.title, meta.description);
           console.log('%c[LINK FLOW] Content type:', 'color: #1abc9c', contentType.type);
 
+          // Extract music metadata if categorized as listen or content_type is music
+          let music = null;
+          if (cat.category === 'listen' || contentType.type === 'music') {
+            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
+          }
+
           // Update the link with full data
-          updateLink(id, {
+          const linkUpdate = {
             title: meta.title,
             description: meta.description,
             image: meta.image,
@@ -8106,7 +8387,9 @@ Return JSON:
             type_confidence: contentType.confidence,
             type_signals: contentType.signals,
             loading: false // Mark as loaded
-          });
+          };
+          if (music) linkUpdate.music = music;
+          updateLink(id, linkUpdate);
 
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
@@ -9086,7 +9369,13 @@ Return JSON:
           const cat = await smartCategorize(meta);
           const contentType = classifyByRules(url, meta.title, meta.description);
 
-          updateLink(id, {
+          // Extract music metadata if categorized as listen or content_type is music
+          let music = null;
+          if (cat.category === 'listen' || contentType.type === 'music') {
+            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
+          }
+
+          const linkUpdate = {
             title: meta.title,
             description: meta.description,
             image: meta.image,
@@ -9096,7 +9385,9 @@ Return JSON:
             type_confidence: contentType.confidence,
             type_signals: contentType.signals,
             loading: false
-          });
+          };
+          if (music) linkUpdate.music = music;
+          updateLink(id, linkUpdate);
 
           renderGrid();
 
@@ -10070,6 +10361,9 @@ Return JSON:
         localStorage.setItem(FILTER_KEY, 'all');
       }
     }
+
+    // Run one-time migration: watch → listen for music links
+    migrateWatchToListen();
 
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();

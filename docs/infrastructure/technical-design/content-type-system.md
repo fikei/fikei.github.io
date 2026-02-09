@@ -14,7 +14,8 @@ The system uses a **hybrid architecture** where the client handles fast, free op
 │  ├── classifyByRules()     → Domain/pattern/keyword matching              │
 │  ├── BUILTIN_TYPES[]       → 9 content types with signals                 │
 │  ├── domainProfileCache{}  → Synced from server, used offline             │
-│  └── Platform thumbnails   → YouTube/Vimeo/GitHub URL parsing             │
+│  ├── Platform thumbnails   → YouTube/Vimeo/GitHub/Spotify/SoundCloud       │
+│  └── extractMusicMetadata  → oEmbed + og:music tags for listen links      │
 │                                                                           │
 │  ASYNC (Background Queue)                                                 │
 │  ├── imageQueue[]          → Links needing image resolution               │
