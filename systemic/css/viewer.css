@@ -630,6 +630,40 @@
   margin-left: auto;
 }
 
+/* Preferred variant card */
+.variant-preview-card--preferred {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.qa-preferred-badge {
+  font-family: var(--font-primary);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+  padding: 0 4px;
+  line-height: 14px;
+  flex-shrink: 0;
+}
+
+.qa-action-btn--prefer {
+  color: #3b82f6;
+  border-color: transparent;
+}
+
+.qa-action-btn--prefer:hover {
+  border-color: #3b82f6;
+}
+
+.qa-action-btn--prefer.qa-action-btn--active {
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.qa-audit-table td.status--preferred { color: #3b82f6; }
+
 /* Flagged/blocked variant card */
 .variant-preview-card--flagged .variant-preview-content {
   opacity: 0.15;
