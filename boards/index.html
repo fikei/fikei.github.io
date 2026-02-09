@@ -8770,6 +8770,7 @@ Return JSON:
           if (music) linkUpdate.music = music;
           updateLink(id, linkUpdate);
 
+          renderFilters();
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
 
@@ -8946,28 +8947,36 @@ Return JSON:
 
     // Toggle expansion (collapsed ↔ medium)
     const item = e.target.closest('.grid-item');
-    if (item && !isDragging) {
-      const id = item.dataset.id;
-
-      // On touch devices, toggle tapped state for label visibility
-      const isTouchDevice = window.matchMedia('(hover: none)').matches;
-      if (isTouchDevice) {
-        document.querySelectorAll('.grid-item--tapped').forEach(el => {
-          if (el !== item) el.classList.remove('grid-item--tapped');
-        });
-        item.classList.toggle('grid-item--tapped');
-      }
-
-      if (expandedCards[id]) {
-        // Collapse
-        delete expandedCards[id];
-      } else {
-        // Expand to medium
-        expandedCards[id] = 'medium';
-      }
-      saveExpandedCards(expandedCards);
-      renderGrid();
+    if (!item) {
+      // Click was outside any grid-item (e.g., on a widget or empty space)
+      console.log('[click] No .grid-item found. Target:', e.target.className);
+      return;
     }
+    if (isDragging) {
+      console.log('[click] Ignored — isDragging=true');
+      return;
+    }
+    const id = item.dataset.id;
+    console.log('[click] Toggle expansion:', id, expandedCards[id] ? 'collapse' : 'expand');
+
+    // On touch devices, toggle tapped state for label visibility
+    const isTouchDevice = window.matchMedia('(hover: none)').matches;
+    if (isTouchDevice) {
+      document.querySelectorAll('.grid-item--tapped').forEach(el => {
+        if (el !== item) el.classList.remove('grid-item--tapped');
+      });
+      item.classList.toggle('grid-item--tapped');
+    }
+
+    if (expandedCards[id]) {
+      // Collapse
+      delete expandedCards[id];
+    } else {
+      // Expand to medium
+      expandedCards[id] = 'medium';
+    }
+    saveExpandedCards(expandedCards);
+    renderGrid();
   };
 
   // Drag and drop reordering (links + widgets)
@@ -9371,12 +9380,13 @@ Return JSON:
 
     e.preventDefault();
 
-    // Find which widget this is
-    const widgetLabel = header.querySelector('.w-text--label');
-    const widgetName = widgetLabel ? widgetLabel.textContent.trim() : 'Unknown';
-    const widgetEntry = Object.values(WIDGET_REGISTRY).find(w => w.name === widgetName);
-
+    // Find which widget this is — use data-widget-id (name uses resolved template vars)
+    const widgetId = shell.dataset.widgetId;
+    const widgetEntry = widgetId ? WIDGET_REGISTRY[widgetId] : null;
     if (!widgetEntry) return;
+
+    const widgetLabel = header.querySelector('.w-text--label');
+    const widgetName = widgetLabel ? widgetLabel.textContent.trim() : widgetEntry.name;
 
     // Get scoring data
     const allLinks = getAllLinks();
@@ -9773,6 +9783,7 @@ Return JSON:
           if (music) linkUpdate.music = music;
           updateLink(id, linkUpdate);
 
+          renderFilters();
           renderGrid();
 
           if (contentType.confidence < 0.7 || !meta.image) {
