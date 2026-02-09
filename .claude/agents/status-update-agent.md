@@ -1,3 +1,10 @@
+---
+name: status-update
+description: Tracks progress and flags risks, blockers, and anomalies
+model: sonnet
+tools: Read, Glob, Grep, Bash
+---
+
 # Status Update Agent
 
 ## Purpose

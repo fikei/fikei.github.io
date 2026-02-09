@@ -1,3 +1,10 @@
+---
+name: documentation
+description: Manages documentation content across the repository
+model: sonnet
+tools: Read, Glob, Grep, Bash, Edit, Write
+---
+
 # Documentation Agent
 
 ## Purpose

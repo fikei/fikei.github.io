@@ -1,3 +1,10 @@
+---
+name: organizational
+description: Audits changes, maintains documentation standards, ensures data integrity
+model: sonnet
+tools: Read, Glob, Grep, Bash
+---
+
 # Organizational Agent
 
 ## Purpose

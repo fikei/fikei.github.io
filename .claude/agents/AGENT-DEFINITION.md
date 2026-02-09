@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # The Agent — Consolidated Definition
 
 This document is the single source of truth for what "the Agent" is, how it behaves, and what it does. It consolidates requirements from `CLAUDE.md` and the 7 specialist agent files into one authoritative definition.

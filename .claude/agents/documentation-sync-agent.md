@@ -1,3 +1,10 @@
+---
+name: documentation-sync
+description: Keeps Notion synchronized with git repository
+model: sonnet
+tools: Read, Glob, Grep, Bash, WebFetch
+---
+
 # Documentation Sync Agent
 
 ## Purpose

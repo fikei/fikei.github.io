@@ -1,5 +1,9 @@
 {
   "version": "1.0",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
   "project": {
     "name": "ctrl.rodeo",
     "domain": "ctrl.rodeo",
@@ -171,8 +175,24 @@
       "projectPlanPrefix": "PROJECT-PLAN-"
     },
     "aiModels": {
-      "primary": "claude-3-haiku",
-      "fallback": "gpt-4o-mini"
+      "primary": "claude-sonnet-4-6",
+      "fallback": "claude-3-haiku",
+      "agentTeams": {
+        "teamLead": "claude-sonnet-4-6",
+        "teammates": "claude-sonnet-4-6"
+      },
+      "subagents": {
+        "default": "sonnet",
+        "overrides": {
+          "chief-of-staff": "sonnet",
+          "documentation": "sonnet",
+          "security-compliance": "sonnet",
+          "project-management": "sonnet",
+          "status-update": "sonnet",
+          "organizational": "sonnet",
+          "continuous-improvement": "sonnet"
+        }
+      }
     }
   }
 }

@@ -1,3 +1,10 @@
+---
+name: security-compliance
+description: Audits privacy, data safety, and security compliance
+model: sonnet
+tools: Read, Glob, Grep, Bash
+---
+
 # Security & Compliance Agent
 
 ## Purpose

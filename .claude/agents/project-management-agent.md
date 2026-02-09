@@ -1,3 +1,10 @@
+---
+name: project-management
+description: Breaks PRDs into actionable phases, epics, stories, and tasks
+model: sonnet
+tools: Read, Glob, Grep, Bash, Edit, Write
+---
+
 # Project Management Agent
 
 ## Purpose

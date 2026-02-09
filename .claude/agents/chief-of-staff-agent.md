@@ -1,3 +1,10 @@
+---
+name: chief-of-staff
+description: Global oversight, agent orchestration, and decision routing
+model: sonnet
+tools: Read, Glob, Grep, Bash
+---
+
 # Chief of Staff Agent
 
 ## Purpose

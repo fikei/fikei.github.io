@@ -1,3 +1,10 @@
+---
+name: continuous-improvement
+description: Analyzes patterns and suggests process optimizations
+model: sonnet
+tools: Read, Glob, Grep, Bash
+---
+
 # Continuous Improvement Agent
 
 ## Purpose
