@@ -7082,10 +7082,30 @@ Return JSON:
     }
 
     try {
+      // Detect error pages — if the HTML looks like a 404/error page, skip metadata extraction
+      const ERROR_TITLE_PATTERNS = [
+        /page\s*not\s*found/i, /404\s*(error|not found)?/i, /not\s*found/i,
+        /access\s*denied/i, /403\s*forbidden/i, /error\s*\d{3}/i,
+        /something\s*went\s*wrong/i, /unavailable/i, /page\s*doesn'?t?\s*exist/i,
+        /sorry.*couldn'?t?\s*find/i, /this\s*page\s*isn'?t?\s*available/i
+      ];
+
+      const rawTitle = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+      const rawOgTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:title["']/i);
+      const extractedTitle = rawOgTitle ? decodeEntities(rawOgTitle[1]) : rawTitle ? decodeEntities(rawTitle[1]) : '';
+
+      const isErrorPage = ERROR_TITLE_PATTERNS.some(p => p.test(extractedTitle));
+      if (isErrorPage) {
+        console.log('%c[FETCH] Error page detected, skipping metadata:', 'color: #e74c3c', extractedTitle);
+        meta.title = generateTitleFromUrl(url);
+        meta._errorPage = true;
+        return meta;
+      }
+
       // Title
-      const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
-                      html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:title["']/i);
-      const title = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+      const ogTitle = rawOgTitle;
+      const title = rawTitle;
       if (ogTitle) meta.title = decodeEntities(ogTitle[1]);
       else if (title) meta.title = decodeEntities(title[1]);
 
@@ -8635,8 +8655,19 @@ Return JSON:
           const meta = await fetchMetadata(url);
           console.log('%c[LINK FLOW] Metadata received:', 'color: #1abc9c', {
             title: meta.title,
-            image: meta.image ? 'YES' : 'NO'
+            image: meta.image ? 'YES' : 'NO',
+            errorPage: !!meta._errorPage
           });
+
+          // If error page detected, try platform API for image (oEmbed etc.)
+          if (meta._errorPage && !meta.image) {
+            console.log('%c[LINK FLOW] Error page — trying platform image APIs...', 'color: #f39c12');
+            const platformResult = await resolvePlatformImage(url);
+            if (platformResult?.imageUrl) {
+              meta.image = platformResult.imageUrl;
+              console.log('%c[LINK FLOW] Platform image recovered:', 'color: #27ae60', meta.image);
+            }
+          }
 
           // Categorize
           const cat = await smartCategorize(meta);
@@ -8650,6 +8681,14 @@ Return JSON:
           let music = null;
           if (cat.category === 'listen' || contentType.type === 'music') {
             music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
+            // If error page lost the title, try to recover from oEmbed/music metadata
+            if (meta._errorPage && music) {
+              const recovered = music.title || music.trackName || music.albumTitle;
+              if (recovered) {
+                meta.title = recovered + (music.artist ? ` — ${music.artist}` : '');
+                console.log('%c[LINK FLOW] Title recovered from music metadata:', 'color: #27ae60', meta.title);
+              }
+            }
           }
 
           // Update the link with full data
@@ -8670,8 +8709,8 @@ Return JSON:
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
 
-          // Queue for server enrichment if needed
-          const needsEnrichment = contentType.confidence < 0.7 || !meta.image;
+          // Queue for server enrichment — always enrich if error page, or if low confidence/no image
+          const needsEnrichment = meta._errorPage || contentType.confidence < 0.7 || !meta.image;
           if (needsEnrichment) {
             if (!meta.image) {
               queueImageResolution(id, url, meta.title, meta.description, contentType.type);

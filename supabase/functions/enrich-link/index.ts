@@ -374,6 +374,38 @@ async function resolvePlatformImage(url: string): Promise<{ url: string, source:
     }
   }
 
+  // Spotify (oEmbed API — bypasses bot detection)
+  if (domain.includes('spotify.com')) {
+    try {
+      const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.thumbnail_url) {
+          console.log('[platform] Spotify oEmbed thumbnail:', data.thumbnail_url)
+          return { url: data.thumbnail_url, source: 'platform' }
+        }
+      }
+    } catch (e) {
+      console.error('[platform] Spotify oEmbed error:', e)
+    }
+  }
+
+  // SoundCloud (oEmbed API)
+  if (domain.includes('soundcloud.com')) {
+    try {
+      const response = await fetch(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.thumbnail_url) {
+          console.log('[platform] SoundCloud oEmbed thumbnail:', data.thumbnail_url)
+          return { url: data.thumbnail_url, source: 'platform' }
+        }
+      }
+    } catch (e) {
+      console.error('[platform] SoundCloud oEmbed error:', e)
+    }
+  }
+
   // GitHub
   if (domain.includes('github.com')) {
     const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/)
@@ -407,6 +439,22 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
     }
 
     const html = await response.text()
+
+    // Detect error pages that return 200 — check title for error patterns
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    if (titleMatch) {
+      const pageTitle = titleMatch[1].toLowerCase().trim()
+      const errorPatterns = [
+        /page\s*not\s*found/, /^404/, /not\s*found/, /access\s*denied/,
+        /403\s*forbidden/, /something\s*went\s*wrong/, /unavailable/,
+        /page\s*doesn'?t?\s*exist/, /this\s*page\s*isn'?t?\s*available/
+      ]
+      if (errorPatterns.some(p => p.test(pageTitle))) {
+        console.log('[scrape] Error page detected (title:', titleMatch[1].trim(), '), skipping:', url)
+        return null
+      }
+    }
+
     const base = new URL(url)
 
     // Helper to resolve relative URLs

@@ -24,19 +24,22 @@ serve(async (req) => {
       throw new Error('URL is required')
     }
 
-    const categoryList = categories || ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read']
+    const categoryList = categories || ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read']
 
     const prompt = `You are a link categorizer. Given information about a webpage, categorize it into exactly ONE of these categories:
 
 Categories:
 - home: Furniture, home decor, interior design, lighting, rugs, ceramics
 - wear: Clothing, shoes, accessories, jewelry, fashion
-- watch: Videos, music, podcasts, streaming content, films, shows
+- watch: Videos, films, shows, documentaries, streaming video content
+- listen: Music, podcasts, audio content, songs, albums, playlists, DJ mixes, radio
 - use: Apps, software, tools, code, developer resources, products
 - eat: Restaurants, cafes, recipes, food, cooking, dining
 - go: Travel, hotels, destinations, maps, places to visit
 - follow: People, profiles, portfolios, social media accounts, creators
 - read: Articles, essays, blogs, news, books, tutorials, guides
+
+IMPORTANT: Music platforms (Spotify, SoundCloud, Bandcamp, Apple Music, Tidal, etc.) should ALWAYS be "listen", never "watch".
 
 If the link doesn't clearly fit any category, respond with "uncategorized".
 
