@@ -89,12 +89,14 @@ Single AI call that scores an image across all remaining dimensions.
 
 | Task | Status |
 |------|--------|
-| Design multimodal prompt: accuracy, aesthetic (text/watermarks, clutter), distinctiveness, safety classification | Pending |
-| Safety classification uses 3 tiers: "safe" / "mature" / "blocked" — nudity allowed, porn/CSAM/gore blocked | Pending |
-| Implement `validate-image` edge function accepting `{ image_url, title, category, content_type }` | Pending |
-| Return structured JSON: `{ accuracy, aesthetic_fit, distinctiveness, safety, evaluation_model, tokens_used }` | Pending |
-| Error handling: if vision call fails, keep Tier 2 scores (don't block display) | Pending |
-| Support multiple vision providers: Claude Sonnet (primary), GPT-4o (fallback) | Pending |
+| Design multimodal prompt: accuracy, aesthetic (text/watermarks, clutter), distinctiveness, safety classification | Complete |
+| Safety classification uses 3 tiers: "safe" / "mature" / "blocked" — nudity allowed, porn/CSAM/gore blocked | Complete |
+| Implement `validate-image` edge function accepting `{ image_url, title, category, content_type }` | Complete |
+| Return structured JSON: `{ accuracy, aesthetic_fit, distinctiveness, safety, evaluation_model, tokens_used }` | Complete |
+| Error handling: if vision call fails, keep Tier 2 scores (don't block display) | Complete |
+| Support multiple vision providers: Claude Sonnet (primary), GPT-4o (fallback) | Complete |
+
+**Key files**: `supabase/functions/validate-image/index.ts`
 
 ### Story 2: Validation Cache
 
@@ -102,12 +104,14 @@ Cache AI vision results by image URL so the same image is never re-evaluated.
 
 | Task | Status |
 |------|--------|
-| Create `image_validation_cache` table (image_url_hash PK, image_url, scores, evaluated_at, ttl_days, source_domain, content_type) | Pending |
-| Add index on source_domain for domain-level analytics | Pending |
-| Add index on composite score for finding lowest-scored images | Pending |
-| Cache lookup before calling AI: if cached and TTL valid, use cached scores | Pending |
-| Default TTL: 30 days (images at the same URL rarely change) | Pending |
+| Create `image_validation_cache` table (image_url_hash PK, image_url, scores, evaluated_at, ttl_days, source_domain, content_type) | Complete |
+| Add index on source_domain for domain-level analytics | Complete |
+| Add index on composite score for finding lowest-scored images | Complete |
+| Cache lookup before calling AI: if cached and TTL valid, use cached scores | Complete |
+| Default TTL: 30 days (images at the same URL rarely change) | Complete |
 | Cache invalidation: clear when user manually overrides image | Pending |
+
+**Key files**: `supabase/functions/validate-image/index.ts` (cache lookup/write), `supabase/migrations/007_image_validation.sql` (table)
 
 ### Story 3: Known-Good Source Bypass
 
@@ -115,8 +119,8 @@ Skip expensive Tier 3 evaluation for sources with historically high quality.
 
 | Task | Status |
 |------|--------|
-| Define known-good source list: YouTube thumbnails, GitHub social previews, Vimeo thumbnails, Spotify album art | Pending |
-| Auto-assign high scores for known-good sources (accuracy: 0.9, aesthetic: 0.8, distinctiveness: 1.0, safety: 1.0) | Pending |
+| Define known-good source list: YouTube thumbnails, GitHub social previews, Vimeo thumbnails, Spotify album art | Complete |
+| Auto-assign high scores for known-good sources (accuracy: 0.9, aesthetic: 0.8, distinctiveness: 1.0, safety: 1.0) | Complete |
 | Track override rate for known-good sources — if > 10%, remove from bypass list | Pending |
 
 ### Story 4: Async Display-Then-Validate Flow
@@ -125,11 +129,13 @@ Images display immediately from Tier 2, then Tier 3 runs in background and can d
 
 | Task | Status |
 |------|--------|
-| After Tier 2 pass, display image and queue Tier 3 evaluation | Pending |
-| On Tier 3 completion: if composite drops below "Marginal" threshold (0.40), remove displayed image | Pending |
-| On Tier 3 completion: if composite is "Marginal" (0.40–0.64), queue for background enrichment | Pending |
-| UI: smooth transition when image is downgraded (fade to styled text card or replacement) | Pending |
-| Track frequency of Tier 3 downgrades (how often does Tier 2 pass but Tier 3 fail?) | Pending |
+| After Tier 2 pass, display image and queue Tier 3 evaluation | Complete |
+| On Tier 3 completion: if composite drops below "Marginal" threshold (0.40), remove displayed image | Complete |
+| On Tier 3 completion: if composite is "Marginal" (0.40–0.64), queue for background enrichment | Complete |
+| UI: smooth transition when image is downgraded (fade to styled text card or replacement) | Complete |
+| Track frequency of Tier 3 downgrades (how often does Tier 2 pass but Tier 3 fail?) | Complete |
+
+**Key files**: `boards/index.html` (Tier 3 queue, `callValidateImage`, `handleTier3Downgrade`)
 
 ### Story 5: Cost Controls
 
@@ -137,9 +143,9 @@ Budget management for AI vision API calls.
 
 | Task | Status |
 |------|--------|
-| Track tokens used per validation call | Pending |
-| Daily budget cap: stop Tier 3 evaluations when daily cost exceeds threshold | Pending |
-| When budget exhausted, fall back to Tier 2 scores only (graceful degradation) | Pending |
+| Track tokens used per validation call | Complete |
+| Daily budget cap: stop Tier 3 evaluations when daily cost exceeds threshold | Complete |
+| When budget exhausted, fall back to Tier 2 scores only (graceful degradation) | Complete |
 | Monthly cost dashboard in admin panel | Pending |
 
 ---
@@ -293,9 +299,9 @@ Surface validation data in the image editor (depends on Epic 3.5 Story 6).
 
 | Epic | Stories | Tasks | Status |
 |------|---------|-------|--------|
-| 10.1 Heuristic Validation | 4 | 28 | Pending |
-| 10.2 AI Vision Scoring | 5 | 23 | Pending |
+| 10.1 Heuristic Validation | 4 | 28 | Complete (27/28) |
+| 10.2 AI Vision Scoring | 5 | 23 | Complete (20/23) |
 | 10.3 Composite Scoring | 2 | 11 | Pending |
 | 10.4 Enrichment Router | 4 | 26 | Pending |
 | 10.5 Feedback Loop | 3 | 14 | Pending |
-| **Total** | **18** | **102** | **Pending** |
+| **Total** | **18** | **102** | **IN PROGRESS (47/102)** |

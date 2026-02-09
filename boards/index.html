@@ -6002,6 +6002,8 @@ Return JSON:
           }
           await updateLinkImage(item.linkId, result.imageUrl, result.source, imageScores);
           console.log('%c[IMAGE QUEUE] Updated link image successfully', 'color: #27ae60; font-weight: bold');
+          // Queue for async Tier 3 AI vision validation
+          queueTier3Validation(item.linkId, result.imageUrl, item.title, null, item.contentType);
         } else {
           console.log('%c[IMAGE QUEUE] No image found, using template fallback', 'color: #f39c12');
         }
@@ -6307,6 +6309,143 @@ Return JSON:
         method: l.image_scores.evaluation_method
       }));
   };
+
+  // ============================================
+  // Tier 3: Async AI Vision Validation Queue
+  // ============================================
+  const tier3Queue = [];
+  let isProcessingTier3 = false;
+
+  /**
+   * Queue a pin for Tier 3 AI vision validation.
+   * Called after Tier 2 passes and image is displayed.
+   */
+  function queueTier3Validation(linkId, imageUrl, title, category, contentType) {
+    // Skip if already scored by Tier 3
+    const data = load();
+    const link = data.links.find(l => l.id === linkId);
+    if (link?.image_scores?.evaluation_method === 'tier3_ai_vision' ||
+        link?.image_scores?.evaluation_method === 'tier3_known_good') {
+      return;
+    }
+
+    console.log('%c[TIER 3] Queuing for AI validation:', 'color: #8b5cf6', imageUrl);
+    tier3Queue.push({ linkId, imageUrl, title, category, contentType });
+    if (!isProcessingTier3) {
+      processTier3Queue();
+    }
+  }
+
+  async function processTier3Queue() {
+    if (isProcessingTier3 || tier3Queue.length === 0) return;
+    isProcessingTier3 = true;
+
+    while (tier3Queue.length > 0) {
+      const item = tier3Queue.shift();
+      try {
+        console.log('%c[TIER 3] Evaluating:', 'color: #8b5cf6', item.imageUrl);
+        const result = await callValidateImage(item);
+
+        if (result?.scores) {
+          console.log('%c[TIER 3] Scores received:', 'color: #8b5cf6', {
+            composite: result.scores.composite,
+            tier: result.scores.tier,
+            safety: result.safety_tier,
+            cached: result.cached
+          });
+
+          // Update local link with full Tier 3 scores
+          const data = load();
+          const link = data.links.find(l => l.id === item.linkId);
+          if (link) {
+            link.image_scores = result.scores;
+            save(data);
+
+            // Handle downgrades
+            if (result.scores.tier === 'poor' || result.scores.tier === 'rejected' ||
+                result.safety_tier === 'blocked') {
+              console.log('%c[TIER 3] DOWNGRADE:', 'color: #e74c3c; font-weight: bold',
+                item.linkId, '→', result.scores.tier);
+              handleTier3Downgrade(item.linkId, result.scores);
+            } else if (result.scores.tier === 'marginal') {
+              console.log('%c[TIER 3] Marginal — queued for future enrichment:', 'color: #f39c12',
+                item.linkId);
+            }
+          }
+        } else if (result?.error === 'daily_budget_exhausted') {
+          console.log('%c[TIER 3] Daily budget exhausted, stopping queue', 'color: #f39c12');
+          tier3Queue.length = 0; // Clear remaining queue
+          break;
+        }
+      } catch (e) {
+        console.error('%c[TIER 3] Evaluation failed:', 'color: #e74c3c', e);
+      }
+
+      // Small delay between evaluations to avoid rate limiting
+      if (tier3Queue.length > 0) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    isProcessingTier3 = false;
+  }
+
+  async function callValidateImage({ linkId, imageUrl, title, category, contentType }) {
+    const accessToken = getAccessToken();
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/validate-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          title: title || '',
+          category: category || '',
+          content_type: contentType || '',
+          link_id: linkId
+        })
+      });
+
+      if (res.status === 429) {
+        return { error: 'daily_budget_exhausted' };
+      }
+      if (!res.ok) {
+        console.error('[TIER 3] API error:', res.status);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      console.error('[TIER 3] Network error:', e);
+      return null;
+    }
+  }
+
+  function handleTier3Downgrade(linkId, scores) {
+    // Remove the displayed image and show placeholder
+    const card = document.querySelector(`[data-id="${linkId}"]`);
+    if (card) {
+      const img = card.querySelector('.grid-item__image');
+      if (img) {
+        img.classList.add('grid-item__image--loading');
+        // After fade out, re-render to show placeholder
+        setTimeout(() => renderGrid(), 300);
+      }
+    }
+
+    // If safety blocked, clear the image entirely
+    if (scores.safety === 0) {
+      const data = load();
+      const link = data.links.find(l => l.id === linkId);
+      if (link) {
+        link.image = null;
+        link.image_source = 'blocked';
+        save(data);
+      }
+    }
+  }
 
   // ============================================
   // Server-Side Enrichment Queue
@@ -8109,6 +8248,11 @@ Return JSON:
               queueImageResolution(id, url, meta.title, meta.description, contentType.type);
             }
             queueServerEnrichment(id, url, meta.title, meta.description);
+          }
+
+          // Queue Tier 3 AI vision validation for images that passed Tier 1
+          if (meta.image) {
+            queueTier3Validation(id, meta.image, meta.title, cat.category, contentType.type);
           }
 
           // Sync to Supabase
