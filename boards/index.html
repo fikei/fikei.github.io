@@ -7028,12 +7028,17 @@ Return JSON:
 
   function normalizeUrl(url) {
     if (!url) return null;
-    let n = url.trim().toLowerCase();
-    if (!n.startsWith('http://') && !n.startsWith('https://')) {
+    let n = url.trim();
+    if (!n.toLowerCase().startsWith('http://') && !n.toLowerCase().startsWith('https://')) {
       n = 'https://' + n;
     }
     n = n.replace(/\/+$/, '');
-    try { new URL(n); return n; } catch { return null; }
+    try {
+      const parsed = new URL(n);
+      // Only lowercase scheme + hostname (case-insensitive per RFC)
+      // Preserve path case (Spotify, Bandcamp etc. use case-sensitive IDs)
+      return parsed.origin.toLowerCase() + parsed.pathname + parsed.search + parsed.hash;
+    } catch { return null; }
   }
 
   function extractDomain(url) {
