@@ -79,14 +79,14 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 1: Foundation | 18 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 12 | 0 | 0 | 0 |
 | Phase 3: AI Intelligence | 113 | 3 | 253 | 0 |
-| Phase 4: Sharing & Collaboration | 8 | 8 | 72 | 2 |
+| Phase 4: Sharing & Collaboration | 8 | 8 | 73 | 1 |
 | Phase 5: UX Polish | 3 | 0 | 67 | 0 |
 | Phase 6: Performance | 1 | 0 | 26 | 0 |
 | Phase 7: Platform Expansion | 0 | 0 | 17 | 0 |
 | Phase 8: Automated Pins | 0 | 0 | 65 | 0 |
 | Phase 9: Bulk Import | 0 | 0 | 105 | 0 |
 | Backlog | 0 | 0 | 83 | 0 |
-| **TOTAL** | **155** | **11** | **688** | **2** |
+| **TOTAL** | **155** | **11** | **689** | **1** |
 
 ---
 
@@ -108,7 +108,6 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 
 | Item | Blocker | Owner |
 |------|---------|-------|
-| Email invitations for collaborative boards | Resend API setup required | Human |
 | Push notifications | FCM/APNs setup required | Human |
 
 ---

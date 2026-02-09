@@ -82,11 +82,11 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Story 5: Invite Members via Email** | | Blocked |
+| **Story 5: Invite Members via Email** | | Pending |
 | | Build members management modal | Pending |
 | | Email input with "Send Invite" button | Pending |
 | | Create invite record (pending status) | Pending |
-| | Send magic link via Supabase/Resend | Blocked (Needs Resend API) |
+| | Send magic link via Supabase/Resend | Pending |
 | | Handle invite acceptance flow | Pending |
 
 | Story | Tasks | Status |
