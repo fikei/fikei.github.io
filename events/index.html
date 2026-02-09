@@ -56,17 +56,38 @@ body {
   flex-wrap: wrap;
 }
 
-.sources-bar__label {
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  margin-right: var(--space-1);
+.sources-bar__chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  flex: 1;
 }
 
 .source-chip__count {
   margin-left: var(--space-1);
   opacity: 0.6;
+}
+
+.sources-bar__filter-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.sources-bar__filter-btn.active {
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+.sources-bar__filter-btn .filter-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fg);
+  display: inline-block;
 }
 
 /* Filter bar overrides */
@@ -941,19 +962,19 @@ body {
 
     <!-- Sources bar -->
     <div class="sources-bar">
-      <span class="sources-bar__label">Sources:</span>
-      <div id="sourceChips"></div>
+      <div class="sources-bar__chips" id="sourceChips"></div>
       <button class="btn btn--sm btn--dashed" id="addSourceBtn">+ Add Source</button>
+      <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
+        Filter
+      </button>
     </div>
 
-    <!-- Filters — DS: .filter-bar -->
-    <div class="filter-bar">
+    <!-- Filters — DS: .filter-bar (collapsible) -->
+    <div class="filter-bar filter-bar--collapsible" id="filterBar" style="display:none">
       <input type="text" class="input input--search" id="filterSearch" placeholder="Search events..." autocomplete="off">
       <select class="input select" id="filterCity">
         <option value="">All Cities</option>
-      </select>
-      <select class="input select" id="filterSource">
-        <option value="">All Sources</option>
       </select>
       <input type="date" class="input input--date" id="filterDateFrom" title="From date">
       <input type="date" class="input input--date" id="filterDateTo" title="To date">
@@ -1999,6 +2020,18 @@ body {
 
     renderSourceChips();
 
+    // Update filter button indicator (show dot when non-source filters are active)
+    const filterBtn = document.getElementById('filterToggleBtn');
+    const hasNonSourceFilters = state.filters.search || state.filters.city || state.filters.dateFrom || state.filters.dateTo;
+    const existingDot = filterBtn.querySelector('.filter-dot');
+    if (hasNonSourceFilters && !existingDot) {
+      const dot = document.createElement('span');
+      dot.className = 'filter-dot';
+      filterBtn.appendChild(dot);
+    } else if (!hasNonSourceFilters && existingDot) {
+      existingDot.remove();
+    }
+
     // View toggle active state
     document.querySelectorAll('.view-toggle__btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.view === state.view);
@@ -2384,15 +2417,23 @@ body {
 
   function renderSourceChips() {
     const container = document.getElementById('sourceChips');
-    container.innerHTML = state.sources.map(s => {
+    const activeSource = state.filters.source;
+    const allActive = !activeSource;
+
+    // Build "All" chip + source chips
+    let html = `<button class="token ${allActive ? 'token--active' : ''}" data-source-id="">All</button>`;
+    html += state.sources.filter(s => s.enabled).map(s => {
       const count = state.events.filter(e => e.source === s.id).length;
-      return `<button class="token ${s.enabled ? 'token--active' : ''}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span></button>`;
+      const isActive = activeSource === s.id;
+      return `<button class="token ${isActive ? 'token--active' : ''}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span></button>`;
     }).join('');
+    container.innerHTML = html;
 
     container.querySelectorAll('.token').forEach(chip => {
       chip.addEventListener('click', () => {
-        const source = state.sources.find(s => s.id === chip.dataset.sourceId);
-        if (source) { source.enabled = !source.enabled; saveSources(); fetchAllSources(); }
+        const sourceId = chip.dataset.sourceId;
+        state.filters.source = sourceId;
+        render();
       });
     });
   }
@@ -2415,7 +2456,6 @@ body {
     state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' };
     document.getElementById('filterSearch').value = '';
     document.getElementById('filterCity').value = '';
-    document.getElementById('filterSource').value = '';
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
     updateContentTypeFilter();
@@ -2458,10 +2498,6 @@ body {
     const citySelect = document.getElementById('filterCity');
     const cc = citySelect.value;
     citySelect.innerHTML = '<option value="">All Cities</option>' + cities.map(c => `<option value="${escHtml(c)}" ${c === cc ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
-
-    const sourceSelect = document.getElementById('filterSource');
-    const cs = sourceSelect.value;
-    sourceSelect.innerHTML = '<option value="">All Sources</option>' + state.sources.map(s => `<option value="${escHtml(s.id)}" ${s.id === cs ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('');
   }
 
   // --- Sorting ---
@@ -2525,15 +2561,27 @@ body {
       localStorage.setItem('theme', root.classList.contains('light') ? 'light' : 'dark');
     });
 
+    // Filter toggle button
+    const filterToggleBtn = document.getElementById('filterToggleBtn');
+    const filterBar = document.getElementById('filterBar');
+    filterToggleBtn.addEventListener('click', () => {
+      const visible = filterBar.style.display !== 'none';
+      filterBar.style.display = visible ? 'none' : '';
+      filterToggleBtn.classList.toggle('active', !visible);
+    });
+
     // Filters
     const filterSearch = document.getElementById('filterSearch');
     let debounceTimer;
     filterSearch.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { state.filters.search = filterSearch.value; render(); }, 150); });
     document.getElementById('filterCity').addEventListener('change', (e) => { state.filters.city = e.target.value; render(); });
-    document.getElementById('filterSource').addEventListener('change', (e) => { state.filters.source = e.target.value; render(); });
     document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
     document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
-    document.getElementById('filterClear').addEventListener('click', clearAllFilters);
+    document.getElementById('filterClear').addEventListener('click', () => {
+      clearAllFilters();
+      filterBar.style.display = 'none';
+      filterToggleBtn.classList.remove('active');
+    });
     document.getElementById('emptyClear').addEventListener('click', clearAllFilters);
 
     // Column sorting
