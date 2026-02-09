@@ -27,6 +27,14 @@
   --color-error: #c00;
   --color-warning: #f90;
 
+  /* Platform colors (music) */
+  --color-spotify: #1DB954;
+  --color-soundcloud: #FF5500;
+  --color-apple-music: #FC3C44;
+  --color-bandcamp: #1DA0C3;
+  --color-tidal: #00FFFF;
+  --color-youtube-music: #FF0000;
+
   /* Overlays */
   --overlay-light: rgba(0, 0, 0, 0.5);
   --overlay-medium: rgba(0, 0, 0, 0.8);

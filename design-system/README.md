@@ -56,6 +56,12 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 | `--fg-muted` | `#888` | Secondary text |
 | `--border` | `#fff` | Borders, dividers |
 | `--border-subtle` | `#333` | Subtle dividers |
+| `--color-spotify` | `#1DB954` | Spotify platform accent |
+| `--color-soundcloud` | `#FF5500` | SoundCloud platform accent |
+| `--color-apple-music` | `#FC3C44` | Apple Music platform accent |
+| `--color-bandcamp` | `#1DA0C3` | Bandcamp platform accent |
+| `--color-tidal` | `#00FFFF` | Tidal platform accent |
+| `--color-youtube-music` | `#FF0000` | YouTube Music platform accent |
 
 ### Typography
 
@@ -427,6 +433,48 @@ Vertical label + value for statistics. Extracted from Systemic.
 - Uses CSS Grid with `grid-auto-flow: dense` for automatic gap filling
 - Responsive columns: 2 (mobile) → 3 → 4 → 5 (large screens)
 - Expanded items (2x2 or 3x2) trigger reflow of smaller items
+
+### Music Card (Listen Category)
+
+Grid item variant for music/audio links. Album art shows in full color (no grayscale), with two-line artist/track text, a format+duration badge, and a platform icon dot.
+
+```html
+<!-- Collapsed (1x1) music card -->
+<article class="grid-item grid-item--listen" data-id="...">
+  <img class="grid-item__image" src="album-art.jpg" alt="" loading="lazy">
+  <div class="grid-item__overlay">
+    <span class="grid-item__artist">Artist Name</span>
+    <span class="grid-item__track">Track Title</span>
+  </div>
+  <span class="grid-item__category">Listen</span>
+  <div class="grid-item__format-badge">
+    <span class="grid-item__platform-icon grid-item__platform-icon--spotify"></span>
+    Track · 3:24
+  </div>
+</article>
+```
+
+**Music card behavior:**
+- `.grid-item--listen` removes grayscale filter from album art (always full color)
+- `.grid-item__artist` — bold uppercase artist name, single line with ellipsis
+- `.grid-item__track` — muted track title, single line with ellipsis
+- `.grid-item__format-badge` — bottom-left badge showing format (Track, Album, etc.) and duration
+- `.grid-item__platform-icon` — 8px colored dot indicating music platform
+- Platform icon modifiers: `--spotify`, `--soundcloud`, `--apple-music`, `--bandcamp`, `--tidal`, `--youtube-music`
+
+### Listen Grid Override
+
+Tighter grid layout used when the listen category is active.
+
+```html
+<main class="grid grid--listen" id="grid">
+  <!-- Music cards render here -->
+</main>
+```
+
+**Listen grid behavior:**
+- 8px gap (vs default 16px) for a denser album-art wall
+- Applied dynamically when `currentFilter === 'listen'`
 
 ### Sub-Tags
 
