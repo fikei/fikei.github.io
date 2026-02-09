@@ -83,44 +83,68 @@ ALTER TABLE board_invites ENABLE ROW LEVEL SECURITY;
 
 -- Shared Boards Policies
 -- Owner can do everything
-CREATE POLICY "Users can manage own shared boards"
-  ON shared_boards FOR ALL
-  USING (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can manage own shared boards' AND tablename = 'shared_boards') THEN
+    CREATE POLICY "Users can manage own shared boards"
+      ON shared_boards FOR ALL
+      USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Anyone can view link/public boards
-CREATE POLICY "Anyone can view link or public boards"
-  ON shared_boards FOR SELECT
-  USING (visibility IN ('link', 'public'));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can view link or public boards' AND tablename = 'shared_boards') THEN
+    CREATE POLICY "Anyone can view link or public boards"
+      ON shared_boards FOR SELECT
+      USING (visibility IN ('link', 'public'));
+  END IF;
+END $$;
 
 -- Board Views Policies
 -- Anyone can insert a view (anonymous tracking)
-CREATE POLICY "Anyone can record a view"
-  ON board_views FOR INSERT
-  WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can record a view' AND tablename = 'board_views') THEN
+    CREATE POLICY "Anyone can record a view"
+      ON board_views FOR INSERT
+      WITH CHECK (true);
+  END IF;
+END $$;
 
 -- Board owner can see their views
-CREATE POLICY "Owners can view their board analytics"
-  ON board_views FOR SELECT
-  USING (
-    board_id IN (
-      SELECT id FROM shared_boards WHERE user_id = auth.uid()
-    )
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Owners can view their board analytics' AND tablename = 'board_views') THEN
+    CREATE POLICY "Owners can view their board analytics"
+      ON board_views FOR SELECT
+      USING (
+        board_id IN (
+          SELECT id FROM shared_boards WHERE user_id = auth.uid()
+        )
+      );
+  END IF;
+END $$;
 
 -- Board Invites Policies
 -- Owner can manage invites
-CREATE POLICY "Owners can manage invites"
-  ON board_invites FOR ALL
-  USING (
-    board_id IN (
-      SELECT id FROM shared_boards WHERE user_id = auth.uid()
-    )
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Owners can manage invites' AND tablename = 'board_invites') THEN
+    CREATE POLICY "Owners can manage invites"
+      ON board_invites FOR ALL
+      USING (
+        board_id IN (
+          SELECT id FROM shared_boards WHERE user_id = auth.uid()
+        )
+      );
+  END IF;
+END $$;
 
 -- Invitees can see their own invites
-CREATE POLICY "Users can see their invites"
-  ON board_invites FOR SELECT
-  USING (email = auth.email());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can see their invites' AND tablename = 'board_invites') THEN
+    CREATE POLICY "Users can see their invites"
+      ON board_invites FOR SELECT
+      USING (email = auth.email());
+  END IF;
+END $$;
 
 -- ============================================
 -- Helper function: Generate unique slug

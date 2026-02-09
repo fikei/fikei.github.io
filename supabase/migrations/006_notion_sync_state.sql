@@ -69,10 +69,26 @@ ALTER TABLE sync_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE structure_state ENABLE ROW LEVEL SECURITY;
 
 -- Policies for service role access (notion-sync function uses service key)
-CREATE POLICY "Allow service role full access" ON sync_state FOR ALL USING (true);
-CREATE POLICY "Allow service role full access" ON block_state FOR ALL USING (true);
-CREATE POLICY "Allow service role full access" ON sync_log FOR ALL USING (true);
-CREATE POLICY "Allow service role full access" ON structure_state FOR ALL USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow service role full access' AND tablename = 'sync_state') THEN
+    CREATE POLICY "Allow service role full access" ON sync_state FOR ALL USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow service role full access' AND tablename = 'block_state') THEN
+    CREATE POLICY "Allow service role full access" ON block_state FOR ALL USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow service role full access' AND tablename = 'sync_log') THEN
+    CREATE POLICY "Allow service role full access" ON sync_log FOR ALL USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow service role full access' AND tablename = 'structure_state') THEN
+    CREATE POLICY "Allow service role full access" ON structure_state FOR ALL USING (true);
+  END IF;
+END $$;
 
 -- Function to update sync_state.updated_at
 CREATE OR REPLACE FUNCTION update_sync_state_timestamp()
@@ -84,13 +100,21 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for updated_at
-CREATE TRIGGER sync_state_updated_at
-  BEFORE UPDATE ON sync_state
-  FOR EACH ROW EXECUTE FUNCTION update_sync_state_timestamp();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'sync_state_updated_at') THEN
+    CREATE TRIGGER sync_state_updated_at
+      BEFORE UPDATE ON sync_state
+      FOR EACH ROW EXECUTE FUNCTION update_sync_state_timestamp();
+  END IF;
+END $$;
 
-CREATE TRIGGER structure_state_updated_at
-  BEFORE UPDATE ON structure_state
-  FOR EACH ROW EXECUTE FUNCTION update_sync_state_timestamp();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'structure_state_updated_at') THEN
+    CREATE TRIGGER structure_state_updated_at
+      BEFORE UPDATE ON structure_state
+      FOR EACH ROW EXECUTE FUNCTION update_sync_state_timestamp();
+  END IF;
+END $$;
 
 -- Helper function: Get pages that need sync (changed since last sync)
 CREATE OR REPLACE FUNCTION get_dirty_pages()

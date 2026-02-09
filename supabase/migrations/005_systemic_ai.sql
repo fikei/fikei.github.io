@@ -130,30 +130,102 @@ ALTER TABLE ghost_components ENABLE ROW LEVEL SECURITY;
 ALTER TABLE component_relationships ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for public access (adjust as needed for auth)
-CREATE POLICY "Allow public read access" ON audit_jobs FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON audit_jobs FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update" ON audit_jobs FOR UPDATE USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'audit_jobs') THEN
+    CREATE POLICY "Allow public read access" ON audit_jobs FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'audit_jobs') THEN
+    CREATE POLICY "Allow public insert" ON audit_jobs FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public update' AND tablename = 'audit_jobs') THEN
+    CREATE POLICY "Allow public update" ON audit_jobs FOR UPDATE USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Allow public read access" ON design_systems FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON design_systems FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update" ON design_systems FOR UPDATE USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'design_systems') THEN
+    CREATE POLICY "Allow public read access" ON design_systems FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'design_systems') THEN
+    CREATE POLICY "Allow public insert" ON design_systems FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public update' AND tablename = 'design_systems') THEN
+    CREATE POLICY "Allow public update" ON design_systems FOR UPDATE USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Allow public read access" ON design_tokens FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON design_tokens FOR INSERT WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'design_tokens') THEN
+    CREATE POLICY "Allow public read access" ON design_tokens FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'design_tokens') THEN
+    CREATE POLICY "Allow public insert" ON design_tokens FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Allow public read access" ON design_components FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON design_components FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update" ON design_components FOR UPDATE USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'design_components') THEN
+    CREATE POLICY "Allow public read access" ON design_components FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'design_components') THEN
+    CREATE POLICY "Allow public insert" ON design_components FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public update' AND tablename = 'design_components') THEN
+    CREATE POLICY "Allow public update" ON design_components FOR UPDATE USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Allow public read access" ON crawl_pages FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON crawl_pages FOR INSERT WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'crawl_pages') THEN
+    CREATE POLICY "Allow public read access" ON crawl_pages FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'crawl_pages') THEN
+    CREATE POLICY "Allow public insert" ON crawl_pages FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Allow public read access" ON ghost_components FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON ghost_components FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update" ON ghost_components FOR UPDATE USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'ghost_components') THEN
+    CREATE POLICY "Allow public read access" ON ghost_components FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'ghost_components') THEN
+    CREATE POLICY "Allow public insert" ON ghost_components FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public update' AND tablename = 'ghost_components') THEN
+    CREATE POLICY "Allow public update" ON ghost_components FOR UPDATE USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Allow public read access" ON component_relationships FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON component_relationships FOR INSERT WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public read access' AND tablename = 'component_relationships') THEN
+    CREATE POLICY "Allow public read access" ON component_relationships FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow public insert' AND tablename = 'component_relationships') THEN
+    CREATE POLICY "Allow public insert" ON component_relationships FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
 
 -- Function to update design_systems.updated_at
 CREATE OR REPLACE FUNCTION update_design_system_timestamp()
@@ -165,10 +237,18 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers to update timestamps
-CREATE TRIGGER update_design_system_on_token_change
-  AFTER INSERT OR UPDATE ON design_tokens
-  FOR EACH ROW EXECUTE FUNCTION update_design_system_timestamp();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_design_system_on_token_change') THEN
+    CREATE TRIGGER update_design_system_on_token_change
+      AFTER INSERT OR UPDATE ON design_tokens
+      FOR EACH ROW EXECUTE FUNCTION update_design_system_timestamp();
+  END IF;
+END $$;
 
-CREATE TRIGGER update_design_system_on_component_change
-  AFTER INSERT OR UPDATE ON design_components
-  FOR EACH ROW EXECUTE FUNCTION update_design_system_timestamp();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_design_system_on_component_change') THEN
+    CREATE TRIGGER update_design_system_on_component_change
+      AFTER INSERT OR UPDATE ON design_components
+      FOR EACH ROW EXECUTE FUNCTION update_design_system_timestamp();
+  END IF;
+END $$;
