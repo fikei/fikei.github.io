@@ -28,6 +28,8 @@ import { discoverMore } from './widgets/discover-more.ts'
 import { stylePick } from './widgets/style-pick.ts'
 import { outfitChecklist } from './widgets/outfit-checklist.ts'
 import { boardOverview } from './widgets/board-overview.ts'
+import { soundShelf } from './widgets/sound-shelf.ts'
+import { listenNext } from './widgets/listen-next.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -47,6 +49,8 @@ const registry: WidgetRegistry = {
     'style-pick': stylePick,
     'outfit-checklist': outfitChecklist,
     'board-overview': boardOverview,
+    'sound-shelf': soundShelf,
+    'listen-next': listenNext,
   },
 
   defaults: {
