@@ -195,9 +195,9 @@ When working on this project, always follow these guidelines:
 Claude Code is authorized to perform the following operations **without asking for confirmation**:
 
 ### Git & GitHub
-- **Merge PRs to master** using `gh pr merge` after CI checks pass
+- **Always create a PR to merge into master** — never push to master directly
+- **Assign all PRs to `fikei`** so they appear in the GitHub mobile app for quick merge
 - **Create and push branches** for feature work
-- **Create pull requests** with appropriate titles and descriptions
 - **Close stale branches** after successful merges
 
 ### Supabase Deployment
