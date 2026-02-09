@@ -1033,3 +1033,84 @@ body {
 .mt-4 { margin-top: var(--space-4); }
 .mb-2 { margin-bottom: var(--space-2); }
 .mb-4 { margin-bottom: var(--space-4); }
+
+/* ============================================
+   Music Card (Listen Category)
+   Grid item variant for music/audio links.
+   No grayscale on album art, two-line
+   artist/track text, format+duration badge,
+   platform icon dot.
+   ============================================ */
+
+/* Listen variant — collapsed (1×1) */
+.grid-item--listen .grid-item__image {
+  filter: none;
+}
+
+.grid-item--listen:hover .grid-item__image {
+  filter: none;
+}
+
+/* Artist line */
+.grid-item__artist {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--leading-tight);
+}
+
+/* Track title line */
+.grid-item__track {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--leading-tight);
+}
+
+/* Format + duration badge */
+.grid-item__format-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 6px;
+  font-family: var(--font-primary);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  border: var(--border-thin) solid var(--border-subtle);
+  background: transparent;
+}
+
+/* Platform icon dot */
+.grid-item__platform-icon {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.grid-item__platform-icon--spotify { background: var(--color-spotify); }
+.grid-item__platform-icon--soundcloud { background: var(--color-soundcloud); }
+.grid-item__platform-icon--apple-music { background: var(--color-apple-music); }
+.grid-item__platform-icon--bandcamp { background: var(--color-bandcamp); }
+.grid-item__platform-icon--tidal { background: var(--color-tidal); }
+.grid-item__platform-icon--youtube-music { background: var(--color-youtube-music); }
+
+/* ============================================
+   Listen Grid Override
+   Tighter gaps for the listen category view.
+   ============================================ */
+.grid--listen {
+  gap: var(--space-2);
+}

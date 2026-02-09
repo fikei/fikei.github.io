@@ -1483,6 +1483,128 @@ body {
 }
 
 /* ============================================
+   Music Card (Listen Category)
+   ============================================ */
+
+/* Platform colors */
+:root {
+  --color-spotify: #1DB954;
+  --color-soundcloud: #FF5500;
+  --color-apple-music: #FC3C44;
+  --color-bandcamp: #1DA0C3;
+  --color-tidal: #00FFFF;
+  --color-youtube-music: #FF0000;
+}
+
+/* Listen variant — no grayscale on album art */
+.grid-item--listen .grid-item__image {
+  filter: none;
+}
+
+.grid-item--listen:hover .grid-item__image {
+  filter: none;
+}
+
+/* Listen overlay: artist + track two-line layout */
+.grid-item--listen .grid-item__overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Artist line */
+.grid-item__artist {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Track title line */
+.grid-item__track {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Format + duration badge (bottom-left) */
+.grid-item__format-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+  background: var(--bg);
+  border-top: 1px solid var(--fg);
+  border-right: 1px solid var(--fg);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.grid-item--listen:hover .grid-item__format-badge {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .grid-item--listen:active .grid-item__format-badge,
+  .grid-item--listen.grid-item--tapped .grid-item__format-badge {
+    opacity: 1;
+  }
+}
+
+/* Platform icon dot */
+.grid-item__platform-icon {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.grid-item__platform-icon--spotify { background: var(--color-spotify); }
+.grid-item__platform-icon--soundcloud { background: var(--color-soundcloud); }
+.grid-item__platform-icon--apple-music { background: var(--color-apple-music); }
+.grid-item__platform-icon--bandcamp { background: var(--color-bandcamp); }
+.grid-item__platform-icon--tidal { background: var(--color-tidal); }
+.grid-item__platform-icon--youtube-music { background: var(--color-youtube-music); }
+
+/* Expanded listen cards — show artist/track in details */
+.grid-item--listen.grid-item--expanded-medium .grid-item__format-badge,
+.grid-item--listen.grid-item--expanded-large .grid-item__format-badge {
+  opacity: 1;
+  position: static;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  width: fit-content;
+}
+
+/* ============================================
+   Listen Grid Override
+   ============================================ */
+.grid--listen {
+  gap: 8px;
+}
+
+/* ============================================
    Empty State
    ============================================ */
 .empty-state {
@@ -6229,27 +6351,14 @@ Return JSON:
 
   async function fetchOembed(oembedUrl, cacheKey) {
     if (oembedCache[cacheKey]) return oembedCache[cacheKey];
-
-    // Try direct fetch first, then CORS proxy fallback
-    // (most oEmbed endpoints don't have CORS headers for browser requests)
-    const urls = [
-      oembedUrl,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(oembedUrl)}`
-    ];
-
-    for (const url of urls) {
-      try {
-        const resp = await fetchWithTimeout(url, 5000);
-        if (resp.ok) {
-          const text = await resp.text();
-          const data = JSON.parse(text);
-          oembedCache[cacheKey] = data;
-          return data;
-        }
-      } catch (e) { /* try next */ }
-    }
-
-    console.warn('[oembed] All attempts failed:', cacheKey);
+    try {
+      const resp = await fetch(oembedUrl);
+      if (resp.ok) {
+        const data = await resp.json();
+        oembedCache[cacheKey] = data;
+        return data;
+      }
+    } catch (e) { console.warn('[oembed] Fetch failed:', cacheKey, e.message); }
     return null;
   }
 
@@ -6263,18 +6372,9 @@ Return JSON:
         const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?]+)/)?.[1];
         console.log('%c[PLATFORM] YouTube detected, videoId:', 'color: #e67e22', videoId);
         if (videoId) {
-          // Try hqdefault first, fall back to mqdefault (more reliably available)
-          for (const quality of ['hqdefault', 'mqdefault']) {
-            const imageUrl = `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
-            try {
-              const check = await fetchWithTimeout(imageUrl, 3000);
-              if (check.ok) {
-                console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
-                return { imageUrl, source: 'platform_api' };
-              }
-            } catch (e) { /* try next quality */ }
-          }
-          console.log('%c[PLATFORM] YouTube thumbnail not found (video may be deleted/private)', 'color: #e74c3c', videoId);
+          const imageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
+          return { imageUrl, source: 'platform_api' };
         }
       }
 
@@ -6351,6 +6451,38 @@ Return JSON:
       console.error('[image] Search error:', e);
     }
 
+    return null;
+  }
+
+  // ============================================
+  // Music Utilities
+  // ============================================
+
+  // Formats a duration in seconds to a human-readable string.
+  // e.g. 204 → "3:24", 3661 → "1:01:01", 0 → "0:00", null → null
+  function formatDuration(seconds) {
+    if (seconds == null || isNaN(seconds) || seconds < 0) return null;
+    seconds = Math.round(seconds);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  // Returns the platform key from a link's domain for icon rendering.
+  // e.g. "open.spotify.com" → "spotify", "soundcloud.com" → "soundcloud"
+  function getMusicPlatform(domain) {
+    if (!domain) return null;
+    const d = domain.toLowerCase();
+    if (d.includes('spotify.com')) return 'spotify';
+    if (d.includes('soundcloud.com')) return 'soundcloud';
+    if (d.includes('music.apple.com')) return 'apple-music';
+    if (d.includes('bandcamp.com')) return 'bandcamp';
+    if (d.includes('tidal.com')) return 'tidal';
+    if (d.includes('music.youtube.com')) return 'youtube-music';
     return null;
   }
 
@@ -6804,7 +6936,6 @@ Return JSON:
   // Call enrichment API with retry logic
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
     let lastError = null;
-    const accessToken = getAccessToken();
 
     for (let attempt = 0; attempt <= ENRICHMENT_MAX_RETRIES; attempt++) {
       try {
@@ -6814,15 +6945,8 @@ Return JSON:
           await sleep(delay);
         }
 
-        // Use raw fetch with anon key fallback (matches categorize/validate-image pattern)
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
+        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
+          body: {
             url: item.url,
             title: item.title,
             description: item.description,
@@ -6831,25 +6955,19 @@ Return JSON:
             skipIfHasImage: !forceRefresh && !!currentImage,
             skipClassification: item.skipClassification || false,
             forceRefresh: forceRefresh
-          })
+          }
         });
 
-        // Don't retry auth errors — they won't resolve on retry
-        if (res.status === 401 || res.status === 403) {
-          console.error(`%c[ENRICH] Auth error (${res.status}) — not retrying`, 'color: #e74c3c');
-          return { success: false, error: new Error(`Auth error: ${res.status}`) };
-        }
-
-        if (!res.ok) {
-          const isRetryable = res.status >= 500;
+        if (error) {
+          // Check if it's a retryable error (network, 5xx)
+          const isRetryable = !error.message?.includes('400') && !error.message?.includes('401');
           if (isRetryable && attempt < ENRICHMENT_MAX_RETRIES) {
-            lastError = new Error(`HTTP ${res.status}`);
+            lastError = error;
             continue;
           }
-          throw new Error(`HTTP ${res.status}`);
+          throw new Error(error.message || 'Server error');
         }
 
-        const result = await res.json();
         return { success: true, result };
       } catch (e) {
         lastError = e;
@@ -7028,17 +7146,12 @@ Return JSON:
 
   function normalizeUrl(url) {
     if (!url) return null;
-    let n = url.trim();
-    if (!n.toLowerCase().startsWith('http://') && !n.toLowerCase().startsWith('https://')) {
+    let n = url.trim().toLowerCase();
+    if (!n.startsWith('http://') && !n.startsWith('https://')) {
       n = 'https://' + n;
     }
     n = n.replace(/\/+$/, '');
-    try {
-      const parsed = new URL(n);
-      // Only lowercase scheme + hostname (case-insensitive per RFC)
-      // Preserve path case (Spotify, Bandcamp etc. use case-sensitive IDs)
-      return parsed.origin.toLowerCase() + parsed.pathname + parsed.search + parsed.hash;
-    } catch { return null; }
+    try { new URL(n); return n; } catch { return null; }
   }
 
   function extractDomain(url) {
@@ -7123,30 +7236,10 @@ Return JSON:
     }
 
     try {
-      // Detect error pages — if the HTML looks like a 404/error page, skip metadata extraction
-      const ERROR_TITLE_PATTERNS = [
-        /page\s*not\s*found/i, /404\s*(error|not found)?/i, /not\s*found/i,
-        /access\s*denied/i, /403\s*forbidden/i, /error\s*\d{3}/i,
-        /something\s*went\s*wrong/i, /unavailable/i, /page\s*doesn'?t?\s*exist/i,
-        /sorry.*couldn'?t?\s*find/i, /this\s*page\s*isn'?t?\s*available/i
-      ];
-
-      const rawTitle = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-      const rawOgTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
-                         html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:title["']/i);
-      const extractedTitle = rawOgTitle ? decodeEntities(rawOgTitle[1]) : rawTitle ? decodeEntities(rawTitle[1]) : '';
-
-      const isErrorPage = ERROR_TITLE_PATTERNS.some(p => p.test(extractedTitle));
-      if (isErrorPage) {
-        console.log('%c[FETCH] Error page detected, skipping metadata:', 'color: #e74c3c', extractedTitle);
-        meta.title = generateTitleFromUrl(url);
-        meta._errorPage = true;
-        return meta;
-      }
-
       // Title
-      const ogTitle = rawOgTitle;
-      const title = rawTitle;
+      const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
+                      html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:title["']/i);
+      const title = html.match(/<title[^>]*>([^<]*)<\/title>/i);
       if (ogTitle) meta.title = decodeEntities(ogTitle[1]);
       else if (title) meta.title = decodeEntities(title[1]);
 
@@ -7792,30 +7885,7 @@ Return JSON:
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        console.error('[sync] Upload failed:', res.status, body);
-
-        // If 400, retry without enrichment fields (table may not have these columns yet)
-        if (res.status === 400 && (payload.content_type !== undefined || payload.image_scores !== undefined)) {
-          console.log('[sync] Retrying without enrichment fields...');
-          const { content_type, type_confidence, image_source, image_scores, ...corePayload } = payload;
-          const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Prefer': 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify(corePayload)
-          });
-          if (retry.ok) {
-            console.log('[sync] Uploaded (core fields only):', link.url);
-          } else {
-            const retryBody = await retry.text().catch(() => '');
-            console.error('[sync] Core retry also failed:', retry.status, retryBody);
-          }
-        }
+        console.error('[sync] Upload failed:', res.status);
       } else {
         console.log('[sync] Uploaded:', link.url);
       }
@@ -8314,6 +8384,9 @@ Return JSON:
   }
 
   function renderGrid(newIds = []) {
+    // Toggle listen grid override
+    grid.classList.toggle('grid--listen', currentFilter === 'listen');
+
     const newIdSet = new Set(newIds);
     const allLinks = getAllLinks();
     // Filter by category, then by search query
@@ -8446,6 +8519,22 @@ Return JSON:
       const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
       const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="Enrichment failed - click Refresh Image to retry">!</span>` : '';
       const loadingClass = l.loading ? ' grid-item--loading' : '';
+
+      // Build music-specific details for expanded listen cards
+      const _music = l.category === 'listen' ? l.music : null;
+      let musicDetailsHtml = '';
+      if (_music) {
+        const parts = [];
+        if (_music.artist) parts.push(`<span>${esc(_music.artist)}</span>`);
+        if (_music.albumTitle) parts.push(`<span>${esc(_music.albumTitle)}</span>`);
+        if (_music.genre) parts.push(`<span>${esc(_music.genre)}</span>`);
+        const durStr = formatDuration(_music.duration);
+        if (durStr) parts.push(`<span>${durStr}</span>`);
+        if (parts.length > 0) {
+          musicDetailsHtml = `<div class="grid-item__details-meta">${parts.join('')}</div>`;
+        }
+      }
+
       const detailsHtml = `
         <div class="grid-item__menu-container">
           <button class="grid-item__menu-btn" data-action="menu" aria-label="More options"></button>
@@ -8460,9 +8549,10 @@ Return JSON:
           </div>
         </div>
         <div class="grid-item__details">
-          <h2 class="grid-item__details-title">${esc(l.title)}</h2>
-          <p class="grid-item__details-domain">${esc(l.domain)}</p>
+          <h2 class="grid-item__details-title">${esc(_music?.trackTitle || l.title)}</h2>
+          <p class="grid-item__details-domain">${esc(_music?.artist || l.domain)}</p>
           ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
+          ${musicDetailsHtml}
           <div class="grid-item__details-meta">
             <span>${cap(l.category)}</span>
             ${contentTypeDisplay ? `<span>${contentTypeDisplay}</span>` : ''}
@@ -8474,27 +8564,56 @@ Return JSON:
         </div>
         <div class="grid-item__resize" data-action="resize"></div>`;
 
+      // Determine if this is a listen (music) card
+      const isListen = l.category === 'listen';
+      const listenClass = isListen ? ' grid-item--listen' : '';
+      const music = isListen ? l.music : null;
+
+      // Build format badge for listen cards
+      let formatBadgeHtml = '';
+      if (isListen) {
+        const platform = getMusicPlatform(l.domain);
+        const platformDot = platform ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platform}"></span>` : '';
+        const fmt = music?.contentFormat ? cap(music.contentFormat.replace('-', ' ')) : '';
+        const dur = music?.duration ? formatDuration(music.duration) : '';
+        const badgeText = [fmt, dur].filter(Boolean).join(' · ');
+        if (badgeText || platformDot) {
+          formatBadgeHtml = `<span class="grid-item__format-badge">${platformDot}${badgeText ? esc(badgeText) : ''}</span>`;
+        }
+      }
+
       if (hasImg) {
         // Show sub-tag when filtered into a category, otherwise show category
         const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
           ? (getSubTag(l) || l.category)
           : l.category;
-        html += `<article class="grid-item${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+
+        // Listen cards use artist/track overlay instead of title/domain
+        let overlayHtml;
+        if (isListen && music && (music.artist || music.trackTitle)) {
+          overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__artist">${esc(music.artist || '')}</span><span class="grid-item__track">${esc(music.trackTitle || l.title)}</span></div>`;
+        } else {
+          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>`;
+        }
+
+        html += `<article class="grid-item${listenClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
-          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy" onerror="this.style.display='none'">
-          <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
+          ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
+          ${formatBadgeHtml}
           ${detailsHtml}
         </article>`;
       } else {
         const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
           ? (getSubTag(l) || l.category)
           : l.category;
-        html += `<article class="grid-item grid-item--placeholder${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item grid-item--placeholder${listenClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
+          ${formatBadgeHtml}
           ${detailsHtml}
         </article>`;
       }
@@ -8719,19 +8838,8 @@ Return JSON:
           const meta = await fetchMetadata(url);
           console.log('%c[LINK FLOW] Metadata received:', 'color: #1abc9c', {
             title: meta.title,
-            image: meta.image ? 'YES' : 'NO',
-            errorPage: !!meta._errorPage
+            image: meta.image ? 'YES' : 'NO'
           });
-
-          // If error page detected, try platform API for image (oEmbed etc.)
-          if (meta._errorPage && !meta.image) {
-            console.log('%c[LINK FLOW] Error page — trying platform image APIs...', 'color: #f39c12');
-            const platformResult = await resolvePlatformImage(url);
-            if (platformResult?.imageUrl) {
-              meta.image = platformResult.imageUrl;
-              console.log('%c[LINK FLOW] Platform image recovered:', 'color: #27ae60', meta.image);
-            }
-          }
 
           // Categorize
           const cat = await smartCategorize(meta);
@@ -8745,14 +8853,6 @@ Return JSON:
           let music = null;
           if (cat.category === 'listen' || contentType.type === 'music') {
             music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
-            // If error page lost the title, try to recover from oEmbed/music metadata
-            if (meta._errorPage && music) {
-              const recovered = music.title || music.trackName || music.albumTitle;
-              if (recovered) {
-                meta.title = recovered + (music.artist ? ` — ${music.artist}` : '');
-                console.log('%c[LINK FLOW] Title recovered from music metadata:', 'color: #27ae60', meta.title);
-              }
-            }
           }
 
           // Update the link with full data
@@ -8773,8 +8873,8 @@ Return JSON:
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
 
-          // Queue for server enrichment — always enrich if error page, or if low confidence/no image
-          const needsEnrichment = meta._errorPage || contentType.confidence < 0.7 || !meta.image;
+          // Queue for server enrichment if needed
+          const needsEnrichment = contentType.confidence < 0.7 || !meta.image;
           if (needsEnrichment) {
             if (!meta.image) {
               queueImageResolution(id, url, meta.title, meta.description, contentType.type);
@@ -10849,20 +10949,8 @@ Return JSON:
       .map(l => l.id);
 
     // Find deleted items (in local but not cloud)
-    // Protect links added within the last 5 minutes — they may not have synced yet
-    const SYNC_GRACE_MS = 5 * 60 * 1000;
-    const now = Date.now();
     const deletedIds = localData.links
-      .filter(l => {
-        if (cloudIds.has(l.id)) return false; // exists in cloud, not deleted
-        // Don't delete recently-added local links that may not have synced
-        const addedAt = l.addedAt ? new Date(l.addedAt).getTime() : 0;
-        if (now - addedAt < SYNC_GRACE_MS) {
-          console.log('[poll] Protecting recent local link from deletion:', l.id, l.url);
-          return false;
-        }
-        return true;
-      })
+      .filter(l => !cloudIds.has(l.id))
       .map(l => l.id);
 
     // Check for any changes
