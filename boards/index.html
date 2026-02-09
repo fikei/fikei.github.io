@@ -6229,14 +6229,27 @@ Return JSON:
 
   async function fetchOembed(oembedUrl, cacheKey) {
     if (oembedCache[cacheKey]) return oembedCache[cacheKey];
-    try {
-      const resp = await fetch(oembedUrl);
-      if (resp.ok) {
-        const data = await resp.json();
-        oembedCache[cacheKey] = data;
-        return data;
-      }
-    } catch (e) { console.warn('[oembed] Fetch failed:', cacheKey, e.message); }
+
+    // Try direct fetch first, then CORS proxy fallback
+    // (most oEmbed endpoints don't have CORS headers for browser requests)
+    const urls = [
+      oembedUrl,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(oembedUrl)}`
+    ];
+
+    for (const url of urls) {
+      try {
+        const resp = await fetchWithTimeout(url, 5000);
+        if (resp.ok) {
+          const text = await resp.text();
+          const data = JSON.parse(text);
+          oembedCache[cacheKey] = data;
+          return data;
+        }
+      } catch (e) { /* try next */ }
+    }
+
+    console.warn('[oembed] All attempts failed:', cacheKey);
     return null;
   }
 
@@ -6782,6 +6795,7 @@ Return JSON:
   // Call enrichment API with retry logic
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
     let lastError = null;
+    const accessToken = getAccessToken();
 
     for (let attempt = 0; attempt <= ENRICHMENT_MAX_RETRIES; attempt++) {
       try {
@@ -6791,8 +6805,15 @@ Return JSON:
           await sleep(delay);
         }
 
-        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
-          body: {
+        // Use raw fetch with anon key fallback (matches categorize/validate-image pattern)
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
             url: item.url,
             title: item.title,
             description: item.description,
@@ -6801,19 +6822,25 @@ Return JSON:
             skipIfHasImage: !forceRefresh && !!currentImage,
             skipClassification: item.skipClassification || false,
             forceRefresh: forceRefresh
-          }
+          })
         });
 
-        if (error) {
-          // Check if it's a retryable error (network, 5xx)
-          const isRetryable = !error.message?.includes('400') && !error.message?.includes('401');
-          if (isRetryable && attempt < ENRICHMENT_MAX_RETRIES) {
-            lastError = error;
-            continue;
-          }
-          throw new Error(error.message || 'Server error');
+        // Don't retry auth errors — they won't resolve on retry
+        if (res.status === 401 || res.status === 403) {
+          console.error(`%c[ENRICH] Auth error (${res.status}) — not retrying`, 'color: #e74c3c');
+          return { success: false, error: new Error(`Auth error: ${res.status}`) };
         }
 
+        if (!res.ok) {
+          const isRetryable = res.status >= 500;
+          if (isRetryable && attempt < ENRICHMENT_MAX_RETRIES) {
+            lastError = new Error(`HTTP ${res.status}`);
+            continue;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const result = await res.json();
         return { success: true, result };
       } catch (e) {
         lastError = e;
@@ -10785,8 +10812,20 @@ Return JSON:
       .map(l => l.id);
 
     // Find deleted items (in local but not cloud)
+    // Protect links added within the last 5 minutes — they may not have synced yet
+    const SYNC_GRACE_MS = 5 * 60 * 1000;
+    const now = Date.now();
     const deletedIds = localData.links
-      .filter(l => !cloudIds.has(l.id))
+      .filter(l => {
+        if (cloudIds.has(l.id)) return false; // exists in cloud, not deleted
+        // Don't delete recently-added local links that may not have synced
+        const addedAt = l.addedAt ? new Date(l.addedAt).getTime() : 0;
+        if (now - addedAt < SYNC_GRACE_MS) {
+          console.log('[poll] Protecting recent local link from deletion:', l.id, l.url);
+          return false;
+        }
+        return true;
+      })
       .map(l => l.id);
 
     // Check for any changes
