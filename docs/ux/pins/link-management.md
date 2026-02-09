@@ -1,5 +1,11 @@
 # Link Management
 
+> **Status:** ✅ Shipped
+> **Brand Principle:** Organize as you go
+> **Key Personas:** All
+>
+> Back to [UX Index](../index.md)
+
 Actions users take on existing pins: editing, deleting, moving between categories, and reordering.
 
 ---

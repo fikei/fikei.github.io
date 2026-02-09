@@ -1,5 +1,5 @@
 // Documentation Agent - Cleanup Domain
-// Functions: cleanup:stale, cleanup:orphans
+// Functions: cleanup:stale, cleanup:orphans, cleanup:duplicates, cleanup:archive
 
 import { createLogger } from './logger.ts'
 import type { GitHubClient } from './github.ts'
@@ -314,5 +314,189 @@ export async function cleanupOrphans(
       apiCalls: github.apiCalls,
     },
     nextActions: ['`cleanup:archive` for dead docs', '`cleanup:duplicates` to check for contradictions'],
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLEANUP:DUPLICATES
+// ═══════════════════════════════════════════════════════════════
+
+export async function cleanupDuplicates(
+  github: GitHubClient,
+  analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+  const errors: string[] = []
+
+  log.info('Checking for duplicate content')
+
+  // Read all tech design docs — most likely source of duplicates
+  const techFiles = await github.getDirectory('docs/infrastructure/technical-design')
+  const mdFiles = techFiles.filter((f) => f.endsWith('.md'))
+
+  // Extract key facts from each doc (headers, config values, endpoints)
+  const docFacts: Record<string, string[]> = {}
+
+  for (const filePath of mdFiles) {
+    const file = await github.getFile(filePath)
+    if (!file) continue
+
+    // Extract facts: headers, quoted values, URLs, config keys
+    const facts: string[] = []
+    const lines = file.content.split('\n')
+    for (const line of lines) {
+      // Config values like key = value
+      const configMatch = line.match(/`([A-Z_]+)`\s*[:=]\s*`?([^`\n]+)/)
+      if (configMatch) facts.push(`${configMatch[1]}=${configMatch[2].trim()}`)
+
+      // API endpoints
+      const endpointMatch = line.match(/(GET|POST|PUT|DELETE|PATCH)\s+([/\w-]+)/)
+      if (endpointMatch) facts.push(`${endpointMatch[1]} ${endpointMatch[2]}`)
+
+      // Table names
+      const tableMatch = line.match(/`(\w+)`\s+table/)
+      if (tableMatch) facts.push(`table:${tableMatch[1]}`)
+    }
+
+    docFacts[filePath] = facts
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+
+  // Compare facts across documents
+  const contradictions: Array<{ fact: string; docA: string; docB: string; valueA: string; valueB: string }> = []
+  const redundant: Array<{ fact: string; docs: string[] }> = []
+
+  const allFacts = new Map<string, Array<{ doc: string; value: string }>>()
+
+  for (const [doc, facts] of Object.entries(docFacts)) {
+    for (const fact of facts) {
+      const key = fact.split('=')[0]
+      if (!allFacts.has(key)) allFacts.set(key, [])
+      allFacts.get(key)!.push({ doc, value: fact })
+    }
+  }
+
+  for (const [key, occurrences] of allFacts) {
+    if (occurrences.length > 1) {
+      const values = new Set(occurrences.map((o) => o.value))
+      if (values.size > 1) {
+        contradictions.push({
+          fact: key,
+          docA: occurrences[0].doc,
+          docB: occurrences[1].doc,
+          valueA: occurrences[0].value,
+          valueB: occurrences[1].value,
+        })
+      } else {
+        redundant.push({ fact: key, docs: occurrences.map((o) => o.doc) })
+      }
+    }
+  }
+
+  let report = `## Duplicate Content Report — ${new Date().toISOString().split('T')[0]}\n\n`
+
+  if (contradictions.length > 0) {
+    report += `### Contradictions (same fact, different values)\n`
+    report += `| Fact | Doc A Says | Doc B Says |\n`
+    report += `|------|-----------|------------|\n`
+    for (const c of contradictions.slice(0, 15)) {
+      report += `| ${c.fact} | \`${c.docA.split('/').pop()}\`: ${c.valueA} | \`${c.docB.split('/').pop()}\`: ${c.valueB} |\n`
+    }
+    report += '\n'
+  }
+
+  if (redundant.length > 0) {
+    report += `### Redundant (same fact, multiple locations)\n`
+    for (const r of redundant.slice(0, 10)) {
+      report += `- **${r.fact}** appears in: ${r.docs.map((d) => '`' + d.split('/').pop() + '`').join(', ')}\n`
+    }
+    report += '\n'
+  }
+
+  if (contradictions.length === 0 && redundant.length === 0) {
+    report += `### ✅ All Clear\nNo contradictions or significant redundancy found.\n`
+  }
+
+  report += `\n### Recommended Actions\n`
+  if (contradictions.length > 0) report += `1. Resolve ${contradictions.length} contradictions\n`
+  if (redundant.length > 0) report += `2. Consider consolidating ${redundant.length} redundant facts\n`
+  report += `3. Run \`cleanup:archive\` to archive deprecated docs\n`
+
+  const endTime = Date.now()
+  return {
+    success: true, action: 'cleanup:duplicates', report, changes: [], errors,
+    metrics: { startTime, endTime, durationMs: endTime - startTime, filesRead: mdFiles.length, filesChanged: 0, apiCalls: github.apiCalls },
+    nextActions: ['`cleanup:archive`'],
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLEANUP:ARCHIVE
+// ═══════════════════════════════════════════════════════════════
+
+export async function cleanupArchive(
+  github: GitHubClient,
+  _analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+
+  const autoDetect = (request.params?.auto as boolean) !== false
+
+  log.info('Checking for archive candidates', { autoDetect })
+
+  const archiveCandidates: Array<{ file: string; reason: string; lastUpdate: string }> = []
+
+  // Check for docs with no updates in 90+ days
+  const allDocDirs = ['docs/infrastructure/technical-design', 'docs/strategy/prds', 'docs/ux']
+
+  for (const dir of allDocDirs) {
+    const files = await github.getDirectory(dir)
+    for (const filePath of files.filter((f) => f.endsWith('.md'))) {
+      const lastUpdate = await github.getLastCommitDate(filePath)
+      if (lastUpdate) {
+        const daysAgo = Math.floor((Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60 * 24))
+        if (daysAgo > 90) {
+          archiveCandidates.push({
+            file: filePath,
+            reason: `Not updated in ${daysAgo} days`,
+            lastUpdate: lastUpdate.split('T')[0],
+          })
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+
+  let report = `## Archive Candidates — ${new Date().toISOString().split('T')[0]}\n\n`
+
+  if (archiveCandidates.length > 0) {
+    report += `### Candidates (90+ days without update)\n`
+    report += `| File | Last Updated | Days Ago | Reason |\n`
+    report += `|------|-------------|----------|--------|\n`
+    for (const c of archiveCandidates) {
+      const daysAgo = Math.floor((Date.now() - new Date(c.lastUpdate).getTime()) / (1000 * 60 * 60 * 24))
+      report += `| \`${c.file.split('/').pop()}\` | ${c.lastUpdate} | ${daysAgo} | ${c.reason} |\n`
+    }
+    report += '\n'
+  } else {
+    report += `### ✅ No archive candidates\nAll docs have been updated within the last 90 days.\n`
+  }
+
+  report += `\n### Recommended Actions\n`
+  if (archiveCandidates.length > 0) {
+    report += `1. Review ${archiveCandidates.length} candidates — are they still relevant?\n`
+    report += `2. Move deprecated docs to \`archive/\` with \`git mv\`\n`
+    report += `3. Update \`notion-structure.json\` to remove archived pages\n`
+  }
+
+  const endTime = Date.now()
+  return {
+    success: true, action: 'cleanup:archive', report,
+    changes: archiveCandidates.map((c) => ({ file: c.file, type: 'updated' as const, summary: c.reason })),
+    errors: [],
+    metrics: { startTime, endTime, durationMs: endTime - startTime, filesRead: archiveCandidates.length, filesChanged: 0, apiCalls: github.apiCalls },
+    nextActions: archiveCandidates.length > 0 ? ['Move candidates to archive/ directory'] : [],
   }
 }

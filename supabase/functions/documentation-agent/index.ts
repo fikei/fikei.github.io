@@ -12,9 +12,13 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createLogger } from './logger.ts'
 import { GitHubClient } from './github.ts'
 import { Analyzer } from './analyzer.ts'
-import { planAudit, planUpdate } from './plan.ts'
-import { archSync, archAudit } from './arch.ts'
-import { cleanupStale, cleanupOrphans } from './cleanup.ts'
+import { planAudit, planUpdate, planAdd, planRebalance } from './plan.ts'
+import { archSync, archAudit, archAddAdr, archUpdateSpec } from './arch.ts'
+import { cleanupStale, cleanupOrphans, cleanupDuplicates, cleanupArchive } from './cleanup.ts'
+import { captureBug, captureWork, captureTechDebt } from './capture.ts'
+import { uxUpdate, uxAudit, uxWireframe } from './ux.ts'
+import { branchDiff, branchReconcile, branchCherryPickDocs } from './branch.ts'
+import { pmScopeCheck, pmDependencyMap, pmStatusReport, pmRetro, pmDecisionLog, pmPrdToPlan, pmChangelog } from './pm.ts'
 import type { DocAgentRequest, DocAgentResult, DocAgentAction } from './types.ts'
 
 const log = createLogger('doc-agent')
@@ -34,31 +38,49 @@ type ActionHandler = (
   request: DocAgentRequest
 ) => Promise<DocAgentResult>
 
-const HANDLERS: Partial<Record<DocAgentAction, ActionHandler>> = {
+const HANDLERS: Record<DocAgentAction, ActionHandler> = {
   // Plan domain
   'plan:audit': planAudit,
   'plan:update': planUpdate,
+  'plan:add': planAdd,
+  'plan:rebalance': planRebalance,
 
   // Architecture domain
   'arch:sync': archSync,
   'arch:audit': archAudit,
+  'arch:add-adr': archAddAdr,
+  'arch:update-spec': archUpdateSpec,
+
+  // Capture domain
+  'capture:bug': captureBug,
+  'capture:work': captureWork,
+  'capture:tech-debt': captureTechDebt,
+
+  // UX domain
+  'ux:update': uxUpdate,
+  'ux:audit': uxAudit,
+  'ux:wireframe': uxWireframe,
+
+  // Branch domain
+  'branch:diff': branchDiff,
+  'branch:reconcile': branchReconcile,
+  'branch:cherry-pick-docs': branchCherryPickDocs,
 
   // Cleanup domain
   'cleanup:stale': cleanupStale,
   'cleanup:orphans': cleanupOrphans,
-}
+  'cleanup:duplicates': cleanupDuplicates,
+  'cleanup:archive': cleanupArchive,
 
-// Actions that are defined in the spec but not yet implemented
-const PLANNED_ACTIONS: DocAgentAction[] = [
-  'plan:add', 'plan:rebalance',
-  'arch:add-adr', 'arch:update-spec',
-  'capture:bug', 'capture:work', 'capture:tech-debt',
-  'ux:update', 'ux:audit', 'ux:wireframe',
-  'branch:diff', 'branch:reconcile', 'branch:cherry-pick-docs',
-  'cleanup:duplicates', 'cleanup:archive',
-  'pm:scope-check', 'pm:dependency-map', 'pm:status-report', 'pm:retro',
-  'pm:decision-log', 'pm:prd-to-plan', 'pm:changelog',
-]
+  // PM domain
+  'pm:scope-check': pmScopeCheck,
+  'pm:dependency-map': pmDependencyMap,
+  'pm:status-report': pmStatusReport,
+  'pm:retro': pmRetro,
+  'pm:decision-log': pmDecisionLog,
+  'pm:prd-to-plan': pmPrdToPlan,
+  'pm:changelog': pmChangelog,
+}
 
 // ═══════════════════════════════════════════════════════════════
 // PRODUCT SCOPING
@@ -117,7 +139,7 @@ const PRODUCT_SCOPES: Record<string, {
   },
   'content-types': {
     name: 'Content Types',
-    docPaths: ['docs/strategy/prds/content-type-and-image-systems.md', 'docs/ux/pins/content-types.md', 'docs/infrastructure/technical-design/content-type-system.md'],
+    docPaths: ['docs/strategy/prds/content-type-and-image-systems.md', 'docs/ux/pins/ai-categorization.md', 'docs/infrastructure/technical-design/content-type-system.md'],
     codePaths: ['boards/js/content-types/'],
     relatedProducts: ['boards'],
   },
@@ -144,7 +166,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: 'Missing required field: action',
-          availableActions: [...Object.keys(HANDLERS), ...PLANNED_ACTIONS],
+          availableActions: Object.keys(HANDLERS),
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -156,20 +178,6 @@ serve(async (req) => {
       product: request.params?.product as string,
     })
 
-    // Check if action is planned but not implemented
-    if (PLANNED_ACTIONS.includes(request.action)) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Action '${request.action}' is defined in the spec but not yet implemented`,
-          status: 'planned',
-          spec: 'See .claude/agents/documentation-agent.md for full specification',
-          implementedActions: Object.keys(HANDLERS),
-        }),
-        { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     // Get handler
     const handler = HANDLERS[request.action]
     if (!handler) {
@@ -178,7 +186,6 @@ serve(async (req) => {
           success: false,
           error: `Unknown action: ${request.action}`,
           availableActions: Object.keys(HANDLERS),
-          plannedActions: PLANNED_ACTIONS,
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Agentic Crawler
+ * Systemic - Agentic Crawler
  * Navigates websites and extracts design components
  */
 

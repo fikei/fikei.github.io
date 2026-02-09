@@ -1,10 +1,39 @@
 # AI Widget System - Technical Documentation
 
-**Version:** 5.0
-**Last Updated:** 2026-02-05
+**Version:** 6.0
+**Last Updated:** 2026-02-09
 **Status:** Active
 
-## Recent Updates (v5.0 - Phase 2: Config-Generated Widgets)
+## Recent Updates (v6.0 - Generic Widget Architecture)
+
+### Generic Consolidation
+- **18 → 10 generic widgets**: Category-specific widgets collapsed into generic versions with template variables
+- **Template variables**: `{{category}}`, `{{domain}}`, `{{noun}}`, `{{analyst}}` resolved at runtime from `CATEGORY_DOMAINS`
+- **WIDGET_CATEGORY_MAP** (allowlist): Separate from widget configs — declares where each widget can appear
+- **WIDGET_SERVER_MAP**: Routes generic client IDs to server widget IDs for backward compatibility
+- **Design system binding**: Startup validation ensures all widget templates reference valid design system templates (`VALID_DS_TEMPLATES`)
+- **SERVER_TO_GENERIC_MAP**: Auto-built reverse mapping for server discovery → client registry resolution
+
+### Architecture Decisions
+- **Allowlist over blocklist**: Fail-safe (missing entry = hidden, not shown). At scale, declaring fitness is smaller data than declaring exceptions
+- **Separation of concerns**: Widget configs define WHAT (template, prompt, zone). Allowlist defines WHERE (categories). Server map defines HOW (routing)
+- **Design system is the gatekeeper**: New templates must be added to the design system first, then referenced by widgets. `validateWidgetDesignSystem()` enforces this at startup
+
+### 10 Generic Widgets
+| Widget | Template | Zone | Description |
+|--------|----------|------|-------------|
+| profiler | hero-card | hero | Identity analysis — "who am I?" |
+| completer | grid-split | inline | Gap discovery — "what's missing?" |
+| pick | choices | hero | Decision aid — "which one?" |
+| spectrum | spectrum | hero | Dimensional positioning — "where do I fall?" |
+| gap-finder | quick-add | inline | Single suggestion — "you need this" |
+| compare | comparison | inline | A vs B comparison |
+| buy-checklist | checklist | inline | Curated set with check-off |
+| discover-more | quick-add | footer | New recommendation |
+| upcoming-releases | list | inline | Brand/creator drops |
+| board-overview | grouped | footer | Themed grouping of saves |
+
+## Previous Updates (v5.0 - Phase 2: Config-Generated Widgets)
 
 - **Config-Driven Widget Definitions**: Widgets defined in TypeScript config files, not hard-coded
 - **Widget Definition Schema**: Type-safe schema for eligibility, confidence, generation, enrichment, rendering

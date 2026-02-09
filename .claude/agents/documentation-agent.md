@@ -65,7 +65,7 @@ Each sub-product maps to specific locations in the documentation tree:
 |-------------|-----|-------------|-----------|---------|
 | **Boards** | `prds/boards-mvp.md` | Phase 1-2 | `technical-design/client-architecture.md` | `ux/boards/` |
 | **AI Widgets** | `prds/ai-widgets.md`, `prds/generative-widget-ecosystem.md` | Phase 3 | `technical-design/ai-widget-system.md`, `ai-widget-pipeline.md`, `widget-architecture.md` | `ux/widgets/` |
-| **Content Types** | `prds/content-type-and-image-systems.md` | Phase 3 | `technical-design/content-type-system.md` | `ux/pins/content-types.md` |
+| **Content Types** | `prds/content-type-and-image-systems.md` | Phase 3 | `technical-design/content-type-system.md` | `ux/pins/ai-categorization.md` |
 | **Design System** | `prds/widget-design-system.md` | Phase 3 | — | `design-system/README.md` |
 | **Sharing** | `prds/collaborative-boards.md` | Phase 4 | `technical-design/auth-system.md` | `ux/boards/sharing.md` |
 | **Notion Sync** | `prds/notion-sync-platform.md` | — | `technical-design/sync-protocol.md` | — |

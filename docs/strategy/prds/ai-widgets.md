@@ -8,7 +8,7 @@
 
 ## Problem
 
-Users save links to boards across 8 categories (home, wear, watch, use, eat, go, follow, read). The collection grows, but the app doesn't help users *understand* what they've saved or *do* anything with it. Items sit in a grid. There's no synthesis, no insight, no action.
+Users save links to boards across 9 categories (home, wear, watch, listen, use, eat, go, follow, read). The collection grows, but the app doesn't help users *understand* what they've saved or *do* anything with it. Items sit in a grid. There's no synthesis, no insight, no action.
 
 ## Goal
 
@@ -25,7 +25,8 @@ Each item on a board is a link with:
 - **url** — where it lives
 - **image** — hero image (sometimes missing)
 - **description** — optional, often empty
-- **category** — one of: home, wear, watch, use, eat, go, follow, read
+- **category** — one of: home, wear, watch, listen, use, eat, go, follow, read
+- **music** — structured metadata for listen links (artist, trackTitle, albumTitle, genre, duration, contentFormat, platformId, etc.)
 - **domain** — where it came from (nike.com, nytimes.com, etc.)
 
 ### What a user does NOT have
@@ -48,6 +49,7 @@ Widgets must work with **titles, URLs, domains, and images**. Anything beyond th
 | **wear** | Clothing, shoes, accessories | Nike Dunk, Reigning Champ hoodie |
 | **home** | Furniture, decor, housewares | CB2 sofa, Hay lamp |
 | **watch** | Movies, shows, docs | Letterboxd link, Netflix title |
+| **listen** | Music, podcasts, mixes | Spotify track, SoundCloud mix, Bandcamp album |
 | **use** | Tools, apps, gadgets | Notion, Arc browser, Dyson |
 | **eat** | Restaurants, recipes, ingredients | Resy link, NYT Cooking recipe |
 | **go** | Destinations, stays, experiences | Airbnb, Google Maps pin |
@@ -56,7 +58,7 @@ Widgets must work with **titles, URLs, domains, and images**. Anything beyond th
 
 ### Future: Dynamic AI-Evaluated Categories
 
-The 8 static categories are a starting constraint, not the end state. The widget catalog already demands 9 new categories (gift, spend, make, listen, learn, events, work, all, cross). Rather than extending the enum indefinitely, **categories should become AI-inferred from content**.
+The 9 static categories are a starting constraint, not the end state. The widget catalog already demands additional categories (gift, spend, make, learn, events, work, all, cross). "listen" was promoted from this list to a first-class category in Feb 2026. Rather than extending the enum indefinitely, **categories should become AI-inferred from content**.
 
 **How it works**:
 1. User saves a link. AI analyzes title + URL + domain

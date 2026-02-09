@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Split-Context Viewer
+ * Systemic - Split-Context Viewer
  * Interactive documentation viewer with designer/developer views
  */
 
@@ -839,21 +839,24 @@ class DesignSystemViewer {
               const status = audit ? audit.getStatus(compName, auditSize) : 'green';
               const entry = audit ? audit.getAuditEntry(compName, auditSize) : {};
               const isFlagged = !!entry.flagged;
+              const isPref = !!entry.preferred;
               const hasNote = !!entry.note;
               const statusLabel = audit?.STATUS_LABELS?.[status] || '';
 
               return `
-              <div class="variant-preview-card ${isTemplate ? 'variant-preview-card--template' : ''} ${i === variantIndex ? 'active' : ''} ${isFlagged ? 'variant-preview-card--flagged' : ''}"
+              <div class="variant-preview-card ${isTemplate ? 'variant-preview-card--template' : ''} ${i === variantIndex ? 'active' : ''} ${isFlagged ? 'variant-preview-card--flagged' : ''} ${isPref ? 'variant-preview-card--preferred' : ''}"
                    data-index="${i}" data-audit-name="${compName}" data-audit-size="${auditSize}">
                 <div class="variant-preview-content ${isTemplate ? 'variant-preview-content--template' : ''}">
                   ${v.html || '<span class="no-preview">No preview</span>'}
                 </div>
                 <div class="variant-preview-label">
                   <span class="qa-stoplight qa-stoplight--${status}" title="${statusLabel}"></span>
+                  ${isPref ? '<span class="qa-preferred-badge" title="Preferred">Preferred</span>' : ''}
                   <span class="variant-name">${v.name}</span>
                   <span class="variant-usage">${v.usageCount || 0} uses</span>
                   ${hasNote ? `<span class="qa-comment-count" title="${(entry.note || '').replace(/"/g, '&quot;')}">1</span>` : ''}
                   <div class="qa-variant-actions stage-audit-actions">
+                    <button class="qa-action-btn qa-action-btn--prefer${isPref ? ' qa-action-btn--active' : ''}" data-action="prefer">${isPref ? 'Unprefer' : 'Prefer'}</button>
                     <button class="qa-action-btn${hasNote ? ' qa-action-btn--active' : ''}" data-action="comment">${hasNote ? 'Edit' : 'Comment'}</button>
                     ${status === 'yellow' ? '<button class="qa-action-btn" data-action="process">Mark processed</button>' : ''}
                     ${status === 'orange' ? '<button class="qa-action-btn" data-action="approve">Approve</button>' : ''}
@@ -919,7 +922,7 @@ class DesignSystemViewer {
     variants.forEach(v => {
       const size = this.getAuditSize(v, isTemplate);
       const entry = audit.getAuditEntry(compName, size);
-      if (entry.flagged || entry.note) {
+      if (entry.flagged || entry.note || entry.preferred) {
         const status = audit.getStatus(compName, size);
         entries.push({ size, entry, status });
       }
@@ -940,22 +943,26 @@ class DesignSystemViewer {
 
     entries.forEach(({ size, entry, status }) => {
       const statusLabel = entry.flagged ? 'Blocked'
+        : entry.preferred ? 'Preferred'
         : entry.note && entry.processed ? 'Needs review'
         : entry.note ? 'To process' : 'Clean';
       const statusClass = entry.flagged ? 'status--blocked'
+        : entry.preferred ? 'status--preferred'
         : entry.note && entry.processed ? 'status--review'
         : entry.note ? 'status--todo' : 'status--clean';
       const dotColor = entry.flagged ? '#ef4444'
+        : entry.preferred ? '#3b82f6'
         : entry.note && entry.processed ? '#f97316'
         : entry.note ? '#eab308' : '#22c55e';
       const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:${dotColor}"></span>`;
+      const prefTag = entry.preferred ? '<span class="qa-preferred-badge">Preferred</span> ' : '';
       const note = entry.note ? `<span class="note-text">${entry.note.replace(/</g, '&lt;')}</span>` : '';
 
       html += `<tr>
         <td>${size}</td>
         <td>${sizeLabels[size] || size}</td>
         <td class="${statusClass}">${dot}${statusLabel}</td>
-        <td>${note}</td>
+        <td>${prefTag}${note}</td>
       </tr>`;
     });
 
@@ -988,6 +995,11 @@ class DesignSystemViewer {
         const action = btn.dataset.action;
 
         switch (action) {
+          case 'prefer':
+            audit.setPreferred(name, size, !audit.isPreferred(name, size));
+            audit.renderAuditTable();
+            this.renderComponentPreview(component, currentVariantIndex);
+            break;
           case 'comment':
             this.openStageComment(card, name, size, component, currentVariantIndex);
             break;

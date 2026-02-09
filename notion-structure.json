@@ -13,6 +13,12 @@
           "source": "human"
         },
         {
+          "title": "Brand Positioning",
+          "icon": "\ud83c\udfaf",
+          "file": "docs/strategy/brand-positioning.md",
+          "source": "ai"
+        },
+        {
           "title": "Decision Log",
           "icon": "\ud83d\udccb",
           "file": "docs/strategy/decision-log.md",
@@ -90,8 +96,15 @@
     {
       "title": "User Experience",
       "icon": "\ud83c\udfa8",
+      "file": "docs/ux/index.md",
       "source": "ai",
       "children": [
+        {
+          "title": "User Personas",
+          "icon": "\ud83d\udc64",
+          "file": "docs/ux/personas.md",
+          "source": "ai"
+        },
         {
           "title": "Components",
           "icon": "\ud83e\udde9",
@@ -104,21 +117,33 @@
               "source": "ai",
               "children": [
                 {
-                  "title": "Content Types",
-                  "icon": "\ud83d\udce6",
-                  "file": "docs/ux/pins/content-types.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Link Enrichment",
+                  "title": "Link Capture & Enrichment",
                   "icon": "\u2728",
-                  "file": "docs/ux/pins/link-enrichment.md",
+                  "file": "docs/ux/pins/link-capture.md",
                   "source": "ai"
                 },
                 {
-                  "title": "Add Links",
-                  "icon": "\u2795",
-                  "file": "docs/ux/pins/add-links.md",
+                  "title": "AI Categorization",
+                  "icon": "\ud83e\udde0",
+                  "file": "docs/ux/pins/ai-categorization.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Multi-Format Content",
+                  "icon": "\ud83d\udce6",
+                  "file": "docs/ux/pins/multi-format.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Flexible Tagging",
+                  "icon": "\ud83c\udff7\ufe0f",
+                  "file": "docs/ux/pins/tagging.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Mobile Capture",
+                  "icon": "\ud83d\udcf1",
+                  "file": "docs/ux/pins/mobile-capture.md",
                   "source": "ai"
                 },
                 {
@@ -142,6 +167,12 @@
                   "source": "ai"
                 },
                 {
+                  "title": "Taste & Pattern Surfacing",
+                  "icon": "\ud83d\udcca",
+                  "file": "docs/ux/widgets/taste-patterns.md",
+                  "source": "ai"
+                },
+                {
                   "title": "Widget Preferences",
                   "icon": "\u2699\ufe0f",
                   "file": "docs/ux/widgets/widget-preferences.md",
@@ -156,21 +187,33 @@
               "source": "ai",
               "children": [
                 {
-                  "title": "Categories & Filtering",
-                  "icon": "\ud83c\udff7\ufe0f",
-                  "file": "docs/ux/boards/categories-filtering.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Grid Layout & Display",
+                  "title": "Visual Grid Browsing",
                   "icon": "\ud83d\udcd0",
                   "file": "docs/ux/boards/grid-layout.md",
                   "source": "ai"
                 },
                 {
-                  "title": "Sharing & Collaboration",
+                  "title": "Search & Retrieval",
+                  "icon": "\ud83d\udd0d",
+                  "file": "docs/ux/boards/search.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Collection Sharing",
                   "icon": "\ud83d\udc65",
                   "file": "docs/ux/boards/sharing.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Cross-Category Connections",
+                  "icon": "\ud83d\udd00",
+                  "file": "docs/ux/boards/cross-category.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Events Integration",
+                  "icon": "\ud83d\udcc5",
+                  "file": "docs/ux/boards/events.md",
                   "source": "ai"
                 }
               ]
