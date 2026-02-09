@@ -18,6 +18,9 @@
   <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
   <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
 
+  <!-- Design Constraints — runtime validation engine (loads manifest + template-registry) -->
+  <script src="/boards/design-constraints.js"></script>
+
   <style>
 /* ============================================
    Boards - Swiss Grid + Web 1.0 Typography
@@ -5310,6 +5313,7 @@ Return JSON:
   /**
    * Select and render a widget using the template engine.
    * Tries the primary template, falls back to fallbackTemplate, then simple-list.
+   * Validates rendered output against design system constraints.
    * @param {object} widget - Widget definition from WIDGET_REGISTRY
    * @param {Array} items - User's items
    * @param {object} aiResult - AI-generated content
@@ -5329,24 +5333,103 @@ Return JSON:
     const resolvedName = templateAliases[templateName] || templateName;
     const resolvedFallback = templateAliases[fallbackName] || fallbackName;
 
+    // --- Design Constraint: query constraints for this template ---
+    const dc = window.DS_CONSTRAINTS;
+    let activeConstraints = null;
+    if (dc && dc.ready) {
+      // Find the DS template name that maps to this Boards template
+      // template-registry uses boardsTemplate to link DS templates → Boards templates
+      const dsTemplateName = _findDSTemplate(resolvedName);
+      if (dsTemplateName) {
+        activeConstraints = dc.getConstraints(dsTemplateName);
+      }
+    }
+
     // Try primary template
     let template = WIDGET_TEMPLATES[resolvedName];
     if (template) {
       const html = template.render(widget, items, aiResult);
-      if (html) return html;
+      if (html) {
+        return _applyConstraints(html, resolvedName, activeConstraints, widget);
+      }
     }
 
     // Try fallback template
     if (resolvedFallback) {
       template = WIDGET_TEMPLATES[resolvedFallback];
       if (template) {
+        // Re-query constraints for fallback template
+        if (dc && dc.ready) {
+          const dsFallback = _findDSTemplate(resolvedFallback);
+          if (dsFallback) activeConstraints = dc.getConstraints(dsFallback);
+        }
         const html = template.render(widget, items, aiResult);
-        if (html) return html;
+        if (html) {
+          return _applyConstraints(html, resolvedFallback, activeConstraints, widget);
+        }
       }
     }
 
     // Last resort: list
-    return WIDGET_TEMPLATES['list'].render(widget, items, aiResult);
+    const listConstraints = dc && dc.ready ? dc.getConstraints('list') : null;
+    return _applyConstraints(
+      WIDGET_TEMPLATES['list'].render(widget, items, aiResult),
+      'list',
+      listConstraints,
+      widget
+    );
+  }
+
+  /**
+   * Map a Boards template name to its design-system template name
+   * by searching template-registry's boardsTemplate field.
+   */
+  function _findDSTemplate(boardsTemplateName) {
+    const dc = window.DS_CONSTRAINTS;
+    if (!dc || !dc.templates) return null;
+    for (const [dsName, tmpl] of Object.entries(dc.templates.templates)) {
+      if (tmpl.boardsTemplate === boardsTemplateName) return dsName;
+    }
+    // Direct name match (e.g. 'list', 'spectrum', 'stat-row')
+    if (dc.templates.templates[boardsTemplateName]) return boardsTemplateName;
+    return null;
+  }
+
+  /**
+   * Stamp constraint metadata onto rendered widget HTML and validate structure.
+   * Adds data-ds-* attributes so components know their design boundaries.
+   */
+  function _applyConstraints(html, templateName, constraints, widget) {
+    if (!html || !constraints) return html;
+
+    const dc = window.DS_CONSTRAINTS;
+
+    // Validate: check required atoms are present
+    const structResult = dc.validateTemplateStructure(constraints.name, html);
+    if (!structResult.valid) {
+      console.warn('[widget:%s] Constraint violation — %s', widget.id, structResult.message);
+    }
+
+    // Stamp constraint data onto the w-shell root element
+    const attrs = [
+      'data-ds-template="' + esc(constraints.name) + '"',
+      'data-ds-boards-template="' + esc(templateName) + '"',
+      constraints.validSizes.length > 0
+        ? 'data-ds-valid-sizes="' + esc(constraints.validSizes.join(',')) + '"'
+        : '',
+      constraints.requiredAtoms.length > 0
+        ? 'data-ds-required-atoms="' + esc(constraints.requiredAtoms.join(',')) + '"'
+        : '',
+      constraints.optionalAtoms.length > 0
+        ? 'data-ds-optional-atoms="' + esc(constraints.optionalAtoms.join(',')) + '"'
+        : ''
+    ].filter(Boolean).join(' ');
+
+    // Inject attributes into the first w-shell element
+    return html.replace(
+      /(<div\s+class="w-shell")/,
+      '$1 ' + attrs
+    );
   }
 
   // Store inline widgets for grid injection
@@ -5482,6 +5565,10 @@ Return JSON:
     // Render hero zone
     if (heroHtml) {
       heroContent.innerHTML = heroHtml;
+      // Annotate hero widgets with design constraints
+      if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+        window.DS_CONSTRAINTS.annotate(heroContent);
+      }
     } else {
       heroSection.classList.remove('widget-section--visible');
     }
@@ -5490,6 +5577,10 @@ Return JSON:
     if (footerHtml) {
       footerSection.classList.add('widget-section--visible');
       footerContent.innerHTML = footerHtml;
+      // Annotate footer widgets with design constraints
+      if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+        window.DS_CONSTRAINTS.annotate(footerContent);
+      }
     }
 
     // Re-render grid to inject inline widgets
@@ -5615,6 +5706,10 @@ Return JSON:
       if (inlineContainer) {
         inlineContainer.style.display = ''; // Ensure visible
         inlineContainer.innerHTML = `<div class="widget-inline__drag-handle" title="Drag to reposition"></div>${widgetHtml}`;
+        // Re-annotate inline widget with design constraints after refresh
+        if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+          window.DS_CONSTRAINTS.annotate(inlineContainer);
+        }
       }
       // Also update stored HTML for future grid re-renders
       const updatedWrapHtml = `
@@ -5630,6 +5725,10 @@ Return JSON:
       const heroContent = $('widgetContent');
       if (heroContent) {
         heroContent.innerHTML = widgetHtml;
+        // Re-annotate hero widgets with design constraints after refresh
+        if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+          window.DS_CONSTRAINTS.annotate(heroContent);
+        }
       }
     }
 
@@ -7441,6 +7540,11 @@ Return JSON:
 
     filters.innerHTML = html;
 
+    // --- Design Constraints: annotate filter components ---
+    if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+      window.DS_CONSTRAINTS.annotate(filters);
+    }
+
     // Re-attach search input listener after re-render
     const searchInput = $('searchInput');
     if (searchInput) {
@@ -7732,6 +7836,11 @@ Return JSON:
     }
 
     grid.innerHTML = html;
+
+    // --- Design Constraints: annotate rendered components ---
+    if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+      window.DS_CONSTRAINTS.annotate(grid);
+    }
 
     // Remove animation class after animation completes
     if (newIds.length > 0) {
@@ -10094,6 +10203,37 @@ Return JSON:
     // Auto-dismiss after 10 seconds
     setTimeout(() => prompt.remove(), 10000);
   }
+
+  // ============================================
+  // Design Constraints — devtools helpers
+  // ============================================
+  // When the constraint engine finishes loading (async), re-annotate the
+  // already-rendered DOM so every component carries its data-ds-* attributes.
+  window.addEventListener('design-constraints-ready', function () {
+    const dc = window.DS_CONSTRAINTS;
+    if (dc && dc.ready) {
+      dc.annotate(document);
+      console.log('[design-constraints] Annotated %d components',
+        document.querySelectorAll('[data-ds-component],[data-ds-widget],[data-ds-template]').length);
+    }
+  });
+
+  // Expose convenience audit function in devtools
+  window.auditDesignConstraints = function () {
+    const dc = window.DS_CONSTRAINTS;
+    if (!dc || !dc.ready) { console.warn('[design-constraints] Not ready yet'); return []; }
+    var issues = dc.auditDOM(document);
+    if (issues.length === 0) {
+      console.log('%c[design-constraints] ✓ No violations found', 'color: #0f0');
+    } else {
+      console.group('[design-constraints] %d violation(s)', issues.length);
+      issues.forEach(function (i) {
+        console.warn('  [%s] %s', i.type, i.detail.message, i.element);
+      });
+      console.groupEnd();
+    }
+    return issues;
+  };
 
   init();
 

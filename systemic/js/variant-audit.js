@@ -85,7 +85,7 @@ class VariantAudit {
     var key = this.auditKey(name, size);
     if (!this.audit[key]) this.audit[key] = {};
     this.audit[key].flagged = flagged;
-    if (!flagged && !this.audit[key].note) delete this.audit[key];
+    if (!flagged && !this.audit[key].note && !this.audit[key].preferred) delete this.audit[key];
     this.saveAudit();
   }
 
@@ -99,9 +99,27 @@ class VariantAudit {
     } else {
       delete this.audit[key].note;
       delete this.audit[key].processed;
-      if (!this.audit[key].flagged) delete this.audit[key];
+      if (!this.audit[key].flagged && !this.audit[key].preferred) delete this.audit[key];
     }
     this.saveAudit();
+  }
+
+  setPreferred(name, size, preferred) {
+    var key = this.auditKey(name, size);
+    if (!this.audit[key]) this.audit[key] = {};
+    if (preferred) {
+      this.audit[key].preferred = true;
+      // Unblock if setting as preferred
+      delete this.audit[key].flagged;
+    } else {
+      delete this.audit[key].preferred;
+      if (!this.audit[key].flagged && !this.audit[key].note) delete this.audit[key];
+    }
+    this.saveAudit();
+  }
+
+  isPreferred(name, size) {
+    return !!this.getAuditEntry(name, size).preferred;
   }
 
   setProcessed(name, size, val) {
@@ -393,12 +411,14 @@ class VariantAudit {
   buildVariantItem(sourceNode, auditName, size, comp) {
     var entry = this.getAuditEntry(auditName, size);
     var isFlagged = !!entry.flagged;
+    var isPref = !!entry.preferred;
     var hasNote = !!entry.note;
     var status = this.getStatus(auditName, size);
 
     var wrapper = document.createElement('div');
     wrapper.className = 'qa-variant-item qa-variant-item--' + size +
-      (isFlagged ? ' qa-variant-item--flagged' : '');
+      (isFlagged ? ' qa-variant-item--flagged' : '') +
+      (isPref ? ' qa-variant-item--preferred' : '');
     wrapper.dataset.auditName = auditName;
     wrapper.dataset.size = size;
 
@@ -410,6 +430,14 @@ class VariantAudit {
     dot.className = 'qa-stoplight qa-stoplight--' + status;
     dot.title = this.STATUS_LABELS[status];
     lbl.appendChild(dot);
+
+    if (isPref) {
+      var prefBadge = document.createElement('span');
+      prefBadge.className = 'qa-preferred-badge';
+      prefBadge.textContent = 'Preferred';
+      prefBadge.title = 'Preferred variant';
+      lbl.appendChild(prefBadge);
+    }
 
     var lblText = document.createElement('span');
     lblText.textContent = size + ' (' + (this.SIZE_LABELS[size] || size) + ')';
@@ -426,6 +454,17 @@ class VariantAudit {
     // Action buttons (visible controls instead of right-click only)
     var actions = document.createElement('div');
     actions.className = 'qa-variant-actions';
+
+    // Prefer button
+    var preferBtn = document.createElement('button');
+    preferBtn.className = 'qa-action-btn qa-action-btn--prefer' + (isPref ? ' qa-action-btn--active' : '');
+    preferBtn.textContent = isPref ? 'Unprefer' : 'Prefer';
+    preferBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setPreferred(auditName, size, !isPref);
+      this.showVariants();
+    });
+    actions.appendChild(preferBtn);
 
     var commentBtn = document.createElement('button');
     commentBtn.className = 'qa-action-btn' + (hasNote ? ' qa-action-btn--active' : '');
@@ -842,9 +881,11 @@ class VariantAudit {
       var entry = this.audit[key];
       var obj = { name: parts[0], size: parts[1], grid: this.SIZE_LABELS[parts[1]] || parts[1] };
       if (entry.flagged) obj.status = 'blocked';
+      else if (entry.preferred) obj.status = 'preferred';
       else if (entry.note && entry.processed) obj.status = 'needs-review';
       else if (entry.note) obj.status = 'to-process';
       else obj.status = 'clean';
+      if (entry.preferred) obj.preferred = true;
       if (entry.note) obj.note = entry.note;
       return obj;
     });

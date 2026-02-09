@@ -192,6 +192,15 @@
   border-color: var(--color-error);
 }
 
+/* Preferred state */
+.qa-variant-item--preferred {
+  border-left: 3px solid #3b82f6;
+}
+
+.qa-variant-item--preferred .qa-variant-label {
+  color: #3b82f6;
+}
+
 /* Blocked state */
 .qa-variant-item--flagged .qa-variant-preview { opacity: 0.2; }
 .qa-variant-item--flagged .qa-variant-label {

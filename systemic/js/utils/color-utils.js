@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Color Utilities
+ * Systemic - Color Utilities
  * Functions for color extraction, analysis, and Material Design mapping
  */
 

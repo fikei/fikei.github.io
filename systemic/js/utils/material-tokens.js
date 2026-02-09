@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Material Design Token Mappings
+ * Systemic - Material Design Token Mappings
  * Reference data for Material Design 3 token system
  */
 
