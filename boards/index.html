@@ -6263,9 +6263,18 @@ Return JSON:
         const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?]+)/)?.[1];
         console.log('%c[PLATFORM] YouTube detected, videoId:', 'color: #e67e22', videoId);
         if (videoId) {
-          const imageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-          console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
-          return { imageUrl, source: 'platform_api' };
+          // Try hqdefault first, fall back to mqdefault (more reliably available)
+          for (const quality of ['hqdefault', 'mqdefault']) {
+            const imageUrl = `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
+            try {
+              const check = await fetchWithTimeout(imageUrl, 3000);
+              if (check.ok) {
+                console.log('%c[PLATFORM] YouTube thumbnail:', 'color: #27ae60', imageUrl);
+                return { imageUrl, source: 'platform_api' };
+              }
+            } catch (e) { /* try next quality */ }
+          }
+          console.log('%c[PLATFORM] YouTube thumbnail not found (video may be deleted/private)', 'color: #e74c3c', videoId);
         }
       }
 

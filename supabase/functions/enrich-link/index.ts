@@ -345,14 +345,20 @@ async function executeImageStrategy(
 async function resolvePlatformImage(url: string): Promise<{ url: string, source: 'platform' } | null> {
   const domain = new URL(url).hostname
 
-  // YouTube
+  // YouTube — verify thumbnail exists (deleted/private videos return 404)
   if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
     const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?]+)/)?.[1]
     if (videoId) {
-      return {
-        url: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        source: 'platform'
+      for (const quality of ['hqdefault', 'mqdefault']) {
+        const thumbUrl = `https://img.youtube.com/vi/${videoId}/${quality}.jpg`
+        try {
+          const check = await fetch(thumbUrl, { method: 'HEAD' })
+          if (check.ok) {
+            return { url: thumbUrl, source: 'platform' }
+          }
+        } catch (e) { /* try next quality */ }
       }
+      console.log('[platform] YouTube thumbnail not found for videoId:', videoId)
     }
   }
 
