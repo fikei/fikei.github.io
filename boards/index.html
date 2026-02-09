@@ -6137,6 +6137,22 @@ Return JSON:
     return null;
   }
 
+  // oEmbed response cache — shared between resolvePlatformImage and extractMusicMetadata
+  const oembedCache = {};
+
+  async function fetchOembed(oembedUrl, cacheKey) {
+    if (oembedCache[cacheKey]) return oembedCache[cacheKey];
+    try {
+      const resp = await fetch(oembedUrl);
+      if (resp.ok) {
+        const data = await resp.json();
+        oembedCache[cacheKey] = data;
+        return data;
+      }
+    } catch (e) { console.warn('[oembed] Fetch failed:', cacheKey, e.message); }
+    return null;
+  }
+
   async function resolvePlatformImage(url) {
     try {
       const domain = new URL(url).hostname;
@@ -6167,34 +6183,24 @@ Return JSON:
         }
       }
 
-      // Spotify (oEmbed)
+      // Spotify (oEmbed — cached)
       if (domain.includes('spotify.com')) {
         console.log('%c[PLATFORM] Spotify detected', 'color: #e67e22');
-        try {
-          const oembedResp = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
-          if (oembedResp.ok) {
-            const oembedData = await oembedResp.json();
-            if (oembedData.thumbnail_url) {
-              console.log('%c[PLATFORM] Spotify thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
-              return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
-            }
-          }
-        } catch (e) { console.warn('[PLATFORM] Spotify oEmbed failed:', e.message); }
+        const oembedData = await fetchOembed(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, `spotify:${url}`);
+        if (oembedData?.thumbnail_url) {
+          console.log('%c[PLATFORM] Spotify thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
+          return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
+        }
       }
 
-      // SoundCloud (oEmbed)
+      // SoundCloud (oEmbed — cached)
       if (domain.includes('soundcloud.com')) {
         console.log('%c[PLATFORM] SoundCloud detected', 'color: #e67e22');
-        try {
-          const oembedResp = await fetch(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`);
-          if (oembedResp.ok) {
-            const oembedData = await oembedResp.json();
-            if (oembedData.thumbnail_url) {
-              console.log('%c[PLATFORM] SoundCloud thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
-              return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
-            }
-          }
-        } catch (e) { console.warn('[PLATFORM] SoundCloud oEmbed failed:', e.message); }
+        const oembedData = await fetchOembed(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, `soundcloud:${url}`);
+        if (oembedData?.thumbnail_url) {
+          console.log('%c[PLATFORM] SoundCloud thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
+          return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
+        }
       }
 
       // GitHub
@@ -6246,7 +6252,8 @@ Return JSON:
   // Returns a music object to persist on the link for future rendering.
   // Fields: artist, trackTitle, albumTitle, genre, duration, bpm,
   //         releaseDate, contentFormat, platformId, isExplicit, key, label
-  async function extractMusicMetadata(url, title, description) {
+  // musicTags: optional og:music tags already scraped by fetchMetadata (avoids re-fetching)
+  async function extractMusicMetadata(url, title, description, musicTags) {
     const meta = {
       artist: null,
       trackTitle: null,
@@ -6266,45 +6273,55 @@ Return JSON:
       const domain = new URL(url).hostname;
       const path = new URL(url).pathname;
 
-      // Infer contentFormat from URL structure
-      if (/\/track[\/s]/.test(path)) meta.contentFormat = 'track';
-      else if (/\/album[\/s]/.test(path)) meta.contentFormat = 'album';
-      else if (/\/playlist[\/s]/.test(path)) meta.contentFormat = 'playlist';
-      else if (/\/episode[\/s]/.test(path) || /\/podcast/.test(path)) meta.contentFormat = 'podcast-episode';
-      else if (/\/artist[\/s]/.test(path)) meta.contentFormat = 'artist';
-      else if (/\/sets?[\/]/.test(path) && domain.includes('soundcloud.com')) meta.contentFormat = 'mix';
+      // ── Step 1: Apply og:music tags from HTML scrape (free, already fetched) ──
+      if (musicTags) {
+        if (musicTags.duration) meta.duration = musicTags.duration;
+        if (musicTags.albumTitle) meta.albumTitle = musicTags.albumTitle;
+        if (musicTags.releaseDate) meta.releaseDate = musicTags.releaseDate;
+        if (musicTags.musician) meta.artist = musicTags.musician;
+        if (musicTags.genre) meta.genre = musicTags.genre;
+        // Infer contentFormat from og:type if present
+        if (musicTags.ogType) {
+          const ogTypeMap = { 'music.song': 'track', 'music.album': 'album', 'music.playlist': 'playlist', 'music.radio_station': 'mix' };
+          meta.contentFormat = ogTypeMap[musicTags.ogType] || null;
+        }
+      }
 
-      // Spotify oEmbed
+      // ── Step 2: Infer contentFormat from URL structure ──
+      if (!meta.contentFormat) {
+        if (/\/track[\/s]/.test(path)) meta.contentFormat = 'track';
+        else if (/\/album[\/s]/.test(path)) meta.contentFormat = 'album';
+        else if (/\/playlist[\/s]/.test(path)) meta.contentFormat = 'playlist';
+        else if (/\/episode[\/s]/.test(path) || /\/podcast/.test(path)) meta.contentFormat = 'podcast-episode';
+        else if (/\/artist[\/s]/.test(path)) meta.contentFormat = 'artist';
+        else if (/\/sets?[\/]/.test(path) && domain.includes('soundcloud.com')) meta.contentFormat = 'mix';
+      }
+
+      // ── Step 3: Platform-specific oEmbed (uses shared cache) ──
+
+      // Spotify
       if (domain.includes('spotify.com')) {
         const spotifyMatch = path.match(/\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
         if (spotifyMatch) {
           meta.platformId = `spotify:${spotifyMatch[1]}:${spotifyMatch[2]}`;
           meta.contentFormat = meta.contentFormat || spotifyMatch[1].replace('show', 'podcast-episode');
         }
-        try {
-          const resp = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
-          if (resp.ok) {
-            const d = await resp.json();
-            // oEmbed title format is typically "Track Name" or "Album Name"
-            // author_name is the artist
-            meta.artist = d.provider_name === 'Spotify' ? (d.author_name || null) : null;
-            meta.trackTitle = d.title || null;
-          }
-        } catch (e) { console.warn('[music-meta] Spotify oEmbed failed:', e.message); }
+        const d = await fetchOembed(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, `spotify:${url}`);
+        if (d) {
+          meta.artist = meta.artist || (d.provider_name === 'Spotify' ? (d.author_name || null) : null);
+          meta.trackTitle = meta.trackTitle || d.title || null;
+        }
       }
 
-      // SoundCloud oEmbed
+      // SoundCloud
       if (domain.includes('soundcloud.com')) {
         const scSlug = path.split('/').filter(Boolean);
         if (scSlug.length >= 1) meta.platformId = `soundcloud:${scSlug.join('/')}`;
-        try {
-          const resp = await fetch(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`);
-          if (resp.ok) {
-            const d = await resp.json();
-            meta.artist = d.author_name || null;
-            meta.trackTitle = d.title || null;
-          }
-        } catch (e) { console.warn('[music-meta] SoundCloud oEmbed failed:', e.message); }
+        const d = await fetchOembed(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, `soundcloud:${url}`);
+        if (d) {
+          meta.artist = meta.artist || d.author_name || null;
+          meta.trackTitle = meta.trackTitle || d.title || null;
+        }
       }
 
       // Bandcamp (parse from URL structure + title)
@@ -6312,8 +6329,8 @@ Return JSON:
         const bcArtist = domain.replace('.bandcamp.com', '');
         meta.artist = meta.artist || bcArtist;
         meta.platformId = `bandcamp:${bcArtist}${path}`;
-        if (/\/album\//.test(path)) meta.contentFormat = 'album';
-        else if (/\/track\//.test(path)) meta.contentFormat = 'track';
+        if (/\/album\//.test(path)) meta.contentFormat = meta.contentFormat || 'album';
+        else if (/\/track\//.test(path)) meta.contentFormat = meta.contentFormat || 'track';
       }
 
       // Apple Music (parse URL)
@@ -6333,7 +6350,7 @@ Return JSON:
         else meta.contentFormat = meta.contentFormat || 'track';
       }
 
-      // Fallback: parse artist/title from page title if not populated
+      // ── Step 4: Fallback parsing from page title ──
       if (!meta.artist && title) {
         // Common patterns: "Artist - Track" or "Track by Artist" or "Track | Artist"
         const dashSplit = title.match(/^(.+?)\s*[-–—]\s*(.+?)(?:\s*\|.*)?$/);
@@ -6832,6 +6849,34 @@ Return JSON:
           meta.image = img;
         }
       }
+      // Extract og:music tags for music metadata (free — already have the HTML)
+      const musicDuration = html.match(/<meta[^>]*property=["'](?:og:)?music:duration["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:duration["']/i);
+      const musicAlbum = html.match(/<meta[^>]*property=["'](?:og:)?music:album["'][^>]*content=["']([^"']*)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:album["']/i);
+      const musicReleaseDate = html.match(/<meta[^>]*property=["'](?:og:)?music:release_date["'][^>]*content=["']([^"']*)["']/i) ||
+                               html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:release_date["']/i);
+      const musicMusician = html.match(/<meta[^>]*property=["'](?:og:)?music:musician["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:musician["']/i);
+      const ogType = html.match(/<meta[^>]*property=["']og:type["'][^>]*content=["']([^"']*)["']/i) ||
+                     html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:type["']/i);
+
+      // Bandcamp/SoundCloud genre from tags or structured data
+      const genreTag = html.match(/<meta[^>]*(?:name|property)=["'](?:genre|music:genre)["'][^>]*content=["']([^"']*)["']/i) ||
+                       html.match(/["']genre["']\s*:\s*["']([^"']+)["']/i) ||
+                       html.match(/<a[^>]*class=["'][^"']*genre[^"']*["'][^>]*>([^<]+)<\/a>/i);
+
+      if (musicDuration || musicAlbum || musicReleaseDate || musicMusician || genreTag || (ogType && ogType[1]?.startsWith('music'))) {
+        meta.musicTags = {};
+        if (musicDuration) meta.musicTags.duration = parseInt(musicDuration[1], 10) || null;
+        if (musicAlbum) meta.musicTags.albumTitle = decodeEntities(musicAlbum[1]);
+        if (musicReleaseDate) meta.musicTags.releaseDate = musicReleaseDate[1];
+        if (musicMusician) meta.musicTags.musician = decodeEntities(musicMusician[1]);
+        if (genreTag) meta.musicTags.genre = decodeEntities(genreTag[1]).trim();
+        if (ogType) meta.musicTags.ogType = ogType[1];
+        console.log('%c[FETCH] og:music tags found:', 'color: #1DB954', meta.musicTags);
+      }
+
     } catch (parseErr) {
       // Parse error - continue with defaults
     }
@@ -8258,7 +8303,7 @@ Return JSON:
           // Extract music metadata if categorized as listen or content_type is music
           let music = null;
           if (cat.category === 'listen' || contentType.type === 'music') {
-            music = await extractMusicMetadata(url, meta.title, meta.description);
+            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
           }
 
           // Update the link with full data
@@ -9254,7 +9299,13 @@ Return JSON:
           const cat = await smartCategorize(meta);
           const contentType = classifyByRules(url, meta.title, meta.description);
 
-          updateLink(id, {
+          // Extract music metadata if categorized as listen or content_type is music
+          let music = null;
+          if (cat.category === 'listen' || contentType.type === 'music') {
+            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
+          }
+
+          const linkUpdate = {
             title: meta.title,
             description: meta.description,
             image: meta.image,
@@ -9264,7 +9315,9 @@ Return JSON:
             type_confidence: contentType.confidence,
             type_signals: contentType.signals,
             loading: false
-          });
+          };
+          if (music) linkUpdate.music = music;
+          updateLink(id, linkUpdate);
 
           renderGrid();
 
