@@ -140,7 +140,7 @@ A board is a container for pins with:
 
 | Component | Status | Description | See Details |
 |-----------|--------|-------------|-------------|
-| **Categories & Filtering** | ✅ Shipped | Organization system with AI categories and sub-tags | [Categories & Filtering](./categories-filtering.md) |
+| **Flexible Tagging** | ⚠️ Partial | Categories, sub-tags, content types; freeform tags planned | [Flexible Tagging](../pins/tagging.md) |
 | **Visual Grid Browsing** | ✅ Shipped | Responsive grid, card expansion, dense flow | [Grid Layout & Display](./grid-layout.md) |
 | **Search & Retrieval** | ✅ Shipped | Live search, category filter, sub-tag filter | [Search & Retrieval](./search.md) |
 | **Collection Sharing** | ⚠️ Partial | Export shipped; public boards planned | [Sharing & Collaboration](./sharing.md) |

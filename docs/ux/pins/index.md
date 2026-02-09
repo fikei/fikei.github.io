@@ -119,9 +119,6 @@ Normal          Hover           Selected        Loading
 | **Multi-Format Content** | ⚠️ Partial | Links + photos + videos; notes/files planned | [Multi-Format](./multi-format.md) |
 | **Flexible Tagging** | ⚠️ Partial | Categories + sub-tags; freeform tags planned | [Tagging](./tagging.md) |
 | **Mobile Capture** | ⚠️ Partial | Responsive + clipboard; Share Target planned | [Mobile Capture](./mobile-capture.md) |
-| **Content Types** | ✅ Shipped | AI classification of what a pin represents | [Content Types](./content-types.md) |
-| **Link Enrichment** | ✅ Shipped | Automatic metadata extraction from URLs | [Link Enrichment](./link-enrichment.md) |
-| **Add Links** | ✅ Shipped | Interface for saving new pins | [Add Links](./add-links.md) |
 | **Link Management** | ✅ Shipped | Editing, deleting, organizing pins | [Link Management](./link-management.md) |
 
 ---

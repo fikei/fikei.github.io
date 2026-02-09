@@ -117,7 +117,7 @@ const PRODUCT_SCOPES: Record<string, {
   },
   'content-types': {
     name: 'Content Types',
-    docPaths: ['docs/strategy/prds/content-type-and-image-systems.md', 'docs/ux/pins/content-types.md', 'docs/infrastructure/technical-design/content-type-system.md'],
+    docPaths: ['docs/strategy/prds/content-type-and-image-systems.md', 'docs/ux/pins/ai-categorization.md', 'docs/infrastructure/technical-design/content-type-system.md'],
     codePaths: ['boards/js/content-types/'],
     relatedProducts: ['boards'],
   },
