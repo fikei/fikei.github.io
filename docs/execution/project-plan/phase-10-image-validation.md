@@ -19,16 +19,18 @@ Extend the existing logo/placeholder blocklist into a full heuristic scoring pas
 
 | Task | Status |
 |------|--------|
-| Extract existing blocklist patterns from `enrich-link` and `boards/index.html` into shared constants | Pending |
-| Add file size check: reject images < 5KB as likely placeholders | Pending |
-| Add dimension check: reject images < 50px in either dimension | Pending |
-| Add filename pattern scoring (logo, icon, favicon, sprite, pixel, spacer, blank, transparent) | Pending |
-| Add URL pattern detection for known CDN placeholder paths | Pending |
-| Detect when image URL matches site favicon URL | Pending |
-| Add duplicate detection: same image URL used across multiple pins from same domain | Pending |
-| Score each check and compute Tier 1 distinctiveness sub-score | Pending |
-| When Tier 1 fails → skip display, trigger next strategy in pipeline | Pending |
+| Extract existing blocklist patterns from `enrich-link` and `boards/index.html` into shared constants | Complete |
+| Add file size check: reject images < 5KB as likely placeholders | Complete |
+| Add dimension check: reject images < 50px in either dimension | Complete |
+| Add filename pattern scoring (logo, icon, favicon, sprite, pixel, spacer, blank, transparent) | Complete |
+| Add URL pattern detection for known CDN placeholder paths | Complete |
+| Detect when image URL matches site favicon URL | Complete |
+| Add duplicate detection: same image URL used across multiple pins from same domain | Complete |
+| Score each check and compute Tier 1 distinctiveness sub-score | Complete |
+| When Tier 1 fails → skip display, trigger next strategy in pipeline | Complete |
 | Unit tests for heuristic checks with known good/bad image URLs | Pending |
+
+**Key files**: `js/image-validation.js` (shared module), `boards/index.html` (integration in `fetchMetadata` + `resolveImage`)
 
 ### Story 2: Server-Side Technical Analysis (Tier 2)
 
@@ -36,14 +38,16 @@ Validate image metadata without full download. HEAD requests + partial decode fo
 
 | Task | Status |
 |------|--------|
-| Add HTTP HEAD request in `enrich-link` to verify image loads (200, correct Content-Type) | Pending |
-| Extract image dimensions from headers or partial download (first bytes for JPEG/PNG/WebP) | Pending |
-| Detect redirects to generic error/placeholder images (compare final URL to known patterns) | Pending |
-| Implement resolution scoring against card context thresholds (grid: 300x200, hero: 600x400, thumb: 100x100) | Pending |
-| Implement aspect ratio scoring: reject extreme ratios (> 3:1 or < 1:3) | Pending |
-| Implement format validation: JPEG, PNG, WebP, AVIF only | Pending |
-| Compute Tier 2 visual quality sub-score from resolution + aspect ratio + format checks | Pending |
-| When Tier 2 fails → trigger re-resolution with next strategy | Pending |
+| Add HTTP HEAD request in `enrich-link` to verify image loads (200, correct Content-Type) | Complete |
+| Extract image dimensions from headers or partial download (first bytes for JPEG/PNG/WebP) | Complete |
+| Detect redirects to generic error/placeholder images (compare final URL to known patterns) | Complete |
+| Implement resolution scoring against card context thresholds (grid: 300x200, hero: 600x400, thumb: 100x100) | Complete |
+| Implement aspect ratio scoring: reject extreme ratios (> 3:1 or < 1:3) | Complete |
+| Implement format validation: JPEG, PNG, WebP, AVIF only | Complete |
+| Compute Tier 2 visual quality sub-score from resolution + aspect ratio + format checks | Complete |
+| When Tier 2 fails → trigger re-resolution with next strategy | Complete |
+
+**Key files**: `supabase/functions/enrich-link/index.ts` (`validateImageTier2`, `extractDimensions`)
 
 ### Story 3: Scoring Data Model
 
@@ -51,12 +55,14 @@ Add score storage to the database so validation results persist and can inform d
 
 | Task | Status |
 |------|--------|
-| Add `image_scores` JSONB column to links table (accuracy, visual_quality, aesthetic_fit, distinctiveness, safety, composite, tier, evaluated_at, evaluation_method) | Pending |
-| Add `image_enrichment_attempts` INT column to links table (default 0) | Pending |
-| Add `image_enrichment_log` JSONB column to links table (default '[]') | Pending |
-| Create Supabase migration file `005_image_validation.sql` | Pending |
-| Update client-side link model to include image_scores | Pending |
-| Update Supabase sync to persist image_scores | Pending |
+| Add `image_scores` JSONB column to links table (accuracy, visual_quality, aesthetic_fit, distinctiveness, safety, composite, tier, evaluated_at, evaluation_method) | Complete |
+| Add `image_enrichment_attempts` INT column to links table (default 0) | Complete |
+| Add `image_enrichment_log` JSONB column to links table (default '[]') | Complete |
+| Create Supabase migration file `007_image_validation.sql` | Complete |
+| Update client-side link model to include image_scores | Complete |
+| Update Supabase sync to persist image_scores | Complete |
+
+**Key files**: `supabase/migrations/007_image_validation.sql`, `boards/index.html` (sync payload + `updateLinkImage`)
 
 ### Story 4: Baseline Metrics
 
@@ -64,10 +70,12 @@ Instrument score tracking to establish baseline before adding AI evaluation.
 
 | Task | Status |
 |------|--------|
-| Log score distributions for Tier 1/2 evaluations (histogram of composite scores) | Pending |
-| Track pass/fail rates per tier (what % of images fail Tier 1? Tier 2?) | Pending |
-| Track scores by content type and domain (which types score lowest?) | Pending |
-| Create admin view: pins with lowest image scores | Pending |
+| Log score distributions for Tier 1/2 evaluations (histogram of composite scores) | Complete |
+| Track pass/fail rates per tier (what % of images fail Tier 1? Tier 2?) | Complete |
+| Track scores by content type and domain (which types score lowest?) | Complete |
+| Create admin view: pins with lowest image scores | Complete |
+
+**Key files**: `boards/index.html` (`imageQualityReport()`, `worstImages()` console diagnostics)
 
 ---
 

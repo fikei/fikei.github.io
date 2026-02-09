@@ -2769,6 +2769,7 @@ body {
 }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/image-validation.js"></script>
 </head>
 <body>
   <!-- Progress Bar -->
@@ -5985,7 +5986,21 @@ Return JSON:
         const result = await resolveImage(item);
         console.log('%c[IMAGE QUEUE] Resolution result:', 'color: #9b59b6', result);
         if (result?.imageUrl) {
-          await updateLinkImage(item.linkId, result.imageUrl, result.source);
+          // Tier 1 validation gate on resolved images
+          let imageScores = null;
+          if (typeof ImageValidation !== 'undefined') {
+            const validation = ImageValidation.tier1(result.imageUrl, {
+              title: item.title,
+              domain: extractDomain(item.url)
+            });
+            imageScores = validation.scores;
+            if (!validation.pass) {
+              console.log('%c[IMAGE QUEUE] Tier 1 rejected resolved image:', 'color: #e74c3c',
+                result.imageUrl, validation.reason);
+              continue; // Skip this image, try next in queue won't help — already best strategy result
+            }
+          }
+          await updateLinkImage(item.linkId, result.imageUrl, result.source, imageScores);
           console.log('%c[IMAGE QUEUE] Updated link image successfully', 'color: #27ae60; font-weight: bold');
         } else {
           console.log('%c[IMAGE QUEUE] No image found, using template fallback', 'color: #f39c12');
@@ -6042,6 +6057,16 @@ Return JSON:
         }
 
         if (result?.imageUrl) {
+          // Validate each strategy result with Tier 1 before accepting
+          if (typeof ImageValidation !== 'undefined') {
+            const validation = ImageValidation.tier1(result.imageUrl, { title, domain: extractDomain(url) });
+            if (!validation.pass) {
+              console.log('%c[IMAGE RESOLVE] Tier 1 rejected %s result:', 'color: #e74c3c', strategy,
+                result.imageUrl, validation.reason);
+              continue; // Try next strategy
+            }
+            result.imageScores = validation.scores;
+          }
           console.log('%c[IMAGE RESOLVE] Success with strategy:', 'color: #27ae60; font-weight: bold', strategy, result.imageUrl);
           return result;
         } else if (result) {
@@ -6146,7 +6171,7 @@ Return JSON:
     return null;
   }
 
-  async function updateLinkImage(linkId, imageUrl, source) {
+  async function updateLinkImage(linkId, imageUrl, source, imageScores) {
     // Update local state
     const data = load();
     const link = data.links.find(l => l.id === linkId);
@@ -6154,6 +6179,9 @@ Return JSON:
       link.image = imageUrl;
       link.image_source = source;
       link.image_resolved_at = new Date().toISOString();
+      if (imageScores) {
+        link.image_scores = imageScores;
+      }
       save(data);
 
       // Update UI
@@ -6185,6 +6213,100 @@ Return JSON:
 
   // Initialize domain cache on load
   loadDomainCache();
+
+  // ============================================
+  // Image Validation Metrics (Story 4)
+  // ============================================
+
+  /**
+   * Analyze image quality scores across all pins.
+   * Call from console: imageQualityReport()
+   */
+  window.imageQualityReport = function() {
+    const data = load();
+    const links = data.links || [];
+    const withImage = links.filter(l => l.image);
+    const withScores = links.filter(l => l.image_scores);
+    const noImage = links.filter(l => !l.image);
+
+    const tierCounts = { excellent: 0, good: 0, marginal: 0, poor: 0, rejected: 0, unscored: 0 };
+    const byContentType = {};
+    const byDomain = {};
+
+    withScores.forEach(l => {
+      const tier = l.image_scores.tier || 'unscored';
+      tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+
+      // By content type
+      const ct = l.content_type || 'unknown';
+      if (!byContentType[ct]) byContentType[ct] = { count: 0, totalComposite: 0 };
+      byContentType[ct].count++;
+      byContentType[ct].totalComposite += (l.image_scores.composite || 0);
+
+      // By domain
+      const d = l.domain || 'unknown';
+      if (!byDomain[d]) byDomain[d] = { count: 0, totalComposite: 0, overrides: 0 };
+      byDomain[d].count++;
+      byDomain[d].totalComposite += (l.image_scores.composite || 0);
+    });
+
+    // Compute averages
+    Object.keys(byContentType).forEach(k => {
+      byContentType[k].avgComposite = Math.round((byContentType[k].totalComposite / byContentType[k].count) * 100) / 100;
+    });
+    Object.keys(byDomain).forEach(k => {
+      byDomain[k].avgComposite = Math.round((byDomain[k].totalComposite / byDomain[k].count) * 100) / 100;
+    });
+
+    // Sort domains by worst average
+    const worstDomains = Object.entries(byDomain)
+      .sort((a, b) => a[1].avgComposite - b[1].avgComposite)
+      .slice(0, 10)
+      .map(([domain, stats]) => ({ domain, ...stats }));
+
+    const report = {
+      summary: {
+        total_pins: links.length,
+        with_image: withImage.length,
+        with_scores: withScores.length,
+        no_image: noImage.length,
+        image_coverage: Math.round((withImage.length / links.length) * 100) + '%',
+        scored_coverage: Math.round((withScores.length / links.length) * 100) + '%'
+      },
+      tier_distribution: tierCounts,
+      by_content_type: byContentType,
+      worst_domains: worstDomains
+    };
+
+    console.log('%c[IMAGE QUALITY REPORT]', 'color: #8b5cf6; font-weight: bold; font-size: 14px');
+    console.log('%cSummary:', 'font-weight: bold', report.summary);
+    console.log('%cTier Distribution:', 'font-weight: bold', report.tier_distribution);
+    console.log('%cBy Content Type:', 'font-weight: bold', report.by_content_type);
+    console.log('%cWorst Domains (by avg composite):', 'font-weight: bold', report.worst_domains);
+    console.table(report.worst_domains);
+
+    return report;
+  };
+
+  /**
+   * Find pins with lowest image scores. Call from console: worstImages(10)
+   */
+  window.worstImages = function(count) {
+    count = count || 10;
+    const data = load();
+    return data.links
+      .filter(l => l.image_scores && l.image_scores.composite != null)
+      .sort((a, b) => a.image_scores.composite - b.image_scores.composite)
+      .slice(0, count)
+      .map(l => ({
+        title: l.title?.substring(0, 40),
+        domain: l.domain,
+        composite: l.image_scores.composite,
+        tier: l.image_scores.tier,
+        image: l.image?.substring(0, 60),
+        method: l.image_scores.evaluation_method
+      }));
+  };
 
   // ============================================
   // Server-Side Enrichment Queue
@@ -6592,10 +6714,24 @@ Return JSON:
         if (!img.startsWith('http')) {
           try { img = new URL(img, url).href; } catch {}
         }
-        // Final check - don't use if still a logo
-        const finalLower = img.toLowerCase();
-        if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
-          meta.image = img;
+        // Tier 1 image validation — replaces simple logo check
+        if (typeof ImageValidation !== 'undefined') {
+          const validation = ImageValidation.tier1(img, {
+            title: meta.title,
+            domain: meta.domain
+          });
+          if (validation.pass) {
+            meta.image = img;
+            meta.image_scores = validation.scores;
+          } else {
+            console.log('%c[IMAGE VALIDATION] Tier 1 rejected:', 'color: #e74c3c', img, validation.reason, validation.checks.filter(c => !c.pass));
+          }
+        } else {
+          // Fallback: simple logo check if validation module not loaded
+          const finalLower = img.toLowerCase();
+          if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
+            meta.image = img;
+          }
         }
       }
     } catch (parseErr) {
@@ -7031,7 +7167,8 @@ Return JSON:
         // Enrichment fields
         content_type: link.content_type || null,
         type_confidence: link.type_confidence || null,
-        image_source: link.image_source || null
+        image_source: link.image_source || null,
+        image_scores: link.image_scores || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
