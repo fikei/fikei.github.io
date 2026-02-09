@@ -191,6 +191,57 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 
 ---
 
+## Generic Widget Architecture Risks
+
+Risks identified during v6.0 generic widget consolidation (2026-02-09). Ordered by impact.
+
+### Server-Side Generic Prompts (Risk #6 — Highest)
+
+Server widget configs have hardcoded category-specific prompts (e.g. `complete-the-look` says "outfit"). The client resolves `{{domain}}` vars but the server ignores the client prompt and uses its own. Expanding widgets to new categories requires new server configs with matching prompts.
+
+| Story | Status |
+|-------|--------|
+| **Adopt template variables in server widget configs** — Replace hardcoded domain words with `{{domain}}`/`{{noun}}`/`{{analyst}}` in server prompt fields | Pending |
+| **Add `resolveWidgetVars()` to edge function** — Server-side template var resolution using category from request body | Pending |
+| **Consolidate server configs** — Merge 18 individual server configs into 10 generic ones with template vars, mirroring client architecture | Pending |
+| **Remove WIDGET_SERVER_MAP from client** — Once server handles generic IDs natively, the routing layer is unnecessary | Pending |
+
+### Category Expansion Requires 3 Touchpoints (Risk #5 — Medium)
+
+Adding a widget to a new category requires updating WIDGET_CATEGORY_MAP, WIDGET_SERVER_MAP, and adding a server config. Missing any one = silent failure.
+
+| Story | Status |
+|-------|--------|
+| **Add `validateWidgetMaps()` startup check** — Cross-validate that every allowlist entry has a matching server map entry, log warnings for gaps | Pending |
+| **CLI tooling for widget expansion** — Script that takes (widget, category) and updates all 3 touchpoints + generates server config stub | Pending |
+
+### Discovery Response Mapping (Risk #4 — Medium)
+
+Server discovery returns specific widget IDs that need reverse-mapping to generic IDs. Unknown widgets fall through to temp entries without local config.
+
+| Story | Status |
+|-------|--------|
+| **Server discovery returns generic IDs** — After server consolidation, discovery endpoint returns generic widget IDs directly | Pending |
+| **Fallback widget template** — When a discovered widget has no local config, use a safe default renderer instead of building temp entry from server data | Pending |
+
+### Cache Key Consistency (Risk #3 — Medium)
+
+Client cache uses generic widget ID but server call uses server widget ID. Cache invalidation is consistent but key format differs from what the server sees.
+
+| Story | Status |
+|-------|--------|
+| **Unified cache key strategy** — Document cache key format, ensure server cache and client cache align on key structure | Pending |
+
+---
+
+## Standard UI Enhancements
+
+| Story | Status |
+|-------|--------|
+| **Collection stats in standard UI** — Move collection stats (item count, domain count, brand count, price range) out of the AI widget system and into the standard category UI. Show as a persistent stats bar or summary row visible for every category, not gated behind AI. Stats should update instantly on add/remove without an AI call. | Pending |
+
+---
+
 ## Accessibility
 
 | Story | Status |
