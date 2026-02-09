@@ -88,7 +88,7 @@ Return JSON format:
   },
 
   // Metadata
-  categories: ['wear', 'fashion', 'all'],
+  categories: ['wear', 'fashion'],
   tags: ['analysis', 'insights', 'ai', 'profile'],
   enabled: true,
 

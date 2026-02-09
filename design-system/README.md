@@ -3,7 +3,7 @@
 > Minimal, high-contrast design system powering all ctrl.rodeo products.
 
 **Status**: 🟢 Active
-**Last Updated**: 2026-02-05
+**Last Updated**: 2026-02-09
 
 ---
 
@@ -602,8 +602,21 @@ The CSS files are the single source of truth. Everything else is derived or supp
 **Rules:**
 - Change styles → edit the CSS files
 - Regenerate manifest → `node scripts/parse-design-system.js`
-- Systemic does **not** read the local design system (it crawls external sites)
+- Systemic can load the local design system via "Scan Local" (reads manifest + registry) or crawl external sites
 - `manifest.json` is read-only; never hand-edit it
+
+### Runtime Constraint Engine
+
+Boards loads the design system at runtime via `boards/design-constraints.js`:
+
+```
+Page load → fetch manifest.json + template-registry.json → build indexes
+         → validate widget sizes, component modifiers, template structure
+         → annotate DOM with data-ds-* attributes
+         → emit violation events for debugging
+```
+
+Key APIs: `DS_CONSTRAINTS.validate(el)`, `DS_CONSTRAINTS.auditDOM(root)`, `DS_CONSTRAINTS.annotate(root)`
 
 ## File Structure
 

@@ -1,8 +1,12 @@
 # AI Recommendations
 
-AI-powered widgets that analyze your pins and suggest complementary products, style summaries, and related content.
+> **Status:** ✅ Shipped
+> **Brand Principle:** Input shapes output
+> **Key Personas:** All — widget system serves every persona
+>
+> Back to [UX Index](../index.md)
 
-**Implementation Status**: ✅ Shipped
+AI-powered widgets that analyze your pins and suggest complementary products, style summaries, and related content.
 
 | Feature | Status | Notes |
 |---------|--------|-------|

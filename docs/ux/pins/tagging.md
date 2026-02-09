@@ -1,16 +1,12 @@
-# Categories & Filtering
+# Flexible Tagging & Metadata
 
-Organization system that lets users group pins into categories and filter their board view.
+> **Status:** ⚠️ Partial
+> **Brand Principle:** Organize as you go
+> **Key Personas:** DJ (critical), Design Technologist (critical), Multidisciplinary Maker (high), Researcher (high)
+>
+> Back to [UX Index](../index.md)
 
-**Implementation Status**: ✅ Shipped
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Category Filter Bar | ✅ Shipped | Horizontal scrollable tokens |
-| AI Category Assignment | ✅ Shipped | Auto-categorize on add |
-| Sub-Tags on Cards | ✅ Shipped | Shows sub-tag when filtered into category |
-| Sub-Tags Bar | 🧪 Beta | Enable via `window.enableSubTagsBar()` |
-| Category Counts | ✅ Shipped | Shows count per category |
+Organization should be fluid. Categories are a start, but power users need freeform tags, custom metadata, and the ability to find things their way.
 
 ---
 
@@ -21,7 +17,7 @@ Organization system that lets users group pins into categories and filter their 
 - **Drill down further** with sub-tags within a category
 - **Create categories** that match my mental model
 - **See category counts** to understand my collection
-- **Assign categories** during or after adding pins
+- **Tag pins freely** beyond single-category assignment
 
 ---
 
@@ -33,7 +29,45 @@ Organization system that lets users group pins into categories and filter their 
 | Browse my board | Filter by category | Focus on one type of content |
 | Have uncategorized pins | See them separately | Organize them later |
 | Need a new category | Create one easily | Adapt my organization |
-| Wonder about my collection | See category stats | Understand my patterns |
+| Want more detail | Add tags beyond the category | Find things multiple ways |
+
+---
+
+## What's Shipped
+
+### Categories
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Category Filter Bar | ✅ Shipped | Horizontal scrollable tokens |
+| AI Category Assignment | ✅ Shipped | Auto-categorize on add |
+| Category Counts | ✅ Shipped | Shows count per category |
+| Create Category | ✅ Shipped | Dynamic creation, max 30 chars |
+| Move Between Categories | ✅ Shipped | Single or bulk move |
+| Bulk Category Assignment | ✅ Shipped | Select multiple pins, assign together |
+
+#### Category Rules
+
+| Rule | Detail |
+|------|--------|
+| Max length | 30 characters |
+| Duplicates | Not allowed (case-insensitive) |
+| Special chars | Emoji allowed |
+| System categories | `All` (everything), `Uncategorized` (no assignment) — cannot delete |
+
+### Sub-Tags
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Sub-Tags on Cards | ✅ Shipped | Shows sub-tag when filtered into category |
+| Sub-Tags Bar | 🧪 Beta | Enable via `window.enableSubTagsBar()` |
+
+Sub-tags are auto-detected from keywords in pin title/description. Within a category, they provide a second level of filtering.
+
+### Content Types
+- 9 content types assigned by AI (see [AI Categorization](./ai-categorization.md))
+- Content type visible on cards as badge
+- Filterable in search
 
 ---
 
@@ -56,7 +90,7 @@ Active state (inverted colors):
 └────────────┘
 ```
 
-### Category Filter Bar (Mobile - Scrollable)
+### Category Filter Bar (Mobile)
 
 ```
 ┌────────────────────────────────────┐
@@ -65,9 +99,7 @@ Active state (inverted colors):
         ← swipe to see more →
 ```
 
-### Sub-Tags on Cards ✅ IMPLEMENTED
-
-When filtered into a category, cards show their sub-tag instead of the category:
+### Sub-Tags on Cards
 
 ```
 "All" View - shows category:
@@ -89,12 +121,7 @@ When filtered into a category, cards show their sub-tag instead of the category:
 └─────────────────┘
 ```
 
-Sub-tag detection:
-- Keyword matching from title/description
-- Falls back to category if no sub-tag detected
-- Cached on link object for performance
-
-### Sub-Tags Bar 🧪 BETA
+### Sub-Tags Bar (Beta)
 
 Enable via console: `window.enableSubTagsBar()`
 
@@ -105,13 +132,6 @@ Sub-Tags Bar (appears when Wear selected):
 │  [ Footwear 15 ] [ Accessories 4 ] [ Bags 2 ]                │
 └──────────────────────────────────────────────────────────────┘
 ```
-
-Sub-tag bar styling:
-- Smaller than category tokens (9px vs 10px)
-- Muted color by default (--muted)
-- Outline border (--subtle)
-- Shows count inline
-- "Other" option for untagged items
 
 ### Create Category Modal
 
@@ -129,33 +149,6 @@ Sub-tag bar styling:
 │  [ Fashion ] [ Style ] [ Seasonal ]     │
 │                                         │
 │           [ Cancel ]  [ Create ]        │
-└─────────────────────────────────────────┘
-```
-
-### Category Assignment (During Add)
-
-```
-┌─────────────────────────────────────────┐
-│  Add Links                        [X]   │
-├─────────────────────────────────────────┤
-│                                         │
-│  URL: https://example.com/jacket        │
-│                                         │
-│  Category:                              │
-│  ┌─────────────────────────────────┐    │
-│  │ [ Select category...        ▾ ] │    │
-│  └─────────────────────────────────┘    │
-│                                         │
-│  ┌─────────────────────────────────┐    │
-│  │ ○ Clothing                      │    │
-│  │ ○ Tech                          │    │
-│  │ ○ Home                          │    │
-│  │ ● Wishlist  ← AI suggested      │    │
-│  │ ─────────────────────────────   │    │
-│  │ [ + Create new category ]       │    │
-│  └─────────────────────────────────┘    │
-│                                         │
-│           [ Cancel ]  [ Add ]           │
 └─────────────────────────────────────────┘
 ```
 
@@ -179,29 +172,6 @@ Sub-tag bar styling:
 
 ---
 
-## Category Rules
-
-### Naming
-- Max 30 characters
-- No duplicate names (case-insensitive)
-- Emoji allowed but not required
-- Auto-trim whitespace
-
-### Special Categories
-| Category | Behavior |
-|----------|----------|
-| `All` | System category, shows everything, cannot be deleted |
-| `Uncategorized` | System category, pins without assignment |
-
-### AI Category Suggestions
-When adding a pin, AI analyzes:
-- Pin content type
-- Similar pins already categorized
-- Domain patterns
-- Title/description keywords
-
----
-
 ## Filtering Behavior
 
 ```
@@ -219,6 +189,14 @@ Filter: Wear → Footwear
 
 Filter: Wear → Other
 └── Shows: "Wear" pins that don't match any sub-tag keywords
+
+Filter: Listen
+└── Shows: Only pins in "Listen" category (music, podcasts, mixes)
+└── Sub-tags: Albums, Tracks, Playlists, Podcasts, Artists, Mixes, Other
+
+Filter: Listen → Albums
+└── Shows: Only "Listen" pins matching album keywords
+└── Keywords: album, lp, ep, deluxe, record, vinyl, release, reissue
 
 Multiple filters: Not supported (single select per level)
 ```
@@ -249,49 +227,59 @@ Multiple filters: Not supported (single select per level)
 - `office`: pen, notebook, planner, stapler, stationery
 - `travel`: luggage, suitcase, carry-on, adapter, toiletry
 
----
-
-## Known Extensions / Future States
-
-### Short-term
-- **Category colors** - Assign colors for visual distinction
-- **Category icons** - Custom emoji/icon per category
-- **Category description** - Add notes about what goes in each
-- **AI sub-tag detection** - Use image recognition for better tagging
-
-### Medium-term
-- ~~**Nested categories** - Sub-categories for deeper organization~~ → Implemented as Sub-Tags
-- **Smart categories** - Auto-populate based on rules (e.g., "All products under $50")
-- **Category merge** - Combine two categories into one
-- **Category split** - Divide a category into two
-- **Manual sub-tag editing** - Override auto-detected sub-tags
-- **Custom sub-tags** - User-defined sub-tags per category
-
-### Long-term
-- **Cross-board categories** - Share categories across multiple boards
-- **Collaborative categories** - Team-defined categories
-- **Category templates** - Pre-built category sets for common use cases
+**Listen:**
+- `albums`: album, lp, ep, deluxe, record, vinyl, release, reissue
+- `tracks`: song, track, single, remix, beat, instrumental, feat
+- `playlists`: playlist, compilation, curated, collection, best of
+- `podcasts`: podcast, episode, pod, interview, talk, hosted by
+- `artists`: artist, band, singer, rapper, producer, dj, musician, composer
+- `mixes`: mix, set, live, session, boiler room, essential mix, radio
 
 ---
 
-## Technical Notes
+## What's Planned
 
-### Categories
-- Categories stored in Supabase `categories` table
-- Filter state stored in URL params for shareability
-- Category cache in localStorage for offline access
-- AI suggestions via `categorizeWithAI()` function
-- Bulk moves handled by `bulkMove()` with batch updates
+### Custom Tags
+- User-applied freeform tags on any pin
+- Autocomplete from existing tag vocabulary
+- Multiple tags per pin (not just single category)
+- Tag management: rename, merge, delete
+- Filter board view by one or more tags
+- Bulk tag operations: select multiple pins, apply/remove tags
 
-### Sub-Tags
-- Sub-tag definitions in `SUB_TAGS` constant per category
-- Detection via `detectSubTag()` using keyword matching
-- Cached on link object via `getSubTag()` for performance
-- Card display: shows sub-tag when filtered into category, category when in "All"
-- Beta bar feature: `showSubTagsBar` flag, enable via `window.enableSubTagsBar()`
-- File: `boards/index.html`
+### Structured Metadata
+Pin-type-specific fields beyond title/description:
+- Music pins: BPM, key, energy level, mood
+- Image pins: dimensions, color palette, EXIF
+- Event pins: date, venue, lineup
+- Custom fields per user or per board
+
+### Smart Tags
+- AI-suggested tags based on pin content and user patterns
+- "You might want to tag this as..." suggestions
+- Tag trends: see which tags are growing in your collection
+
+### Category Extensions
+- Category colors — assign colors for visual distinction
+- Category icons — custom emoji/icon per category
+- Category description — notes about what goes in each
+- AI sub-tag detection — use image recognition for better tagging
+- Smart categories — auto-populate based on rules (e.g., "All products under $50")
+- Category merge/split — combine or divide categories
+- Manual sub-tag editing — override auto-detected sub-tags
+- Custom sub-tags — user-defined sub-tags per category
+- Cross-board categories — share categories across multiple boards
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `boards/index.html` | Category filter UI, sub-tag detection, `SUB_TAGS` constant, `detectSubTag()`, `getSubTag()` |
 
 ### CSS Classes
+
 ```css
 .grid-item__category   /* Tag display on cards */
 .sub-tags              /* Container bar (beta) */
@@ -300,3 +288,29 @@ Multiple filters: Not supported (single select per level)
 .sub-tag--active       /* Selected state */
 .sub-tag__count        /* Count badge */
 ```
+
+---
+
+## Persona Fit
+
+| Persona | What They Need |
+|---------|---------------|
+| DJ | BPM, key, energy, mood as first-class metadata — not just categories |
+| Design Technologist | Cross-domain tags (a pin can be "typography" AND "algorithm" AND "generative") |
+| Multidisciplinary Maker | Tags that bridge "work" and "personal" without artificial separation |
+| Researcher | Theme tags for building arguments across sources |
+
+---
+
+## Technical Notes
+
+- Sub-tag definitions in `SUB_TAGS` constant per category
+- Detection via `detectSubTag()` using keyword matching
+- Cached on link object via `getSubTag()` for performance
+- Card display: shows sub-tag when filtered into category, category when in "All"
+- Beta bar feature: `showSubTagsBar` flag, enable via `window.enableSubTagsBar()`
+- Sub-tag bar styling: 9px font, muted color, outline border, count inline, "Other" for untagged
+
+---
+
+*See also: [AI Categorization](./ai-categorization.md) · [Search & Retrieval](../boards/search.md) · [Cross-Category Connections](../boards/cross-category.md)*

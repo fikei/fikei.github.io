@@ -18,6 +18,9 @@
   <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
   <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
 
+  <!-- Design Constraints — runtime validation engine (loads manifest + template-registry) -->
+  <script src="/boards/design-constraints.js"></script>
+
   <style>
 /* ============================================
    Boards - Swiss Grid + Web 1.0 Typography
@@ -2769,6 +2772,7 @@ body {
 }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/image-validation.js"></script>
 </head>
 <body>
   <!-- Progress Bar -->
@@ -3285,8 +3289,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const BUILTIN_TYPES = [
     { name: 'product', keywords: ['buy', 'price', 'cart', 'shop', 'store'], domains: ['amazon.com', 'ebay.com', 'etsy.com'] },
     { name: 'article', keywords: ['read', 'blog', 'post', 'article', 'story'], domains: ['medium.com', 'substack.com'], patterns: ['/blog/', '/post/', '/article/'] },
+    { name: 'music', keywords: ['listen', 'track', 'album', 'playlist', 'song', 'artist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'music.youtube.com', 'audiomack.com'] },
     { name: 'video', keywords: ['watch', 'video', 'stream'], domains: ['youtube.com', 'youtu.be', 'vimeo.com', 'tiktok.com'] },
-    { name: 'music', keywords: ['listen', 'track', 'album', 'playlist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com'] },
     { name: 'repository', keywords: ['code', 'repo', 'commit', 'fork'], domains: ['github.com', 'gitlab.com', 'bitbucket.org'] },
     { name: 'social', keywords: ['tweet', 'post', 'profile'], domains: ['twitter.com', 'x.com', 'linkedin.com', 'instagram.com', 'threads.net'] },
     { name: 'document', keywords: ['document', 'pdf', 'doc'], patterns: ['.pdf', '.doc', '.xls', 'docs.google.com'] },
@@ -3516,435 +3520,453 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     }
   };
 
-  // Widget Registry - Full PRD definitions for each widget
+  // ==========================================================================
+  // CATEGORY DOMAIN MAP — provides context for generic widget prompt templates
+  // Each category maps to domain vocabulary used in AI prompts.
+  // ==========================================================================
+  const CATEGORY_DOMAINS = {
+    wear:   { domain: 'fashion',              noun: 'clothing and accessories',        analyst: 'fashion stylist' },
+    home:   { domain: 'interior design',      noun: 'home and decor items',            analyst: 'interior design expert' },
+    watch:  { domain: 'film & entertainment', noun: 'films, shows, and videos',        analyst: 'film and TV critic' },
+    use:    { domain: 'technology',           noun: 'tools, gadgets, and tech',        analyst: 'technology analyst' },
+    eat:    { domain: 'culinary',             noun: 'food, recipes, and restaurants',  analyst: 'culinary expert' },
+    go:     { domain: 'travel',              noun: 'destinations and experiences',     analyst: 'travel expert' },
+    follow: { domain: 'culture & creators',   noun: 'creators and accounts',           analyst: 'cultural analyst' },
+    read:   { domain: 'intellectual',         noun: 'articles, books, and reading',    analyst: 'literary analyst' },
+    listen: { domain: 'music',               noun: 'music, albums, and playlists',    analyst: 'music curator' },
+    all:    { domain: 'general',              noun: 'saved items',                     analyst: 'collection analyst' }
+  };
+
+  // ==========================================================================
+  // WIDGET CATEGORY ALLOWLIST — separate from widget configs
+  // Declares which categories each generic widget is allowed to appear in.
+  // If a widget isn't listed here, it won't appear anywhere.
+  // To expand a widget to a new category: add the category here AND ensure
+  // the server has a matching config (or update WIDGET_SERVER_MAP).
+  // ==========================================================================
+  const WIDGET_CATEGORY_MAP = {
+    'profiler':          ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen'],
+    'completer':         ['wear'],
+    'pick':              ['wear', 'eat'],
+    'spectrum':          ['wear'],
+    'gap-finder':        ['wear'],
+    'compare':           ['use'],
+    'buy-checklist':     ['wear'],
+    'discover-more':     ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen'],
+    'upcoming-releases': ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen'],
+    'sound-shelf':       ['listen'],
+    'listen-next':       ['listen'],
+    'board-overview':    ['all', 'wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read', 'listen']
+  };
+
+  // ==========================================================================
+  // WIDGET SERVER MAP — routes generic client widget IDs to server widget IDs
+  // The server still has individual configs (style-summary, design-dna, etc.)
+  // until it's updated to handle generic widgets natively.
+  // _default: used when no category-specific mapping exists
+  // ==========================================================================
+  const WIDGET_SERVER_MAP = {
+    'profiler': {
+      wear: 'style-summary', home: 'design-dna', watch: 'viewer-profile',
+      use: 'setup-profile', eat: 'flavor-profile', go: 'traveler-type',
+      follow: 'fan-profile', read: 'reader-identity', listen: 'sound-shelf'
+    },
+    'completer':         { _default: 'complete-the-look' },
+    'pick':              { eat: 'eat-decide', _default: 'style-pick' },
+    'spectrum':          { _default: 'price-radar' },
+    'gap-finder':        { _default: 'gap-filler' },
+    'compare':           { _default: 'use-compare' },
+    'buy-checklist':     { _default: 'outfit-checklist' },
+    'discover-more':     { _default: 'discover-more' },
+    'upcoming-releases': { _default: 'upcoming-releases' },
+    'board-overview':    { _default: 'board-overview' },
+    'sound-shelf':       { _default: 'sound-shelf' },
+    'listen-next':       { _default: 'listen-next' }
+  };
+
+  // Build reverse map: server widget ID → generic widget ID
+  const SERVER_TO_GENERIC_MAP = {};
+  for (const [genericId, categoryMap] of Object.entries(WIDGET_SERVER_MAP)) {
+    for (const [, serverId] of Object.entries(categoryMap)) {
+      if (serverId !== '_default') SERVER_TO_GENERIC_MAP[serverId] = genericId;
+    }
+    if (categoryMap._default) SERVER_TO_GENERIC_MAP[categoryMap._default] = genericId;
+  }
+
+  // ==========================================================================
+  // DESIGN SYSTEM BINDING — widgets must reference valid DS templates
+  // These are the boards-side template names from template-registry.json.
+  // To add a new template: extend the design system first, then add here.
+  // ==========================================================================
+  const VALID_DS_TEMPLATES = [
+    'grid-split', 'hero-card', 'list', 'text-block', 'spectrum',
+    'stat-row', 'quick-add', 'comparison', 'choices', 'checklist', 'grouped'
+  ];
+
+  // ==========================================================================
+  // TEMPLATE VARIABLE RESOLUTION
+  // Generic widgets use {{category}}/{{domain}}/{{noun}}/{{analyst}} placeholders
+  // Resolved at runtime from CATEGORY_DOMAINS based on current category.
+  // ==========================================================================
+  function resolveWidgetVars(str, category) {
+    if (!str || typeof str !== 'string') return str;
+    const ctx = CATEGORY_DOMAINS[category] || CATEGORY_DOMAINS['all'];
+    return str
+      .replace(/\{\{category\}\}/g, category || 'all')
+      .replace(/\{\{domain\}\}/g, ctx.domain)
+      .replace(/\{\{noun\}\}/g, ctx.noun)
+      .replace(/\{\{analyst\}\}/g, ctx.analyst);
+  }
+
+  function getServerWidgetId(genericId, category) {
+    const map = WIDGET_SERVER_MAP[genericId];
+    if (!map) return genericId;
+    return map[category] || map._default || genericId;
+  }
+
+  function getGenericWidgetId(serverId) {
+    return SERVER_TO_GENERIC_MAP[serverId] || serverId;
+  }
+
+  // Widget Registry - Generic widgets with {{category}}/{{domain}}/{{noun}}/{{analyst}} template vars
   // status: 'active' | 'beta' | 'draft' (only active shown to users, beta for testers, draft admin-only)
   // zone: 'hero' | 'inline' | 'footer' (controls placement)
+  // Category filtering is via WIDGET_CATEGORY_MAP (separate allowlist, not in configs)
   const WIDGET_REGISTRY = {
-    'complete-the-look': {
-      id: 'complete-the-look',
-      version: '3.0',
-      name: 'Complete the Look',
-      description: 'Finds items in your collection that work together, then suggests specific products to purchase.',
+
+    'profiler': {
+      id: 'profiler',
+      version: '2.0',
+      name: 'Your {{domain}} Identity',
+      description: 'Analyzes your saves and tells you who you are in this category.',
       status: 'active',
-      zone: 'inline', // Appears between cards
-      criteria: {
-        category: 'wear',
-        minItems: 2,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `You are a fashion stylist. Your job: suggest items the user DOES NOT OWN.
+      zone: 'hero',
+      criteria: { minItems: 3 },
+      prompt: `You are a {{analyst}}. Analyze these saved {{noun}} and identify the user's {{domain}} identity.
 
-STEP 1 - CATEGORIZE OWNED ITEMS:
-Look at each item and assign it to ONE category:
-- tops: t-shirts, shirts, sweaters, hoodies, polos
-- bottoms: pants, jeans, shorts, trousers, chinos
-- outerwear: jackets, coats, blazers, vests
-- footwear: sneakers, boots, shoes, sandals, loafers
-- accessories: watches, belts, bags, hats, sunglasses, jewelry
+Consider what patterns, preferences, and tendencies emerge from their saved items. Look for:
+- Aesthetic or stylistic patterns
+- Brand or source preferences
+- Quality and complexity level
+- Thematic throughlines
 
-STEP 2 - IDENTIFY GAPS:
-Which categories have ZERO items? Those are the gaps.
+Return JSON:
+{
+  "label": "Identity in 2-3 evocative words (e.g., 'Minimal Modern', 'Cultural Flaneur', 'Systems Thinker')",
+  "traits": ["2-4 descriptive tags that characterize their taste"],
+  "summary": "One sentence describing their overall {{domain}} identity"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
 
-STEP 3 - SUGGEST ONLY FROM GAPS:
-Only suggest items from categories the user has NOTHING in.
+    'completer': {
+      id: 'completer',
+      version: '2.0',
+      name: 'Complete Your {{domain}} Collection',
+      description: 'Finds what works together in your saves, then suggests what is missing.',
+      status: 'active',
+      zone: 'inline',
+      criteria: { minItems: 2 },
+      prompt: `You are a {{analyst}}. Analyze the user's saved {{noun}} and identify items that work together as a set or collection.
 
-ABSOLUTE RULES (violations rejected):
-❌ User owns a t-shirt → NEVER suggest any top
-❌ User owns jeans → NEVER suggest any bottom
-❌ User owns a jacket → NEVER suggest any outerwear
-❌ User owns sneakers → NEVER suggest any footwear
-✅ Only suggest from EMPTY categories
-✅ If all categories filled, suggest ONLY accessories
+STEP 1: Group the saved items into logical sub-categories for {{domain}}
+STEP 2: Identify which sub-categories have gaps (zero items)
+STEP 3: Suggest 1-2 specific items that would fill the most important gaps
+
+RULES:
+- Only suggest items from categories the user is MISSING
+- Be specific: real names, real brands, real search terms
+- Explain why each suggestion completes their collection
 
 Return JSON:
 {
   "matchedItems": ["id1", "id2"],
-  "reasoning": "These items form the base of an outfit because...",
-  "missingPieces": "To complete this outfit, user needs: shoes and a basic tee",
+  "reasoning": "These items form the core of your collection because...",
+  "missingPieces": "To complete this, you need...",
   "suggestions": [
     {
-      "name": "New Balance 550 White Green",
-      "brand": "New Balance",
-      "price": "$130",
-      "category": "footwear",
-      "imageQuery": "new balance 550 sneakers",
-      "searchQuery": "new balance 550 white green",
-      "reason": "Clean sneakers to ground the outfit"
+      "name": "Specific item name",
+      "brand": "Brand",
+      "price": "$XX",
+      "category": "sub-category",
+      "searchQuery": "search terms",
+      "reason": "Fills your gap in..."
     }
   ]
 }`,
-      template: {
-        name: 'grid-split',
-        fallback: 'list',
-        layout: 'two-column',
-        sections: ['your-items', 'suggestions']
-      },
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-20'
+      template: { name: 'grid-split', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'style-summary': {
-      id: 'style-summary',
+
+    'pick': {
+      id: 'pick',
       version: '2.0',
-      name: 'Style Summary',
-      description: 'Analyzes your wear collection and generates a style profile with descriptive traits.',
+      name: 'Pick One',
+      description: 'Can\'t decide? AI picks the best from your saves with reasoning.',
       status: 'active',
-      zone: 'hero', // Appears at top
-      criteria: {
-        category: 'wear',
-        minItems: 1,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `You are a fashion analyst. Analyze these clothing items and determine the overall style aesthetic.
+      zone: 'hero',
+      criteria: { minItems: 3 },
+      prompt: `You are a decisive {{analyst}}. The user has saved these {{noun}} and needs help deciding.
+
+Pick the BEST option and explain why. Present 2-3 runner-up choices too.
 
 Return JSON:
 {
-  "label": "Style name (e.g., 'Minimal Modern', 'Streetwear Edge')",
-  "traits": ["2-4 descriptive traits like 'Neutral palette', 'Relaxed silhouettes'"],
-  "summary": "One sentence describing the overall aesthetic"
+  "question": "Which one should you go for?",
+  "options": [
+    { "title": "Top pick name", "description": "Why this is the best choice — specific reasoning" },
+    { "title": "Runner up", "description": "Brief reason this is a good alternative" }
+  ],
+  "confidence": 0.8
 }`,
-      template: {
-        name: 'hero-card',
-        fallback: 'text-block',
-        layout: 'card',
-        sections: ['label', 'traits']
-      },
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-20'
+      template: { name: 'choices', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'price-radar': {
-      id: 'price-radar',
-      version: '1.0',
-      name: 'Price Radar',
-      description: 'Shows where you fall on key dimensions like budget, style, and brand affinity.',
+
+    'spectrum': {
+      id: 'spectrum',
+      version: '2.0',
+      name: '{{domain}} Spectrum',
+      description: 'Maps where you fall on key dimensions relevant to your saves.',
       status: 'active',
       zone: 'hero',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'all'],
-        minItems: 3,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and position the user on 2-3 meaningful dimensions.
+      criteria: { minItems: 3 },
+      prompt: `Analyze these saved {{noun}} and position the user on 2-3 meaningful dimensions relevant to {{domain}}.
 
-Choose axes relevant to the content (e.g. Budget<->Luxury, Minimal<->Bold, Classic<->Trendy).
+Choose axes that reveal something interesting about their taste or preferences.
 For each axis, estimate where the user falls (0.0 = fully left, 1.0 = fully right).
 
 Return JSON:
 {
   "axes": [
-    { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.35, "note": "You: $85 avg" },
-    { "leftLabel": "Minimal", "rightLabel": "Bold", "position": 0.2, "note": "Mostly neutrals" }
+    { "leftLabel": "Left end", "rightLabel": "Right end", "position": 0.35, "note": "Brief insight" },
+    { "leftLabel": "Left end", "rightLabel": "Right end", "position": 0.7, "note": "Brief insight" }
   ],
   "confidence": 0.75
 }`,
-      template: {
-        name: 'spectrum',
-        fallback: 'text-block'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
+      template: { name: 'spectrum', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'collection-stats': {
-      id: 'collection-stats',
-      version: '1.0',
-      name: 'Collection Stats',
-      description: 'Key metrics about your saved items — brands, categories, price range, and more.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'eat', 'read', 'all'],
-        minItems: 3,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and extract 3-4 key metrics about the collection.
 
-Return JSON:
-{
-  "stats": [
-    { "value": "12", "label": "brands" },
-    { "value": "3", "label": "styles" },
-    { "value": "$85", "label": "avg price" }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'stat-row',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
-    },
-    'gap-filler': {
-      id: 'gap-filler',
-      version: '1.0',
+    'gap-finder': {
+      id: 'gap-finder',
+      version: '2.0',
       name: 'You Might Want This',
-      description: 'AI identifies the biggest gap in your collection and suggests one item to fill it.',
+      description: 'Identifies the biggest gap in your collection and suggests one item to fill it.',
       status: 'active',
       zone: 'inline',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'fitness'],
-        minItems: 2,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and identify the single biggest gap in the user's collection.
-Suggest ONE specific product that would fill that gap.
+      criteria: { minItems: 2 },
+      prompt: `You are a {{analyst}}. Analyze these saved {{noun}} and identify the single biggest gap in the user's collection.
+Suggest ONE specific thing that would fill that gap.
 
 Return JSON:
 {
   "suggestion": {
-    "name": "Product Name",
-    "brand": "Brand Name",
-    "price": "$XX.XX",
-    "reason": "Fills your category gap — you have X and Y but no Z.",
-    "searchQuery": "brand product name"
+    "name": "Specific name",
+    "brand": "Brand if applicable",
+    "price": "$XX if applicable",
+    "reason": "Fills your gap — you have X and Y but no Z.",
+    "searchQuery": "search terms"
   },
   "confidence": 0.85
 }`,
-      template: {
-        name: 'quick-add',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
+      template: { name: 'quick-add', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'eat-decide': {
-      id: 'eat-decide',
-      version: '1.0',
-      name: 'Decide',
-      description: 'Can\'t pick a restaurant? AI picks one from your saved spots with reasoning.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: 'eat',
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a decisive dining advisor. The user has saved these restaurants/food spots and can't decide where to go.
 
-Pick the BEST option and explain why. Also present 2-3 runner-up choices.
-
-Return JSON:
-{
-  "question": "Where should you eat tonight?",
-  "options": [
-    {
-      "title": "Restaurant Name",
-      "description": "Why this is the top pick — specific reasoning based on the saved items"
-    },
-    {
-      "title": "Runner Up 1",
-      "description": "Brief reason this is a good alternative"
-    }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'choices',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'use-compare': {
-      id: 'use-compare',
-      version: '1.0',
+    'compare': {
+      id: 'compare',
+      version: '2.0',
       name: 'Compare',
-      description: 'Compares a saved tool/product against its top competitor with pros and cons.',
+      description: 'Picks an item from your saves and compares it against its top alternative.',
       status: 'active',
       zone: 'inline',
-      criteria: {
-        category: ['use', 'tech', 'home', 'wear', 'all'],
-        minItems: 1,
-        maxItems: null
-      },
-      prompt: `You are a product comparison expert. Pick the most interesting item from the user's saved items and compare it against its top competitor.
+      criteria: { minItems: 1 },
+      prompt: `You are a {{domain}} comparison expert. Pick the most interesting item from the user's saved {{noun}} and compare it against its top competitor or alternative.
 
 RULES:
-- Pick an item that has a clear, well-known competitor
+- Pick an item that has a clear, well-known alternative
 - List 2-3 specific pros and cons for each
-- Be objective and fair to both options
+- Be objective and fair
 
 Return JSON:
 {
   "optionA": {
-    "title": "Saved Item Name",
+    "title": "Saved item name",
     "price": "$XX (if known)",
-    "pros": ["Specific advantage 1", "Specific advantage 2"],
-    "cons": ["Specific weakness"]
+    "pros": ["Advantage 1", "Advantage 2"],
+    "cons": ["Weakness"]
   },
   "optionB": {
-    "title": "Top Competitor",
+    "title": "Top alternative",
     "price": "$XX (if known)",
-    "pros": ["Specific advantage 1", "Specific advantage 2"],
-    "cons": ["Specific weakness"]
+    "pros": ["Advantage 1", "Advantage 2"],
+    "cons": ["Weakness"]
   },
   "dividerLabel": "VS",
   "confidence": 0.75
 }`,
-      template: {
-        name: 'comparison',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
+      template: { name: 'comparison', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'discover-more': {
-      id: 'discover-more',
-      version: '1.0',
-      name: 'More Like Your Board',
-      description: 'Analyzes your saved items and recommends something new you might like.',
-      status: 'active',
-      zone: 'footer',
-      criteria: {
-        category: 'all',
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a discovery engine. Analyze the user's saved items and recommend ONE specific new thing they'd like.
 
-RULES:
-- The recommendation must be DIFFERENT from what they already have
-- It should complement their existing collection, not duplicate it
-- Be specific: real product names, real brands, real URLs
-- Explain WHY this fits based on patterns you see in their saves
-
-Return JSON:
-{
-  "suggestion": {
-    "name": "Specific Product or Thing",
-    "brand": "Brand if applicable",
-    "price": "$XX if applicable",
-    "reason": "Based on your saves, you clearly like X and Y — this combines both.",
-    "searchQuery": "search terms to find this item"
-  },
-  "confidence": 0.7
-}`,
-      template: {
-        name: 'quick-add',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'style-pick': {
-      id: 'style-pick',
-      version: '1.0',
-      name: 'Pick Your Favorite',
-      description: 'Shows your saved items as selectable cards — tap the one you\'d buy first.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'all'],
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a personal shopper. The user has saved these items. Present 3-4 of their best saved items as choices and ask them to pick their favorite.
-
-For each option, write a brief one-line reason why it stands out.
-
-Return JSON:
-{
-  "question": "Which would you grab first?",
-  "options": [
-    { "title": "Item name", "description": "Why this one stands out — 1 sentence" },
-    { "title": "Item name", "description": "Why this one stands out — 1 sentence" }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'choices',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'outfit-checklist': {
-      id: 'outfit-checklist',
-      version: '1.0',
-      name: 'Outfit Checklist',
-      description: 'Builds a complete outfit from your saves — check off what you already own.',
+    'buy-checklist': {
+      id: 'buy-checklist',
+      version: '2.0',
+      name: '{{domain}} Checklist',
+      description: 'Builds a curated set from your saves — check off what you have, see what you need.',
       status: 'active',
       zone: 'inline',
-      criteria: {
-        category: ['wear', 'all'],
-        minItems: 2,
-        maxItems: null
-      },
-      prompt: `You are a wardrobe stylist. From the user's saved items, build a complete outfit as a checklist.
+      criteria: { minItems: 2 },
+      prompt: `You are a {{analyst}}. From the user's saved {{noun}}, build a curated set as a checklist.
 
-Include 4-6 items covering different categories (top, bottom, shoes, accessories). Use items from their saves where possible, and suggest missing pieces.
+Include 4-6 items that form a complete, cohesive set. Use items from their saves where possible, and suggest missing pieces.
 
 For each item, indicate if the user already has it (checked) based on whether it appears in their saved items.
 
 Return JSON:
 {
   "items": [
-    { "name": "White Oxford Shirt", "price": "$65", "checked": true },
-    { "name": "Dark Wash Jeans", "price": "$90", "checked": true },
-    { "name": "White Sneakers", "price": "$130", "checked": false },
-    { "name": "Leather Belt", "price": "$45", "checked": false }
+    { "name": "Item name", "price": "$XX", "checked": true },
+    { "name": "Item name", "price": "$XX", "checked": false }
   ],
-  "total": "$330",
+  "total": "$XXX",
   "confidence": 0.75
 }`,
-      template: {
-        name: 'checklist',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
+      template: { name: 'checklist', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
+
+    'discover-more': {
+      id: 'discover-more',
+      version: '1.0',
+      name: 'More Like Your Board',
+      description: 'Recommends something new based on patterns in your saves.',
+      status: 'active',
+      zone: 'footer',
+      criteria: { minItems: 3 },
+      prompt: `You are a discovery engine. Analyze the user's saved {{noun}} and recommend ONE specific new thing they'd like.
+
+RULES:
+- Must be DIFFERENT from what they already have
+- Should complement their collection, not duplicate it
+- Be specific: real names, real brands
+- Explain WHY based on patterns in their saves
+
+Return JSON:
+{
+  "suggestion": {
+    "name": "Specific thing",
+    "brand": "Brand if applicable",
+    "price": "$XX if applicable",
+    "reason": "Based on your saves, you clearly like X and Y — this combines both.",
+    "searchQuery": "search terms"
+  },
+  "confidence": 0.7
+}`,
+      template: { name: 'quick-add', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
+    'upcoming-releases': {
+      id: 'upcoming-releases',
+      version: '1.0',
+      name: 'Upcoming Releases',
+      description: 'Predicts upcoming releases from brands and creators in your collection.',
+      status: 'active',
+      zone: 'inline',
+      criteria: { minItems: 3 },
+      prompt: `You are a trend forecaster for {{domain}}. Based on the user's saved {{noun}}, identify brands, creators, or publishers in their collection.
+
+Predict upcoming releases, drops, or launches they'd care about.
+
+RULES:
+- Focus on brands/creators in the saved items
+- Be specific about WHAT is coming
+- Use general timeframes if exact dates unknown
+- 3-5 items ranked by relevance
+- Don't fabricate — only plausibly upcoming things
+
+Return JSON:
+{
+  "items": [
+    { "brand": "Name", "release": "What's coming", "when": "Timeframe", "relevance": "Why it matters" }
+  ],
+  "confidence": 0.7
+}`,
+      template: { name: 'list', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
+
     'board-overview': {
       id: 'board-overview',
       version: '1.0',
       name: 'Board at a Glance',
-      description: 'Groups your saved items by theme or type so you can see the shape of your collection.',
+      description: 'Groups your saves by theme so you can see the shape of your collection.',
       status: 'active',
       zone: 'footer',
-      criteria: {
-        category: 'all',
-        minItems: 4,
-        maxItems: null
-      },
-      prompt: `You are a collection analyst. Group the user's saved items into 2-4 meaningful themes or categories.
+      criteria: { minItems: 4 },
+      prompt: `You are a {{analyst}}. Group the user's saved {{noun}} into 2-4 meaningful themes.
 
 RULES:
-- Don't just group by website — group by PURPOSE or TYPE
+- Group by PURPOSE or TYPE, not by website
 - Each group needs a clear, descriptive title
-- Include the actual item names from the user's saves
-- 2-4 groups, each with 2-5 items
+- Include actual item names from their saves
+- 2-4 groups, 2-5 items each
 
 Return JSON:
 {
   "sections": [
-    {
-      "title": "Everyday Essentials",
-      "items": [
-        { "name": "Item name", "brand": "Brand" },
-        { "name": "Item name", "brand": "Brand" }
-      ]
-    },
-    {
-      "title": "Statement Pieces",
-      "items": [
-        { "name": "Item name", "brand": "Brand" }
-      ]
-    }
+    { "title": "Theme Name", "items": [{ "name": "Item", "brand": "Brand" }] }
   ],
   "confidence": 0.8
 }`,
-      template: {
-        name: 'grouped',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
+      template: { name: 'grouped', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     }
   };
+
+  // ==========================================================================
+  // DESIGN SYSTEM VALIDATION — runs at init, warns if widgets reference
+  // templates not in the design system. To extend: add to design system first,
+  // then add to VALID_DS_TEMPLATES.
+  // ==========================================================================
+  (function validateWidgetDesignSystem() {
+    const issues = [];
+    for (const [id, widget] of Object.entries(WIDGET_REGISTRY)) {
+      const tpl = widget.template?.name;
+      if (tpl && !VALID_DS_TEMPLATES.includes(tpl)) {
+        issues.push(`Widget "${id}" uses template "${tpl}" — not in design system`);
+      }
+      const fb = widget.template?.fallback;
+      if (fb && !VALID_DS_TEMPLATES.includes(fb)) {
+        issues.push(`Widget "${id}" fallback "${fb}" — not in design system`);
+      }
+      if (!WIDGET_CATEGORY_MAP[id]) {
+        issues.push(`Widget "${id}" has no entry in WIDGET_CATEGORY_MAP — will never appear`);
+      }
+      if (!WIDGET_SERVER_MAP[id]) {
+        issues.push(`Widget "${id}" has no entry in WIDGET_SERVER_MAP — server calls will use raw ID`);
+      }
+    }
+    if (issues.length > 0) {
+      console.warn('[widget-ds] Design system validation issues:');
+      issues.forEach(i => console.warn('  •', i));
+    } else {
+      console.log('[widget-ds] All widgets bound to design system ✓');
+    }
+  })();
 
   // Widget feature flag — all widgets hidden by default
   // Enable via console: window.enableWidgetDS()
@@ -3980,7 +4002,8 @@ Return JSON:
   }
 
   function getCacheKey(widgetId, itemIds, includeRefresh = false) {
-    const base = `${widgetId}:${itemIds.sort().join(',')}`;
+    const category = currentFilter || 'all';
+    const base = `${widgetId}:${category}:${itemIds.sort().join(',')}`;
     const counter = widgetRefreshCounters[widgetId] || 0;
     return includeRefresh ? `${base}:v${counter}` : base;
   }
@@ -4307,22 +4330,16 @@ Return JSON:
 
     const c = widget.criteria;
 
-    // --- Category match (weight: 0.3) ---
+    // --- Category match (weight: 0.3) — uses WIDGET_CATEGORY_MAP allowlist ---
     maxScore += 0.3;
-    if (c.category) {
-      const cats = Array.isArray(c.category) ? c.category : [c.category];
-      if (cats.includes(currentCategory) || cats.includes('all')) {
-        score += 0.3;
-        signals.categoryMatch = true;
-        rationale.push(`Category "${currentCategory}" matches`);
-      } else {
-        signals.categoryMatch = false;
-        rationale.push(`Category "${currentCategory}" not in [${cats.join(', ')}]`);
-      }
-    } else {
+    const allowedCategories = WIDGET_CATEGORY_MAP[widget.id] || [];
+    if (allowedCategories.includes(currentCategory) || allowedCategories.includes('all')) {
       score += 0.3;
       signals.categoryMatch = true;
-      rationale.push('No category restriction');
+      rationale.push(`Category "${currentCategory}" allowed`);
+    } else {
+      signals.categoryMatch = false;
+      rationale.push(`Category "${currentCategory}" not in allowlist [${allowedCategories.join(', ')}]`);
     }
 
     // --- Item count (weight: 0.25) ---
@@ -4364,8 +4381,8 @@ Return JSON:
 
     // --- Content type affinity (weight: 0.15) ---
     maxScore += 0.15;
-    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
-    const isAnalyticsWidget = ['style-summary', 'collection-stats', 'eat-decide', 'discover-more', 'style-pick', 'board-overview'].includes(widget.id);
+    const isProductWidget = ['completer', 'spectrum', 'gap-finder', 'compare', 'buy-checklist'].includes(widget.id);
+    const isAnalyticsWidget = ['profiler', 'pick', 'discover-more', 'board-overview', 'upcoming-releases'].includes(widget.id);
 
     if (isProductWidget && profile.productRatio > 0.3) {
       const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;
@@ -4398,13 +4415,15 @@ Return JSON:
   let lastScoringResults = null;
 
   // Check if widget criteria are met (hard gate — returns boolean)
+  // Category filtering uses WIDGET_CATEGORY_MAP (separate allowlist)
   function checkWidgetCriteria(widget, items, currentCategory) {
     const c = widget.criteria;
-    // Phase 2: Category-agnostic — category field can be a string or array
-    if (c.category) {
-      const widgetCategories = Array.isArray(c.category) ? c.category : [c.category];
-      const matchesCategory = widgetCategories.includes(currentCategory) || widgetCategories.includes('all');
-      if (!matchesCategory) return false;
+    // Category check via allowlist
+    const allowed = WIDGET_CATEGORY_MAP[widget.id];
+    if (allowed) {
+      if (!allowed.includes(currentCategory) && !allowed.includes('all')) return false;
+    } else {
+      return false; // Not in allowlist → don't show
     }
     if (c.minItems && items.length < c.minItems) return false;
     if (c.maxItems && items.length > c.maxItems) return false;
@@ -4486,17 +4505,19 @@ Return JSON:
       const data = await response.json();
       console.log('[discovery] Server returned', data.widgets?.length, 'eligible widgets for', category);
 
-      // Map server widgets to local WIDGET_REGISTRY entries, merging server metadata.
-      // If a widget exists only on the server (not in local WIDGET_REGISTRY), build
-      // a temporary local entry from the discovery response so it can still render.
+      // Map server widgets to local WIDGET_REGISTRY entries via reverse mapping.
+      // Server returns specific IDs (e.g. 'style-summary') which map to generic IDs
+      // (e.g. 'profiler') via SERVER_TO_GENERIC_MAP.
       const discoveredWidgets = [];
       for (const serverWidget of (data.widgets || [])) {
-        const localWidget = WIDGET_REGISTRY[serverWidget.widgetId];
+        const genericId = getGenericWidgetId(serverWidget.widgetId);
+        const localWidget = WIDGET_REGISTRY[genericId] || WIDGET_REGISTRY[serverWidget.widgetId];
         if (localWidget) {
           // Merge: use local prompt + template config, server zone/priority/eligibility
           discoveredWidgets.push({
             ...localWidget,
             zone: serverWidget.zone || localWidget.zone,
+            _serverWidgetId: serverWidget.widgetId,
             _serverEligibility: serverWidget.eligibility,
             _serverPriority: serverWidget.priority
           });
@@ -4665,6 +4686,10 @@ Return JSON:
     // Get current category if not provided
     const currentCategory = category || currentFilter || 'all';
 
+    // Resolve template vars and map to server widget ID
+    const serverWidgetId = getServerWidgetId(widget.id, currentCategory);
+    const resolvedPrompt = resolveWidgetVars(widget.prompt, currentCategory) + variationPrompt;
+
     // Get user preferences for personalization
     const userPrefs = widgetFeedback.userPrefs || {};
 
@@ -4676,11 +4701,11 @@ Return JSON:
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
-          widgetId: widget.id,
-          prompt: widget.prompt + variationPrompt,
+          widgetId: serverWidgetId,
+          prompt: resolvedPrompt,
           items: itemsPayload,
-          category: currentCategory,  // Phase 1: For eligibility engine
-          userPrefs: userPrefs        // Phase 1: For personalization
+          category: currentCategory,
+          userPrefs: userPrefs
         })
       });
 
@@ -4773,10 +4798,12 @@ Return JSON:
 
   // Shared widget shell header — w-* design system classes
   function renderWidgetHeader(widget) {
+    const category = currentFilter || 'all';
+    const resolvedName = resolveWidgetVars(widget.name, category);
     return `
       <div class="w-header">
         <div class="w-header__left">
-          <span class="w-text w-text--label">${esc(widget.name)}</span>
+          <span class="w-text w-text--label">${esc(resolvedName)}</span>
           <span class="w-badge">AI</span>
         </div>
         <div class="w-header__controls">
@@ -4929,21 +4956,22 @@ Return JSON:
       </div>`;
   }
 
-  // Render Style Summary widget
-  function renderStyleSummaryWidget(widget, items, aiResult) {
+  // Generic profiler renderer — works for any { label, traits, summary } response
+  function renderProfilerWidget(widget, items, aiResult) {
+    if (!aiResult) return '';
+
     let label, traits, sublabel;
 
-    if (aiResult && aiResult.label) {
+    if (aiResult.label) {
       label = aiResult.label;
       traits = aiResult.traits || [];
       sublabel = aiResult.summary || `Based on ${items.length} items`;
+    } else if (aiResult.styleProfile) {
+      label = aiResult.styleProfile.primaryStyle;
+      traits = aiResult.styleProfile.secondaryInfluences || [];
+      sublabel = aiResult.styleProfile.aestheticNotes || `Based on ${items.length} items`;
     } else {
-      // Fallback
-      const labels = ['Minimal Modern', 'Classic Refined', 'Streetwear Edge', 'Smart Casual', 'Urban Explorer'];
-      const fallbackTraits = ['Curated selection', 'Personal style', 'Versatile pieces'];
-      label = labels[Math.floor(Math.random() * labels.length)];
-      traits = fallbackTraits;
-      sublabel = `Based on ${items.length} item${items.length > 1 ? 's' : ''}`;
+      return '';
     }
 
     const traitsHtml = traits.map(t => `<span class="w-badge">${esc(t)}</span>`).join('');
@@ -5116,7 +5144,7 @@ Return JSON:
       name: 'hero-card',
       version: '1.0',
       render: function(widget, items, aiResult) {
-        return renderStyleSummaryWidget(widget, items, aiResult);
+        return renderProfilerWidget(widget, items, aiResult);
       }
     },
 
@@ -5127,10 +5155,15 @@ Return JSON:
       version: '1.0',
       render: function(widget, items, aiResult) {
         if (!aiResult) return '';
-        const listItems = (aiResult.suggestions || aiResult.traits || []).slice(0, 5);
+        const listItems = (aiResult.items || aiResult.suggestions || aiResult.traits || []).slice(0, 5);
         const listHtml = listItems.map(item => {
-          const label = typeof item === 'string' ? item : (item.name || item.label || JSON.stringify(item));
-          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span></div></div>`;
+          if (typeof item === 'string') {
+            return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(item)}</span></div></div>`;
+          }
+          const label = item.name || item.label || item.release || JSON.stringify(item);
+          const meta = item.when || item.brand || item.price || '';
+          const detail = item.relevance || item.reason || '';
+          return `<div class="w-row"><div class="w-row__content"><span class="w-text">${esc(label)}</span>${meta ? `<span class="w-text w-text--meta">${esc(meta)}</span>` : ''}${detail ? `<span class="w-text w-text--note">${esc(detail)}</span>` : ''}</div></div>`;
         }).join('');
 
         return `
@@ -5149,7 +5182,8 @@ Return JSON:
       name: 'text-block',
       version: '1.0',
       render: function(widget, items, aiResult) {
-        const text = aiResult?.summary || aiResult?.styleNotes || aiResult?.label || 'No summary available';
+        if (!aiResult) return '';
+        const text = aiResult.summary || aiResult.styleNotes || aiResult.label || 'No summary available';
         return `
           <div class="w-shell" data-widget-id="${widget.id}">
             ${renderWidgetHeader(widget)}
@@ -5310,6 +5344,7 @@ Return JSON:
   /**
    * Select and render a widget using the template engine.
    * Tries the primary template, falls back to fallbackTemplate, then simple-list.
+   * Validates rendered output against design system constraints.
    * @param {object} widget - Widget definition from WIDGET_REGISTRY
    * @param {Array} items - User's items
    * @param {object} aiResult - AI-generated content
@@ -5329,24 +5364,103 @@ Return JSON:
     const resolvedName = templateAliases[templateName] || templateName;
     const resolvedFallback = templateAliases[fallbackName] || fallbackName;
 
+    // --- Design Constraint: query constraints for this template ---
+    const dc = window.DS_CONSTRAINTS;
+    let activeConstraints = null;
+    if (dc && dc.ready) {
+      // Find the DS template name that maps to this Boards template
+      // template-registry uses boardsTemplate to link DS templates → Boards templates
+      const dsTemplateName = _findDSTemplate(resolvedName);
+      if (dsTemplateName) {
+        activeConstraints = dc.getConstraints(dsTemplateName);
+      }
+    }
+
     // Try primary template
     let template = WIDGET_TEMPLATES[resolvedName];
     if (template) {
       const html = template.render(widget, items, aiResult);
-      if (html) return html;
+      if (html) {
+        return _applyConstraints(html, resolvedName, activeConstraints, widget);
+      }
     }
 
     // Try fallback template
     if (resolvedFallback) {
       template = WIDGET_TEMPLATES[resolvedFallback];
       if (template) {
+        // Re-query constraints for fallback template
+        if (dc && dc.ready) {
+          const dsFallback = _findDSTemplate(resolvedFallback);
+          if (dsFallback) activeConstraints = dc.getConstraints(dsFallback);
+        }
         const html = template.render(widget, items, aiResult);
-        if (html) return html;
+        if (html) {
+          return _applyConstraints(html, resolvedFallback, activeConstraints, widget);
+        }
       }
     }
 
     // Last resort: list
-    return WIDGET_TEMPLATES['list'].render(widget, items, aiResult);
+    const listConstraints = dc && dc.ready ? dc.getConstraints('list') : null;
+    return _applyConstraints(
+      WIDGET_TEMPLATES['list'].render(widget, items, aiResult),
+      'list',
+      listConstraints,
+      widget
+    );
+  }
+
+  /**
+   * Map a Boards template name to its design-system template name
+   * by searching template-registry's boardsTemplate field.
+   */
+  function _findDSTemplate(boardsTemplateName) {
+    const dc = window.DS_CONSTRAINTS;
+    if (!dc || !dc.templates) return null;
+    for (const [dsName, tmpl] of Object.entries(dc.templates.templates)) {
+      if (tmpl.boardsTemplate === boardsTemplateName) return dsName;
+    }
+    // Direct name match (e.g. 'list', 'spectrum', 'stat-row')
+    if (dc.templates.templates[boardsTemplateName]) return boardsTemplateName;
+    return null;
+  }
+
+  /**
+   * Stamp constraint metadata onto rendered widget HTML and validate structure.
+   * Adds data-ds-* attributes so components know their design boundaries.
+   */
+  function _applyConstraints(html, templateName, constraints, widget) {
+    if (!html || !constraints) return html;
+
+    const dc = window.DS_CONSTRAINTS;
+
+    // Validate: check required atoms are present
+    const structResult = dc.validateTemplateStructure(constraints.name, html);
+    if (!structResult.valid) {
+      console.warn('[widget:%s] Constraint violation — %s', widget.id, structResult.message);
+    }
+
+    // Stamp constraint data onto the w-shell root element
+    const attrs = [
+      'data-ds-template="' + esc(constraints.name) + '"',
+      'data-ds-boards-template="' + esc(templateName) + '"',
+      constraints.validSizes.length > 0
+        ? 'data-ds-valid-sizes="' + esc(constraints.validSizes.join(',')) + '"'
+        : '',
+      constraints.requiredAtoms.length > 0
+        ? 'data-ds-required-atoms="' + esc(constraints.requiredAtoms.join(',')) + '"'
+        : '',
+      constraints.optionalAtoms.length > 0
+        ? 'data-ds-optional-atoms="' + esc(constraints.optionalAtoms.join(',')) + '"'
+        : ''
+    ].filter(Boolean).join(' ');
+
+    // Inject attributes into the first w-shell element
+    return html.replace(
+      /(<div\s+class="w-shell")/,
+      '$1 ' + attrs
+    );
   }
 
   // Store inline widgets for grid injection
@@ -5354,13 +5468,17 @@ Return JSON:
   let inlineWidgets = []; // Array of { id, html } for drag-and-drop support
   const INLINE_WIDGET_POSITION = 8; // Default: insert inline widget after this many cards
   let widgetGenerationInProgress = false; // Mutex to prevent duplicate generation
+  let widgetRegenerationNeeded = false; // Queue regeneration if called while in progress
 
   // Main widget generation function - zone-aware
   async function generateWidgets() {
     // Feature flag: skip all widget rendering when disabled
     if (!widgetDSEnabled) return;
-    // Prevent duplicate generation
-    if (widgetGenerationInProgress) return;
+    // If already running, queue a regeneration for when it finishes
+    if (widgetGenerationInProgress) {
+      widgetRegenerationNeeded = true;
+      return;
+    }
     widgetGenerationInProgress = true;
     const heroSection = $('widgetSection');
     const heroContent = $('widgetContent');
@@ -5383,6 +5501,7 @@ Return JSON:
     if (items.length < 1) {
       renderGrid();
       widgetGenerationInProgress = false;
+      if (widgetRegenerationNeeded) { widgetRegenerationNeeded = false; generateWidgets(); }
       return;
     }
 
@@ -5397,6 +5516,7 @@ Return JSON:
     if (applicableWidgets.length === 0) {
       renderGrid();
       widgetGenerationInProgress = false;
+      if (widgetRegenerationNeeded) { widgetRegenerationNeeded = false; generateWidgets(); }
       return;
     }
 
@@ -5423,7 +5543,7 @@ Return JSON:
 
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
-      const firstHeroName = widgetsByZone.hero[0].name || 'Widget';
+      const firstHeroName = resolveWidgetVars(widgetsByZone.hero[0].name, widgetCategory) || 'Widget';
       heroSection.classList.add('widget-section--visible');
       heroContent.innerHTML = `
         <div class="w-shell">
@@ -5482,6 +5602,10 @@ Return JSON:
     // Render hero zone
     if (heroHtml) {
       heroContent.innerHTML = heroHtml;
+      // Annotate hero widgets with design constraints
+      if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+        window.DS_CONSTRAINTS.annotate(heroContent);
+      }
     } else {
       heroSection.classList.remove('widget-section--visible');
     }
@@ -5490,11 +5614,21 @@ Return JSON:
     if (footerHtml) {
       footerSection.classList.add('widget-section--visible');
       footerContent.innerHTML = footerHtml;
+      // Annotate footer widgets with design constraints
+      if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+        window.DS_CONSTRAINTS.annotate(footerContent);
+      }
     }
 
     // Re-render grid to inject inline widgets
     renderGrid();
     widgetGenerationInProgress = false;
+
+    // If another generateWidgets() was called while we were running, run again
+    if (widgetRegenerationNeeded) {
+      widgetRegenerationNeeded = false;
+      generateWidgets();
+    }
   }
 
   // Update checklist running total when checkbox is toggled
@@ -5615,6 +5749,10 @@ Return JSON:
       if (inlineContainer) {
         inlineContainer.style.display = ''; // Ensure visible
         inlineContainer.innerHTML = `<div class="widget-inline__drag-handle" title="Drag to reposition"></div>${widgetHtml}`;
+        // Re-annotate inline widget with design constraints after refresh
+        if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+          window.DS_CONSTRAINTS.annotate(inlineContainer);
+        }
       }
       // Also update stored HTML for future grid re-renders
       const updatedWrapHtml = `
@@ -5630,6 +5768,10 @@ Return JSON:
       const heroContent = $('widgetContent');
       if (heroContent) {
         heroContent.innerHTML = widgetHtml;
+        // Re-annotate hero widgets with design constraints after refresh
+        if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+          window.DS_CONSTRAINTS.annotate(heroContent);
+        }
       }
     }
 
@@ -5985,8 +6127,24 @@ Return JSON:
         const result = await resolveImage(item);
         console.log('%c[IMAGE QUEUE] Resolution result:', 'color: #9b59b6', result);
         if (result?.imageUrl) {
-          await updateLinkImage(item.linkId, result.imageUrl, result.source);
+          // Tier 1 validation gate on resolved images
+          let imageScores = null;
+          if (typeof ImageValidation !== 'undefined') {
+            const validation = ImageValidation.tier1(result.imageUrl, {
+              title: item.title,
+              domain: extractDomain(item.url)
+            });
+            imageScores = validation.scores;
+            if (!validation.pass) {
+              console.log('%c[IMAGE QUEUE] Tier 1 rejected resolved image:', 'color: #e74c3c',
+                result.imageUrl, validation.reason);
+              continue; // Skip this image, try next in queue won't help — already best strategy result
+            }
+          }
+          await updateLinkImage(item.linkId, result.imageUrl, result.source, imageScores);
           console.log('%c[IMAGE QUEUE] Updated link image successfully', 'color: #27ae60; font-weight: bold');
+          // Queue for async Tier 3 AI vision validation
+          queueTier3Validation(item.linkId, result.imageUrl, item.title, null, item.contentType);
         } else {
           console.log('%c[IMAGE QUEUE] No image found, using template fallback', 'color: #f39c12');
         }
@@ -6042,6 +6200,16 @@ Return JSON:
         }
 
         if (result?.imageUrl) {
+          // Validate each strategy result with Tier 1 before accepting
+          if (typeof ImageValidation !== 'undefined') {
+            const validation = ImageValidation.tier1(result.imageUrl, { title, domain: extractDomain(url) });
+            if (!validation.pass) {
+              console.log('%c[IMAGE RESOLVE] Tier 1 rejected %s result:', 'color: #e74c3c', strategy,
+                result.imageUrl, validation.reason);
+              continue; // Try next strategy
+            }
+            result.imageScores = validation.scores;
+          }
           console.log('%c[IMAGE RESOLVE] Success with strategy:', 'color: #27ae60; font-weight: bold', strategy, result.imageUrl);
           return result;
         } else if (result) {
@@ -6053,6 +6221,22 @@ Return JSON:
     }
 
     console.log('%c[IMAGE RESOLVE] All strategies exhausted, no image found', 'color: #e74c3c');
+    return null;
+  }
+
+  // oEmbed response cache — shared between resolvePlatformImage and extractMusicMetadata
+  const oembedCache = {};
+
+  async function fetchOembed(oembedUrl, cacheKey) {
+    if (oembedCache[cacheKey]) return oembedCache[cacheKey];
+    try {
+      const resp = await fetch(oembedUrl);
+      if (resp.ok) {
+        const data = await resp.json();
+        oembedCache[cacheKey] = data;
+        return data;
+      }
+    } catch (e) { console.warn('[oembed] Fetch failed:', cacheKey, e.message); }
     return null;
   }
 
@@ -6083,6 +6267,26 @@ Return JSON:
             console.log('%c[PLATFORM] Vimeo thumbnail:', 'color: #27ae60', data[0]?.thumbnail_large);
             return { imageUrl: data[0]?.thumbnail_large, source: 'platform_api' };
           }
+        }
+      }
+
+      // Spotify (oEmbed — cached)
+      if (domain.includes('spotify.com')) {
+        console.log('%c[PLATFORM] Spotify detected', 'color: #e67e22');
+        const oembedData = await fetchOembed(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, `spotify:${url}`);
+        if (oembedData?.thumbnail_url) {
+          console.log('%c[PLATFORM] Spotify thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
+          return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
+        }
+      }
+
+      // SoundCloud (oEmbed — cached)
+      if (domain.includes('soundcloud.com')) {
+        console.log('%c[PLATFORM] SoundCloud detected', 'color: #e67e22');
+        const oembedData = await fetchOembed(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, `soundcloud:${url}`);
+        if (oembedData?.thumbnail_url) {
+          console.log('%c[PLATFORM] SoundCloud thumbnail:', 'color: #27ae60', oembedData.thumbnail_url);
+          return { imageUrl: oembedData.thumbnail_url, source: 'platform_api' };
         }
       }
 
@@ -6128,6 +6332,140 @@ Return JSON:
     return null;
   }
 
+  // ============================================
+  // Music Metadata Extraction
+  // ============================================
+  // Extracts structured music metadata from platform oEmbed APIs.
+  // Returns a music object to persist on the link for future rendering.
+  // Fields: artist, trackTitle, albumTitle, genre, duration, bpm,
+  //         releaseDate, contentFormat, platformId, isExplicit, key, label
+  // musicTags: optional og:music tags already scraped by fetchMetadata (avoids re-fetching)
+  async function extractMusicMetadata(url, title, description, musicTags) {
+    const meta = {
+      artist: null,
+      trackTitle: null,
+      albumTitle: null,
+      genre: null,
+      duration: null,       // seconds
+      bpm: null,
+      releaseDate: null,
+      contentFormat: null,  // 'track' | 'album' | 'playlist' | 'podcast-episode' | 'artist' | 'mix'
+      platformId: null,
+      isExplicit: null,
+      key: null,            // musical key (e.g. "Cm", "F#")
+      label: null
+    };
+
+    try {
+      const domain = new URL(url).hostname;
+      const path = new URL(url).pathname;
+
+      // ── Step 1: Apply og:music tags from HTML scrape (free, already fetched) ──
+      if (musicTags) {
+        if (musicTags.duration) meta.duration = musicTags.duration;
+        if (musicTags.albumTitle) meta.albumTitle = musicTags.albumTitle;
+        if (musicTags.releaseDate) meta.releaseDate = musicTags.releaseDate;
+        if (musicTags.musician) meta.artist = musicTags.musician;
+        if (musicTags.genre) meta.genre = musicTags.genre;
+        // Infer contentFormat from og:type if present
+        if (musicTags.ogType) {
+          const ogTypeMap = { 'music.song': 'track', 'music.album': 'album', 'music.playlist': 'playlist', 'music.radio_station': 'mix' };
+          meta.contentFormat = ogTypeMap[musicTags.ogType] || null;
+        }
+      }
+
+      // ── Step 2: Infer contentFormat from URL structure ──
+      if (!meta.contentFormat) {
+        if (/\/track[\/s]/.test(path)) meta.contentFormat = 'track';
+        else if (/\/album[\/s]/.test(path)) meta.contentFormat = 'album';
+        else if (/\/playlist[\/s]/.test(path)) meta.contentFormat = 'playlist';
+        else if (/\/episode[\/s]/.test(path) || /\/podcast/.test(path)) meta.contentFormat = 'podcast-episode';
+        else if (/\/artist[\/s]/.test(path)) meta.contentFormat = 'artist';
+        else if (/\/sets?[\/]/.test(path) && domain.includes('soundcloud.com')) meta.contentFormat = 'mix';
+      }
+
+      // ── Step 3: Platform-specific oEmbed (uses shared cache) ──
+
+      // Spotify
+      if (domain.includes('spotify.com')) {
+        const spotifyMatch = path.match(/\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
+        if (spotifyMatch) {
+          meta.platformId = `spotify:${spotifyMatch[1]}:${spotifyMatch[2]}`;
+          meta.contentFormat = meta.contentFormat || spotifyMatch[1].replace('show', 'podcast-episode');
+        }
+        const d = await fetchOembed(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, `spotify:${url}`);
+        if (d) {
+          meta.artist = meta.artist || (d.provider_name === 'Spotify' ? (d.author_name || null) : null);
+          meta.trackTitle = meta.trackTitle || d.title || null;
+        }
+      }
+
+      // SoundCloud
+      if (domain.includes('soundcloud.com')) {
+        const scSlug = path.split('/').filter(Boolean);
+        if (scSlug.length >= 1) meta.platformId = `soundcloud:${scSlug.join('/')}`;
+        const d = await fetchOembed(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, `soundcloud:${url}`);
+        if (d) {
+          meta.artist = meta.artist || d.author_name || null;
+          meta.trackTitle = meta.trackTitle || d.title || null;
+        }
+      }
+
+      // Bandcamp (parse from URL structure + title)
+      if (domain.includes('bandcamp.com')) {
+        const bcArtist = domain.replace('.bandcamp.com', '');
+        meta.artist = meta.artist || bcArtist;
+        meta.platformId = `bandcamp:${bcArtist}${path}`;
+        if (/\/album\//.test(path)) meta.contentFormat = meta.contentFormat || 'album';
+        else if (/\/track\//.test(path)) meta.contentFormat = meta.contentFormat || 'track';
+      }
+
+      // Apple Music (parse URL)
+      if (domain.includes('music.apple.com')) {
+        const amMatch = path.match(/\/(album|playlist|artist|station)\/[^\/]+\/(\d+)/);
+        if (amMatch) {
+          meta.platformId = `apple-music:${amMatch[1]}:${amMatch[2]}`;
+          meta.contentFormat = meta.contentFormat || amMatch[1];
+        }
+      }
+
+      // YouTube Music
+      if (domain.includes('music.youtube.com')) {
+        const ytmId = url.match(/[?&]v=([^&]+)/)?.[1] || url.match(/[?&]list=([^&]+)/)?.[1];
+        if (ytmId) meta.platformId = `youtube-music:${ytmId}`;
+        if (/[?&]list=/.test(url)) meta.contentFormat = meta.contentFormat || 'playlist';
+        else meta.contentFormat = meta.contentFormat || 'track';
+      }
+
+      // ── Step 4: Fallback parsing from page title ──
+      if (!meta.artist && title) {
+        // Common patterns: "Artist - Track" or "Track by Artist" or "Track | Artist"
+        const dashSplit = title.match(/^(.+?)\s*[-–—]\s*(.+?)(?:\s*\|.*)?$/);
+        const bySplit = title.match(/^(.+?)\s+by\s+(.+?)(?:\s*\|.*)?$/i);
+        if (dashSplit) {
+          meta.artist = meta.artist || dashSplit[1].trim();
+          meta.trackTitle = meta.trackTitle || dashSplit[2].trim();
+        } else if (bySplit) {
+          meta.trackTitle = meta.trackTitle || bySplit[1].trim();
+          meta.artist = meta.artist || bySplit[2].trim();
+        }
+      }
+
+      // Detect explicit from title
+      if (title && /\[E\]|\(Explicit\)/i.test(title)) {
+        meta.isExplicit = true;
+      }
+
+      console.log('%c[music-meta] Extracted:', 'color: #1DB954', meta);
+    } catch (e) {
+      console.warn('[music-meta] Extraction failed:', e.message);
+    }
+
+    // Return null if we got nothing useful
+    const hasData = meta.artist || meta.trackTitle || meta.platformId || meta.contentFormat;
+    return hasData ? meta : null;
+  }
+
   async function resolveFavicon(url) {
     try {
       const domain = new URL(url).hostname;
@@ -6146,7 +6484,7 @@ Return JSON:
     return null;
   }
 
-  async function updateLinkImage(linkId, imageUrl, source) {
+  async function updateLinkImage(linkId, imageUrl, source, imageScores) {
     // Update local state
     const data = load();
     const link = data.links.find(l => l.id === linkId);
@@ -6154,6 +6492,9 @@ Return JSON:
       link.image = imageUrl;
       link.image_source = source;
       link.image_resolved_at = new Date().toISOString();
+      if (imageScores) {
+        link.image_scores = imageScores;
+      }
       save(data);
 
       // Update UI
@@ -6185,6 +6526,237 @@ Return JSON:
 
   // Initialize domain cache on load
   loadDomainCache();
+
+  // ============================================
+  // Image Validation Metrics (Story 4)
+  // ============================================
+
+  /**
+   * Analyze image quality scores across all pins.
+   * Call from console: imageQualityReport()
+   */
+  window.imageQualityReport = function() {
+    const data = load();
+    const links = data.links || [];
+    const withImage = links.filter(l => l.image);
+    const withScores = links.filter(l => l.image_scores);
+    const noImage = links.filter(l => !l.image);
+
+    const tierCounts = { excellent: 0, good: 0, marginal: 0, poor: 0, rejected: 0, unscored: 0 };
+    const byContentType = {};
+    const byDomain = {};
+
+    withScores.forEach(l => {
+      const tier = l.image_scores.tier || 'unscored';
+      tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+
+      // By content type
+      const ct = l.content_type || 'unknown';
+      if (!byContentType[ct]) byContentType[ct] = { count: 0, totalComposite: 0 };
+      byContentType[ct].count++;
+      byContentType[ct].totalComposite += (l.image_scores.composite || 0);
+
+      // By domain
+      const d = l.domain || 'unknown';
+      if (!byDomain[d]) byDomain[d] = { count: 0, totalComposite: 0, overrides: 0 };
+      byDomain[d].count++;
+      byDomain[d].totalComposite += (l.image_scores.composite || 0);
+    });
+
+    // Compute averages
+    Object.keys(byContentType).forEach(k => {
+      byContentType[k].avgComposite = Math.round((byContentType[k].totalComposite / byContentType[k].count) * 100) / 100;
+    });
+    Object.keys(byDomain).forEach(k => {
+      byDomain[k].avgComposite = Math.round((byDomain[k].totalComposite / byDomain[k].count) * 100) / 100;
+    });
+
+    // Sort domains by worst average
+    const worstDomains = Object.entries(byDomain)
+      .sort((a, b) => a[1].avgComposite - b[1].avgComposite)
+      .slice(0, 10)
+      .map(([domain, stats]) => ({ domain, ...stats }));
+
+    const report = {
+      summary: {
+        total_pins: links.length,
+        with_image: withImage.length,
+        with_scores: withScores.length,
+        no_image: noImage.length,
+        image_coverage: Math.round((withImage.length / links.length) * 100) + '%',
+        scored_coverage: Math.round((withScores.length / links.length) * 100) + '%'
+      },
+      tier_distribution: tierCounts,
+      by_content_type: byContentType,
+      worst_domains: worstDomains
+    };
+
+    console.log('%c[IMAGE QUALITY REPORT]', 'color: #8b5cf6; font-weight: bold; font-size: 14px');
+    console.log('%cSummary:', 'font-weight: bold', report.summary);
+    console.log('%cTier Distribution:', 'font-weight: bold', report.tier_distribution);
+    console.log('%cBy Content Type:', 'font-weight: bold', report.by_content_type);
+    console.log('%cWorst Domains (by avg composite):', 'font-weight: bold', report.worst_domains);
+    console.table(report.worst_domains);
+
+    return report;
+  };
+
+  /**
+   * Find pins with lowest image scores. Call from console: worstImages(10)
+   */
+  window.worstImages = function(count) {
+    count = count || 10;
+    const data = load();
+    return data.links
+      .filter(l => l.image_scores && l.image_scores.composite != null)
+      .sort((a, b) => a.image_scores.composite - b.image_scores.composite)
+      .slice(0, count)
+      .map(l => ({
+        title: l.title?.substring(0, 40),
+        domain: l.domain,
+        composite: l.image_scores.composite,
+        tier: l.image_scores.tier,
+        image: l.image?.substring(0, 60),
+        method: l.image_scores.evaluation_method
+      }));
+  };
+
+  // ============================================
+  // Tier 3: Async AI Vision Validation Queue
+  // ============================================
+  const tier3Queue = [];
+  let isProcessingTier3 = false;
+
+  /**
+   * Queue a pin for Tier 3 AI vision validation.
+   * Called after Tier 2 passes and image is displayed.
+   */
+  function queueTier3Validation(linkId, imageUrl, title, category, contentType) {
+    // Skip if already scored by Tier 3
+    const data = load();
+    const link = data.links.find(l => l.id === linkId);
+    if (link?.image_scores?.evaluation_method === 'tier3_ai_vision' ||
+        link?.image_scores?.evaluation_method === 'tier3_known_good') {
+      return;
+    }
+
+    console.log('%c[TIER 3] Queuing for AI validation:', 'color: #8b5cf6', imageUrl);
+    tier3Queue.push({ linkId, imageUrl, title, category, contentType });
+    if (!isProcessingTier3) {
+      processTier3Queue();
+    }
+  }
+
+  async function processTier3Queue() {
+    if (isProcessingTier3 || tier3Queue.length === 0) return;
+    isProcessingTier3 = true;
+
+    while (tier3Queue.length > 0) {
+      const item = tier3Queue.shift();
+      try {
+        console.log('%c[TIER 3] Evaluating:', 'color: #8b5cf6', item.imageUrl);
+        const result = await callValidateImage(item);
+
+        if (result?.scores) {
+          console.log('%c[TIER 3] Scores received:', 'color: #8b5cf6', {
+            composite: result.scores.composite,
+            tier: result.scores.tier,
+            safety: result.safety_tier,
+            cached: result.cached
+          });
+
+          // Update local link with full Tier 3 scores
+          const data = load();
+          const link = data.links.find(l => l.id === item.linkId);
+          if (link) {
+            link.image_scores = result.scores;
+            save(data);
+
+            // Handle downgrades
+            if (result.scores.tier === 'poor' || result.scores.tier === 'rejected' ||
+                result.safety_tier === 'blocked') {
+              console.log('%c[TIER 3] DOWNGRADE:', 'color: #e74c3c; font-weight: bold',
+                item.linkId, '→', result.scores.tier);
+              handleTier3Downgrade(item.linkId, result.scores);
+            } else if (result.scores.tier === 'marginal') {
+              console.log('%c[TIER 3] Marginal — queued for future enrichment:', 'color: #f39c12',
+                item.linkId);
+            }
+          }
+        } else if (result?.error === 'daily_budget_exhausted') {
+          console.log('%c[TIER 3] Daily budget exhausted, stopping queue', 'color: #f39c12');
+          tier3Queue.length = 0; // Clear remaining queue
+          break;
+        }
+      } catch (e) {
+        console.error('%c[TIER 3] Evaluation failed:', 'color: #e74c3c', e);
+      }
+
+      // Small delay between evaluations to avoid rate limiting
+      if (tier3Queue.length > 0) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    isProcessingTier3 = false;
+  }
+
+  async function callValidateImage({ linkId, imageUrl, title, category, contentType }) {
+    const accessToken = getAccessToken();
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/validate-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          title: title || '',
+          category: category || '',
+          content_type: contentType || '',
+          link_id: linkId
+        })
+      });
+
+      if (res.status === 429) {
+        return { error: 'daily_budget_exhausted' };
+      }
+      if (!res.ok) {
+        console.error('[TIER 3] API error:', res.status);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      console.error('[TIER 3] Network error:', e);
+      return null;
+    }
+  }
+
+  function handleTier3Downgrade(linkId, scores) {
+    // Remove the displayed image and show placeholder
+    const card = document.querySelector(`[data-id="${linkId}"]`);
+    if (card) {
+      const img = card.querySelector('.grid-item__image');
+      if (img) {
+        img.classList.add('grid-item__image--loading');
+        // After fade out, re-render to show placeholder
+        setTimeout(() => renderGrid(), 300);
+      }
+    }
+
+    // If safety blocked, clear the image entirely
+    if (scores.safety === 0) {
+      const data = load();
+      const link = data.links.find(l => l.id === linkId);
+      if (link) {
+        link.image = null;
+        link.image_source = 'blocked';
+        save(data);
+      }
+    }
+  }
 
   // ============================================
   // Server-Side Enrichment Queue
@@ -6592,12 +7164,54 @@ Return JSON:
         if (!img.startsWith('http')) {
           try { img = new URL(img, url).href; } catch {}
         }
-        // Final check - don't use if still a logo
-        const finalLower = img.toLowerCase();
-        if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
-          meta.image = img;
+        // Tier 1 image validation — replaces simple logo check
+        if (typeof ImageValidation !== 'undefined') {
+          const validation = ImageValidation.tier1(img, {
+            title: meta.title,
+            domain: meta.domain
+          });
+          if (validation.pass) {
+            meta.image = img;
+            meta.image_scores = validation.scores;
+          } else {
+            console.log('%c[IMAGE VALIDATION] Tier 1 rejected:', 'color: #e74c3c', img, validation.reason, validation.checks.filter(c => !c.pass));
+          }
+        } else {
+          // Fallback: simple logo check if validation module not loaded
+          const finalLower = img.toLowerCase();
+          if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
+            meta.image = img;
+          }
         }
       }
+      // Extract og:music tags for music metadata (free — already have the HTML)
+      const musicDuration = html.match(/<meta[^>]*property=["'](?:og:)?music:duration["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:duration["']/i);
+      const musicAlbum = html.match(/<meta[^>]*property=["'](?:og:)?music:album["'][^>]*content=["']([^"']*)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:album["']/i);
+      const musicReleaseDate = html.match(/<meta[^>]*property=["'](?:og:)?music:release_date["'][^>]*content=["']([^"']*)["']/i) ||
+                               html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:release_date["']/i);
+      const musicMusician = html.match(/<meta[^>]*property=["'](?:og:)?music:musician["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?music:musician["']/i);
+      const ogType = html.match(/<meta[^>]*property=["']og:type["'][^>]*content=["']([^"']*)["']/i) ||
+                     html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:type["']/i);
+
+      // Bandcamp/SoundCloud genre from tags or structured data
+      const genreTag = html.match(/<meta[^>]*(?:name|property)=["'](?:genre|music:genre)["'][^>]*content=["']([^"']*)["']/i) ||
+                       html.match(/["']genre["']\s*:\s*["']([^"']+)["']/i) ||
+                       html.match(/<a[^>]*class=["'][^"']*genre[^"']*["'][^>]*>([^<]+)<\/a>/i);
+
+      if (musicDuration || musicAlbum || musicReleaseDate || musicMusician || genreTag || (ogType && ogType[1]?.startsWith('music'))) {
+        meta.musicTags = {};
+        if (musicDuration) meta.musicTags.duration = parseInt(musicDuration[1], 10) || null;
+        if (musicAlbum) meta.musicTags.albumTitle = decodeEntities(musicAlbum[1]);
+        if (musicReleaseDate) meta.musicTags.releaseDate = musicReleaseDate[1];
+        if (musicMusician) meta.musicTags.musician = decodeEntities(musicMusician[1]);
+        if (genreTag) meta.musicTags.genre = decodeEntities(genreTag[1]).trim();
+        if (ogType) meta.musicTags.ogType = ogType[1];
+        console.log('%c[FETCH] og:music tags found:', 'color: #1DB954', meta.musicTags);
+      }
+
     } catch (parseErr) {
       // Parse error - continue with defaults
     }
@@ -6625,7 +7239,7 @@ Return JSON:
   // ============================================
   const AI_CATEGORIZE_ENDPOINT = `${SUPABASE_URL}/functions/v1/categorize`;
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
-  const CATEGORIES = ['home', 'wear', 'watch', 'use', 'eat', 'go', 'follow', 'read'];
+  const CATEGORIES = ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read'];
 
   // Sub-tags for each category - shown when filtering by category
   const SUB_TAGS = {
@@ -6660,6 +7274,17 @@ Return JSON:
         outdoor: ['tent', 'camping', 'hiking', 'bike', 'bicycle', 'kayak', 'ski', 'snowboard', 'fishing'],
         office: ['pen', 'notebook', 'planner', 'stapler', 'organizer', 'desk', 'stationery'],
         travel: ['luggage', 'suitcase', 'carry-on', 'passport', 'adapter', 'toiletry', 'packing']
+      }
+    },
+    listen: {
+      tags: ['albums', 'tracks', 'playlists', 'podcasts', 'artists', 'mixes'],
+      keywords: {
+        albums: ['album', 'lp', 'ep', 'deluxe', 'record', 'vinyl', 'release', 'reissue'],
+        tracks: ['song', 'track', 'single', 'remix', 'beat', 'instrumental', 'feat'],
+        playlists: ['playlist', 'compilation', 'curated', 'collection', 'best of'],
+        podcasts: ['podcast', 'episode', 'pod', 'interview', 'talk', 'hosted by'],
+        artists: ['artist', 'band', 'singer', 'rapper', 'producer', 'dj', 'musician', 'composer'],
+        mixes: ['mix', 'set', 'live', 'session', 'boiler room', 'essential mix', 'radio']
       }
     }
   };
@@ -6852,6 +7477,63 @@ Return JSON:
   }
 
   // ============================================
+  // Migration: watch → listen for music links
+  // ============================================
+  // Domains that should be 'listen' instead of 'watch'
+  const LISTEN_DOMAINS = ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com'];
+  const LISTEN_MIGRATION_KEY = 'boards-listen-migration-v1';
+
+  function migrateWatchToListen() {
+    if (localStorage.getItem(LISTEN_MIGRATION_KEY)) return; // Already ran
+
+    const allLinks = getAllLinks();
+    let updated = 0;
+
+    for (const link of allLinks) {
+      if (link.category !== 'watch') continue;
+
+      const domain = (link.domain || '').toLowerCase();
+      const url = (link.url || '').toLowerCase();
+      const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
+
+      // Check if domain is a music platform
+      let isMusic = LISTEN_DOMAINS.some(d => domain.includes(d) || url.includes(d));
+
+      // If not a clear domain match, check music keywords (require 2+ for confidence)
+      if (!isMusic) {
+        const musicKw = ['music', 'album', 'song', 'playlist', 'track', 'artist', 'band', 'concert', 'listen', 'podcast', 'dj', 'remix', 'mix', 'vinyl', 'record', 'ep', 'single'];
+        const hits = musicKw.filter(k => text.includes(k)).length;
+        isMusic = hits >= 2;
+      }
+
+      if (isMusic) {
+        updateLink(link.id, { category: 'listen' });
+        updated++;
+        console.log(`%c[migrate-listen] ${link.domain}: watch → listen`, 'color: #1DB954', link.title);
+      }
+    }
+
+    // Clear cached domain→category entries for music domains
+    const cache = loadCategoryCache();
+    for (const d of LISTEN_DOMAINS) {
+      for (const key of Object.keys(cache)) {
+        if (key.includes(d)) {
+          delete cache[key];
+        }
+      }
+    }
+    saveCategoryCache(cache);
+
+    localStorage.setItem(LISTEN_MIGRATION_KEY, Date.now().toString());
+
+    if (updated > 0) {
+      console.log(`%c[migrate-listen] Migrated ${updated} links from watch → listen`, 'color: #1DB954; font-weight: bold');
+      renderFilters();
+      renderGrid();
+    }
+  }
+
+  // ============================================
   // Rule-based Categorizer (fallback)
   // ============================================
   const PATTERNS = {
@@ -6864,8 +7546,12 @@ Return JSON:
       domains: ['ssense.com', 'endclothing.com', 'mrporter.com', 'grailed.com', 'farfetch.com', 'matchesfashion.com', 'net-a-porter.com', 'mejuri.com', 'catbirdnyc.com', 'auratenewyork.com', 'stockx.com', 'goat.com', 'nike.com', 'adidas.com', 'newbalance.com', 'amiparis.com', 'apc.fr', 'acnestudios.com', 'cos.com', 'arket.com', 'toteme-studio.com', 'lemaire.fr', 'therow.com', 'jilsander.com', 'maison-margiela.com', 'loewe.com', 'bottegaveneta.com', 'celine.com', 'pfrankstore.com', 'eckhauslatta.com', 'ourlegacy.com', 'stussy.com', 'palace.com', 'supremenewyork.com', 'kith.com', 'nordstrom.com', 'shopbop.com', 'revolve.com', 'asos.com', 'zara.com', 'hm.com', 'uniqlo.com', 'everlane.com', 'madewell.com']
     },
     watch: {
-      kw: ['video', 'music', 'podcast', 'album', 'song', 'movie', 'film', 'stream', 'listen', 'playlist', 'track', 'artist', 'band', 'concert', 'episode', 'series', 'show'],
-      domains: ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com', 'vimeo.com', 'bandcamp.com', 'tiktok.com', 'netflix.com']
+      kw: ['video', 'movie', 'film', 'stream', 'episode', 'series', 'show', 'documentary', 'trailer', 'animation', 'clip', 'cinema', 'tv'],
+      domains: ['youtube.com', 'youtu.be', 'vimeo.com', 'tiktok.com', 'netflix.com', 'hulu.com', 'twitch.tv', 'disneyplus.com', 'hbomax.com']
+    },
+    listen: {
+      kw: ['music', 'album', 'song', 'playlist', 'track', 'artist', 'band', 'concert', 'listen', 'podcast', 'dj', 'remix', 'mix', 'vinyl', 'record', 'ep', 'single', 'lyrics', 'genre', 'beat', 'producer', 'rapper', 'singer', 'songwriter', 'audio'],
+      domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com']
     },
     use: {
       kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer', 'utility', 'product'],
@@ -7031,7 +7717,8 @@ Return JSON:
         // Enrichment fields
         content_type: link.content_type || null,
         type_confidence: link.type_confidence || null,
-        image_source: link.image_source || null
+        image_source: link.image_source || null,
+        image_scores: link.image_scores || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -7441,6 +8128,11 @@ Return JSON:
 
     filters.innerHTML = html;
 
+    // --- Design Constraints: annotate filter components ---
+    if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+      window.DS_CONSTRAINTS.annotate(filters);
+    }
+
     // Re-attach search input listener after re-render
     const searchInput = $('searchInput');
     if (searchInput) {
@@ -7733,6 +8425,11 @@ Return JSON:
 
     grid.innerHTML = html;
 
+    // --- Design Constraints: annotate rendered components ---
+    if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+      window.DS_CONSTRAINTS.annotate(grid);
+    }
+
     // Remove animation class after animation completes
     if (newIds.length > 0) {
       setTimeout(() => {
@@ -7949,8 +8646,14 @@ Return JSON:
           const contentType = classifyByRules(url, meta.title, meta.description);
           console.log('%c[LINK FLOW] Content type:', 'color: #1abc9c', contentType.type);
 
+          // Extract music metadata if categorized as listen or content_type is music
+          let music = null;
+          if (cat.category === 'listen' || contentType.type === 'music') {
+            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
+          }
+
           // Update the link with full data
-          updateLink(id, {
+          const linkUpdate = {
             title: meta.title,
             description: meta.description,
             image: meta.image,
@@ -7960,7 +8663,9 @@ Return JSON:
             type_confidence: contentType.confidence,
             type_signals: contentType.signals,
             loading: false // Mark as loaded
-          });
+          };
+          if (music) linkUpdate.music = music;
+          updateLink(id, linkUpdate);
 
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
@@ -7972,6 +8677,11 @@ Return JSON:
               queueImageResolution(id, url, meta.title, meta.description, contentType.type);
             }
             queueServerEnrichment(id, url, meta.title, meta.description);
+          }
+
+          // Queue Tier 3 AI vision validation for images that passed Tier 1
+          if (meta.image) {
+            queueTier3Validation(id, meta.image, meta.title, cat.category, contentType.type);
           }
 
           // Sync to Supabase
@@ -8940,7 +9650,13 @@ Return JSON:
           const cat = await smartCategorize(meta);
           const contentType = classifyByRules(url, meta.title, meta.description);
 
-          updateLink(id, {
+          // Extract music metadata if categorized as listen or content_type is music
+          let music = null;
+          if (cat.category === 'listen' || contentType.type === 'music') {
+            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
+          }
+
+          const linkUpdate = {
             title: meta.title,
             description: meta.description,
             image: meta.image,
@@ -8950,7 +9666,9 @@ Return JSON:
             type_confidence: contentType.confidence,
             type_signals: contentType.signals,
             loading: false
-          });
+          };
+          if (music) linkUpdate.music = music;
+          updateLink(id, linkUpdate);
 
           renderGrid();
 
@@ -9925,6 +10643,9 @@ Return JSON:
       }
     }
 
+    // Run one-time migration: watch → listen for music links
+    migrateWatchToListen();
+
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();
     renderGrid();
@@ -10094,6 +10815,37 @@ Return JSON:
     // Auto-dismiss after 10 seconds
     setTimeout(() => prompt.remove(), 10000);
   }
+
+  // ============================================
+  // Design Constraints — devtools helpers
+  // ============================================
+  // When the constraint engine finishes loading (async), re-annotate the
+  // already-rendered DOM so every component carries its data-ds-* attributes.
+  window.addEventListener('design-constraints-ready', function () {
+    const dc = window.DS_CONSTRAINTS;
+    if (dc && dc.ready) {
+      dc.annotate(document);
+      console.log('[design-constraints] Annotated %d components',
+        document.querySelectorAll('[data-ds-component],[data-ds-widget],[data-ds-template]').length);
+    }
+  });
+
+  // Expose convenience audit function in devtools
+  window.auditDesignConstraints = function () {
+    const dc = window.DS_CONSTRAINTS;
+    if (!dc || !dc.ready) { console.warn('[design-constraints] Not ready yet'); return []; }
+    var issues = dc.auditDOM(document);
+    if (issues.length === 0) {
+      console.log('%c[design-constraints] ✓ No violations found', 'color: #0f0');
+    } else {
+      console.group('[design-constraints] %d violation(s)', issues.length);
+      issues.forEach(function (i) {
+        console.warn('  [%s] %s', i.type, i.detail.message, i.element);
+      });
+      console.groupEnd();
+    }
+    return issues;
+  };
 
   init();
 

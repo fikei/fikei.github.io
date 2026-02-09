@@ -20,7 +20,6 @@ import type {
 import { completeTheLook } from './widgets/complete-the-look.ts'
 import { styleSummary } from './widgets/style-summary.ts'
 import { priceRadar } from './widgets/price-radar.ts'
-import { collectionStats } from './widgets/collection-stats.ts'
 import { gapFiller } from './widgets/gap-filler.ts'
 import { eatDecide } from './widgets/eat-decide.ts'
 import { useCompare } from './widgets/use-compare.ts'
@@ -28,6 +27,16 @@ import { discoverMore } from './widgets/discover-more.ts'
 import { stylePick } from './widgets/style-pick.ts'
 import { outfitChecklist } from './widgets/outfit-checklist.ts'
 import { boardOverview } from './widgets/board-overview.ts'
+import { designDna } from './widgets/design-dna.ts'
+import { viewerProfile } from './widgets/viewer-profile.ts'
+import { setupProfile } from './widgets/setup-profile.ts'
+import { flavorProfile } from './widgets/flavor-profile.ts'
+import { travelerType } from './widgets/traveler-type.ts'
+import { fanProfile } from './widgets/fan-profile.ts'
+import { readerIdentity } from './widgets/reader-identity.ts'
+import { upcomingReleases } from './widgets/upcoming-releases.ts'
+import { soundShelf } from './widgets/sound-shelf.ts'
+import { listenNext } from './widgets/listen-next.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -39,7 +48,6 @@ const registry: WidgetRegistry = {
     'complete-the-look': completeTheLook,
     'style-summary': styleSummary,
     'price-radar': priceRadar,
-    'collection-stats': collectionStats,
     'gap-filler': gapFiller,
     'eat-decide': eatDecide,
     'use-compare': useCompare,
@@ -47,6 +55,16 @@ const registry: WidgetRegistry = {
     'style-pick': stylePick,
     'outfit-checklist': outfitChecklist,
     'board-overview': boardOverview,
+    'design-dna': designDna,
+    'viewer-profile': viewerProfile,
+    'setup-profile': setupProfile,
+    'flavor-profile': flavorProfile,
+    'traveler-type': travelerType,
+    'fan-profile': fanProfile,
+    'reader-identity': readerIdentity,
+    'upcoming-releases': upcomingReleases,
+    'sound-shelf': soundShelf,
+    'listen-next': listenNext,
   },
 
   defaults: {
@@ -117,9 +135,12 @@ export function getEnabledWidgets(): WidgetDefinition[] {
 }
 
 export function getWidgetsForCategory(category: string): WidgetDefinition[] {
-  return getEnabledWidgets().filter(w =>
-    w.categories.includes(category) || w.categories.includes('all')
-  )
+  return getEnabledWidgets().filter(w => {
+    // Widget with only ['all'] is category-agnostic — matches any category
+    if (w.categories.length === 1 && w.categories[0] === 'all') return true
+    // Otherwise, match the specific requested category
+    return w.categories.includes(category)
+  })
 }
 
 export function getConfidenceConfig(widgetId: string): ConfidenceConfig {

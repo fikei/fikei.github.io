@@ -1,5 +1,5 @@
 /**
- * SystemicAI - Component Consolidator
+ * Systemic - Component Consolidator
  * Consolidates raw crawled components into organized design system components
  */
 

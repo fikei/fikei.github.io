@@ -77,6 +77,16 @@ Boards is a link curation application that helps you collect, organize, and shar
 
 > Tasks that require manual attention or decisions
 
+### Widget System (2026-02-09)
+- [ ] Test cross-category data leak fix: hard refresh on Watch category — Style Summary should NOT appear
+- [ ] Clear localStorage `boards_widget_cache` key (old cache format won't match but takes space)
+- [ ] Deploy updated edge function: `supabase functions deploy generate-widget` (server-side category fix)
+- [ ] Verify all 4 new template renderers render correctly (comparison, choices, checklist, grouped)
+- [ ] Test right-click widget header context menu (shows score + signals)
+- [ ] Review cleaned-up widget list (11 → 10, removing style-pick) and approve direction
+- [ ] Review 30 new widget concepts and prioritize which categories to build next
+
+### General
 - [ ] Review AI categorization accuracy and adjust prompts
 - [ ] Decide on pricing model for collaborative features
 - [ ] Design board templates for common use cases

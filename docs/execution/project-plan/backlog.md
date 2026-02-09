@@ -1,6 +1,42 @@
 # Backlog: Future Considerations
 
 > Back to [Project Plan](./index.md)
+>
+> Items are derived from [Brand Positioning](../../strategy/brand-positioning.md) and [User Personas](../../ux/personas.md). Persona tags indicate which personas a feature primarily serves.
+
+---
+
+## Taste & Pattern Intelligence
+
+Surfaces connections and patterns in what users collect. Directly supports brand principle #1: **Input shapes output.**
+
+> Personas: Visual Collector, Sound & Scene Curator, DJ, Researcher, Cultural Omnivore
+
+| Story | Status |
+|-------|--------|
+| **Taste profile** — Auto-generated summary of what a user collects most (domains, categories, content types) | Pending |
+| **"You save a lot of X" insights** — Surface collection patterns via widget or dashboard card | Pending |
+| **Trend detection** — Identify emerging themes across recent saves (e.g. "3 brutalist architecture links this week") | Pending |
+| **Cross-category connections** — Surface related pins across categories ("these pins share a theme") | Pending |
+| **Collection timeline** — Visual timeline of saves over time, filterable by category | Pending |
+| **Monthly digest widget** — Auto-generated summary of that month's curation activity | Pending |
+
+---
+
+## Flexible Tagging & Metadata
+
+User-defined metadata beyond AI categories. Critical for DJ, Design Technologist, and power users.
+
+> Personas: DJ, Design Technologist, Multidisciplinary Maker, Researcher
+
+| Story | Status |
+|-------|--------|
+| **Custom tags** — User-applied tags on any pin, with autocomplete from existing tags | Pending |
+| **Tag management** — Rename, merge, delete tags; view all pins by tag | Pending |
+| **Structured metadata fields** — Pin-type-specific fields (BPM/key/energy for music, dimensions for images) | Pending |
+| **Filter by tags** — Filter board view by one or more tags | Pending |
+| **Smart tags** — AI-suggested tags based on pin content and user patterns | Pending |
+| **Bulk tag operations** — Select multiple pins, apply/remove tags in batch | Pending |
 
 ---
 
@@ -9,6 +45,8 @@
 Everything related to supporting multiple pin types, organized by epic. The Pin Type Abstraction epic is the prerequisite — start there before building any new pin type.
 
 > See: [Core Systems Architecture](../../infrastructure/technical-design/core-systems-architecture.md) for the enrichment extensibility model.
+>
+> Personas: all — Multi-format content is critical for Sound & Scene Curator, DJ, Multidisciplinary Maker, Design Technologist
 
 ### Epic 0: Pin Type Abstraction (Pre-requisite)
 
@@ -79,8 +117,9 @@ Document and file uploads — PDFs, CSVs, other file types.
 
 ## Action Widget Templates
 
-Templates that collect user input and close a feedback loop (choices train AI, adds update boards).
-See [Widget Template Patterns research](../../ux/research/widget-template-patterns.md) for wireframes.
+Templates that collect user input and close a feedback loop (choices train AI, adds update boards). See [Widget Template Patterns research](../../ux/research/widget-template-patterns.md) for wireframes.
+
+> Personas: Visual Collector, Sound & Scene Curator, DJ, Deep-Dive Enthusiast
 
 | Story | Template | Verb | Status |
 |-------|----------|------|--------|
@@ -166,6 +205,8 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 
 ## Sharing Enhancements
 
+> Personas: Multidisciplinary Maker, Deep-Dive Enthusiast, Researcher, Cultural Omnivore, Design Technologist
+
 | Story | Status |
 |-------|--------|
 | Board fork/copy | Pending |
@@ -191,6 +232,57 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 
 ---
 
+## Generic Widget Architecture Risks
+
+Risks identified during v6.0 generic widget consolidation (2026-02-09). Ordered by impact.
+
+### Server-Side Generic Prompts (Risk #6 — Highest)
+
+Server widget configs have hardcoded category-specific prompts (e.g. `complete-the-look` says "outfit"). The client resolves `{{domain}}` vars but the server ignores the client prompt and uses its own. Expanding widgets to new categories requires new server configs with matching prompts.
+
+| Story | Status |
+|-------|--------|
+| **Adopt template variables in server widget configs** — Replace hardcoded domain words with `{{domain}}`/`{{noun}}`/`{{analyst}}` in server prompt fields | Pending |
+| **Add `resolveWidgetVars()` to edge function** — Server-side template var resolution using category from request body | Pending |
+| **Consolidate server configs** — Merge 18 individual server configs into 10 generic ones with template vars, mirroring client architecture | Pending |
+| **Remove WIDGET_SERVER_MAP from client** — Once server handles generic IDs natively, the routing layer is unnecessary | Pending |
+
+### Category Expansion Requires 3 Touchpoints (Risk #5 — Medium)
+
+Adding a widget to a new category requires updating WIDGET_CATEGORY_MAP, WIDGET_SERVER_MAP, and adding a server config. Missing any one = silent failure.
+
+| Story | Status |
+|-------|--------|
+| **Add `validateWidgetMaps()` startup check** — Cross-validate that every allowlist entry has a matching server map entry, log warnings for gaps | Pending |
+| **CLI tooling for widget expansion** — Script that takes (widget, category) and updates all 3 touchpoints + generates server config stub | Pending |
+
+### Discovery Response Mapping (Risk #4 — Medium)
+
+Server discovery returns specific widget IDs that need reverse-mapping to generic IDs. Unknown widgets fall through to temp entries without local config.
+
+| Story | Status |
+|-------|--------|
+| **Server discovery returns generic IDs** — After server consolidation, discovery endpoint returns generic widget IDs directly | Pending |
+| **Fallback widget template** — When a discovered widget has no local config, use a safe default renderer instead of building temp entry from server data | Pending |
+
+### Cache Key Consistency (Risk #3 — Medium)
+
+Client cache uses generic widget ID but server call uses server widget ID. Cache invalidation is consistent but key format differs from what the server sees.
+
+| Story | Status |
+|-------|--------|
+| **Unified cache key strategy** — Document cache key format, ensure server cache and client cache align on key structure | Pending |
+
+---
+
+## Standard UI Enhancements
+
+| Story | Status |
+|-------|--------|
+| **Collection stats in standard UI** — Move collection stats (item count, domain count, brand count, price range) out of the AI widget system and into the standard category UI. Show as a persistent stats bar or summary row visible for every category, not gated behind AI. Stats should update instantly on add/remove without an AI call. | Pending |
+
+---
+
 ## Accessibility
 
 | Story | Status |
@@ -199,6 +291,55 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 | Reduced motion option | Pending |
 | Screen reader optimization | Pending |
 | Focus indicators | Pending |
+
+---
+
+## Events & Venue Integration
+
+Connecting digital curation to real-world experiences. Supports brand principle #3: **One place, whole life.**
+
+> Personas: Sound & Scene Curator, DJ, Cultural Omnivore
+
+| Story | Status |
+|-------|--------|
+| **Event pin type** — Save events with date, venue, lineup; auto-enrich from event pages | Pending |
+| **Venue pin type** — Save venues/locations with map preview, hours, links | Pending |
+| **Calendar view** — Upcoming saved events in timeline/calendar format | Pending |
+| **"Events near you" widget** — Location-based suggestions from saved venues and event sources | Pending |
+| **Event → pin linking** — Associate regular pins with events ("I found this at that show") | Pending |
+| **Past events archive** — Auto-move past events to archive, preserve as part of collection history | Pending |
+
+---
+
+## Mobile Capture Enhancements
+
+Zero-friction capture from anywhere. Supports brand principle #2: **Organize as you go.**
+
+> Personas: Visual Collector, DJ, Multidisciplinary Maker — all mobile-critical
+
+| Story | Status |
+|-------|--------|
+| **Share sheet integration** — Save to ctrl.rodeo from any app's share menu (iOS/Android) | Pending |
+| **Photo-to-pin** — Capture photo, AI extracts context (product, artwork, event poster) | Pending |
+| **Audio snippet capture** — Record a few seconds at a show/club, use audio fingerprinting to identify | Pending |
+| **Quick capture widget** — Home screen widget for instant URL/note/photo capture | Pending |
+| **Offline capture queue** — Save pins offline, sync when back online | Pending |
+
+---
+
+## Collection Export & Sharing
+
+Making collections useful beyond the platform. Supports brand principle #5: **Expand with the user.**
+
+> Personas: Multidisciplinary Maker, Deep-Dive Enthusiast, Researcher, Design Technologist
+
+| Story | Status |
+|-------|--------|
+| **Export as mood board** — Generate visual PDF/image of a filtered collection | Pending |
+| **Export as playlist** — For music-heavy collections, export track list to Spotify/Apple Music | Pending |
+| **Shareable collection pages** — Public URL showing a curated subset of a board | Pending |
+| **Collection templates** — Pre-built board structures (e.g. "DJ Crate", "Design Research", "Trip Plan") | Pending |
+| **Recommendation sharing** — "My top picks for X" exportable list | Pending |
 
 ---
 

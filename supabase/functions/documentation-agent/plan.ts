@@ -21,20 +21,23 @@ function parsePlanIndex(content: string): PlanPhase[] {
   const lines = content.split('\n')
 
   for (const line of lines) {
-    // Match table rows like: | Phase 3 | IN PROGRESS | 113/370 | ...
+    // Match table rows like:
+    // | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 18/18 |
+    // | [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | ~113/370 |
     const tableMatch = line.match(
-      /\|\s*\[?Phase\s+(\d+)[^\]]*\]?\([^)]*\)\s*\|\s*(\w[\w\s-]*\w)\s*\|\s*(\d+)\/(\d+)/i
+      /\|\s*\[Phase\s+(\d+)[^\]]*\]\(\.\/([^)]+)\)\s*\|\s*([^|]+)\|\s*~?(\d+)\/(\d+)/i
     )
     if (tableMatch) {
+      const statusText = tableMatch[3].trim().toLowerCase()
       phases.push({
-        file: `docs/execution/project-plan/phase-${tableMatch[1]}`,
+        file: `docs/execution/project-plan/${tableMatch[2]}`,
         name: `Phase ${tableMatch[1]}`,
         number: parseInt(tableMatch[1]),
-        status: tableMatch[2].toLowerCase().includes('ship') ? 'shipped'
-          : tableMatch[2].toLowerCase().includes('progress') ? 'in-progress'
+        status: statusText.includes('ship') ? 'shipped'
+          : statusText.includes('progress') ? 'in-progress'
           : 'pending',
-        completedTasks: parseInt(tableMatch[3]),
-        totalTasks: parseInt(tableMatch[4]),
+        completedTasks: parseInt(tableMatch[4]),
+        totalTasks: parseInt(tableMatch[5]),
         inProgressTasks: 0,
         pendingTasks: 0,
         blockedTasks: 0,
@@ -54,37 +57,82 @@ function parsePlanItems(content: string, file: string): PlanItem[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
-    // Track epic headers (### or #### level)
-    const epicMatch = line.match(/^#{2,3}\s+(?:Epic[:\s]*)?(.+)/i)
-    if (epicMatch) {
+    // Track epic headers: ## Epic 3.1: Content Type System
+    const epicMatch = line.match(/^#{2,3}\s+(?:Epic\s+[\d.]+[:\s]*)?(.+)/i)
+    if (epicMatch && !line.includes('|')) {
       currentEpic = epicMatch[1].trim()
       continue
     }
 
-    // Track story headers
-    const storyMatch = line.match(/^#{4,5}\s+(?:Story[:\s]*)?(.+)/i)
-    if (storyMatch) {
-      currentStory = storyMatch[1].trim()
-      continue
+    // Parse table rows for tasks
+    // Format: | | Task description | Complete |
+    // Format: | **Story Name** | | Complete |
+    // Format: | | ~~Superseded task~~ | Superseded → ... |
+    const tableRowMatch = line.match(/^\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|/)
+    if (tableRowMatch) {
+      const col1 = tableRowMatch[1].trim()
+      const col2 = tableRowMatch[2].trim()
+      const col3 = tableRowMatch[3].trim()
+
+      // Skip header rows and separator rows
+      if (col1 === 'Story' || col1 === '---' || col3 === 'Status' || line.includes('------|')) {
+        continue
+      }
+
+      const statusText = col3.toLowerCase()
+
+      // Story row: | **Story Name** | | Status |
+      if (col1.startsWith('**') && col1.endsWith('**')) {
+        currentStory = col1.replace(/\*\*/g, '').trim()
+        // Stories themselves don't count as tasks — only sub-tasks do
+        continue
+      }
+
+      // Task row: | | Task description | Status |
+      if (col2 && statusText) {
+        const title = col2.replace(/~~(.*?)~~/g, '$1').trim()
+
+        // Skip empty task descriptions
+        if (!title) continue
+
+        let status: PlanItem['status'] = 'pending'
+        if (statusText.includes('complete')) {
+          status = 'complete'
+        } else if (statusText.includes('in progress') || statusText.includes('in-progress')) {
+          status = 'in-progress'
+        } else if (statusText.includes('blocked')) {
+          status = 'blocked'
+        } else if (statusText.includes('superseded') || statusText.includes('cut') || statusText.includes('deferred')) {
+          // Superseded/cut items count as complete (they're done — just not by building them)
+          status = 'complete'
+        } else if (statusText.includes('pending') || statusText.includes('planned')) {
+          status = 'pending'
+        }
+
+        items.push({
+          title,
+          status,
+          phase: file,
+          epic: currentEpic,
+          story: currentStory,
+          line: i + 1,
+          file,
+        })
+      }
     }
 
-    // Parse task checkboxes
-    const taskMatch = line.match(/^(\s*)-\s*\[([ xX])\]\s*(.+)/)
-    if (taskMatch) {
-      const checked = taskMatch[2].toLowerCase() === 'x'
-      const title = taskMatch[3].trim()
+    // Also support checkbox format (backlog.md might use this)
+    const checkboxMatch = line.match(/^(\s*)-\s*\[([ xX])\]\s*(.+)/)
+    if (checkboxMatch) {
+      const checked = checkboxMatch[2].toLowerCase() === 'x'
+      const title = checkboxMatch[3].trim()
 
-      // Check for status markers
       let status: PlanItem['status'] = checked ? 'complete' : 'pending'
-      if (title.includes('🔄') || title.toLowerCase().includes('in progress')) {
-        status = 'in-progress'
-      }
-      if (title.includes('🚫') || title.toLowerCase().includes('blocked')) {
-        status = 'blocked'
-      }
+      if (title.toLowerCase().includes('in progress')) status = 'in-progress'
+      if (title.toLowerCase().includes('blocked')) status = 'blocked'
 
       items.push({
-        title: title.replace(/[🔄🚫⚡✅]/g, '').trim(),
+        title,
         status,
         phase: file,
         epic: currentEpic,
@@ -139,9 +187,17 @@ export async function planAudit(
   const indexPhases = parsePlanIndex(indexFile.content)
   log.info(`Found ${indexPhases.length} phases in index`)
 
-  // 2. Read all phase files
+  // 2. Read all phase files — use the file paths from the index instead of directory listing
+  // This is more reliable because the index already has the exact file names
   const phaseDir = await github.getDirectory('docs/execution/project-plan')
-  const phaseFiles = phaseDir.filter((f) => f.match(/phase-\d+/))
+  log.info(`Directory listing returned ${phaseDir.length} files`, { files: phaseDir })
+
+  // Use index phase file paths when available, fall back to directory listing
+  const phaseFilesFromIndex = indexPhases.map((p) => p.file)
+  const phaseFilesFromDir = phaseDir.filter((f) => f.match(/phase-\d+/))
+  const phaseFiles = phaseFilesFromIndex.length > 0 ? phaseFilesFromIndex : phaseFilesFromDir
+
+  log.info(`Will scan ${phaseFiles.length} phase files`, { phaseFiles })
 
   const allItems: PlanItem[] = []
   const countMismatches: CountMismatch[] = []
@@ -379,5 +435,179 @@ export async function planUpdate(
       apiCalls: github.apiCalls + analyzer.apiCalls,
     },
     nextActions: ['`plan:audit` to verify counts', '`arch:sync` if architecture changed'],
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN:ADD
+// ═══════════════════════════════════════════════════════════════
+
+export async function planAdd(
+  github: GitHubClient,
+  analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+  const changes: FileChange[] = []
+  const errors: string[] = []
+
+  const title = request.title || ''
+  const description = request.description || ''
+  const itemType = request.type || 'task'
+  const priority = request.priority || 'medium'
+
+  if (!title) {
+    return {
+      success: false, action: 'plan:add',
+      report: '## Error\n\nMissing required field: `title`',
+      changes: [], errors: ['title is required'],
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 0, filesChanged: 0, apiCalls: 0 },
+    }
+  }
+
+  // Auto-detect sub-product if not provided
+  let subProduct = request.subProduct || ''
+  if (!subProduct) {
+    subProduct = await analyzer.detectSubProduct(`${title} ${description}`)
+  }
+
+  log.info('Adding plan item', { title, itemType, subProduct, priority })
+
+  // Determine target file based on type and urgency
+  let targetFile = ''
+  if (itemType === 'bug') {
+    targetFile = 'docs/execution/BUGS.md'
+  } else if (itemType === 'backlog') {
+    targetFile = 'docs/execution/project-plan/backlog.md'
+  } else {
+    // Find the active phase that matches the sub-product
+    const indexFile = await github.getFile('docs/execution/project-plan/index.md')
+    if (indexFile) {
+      const phases = parsePlanIndex(indexFile.content)
+      const activePhase = phases.find((p) => p.status === 'in-progress')
+      if (activePhase) {
+        targetFile = activePhase.file
+      } else {
+        targetFile = 'docs/execution/project-plan/backlog.md'
+      }
+    }
+  }
+
+  // Read the target file
+  const file = await github.getFile(targetFile)
+  if (!file) {
+    errors.push(`Could not read ${targetFile}`)
+    return {
+      success: false, action: 'plan:add',
+      report: `## Error\n\nCould not read target file: \`${targetFile}\``,
+      changes: [], errors,
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 1, filesChanged: 0, apiCalls: github.apiCalls },
+    }
+  }
+
+  // Build the new entry
+  let newEntry = ''
+  if (itemType === 'bug') {
+    // Count existing bugs to get next ID
+    const bugCount = (file.content.match(/BUG-\d+/g) || []).length
+    const bugId = `BUG-${String(bugCount + 1).padStart(3, '0')}`
+    const severity = request.severity || await analyzer.classifySeverity(description || title)
+    newEntry = `| ${bugId} | ${title} | ${severity} | ${subProduct} | Open | ${new Date().toISOString().split('T')[0]} |\n`
+  } else {
+    newEntry = `| | ${title} | Pending |\n`
+  }
+
+  let report = `## Item Added\n\n`
+  report += `- **Type**: ${itemType}\n`
+  report += `- **Title**: ${title}\n`
+  report += `- **Sub-product**: ${subProduct}\n`
+  report += `- **Filed to**: \`${targetFile}\`\n`
+  report += `- **Priority**: ${priority}\n`
+  report += `- **Entry**: \`${newEntry.trim()}\`\n\n`
+  report += `### Recommended Actions\n`
+  report += `1. Review the filed item in \`${targetFile}\`\n`
+  report += `2. Run \`plan:audit\` to verify counts\n`
+
+  changes.push({ file: targetFile, type: 'updated', summary: `Added ${itemType}: ${title}` })
+
+  const endTime = Date.now()
+  return {
+    success: true, action: 'plan:add', report, changes, errors,
+    metrics: { startTime, endTime, durationMs: endTime - startTime, filesRead: 2, filesChanged: 1, apiCalls: github.apiCalls + analyzer.apiCalls },
+    nextActions: ['`plan:audit` to verify counts'],
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN:REBALANCE
+// ═══════════════════════════════════════════════════════════════
+
+export async function planRebalance(
+  github: GitHubClient,
+  _analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+
+  log.info('Starting plan rebalance analysis')
+
+  // Read index to get phase sizes
+  const indexFile = await github.getFile('docs/execution/project-plan/index.md')
+  if (!indexFile) {
+    return {
+      success: false, action: 'plan:rebalance',
+      report: '## Error\n\nCould not read index.md',
+      changes: [], errors: ['index.md not found'],
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 0, filesChanged: 0, apiCalls: 0 },
+    }
+  }
+
+  const phases = parsePlanIndex(indexFile.content)
+
+  // Analyze phase sizes and completion rates
+  let report = `## Plan Rebalance Analysis — ${new Date().toISOString().split('T')[0]}\n\n`
+  report += `### Current Phase Sizes\n`
+  report += `| Phase | Total | Complete | Remaining | Completion % |\n`
+  report += `|-------|-------|----------|-----------|-------------|\n`
+
+  const overloaded: PlanPhase[] = []
+  const underloaded: PlanPhase[] = []
+
+  for (const phase of phases) {
+    const remaining = phase.totalTasks - phase.completedTasks
+    const pct = phase.totalTasks > 0 ? Math.round((phase.completedTasks / phase.totalTasks) * 100) : 0
+    report += `| ${phase.name} | ${phase.totalTasks} | ${phase.completedTasks} | ${remaining} | ${pct}% |\n`
+
+    if (remaining > 100) overloaded.push(phase)
+    if (remaining < 10 && phase.status !== 'shipped') underloaded.push(phase)
+  }
+  report += '\n'
+
+  if (overloaded.length > 0) {
+    report += `### Overloaded Phases (100+ remaining tasks)\n`
+    for (const p of overloaded) {
+      report += `- **${p.name}**: ${p.totalTasks - p.completedTasks} remaining tasks\n`
+    }
+    report += `\n**Recommendation**: Consider splitting large phases or moving non-critical items to later phases.\n\n`
+  }
+
+  if (underloaded.length > 0) {
+    report += `### Nearly Complete Phases\n`
+    for (const p of underloaded) {
+      report += `- **${p.name}**: ${p.totalTasks - p.completedTasks} remaining tasks\n`
+    }
+    report += '\n'
+  }
+
+  report += `### Recommended Actions\n`
+  report += `1. Review overloaded phases for items that can be deferred\n`
+  report += `2. Consider merging nearly-complete phases\n`
+  report += `3. Run \`plan:audit\` after any rebalancing\n`
+
+  const endTime = Date.now()
+  return {
+    success: true, action: 'plan:rebalance', report, changes: [], errors: [],
+    metrics: { startTime, endTime, durationMs: endTime - startTime, filesRead: 1, filesChanged: 0, apiCalls: github.apiCalls },
+    nextActions: ['`plan:audit` after rebalancing'],
   }
 }

@@ -55,6 +55,7 @@ serve(async (req) => {
     let typeSource: 'cache' | 'rules' | 'ai' = 'rules'
     let imageUrl: string | null = null
     let imageSource: 'scraped' | 'platform' | 'searched' | 'generated' | 'template' = 'template'
+    let imageScores: Record<string, any> | null = null
     let cached = false
 
     // Initialize Supabase client
@@ -111,9 +112,29 @@ serve(async (req) => {
         try {
           const result = await executeImageStrategy(strategy, url, title, description)
           if (result && result.url) {
+            // Tier 2 validation: check image loads, dimensions, format
+            console.log('[enrich-link] Validating image via Tier 2:', result.url)
+            const validation = await validateImageTier2(result.url)
+
+            if (!validation.pass) {
+              console.log('[enrich-link] Tier 2 rejected:', result.url, validation.reason, validation.checks.filter(c => !c.pass))
+              continue // Try next strategy
+            }
+
             imageUrl = result.url
             imageSource = result.source
-            console.log('[enrich-link] Image found via', strategy, ':', imageUrl)
+            imageScores = {
+              visual_quality: validation.scores.visual_quality,
+              distinctiveness: validation.scores.distinctiveness,
+              tier2_checks: validation.checks,
+              dimensions: validation.dimensions || null,
+              file_size: validation.fileSize || null,
+              content_type_header: validation.contentType || null,
+              evaluated_at: new Date().toISOString(),
+              evaluation_method: 'tier2_technical'
+            }
+            console.log('[enrich-link] Image validated via', strategy, ':', imageUrl,
+              validation.dimensions ? `${validation.dimensions.width}x${validation.dimensions.height}` : '')
             break
           }
         } catch (e) {
@@ -128,15 +149,19 @@ serve(async (req) => {
     if (linkId) {
       console.log('[enrich-link] Step 3: Updating link', linkId)
 
+      const updatePayload: Record<string, any> = {
+        content_type: contentType,
+        type_confidence: typeConfidence,
+        image: imageUrl,
+        image_source: imageSource,
+        image_resolved_at: new Date().toISOString()
+      }
+      if (imageScores) {
+        updatePayload.image_scores = imageScores
+      }
       await supabase
         .from('links')
-        .update({
-          content_type: contentType,
-          type_confidence: typeConfidence,
-          image: imageUrl,
-          image_source: imageSource,
-          image_resolved_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', linkId)
     }
 
@@ -147,6 +172,7 @@ serve(async (req) => {
       type_source: typeSource,
       image_url: imageUrl,
       image_source: imageSource,
+      image_scores: imageScores,
       cached
     }
 
@@ -470,11 +496,281 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
 const LOGO_PATTERNS = [
   /logo/i, /icon/i, /favicon/i, /brand/i, /avatar/i,
   /placeholder/i, /default/i, /blank/i, /spacer/i,
-  /pixel/i, /1x1/i, /transparent/i, /sprite/i
+  /pixel/i, /1x1/i, /transparent/i, /sprite/i,
+  /tracking/i, /beacon/i, /badge/i, /button/i,
+  /banner-ad/i, /ad-banner/i, /widget-icon/i
+]
+
+// Known CDN placeholder URL patterns
+const PLACEHOLDER_URL_PATTERNS = [
+  /no-image/i, /noimage/i, /no_image/i,
+  /missing/i, /not-found/i, /not_found/i,
+  /fallback/i,
+  /placeholder\.(jpg|png|gif|svg|webp)/i,
+  /default\.(jpg|png|gif|svg|webp)/i,
+  /blank\.(jpg|png|gif|svg|webp)/i
 ]
 
 function isLikelyLogo(url: string): boolean {
   return LOGO_PATTERNS.some(p => p.test(url))
+}
+
+function isPlaceholderUrl(url: string): boolean {
+  return PLACEHOLDER_URL_PATTERNS.some(p => p.test(url))
+}
+
+// ========================================
+// Tier 2: Server-Side Image Validation
+// ========================================
+
+// Known-good image sources that bypass Tier 2 checks
+const KNOWN_GOOD_SOURCES = [
+  /img\.youtube\.com\/vi\//,
+  /i\.vimeocdn\.com\//,
+  /opengraph\.githubassets\.com\//,
+  /i\.scdn\.co\//,
+  /mosaic\.scdn\.co\//,
+  /image\.tmdb\.org\//,
+  /m\.media-amazon\.com\//,
+  /images-na\.ssl-images-amazon\.com\//
+]
+
+// Card context minimum dimensions
+const CARD_THRESHOLDS: Record<string, { minWidth: number, minHeight: number, maxAspect: number }> = {
+  grid:   { minWidth: 300, minHeight: 200, maxAspect: 3 },
+  hero:   { minWidth: 600, minHeight: 400, maxAspect: 2.5 },
+  thumb:  { minWidth: 100, minHeight: 100, maxAspect: 2 },
+  widget: { minWidth: 200, minHeight: 200, maxAspect: 2 }
+}
+
+// Valid image content types
+const VALID_IMAGE_TYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/svg+xml'
+]
+
+interface Tier2Result {
+  pass: boolean
+  reason?: string
+  scores: {
+    visual_quality: number
+    distinctiveness: number
+  }
+  checks: Array<{ check: string, pass: boolean, detail?: string }>
+  dimensions?: { width: number, height: number }
+  fileSize?: number
+  contentType?: string
+}
+
+/**
+ * Tier 2 server-side image validation.
+ * Uses HEAD request + optional partial download to check dimensions, format, and file size.
+ */
+async function validateImageTier2(imageUrl: string, cardContext: string = 'grid'): Promise<Tier2Result> {
+  const checks: Array<{ check: string, pass: boolean, detail?: string }> = []
+  let visualQuality = 1.0
+  let distinctiveness = 1.0
+  let dimensions: { width: number, height: number } | undefined
+  let fileSize: number | undefined
+  let contentType: string | undefined
+
+  // Known-good source bypass
+  if (KNOWN_GOOD_SOURCES.some(p => p.test(imageUrl))) {
+    checks.push({ check: 'known_good_source', pass: true, detail: 'trusted source' })
+    return {
+      pass: true,
+      scores: { visual_quality: 0.9, distinctiveness: 1.0 },
+      checks,
+      dimensions: undefined,
+      fileSize: undefined,
+      contentType: undefined
+    }
+  }
+
+  // Placeholder URL check
+  if (isPlaceholderUrl(imageUrl)) {
+    return {
+      pass: false,
+      reason: 'placeholder_url',
+      scores: { visual_quality: 0, distinctiveness: 0 },
+      checks: [{ check: 'placeholder_url', pass: false }]
+    }
+  }
+
+  try {
+    // HEAD request to get metadata without downloading full image
+    const headResponse = await fetch(imageUrl, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo image validator)',
+        'Accept': 'image/*'
+      }
+    })
+
+    // Check 1: Image loads (HTTP 200)
+    if (!headResponse.ok) {
+      checks.push({ check: 'http_status', pass: false, detail: `HTTP ${headResponse.status}` })
+      return {
+        pass: false,
+        reason: 'http_error',
+        scores: { visual_quality: 0, distinctiveness: 0 },
+        checks
+      }
+    }
+    checks.push({ check: 'http_status', pass: true })
+
+    // Check 2: Content-Type is an image
+    contentType = headResponse.headers.get('content-type')?.split(';')[0]?.trim() || ''
+    const isValidType = VALID_IMAGE_TYPES.some(t => contentType!.startsWith(t))
+    checks.push({ check: 'content_type', pass: isValidType, detail: contentType })
+    if (!isValidType) {
+      return {
+        pass: false,
+        reason: 'not_image',
+        scores: { visual_quality: 0, distinctiveness: 0 },
+        checks,
+        contentType
+      }
+    }
+
+    // Check 3: File size (from Content-Length header)
+    const contentLength = headResponse.headers.get('content-length')
+    if (contentLength) {
+      fileSize = parseInt(contentLength, 10)
+
+      // Too small — likely placeholder/pixel
+      if (fileSize < 5000) { // 5KB
+        visualQuality = Math.min(visualQuality, 0.1)
+        distinctiveness = Math.min(distinctiveness, 0.1)
+        checks.push({ check: 'file_size', pass: false, detail: `${fileSize} bytes (< 5KB minimum)` })
+      }
+      // Very small — suspicious but not definitive
+      else if (fileSize < 15000) { // 15KB
+        visualQuality = Math.min(visualQuality, 0.5)
+        checks.push({ check: 'file_size', pass: true, detail: `${fileSize} bytes (small but acceptable)` })
+      } else {
+        checks.push({ check: 'file_size', pass: true, detail: `${fileSize} bytes` })
+      }
+    } else {
+      checks.push({ check: 'file_size', pass: true, detail: 'no Content-Length header' })
+    }
+
+    // Check 4: Redirect detection — if final URL differs significantly, might be error page
+    const finalUrl = headResponse.url
+    if (finalUrl && finalUrl !== imageUrl) {
+      const finalLower = finalUrl.toLowerCase()
+      if (finalLower.includes('error') || finalLower.includes('404') || finalLower.includes('not-found')) {
+        checks.push({ check: 'redirect_check', pass: false, detail: `redirected to error page: ${finalUrl}` })
+        return {
+          pass: false,
+          reason: 'redirect_to_error',
+          scores: { visual_quality: 0, distinctiveness: 0 },
+          checks,
+          contentType,
+          fileSize
+        }
+      }
+      checks.push({ check: 'redirect_check', pass: true, detail: `redirected to ${finalUrl}` })
+    }
+
+    // Check 5: Try to extract dimensions by partial download (first 32KB for JPEG/PNG headers)
+    try {
+      const partialResponse = await fetch(imageUrl, {
+        headers: {
+          'Range': 'bytes=0-32768',
+          'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo image validator)',
+          'Accept': 'image/*'
+        }
+      })
+
+      if (partialResponse.ok || partialResponse.status === 206) {
+        const buffer = await partialResponse.arrayBuffer()
+        const bytes = new Uint8Array(buffer)
+        dimensions = extractDimensions(bytes, contentType!)
+
+        if (dimensions) {
+          const thresholds = CARD_THRESHOLDS[cardContext] || CARD_THRESHOLDS.grid
+          const aspect = dimensions.width / dimensions.height
+
+          // Resolution check
+          if (dimensions.width < 50 || dimensions.height < 50) {
+            visualQuality = 0
+            checks.push({ check: 'dimensions', pass: false, detail: `${dimensions.width}x${dimensions.height} (below absolute minimum 50px)` })
+          } else if (dimensions.width < thresholds.minWidth || dimensions.height < thresholds.minHeight) {
+            visualQuality = Math.min(visualQuality, 0.4)
+            checks.push({ check: 'dimensions', pass: false, detail: `${dimensions.width}x${dimensions.height} (below ${cardContext} minimum ${thresholds.minWidth}x${thresholds.minHeight})` })
+          } else {
+            checks.push({ check: 'dimensions', pass: true, detail: `${dimensions.width}x${dimensions.height}` })
+          }
+
+          // Aspect ratio check
+          if (aspect > thresholds.maxAspect || aspect < (1 / thresholds.maxAspect)) {
+            visualQuality = Math.min(visualQuality, 0.3)
+            checks.push({ check: 'aspect_ratio', pass: false, detail: `${aspect.toFixed(2)} (outside ${thresholds.maxAspect}:1 limit)` })
+          } else {
+            checks.push({ check: 'aspect_ratio', pass: true, detail: `${aspect.toFixed(2)}` })
+          }
+        } else {
+          checks.push({ check: 'dimensions', pass: true, detail: 'could not extract from headers' })
+        }
+      }
+    } catch (e) {
+      // Partial download failed — not critical, skip dimension checks
+      checks.push({ check: 'dimensions', pass: true, detail: 'partial download failed, skipping' })
+    }
+
+  } catch (e) {
+    checks.push({ check: 'network', pass: false, detail: (e as Error).message })
+    return {
+      pass: false,
+      reason: 'network_error',
+      scores: { visual_quality: 0, distinctiveness: 0 },
+      checks
+    }
+  }
+
+  const pass = visualQuality > 0 && distinctiveness > 0
+
+  return {
+    pass,
+    reason: !pass ? 'below_quality_threshold' : undefined,
+    scores: { visual_quality: visualQuality, distinctiveness },
+    checks,
+    dimensions,
+    fileSize,
+    contentType
+  }
+}
+
+/**
+ * Extract image dimensions from the first bytes of an image file.
+ * Supports JPEG (SOF markers) and PNG (IHDR chunk).
+ */
+function extractDimensions(bytes: Uint8Array, contentType: string): { width: number, height: number } | null {
+  // PNG: width/height at bytes 16-23 in IHDR
+  if (contentType.includes('png') && bytes.length >= 24) {
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+      const width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]
+      const height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]
+      if (width > 0 && height > 0 && width < 100000 && height < 100000) {
+        return { width, height }
+      }
+    }
+  }
+
+  // JPEG: scan for SOF0 (0xFFC0) or SOF2 (0xFFC2) marker
+  if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+    for (let i = 0; i < bytes.length - 9; i++) {
+      if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC2)) {
+        const height = (bytes[i + 5] << 8) | bytes[i + 6]
+        const width = (bytes[i + 7] << 8) | bytes[i + 8]
+        if (width > 0 && height > 0 && width < 100000 && height < 100000) {
+          return { width, height }
+        }
+      }
+    }
+  }
+
+  return null
 }
 
 // Search for image using Unsplash API

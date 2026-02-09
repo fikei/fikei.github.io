@@ -4,7 +4,29 @@ This file provides context to Claude Code and other AI development tools for wor
 
 ## Project Overview
 
-**ctrl.rodeo** is a unified personal platform combining multiple micro-applications with AI integration, built as a Jekyll static site with Supabase backend services.
+**ctrl.rodeo** is a personal curation platform that helps people collect, organize, and build on everything that matters to them. Built as a Jekyll static site with Supabase backend and AI integration.
+
+**Tagline:** Your likes. Your saves. Your life — organized.
+
+### Brand Positioning
+
+The core insight: **what you experience informs what you create.** ctrl.rodeo makes the connection between input and output visible, searchable, and actionable. It starts with creatives — artists, designers, musicians — and expands to anyone whose life is richer when intentionally curated.
+
+See [Brand Positioning](./docs/strategy/brand-positioning.md) for full positioning statement, voice & tone, and development implications.
+See [User Personas](./docs/ux/personas.md) for detailed personas with Jobs To Be Done and the persona-to-feature matrix.
+
+### Brand Principles (Guide All Feature Decisions)
+1. **Input shapes output** — surface connections and patterns in what users collect
+2. **Organize as you go** — AI handles categorization; zero-friction capture
+3. **One place, whole life** — don't silo interests; let connections emerge across categories
+4. **Show, don't decorate** — minimal interface; the user's content is the design
+5. **Expand with the user** — start simple, grow deep; progressive complexity
+
+### Primary Audience: Creatives
+Artists, designers, musicians, writers, filmmakers — high-volume collectors whose creative output depends on input richness. See personas: The Visual Collector, The Sound & Scene Curator, The DJ, The Multidisciplinary Maker.
+
+### Growth Audiences
+Enthusiasts, researchers, cultural omnivores, knowledge workers, students, small business owners. Same core need: intentional curation of a complex life. See personas: The Deep-Dive Enthusiast, The Researcher, The Cultural Omnivore, The Design Technologist, and future personas The Student, The Small Business Owner, The Planner.
 
 ### Core Philosophy
 - **Vibe Coding**: Rapid, intuitive development with AI assistance
@@ -464,6 +486,8 @@ Check `docs/execution/project-plan/index.md` for current priorities and phase st
 ---
 
 ## Related Documents
+- [Brand Positioning](./docs/strategy/brand-positioning.md) - Tagline, positioning statement, brand principles
+- [User Personas](./docs/ux/personas.md) - Audience personas with JTBD and feature matrix
 - [Project Plan](./docs/execution/project-plan/index.md) - Current task tracking (single source of truth)
 - [CHANGELOG.md](./CHANGELOG.md) - History of all changes
 - [Backlog](./docs/execution/project-plan/backlog.md) - Future work items

@@ -6,6 +6,63 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-09] - Listen Category: Music as First-Class Content
+
+### Added
+- **`listen` category** — 9th category, splits music out of `watch`. Keywords: music, album, song, playlist, track, artist, band, concert, podcast, dj, remix, mix, vinyl. Domains: spotify.com, soundcloud.com, bandcamp.com, music.apple.com, tidal.com, deezer.com, music.youtube.com, last.fm, genius.com, pitchfork.com.
+- **Listen sub-tags** — albums, tracks, playlists, podcasts, artists, mixes with keyword detection.
+- **`extractMusicMetadata()`** — Structured music metadata extraction: artist, trackTitle, albumTitle, genre, duration, releaseDate, contentFormat, platformId, isExplicit. Populates 9/12 fields without OAuth via oEmbed APIs + og:music tag scraping.
+- **Spotify/SoundCloud oEmbed** in `resolvePlatformImage()` — Album art resolution for music platforms.
+- **oEmbed response cache** (`fetchOembed()`) — Shared between image resolver and metadata extractor, eliminates duplicate API calls.
+- **og:music tag extraction** in `fetchMetadata()` — Scrapes `og:music:duration`, `og:music:album`, `og:music:release_date`, `og:music:musician`, genre from already-fetched HTML.
+- **watch→listen migration** — One-time `migrateWatchToListen()` moves music links from watch, clears domain cache for music domains.
+- **Sound Shelf widget** — Visual album art grid for listen category (hero zone, 4+ items).
+- **Listen Next widget** — AI-picked listening queue of 3 items (inline zone, 3+ items).
+
+### Changed
+- **`watch` category** — Trimmed to video-only: movie, film, series, show, documentary, trailer, animation, clip, cinema, tv.
+- **`BUILTIN_TYPES`** — Reordered music before video so `music.youtube.com` matches music content type before `youtube.com` matches video.
+- **Music content type domains** — Added music.apple.com, tidal.com, deezer.com, music.youtube.com, audiomack.com.
+- **Widget registry** — 2 new widgets registered (server + client): sound-shelf, listen-next.
+
+---
+
+## [2026-02-09] - Runtime Design Constraint Engine for Boards
+
+### Added
+- **`boards/design-constraints.js`** — New runtime constraint engine that loads the design system manifest and template registry at page load, then exposes validation and annotation APIs for Boards widgets.
+  - `DS_CONSTRAINTS.init()` — Auto-loads `manifest.json` + `template-registry.json`, builds lookup indexes
+  - `DS_CONSTRAINTS.validate(el)` — Validates a single DOM element against design system rules
+  - `DS_CONSTRAINTS.auditDOM(root)` — Scans all elements in a subtree, reports constraint violations
+  - `DS_CONSTRAINTS.annotate(root)` — Stamps `data-ds-*` attributes on elements for introspection (`data-ds-size`, `data-ds-template`, `data-ds-valid-modifiers`)
+  - `DS_CONSTRAINTS.getConstraints(templateName)` — Query API for template rules
+  - `validateWidgetSize()`, `validateComponent()`, `validateWidgetElement()`, `validateTemplateStructure()` — Targeted validation functions
+  - Violation tracking with timestamps and custom event emission
+- **Boards `index.html` integration** — Loads the constraint engine script and wires it into the widget rendering pipeline
+
+---
+
+## [2026-02-08] - Systemic QA Enhancements + Preferred Variant Marking
+
+### Added
+- **Preferred variant marking** — New `preferred` flag in VariantAudit system. Designers can mark recommended variants per template/size. Preferred badge displayed on variant cards and in the audit log table. Setting a variant as preferred automatically unblocks it.
+- **QA controls integrated into component stage** — Viewer variant cards now show inline stoplight status dots, preferred badges, comment counts, and action buttons (Prefer, Comment, Process/Approve, Block). Inline audit log table rendered below the variant gallery with JSON export.
+- **Visible comment/block/status controls** — No longer hidden behind right-click context menu. Quick-access buttons always visible on each variant item in QA view.
+- **Scan modal** — Quick-access modal (`/` key or dev menu) for entering a URL or loading the local design system without navigating to the audit form.
+- **Dev menu** — `/` button in Systemic header opens dropdown: "Reload local system", "Clean up duplicates", "Copy/Download debug log", "Clear all data".
+- **Debug logging system** — Comprehensive categorized logging (`AUDIT`, `TOKENS`, `COMPONENTS`, `CLEANUP`, etc.) with timestamped entries. Export as JSON via clipboard or file download.
+- **Template grid size expansion** — Systemic now shows all 15 grid sizes for template variants (not just `validSizes`), enabling QA audit of every size permutation.
+- **Grid test section** — Column permutation testing (1-col through 4-col) with grid lines overlay toggle for visual inspection.
+
+### Changed
+- **Rename from SystemicAI to Systemic** — All files, classes, references, and UI text updated. The app is now just "Systemic".
+- **Specs moved to sidebar** — Component specs now display in the context sidebar panel instead of the main content area, matching the split Design/Code context pattern.
+- **Variant gallery shows accurate grid widths** — Fixed template variant previews to use correct CSS grid column widths matching the actual `w-shell--*` size tokens.
+- **QA feature parity with widgets.html** — Variant audit system now matches the widget showcase's governance features: grid lines overlay, grid test section, and stoplight status management.
+- **Removed duplicative variants sidebar** — Eliminated redundant sidebar that showed variants in both the sidebar and the main content panel.
+
+---
+
 ## [2026-02-08] - Pin Profiling, Widget Inspector & 6 New Widgets
 
 ### Added

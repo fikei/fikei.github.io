@@ -51,7 +51,13 @@ export class GitHubClient {
         `/repos/${this.owner}/${this.repo}/contents/${path}?ref=${ref}`
       ) as { content: string; sha: string; path: string }
 
-      const content = atob(data.content.replace(/\n/g, ''))
+      // Decode base64 → binary string → UTF-8
+      const binaryString = atob(data.content.replace(/\n/g, ''))
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+      const content = new TextDecoder().decode(bytes)
       return { path: data.path, content, sha: data.sha }
     } catch (e) {
       if (String(e).includes('404')) return null

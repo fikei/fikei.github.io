@@ -1,5 +1,5 @@
 // Documentation Agent - Architecture Domain
-// Functions: arch:sync, arch:audit
+// Functions: arch:sync, arch:audit, arch:add-adr, arch:update-spec
 
 import { createLogger } from './logger.ts'
 import type { GitHubClient } from './github.ts'
@@ -333,5 +333,165 @@ export async function archAudit(
       totalContradictions > 0 ? '`arch:update-spec` to fix contradictions' : '',
       '`plan:audit` to verify plan matches architecture state',
     ].filter(Boolean),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ARCH:ADD-ADR
+// ═══════════════════════════════════════════════════════════════
+
+export async function archAddAdr(
+  github: GitHubClient,
+  _analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+  const errors: string[] = []
+
+  const title = request.title || ''
+  const description = request.description || ''
+  const decision = request.changes || ''
+
+  if (!title) {
+    return {
+      success: false, action: 'arch:add-adr',
+      report: '## Error\n\nMissing required field: `title`',
+      changes: [], errors: ['title is required'],
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 0, filesChanged: 0, apiCalls: 0 },
+    }
+  }
+
+  log.info('Adding ADR', { title })
+
+  // Read decision log
+  const decisionLog = await github.getFile('docs/strategy/decision-log.md')
+  if (!decisionLog) {
+    errors.push('Could not read docs/strategy/decision-log.md')
+    return {
+      success: false, action: 'arch:add-adr',
+      report: '## Error\n\nCould not read decision log',
+      changes: [], errors,
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 1, filesChanged: 0, apiCalls: github.apiCalls },
+    }
+  }
+
+  // Count existing ADRs
+  const adrCount = (decisionLog.content.match(/## ADR-\d+/g) || []).length
+  const adrNum = adrCount + 1
+  const date = new Date().toISOString().split('T')[0]
+
+  // Build entry
+  const entry = `\n## ADR-${String(adrNum).padStart(3, '0')}: ${title}\n\n` +
+    `**Date**: ${date}\n` +
+    `**Status**: Accepted\n\n` +
+    `### Context\n${description || 'TBD'}\n\n` +
+    `### Decision\n${decision || 'TBD'}\n\n` +
+    `### Consequences\n- TBD\n`
+
+  let report = `## ADR Added\n\n`
+  report += `- **ID**: ADR-${String(adrNum).padStart(3, '0')}\n`
+  report += `- **Title**: ${title}\n`
+  report += `- **Filed to**: \`docs/strategy/decision-log.md\`\n\n`
+  report += `### Entry Preview\n\`\`\`markdown\n${entry.trim()}\n\`\`\`\n\n`
+  report += `### Recommended Actions\n`
+  report += `1. Fill in the Consequences section\n`
+  report += `2. Run \`arch:update-spec\` if this decision affects a tech spec\n`
+
+  const endTime = Date.now()
+  return {
+    success: true, action: 'arch:add-adr', report,
+    changes: [{ file: 'docs/strategy/decision-log.md', type: 'updated', summary: `Added ADR-${adrNum}: ${title}` }],
+    errors,
+    metrics: { startTime, endTime, durationMs: endTime - startTime, filesRead: 1, filesChanged: 1, apiCalls: github.apiCalls },
+    nextActions: ['`arch:update-spec` if this affects tech specs'],
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ARCH:UPDATE-SPEC
+// ═══════════════════════════════════════════════════════════════
+
+export async function archUpdateSpec(
+  github: GitHubClient,
+  analyzer: Analyzer,
+  request: DocAgentRequest
+): Promise<DocAgentResult> {
+  const startTime = Date.now()
+  const errors: string[] = []
+
+  const targetDoc = request.doc || ''
+  const changesDesc = request.changes || ''
+  const sourceFiles = request.sourceFiles || []
+
+  if (!targetDoc) {
+    return {
+      success: false, action: 'arch:update-spec',
+      report: '## Error\n\nMissing required field: `doc` (path to technical design doc)',
+      changes: [], errors: ['doc is required'],
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 0, filesChanged: 0, apiCalls: 0 },
+    }
+  }
+
+  log.info('Updating spec', { doc: targetDoc, changes: changesDesc })
+
+  // Read the target doc
+  const specFile = await github.getFile(targetDoc)
+  if (!specFile) {
+    return {
+      success: false, action: 'arch:update-spec',
+      report: `## Error\n\nCould not read \`${targetDoc}\``,
+      changes: [], errors: [`${targetDoc} not found`],
+      metrics: { startTime, endTime: Date.now(), durationMs: Date.now() - startTime, filesRead: 1, filesChanged: 0, apiCalls: github.apiCalls },
+    }
+  }
+
+  // Read source code files if provided
+  let codeContext = ''
+  for (const sf of sourceFiles.slice(0, 5)) {
+    const file = await github.getFile(sf)
+    if (file) {
+      codeContext += `\n// FILE: ${sf}\n${file.content.slice(0, 2000)}\n`
+    }
+  }
+
+  // Use Claude to analyze what needs changing
+  const analysis = await analyzer.compareDocToCode(specFile.content, codeContext, targetDoc)
+
+  let report = `## Spec Update Analysis — \`${targetDoc.split('/').pop()}\`\n\n`
+  report += `### Changes Description\n${changesDesc || '(auto-detected)'}\n\n`
+
+  if (analysis.stale) {
+    report += `### Updates Needed\n`
+    for (const change of analysis.changes) {
+      report += `- ${change}\n`
+    }
+    report += '\n'
+  }
+
+  if (analysis.suggestions.length > 0) {
+    report += `### Suggestions\n`
+    for (const s of analysis.suggestions) {
+      report += `- 💡 ${s}\n`
+    }
+    report += '\n'
+  }
+
+  if (!analysis.stale && analysis.suggestions.length === 0) {
+    report += `### ✅ Doc is current — no updates needed\n`
+  }
+
+  report += `\n### Recommended Actions\n`
+  if (analysis.stale) {
+    report += `1. Apply the updates listed above to \`${targetDoc}\`\n`
+  }
+  report += `2. Run \`arch:audit\` to verify doc accuracy after changes\n`
+
+  const endTime = Date.now()
+  return {
+    success: true, action: 'arch:update-spec', report,
+    changes: analysis.stale ? [{ file: targetDoc, type: 'updated', summary: `${analysis.changes.length} updates identified` }] : [],
+    errors,
+    metrics: { startTime, endTime, durationMs: endTime - startTime, filesRead: 1 + sourceFiles.length, filesChanged: analysis.stale ? 1 : 0, apiCalls: github.apiCalls + analyzer.apiCalls },
+    nextActions: ['`arch:audit` to verify accuracy'],
   }
 }
