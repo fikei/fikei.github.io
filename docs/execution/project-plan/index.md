@@ -1,7 +1,7 @@
 # Project Plan - Boards
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-07 (Widget Phase 2 COMPLETE, Phase 2.5a IN PROGRESS, Phases 8 & 9 planned)
+> **Last Updated**: 2026-02-09 (Phase 2.5a nearing completion, runtime constraint engine added)
 
 ---
 
@@ -34,7 +34,7 @@
 ## Recent Milestones
 
 ### Widget Phase 2.5a: Design System Transition ⚡
-**Started: 2026-02-07**
+**Started: 2026-02-07** — **Nearing completion**
 
 - **Design System Manifest**: `manifest.json` generated from CSS (12 atoms, 8 molecules, 11 body modifiers, 15 sizes)
 - **Template Registry**: `template-registry.json` maps 10 canonical templates to Boards implementations
@@ -42,7 +42,11 @@
 - **Template Migration**: All 7 Boards renderers migrated from `widget-*` to `w-*` classes
 - **Design System Extensions**: Added `w-items`, `w-item`, `w-body--stats`, `w-divider__label`; updated marker, header, suggestion layout
 - **Token Bridge**: Boards `:root` maps DS token names to Boards values (visual parity preserved)
-- **Next**: Visual verification → legacy CSS cleanup → config-driven AI prompts → CI validation
+- **Config-Driven AI Prompts**: Server-side `config/design-system.ts` embeds template constraints into AI prompts
+- **Server-Side Validation**: `validateWidgetHtml()` / `sanitizeWidgetHtml()` enforce class allowlist on AI output
+- **Runtime Constraint Engine**: `boards/design-constraints.js` loads manifest + registry at runtime, validates widgets, annotates DOM
+- **Systemic QA Enhancements**: Preferred variant marking, inline QA controls in viewer, scan modal, dev menu, debug logging, all 15 grid sizes exposed
+- **Next**: CI validation pipeline
 
 ### Widget Phase 2: Config-Generated Widgets ✅
 **Completed: 2026-02-05**

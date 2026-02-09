@@ -6,6 +6,42 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-09] - Runtime Design Constraint Engine for Boards
+
+### Added
+- **`boards/design-constraints.js`** — New runtime constraint engine that loads the design system manifest and template registry at page load, then exposes validation and annotation APIs for Boards widgets.
+  - `DS_CONSTRAINTS.init()` — Auto-loads `manifest.json` + `template-registry.json`, builds lookup indexes
+  - `DS_CONSTRAINTS.validate(el)` — Validates a single DOM element against design system rules
+  - `DS_CONSTRAINTS.auditDOM(root)` — Scans all elements in a subtree, reports constraint violations
+  - `DS_CONSTRAINTS.annotate(root)` — Stamps `data-ds-*` attributes on elements for introspection (`data-ds-size`, `data-ds-template`, `data-ds-valid-modifiers`)
+  - `DS_CONSTRAINTS.getConstraints(templateName)` — Query API for template rules
+  - `validateWidgetSize()`, `validateComponent()`, `validateWidgetElement()`, `validateTemplateStructure()` — Targeted validation functions
+  - Violation tracking with timestamps and custom event emission
+- **Boards `index.html` integration** — Loads the constraint engine script and wires it into the widget rendering pipeline
+
+---
+
+## [2026-02-08] - Systemic QA Enhancements + Preferred Variant Marking
+
+### Added
+- **Preferred variant marking** — New `preferred` flag in VariantAudit system. Designers can mark recommended variants per template/size. Preferred badge displayed on variant cards and in the audit log table. Setting a variant as preferred automatically unblocks it.
+- **QA controls integrated into component stage** — Viewer variant cards now show inline stoplight status dots, preferred badges, comment counts, and action buttons (Prefer, Comment, Process/Approve, Block). Inline audit log table rendered below the variant gallery with JSON export.
+- **Visible comment/block/status controls** — No longer hidden behind right-click context menu. Quick-access buttons always visible on each variant item in QA view.
+- **Scan modal** — Quick-access modal (`/` key or dev menu) for entering a URL or loading the local design system without navigating to the audit form.
+- **Dev menu** — `/` button in Systemic header opens dropdown: "Reload local system", "Clean up duplicates", "Copy/Download debug log", "Clear all data".
+- **Debug logging system** — Comprehensive categorized logging (`AUDIT`, `TOKENS`, `COMPONENTS`, `CLEANUP`, etc.) with timestamped entries. Export as JSON via clipboard or file download.
+- **Template grid size expansion** — Systemic now shows all 15 grid sizes for template variants (not just `validSizes`), enabling QA audit of every size permutation.
+- **Grid test section** — Column permutation testing (1-col through 4-col) with grid lines overlay toggle for visual inspection.
+
+### Changed
+- **Rename from SystemicAI to Systemic** — All files, classes, references, and UI text updated. The app is now just "Systemic".
+- **Specs moved to sidebar** — Component specs now display in the context sidebar panel instead of the main content area, matching the split Design/Code context pattern.
+- **Variant gallery shows accurate grid widths** — Fixed template variant previews to use correct CSS grid column widths matching the actual `w-shell--*` size tokens.
+- **QA feature parity with widgets.html** — Variant audit system now matches the widget showcase's governance features: grid lines overlay, grid test section, and stoplight status management.
+- **Removed duplicative variants sidebar** — Eliminated redundant sidebar that showed variants in both the sidebar and the main content panel.
+
+---
+
 ## [2026-02-07] - Config-Driven AI Prompts + Server-Side Validation
 
 ### Added
