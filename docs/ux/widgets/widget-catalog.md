@@ -1,8 +1,48 @@
 # Widget Catalog
 
 **Date**: 2026-02-09
-**Status**: Draft — awaiting prioritization review
+**Status**: Implemented (v6.0 Generic Architecture)
 **Source**: Persona definitions from `docs/ux/personas.md`, template research from `docs/ux/research/widget-template-patterns.md`
+
+---
+
+## Current Implementation (10 Generic Widgets)
+
+### Architecture
+
+Widgets use a **3-layer separation of concerns**:
+
+1. **WIDGET_REGISTRY** — defines WHAT (template, prompt, zone, min items)
+2. **WIDGET_CATEGORY_MAP** — defines WHERE (allowlist of categories per widget)
+3. **WIDGET_SERVER_MAP** — defines HOW (routes generic client IDs to server widget IDs)
+
+All widgets are **bound to the design system**: startup validation (`validateWidgetDesignSystem()`) ensures every template reference exists in `VALID_DS_TEMPLATES`. To add a new template, extend the design system first.
+
+Template variables (`{{category}}`, `{{domain}}`, `{{noun}}`, `{{analyst}}`) are resolved at runtime from `CATEGORY_DOMAINS`, making prompts category-agnostic.
+
+### Implemented Widgets
+
+| Widget | Template | Zone | Archetype | Allowed Categories |
+|--------|----------|------|-----------|-------------------|
+| `profiler` | hero-card | hero | Profiler | wear, home, watch, use, eat, go, follow, read |
+| `completer` | grid-split | inline | Completer | wear |
+| `pick` | choices | hero | Prioritizer | wear, eat |
+| `spectrum` | spectrum | hero | Analyzer | wear |
+| `gap-finder` | quick-add | inline | Completer | wear |
+| `compare` | comparison | inline | Prioritizer | use |
+| `buy-checklist` | checklist | inline | Prioritizer | wear |
+| `discover-more` | quick-add | footer | Completer | all 8 categories |
+| `upcoming-releases` | list | inline | Analyzer | all 8 categories |
+| `board-overview` | grouped | footer | Analyzer | all 8 categories + 'all' |
+
+### Expanding to New Categories
+
+To enable a widget in a new category:
+
+1. Add the category to `WIDGET_CATEGORY_MAP` in `boards/index.html`
+2. Ensure the server has a matching widget config (or add one in `config/widgets/`)
+3. Add the server mapping to `WIDGET_SERVER_MAP`
+4. The generic prompt uses `{{domain}}`/`{{noun}}`/`{{analyst}}` — no prompt changes needed
 
 ---
 
@@ -19,7 +59,7 @@ The 4 archetypes from research map to user jobs:
 | **Prioritizer** | Action ranking | list / checklist / choices | "What should I do next?" |
 | **Analyzer** | Pattern measurement | spectrum / stat-row | "What do the numbers say?" |
 
-### Every category gets all 4 archetypes
+### Every category gets all 4 archetypes (roadmap)
 
 8 categories × 4 archetypes = 32 category-specific widgets.
 Plus 8 cross-category widgets = **40 total**.

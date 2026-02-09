@@ -3457,638 +3457,448 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
     }
   };
 
-  // Widget Registry - Full PRD definitions for each widget
+  // ==========================================================================
+  // CATEGORY DOMAIN MAP — provides context for generic widget prompt templates
+  // Each category maps to domain vocabulary used in AI prompts.
+  // ==========================================================================
+  const CATEGORY_DOMAINS = {
+    wear:   { domain: 'fashion',              noun: 'clothing and accessories',        analyst: 'fashion stylist' },
+    home:   { domain: 'interior design',      noun: 'home and decor items',            analyst: 'interior design expert' },
+    watch:  { domain: 'film & entertainment', noun: 'films, shows, and videos',        analyst: 'film and TV critic' },
+    use:    { domain: 'technology',           noun: 'tools, gadgets, and tech',        analyst: 'technology analyst' },
+    eat:    { domain: 'culinary',             noun: 'food, recipes, and restaurants',  analyst: 'culinary expert' },
+    go:     { domain: 'travel',              noun: 'destinations and experiences',     analyst: 'travel expert' },
+    follow: { domain: 'culture & creators',   noun: 'creators and accounts',           analyst: 'cultural analyst' },
+    read:   { domain: 'intellectual',         noun: 'articles, books, and reading',    analyst: 'literary analyst' },
+    all:    { domain: 'general',              noun: 'saved items',                     analyst: 'collection analyst' }
+  };
+
+  // ==========================================================================
+  // WIDGET CATEGORY ALLOWLIST — separate from widget configs
+  // Declares which categories each generic widget is allowed to appear in.
+  // If a widget isn't listed here, it won't appear anywhere.
+  // To expand a widget to a new category: add the category here AND ensure
+  // the server has a matching config (or update WIDGET_SERVER_MAP).
+  // ==========================================================================
+  const WIDGET_CATEGORY_MAP = {
+    'profiler':          ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read'],
+    'completer':         ['wear'],
+    'pick':              ['wear', 'eat'],
+    'spectrum':          ['wear'],
+    'gap-finder':        ['wear'],
+    'compare':           ['use'],
+    'buy-checklist':     ['wear'],
+    'discover-more':     ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read'],
+    'upcoming-releases': ['wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read'],
+    'board-overview':    ['all', 'wear', 'home', 'watch', 'use', 'eat', 'go', 'follow', 'read']
+  };
+
+  // ==========================================================================
+  // WIDGET SERVER MAP — routes generic client widget IDs to server widget IDs
+  // The server still has individual configs (style-summary, design-dna, etc.)
+  // until it's updated to handle generic widgets natively.
+  // _default: used when no category-specific mapping exists
+  // ==========================================================================
+  const WIDGET_SERVER_MAP = {
+    'profiler': {
+      wear: 'style-summary', home: 'design-dna', watch: 'viewer-profile',
+      use: 'setup-profile', eat: 'flavor-profile', go: 'traveler-type',
+      follow: 'fan-profile', read: 'reader-identity'
+    },
+    'completer':         { _default: 'complete-the-look' },
+    'pick':              { eat: 'eat-decide', _default: 'style-pick' },
+    'spectrum':          { _default: 'price-radar' },
+    'gap-finder':        { _default: 'gap-filler' },
+    'compare':           { _default: 'use-compare' },
+    'buy-checklist':     { _default: 'outfit-checklist' },
+    'discover-more':     { _default: 'discover-more' },
+    'upcoming-releases': { _default: 'upcoming-releases' },
+    'board-overview':    { _default: 'board-overview' }
+  };
+
+  // Build reverse map: server widget ID → generic widget ID
+  const SERVER_TO_GENERIC_MAP = {};
+  for (const [genericId, categoryMap] of Object.entries(WIDGET_SERVER_MAP)) {
+    for (const [, serverId] of Object.entries(categoryMap)) {
+      if (serverId !== '_default') SERVER_TO_GENERIC_MAP[serverId] = genericId;
+    }
+    if (categoryMap._default) SERVER_TO_GENERIC_MAP[categoryMap._default] = genericId;
+  }
+
+  // ==========================================================================
+  // DESIGN SYSTEM BINDING — widgets must reference valid DS templates
+  // These are the boards-side template names from template-registry.json.
+  // To add a new template: extend the design system first, then add here.
+  // ==========================================================================
+  const VALID_DS_TEMPLATES = [
+    'grid-split', 'hero-card', 'list', 'text-block', 'spectrum',
+    'stat-row', 'quick-add', 'comparison', 'choices', 'checklist', 'grouped'
+  ];
+
+  // ==========================================================================
+  // TEMPLATE VARIABLE RESOLUTION
+  // Generic widgets use {{category}}/{{domain}}/{{noun}}/{{analyst}} placeholders
+  // Resolved at runtime from CATEGORY_DOMAINS based on current category.
+  // ==========================================================================
+  function resolveWidgetVars(str, category) {
+    if (!str || typeof str !== 'string') return str;
+    const ctx = CATEGORY_DOMAINS[category] || CATEGORY_DOMAINS['all'];
+    return str
+      .replace(/\{\{category\}\}/g, category || 'all')
+      .replace(/\{\{domain\}\}/g, ctx.domain)
+      .replace(/\{\{noun\}\}/g, ctx.noun)
+      .replace(/\{\{analyst\}\}/g, ctx.analyst);
+  }
+
+  function getServerWidgetId(genericId, category) {
+    const map = WIDGET_SERVER_MAP[genericId];
+    if (!map) return genericId;
+    return map[category] || map._default || genericId;
+  }
+
+  function getGenericWidgetId(serverId) {
+    return SERVER_TO_GENERIC_MAP[serverId] || serverId;
+  }
+
+  // Widget Registry - Generic widgets with {{category}}/{{domain}}/{{noun}}/{{analyst}} template vars
   // status: 'active' | 'beta' | 'draft' (only active shown to users, beta for testers, draft admin-only)
   // zone: 'hero' | 'inline' | 'footer' (controls placement)
+  // Category filtering is via WIDGET_CATEGORY_MAP (separate allowlist, not in configs)
   const WIDGET_REGISTRY = {
-    'complete-the-look': {
-      id: 'complete-the-look',
-      version: '3.0',
-      name: 'Complete the Look',
-      description: 'Finds items in your collection that work together, then suggests specific products to purchase.',
+
+    'profiler': {
+      id: 'profiler',
+      version: '2.0',
+      name: 'Your {{domain}} Identity',
+      description: 'Analyzes your saves and tells you who you are in this category.',
       status: 'active',
-      zone: 'inline', // Appears between cards
-      criteria: {
-        category: 'wear',
-        minItems: 2,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `You are a fashion stylist. Your job: suggest items the user DOES NOT OWN.
+      zone: 'hero',
+      criteria: { minItems: 3 },
+      prompt: `You are a {{analyst}}. Analyze these saved {{noun}} and identify the user's {{domain}} identity.
 
-STEP 1 - CATEGORIZE OWNED ITEMS:
-Look at each item and assign it to ONE category:
-- tops: t-shirts, shirts, sweaters, hoodies, polos
-- bottoms: pants, jeans, shorts, trousers, chinos
-- outerwear: jackets, coats, blazers, vests
-- footwear: sneakers, boots, shoes, sandals, loafers
-- accessories: watches, belts, bags, hats, sunglasses, jewelry
+Consider what patterns, preferences, and tendencies emerge from their saved items. Look for:
+- Aesthetic or stylistic patterns
+- Brand or source preferences
+- Quality and complexity level
+- Thematic throughlines
 
-STEP 2 - IDENTIFY GAPS:
-Which categories have ZERO items? Those are the gaps.
+Return JSON:
+{
+  "label": "Identity in 2-3 evocative words (e.g., 'Minimal Modern', 'Cultural Flaneur', 'Systems Thinker')",
+  "traits": ["2-4 descriptive tags that characterize their taste"],
+  "summary": "One sentence describing their overall {{domain}} identity"
+}`,
+      template: { name: 'hero-card', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
+    },
 
-STEP 3 - SUGGEST ONLY FROM GAPS:
-Only suggest items from categories the user has NOTHING in.
+    'completer': {
+      id: 'completer',
+      version: '2.0',
+      name: 'Complete Your {{domain}} Collection',
+      description: 'Finds what works together in your saves, then suggests what is missing.',
+      status: 'active',
+      zone: 'inline',
+      criteria: { minItems: 2 },
+      prompt: `You are a {{analyst}}. Analyze the user's saved {{noun}} and identify items that work together as a set or collection.
 
-ABSOLUTE RULES (violations rejected):
-❌ User owns a t-shirt → NEVER suggest any top
-❌ User owns jeans → NEVER suggest any bottom
-❌ User owns a jacket → NEVER suggest any outerwear
-❌ User owns sneakers → NEVER suggest any footwear
-✅ Only suggest from EMPTY categories
-✅ If all categories filled, suggest ONLY accessories
+STEP 1: Group the saved items into logical sub-categories for {{domain}}
+STEP 2: Identify which sub-categories have gaps (zero items)
+STEP 3: Suggest 1-2 specific items that would fill the most important gaps
+
+RULES:
+- Only suggest items from categories the user is MISSING
+- Be specific: real names, real brands, real search terms
+- Explain why each suggestion completes their collection
 
 Return JSON:
 {
   "matchedItems": ["id1", "id2"],
-  "reasoning": "These items form the base of an outfit because...",
-  "missingPieces": "To complete this outfit, user needs: shoes and a basic tee",
+  "reasoning": "These items form the core of your collection because...",
+  "missingPieces": "To complete this, you need...",
   "suggestions": [
     {
-      "name": "New Balance 550 White Green",
-      "brand": "New Balance",
-      "price": "$130",
-      "category": "footwear",
-      "imageQuery": "new balance 550 sneakers",
-      "searchQuery": "new balance 550 white green",
-      "reason": "Clean sneakers to ground the outfit"
+      "name": "Specific item name",
+      "brand": "Brand",
+      "price": "$XX",
+      "category": "sub-category",
+      "searchQuery": "search terms",
+      "reason": "Fills your gap in..."
     }
   ]
 }`,
-      template: {
-        name: 'grid-split',
-        fallback: 'list',
-        layout: 'two-column',
-        sections: ['your-items', 'suggestions']
-      },
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-20'
+      template: { name: 'grid-split', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'style-summary': {
-      id: 'style-summary',
+
+    'pick': {
+      id: 'pick',
       version: '2.0',
-      name: 'Style Summary',
-      description: 'Analyzes your wear collection and generates a style profile with descriptive traits.',
+      name: 'Pick One',
+      description: 'Can\'t decide? AI picks the best from your saves with reasoning.',
       status: 'active',
-      zone: 'hero', // Appears at top
-      criteria: {
-        category: 'wear',
-        minItems: 1,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `You are a fashion analyst. Analyze these clothing items and determine the overall style aesthetic.
+      zone: 'hero',
+      criteria: { minItems: 3 },
+      prompt: `You are a decisive {{analyst}}. The user has saved these {{noun}} and needs help deciding.
+
+Pick the BEST option and explain why. Present 2-3 runner-up choices too.
 
 Return JSON:
 {
-  "label": "Style name (e.g., 'Minimal Modern', 'Streetwear Edge')",
-  "traits": ["2-4 descriptive traits like 'Neutral palette', 'Relaxed silhouettes'"],
-  "summary": "One sentence describing the overall aesthetic"
+  "question": "Which one should you go for?",
+  "options": [
+    { "title": "Top pick name", "description": "Why this is the best choice — specific reasoning" },
+    { "title": "Runner up", "description": "Brief reason this is a good alternative" }
+  ],
+  "confidence": 0.8
 }`,
-      template: {
-        name: 'hero-card',
-        fallback: 'text-block',
-        layout: 'card',
-        sections: ['label', 'traits']
-      },
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-20'
+      template: { name: 'choices', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'price-radar': {
-      id: 'price-radar',
-      version: '1.0',
-      name: 'Price Radar',
-      description: 'Shows where you fall on key dimensions like budget, style, and brand affinity.',
+
+    'spectrum': {
+      id: 'spectrum',
+      version: '2.0',
+      name: '{{domain}} Spectrum',
+      description: 'Maps where you fall on key dimensions relevant to your saves.',
       status: 'active',
       zone: 'hero',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'all'],
-        minItems: 3,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and position the user on 2-3 meaningful dimensions.
+      criteria: { minItems: 3 },
+      prompt: `Analyze these saved {{noun}} and position the user on 2-3 meaningful dimensions relevant to {{domain}}.
 
-Choose axes relevant to the content (e.g. Budget<->Luxury, Minimal<->Bold, Classic<->Trendy).
+Choose axes that reveal something interesting about their taste or preferences.
 For each axis, estimate where the user falls (0.0 = fully left, 1.0 = fully right).
 
 Return JSON:
 {
   "axes": [
-    { "leftLabel": "Budget", "rightLabel": "Luxury", "position": 0.35, "note": "You: $85 avg" },
-    { "leftLabel": "Minimal", "rightLabel": "Bold", "position": 0.2, "note": "Mostly neutrals" }
+    { "leftLabel": "Left end", "rightLabel": "Right end", "position": 0.35, "note": "Brief insight" },
+    { "leftLabel": "Left end", "rightLabel": "Right end", "position": 0.7, "note": "Brief insight" }
   ],
   "confidence": 0.75
 }`,
-      template: {
-        name: 'spectrum',
-        fallback: 'text-block'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
+      template: { name: 'spectrum', fallback: 'text-block' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'gap-filler': {
-      id: 'gap-filler',
-      version: '1.0',
+
+    'gap-finder': {
+      id: 'gap-finder',
+      version: '2.0',
       name: 'You Might Want This',
-      description: 'AI identifies the biggest gap in your collection and suggests one item to fill it.',
+      description: 'Identifies the biggest gap in your collection and suggests one item to fill it.',
       status: 'active',
       zone: 'inline',
-      criteria: {
-        category: ['wear', 'tech', 'home', 'fitness'],
-        minItems: 2,
-        maxItems: null,
-        itemTypes: ['product']
-      },
-      prompt: `Analyze these saved items and identify the single biggest gap in the user's collection.
-Suggest ONE specific product that would fill that gap.
+      criteria: { minItems: 2 },
+      prompt: `You are a {{analyst}}. Analyze these saved {{noun}} and identify the single biggest gap in the user's collection.
+Suggest ONE specific thing that would fill that gap.
 
 Return JSON:
 {
   "suggestion": {
-    "name": "Product Name",
-    "brand": "Brand Name",
-    "price": "$XX.XX",
-    "reason": "Fills your category gap — you have X and Y but no Z.",
-    "searchQuery": "brand product name"
+    "name": "Specific name",
+    "brand": "Brand if applicable",
+    "price": "$XX if applicable",
+    "reason": "Fills your gap — you have X and Y but no Z.",
+    "searchQuery": "search terms"
   },
   "confidence": 0.85
 }`,
-      template: {
-        name: 'quick-add',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-06',
-      updatedAt: '2026-02-06'
+      template: { name: 'quick-add', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'eat-decide': {
-      id: 'eat-decide',
-      version: '1.0',
-      name: 'Decide',
-      description: 'Can\'t pick a restaurant? AI picks one from your saved spots with reasoning.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: 'eat',
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a decisive dining advisor. The user has saved these restaurants/food spots and can't decide where to go.
 
-Pick the BEST option and explain why. Also present 2-3 runner-up choices.
-
-Return JSON:
-{
-  "question": "Where should you eat tonight?",
-  "options": [
-    {
-      "title": "Restaurant Name",
-      "description": "Why this is the top pick — specific reasoning based on the saved items"
-    },
-    {
-      "title": "Runner Up 1",
-      "description": "Brief reason this is a good alternative"
-    }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'choices',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'use-compare': {
-      id: 'use-compare',
-      version: '1.0',
+    'compare': {
+      id: 'compare',
+      version: '2.0',
       name: 'Compare',
-      description: 'Compares a saved tool/product against its top competitor with pros and cons.',
+      description: 'Picks an item from your saves and compares it against its top alternative.',
       status: 'active',
       zone: 'inline',
-      criteria: {
-        category: ['use', 'tech', 'home', 'wear', 'all'],
-        minItems: 1,
-        maxItems: null
-      },
-      prompt: `You are a product comparison expert. Pick the most interesting item from the user's saved items and compare it against its top competitor.
+      criteria: { minItems: 1 },
+      prompt: `You are a {{domain}} comparison expert. Pick the most interesting item from the user's saved {{noun}} and compare it against its top competitor or alternative.
 
 RULES:
-- Pick an item that has a clear, well-known competitor
+- Pick an item that has a clear, well-known alternative
 - List 2-3 specific pros and cons for each
-- Be objective and fair to both options
+- Be objective and fair
 
 Return JSON:
 {
   "optionA": {
-    "title": "Saved Item Name",
+    "title": "Saved item name",
     "price": "$XX (if known)",
-    "pros": ["Specific advantage 1", "Specific advantage 2"],
-    "cons": ["Specific weakness"]
+    "pros": ["Advantage 1", "Advantage 2"],
+    "cons": ["Weakness"]
   },
   "optionB": {
-    "title": "Top Competitor",
+    "title": "Top alternative",
     "price": "$XX (if known)",
-    "pros": ["Specific advantage 1", "Specific advantage 2"],
-    "cons": ["Specific weakness"]
+    "pros": ["Advantage 1", "Advantage 2"],
+    "cons": ["Weakness"]
   },
   "dividerLabel": "VS",
   "confidence": 0.75
 }`,
-      template: {
-        name: 'comparison',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
+      template: { name: 'comparison', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'discover-more': {
-      id: 'discover-more',
-      version: '1.0',
-      name: 'More Like Your Board',
-      description: 'Analyzes your saved items and recommends something new you might like.',
-      status: 'active',
-      zone: 'footer',
-      criteria: {
-        category: 'all',
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a discovery engine. Analyze the user's saved items and recommend ONE specific new thing they'd like.
 
-RULES:
-- The recommendation must be DIFFERENT from what they already have
-- It should complement their existing collection, not duplicate it
-- Be specific: real product names, real brands, real URLs
-- Explain WHY this fits based on patterns you see in their saves
-
-Return JSON:
-{
-  "suggestion": {
-    "name": "Specific Product or Thing",
-    "brand": "Brand if applicable",
-    "price": "$XX if applicable",
-    "reason": "Based on your saves, you clearly like X and Y — this combines both.",
-    "searchQuery": "search terms to find this item"
-  },
-  "confidence": 0.7
-}`,
-      template: {
-        name: 'quick-add',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'style-pick': {
-      id: 'style-pick',
-      version: '1.0',
-      name: 'Pick Your Favorite',
-      description: 'Shows your saved items as selectable cards — tap the one you\'d buy first.',
-      status: 'active',
-      zone: 'hero',
-      criteria: {
-        category: ['wear', 'all'],
-        minItems: 3,
-        maxItems: null
-      },
-      prompt: `You are a personal shopper. The user has saved these items. Present 3-4 of their best saved items as choices and ask them to pick their favorite.
-
-For each option, write a brief one-line reason why it stands out.
-
-Return JSON:
-{
-  "question": "Which would you grab first?",
-  "options": [
-    { "title": "Item name", "description": "Why this one stands out — 1 sentence" },
-    { "title": "Item name", "description": "Why this one stands out — 1 sentence" }
-  ],
-  "confidence": 0.8
-}`,
-      template: {
-        name: 'choices',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-    'outfit-checklist': {
-      id: 'outfit-checklist',
-      version: '1.0',
-      name: 'Outfit Checklist',
-      description: 'Builds a complete outfit from your saves — check off what you already own.',
+    'buy-checklist': {
+      id: 'buy-checklist',
+      version: '2.0',
+      name: '{{domain}} Checklist',
+      description: 'Builds a curated set from your saves — check off what you have, see what you need.',
       status: 'active',
       zone: 'inline',
-      criteria: {
-        category: ['wear', 'all'],
-        minItems: 2,
-        maxItems: null
-      },
-      prompt: `You are a wardrobe stylist. From the user's saved items, build a complete outfit as a checklist.
+      criteria: { minItems: 2 },
+      prompt: `You are a {{analyst}}. From the user's saved {{noun}}, build a curated set as a checklist.
 
-Include 4-6 items covering different categories (top, bottom, shoes, accessories). Use items from their saves where possible, and suggest missing pieces.
+Include 4-6 items that form a complete, cohesive set. Use items from their saves where possible, and suggest missing pieces.
 
 For each item, indicate if the user already has it (checked) based on whether it appears in their saved items.
 
 Return JSON:
 {
   "items": [
-    { "name": "White Oxford Shirt", "price": "$65", "checked": true },
-    { "name": "Dark Wash Jeans", "price": "$90", "checked": true },
-    { "name": "White Sneakers", "price": "$130", "checked": false },
-    { "name": "Leather Belt", "price": "$45", "checked": false }
+    { "name": "Item name", "price": "$XX", "checked": true },
+    { "name": "Item name", "price": "$XX", "checked": false }
   ],
-  "total": "$330",
+  "total": "$XXX",
   "confidence": 0.75
 }`,
-      template: {
-        name: 'checklist',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
+      template: { name: 'checklist', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     },
-    'board-overview': {
-      id: 'board-overview',
+
+    'discover-more': {
+      id: 'discover-more',
       version: '1.0',
-      name: 'Board at a Glance',
-      description: 'Groups your saved items by theme or type so you can see the shape of your collection.',
+      name: 'More Like Your Board',
+      description: 'Recommends something new based on patterns in your saves.',
       status: 'active',
       zone: 'footer',
-      criteria: {
-        category: 'all',
-        minItems: 4,
-        maxItems: null
-      },
-      prompt: `You are a collection analyst. Group the user's saved items into 2-4 meaningful themes or categories.
+      criteria: { minItems: 3 },
+      prompt: `You are a discovery engine. Analyze the user's saved {{noun}} and recommend ONE specific new thing they'd like.
 
 RULES:
-- Don't just group by website — group by PURPOSE or TYPE
-- Each group needs a clear, descriptive title
-- Include the actual item names from the user's saves
-- 2-4 groups, each with 2-5 items
+- Must be DIFFERENT from what they already have
+- Should complement their collection, not duplicate it
+- Be specific: real names, real brands
+- Explain WHY based on patterns in their saves
 
 Return JSON:
 {
-  "sections": [
-    {
-      "title": "Everyday Essentials",
-      "items": [
-        { "name": "Item name", "brand": "Brand" },
-        { "name": "Item name", "brand": "Brand" }
-      ]
-    },
-    {
-      "title": "Statement Pieces",
-      "items": [
-        { "name": "Item name", "brand": "Brand" }
-      ]
-    }
-  ],
-  "confidence": 0.8
+  "suggestion": {
+    "name": "Specific thing",
+    "brand": "Brand if applicable",
+    "price": "$XX if applicable",
+    "reason": "Based on your saves, you clearly like X and Y — this combines both.",
+    "searchQuery": "search terms"
+  },
+  "confidence": 0.7
 }`,
-      template: {
-        name: 'grouped',
-        fallback: 'list'
-      },
-      createdAt: '2026-02-07',
-      updatedAt: '2026-02-07'
-    },
-
-    // =========================================================================
-    // PROFILERS — generic { label, traits, summary } → hero-card
-    // =========================================================================
-
-    'design-dna': {
-      id: 'design-dna',
-      version: '1.0',
-      name: 'Design DNA',
-      description: 'Analyzes your home saves to identify your interior design aesthetic.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'home', minItems: 3 },
-      prompt: `You are an interior design analyst. Analyze these saved home items and identify the user's design aesthetic.
-
-Consider:
-- Color temperature and palette (warm vs cool, neutral vs bold)
-- Material preferences (wood, metal, fabric, ceramic, glass)
-- Design era or movement (mid-century, Scandinavian, industrial, Japandi)
-- Spatial style (minimal, maximalist, eclectic, curated)
-
-Return JSON:
-{
-  "label": "Design identity (e.g., 'Japandi Warmth', 'Industrial Minimalist')",
-  "traits": ["2-4 descriptive traits like 'Natural materials', 'Muted earth tones'"],
-  "summary": "One sentence describing their overall home aesthetic"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
+      template: { name: 'quick-add', fallback: 'list' },
       createdAt: '2026-02-09',
       updatedAt: '2026-02-09'
     },
-
-    'viewer-profile': {
-      id: 'viewer-profile',
-      version: '1.0',
-      name: 'Viewer Profile',
-      description: 'Analyzes your watch saves to identify your viewing taste.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'watch', minItems: 3 },
-      prompt: `You are a film and TV analyst. Analyze these saved watch items and identify the user's viewing identity.
-
-Consider:
-- Genre preferences and blends
-- Mood and tone (dark, uplifting, cerebral, visceral)
-- Pacing preferences (slow burn vs fast-paced)
-- Era and origin (classic, contemporary, international)
-- Director or creator sensibility
-
-Return JSON:
-{
-  "label": "Viewer identity (e.g., 'Atmospheric Slow Burns', 'Genre-Bending Thrill Seeker')",
-  "traits": ["2-4 descriptive traits like 'Non-linear narratives', 'Moody cinematography'"],
-  "summary": "One sentence describing their overall viewing taste"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
-      createdAt: '2026-02-09',
-      updatedAt: '2026-02-09'
-    },
-
-    'setup-profile': {
-      id: 'setup-profile',
-      version: '1.0',
-      name: 'Setup Profile',
-      description: 'Analyzes your use/tech saves to identify your tool philosophy.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'use', minItems: 3 },
-      prompt: `You are a technology analyst. Analyze these saved tools, gadgets, and tech items and identify the user's setup identity.
-
-Consider:
-- Tool philosophy (power user, minimalist, all-in-one, best-of-breed)
-- Ecosystem preference (Apple, open-source, cross-platform)
-- Complexity level (simple, prosumer, professional)
-- Workflow style (creative, productivity, development, hybrid)
-
-Return JSON:
-{
-  "label": "Setup identity (e.g., 'Creative Pro', 'Open-Source Minimalist')",
-  "traits": ["2-4 descriptive traits like 'Apple ecosystem', 'Keyboard-driven workflow'"],
-  "summary": "One sentence describing their overall tech philosophy"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
-      createdAt: '2026-02-09',
-      updatedAt: '2026-02-09'
-    },
-
-    'flavor-profile': {
-      id: 'flavor-profile',
-      version: '1.0',
-      name: 'Flavor Profile',
-      description: 'Analyzes your eat saves to identify your culinary identity.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'eat', minItems: 3 },
-      prompt: `You are a culinary analyst. Analyze these saved food, recipe, and restaurant items and identify the user's culinary identity.
-
-Consider:
-- Cuisine regions and traditions
-- Flavor preferences (spicy, umami, sweet, herbaceous)
-- Cooking complexity (quick meals, elaborate projects, restaurant-level)
-- Dietary patterns and ingredient preferences
-
-Return JSON:
-{
-  "label": "Culinary identity (e.g., 'Southeast Asian Fusion', 'Rustic Mediterranean')",
-  "traits": ["2-4 descriptive traits like 'Bold spices', 'Farm-to-table ingredients'"],
-  "summary": "One sentence describing their overall food taste"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
-      createdAt: '2026-02-09',
-      updatedAt: '2026-02-09'
-    },
-
-    'traveler-type': {
-      id: 'traveler-type',
-      version: '1.0',
-      name: 'Traveler Type',
-      description: 'Analyzes your go saves to identify your travel identity.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'go', minItems: 3 },
-      prompt: `You are a travel analyst. Analyze these saved destinations, experiences, and travel items and identify the user's travel identity.
-
-Consider:
-- Destination types (urban, nature, coastal, cultural)
-- Travel pace (slow travel, adventure, city-hopping)
-- Experience style (luxury, budget, off-the-beaten-path)
-- Cultural engagement level (tourist, explorer, immersive)
-
-Return JSON:
-{
-  "label": "Travel identity (e.g., 'Cultural Flaneur', 'Adventure Minimalist')",
-  "traits": ["2-4 descriptive traits like 'Off-grid destinations', 'Local food focus'"],
-  "summary": "One sentence describing their overall travel style"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
-      createdAt: '2026-02-09',
-      updatedAt: '2026-02-09'
-    },
-
-    'fan-profile': {
-      id: 'fan-profile',
-      version: '1.0',
-      name: 'Fan Profile',
-      description: 'Analyzes your follow saves to identify your interest identity.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'follow', minItems: 3 },
-      prompt: `You are a cultural analyst. Analyze these saved creators, accounts, and people the user follows and identify their interest identity.
-
-Consider:
-- Content domains (music, art, tech, fashion, food, politics)
-- Creator types (independent, institutional, niche, mainstream)
-- Community and scene alignment
-- Depth vs breadth of interests
-
-Return JSON:
-{
-  "label": "Interest identity (e.g., 'Experimental Audio + Visual Art', 'Indie Tech Scene')",
-  "traits": ["2-4 descriptive traits like 'Underground music', 'Design-engineering crossover'"],
-  "summary": "One sentence describing the world they follow"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
-      createdAt: '2026-02-09',
-      updatedAt: '2026-02-09'
-    },
-
-    'reader-identity': {
-      id: 'reader-identity',
-      version: '1.0',
-      name: 'Reader Identity',
-      description: 'Analyzes your read saves to identify your intellectual identity.',
-      status: 'active',
-      zone: 'hero',
-      criteria: { category: 'read', minItems: 3 },
-      prompt: `You are a literary and intellectual analyst. Analyze these saved articles, books, and reading material and identify the user's reader identity.
-
-Consider:
-- Subject domains (technology, philosophy, business, science, culture)
-- Thinking style (analytical, creative, strategic, narrative)
-- Format preferences (long-form, quick reads, academic, journalistic)
-- Perspective and worldview tendencies
-
-Return JSON:
-{
-  "label": "Reader identity (e.g., 'Systems Thinker', 'Cultural Critic')",
-  "traits": ["2-4 descriptive traits like 'Long-form essays', 'Cross-disciplinary synthesis'"],
-  "summary": "One sentence describing their intellectual taste"
-}`,
-      template: { name: 'hero-card', fallback: 'text-block' },
-      createdAt: '2026-02-09',
-      updatedAt: '2026-02-09'
-    },
-
-    // =========================================================================
-    // UPCOMING RELEASES — forward-looking widget
-    // =========================================================================
 
     'upcoming-releases': {
       id: 'upcoming-releases',
       version: '1.0',
       name: 'Upcoming Releases',
-      description: 'Predicts upcoming releases, drops, and launches from brands and creators in your collection.',
+      description: 'Predicts upcoming releases from brands and creators in your collection.',
       status: 'active',
       zone: 'inline',
-      criteria: { category: 'all', minItems: 3 },
-      prompt: `You are a trend forecaster. Based on the user's saved items, identify brands, creators, studios, or publishers represented in their collection.
+      criteria: { minItems: 3 },
+      prompt: `You are a trend forecaster for {{domain}}. Based on the user's saved {{noun}}, identify brands, creators, or publishers in their collection.
 
-For each, predict or note upcoming releases, drops, new products, or launches that the user would care about based on their saves.
+Predict upcoming releases, drops, or launches they'd care about.
 
 RULES:
-- Focus on brands/creators that appear in the saved items
-- Be specific about WHAT is coming (product names, seasons, release windows)
-- If you don't know exact dates, give a general timeframe (e.g., "Spring 2026", "Q2 2026")
-- Include 3-5 items, ranked by relevance to the user's collection
-- Only include things that are plausibly upcoming — don't fabricate releases
+- Focus on brands/creators in the saved items
+- Be specific about WHAT is coming
+- Use general timeframes if exact dates unknown
+- 3-5 items ranked by relevance
+- Don't fabricate — only plausibly upcoming things
 
 Return JSON:
 {
   "items": [
-    {
-      "brand": "Brand or creator name",
-      "release": "What's coming",
-      "when": "Timeframe (e.g., 'March 2026', 'This spring')",
-      "relevance": "Why this matters for their collection"
-    }
+    { "brand": "Name", "release": "What's coming", "when": "Timeframe", "relevance": "Why it matters" }
   ],
   "confidence": 0.7
 }`,
       template: { name: 'list', fallback: 'text-block' },
       createdAt: '2026-02-09',
       updatedAt: '2026-02-09'
+    },
+
+    'board-overview': {
+      id: 'board-overview',
+      version: '1.0',
+      name: 'Board at a Glance',
+      description: 'Groups your saves by theme so you can see the shape of your collection.',
+      status: 'active',
+      zone: 'footer',
+      criteria: { minItems: 4 },
+      prompt: `You are a {{analyst}}. Group the user's saved {{noun}} into 2-4 meaningful themes.
+
+RULES:
+- Group by PURPOSE or TYPE, not by website
+- Each group needs a clear, descriptive title
+- Include actual item names from their saves
+- 2-4 groups, 2-5 items each
+
+Return JSON:
+{
+  "sections": [
+    { "title": "Theme Name", "items": [{ "name": "Item", "brand": "Brand" }] }
+  ],
+  "confidence": 0.8
+}`,
+      template: { name: 'grouped', fallback: 'list' },
+      createdAt: '2026-02-09',
+      updatedAt: '2026-02-09'
     }
   };
+
+  // ==========================================================================
+  // DESIGN SYSTEM VALIDATION — runs at init, warns if widgets reference
+  // templates not in the design system. To extend: add to design system first,
+  // then add to VALID_DS_TEMPLATES.
+  // ==========================================================================
+  (function validateWidgetDesignSystem() {
+    const issues = [];
+    for (const [id, widget] of Object.entries(WIDGET_REGISTRY)) {
+      const tpl = widget.template?.name;
+      if (tpl && !VALID_DS_TEMPLATES.includes(tpl)) {
+        issues.push(`Widget "${id}" uses template "${tpl}" — not in design system`);
+      }
+      const fb = widget.template?.fallback;
+      if (fb && !VALID_DS_TEMPLATES.includes(fb)) {
+        issues.push(`Widget "${id}" fallback "${fb}" — not in design system`);
+      }
+      if (!WIDGET_CATEGORY_MAP[id]) {
+        issues.push(`Widget "${id}" has no entry in WIDGET_CATEGORY_MAP — will never appear`);
+      }
+      if (!WIDGET_SERVER_MAP[id]) {
+        issues.push(`Widget "${id}" has no entry in WIDGET_SERVER_MAP — server calls will use raw ID`);
+      }
+    }
+    if (issues.length > 0) {
+      console.warn('[widget-ds] Design system validation issues:');
+      issues.forEach(i => console.warn('  •', i));
+    } else {
+      console.log('[widget-ds] All widgets bound to design system ✓');
+    }
+  })();
 
   // Widget feature flag — all widgets hidden by default
   // Enable via console: window.enableWidgetDS()
@@ -4432,22 +4242,16 @@ Return JSON:
 
     const c = widget.criteria;
 
-    // --- Category match (weight: 0.3) ---
+    // --- Category match (weight: 0.3) — uses WIDGET_CATEGORY_MAP allowlist ---
     maxScore += 0.3;
-    if (c.category) {
-      const cats = Array.isArray(c.category) ? c.category : [c.category];
-      if (cats.includes(currentCategory) || cats.includes('all')) {
-        score += 0.3;
-        signals.categoryMatch = true;
-        rationale.push(`Category "${currentCategory}" matches`);
-      } else {
-        signals.categoryMatch = false;
-        rationale.push(`Category "${currentCategory}" not in [${cats.join(', ')}]`);
-      }
-    } else {
+    const allowedCategories = WIDGET_CATEGORY_MAP[widget.id] || [];
+    if (allowedCategories.includes(currentCategory) || allowedCategories.includes('all')) {
       score += 0.3;
       signals.categoryMatch = true;
-      rationale.push('No category restriction');
+      rationale.push(`Category "${currentCategory}" allowed`);
+    } else {
+      signals.categoryMatch = false;
+      rationale.push(`Category "${currentCategory}" not in allowlist [${allowedCategories.join(', ')}]`);
     }
 
     // --- Item count (weight: 0.25) ---
@@ -4489,8 +4293,8 @@ Return JSON:
 
     // --- Content type affinity (weight: 0.15) ---
     maxScore += 0.15;
-    const isProductWidget = ['complete-the-look', 'price-radar', 'gap-filler', 'use-compare', 'outfit-checklist'].includes(widget.id);
-    const isAnalyticsWidget = ['style-summary', 'eat-decide', 'discover-more', 'style-pick', 'board-overview', 'design-dna', 'viewer-profile', 'setup-profile', 'flavor-profile', 'traveler-type', 'fan-profile', 'reader-identity', 'upcoming-releases'].includes(widget.id);
+    const isProductWidget = ['completer', 'spectrum', 'gap-finder', 'compare', 'buy-checklist'].includes(widget.id);
+    const isAnalyticsWidget = ['profiler', 'pick', 'discover-more', 'board-overview', 'upcoming-releases'].includes(widget.id);
 
     if (isProductWidget && profile.productRatio > 0.3) {
       const affinity = Math.min(profile.productRatio / 0.7, 1) * 0.15;
@@ -4523,13 +4327,15 @@ Return JSON:
   let lastScoringResults = null;
 
   // Check if widget criteria are met (hard gate — returns boolean)
+  // Category filtering uses WIDGET_CATEGORY_MAP (separate allowlist)
   function checkWidgetCriteria(widget, items, currentCategory) {
     const c = widget.criteria;
-    // Phase 2: Category-agnostic — category field can be a string or array
-    if (c.category) {
-      const widgetCategories = Array.isArray(c.category) ? c.category : [c.category];
-      const matchesCategory = widgetCategories.includes(currentCategory) || widgetCategories.includes('all');
-      if (!matchesCategory) return false;
+    // Category check via allowlist
+    const allowed = WIDGET_CATEGORY_MAP[widget.id];
+    if (allowed) {
+      if (!allowed.includes(currentCategory) && !allowed.includes('all')) return false;
+    } else {
+      return false; // Not in allowlist → don't show
     }
     if (c.minItems && items.length < c.minItems) return false;
     if (c.maxItems && items.length > c.maxItems) return false;
@@ -4611,17 +4417,19 @@ Return JSON:
       const data = await response.json();
       console.log('[discovery] Server returned', data.widgets?.length, 'eligible widgets for', category);
 
-      // Map server widgets to local WIDGET_REGISTRY entries, merging server metadata.
-      // If a widget exists only on the server (not in local WIDGET_REGISTRY), build
-      // a temporary local entry from the discovery response so it can still render.
+      // Map server widgets to local WIDGET_REGISTRY entries via reverse mapping.
+      // Server returns specific IDs (e.g. 'style-summary') which map to generic IDs
+      // (e.g. 'profiler') via SERVER_TO_GENERIC_MAP.
       const discoveredWidgets = [];
       for (const serverWidget of (data.widgets || [])) {
-        const localWidget = WIDGET_REGISTRY[serverWidget.widgetId];
+        const genericId = getGenericWidgetId(serverWidget.widgetId);
+        const localWidget = WIDGET_REGISTRY[genericId] || WIDGET_REGISTRY[serverWidget.widgetId];
         if (localWidget) {
           // Merge: use local prompt + template config, server zone/priority/eligibility
           discoveredWidgets.push({
             ...localWidget,
             zone: serverWidget.zone || localWidget.zone,
+            _serverWidgetId: serverWidget.widgetId,
             _serverEligibility: serverWidget.eligibility,
             _serverPriority: serverWidget.priority
           });
@@ -4790,6 +4598,10 @@ Return JSON:
     // Get current category if not provided
     const currentCategory = category || currentFilter || 'all';
 
+    // Resolve template vars and map to server widget ID
+    const serverWidgetId = getServerWidgetId(widget.id, currentCategory);
+    const resolvedPrompt = resolveWidgetVars(widget.prompt, currentCategory) + variationPrompt;
+
     // Get user preferences for personalization
     const userPrefs = widgetFeedback.userPrefs || {};
 
@@ -4801,11 +4613,11 @@ Return JSON:
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
-          widgetId: widget.id,
-          prompt: widget.prompt + variationPrompt,
+          widgetId: serverWidgetId,
+          prompt: resolvedPrompt,
           items: itemsPayload,
-          category: currentCategory,  // Phase 1: For eligibility engine
-          userPrefs: userPrefs        // Phase 1: For personalization
+          category: currentCategory,
+          userPrefs: userPrefs
         })
       });
 
@@ -4898,10 +4710,12 @@ Return JSON:
 
   // Shared widget shell header — w-* design system classes
   function renderWidgetHeader(widget) {
+    const category = currentFilter || 'all';
+    const resolvedName = resolveWidgetVars(widget.name, category);
     return `
       <div class="w-header">
         <div class="w-header__left">
-          <span class="w-text w-text--label">${esc(widget.name)}</span>
+          <span class="w-text w-text--label">${esc(resolvedName)}</span>
           <span class="w-badge">AI</span>
         </div>
         <div class="w-header__controls">
@@ -5559,7 +5373,7 @@ Return JSON:
 
     // Show loading state for hero zone if we have hero widgets
     if (widgetsByZone.hero.length > 0) {
-      const firstHeroName = widgetsByZone.hero[0].name || 'Widget';
+      const firstHeroName = resolveWidgetVars(widgetsByZone.hero[0].name, widgetCategory) || 'Widget';
       heroSection.classList.add('widget-section--visible');
       heroContent.innerHTML = `
         <div class="w-shell">
