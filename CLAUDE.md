@@ -190,6 +190,30 @@ When working on this project, always follow these guidelines:
 
 ---
 
+## Autonomous Operations
+
+Claude Code is authorized to perform the following operations **without asking for confirmation**:
+
+### Git & GitHub
+- **Merge PRs to master** using `gh pr merge` after CI checks pass
+- **Create and push branches** for feature work
+- **Create pull requests** with appropriate titles and descriptions
+- **Close stale branches** after successful merges
+
+### Supabase Deployment
+- **Deploy edge functions** via `supabase functions deploy` after merging to master
+- **Run database migrations** when migration files are part of a merged PR
+- **Check function logs** for debugging (`supabase functions logs`)
+
+### Guardrails (still require human approval)
+- **Force pushes** to any branch
+- **Deleting branches** that have open PRs
+- **Schema changes** that drop tables or columns (destructive migrations)
+- **Changing environment variables or secrets** in Supabase dashboard
+- **Modifying GitHub Actions workflows** that affect production deployments
+
+---
+
 ## Quick Reference
 
 ### Directory Structure
