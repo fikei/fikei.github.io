@@ -27,6 +27,7 @@
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/17 |
 | [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/65 |
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/105 |
+| [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 47/102 |
 | [Backlog](./backlog.md) | Future | 0/83 |
 
 ---
@@ -85,8 +86,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 7: Platform Expansion | 0 | 0 | 17 | 0 |
 | Phase 8: Automated Pins | 0 | 0 | 65 | 0 |
 | Phase 9: Bulk Import | 0 | 0 | 105 | 0 |
+| Phase 10: Image Validation | 47 | 0 | 55 | 0 |
 | Backlog | 0 | 0 | 83 | 0 |
-| **TOTAL** | **155** | **11** | **689** | **1** |
+| **TOTAL** | **202** | **11** | **744** | **1** |
 
 ---
 
@@ -109,6 +111,11 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Item | Blocker | Owner |
 |------|---------|-------|
 | Push notifications | FCM/APNs setup required | Human |
+| Run migration `007_image_validation.sql` against Supabase (Phase 10) | Supabase Dashboard → SQL Editor | Human |
+| Deploy `enrich-link` edge function with Tier 2 validation (Phase 10) | `supabase functions deploy enrich-link` | Human |
+| Deploy new `validate-image` edge function for Tier 3 (Phase 10) | `supabase functions deploy validate-image` | Human |
+| Verify `ANTHROPIC_API_KEY` is set in Supabase function secrets (Phase 10) | Dashboard → Edge Functions → Secrets | Human |
+| Backfill Tier 1 scores for existing pins via console script (Phase 10) | Run `imageQualityReport()` after deploy to baseline | Human |
 
 ---
 

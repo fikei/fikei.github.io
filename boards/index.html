@@ -2772,6 +2772,7 @@ body {
 }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/image-validation.js"></script>
 </head>
 <body>
   <!-- Progress Bar -->
@@ -6126,8 +6127,24 @@ Return JSON:
         const result = await resolveImage(item);
         console.log('%c[IMAGE QUEUE] Resolution result:', 'color: #9b59b6', result);
         if (result?.imageUrl) {
-          await updateLinkImage(item.linkId, result.imageUrl, result.source);
+          // Tier 1 validation gate on resolved images
+          let imageScores = null;
+          if (typeof ImageValidation !== 'undefined') {
+            const validation = ImageValidation.tier1(result.imageUrl, {
+              title: item.title,
+              domain: extractDomain(item.url)
+            });
+            imageScores = validation.scores;
+            if (!validation.pass) {
+              console.log('%c[IMAGE QUEUE] Tier 1 rejected resolved image:', 'color: #e74c3c',
+                result.imageUrl, validation.reason);
+              continue; // Skip this image, try next in queue won't help — already best strategy result
+            }
+          }
+          await updateLinkImage(item.linkId, result.imageUrl, result.source, imageScores);
           console.log('%c[IMAGE QUEUE] Updated link image successfully', 'color: #27ae60; font-weight: bold');
+          // Queue for async Tier 3 AI vision validation
+          queueTier3Validation(item.linkId, result.imageUrl, item.title, null, item.contentType);
         } else {
           console.log('%c[IMAGE QUEUE] No image found, using template fallback', 'color: #f39c12');
         }
@@ -6183,6 +6200,16 @@ Return JSON:
         }
 
         if (result?.imageUrl) {
+          // Validate each strategy result with Tier 1 before accepting
+          if (typeof ImageValidation !== 'undefined') {
+            const validation = ImageValidation.tier1(result.imageUrl, { title, domain: extractDomain(url) });
+            if (!validation.pass) {
+              console.log('%c[IMAGE RESOLVE] Tier 1 rejected %s result:', 'color: #e74c3c', strategy,
+                result.imageUrl, validation.reason);
+              continue; // Try next strategy
+            }
+            result.imageScores = validation.scores;
+          }
           console.log('%c[IMAGE RESOLVE] Success with strategy:', 'color: #27ae60; font-weight: bold', strategy, result.imageUrl);
           return result;
         } else if (result) {
@@ -6457,7 +6484,7 @@ Return JSON:
     return null;
   }
 
-  async function updateLinkImage(linkId, imageUrl, source) {
+  async function updateLinkImage(linkId, imageUrl, source, imageScores) {
     // Update local state
     const data = load();
     const link = data.links.find(l => l.id === linkId);
@@ -6465,6 +6492,9 @@ Return JSON:
       link.image = imageUrl;
       link.image_source = source;
       link.image_resolved_at = new Date().toISOString();
+      if (imageScores) {
+        link.image_scores = imageScores;
+      }
       save(data);
 
       // Update UI
@@ -6496,6 +6526,237 @@ Return JSON:
 
   // Initialize domain cache on load
   loadDomainCache();
+
+  // ============================================
+  // Image Validation Metrics (Story 4)
+  // ============================================
+
+  /**
+   * Analyze image quality scores across all pins.
+   * Call from console: imageQualityReport()
+   */
+  window.imageQualityReport = function() {
+    const data = load();
+    const links = data.links || [];
+    const withImage = links.filter(l => l.image);
+    const withScores = links.filter(l => l.image_scores);
+    const noImage = links.filter(l => !l.image);
+
+    const tierCounts = { excellent: 0, good: 0, marginal: 0, poor: 0, rejected: 0, unscored: 0 };
+    const byContentType = {};
+    const byDomain = {};
+
+    withScores.forEach(l => {
+      const tier = l.image_scores.tier || 'unscored';
+      tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+
+      // By content type
+      const ct = l.content_type || 'unknown';
+      if (!byContentType[ct]) byContentType[ct] = { count: 0, totalComposite: 0 };
+      byContentType[ct].count++;
+      byContentType[ct].totalComposite += (l.image_scores.composite || 0);
+
+      // By domain
+      const d = l.domain || 'unknown';
+      if (!byDomain[d]) byDomain[d] = { count: 0, totalComposite: 0, overrides: 0 };
+      byDomain[d].count++;
+      byDomain[d].totalComposite += (l.image_scores.composite || 0);
+    });
+
+    // Compute averages
+    Object.keys(byContentType).forEach(k => {
+      byContentType[k].avgComposite = Math.round((byContentType[k].totalComposite / byContentType[k].count) * 100) / 100;
+    });
+    Object.keys(byDomain).forEach(k => {
+      byDomain[k].avgComposite = Math.round((byDomain[k].totalComposite / byDomain[k].count) * 100) / 100;
+    });
+
+    // Sort domains by worst average
+    const worstDomains = Object.entries(byDomain)
+      .sort((a, b) => a[1].avgComposite - b[1].avgComposite)
+      .slice(0, 10)
+      .map(([domain, stats]) => ({ domain, ...stats }));
+
+    const report = {
+      summary: {
+        total_pins: links.length,
+        with_image: withImage.length,
+        with_scores: withScores.length,
+        no_image: noImage.length,
+        image_coverage: Math.round((withImage.length / links.length) * 100) + '%',
+        scored_coverage: Math.round((withScores.length / links.length) * 100) + '%'
+      },
+      tier_distribution: tierCounts,
+      by_content_type: byContentType,
+      worst_domains: worstDomains
+    };
+
+    console.log('%c[IMAGE QUALITY REPORT]', 'color: #8b5cf6; font-weight: bold; font-size: 14px');
+    console.log('%cSummary:', 'font-weight: bold', report.summary);
+    console.log('%cTier Distribution:', 'font-weight: bold', report.tier_distribution);
+    console.log('%cBy Content Type:', 'font-weight: bold', report.by_content_type);
+    console.log('%cWorst Domains (by avg composite):', 'font-weight: bold', report.worst_domains);
+    console.table(report.worst_domains);
+
+    return report;
+  };
+
+  /**
+   * Find pins with lowest image scores. Call from console: worstImages(10)
+   */
+  window.worstImages = function(count) {
+    count = count || 10;
+    const data = load();
+    return data.links
+      .filter(l => l.image_scores && l.image_scores.composite != null)
+      .sort((a, b) => a.image_scores.composite - b.image_scores.composite)
+      .slice(0, count)
+      .map(l => ({
+        title: l.title?.substring(0, 40),
+        domain: l.domain,
+        composite: l.image_scores.composite,
+        tier: l.image_scores.tier,
+        image: l.image?.substring(0, 60),
+        method: l.image_scores.evaluation_method
+      }));
+  };
+
+  // ============================================
+  // Tier 3: Async AI Vision Validation Queue
+  // ============================================
+  const tier3Queue = [];
+  let isProcessingTier3 = false;
+
+  /**
+   * Queue a pin for Tier 3 AI vision validation.
+   * Called after Tier 2 passes and image is displayed.
+   */
+  function queueTier3Validation(linkId, imageUrl, title, category, contentType) {
+    // Skip if already scored by Tier 3
+    const data = load();
+    const link = data.links.find(l => l.id === linkId);
+    if (link?.image_scores?.evaluation_method === 'tier3_ai_vision' ||
+        link?.image_scores?.evaluation_method === 'tier3_known_good') {
+      return;
+    }
+
+    console.log('%c[TIER 3] Queuing for AI validation:', 'color: #8b5cf6', imageUrl);
+    tier3Queue.push({ linkId, imageUrl, title, category, contentType });
+    if (!isProcessingTier3) {
+      processTier3Queue();
+    }
+  }
+
+  async function processTier3Queue() {
+    if (isProcessingTier3 || tier3Queue.length === 0) return;
+    isProcessingTier3 = true;
+
+    while (tier3Queue.length > 0) {
+      const item = tier3Queue.shift();
+      try {
+        console.log('%c[TIER 3] Evaluating:', 'color: #8b5cf6', item.imageUrl);
+        const result = await callValidateImage(item);
+
+        if (result?.scores) {
+          console.log('%c[TIER 3] Scores received:', 'color: #8b5cf6', {
+            composite: result.scores.composite,
+            tier: result.scores.tier,
+            safety: result.safety_tier,
+            cached: result.cached
+          });
+
+          // Update local link with full Tier 3 scores
+          const data = load();
+          const link = data.links.find(l => l.id === item.linkId);
+          if (link) {
+            link.image_scores = result.scores;
+            save(data);
+
+            // Handle downgrades
+            if (result.scores.tier === 'poor' || result.scores.tier === 'rejected' ||
+                result.safety_tier === 'blocked') {
+              console.log('%c[TIER 3] DOWNGRADE:', 'color: #e74c3c; font-weight: bold',
+                item.linkId, '→', result.scores.tier);
+              handleTier3Downgrade(item.linkId, result.scores);
+            } else if (result.scores.tier === 'marginal') {
+              console.log('%c[TIER 3] Marginal — queued for future enrichment:', 'color: #f39c12',
+                item.linkId);
+            }
+          }
+        } else if (result?.error === 'daily_budget_exhausted') {
+          console.log('%c[TIER 3] Daily budget exhausted, stopping queue', 'color: #f39c12');
+          tier3Queue.length = 0; // Clear remaining queue
+          break;
+        }
+      } catch (e) {
+        console.error('%c[TIER 3] Evaluation failed:', 'color: #e74c3c', e);
+      }
+
+      // Small delay between evaluations to avoid rate limiting
+      if (tier3Queue.length > 0) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    isProcessingTier3 = false;
+  }
+
+  async function callValidateImage({ linkId, imageUrl, title, category, contentType }) {
+    const accessToken = getAccessToken();
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/validate-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          title: title || '',
+          category: category || '',
+          content_type: contentType || '',
+          link_id: linkId
+        })
+      });
+
+      if (res.status === 429) {
+        return { error: 'daily_budget_exhausted' };
+      }
+      if (!res.ok) {
+        console.error('[TIER 3] API error:', res.status);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      console.error('[TIER 3] Network error:', e);
+      return null;
+    }
+  }
+
+  function handleTier3Downgrade(linkId, scores) {
+    // Remove the displayed image and show placeholder
+    const card = document.querySelector(`[data-id="${linkId}"]`);
+    if (card) {
+      const img = card.querySelector('.grid-item__image');
+      if (img) {
+        img.classList.add('grid-item__image--loading');
+        // After fade out, re-render to show placeholder
+        setTimeout(() => renderGrid(), 300);
+      }
+    }
+
+    // If safety blocked, clear the image entirely
+    if (scores.safety === 0) {
+      const data = load();
+      const link = data.links.find(l => l.id === linkId);
+      if (link) {
+        link.image = null;
+        link.image_source = 'blocked';
+        save(data);
+      }
+    }
+  }
 
   // ============================================
   // Server-Side Enrichment Queue
@@ -6903,10 +7164,24 @@ Return JSON:
         if (!img.startsWith('http')) {
           try { img = new URL(img, url).href; } catch {}
         }
-        // Final check - don't use if still a logo
-        const finalLower = img.toLowerCase();
-        if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
-          meta.image = img;
+        // Tier 1 image validation — replaces simple logo check
+        if (typeof ImageValidation !== 'undefined') {
+          const validation = ImageValidation.tier1(img, {
+            title: meta.title,
+            domain: meta.domain
+          });
+          if (validation.pass) {
+            meta.image = img;
+            meta.image_scores = validation.scores;
+          } else {
+            console.log('%c[IMAGE VALIDATION] Tier 1 rejected:', 'color: #e74c3c', img, validation.reason, validation.checks.filter(c => !c.pass));
+          }
+        } else {
+          // Fallback: simple logo check if validation module not loaded
+          const finalLower = img.toLowerCase();
+          if (!finalLower.includes('logo') && !finalLower.includes('favicon') && !finalLower.includes('icon')) {
+            meta.image = img;
+          }
         }
       }
       // Extract og:music tags for music metadata (free — already have the HTML)
@@ -7442,7 +7717,8 @@ Return JSON:
         // Enrichment fields
         content_type: link.content_type || null,
         type_confidence: link.type_confidence || null,
-        image_source: link.image_source || null
+        image_source: link.image_source || null,
+        image_scores: link.image_scores || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -8401,6 +8677,11 @@ Return JSON:
               queueImageResolution(id, url, meta.title, meta.description, contentType.type);
             }
             queueServerEnrichment(id, url, meta.title, meta.description);
+          }
+
+          // Queue Tier 3 AI vision validation for images that passed Tier 1
+          if (meta.image) {
+            queueTier3Validation(id, meta.image, meta.title, cat.category, contentType.type);
           }
 
           // Sync to Supabase
