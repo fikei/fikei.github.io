@@ -228,7 +228,7 @@ export const SUB_PRODUCTS: SubProductMap[] = [
     prd: ['prds/content-type-and-image-systems.md'],
     planPhases: ['phase-3'],
     techSpecs: ['technical-design/content-type-system.md'],
-    uxDocs: ['ux/pins/content-types.md'],
+    uxDocs: ['ux/pins/ai-categorization.md'],
     codePatterns: ['boards/js/content-types/'],
   },
   {

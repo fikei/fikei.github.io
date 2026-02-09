@@ -1,6 +1,15 @@
-# Sharing & Collaboration
+# Collection Sharing & Collaboration
+
+> **Status:** ⚠️ Partial (export shipped; public boards planned)
+> **Brand Principle:** Expand with the user
+> **Key Personas:** Multidisciplinary Maker (critical), Deep-Dive Enthusiast (critical), Researcher (high)
+>
+> Back to [UX Index](../index.md)
 
 Features that let users share their boards publicly or with specific people, and eventually collaborate on shared collections.
+
+**What's shipped:** JSON and CSV export, share modal with category scoping.
+**What's planned:** Public boards, share links, collaborative editing, board following.
 
 ---
 

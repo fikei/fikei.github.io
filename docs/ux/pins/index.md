@@ -112,12 +112,14 @@ Normal          Hover           Selected        Loading
 
 ## Pin Components
 
-| Component | Description | See Details |
-|-----------|-------------|-------------|
-| **Content Types** | AI classification of what a pin represents | [Content Types](./content-types.md) |
-| **Link Enrichment** | Automatic metadata extraction from URLs | [Link Enrichment](./link-enrichment.md) |
-| **Add Links** | Interface for saving new pins | [Add Links](./add-links.md) |
-| **Link Management** | Editing, deleting, organizing pins | [Link Management](./link-management.md) |
+| Component | Status | Description | See Details |
+|-----------|--------|-------------|-------------|
+| **Link Capture & Enrichment** | ✅ Shipped | Zero-friction URL capture with auto-enrichment | [Link Capture](./link-capture.md) |
+| **AI Categorization** | ✅ Shipped | Rules-based + AI hybrid classification | [AI Categorization](./ai-categorization.md) |
+| **Multi-Format Content** | ⚠️ Partial | Links + photos + videos; notes/files planned | [Multi-Format](./multi-format.md) |
+| **Flexible Tagging** | ⚠️ Partial | Categories + sub-tags; freeform tags planned | [Tagging](./tagging.md) |
+| **Mobile Capture** | ⚠️ Partial | Responsive + clipboard; Share Target planned | [Mobile Capture](./mobile-capture.md) |
+| **Link Management** | ✅ Shipped | Editing, deleting, organizing pins | [Link Management](./link-management.md) |
 
 ---
 
