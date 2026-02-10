@@ -3852,7 +3852,7 @@ Return JSON:
       description: 'Recommends something new based on patterns in your saves.',
       status: 'active',
       zone: 'footer',
-      criteria: { minItems: 3 },
+      criteria: { minItems: 2 },
       prompt: `You are a discovery engine. Analyze the user's saved {{noun}} and recommend ONE specific new thing they'd like.
 
 RULES:
@@ -3884,7 +3884,7 @@ Return JSON:
       description: 'Predicts upcoming releases from brands and creators in your collection.',
       status: 'active',
       zone: 'inline',
-      criteria: { minItems: 3 },
+      criteria: { minItems: 2 },
       prompt: `You are a trend forecaster for {{domain}}. Based on the user's saved {{noun}}, identify brands, creators, or publishers in their collection.
 
 Predict upcoming releases, drops, or launches they'd care about.
@@ -3915,7 +3915,7 @@ Return JSON:
       description: 'Groups your saves by theme so you can see the shape of your collection.',
       status: 'active',
       zone: 'footer',
-      criteria: { minItems: 4 },
+      criteria: { minItems: 2 },
       prompt: `You are a {{analyst}}. Group the user's saved {{noun}} into 2-4 meaningful themes.
 
 RULES:
@@ -5286,7 +5286,7 @@ Return JSON:
             <div class="w-body w-body--suggestion">
               <div class="w-img w-img--card">${imageHtml}</div>
               <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)">
-                <span class="w-text" style="font-weight:600">${esc(name)}</span>
+                <span class="w-text w-text--title">${esc(name)}</span>
                 ${brand ? `<span class="w-text w-text--meta">${esc(brand)}</span>` : ''}
                 ${price ? `<span class="w-text">${esc(price)}</span>` : ''}
                 ${reason ? `<span class="w-text w-text--note">"${esc(reason)}"</span>` : ''}
@@ -5514,6 +5514,7 @@ Return JSON:
     }
 
     if (applicableWidgets.length === 0) {
+      console.log(`%c[widget] No eligible widgets for "${widgetCategory}" (${items.length} items). Need ≥2 items in this category.`, 'color: #f39c12');
       renderGrid();
       widgetGenerationInProgress = false;
       if (widgetRegenerationNeeded) { widgetRegenerationNeeded = false; generateWidgets(); }
@@ -5622,6 +5623,19 @@ Return JSON:
 
     // Re-render grid to inject inline widgets
     renderGrid();
+
+    // Post-render: run design constraint audit and log summary
+    if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
+      const issues = window.DS_CONSTRAINTS.auditDOM(document);
+      const annotated = document.querySelectorAll('[data-ds-template]').length;
+      if (issues.length === 0) {
+        console.log('%c[design-constraints] ✓ All ' + annotated + ' widgets pass constraint checks', 'color: #4a9');
+      } else {
+        console.warn('[design-constraints] ' + issues.length + ' violation(s) in ' + annotated + ' widgets:');
+        issues.forEach(function (i) { console.warn('  [%s] %s', i.type, i.detail.message); });
+      }
+    }
+
     widgetGenerationInProgress = false;
 
     // If another generateWidgets() was called while we were running, run again
