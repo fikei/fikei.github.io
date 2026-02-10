@@ -69,6 +69,34 @@ body {
   opacity: 0.6;
 }
 
+/* Source chip error state */
+.token--error {
+  border-color: var(--border-subtle);
+  color: var(--fg-muted);
+}
+
+.token--error.token--active {
+  background: var(--bg-elevated);
+  color: var(--fg-muted);
+  border-color: var(--border-subtle);
+}
+
+.source-chip__error {
+  margin-left: var(--space-1);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  font-weight: 500;
+}
+
+/* Empty state detail (error explanation) */
+.empty-state__detail {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  line-height: var(--leading-relaxed);
+  max-width: 320px;
+  margin: var(--space-2) auto 0;
+}
+
 .sources-bar__filter-btn {
   margin-left: auto;
   display: inline-flex;
@@ -1071,7 +1099,8 @@ body {
     <!-- Empty state -->
     <div class="empty-state" id="emptyState" style="display: none;">
       <div class="empty-state__box">
-        <p class="empty-state__text">No events match your filters</p>
+        <p class="empty-state__text" id="emptyText">No events match your filters</p>
+        <p class="empty-state__detail" id="emptyDetail" style="display:none"></p>
         <button class="empty-state__clear" id="emptyClear">Clear Filters</button>
       </div>
     </div>
@@ -1242,6 +1271,7 @@ body {
   const state = {
     events: [],
     sources: [],
+    sourceErrors: {},  // { sourceId: { reason: 'timeout'|'blocked'|'offline'|'empty'|'unknown', message: '...' } }
     filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' },
     sort: { key: 'date', dir: 'asc' },
     view: 'table',
@@ -1476,8 +1506,8 @@ body {
     log(`Fetching ${enabled.length} source(s)...${isBackgroundRefresh ? ' (background)' : ''}`);
     if (!isBackgroundRefresh) document.getElementById('loadingText').textContent = `Fetching ${enabled.length} source(s)...`;
 
-    const failedSources = [];
     const allEvents = [];
+    state.sourceErrors = {};
 
     const promises = enabled.map(async (source) => {
       try {
@@ -1500,9 +1530,11 @@ body {
 
     const results = await Promise.allSettled(promises);
     results.forEach(r => {
-      const res = r.status === 'fulfilled' ? r.value : { source: null, events: [], ok: false, error: r.reason };
+      const res = r.status === 'fulfilled' ? r.value : { source: null, events: [], ok: false, error: r.reason?.message || String(r.reason) };
       if (res.events.length > 0) allEvents.push(...res.events);
-      if (!res.ok) failedSources.push(res.source?.name || 'Unknown');
+      if (!res.ok && res.source) {
+        state.sourceErrors[res.source.id] = classifySourceError(res.error);
+      }
     });
 
     // Replace events with fresh data
@@ -1514,27 +1546,33 @@ body {
     });
 
     log(`Total events loaded: ${state.events.length}`);
-    if (failedSources.length > 0) log(`Failed sources: ${failedSources.join(', ')}`);
+    const failedNames = Object.keys(state.sourceErrors).map(id => state.sources.find(s => s.id === id)?.name || id);
+    if (failedNames.length > 0) log(`Failed sources: ${failedNames.join(', ')}`);
     el.style.display = 'none';
     saveEventCache();
     calAutoNavigate();
     updateFilters();
     updateContentTypeFilter();
     render();
-    showSourceWarnings(failedSources);
   }
 
-  function showSourceWarnings(failedSources) {
-    const existing = document.getElementById('sourceWarning');
-    if (existing) existing.remove();
-    if (failedSources.length === 0) return;
-    const warn = document.createElement('div');
-    warn.id = 'sourceWarning';
-    warn.style.cssText = 'background:#1a1a00;border:1px solid #665500;color:#ffcc00;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;justify-content:space-between;';
-    warn.innerHTML = `<span>⚠ Could not load: ${failedSources.join(', ')}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#ffcc00;cursor:pointer;font-size:16px;padding:0 0 0 12px;">×</button>`;
-    const container = document.querySelector('.container');
-    const cal = document.getElementById('calendarView');
-    if (cal) container.insertBefore(warn, cal);
+  function classifySourceError(errorMsg) {
+    const msg = (errorMsg || '').toLowerCase();
+    if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborted'))
+      return { reason: 'timeout', message: 'This source took too long to respond. It may be experiencing heavy traffic — try again shortly.' };
+    if (msg.includes('blocked') || msg.includes('cors') || msg.includes('403') || msg.includes('forbidden'))
+      return { reason: 'blocked', message: 'This source is blocking our request. The site may have changed its access policy.' };
+    if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('offline') || msg.includes('dns'))
+      return { reason: 'offline', message: 'Couldn\'t reach this source. Check your internet connection, or the site may be down.' };
+    if (msg.includes('404') || msg.includes('not found'))
+      return { reason: 'missing', message: 'This source\'s URL no longer exists. The page may have moved or been removed.' };
+    if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('server'))
+      return { reason: 'server', message: 'This source is having server issues right now. Usually temporary — try again in a few minutes.' };
+    if (msg.includes('parse') || msg.includes('unexpected token') || msg.includes('invalid'))
+      return { reason: 'parse', message: 'We got a response but couldn\'t read it. The source may have changed its page format.' };
+    if (msg.includes('all fetch methods failed'))
+      return { reason: 'unreachable', message: 'Couldn\'t connect to this source through any method. The site may be down or blocking automated access.' };
+    return { reason: 'unknown', message: 'Something went wrong loading this source. Try refreshing the page.' };
   }
 
   // --- HTML Table Scraper (works for 19hz and generic tables) ---
@@ -1987,6 +2025,20 @@ body {
     weekViewEl.style.display = 'none';
     empty.style.display = 'none';
 
+    // Update empty state text based on context
+    const emptyText = document.getElementById('emptyText');
+    const emptyDetail = document.getElementById('emptyDetail');
+    const sourceError = state.filters.source && state.sourceErrors[state.filters.source];
+    if (sourceError) {
+      const sourceName = state.sources.find(s => s.id === state.filters.source)?.name || 'This source';
+      emptyText.textContent = `Couldn't load events from ${sourceName}`;
+      emptyDetail.textContent = sourceError.message;
+      emptyDetail.style.display = '';
+    } else {
+      emptyText.textContent = 'No events match your filters';
+      emptyDetail.style.display = 'none';
+    }
+
     if (v === 'calendar') {
       calView.style.display = '';
       renderCalendar(filtered);
@@ -2425,7 +2477,10 @@ body {
     html += state.sources.filter(s => s.enabled).map(s => {
       const count = state.events.filter(e => e.source === s.id).length;
       const isActive = activeSource === s.id;
-      return `<button class="token ${isActive ? 'token--active' : ''}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span></button>`;
+      const hasError = state.sourceErrors[s.id];
+      const errorClass = hasError ? ' token--error' : '';
+      const errorMark = hasError ? '<span class="source-chip__error" title="Couldn\'t load">!</span>' : '';
+      return `<button class="token ${isActive ? 'token--active' : ''}${errorClass}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span>${errorMark}</button>`;
     }).join('');
     container.innerHTML = html;
 
