@@ -1587,6 +1587,11 @@ body {
 .grid-item__platform-icon--youtube-music { background: var(--color-youtube-music); }
 
 /* Expanded listen cards — show artist/track in details */
+.grid-item--listen.grid-item--expanded-medium .grid-item__overlay,
+.grid-item--listen.grid-item--expanded-large .grid-item__overlay {
+  display: none;
+}
+
 .grid-item--listen.grid-item--expanded-medium .grid-item__format-badge,
 .grid-item--listen.grid-item--expanded-large .grid-item__format-badge {
   opacity: 1;
@@ -7688,6 +7693,47 @@ Return JSON:
   }
 
   // ============================================
+  // Migration v2: Enrich listen links with music metadata
+  // ============================================
+  // Backfills .music property on listen links that were migrated
+  // before extractMusicMetadata existed.
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v1';
+
+  async function enrichListenLinks() {
+    if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
+
+    const allLinks = getAllLinks();
+    const needsEnrich = allLinks.filter(l => l.category === 'listen' && !l.music);
+    if (needsEnrich.length === 0) {
+      localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
+      return;
+    }
+
+    console.log(`%c[enrich-listen] Enriching ${needsEnrich.length} listen links with music metadata`, 'color: #1DB954; font-weight: bold');
+
+    let enriched = 0;
+    for (const link of needsEnrich) {
+      try {
+        const music = await extractMusicMetadata(link.url, link.title, link.description, null);
+        if (music) {
+          updateLink(link.id, { music });
+          enriched++;
+          console.log(`%c[enrich-listen] ✓ ${link.domain}:`, 'color: #1DB954', music.artist || link.title);
+        }
+      } catch (e) {
+        console.warn(`[enrich-listen] Failed for ${link.domain}:`, e.message);
+      }
+    }
+
+    localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
+
+    if (enriched > 0) {
+      console.log(`%c[enrich-listen] Enriched ${enriched}/${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
+      renderGrid();
+    }
+  }
+
+  // ============================================
   // Rule-based Categorizer (fallback)
   // ============================================
   const PATTERNS = {
@@ -8541,6 +8587,7 @@ Return JSON:
           <div class="grid-item__menu" data-menu-id="${l.id}">
             <button class="grid-item__menu-item" data-action="share">Share Link</button>
             <button class="grid-item__menu-item" data-action="refresh-image">Refresh Image</button>
+            <button class="grid-item__menu-item" data-action="rerun-enrichment">Rerun Enrichment</button>
             <div class="grid-item__menu-divider"></div>
             <button class="grid-item__menu-item" data-action="category">Change Category</button>
             <button class="grid-item__menu-item" data-action="content-type">Change Content Type</button>
@@ -9023,6 +9070,39 @@ Return JSON:
             forceRefresh: true // This will override the existing image
           });
           processEnrichmentQueue();
+        }
+        return;
+      } else if (actionType === 'rerun-enrichment') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          toast('Re-enriching link...');
+          try {
+            const meta = await fetchMetadata(link.url);
+            const cat = categorize(link.url, meta.title, meta.description);
+            const contentType = detectContentType(link.url, meta.title, meta.description, cat.category);
+            let music = null;
+            if (cat.category === 'listen' || contentType.type === 'music') {
+              music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
+            }
+            const linkUpdate = {
+              title: meta.title || link.title,
+              description: meta.description || link.description,
+              image: meta.image || link.image,
+              category: cat.category,
+              confidence: cat.confidence,
+              content_type: contentType.type,
+              type_confidence: contentType.confidence,
+              type_signals: contentType.signals
+            };
+            if (music) linkUpdate.music = music;
+            updateLink(id, linkUpdate);
+            renderFilters();
+            renderGrid();
+            toast('Enrichment complete');
+          } catch (err) {
+            console.error('[rerun-enrichment]', err);
+            toast('Enrichment failed', true);
+          }
         }
         return;
       } else if (actionType === 'category') {
@@ -10859,6 +10939,8 @@ Return JSON:
 
     // Run one-time migration: watch → listen for music links
     migrateWatchToListen();
+    // Backfill music metadata on existing listen links (async, non-blocking)
+    enrichListenLinks();
 
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();
