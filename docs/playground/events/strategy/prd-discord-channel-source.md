@@ -591,13 +591,64 @@ With 10 Discord channels active: ~$1.20/month. Well within Supabase free tier an
 
 ---
 
-## 12. Open Questions
+## 12. Design Decisions (Resolved)
 
-1. **Bot hosting**: The bot only needs a token, not a running process. But should we also run a lightweight listener for real-time event detection (push vs. poll)?
-2. **Multi-server bot**: One bot application can be invited to many servers. Should we run a shared bot, or guide users to create their own?
-3. **Private channels**: Should the system support DM-based event sources, or only server channels?
-4. **Event images**: Many Discord event posts are image-only (flyers). Phase 3 mentions OCR — is this worth the complexity?
-5. **Duplicate events across sources**: If the same event appears on 19hz AND a Discord channel, how do we deduplicate cross-source?
+1. **Poll, not push** — Regular polling on refresh (no persistent bot process). The Edge Function fetches messages on-demand when the client requests. No WebSocket listener, no running bot.
+2. **Shared bot** — One ctrl.rodeo bot application invited to all servers. Users get an invite link; no per-user bot setup. Simpler onboarding, single token to manage.
+3. **Cross-source deduplication** — When the same event appears in multiple sources (e.g., 19hz AND a Discord channel), we deduplicate by matching on `(date, name_normalized, venue_normalized)`. Merged events combine the richest data from each source and carry **both source tags** so the event shows up under either source filter. See Section 14 below.
+
+### Open Questions (Remaining)
+
+4. **Private channels**: Should the system support DM-based event sources, or only server channels?
+5. **Event images**: Many Discord event posts are image-only (flyers). Phase 3 mentions OCR — is this worth the complexity?
+
+---
+
+## 14. Cross-Source Deduplication
+
+When the same event is found in multiple sources (e.g., 19hz HTML table + Discord #events channel), the system merges them into a single event with combined metadata.
+
+### Matching Algorithm
+
+Two events are considered duplicates when **all three** match:
+
+| Field | Normalization | Match Threshold |
+|---|---|---|
+| `date` | ISO string (`YYYY-MM-DD`) | Exact match |
+| `name` | Lowercase, strip punctuation, remove common prefixes ("the", "a") | Levenshtein distance <= 3 OR one name contains the other |
+| `venue` | Lowercase, strip punctuation, remove "the" | Levenshtein distance <= 2 OR one venue contains the other |
+
+### Merge Strategy
+
+When a duplicate pair is found, merge into one event:
+
+```javascript
+{
+  // For each field: prefer the longer/more-complete value
+  date:      a.date,                                        // same by definition
+  time:      (a.time || '').length >= (b.time || '').length ? a.time : b.time,
+  name:      a.name.length >= b.name.length ? a.name : b.name,
+  venue:     a.venue.length >= b.venue.length ? a.venue : b.venue,
+  address:   a.address || b.address,
+  city:      a.city || b.city,
+  genre:     mergeGenreTags(a.genre, b.genre),             // union of tags
+  price:     a.price || b.price,
+  ages:      a.ages || b.ages,
+  promoter:  a.promoter || b.promoter,
+  url:       a.url || b.url,                               // prefer non-Discord URL
+
+  // Both source tags preserved
+  source:    a.source,                                     // primary source
+  sources:   [a.source, b.source],                         // all sources
+  contentType: a.contentType,
+}
+```
+
+### Source Tag Display
+
+- Events with multiple sources show all source names in the UI (e.g., "19hz Bay Area + SF EDM Discord")
+- Filtering by either source includes the merged event
+- The `sources[]` array replaces the single `source` field for merged events
 
 ---
 
