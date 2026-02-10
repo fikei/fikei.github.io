@@ -958,8 +958,8 @@ body {
     <!-- Onboarding (first visit) -->
     <div id="onboarding" style="display:none">
       <div class="onboarding">
-        <h2 class="onboarding__title">Events</h2>
-        <p class="onboarding__desc">Aggregate events from multiple sources into one view.</p>
+        <h2 class="onboarding__title">Choose Sources</h2>
+        <p class="onboarding__desc">Pick the event feeds you want to follow. You can always add or remove sources later.</p>
 
         <div class="onboarding__step">
           <div class="onboarding__step-label">Your region</div>
@@ -987,6 +987,9 @@ body {
         </div>
       </div>
     </div>
+
+    <!-- Main events content (hidden during onboarding) -->
+    <div id="eventsContent" style="display:none">
 
     <!-- Sources bar -->
     <div class="sources-bar">
@@ -1110,6 +1113,8 @@ body {
       <div class="spinner"></div>
       <span id="loadingText">Fetching events</span>
     </div>
+
+    </div><!-- /eventsContent -->
 
     <!-- Debug log (visible) -->
     <details id="debugLog" style="margin-bottom: var(--space-4);">
@@ -3160,6 +3165,7 @@ body {
       localStorage.setItem(ONBOARDED_KEY, '1');
       saveSources();
       document.getElementById('onboarding').style.display = 'none';
+      document.getElementById('eventsContent').style.display = '';
       fetchAllSources();
     });
 
@@ -3202,6 +3208,9 @@ body {
     document.getElementById('onboardingCustomUrl').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addOnboardingCustom(); }
     });
+
+    // Show all sources immediately
+    renderOnboardingSources();
   }
 
   function addOnboardingCustom() {
@@ -3220,27 +3229,26 @@ body {
     const sourcesWrap = document.getElementById('onboardingSources');
     const list = document.getElementById('onboardingList');
 
-    // Filter stock by region
+    // Show all sources initially, filter by region when one is selected
     const regionSources = onboardingSelectedRegion
       ? STOCK_SOURCES.filter(s => s.region === onboardingSelectedRegion)
-      : [];
+      : STOCK_SOURCES;
 
     const allSources = [...regionSources, ...onboardingCustomSources];
-
-    if (allSources.length === 0) {
-      sourcesWrap.classList.remove('onboarding__sources--visible');
-      return;
-    }
 
     sourcesWrap.classList.add('onboarding__sources--visible');
     list.innerHTML = allSources.map(s => {
       const catLabel = CONTENT_TYPES[s.category] || s.category || '';
       const isCustom = s.region === 'custom';
+      const regionObj = REGIONS.find(r => r.id === s.region);
+      const regionLabel = regionObj ? regionObj.name : '';
+      const showRegion = !onboardingSelectedRegion && regionLabel;
       return `<label class="onboarding__source">
         <input type="checkbox" value="${escHtml(s.id)}">
         <div class="onboarding__source-info">
           <span class="onboarding__source-name">${escHtml(s.name)}</span>
           <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
+          ${showRegion ? `<span class="onboarding__cat-tag">${escHtml(regionLabel)}</span>` : ''}
           ${isCustom ? '<span class="onboarding__cat-tag">custom</span>' : ''}
         </div>
       </label>`;
@@ -3273,6 +3281,7 @@ body {
     }
     saveSources();
     document.getElementById('onboarding').style.display = 'none';
+    document.getElementById('eventsContent').style.display = '';
     fetchAllSources();
   }
 
@@ -3359,6 +3368,7 @@ body {
     if (!state.onboarded && state.sources.length === 0) {
       showOnboarding();
     } else {
+      document.getElementById('eventsContent').style.display = '';
       fetchAllSources();
     }
   }
