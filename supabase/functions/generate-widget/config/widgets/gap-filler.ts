@@ -22,7 +22,7 @@ export const gapFiller: WidgetDefinition = {
         type: 'category_match',
         weight: 0.7,
         params: {
-          categories: ['wear', 'tech', 'home', 'fitness'],
+          categories: ['wear'],
           mode: 'any',
           fallbackToContent: true
         }
@@ -84,7 +84,7 @@ Return JSON format:
   },
 
   // Metadata
-  categories: ['wear', 'tech', 'home', 'fitness'],
+  categories: ['wear'],
   tags: ['shopping', 'recommendations', 'ai', 'action', 'gap-analysis'],
   enabled: true,
 
