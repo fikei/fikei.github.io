@@ -1267,6 +1267,13 @@ body {
     { id: 'seattle', name: 'Seattle' },
   ];
 
+  // Discord bot config — replace CLIENT_ID after creating app at discord.com/developers
+  const DISCORD_BOT_CLIENT_ID = ''; // TODO: set after creating bot application
+  // Permissions: View Channel (1024) + Send Messages (2048) + Read Message History (65536) = 68608
+  const DISCORD_BOT_INVITE_URL = DISCORD_BOT_CLIENT_ID
+    ? `https://discord.com/oauth2/authorize?client_id=${DISCORD_BOT_CLIENT_ID}&scope=bot&permissions=68608`
+    : '';
+
   const STOCK_SOURCES = [
     // Bay Area
     { id: '19hz-bayarea', name: '19hz Bay Area', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_BayArea.php', region: 'bay-area', description: 'Electronic music & nightlife' },
@@ -3078,6 +3085,14 @@ body {
       document.getElementById('discordGuildId').value = '';
       document.getElementById('discordChannelId').value = '';
       document.getElementById('discordSourceName').value = '';
+      // Set bot invite link
+      const inviteEl = document.getElementById('discordBotInvite');
+      if (DISCORD_BOT_INVITE_URL) {
+        inviteEl.href = DISCORD_BOT_INVITE_URL;
+        inviteEl.parentElement.style.display = '';
+      } else {
+        inviteEl.parentElement.style.display = 'none';
+      }
       renderStockSourcesList();
     });
     document.getElementById('modalCancel').addEventListener('click', () => modal.classList.remove('modal--visible'));
