@@ -1,7 +1,7 @@
-# Project Plan - Boards
+# Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-09 (Phase 2.5a nearing completion, runtime constraint engine added)
+> **Last Updated**: 2026-02-09 (Full audit — all branches merged, counts reconciled)
 
 ---
 
@@ -18,66 +18,65 @@
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 18/18 |
-| [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 12/12 |
-| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | ~113/370 |
-| [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 8/90 |
-| [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/70 |
-| [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/27 |
+| [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 24/24 |
+| [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 15/15 |
+| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 151/413 |
+| [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 11/140 |
+| [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/60 |
+| [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/15 |
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/17 |
-| [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/65 |
-| [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/105 |
+| [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/54 |
+| [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/132 |
 | [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 47/102 |
-| [Backlog](./backlog.md) | Future | 0/120 |
+| [Backlog](./backlog.md) | Future | 1/110 |
 
 ---
 
 ## Recent Milestones
 
+### Listen Category ✅
+**Completed: 2026-02-09**
+
+- **9th category** splitting music out of `watch` — keywords, domains, sub-tags
+- **Music metadata extraction** via oEmbed APIs + og:music scraping (9/12 fields)
+- **2 new widgets**: Sound Shelf (album art grid), Listen Next (AI listening queue)
+- **watch→listen migration** for existing pins
+
+### Runtime Design Constraint Engine ✅
+**Completed: 2026-02-09**
+
+- **`boards/design-constraints.js`** — validates widgets against design system at runtime
+- Loads manifest + registry, exposes `validate()`, `auditDOM()`, `annotate()` APIs
+
+### Events Page ✅
+**Completed: 2026-02-09**
+
+- **Standalone events aggregator** at `/events/index.html`
+- ScreenSlate JSON API integration with day/week calendar views
+- Location filtering, source filtering with status chips, error handling
+
 ### Brand Positioning & Persona Framework ✅
 **Completed: 2026-02-08**
 
 - **Tagline**: "Your likes. Your saves. Your life — organized."
-- **5 brand principles** guiding all feature decisions (input shapes output, organize as you go, one place whole life, show don't decorate, expand with user)
-- **8 named personas** across primary (Visual Collector, Sound & Scene Curator, DJ, Multidisciplinary Maker) and secondary (Deep-Dive Enthusiast, Researcher, Cultural Omnivore, Design Technologist) tiers + 3 future personas
-- **Persona-to-feature matrix** mapping all personas against 11 feature areas
-- **Backlog expanded** with persona-driven epics: Taste & Pattern Intelligence, Flexible Tagging, Events & Venue Integration, Mobile Capture, Collection Export
+- **5 brand principles**, **8 named personas**, **persona-to-feature matrix**
 - See [Brand Positioning](../../strategy/brand-positioning.md) and [User Personas](../../ux/personas.md)
 
 ### Widget Phase 2.5a: Design System Transition ⚡
-**Started: 2026-02-07** — **Nearing completion**
+**Started: 2026-02-07** — **~90% complete**
 
-- **Design System Manifest**: `manifest.json` generated from CSS (12 atoms, 8 molecules, 11 body modifiers, 15 sizes)
-- **Template Registry**: `template-registry.json` maps 10 canonical templates to Boards implementations
-- **Self-Scan**: Systemic loads local design system without crawling
-- **Template Migration**: All 7 Boards renderers migrated from `widget-*` to `w-*` classes
-- **Design System Extensions**: Added `w-items`, `w-item`, `w-body--stats`, `w-divider__label`; updated marker, header, suggestion layout
-- **Token Bridge**: Boards `:root` maps DS token names to Boards values (visual parity preserved)
-- **Config-Driven AI Prompts**: Server-side `config/design-system.ts` embeds template constraints into AI prompts
-- **Server-Side Validation**: `validateWidgetHtml()` / `sanitizeWidgetHtml()` enforce class allowlist on AI output
-- **Runtime Constraint Engine**: `boards/design-constraints.js` loads manifest + registry at runtime, validates widgets, annotates DOM
-- **Systemic QA Enhancements**: Preferred variant marking, inline QA controls in viewer, scan modal, dev menu, debug logging, all 15 grid sizes exposed
-- **Next**: CI validation pipeline
+- All 11 template renderers migrated to `w-*` classes (including 4 new: comparison, choices, checklist, grouped)
+- Design system manifest, template registry, self-scan in Systemic
+- Config-driven AI prompts + server-side validation (class allowlist)
+- Runtime constraint engine, Systemic QA enhancements
+- **Remaining**: CI validation pipeline, visual diff screenshots
 
-### Widget Phase 2: Config-Generated Widgets ✅
+### Widget Phases 0-2 ✅
 **Completed: 2026-02-05**
 
-- **Widget Definition Schema**: TypeScript types in `config/schema.ts`
-- **Config-Driven Eligibility**: Rules defined declaratively, not in code
-- **Registry as Data**: `config/registry.ts` with runtime evaluators
-- **Two Widgets Migrated**: `complete-the-look`, `style-summary`
-- **180+ lines removed**: Hard-coded eligibility logic replaced with config
-- **Template Selection Engine**: Auto-select + fallback chain
-- **Hot-reload**: registerWidget() / unregisterWidget() / reloadWidget()
-
-### Widget Phase 1: Rule-Driven Automation ✅
-**Completed: 2026-02-05**
-
-- **Eligibility Engine**: Widgets must pass rules to render
-- **Confidence Scoring**: AI returns 0.0-1.0 confidence, threshold gates rendering
-- **Validation Engine**: Track success/failure for optimization
-- **SERP API Integration**: Reliable image fallback strategy
-- **Client Instrumentation**: Event tracking for views, clicks, dismissals
+- **21 widget configs** across all categories, **11 template types**
+- Config-driven eligibility, confidence scoring, template selection engine
+- SERP API integration, client instrumentation, hot-reload registry
 
 See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-widget-ecosystem) for full details.
 
@@ -87,18 +86,18 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 
 | Category | Complete | In Progress | Pending | Blocked |
 |----------|----------|-------------|---------|---------|
-| Phase 1: Foundation | 18 | 0 | 0 | 0 |
-| Phase 2: Core Experience | 12 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 113 | 3 | 253 | 0 |
-| Phase 4: Sharing & Collaboration | 8 | 8 | 73 | 1 |
-| Phase 5: UX Polish | 3 | 0 | 67 | 0 |
-| Phase 6: Performance | 1 | 0 | 26 | 0 |
-| Phase 7: Platform Expansion | 0 | 0 | 17 | 0 |
-| Phase 8: Automated Pins | 0 | 0 | 65 | 0 |
-| Phase 9: Bulk Import | 0 | 0 | 105 | 0 |
+| Phase 1: Foundation | 24 | 0 | 0 | 0 |
+| Phase 2: Core Experience | 15 | 0 | 0 | 0 |
+| Phase 3: AI Intelligence | 151 | 4 | 257 | 0 |
+| Phase 4: Sharing & Collaboration | 11 | 1 | 128 | 0 |
+| Phase 5: UX Polish | 3 | 0 | 57 | 0 |
+| Phase 6: Performance | 1 | 0 | 14 | 0 |
+| Phase 7: Platform Expansion | 0 | 0 | 11 | 0 |
+| Phase 8: Automated Pins | 0 | 0 | 54 | 0 |
+| Phase 9: Bulk Import | 0 | 0 | 132 | 0 |
 | Phase 10: Image Validation | 47 | 0 | 55 | 0 |
-| Backlog | 0 | 0 | 120 | 0 |
-| **TOTAL** | **202** | **11** | **781** | **1** |
+| Backlog | 1 | 0 | 108 | 0 |
+| **TOTAL** | **253** | **5** | **816** | **0** |
 
 ---
 

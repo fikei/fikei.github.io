@@ -7329,12 +7329,7 @@ Return JSON:
   }
 
   function generateId(url) {
-    let h = 0;
-    for (let i = 0; i < url.length; i++) {
-      h = ((h << 5) - h) + url.charCodeAt(i);
-      h = h & h;
-    }
-    return Math.abs(h).toString(36);
+    return crypto.randomUUID();
   }
 
   // ============================================
@@ -7677,6 +7672,7 @@ Return JSON:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
@@ -8096,7 +8092,8 @@ Return JSON:
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        console.error('[sync] Upload failed:', res.status);
+        const errBody = await res.text();
+        console.error('[sync] Upload failed:', res.status, errBody);
       } else {
         console.log('[sync] Uploaded:', link.url);
       }
