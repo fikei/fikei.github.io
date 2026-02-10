@@ -3236,8 +3236,8 @@ body {
     list.innerHTML = allSources.map(s => {
       const catLabel = CONTENT_TYPES[s.category] || s.category || '';
       const isCustom = s.region === 'custom';
-      return `<label class="onboarding__source selected">
-        <input type="checkbox" value="${escHtml(s.id)}" checked>
+      return `<label class="onboarding__source">
+        <input type="checkbox" value="${escHtml(s.id)}">
         <div class="onboarding__source-info">
           <span class="onboarding__source-name">${escHtml(s.name)}</span>
           <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
