@@ -88,6 +88,12 @@
               "icon": "\ud83d\udd04",
               "file": "docs/strategy/prds/notion-sync-platform.md",
               "source": "ai"
+            },
+            {
+              "title": "Tasks - Email Triage",
+              "icon": "\u2709\ufe0f",
+              "file": "docs/strategy/prds/tasks.md",
+              "source": "ai"
             }
           ]
         }
@@ -367,6 +373,50 @@
               "icon": "\ud83d\udcdd",
               "file": "docs/execution/project-plan/backlog.md",
               "source": "ai"
+            },
+            {
+              "title": "Tasks Project Plan",
+              "icon": "\u2709\ufe0f",
+              "file": "docs/execution/project-plan/tasks/index.md",
+              "source": "ai",
+              "children": [
+                {
+                  "title": "Phase 1: Foundation",
+                  "icon": "\ud83c\udfd7\ufe0f",
+                  "file": "docs/execution/project-plan/tasks/phase-1-foundation.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Phase 2: AI Classification",
+                  "icon": "\ud83e\udd16",
+                  "file": "docs/execution/project-plan/tasks/phase-2-ai-classification.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Phase 3: Web Dashboard",
+                  "icon": "\ud83d\udcca",
+                  "file": "docs/execution/project-plan/tasks/phase-3-web-dashboard.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Phase 4: Gmail Extension",
+                  "icon": "\ud83d\udce7",
+                  "file": "docs/execution/project-plan/tasks/phase-4-gmail-extension.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Phase 5: iOS App",
+                  "icon": "\ud83d\udcf1",
+                  "file": "docs/execution/project-plan/tasks/phase-5-ios-app.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Phase 6: Launch",
+                  "icon": "\ud83d\ude80",
+                  "file": "docs/execution/project-plan/tasks/phase-6-launch.md",
+                  "source": "ai"
+                }
+              ]
             }
           ]
         }
@@ -508,6 +558,12 @@
               "icon": "\ud83d\udcd6",
               "file": "docs/infrastructure/NOTION-SYNC-GUIDE.md",
               "source": "ai"
+            },
+            {
+              "title": "Tasks System",
+              "icon": "\u2709\ufe0f",
+              "file": "docs/infrastructure/technical-design/tasks-system.md",
+              "source": "ai"
             }
           ]
         }
@@ -552,6 +608,25 @@
               "title": "Variant Audit Project Plan",
               "icon": "\ud83d\udcca",
               "file": "docs/playground/systemic/project-plan-variant-audit.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Tasks",
+          "icon": "\u2709\ufe0f",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Tasks PRD",
+              "icon": "\ud83d\udccb",
+              "file": "docs/strategy/prds/tasks.md",
+              "source": "ai"
+            },
+            {
+              "title": "Tasks Technical Design",
+              "icon": "\ud83d\udcd0",
+              "file": "docs/infrastructure/technical-design/tasks-system.md",
               "source": "ai"
             }
           ]
