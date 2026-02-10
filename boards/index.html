@@ -9077,8 +9077,8 @@ Return JSON:
           toast('Re-enriching link...');
           try {
             const meta = await fetchMetadata(link.url);
-            const cat = categorize(link.url, meta.title, meta.description);
-            const contentType = detectContentType(link.url, meta.title, meta.description, cat.category);
+            const cat = await smartCategorize(meta);
+            const contentType = classifyByRules(link.url, meta.title, meta.description);
             let music = null;
             if (cat.category === 'listen' || contentType.type === 'music') {
               music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
