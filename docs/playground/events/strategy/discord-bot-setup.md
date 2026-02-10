@@ -8,32 +8,22 @@ This connects the ctrl.rodeo Events app to the Agape Discord `#events` channel. 
 
 ## Step 1: Create the Discord Bot Application
 
-1. Go to [discord.com/developers/applications](https://discord.com/developers/applications)
-2. Click **"New Application"** → name it `ctrl.rodeo events` (or whatever you like)
-3. Go to **Bot** tab in the left sidebar
-4. Click **"Reset Token"** → copy the token (you'll need it once)
-5. Under **Privileged Gateway Intents**, enable **MESSAGE CONTENT INTENT** (toggle ON)
-6. Save changes
+**Done.** Application ID: `1470922378652553371`
 
-**Copy these two values:**
-- **Application ID** (on the General Information page, also called "Client ID")
-- **Bot Token** (from step 4)
+**Still needed on the Developer Portal:**
+1. Go to [discord.com/developers/applications/1470922378652553371](https://discord.com/developers/applications/1470922378652553371)
+2. **Bot** tab → Click **"Reset Token"** → copy the token (you'll need it for Step 3)
+3. **Bot** tab → Under **Privileged Gateway Intents**, enable **MESSAGE CONTENT INTENT** (toggle ON)
+4. Save changes
 
 ## Step 2: Set the Client ID in the App
 
-In `events/index.html`, find this line near the top of the `<script>`:
+**Done.** Client ID `1470922378652553371` is set in `events/index.html`.
 
-```javascript
-const DISCORD_BOT_CLIENT_ID = ''; // TODO: set after creating bot application
+The invite URL is:
 ```
-
-Paste your Application ID:
-
-```javascript
-const DISCORD_BOT_CLIENT_ID = '1234567890123456789';
+https://discord.com/oauth2/authorize?client_id=1470922378652553371&scope=bot&permissions=68608
 ```
-
-This generates the invite URL that admins will use to add the bot.
 
 ## Step 3: Store the Bot Token as a Supabase Secret
 
@@ -66,8 +56,8 @@ Send this to Gavin (gavaiken) or Charles (charles_irl):
 > To make it work I need you to:
 >
 > 1. **Click this invite link** to add my bot to the server:
->    `https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot&permissions=68608`
->    (replace YOUR_CLIENT_ID with your actual Application ID)
+>    `https://discord.com/oauth2/authorize?client_id=1470922378652553371&scope=bot&permissions=68608`
+>    (replace 1470922378652553371 with your actual Application ID)
 >
 > 2. **Make sure the bot can see `#events`** — it needs:
 >    - View Channel
