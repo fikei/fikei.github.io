@@ -969,12 +969,56 @@ class SystemicApp {
     const systemName = this.viewer?.designSystem?.name || 'System';
     const components = this.viewer?.designSystem?.components || [];
 
-    // Build component options
-    const componentOptions = components.map(c => {
+    // Group components by source for structured dropdown
+    const groupOrder = [
+      { source: 'components.css', label: 'Components' },
+      { source: 'widgets.css (atom)', label: 'Widget Atoms' },
+      { source: 'widgets.css (molecule)', label: 'Widget Molecules' },
+      { source: 'template-registry.json', label: 'Templates' },
+    ];
+    const grouped = {};
+    const ungrouped = [];
+    for (const c of components) {
+      const key = c.source || '';
+      if (key) {
+        (grouped[key] = grouped[key] || []).push(c);
+      } else {
+        ungrouped.push(c);
+      }
+    }
+    let componentOptions = '';
+    // Render ungrouped items first (e.g. crawled design systems with no source)
+    for (const c of ungrouped) {
       const name = c.name || c.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
       const count = c.variants?.length || 0;
-      return `<option value="${c.type}">${name} (${count})</option>`;
-    }).join('');
+      componentOptions += `<option value="${c.type}">${name} (${count})</option>`;
+    }
+    // Render grouped items with optgroup headers
+    for (const { source, label } of groupOrder) {
+      const items = grouped[source];
+      if (!items || items.length === 0) continue;
+      componentOptions += `<optgroup label="${label}">`;
+      for (const c of items) {
+        let name = c.name || c.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        // Strip redundant "Template: " prefix inside Templates optgroup
+        if (source === 'template-registry.json') name = name.replace(/^Template:\s*/, '');
+        const count = c.variants?.length || 0;
+        componentOptions += `<option value="${c.type}">${name} (${count})</option>`;
+      }
+      componentOptions += `</optgroup>`;
+    }
+    // Render any remaining groups not in groupOrder
+    const knownSources = new Set(groupOrder.map(g => g.source));
+    for (const [source, items] of Object.entries(grouped)) {
+      if (knownSources.has(source)) continue;
+      componentOptions += `<optgroup label="${source}">`;
+      for (const c of items) {
+        const name = c.name || c.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        const count = c.variants?.length || 0;
+        componentOptions += `<option value="${c.type}">${name} (${count})</option>`;
+      }
+      componentOptions += `</optgroup>`;
+    }
 
     this.appNav.innerHTML = `
       <nav class="breadcrumb" id="stage-breadcrumb" aria-label="Breadcrumb">
