@@ -7,40 +7,50 @@
     <link rel="stylesheet" href="/design-system/tokens.css">
     <link rel="stylesheet" href="/design-system/components.css">
     <style>
+        /* Base */
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-primary);
+            font-size: var(--text-xs);
+            margin: 0;
+            padding: 0;
+        }
+
         /* Tasks App Layout */
         .tasks-app {
             max-width: 1200px;
             margin: 0 auto;
-            padding: var(--space-md);
+            padding: var(--space-4);
         }
 
         /* Tab Navigation */
         .tab-nav {
             display: flex;
-            gap: var(--space-xs);
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: var(--space-lg);
+            gap: var(--space-1);
+            border-bottom: 1px solid var(--border-subtle);
+            margin-bottom: var(--space-6);
         }
 
         .tab-nav button {
             background: none;
             border: none;
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             font-family: var(--font-mono);
             font-size: var(--text-sm);
-            padding: var(--space-sm) var(--space-md);
+            padding: var(--space-2) var(--space-4);
             cursor: pointer;
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
         }
 
         .tab-nav button:hover {
-            color: var(--text-primary);
+            color: var(--fg);
         }
 
         .tab-nav button.active {
-            color: var(--text-primary);
-            border-bottom-color: var(--text-primary);
+            color: var(--fg);
+            border-bottom-color: var(--fg);
         }
 
         /* Tab Content */
@@ -54,37 +64,37 @@
 
         /* Section Header */
         .section-header {
-            margin-bottom: var(--space-lg);
+            margin-bottom: var(--space-6);
         }
 
         .section-header h2 {
-            margin: 0 0 var(--space-xs) 0;
+            margin: 0 0 var(--space-1) 0;
             font-size: var(--text-xl);
         }
 
         .section-description {
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             font-size: var(--text-sm);
         }
 
         /* Filter Bar */
         .filter-bar {
             display: flex;
-            gap: var(--space-xs);
+            gap: var(--space-1);
             flex-wrap: wrap;
-            margin-bottom: var(--space-md);
-            padding: var(--space-md);
-            background: var(--surface-secondary);
-            border: 1px solid var(--border-color);
+            margin-bottom: var(--space-4);
+            padding: var(--space-4);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
         }
 
         .filter-token {
-            padding: var(--space-xs) var(--space-sm);
-            border: 1px solid var(--border-color);
+            padding: var(--space-1) var(--space-2);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-sm);
             background: transparent;
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             font-family: var(--font-mono);
             font-size: var(--text-xs);
             cursor: pointer;
@@ -92,34 +102,34 @@
         }
 
         .filter-token:hover {
-            color: var(--text-primary);
-            border-color: var(--text-primary);
+            color: var(--fg);
+            border-color: var(--fg);
         }
 
         .filter-token.active {
-            background: var(--text-primary);
-            color: var(--bg-primary);
-            border-color: var(--text-primary);
+            background: var(--fg);
+            color: var(--bg);
+            border-color: var(--fg);
         }
 
         /* Action Cards */
         .action-list {
             display: flex;
             flex-direction: column;
-            gap: var(--space-md);
+            gap: var(--space-4);
         }
 
         .action-card {
-            padding: var(--space-md);
-            background: var(--surface-primary);
-            border: 1px solid var(--border-color);
-            border-left: 3px solid var(--border-color);
+            padding: var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-left: 3px solid var(--border-subtle);
             border-radius: var(--radius-md);
             transition: all 0.2s;
         }
 
         .action-card:hover {
-            border-color: var(--text-secondary);
+            border-color: var(--fg-muted);
         }
 
         .action-card.priority-high {
@@ -137,12 +147,12 @@
         .action-card-header {
             display: flex;
             align-items: center;
-            gap: var(--space-sm);
-            margin-bottom: var(--space-sm);
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
         }
 
         .category-badge {
-            padding: var(--space-xs) var(--space-sm);
+            padding: var(--space-1) var(--space-2);
             border-radius: var(--radius-sm);
             font-family: var(--font-mono);
             font-size: var(--text-xs);
@@ -159,9 +169,9 @@
         .urgency-indicator {
             display: flex;
             align-items: center;
-            gap: var(--space-xs);
+            gap: var(--space-1);
             font-size: var(--text-xs);
-            color: var(--text-secondary);
+            color: var(--fg-muted);
         }
 
         .urgency-dot {
@@ -176,64 +186,64 @@
 
         .action-card-title {
             font-size: var(--text-md);
-            margin-bottom: var(--space-xs);
+            margin-bottom: var(--space-1);
             font-weight: 500;
         }
 
         .action-card-meta {
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             font-size: var(--text-sm);
-            margin-bottom: var(--space-md);
+            margin-bottom: var(--space-4);
         }
 
         .action-card-buttons {
             display: flex;
-            gap: var(--space-sm);
+            gap: var(--space-2);
         }
 
         /* Empty State */
         .empty-state {
             text-align: center;
-            padding: var(--space-xl) var(--space-md);
-            color: var(--text-secondary);
+            padding: var(--space-10) var(--space-4);
+            color: var(--fg-muted);
         }
 
         .empty-state h3 {
-            margin-bottom: var(--space-sm);
+            margin-bottom: var(--space-2);
         }
 
         /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: var(--space-md);
-            margin-bottom: var(--space-lg);
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
         }
 
         .stat-card {
-            padding: var(--space-md);
-            background: var(--surface-primary);
-            border: 1px solid var(--border-color);
+            padding: var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
         }
 
         .stat-label {
             font-size: var(--text-xs);
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             text-transform: uppercase;
             font-family: var(--font-mono);
-            margin-bottom: var(--space-xs);
+            margin-bottom: var(--space-1);
         }
 
         .stat-value {
             font-size: var(--text-2xl);
             font-weight: 600;
-            margin-bottom: var(--space-xs);
+            margin-bottom: var(--space-1);
         }
 
         .stat-change {
             font-size: var(--text-xs);
-            color: var(--text-secondary);
+            color: var(--fg-muted);
         }
 
         .stat-change.positive { color: #00cc00; }
@@ -241,12 +251,12 @@
 
         /* Chart Placeholder */
         .chart-placeholder {
-            padding: var(--space-xl);
-            background: var(--surface-primary);
-            border: 1px solid var(--border-color);
+            padding: var(--space-10);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
             text-align: center;
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             min-height: 300px;
             display: flex;
             align-items: center;
@@ -255,40 +265,40 @@
 
         /* Form Groups */
         .form-group {
-            margin-bottom: var(--space-lg);
+            margin-bottom: var(--space-6);
         }
 
         .form-label {
             display: block;
             font-size: var(--text-sm);
             font-weight: 500;
-            margin-bottom: var(--space-sm);
+            margin-bottom: var(--space-2);
         }
 
         .form-input, .form-select {
             width: 100%;
-            padding: var(--space-sm);
-            background: var(--surface-primary);
-            border: 1px solid var(--border-color);
+            padding: var(--space-2);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-sm);
-            color: var(--text-primary);
+            color: var(--fg);
             font-family: var(--font-mono);
             font-size: var(--text-sm);
         }
 
         .form-input:focus, .form-select:focus {
             outline: none;
-            border-color: var(--text-primary);
+            border-color: var(--fg);
         }
 
         /* Account Section */
         .account-section {
             display: flex;
             align-items: center;
-            gap: var(--space-md);
-            padding: var(--space-md);
-            background: var(--surface-primary);
-            border: 1px solid var(--border-color);
+            gap: var(--space-4);
+            padding: var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
         }
 
@@ -296,18 +306,18 @@
             width: 48px;
             height: 48px;
             border-radius: 50%;
-            background: var(--text-secondary);
+            background: var(--fg-muted);
         }
 
         .account-info h3 {
-            margin: 0 0 var(--space-xs) 0;
+            margin: 0 0 var(--space-1) 0;
             font-size: var(--text-md);
         }
 
         .account-info p {
             margin: 0;
             font-size: var(--text-sm);
-            color: var(--text-secondary);
+            color: var(--fg-muted);
         }
 
         /* Toggle Switch */
@@ -315,7 +325,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: var(--space-sm) 0;
+            padding: var(--space-2) 0;
         }
 
         .toggle-switch {
@@ -337,7 +347,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: var(--border-color);
+            background-color: var(--border-subtle);
             transition: 0.3s;
             border-radius: 24px;
         }
@@ -349,17 +359,17 @@
             width: 18px;
             left: 3px;
             bottom: 3px;
-            background-color: var(--text-primary);
+            background-color: var(--fg);
             transition: 0.3s;
             border-radius: 50%;
         }
 
         input:checked + .toggle-slider {
-            background-color: var(--text-primary);
+            background-color: var(--fg);
         }
 
         input:checked + .toggle-slider:before {
-            background-color: var(--bg-primary);
+            background-color: var(--bg);
             transform: translateX(24px);
         }
 
@@ -367,25 +377,25 @@
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: var(--space-md);
+            margin-top: var(--space-4);
         }
 
         .data-table th,
         .data-table td {
-            padding: var(--space-sm);
+            padding: var(--space-2);
             text-align: left;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-subtle);
         }
 
         .data-table th {
             font-size: var(--text-xs);
             text-transform: uppercase;
-            color: var(--text-secondary);
+            color: var(--fg-muted);
             font-weight: 500;
         }
 
         .data-table tbody tr:hover {
-            background: var(--surface-secondary);
+            background: var(--bg-elevated);
         }
 
         /* Sign-in Overlay */
@@ -407,38 +417,38 @@
         }
 
         .sign-in-modal {
-            background: var(--surface-primary);
-            border: 1px solid var(--border-color);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
-            padding: var(--space-xl);
+            padding: var(--space-10);
             max-width: 400px;
             text-align: center;
         }
 
         .sign-in-modal h2 {
-            margin-bottom: var(--space-md);
+            margin-bottom: var(--space-4);
         }
 
         .sign-in-modal p {
-            color: var(--text-secondary);
-            margin-bottom: var(--space-lg);
+            color: var(--fg-muted);
+            margin-bottom: var(--space-6);
         }
 
         /* Buttons */
         .btn {
-            padding: var(--space-sm) var(--space-md);
+            padding: var(--space-2) var(--space-4);
             border-radius: var(--radius-sm);
             font-family: var(--font-mono);
             font-size: var(--text-sm);
             cursor: pointer;
             transition: all 0.2s;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border-subtle);
         }
 
         .btn--filled {
-            background: var(--text-primary);
-            color: var(--bg-primary);
-            border-color: var(--text-primary);
+            background: var(--fg);
+            color: var(--bg);
+            border-color: var(--fg);
         }
 
         .btn--filled:hover {
@@ -447,17 +457,17 @@
 
         .btn--ghost {
             background: transparent;
-            color: var(--text-primary);
+            color: var(--fg);
         }
 
         .btn--ghost:hover {
-            background: var(--surface-secondary);
+            background: var(--bg-elevated);
         }
 
         /* Responsive */
         @media (max-width: 768px) {
             .tasks-app {
-                padding: var(--space-sm);
+                padding: var(--space-2);
             }
 
             .action-card-buttons {
@@ -674,7 +684,7 @@
             <!-- Sender Rules -->
             <div class="form-group">
                 <label class="form-label">Sender Rules</label>
-                <p class="section-description" style="margin-bottom: var(--space-md);">
+                <p class="section-description" style="margin-bottom: var(--space-4);">
                     Customize how emails from specific senders are handled
                 </p>
                 <table class="data-table">
@@ -701,7 +711,7 @@
                         </tr>
                     </tbody>
                 </table>
-                <button class="btn btn--filled" style="margin-top: var(--space-md);">Add Rule</button>
+                <button class="btn btn--filled" style="margin-top: var(--space-4);">Add Rule</button>
             </div>
         </div>
 
@@ -817,6 +827,8 @@
         </div>
     </div>
 
+    <!-- API Client -->
+    <script src="api.js"></script>
     <script>
         // Tab Switching
         const tabButtons = document.querySelectorAll('.tab-button');
@@ -892,19 +904,62 @@
         const signInOverlay = document.getElementById('signInOverlay');
         const signInButton = document.getElementById('signInButton');
 
-        // Check authentication state (placeholder - would integrate with real auth)
-        const isAuthenticated = false; // Change to true to simulate signed-in state
+        // Check for OAuth callback code in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const authCode = urlParams.get('code');
+        if (authCode) {
+            TasksAPI.handleCallback(authCode).then(result => {
+                if (result.success) {
+                    window.history.replaceState({}, '', window.location.pathname);
+                    signInOverlay.classList.add('hidden');
+                    loadDashboardData();
+                }
+            });
+        }
 
-        if (!isAuthenticated) {
+        // Check stored auth state
+        if (TasksAPI.isAuthenticated()) {
+            signInOverlay.classList.add('hidden');
+            loadDashboardData();
+        } else {
             signInOverlay.classList.remove('hidden');
         }
 
-        signInButton.addEventListener('click', () => {
-            console.log('Initiating Google OAuth flow...');
-            // In production, this would trigger Google OAuth
-            // For now, just hide the overlay
-            signInOverlay.classList.add('hidden');
+        signInButton.addEventListener('click', async () => {
+            const result = await TasksAPI.connectGoogle();
+            if (!result.success) {
+                // Demo mode: just hide overlay
+                console.log('Running in demo mode — no Supabase configured');
+                signInOverlay.classList.add('hidden');
+            }
         });
+
+        // Load real data when authenticated
+        async function loadDashboardData() {
+            const user = TasksAPI.getUser();
+            if (!user) return;
+
+            // Update account email in settings
+            const accountEmail = document.querySelector('.account-info h3');
+            if (accountEmail && user.email) {
+                accountEmail.textContent = user.email;
+            }
+
+            // Load stats for analytics tab
+            const statsResult = await TasksAPI.getStats(7);
+            if (statsResult.success && statsResult.data?.stats) {
+                const stats = statsResult.data.stats;
+                const statValues = document.querySelectorAll('.stat-value');
+                if (statValues[0]) statValues[0].textContent = stats.total_processed;
+                if (statValues[1]) {
+                    const rate = stats.total_processed > 0
+                        ? Math.round(((stats.confirmed + stats.auto_created) / stats.total_processed) * 100)
+                        : 0;
+                    statValues[1].textContent = rate + '%';
+                }
+                if (statValues[3]) statValues[3].textContent = Math.round(stats.dismiss_rate * 100) + '%';
+            }
+        }
 
         // Toggle Switch Behavior (already handled by CSS, but logging for demo)
         const toggleSwitches = document.querySelectorAll('.toggle-switch input');
