@@ -1840,7 +1840,7 @@ body {
   // City IDs: 10970 = SF Bay Area (others TBD — need to discover NYC ID)
   const SCREENSLATE_CITY_IDS = {
     'bay-area': '10970',
-    // 'new-york': 'XXXXX', // TODO: discover from Network tab on NYC listings
+    'new-york': '10969',
   };
 
   async function fetchScreenSlate(source) {
@@ -1853,7 +1853,7 @@ body {
       const d = new Date(Date.now() + dayOffset * 86400000);
       const dateStr = d.toISOString().split('T')[0]; // 2026-02-10
       const dateParam = dateStr.replace(/-/g, ''); // 20260210
-      let apiUrl = `${baseUrl}/date?_format=json&date=${dateParam}`;
+      let apiUrl = `${baseUrl}/listings/date?_format=json&date=${dateParam}`;
       if (cityId) apiUrl += `&field_city_target_id=${cityId}`;
 
       try {
