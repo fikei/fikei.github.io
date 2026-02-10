@@ -11,8 +11,8 @@ export const upcomingReleases: WidgetDefinition = {
 
   eligibility: {
     rules: [
-      { type: 'min_items', weight: 1.0, params: { min: 3 } },
-      { type: 'variety', weight: 0.8, params: { minUniqueDomains: 2, scoreAtDomains: 4 } }
+      { type: 'min_items', weight: 1.0, params: { min: 2 } },
+      { type: 'variety', weight: 0.8, params: { minUniqueDomains: 1, scoreAtDomains: 3 } }
     ],
     requireAllCritical: true,
     minOverallScore: 0.5
