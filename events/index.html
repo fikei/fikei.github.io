@@ -1836,30 +1836,56 @@ body {
   }
 
   // --- ScreenSlate Parser (adaptive selector discovery) ---
-  // ScreenSlate uses div-based listings, not tables. Structure is unknown ahead of time
-  // so we try multiple selector strategies and report what works.
+  // ScreenSlate uses date-based listing URLs: /listings/YYYY-MM-DD
+  // We fetch today's date page to get current screenings.
   async function fetchScreenSlate(source) {
-    const text = await proxyFetch(source.url);
-    return parseScreenSlate(text, source.id, source.url);
+    // Build date-specific URL: /listings/2026-02-10
+    const today = new Date().toISOString().split('T')[0];
+    const dateUrl = source.url.replace(/\/listings\/?$/, '/listings/' + today);
+    log(`ScreenSlate: fetching date page ${dateUrl}`);
+    const text = await proxyFetch(dateUrl);
+    const events = parseScreenSlate(text, source.id, dateUrl);
+
+    // Also fetch tomorrow for more complete coverage
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const tomorrowUrl = source.url.replace(/\/listings\/?$/, '/listings/' + tomorrow);
+    try {
+      log(`ScreenSlate: fetching tomorrow ${tomorrowUrl}`);
+      const text2 = await proxyFetch(tomorrowUrl);
+      const events2 = parseScreenSlate(text2, source.id, tomorrowUrl);
+      // Dedupe by name+date+venue
+      const seen = new Set(events.map(e => `${e.name}|${e.date}|${e.venue}`));
+      events2.forEach(e => {
+        const key = `${e.name}|${e.date}|${e.venue}`;
+        if (!seen.has(key)) { events.push(e); seen.add(key); }
+      });
+    } catch (e) {
+      log(`ScreenSlate: tomorrow fetch failed: ${e.message}`);
+    }
+
+    return events;
   }
 
   function parseScreenSlate(html, sourceId, baseUrl) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     log(`ScreenSlate parser: ${html.length} chars, URL: ${baseUrl}`);
 
+    // --- ALWAYS dump full page diagnostics first ---
+    screenSlateDiagnostics(doc);
+
     // --- Strategy 0: Check for JSON-LD structured data ---
     const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
     if (jsonLdScripts.length > 0) {
       log(`ScreenSlate: found ${jsonLdScripts.length} JSON-LD block(s)`);
       const ldEvents = parseScreenSlateJsonLd(jsonLdScripts, sourceId);
-      if (ldEvents.length > 0) {
+      if (ldEvents.length > 5) {
         log(`ScreenSlate: JSON-LD yielded ${ldEvents.length} events`);
         return ldEvents;
       }
+      if (ldEvents.length > 0) log(`ScreenSlate: JSON-LD found only ${ldEvents.length} (too few, trying other strategies)`);
     }
 
-    // --- Strategy 1: Drupal Views patterns (most likely for a Drupal site) ---
-    // Try common Drupal listing selectors in priority order
+    // --- Strategy 1: Drupal Views patterns ---
     const drupalStrategies = [
       { name: 'views-row', selector: '.views-row, .views-row-inner' },
       { name: 'node-listing', selector: 'article[class*="node--type"], .node--type-screening, .node--type-event, .node--type-listing' },
@@ -1872,75 +1898,130 @@ body {
       if (rows.length > 2) {
         log(`ScreenSlate: "${strategy.name}" matched ${rows.length} elements`);
         const events = parseScreenSlateRows(rows, sourceId, baseUrl, doc);
-        if (events.length > 0) {
+        if (events.length > 5) {
           log(`ScreenSlate: extracted ${events.length} events via "${strategy.name}"`);
           return events;
         }
+        if (events.length > 0) log(`ScreenSlate: "${strategy.name}" found only ${events.length} (too few, continuing)`);
       }
     }
 
-    // --- Strategy 2: Generic semantic patterns ---
-    const genericStrategies = [
-      { name: 'article tags', selector: 'article' },
-      { name: 'h3 event headings', selector: '.field--name-title, h3 a, h2 a' },
-      { name: 'time elements', selector: 'time[datetime]' },
-    ];
-
-    // Try <article> tags
+    // --- Strategy 2: <article> tags ---
     const articles = doc.querySelectorAll('article');
     if (articles.length > 2) {
       log(`ScreenSlate: found ${articles.length} <article> elements`);
       const events = parseScreenSlateRows(articles, sourceId, baseUrl, doc);
-      if (events.length > 0) {
+      if (events.length > 5) {
         log(`ScreenSlate: extracted ${events.length} events from <article> tags`);
         return events;
       }
+      if (events.length > 0) log(`ScreenSlate: <article> found only ${events.length} (too few, continuing)`);
     }
 
     // --- Strategy 3: Date-grouped sections ---
-    // ScreenSlate likely groups screenings by date with date headings
     const dateGroupEvents = parseScreenSlateDateGroups(doc, sourceId, baseUrl);
-    if (dateGroupEvents.length > 0) {
+    if (dateGroupEvents.length > 5) {
       log(`ScreenSlate: extracted ${dateGroupEvents.length} events from date-grouped sections`);
       return dateGroupEvents;
     }
+    if (dateGroupEvents.length > 0) log(`ScreenSlate: date-groups found only ${dateGroupEvents.length} (too few, continuing)`);
 
     // --- Strategy 4: Link harvesting fallback ---
-    // If all structural approaches fail, extract links that look like event URLs
     const linkEvents = parseScreenSlateLinks(doc, sourceId, baseUrl);
     if (linkEvents.length > 0) {
       log(`ScreenSlate: extracted ${linkEvents.length} events from link harvesting`);
       return linkEvents;
     }
 
-    // --- Diagnostic dump for debugging ---
-    log('ScreenSlate: NO strategy matched. Dumping page diagnostics:');
+    log('ScreenSlate: NO strategy produced usable events');
+    return [];
+  }
+
+  // Deep page diagnostics — always runs to help build selectors
+  function screenSlateDiagnostics(doc) {
+    log('ScreenSlate DIAGNOSTICS:');
+
+    // 1. All unique CSS classes
     const allClasses = new Set();
     doc.querySelectorAll('[class]').forEach(el => {
       el.className.split(/\s+/).forEach(c => { if (c) allClasses.add(c); });
     });
     const classArr = [...allClasses].sort();
-    log(`  Total unique classes: ${classArr.length}`);
-    // Log classes that look event/listing related
-    const relevant = classArr.filter(c => /event|listing|screen|film|show|venue|date|time|sched|view|node|field|card|item|row|entry/i.test(c));
-    log(`  Relevant classes: ${relevant.join(', ') || '(none)'}`);
-    // Log top-level structure
-    const body = doc.querySelector('body, main, #content, .content, [role="main"]');
-    if (body) {
-      const children = Array.from(body.children).slice(0, 20).map(el => {
-        const tag = el.tagName.toLowerCase();
-        const cls = el.className ? '.' + el.className.split(/\s+/).slice(0, 3).join('.') : '';
-        const id = el.id ? '#' + el.id : '';
-        return `${tag}${id}${cls}`;
-      });
-      log(`  Body children: ${children.join(', ')}`);
-    }
-    log(`  Tables: ${doc.querySelectorAll('table').length}, Articles: ${doc.querySelectorAll('article').length}`);
-    log(`  Links containing "screening": ${doc.querySelectorAll('a[href*="screening"]').length}`);
-    log(`  Links containing "listings": ${doc.querySelectorAll('a[href*="listing"]').length}`);
-    log(`  <time> elements: ${doc.querySelectorAll('time').length}`);
+    log(`  [classes] Total unique: ${classArr.length}`);
+    const relevant = classArr.filter(c => /event|listing|screen|film|show|venue|date|time|sched|view|node|field|card|item|row|entry|series|program|calendar|movie|cinema|theater|theatre/i.test(c));
+    log(`  [classes] Relevant: ${relevant.join(', ') || '(none)'}`);
+    // Log ALL classes for complete picture
+    log(`  [classes] All: ${classArr.join(', ')}`);
 
-    return [];
+    // 2. Full DOM tree (3 levels deep)
+    log('  [dom] Full tree (3 levels):');
+    function dumpTree(el, depth, maxDepth) {
+      if (depth > maxDepth) return;
+      const children = Array.from(el.children);
+      children.forEach(child => {
+        const tag = child.tagName.toLowerCase();
+        const cls = child.className ? '.' + child.className.split(/\s+/).filter(Boolean).join('.') : '';
+        const id = child.id ? '#' + child.id : '';
+        const childCount = child.children.length;
+        const textLen = child.textContent.trim().length;
+        const indent = '    '.repeat(depth);
+        const linkCount = child.querySelectorAll('a').length;
+        const extra = [];
+        if (childCount > 0) extra.push(`${childCount} children`);
+        if (linkCount > 0) extra.push(`${linkCount} links`);
+        if (textLen > 0 && childCount === 0) extra.push(`text: "${child.textContent.trim().substring(0, 60)}"`);
+        log(`  ${indent}${tag}${id}${cls}${extra.length ? ' (' + extra.join(', ') + ')' : ''}`);
+        dumpTree(child, depth + 1, maxDepth);
+      });
+    }
+    const root = doc.querySelector('main, [role="main"], #main-content, #content, .main-content, .content, body');
+    if (root) {
+      const rootTag = root.tagName.toLowerCase();
+      const rootCls = root.className ? '.' + root.className.split(/\s+/).filter(Boolean).join('.') : '';
+      const rootId = root.id ? '#' + root.id : '';
+      log(`  [dom] Root: ${rootTag}${rootId}${rootCls}`);
+      dumpTree(root, 1, 3);
+    }
+
+    // 3. All <a> links with their hrefs (first 50)
+    const allLinks = Array.from(doc.querySelectorAll('a[href]')).map(a => ({
+      href: a.getAttribute('href'),
+      text: a.textContent.trim().substring(0, 80),
+      parent: a.parentElement ? a.parentElement.tagName.toLowerCase() + (a.parentElement.className ? '.' + a.parentElement.className.split(/\s+/)[0] : '') : '',
+    }));
+    log(`  [links] Total: ${allLinks.length}`);
+    allLinks.slice(0, 50).forEach((l, i) => {
+      log(`    ${i}: "${l.text}" → ${l.href} [parent: ${l.parent}]`);
+    });
+    if (allLinks.length > 50) log(`    ... and ${allLinks.length - 50} more`);
+
+    // 4. All headings
+    const headings = Array.from(doc.querySelectorAll('h1, h2, h3, h4')).map(h => ({
+      tag: h.tagName,
+      text: h.textContent.trim().substring(0, 80),
+      cls: h.className || '',
+    }));
+    log(`  [headings] ${headings.length} total:`);
+    headings.forEach(h => log(`    <${h.tag}${h.cls ? ' class="' + h.cls + '"' : ''}> ${h.text}`));
+
+    // 5. All <time> elements
+    const times = Array.from(doc.querySelectorAll('time'));
+    log(`  [time] ${times.length} elements:`);
+    times.slice(0, 20).forEach(t => {
+      log(`    datetime="${t.getAttribute('datetime')}" text="${t.textContent.trim().substring(0, 40)}"`);
+    });
+
+    // 6. Elements with data-* attributes that look relevant
+    const dataEls = Array.from(doc.querySelectorAll('[data-date], [data-event], [data-screening], [data-id], [data-nid], [data-venue], [data-type]'));
+    log(`  [data-attrs] ${dataEls.length} elements with data-date/event/screening/id/nid/venue/type`);
+    dataEls.slice(0, 10).forEach(el => {
+      const attrs = Array.from(el.attributes).filter(a => a.name.startsWith('data-')).map(a => `${a.name}="${a.value}"`).join(' ');
+      log(`    <${el.tagName.toLowerCase()} ${attrs}>`);
+    });
+
+    // 7. Count key structural elements
+    log(`  [counts] table:${doc.querySelectorAll('table').length} article:${doc.querySelectorAll('article').length} section:${doc.querySelectorAll('section').length} ul:${doc.querySelectorAll('ul').length} ol:${doc.querySelectorAll('ol').length}`);
+    log(`  [counts] a[href*=screening]:${doc.querySelectorAll('a[href*="screening"]').length} a[href*=listing]:${doc.querySelectorAll('a[href*="listing"]').length} a[href*=event]:${doc.querySelectorAll('a[href*="event"]').length}`);
   }
 
   // Extract events from JSON-LD blocks
@@ -2108,9 +2189,14 @@ body {
         links.forEach(link => {
           const href = link.getAttribute('href') || '';
           const text = link.textContent.trim();
-          // Filter: must look like a screening link (not navigation)
-          if (text.length > 3 && href && !href.startsWith('#') && !href.startsWith('javascript:') &&
-              (href.includes('/screenings/') || href.includes('/listings/') || href.includes('/events/') || href.includes('/venues/') || text.length > 10)) {
+          // Filter: must look like a screening link (not navigation junk)
+          if (text.length < 4 || !href || href.startsWith('#') || href.startsWith('javascript:')) return;
+          // Skip obvious navigation/site chrome
+          if (/^(submit|about|contact|newsletter|subscribe|sign|log\s*in|read more|home|menu|search|archive|support|donate|patreon|guide)/i.test(text)) return;
+          if (href.includes('/submit') || href.includes('/about') || href.includes('/newsletter') || href.includes('/subscribe') || href.includes('/login') || href.includes('/support')) return;
+          // Must have a path that looks like an event link OR meaningful text
+          const isEventPath = href.includes('/screenings/') || href.includes('/events/') || href.includes('/venues/') || href.includes('/films/');
+          if (isEventPath || (text.length > 10 && !text.includes('Screen Slate'))) {
             // Try to extract venue from nearby text
             let venue = '';
             const parent = link.closest('li, div, p, .screening-item, .listing-item, [class*="screening"], [class*="listing"]');
@@ -2138,16 +2224,18 @@ body {
   function parseScreenSlateLinks(doc, sourceId, baseUrl) {
     const events = [];
     const seen = new Set();
-    const links = doc.querySelectorAll('a[href*="/screenings/"], a[href*="/events/"], a[href*="/listings/"]');
+    const links = doc.querySelectorAll('a[href*="/screenings/"], a[href*="/events/"], a[href*="/films/"]');
     log(`ScreenSlate links fallback: found ${links.length} candidate links`);
 
     links.forEach(link => {
       const href = link.getAttribute('href') || '';
       const text = link.textContent.trim();
       if (!text || text.length < 3 || seen.has(href)) return;
-      // Skip navigation/category links
-      if (/^(home|about|contact|submit|newsletter|archive|more|login|sign)/i.test(text)) return;
+      // Skip navigation/site chrome
+      if (/^(home|about|contact|submit|newsletter|archive|more|login|sign|subscribe|read more|guide|support|donate)/i.test(text)) return;
+      if (text.includes('Screen Slate')) return;
       if (href.endsWith('/listings') || href.endsWith('/listings/') || href.endsWith('/screenings') || href.endsWith('/screenings/')) return;
+      if (href.includes('/submit') || href.includes('/about') || href.includes('/newsletter')) return;
       seen.add(href);
 
       // Try to get date from a nearby <time> element
