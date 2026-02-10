@@ -8587,6 +8587,7 @@ Return JSON:
           <div class="grid-item__menu" data-menu-id="${l.id}">
             <button class="grid-item__menu-item" data-action="share">Share Link</button>
             <button class="grid-item__menu-item" data-action="refresh-image">Refresh Image</button>
+            <button class="grid-item__menu-item" data-action="rerun-enrichment">Rerun Enrichment</button>
             <div class="grid-item__menu-divider"></div>
             <button class="grid-item__menu-item" data-action="category">Change Category</button>
             <button class="grid-item__menu-item" data-action="content-type">Change Content Type</button>
@@ -9068,6 +9069,39 @@ Return JSON:
             forceRefresh: true // This will override the existing image
           });
           processEnrichmentQueue();
+        }
+        return;
+      } else if (actionType === 'rerun-enrichment') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          toast('Re-enriching link...');
+          try {
+            const meta = await fetchMetadata(link.url);
+            const cat = categorize(link.url, meta.title, meta.description);
+            const contentType = detectContentType(link.url, meta.title, meta.description, cat.category);
+            let music = null;
+            if (cat.category === 'listen' || contentType.type === 'music') {
+              music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
+            }
+            const linkUpdate = {
+              title: meta.title || link.title,
+              description: meta.description || link.description,
+              image: meta.image || link.image,
+              category: cat.category,
+              confidence: cat.confidence,
+              content_type: contentType.type,
+              type_confidence: contentType.confidence,
+              type_signals: contentType.signals
+            };
+            if (music) linkUpdate.music = music;
+            updateLink(id, linkUpdate);
+            renderFilters();
+            renderGrid();
+            toast('Enrichment complete');
+          } catch (err) {
+            console.error('[rerun-enrichment]', err);
+            toast('Enrichment failed', true);
+          }
         }
         return;
       } else if (actionType === 'category') {
