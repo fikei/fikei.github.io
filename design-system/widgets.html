@@ -1636,6 +1636,267 @@ var SIZE_LABELS = {
 };
 
 // ============================================
+// Dummy content per template — varies by size
+// Each template has multiple content sets; the
+// variant viewer picks one based on size index
+// to show realistic, distinct content at each size.
+// ============================================
+
+var DUMMY_CONTENT = {
+  verdict: [
+    { display: 'Minimalism vs Maximalism', meta: '5 items lean clean lines, 3 items lean bold pattern', tagA: 'Minimal', tagB: 'Maximal' },
+    { display: 'Warm Tones vs Cool Tones', meta: '4 items use earth tones, 6 items lean blue-grey', tagA: 'Warm', tagB: 'Cool' },
+    { display: 'Vintage vs Modern', meta: '7 items are pre-2000, 2 items are current season', tagA: 'Vintage', tagB: 'Modern' },
+    { display: 'Form vs Function', meta: 'Your saves split between aesthetic and utility', tagA: 'Form', tagB: 'Function' },
+    { display: 'Digital vs Analog', meta: '8 digital tools, 3 analog processes saved', tagA: 'Digital', tagB: 'Analog' }
+  ],
+  list: [
+    [
+      { title: 'Aesop Resurrection Hand Wash', meta: '$39 — your most-saved brand' },
+      { title: 'Le Labo Santal 33', meta: '$310 — complements your fragrance saves' },
+      { title: 'Byredo Gypsy Water', meta: '$195 — trending in your network' }
+    ],
+    [
+      { title: 'The Bear S3 Finale', meta: 'Drops Friday — you watched S1-S2' },
+      { title: 'Severance S2E4', meta: 'New episode Monday — caught up' },
+      { title: 'Shogun S2 Premiere', meta: 'March 2026 — on your watchlist' }
+    ],
+    [
+      { title: 'Muji Acrylic Shelf Unit', meta: '$89 — matches 4 saved minimal pieces' },
+      { title: 'HAY Palissade Chair', meta: '$275 — Scandinavian, like your recent saves' },
+      { title: 'Ferm Living Plant Box', meta: '$129 — fills your plant display gap' }
+    ],
+    [
+      { title: 'Khruangbin — A La Sala', meta: 'New album — matches your psych-funk saves' },
+      { title: 'Floating Points — Cascade', meta: 'Released last week — similar to Nils Frahm' },
+      { title: 'Adrianne Lenker — Bright Future', meta: 'Folk pick — aligns with your acoustic saves' }
+    ],
+    [
+      { title: 'Golden Gate Bridge', meta: 'Start here — morning light, 15 min drive' },
+      { title: 'Tartine Bakery', meta: '12 min walk — lunch stop, saved 3x' },
+      { title: 'SFMOMA', meta: '8 min walk — afternoon, 2 exhibits match your saves' }
+    ]
+  ],
+  narrative: [
+    { prose: 'Your last 8 saves share a theme: <strong>the tension between handmade and mass-produced</strong>. You gravitate toward objects with visible craft — stitching, wood grain, hand-thrown ceramics.', tags: ['Craft', 'Authenticity', 'Material'] },
+    { prose: 'A pattern emerges across your reading: <strong>systems thinking applied to everyday life</strong>. From urban planning articles to sourdough guides, you seek frameworks that explain how small inputs create complex outputs.', tags: ['Systems', 'Process', 'Design'] },
+    { prose: 'Your collection reveals <strong>a fascination with Japanese design philosophy</strong> — wabi-sabi imperfection, ma (negative space), and mono no aware (beauty in transience). 12 of your 20 recent saves connect to this.', tags: ['Japanese', 'Wabi-sabi', 'Philosophy'] },
+    { prose: 'Across your saves you keep returning to <strong>the intersection of music and visual art</strong>. Album artwork, concert posters, music videos — you experience sound as a visual medium.', tags: ['Synesthesia', 'Visual', 'Sound'] }
+  ],
+  comparison: [
+    { titleA: 'Arc Browser', metaA: 'Your current default', tagsA: ['Spaces', 'Design'], titleB: 'Zen Browser', metaB: 'Open-source alternative', tagsB: ['Privacy', 'Firefox'] },
+    { titleA: 'Notion', metaA: 'Used daily for 2 years', tagsA: ['All-in-one', 'Collab'], titleB: 'Obsidian', metaB: 'Your recent interest', tagsB: ['Local', 'Markdown'] },
+    { titleA: 'Nike Pegasus 41', metaA: 'Your go-to runner', tagsA: ['Cushion', '$130'], titleB: 'New Balance 1080v14', metaB: 'Based on your saves', tagsB: ['Fresh Foam', '$150'] },
+    { titleA: 'Figma', metaA: 'Your current tool', tagsA: ['Collab', 'Web'], titleB: 'Penpot', metaB: 'Open-source alternative', tagsB: ['Free', 'Self-host'] }
+  ],
+  choices: [
+    [
+      { title: 'Chez Pascal', meta: 'French bistro — untried for 3 weeks' },
+      { title: 'Tacos El Gordo', meta: 'Mexican street — your most-saved cuisine' },
+      { title: 'Sushi Nakazawa', meta: 'Omakase — saved last week, still unvisited' }
+    ],
+    [
+      { title: 'Morning Run', meta: '5K route — matches your fitness saves' },
+      { title: 'Yoga Flow', meta: '30 min session — you saved 2 studios' },
+      { title: 'Bouldering', meta: 'Indoor V3-V5 — trending in your circle' }
+    ],
+    [
+      { title: 'Dune: Part Three', meta: 'Opens Friday — you rated Part Two 9/10' },
+      { title: 'Anora', meta: 'A24 — matches your indie drama saves' },
+      { title: 'Mickey 17', meta: 'Bong Joon-ho — you saved the trailer twice' }
+    ]
+  ],
+  spectrum: [
+    [
+      { labelL: 'Read', labelR: 'Watch', pos: 35 },
+      { labelL: 'Browse', labelR: 'Buy', pos: 70 },
+      { labelL: 'Solo', labelR: 'Social', pos: 25 }
+    ],
+    [
+      { labelL: 'Minimal', labelR: 'Ornate', pos: 20 },
+      { labelL: 'Budget', labelR: 'Premium', pos: 65 },
+      { labelL: 'Classic', labelR: 'Trendy', pos: 45 }
+    ],
+    [
+      { labelL: 'Local', labelR: 'Global', pos: 60 },
+      { labelL: 'Digital', labelR: 'Physical', pos: 40 },
+      { labelL: 'Create', labelR: 'Consume', pos: 55 }
+    ]
+  ],
+  suggestion: [
+    { title: 'Designing Design — Kenya Hara', meta: 'Based on your saves about minimalism and Japanese aesthetics', tags: ['Design', 'Philosophy'] },
+    { title: 'Braun ET66 Calculator', meta: 'Your saves suggest a Dieter Rams appreciation — this is the icon', tags: ['Industrial', 'Classic'] },
+    { title: 'The Creative Act — Rick Rubin', meta: 'Connects your music and creativity saves into one thesis', tags: ['Creativity', 'Music'] },
+    { title: 'Teenage Engineering OP-1 Field', meta: 'Bridges your synth saves and design object interest', tags: ['Synth', 'Design'] }
+  ],
+  grouped: [
+    [
+      { section: 'Morning', items: [{ title: 'Read: Morning Brew', meta: '5 min — from your read saves' }, { title: 'Listen: Huberman Lab', meta: 'Saved episode — 45 min' }] },
+      { section: 'Wind-down', items: [{ title: 'Watch: Chef\'s Table', meta: 'Next unwatched — S7E2' }] }
+    ],
+    [
+      { section: 'Weekday', items: [{ title: 'Focus: Lo-fi playlist', meta: '2 hrs — your top work music' }, { title: 'Read: Stratechery', meta: 'New post — 8 min' }] },
+      { section: 'Weekend', items: [{ title: 'Cook: Ottolenghi recipe', meta: 'Saved 3 weeks ago' }, { title: 'Visit: MoMA PS1', meta: 'New exhibit opens Saturday' }] }
+    ],
+    [
+      { section: 'Create', items: [{ title: 'Sketch: chair concept', meta: 'From your furniture inspo board' }] },
+      { section: 'Consume', items: [{ title: 'Watch: Abstract S3', meta: 'New season — 8 episodes' }, { title: 'Read: Pentagram Papers', meta: 'Library hold ready' }] }
+    ]
+  ]
+};
+
+// Header labels per template — rotated per content index
+var DUMMY_LABELS = {
+  verdict: ['These styles clash', 'Pattern conflict', 'Design tension', 'Opposing themes', 'Style contradiction'],
+  list: ['Your queue', 'Coming up next', 'Good / Better / Best', 'Route these', 'Upcoming for you'],
+  narrative: ['The hidden thread', 'A pattern emerges', 'Worth a deep read', 'Your throughline'],
+  comparison: ['Have you considered?', 'Side by side', 'The switch question', 'Worth comparing'],
+  choices: ['Pick one tonight', 'Decision time', 'Choose your next', 'What are you feeling?'],
+  spectrum: ['Your saving pattern', 'Where you lean', 'Your tendencies'],
+  suggestion: ['Recommended for you', 'You might want this', 'Based on your saves', 'Fill this gap'],
+  grouped: ['Daily ritual bundle', 'Your routine', 'Structured day']
+};
+
+// Apply dummy content to a cloned widget based on template + content index
+function applyDummyContent(clone, template, contentIdx) {
+  var content = DUMMY_CONTENT[template];
+  if (!content) return;
+
+  // Swap header label for variety
+  var labels = DUMMY_LABELS[template];
+  if (labels) {
+    var headerLabel = clone.querySelector('.w-text--label');
+    if (headerLabel) headerLabel.textContent = labels[contentIdx % labels.length];
+  }
+
+  if (template === 'verdict') {
+    var set = content[contentIdx % content.length];
+    var display = clone.querySelector('.w-text--display');
+    if (display) display.textContent = set.display;
+    var meta = clone.querySelector('.w-headline .w-text--meta');
+    if (meta) meta.textContent = set.meta;
+    var badges = clone.querySelectorAll('.w-tag-group .w-badge--filled');
+    if (badges.length >= 2) {
+      badges[0].textContent = set.tagA;
+      badges[1].textContent = set.tagB;
+    }
+  }
+
+  else if (template === 'list') {
+    var setIdx = contentIdx % content.length;
+    var items = content[setIdx];
+    var rows = clone.querySelectorAll('.w-row');
+    for (var i = 0; i < rows.length && i < items.length; i++) {
+      var titleEl = rows[i].querySelector('.w-text--title');
+      var metaEl = rows[i].querySelector('.w-text--meta');
+      if (titleEl) titleEl.textContent = items[i].title;
+      if (metaEl) metaEl.textContent = items[i].meta;
+      // Update image seed for visual variety
+      var img = rows[i].querySelector('img');
+      if (img) img.src = 'https://picsum.photos/seed/' + items[i].title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) + '/160/160';
+    }
+  }
+
+  else if (template === 'narrative') {
+    var set = content[contentIdx % content.length];
+    var prose = clone.querySelector('.w-text--prose');
+    if (prose) prose.innerHTML = set.prose;
+    var tagGroup = clone.querySelector('.w-tag-group');
+    if (tagGroup) {
+      tagGroup.innerHTML = set.tags.map(function(t) {
+        return '<span class="w-badge">' + t + '</span>';
+      }).join('');
+    }
+  }
+
+  else if (template === 'comparison') {
+    var set = content[contentIdx % content.length];
+    var options = clone.querySelectorAll('.w-option');
+    if (options.length >= 2) {
+      var tA = options[0].querySelector('.w-text--title');
+      var mA = options[0].querySelector('.w-text--meta');
+      if (tA) tA.textContent = set.titleA;
+      if (mA) mA.textContent = set.metaA;
+      var tgA = options[0].querySelector('.w-tag-group');
+      if (tgA) tgA.innerHTML = set.tagsA.map(function(t) { return '<span class="w-badge">' + t + '</span>'; }).join('');
+      var imgA = options[0].querySelector('img');
+      if (imgA) imgA.src = 'https://picsum.photos/seed/' + set.titleA.toLowerCase().replace(/[^a-z0-9]/g, '-') + '/400/225';
+
+      var tB = options[1].querySelector('.w-text--title');
+      var mB = options[1].querySelector('.w-text--meta');
+      if (tB) tB.textContent = set.titleB;
+      if (mB) mB.textContent = set.metaB;
+      var tgB = options[1].querySelector('.w-tag-group');
+      if (tgB) tgB.innerHTML = set.tagsB.map(function(t) { return '<span class="w-badge">' + t + '</span>'; }).join('');
+      var imgB = options[1].querySelector('img');
+      if (imgB) imgB.src = 'https://picsum.photos/seed/' + set.titleB.toLowerCase().replace(/[^a-z0-9]/g, '-') + '/400/225';
+    }
+  }
+
+  else if (template === 'choices') {
+    var setIdx = contentIdx % content.length;
+    var items = content[setIdx];
+    var options = clone.querySelectorAll('.w-option');
+    for (var i = 0; i < options.length && i < items.length; i++) {
+      var titleEl = options[i].querySelector('.w-text--title');
+      var metaEl = options[i].querySelector('.w-text--meta');
+      if (titleEl) titleEl.textContent = items[i].title;
+      if (metaEl) metaEl.textContent = items[i].meta;
+      var img = options[i].querySelector('img');
+      if (img) img.src = 'https://picsum.photos/seed/' + items[i].title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) + '/80/80';
+    }
+  }
+
+  else if (template === 'spectrum') {
+    var setIdx = contentIdx % content.length;
+    var axes = content[setIdx];
+    var axisEls = clone.querySelectorAll('.w-axis');
+    for (var i = 0; i < axisEls.length && i < axes.length; i++) {
+      var labels = axisEls[i].querySelectorAll('.w-axis__labels .w-text--label');
+      if (labels.length >= 2) {
+        labels[0].textContent = axes[i].labelL;
+        labels[1].textContent = axes[i].labelR;
+      }
+      var marker = axisEls[i].querySelector('.w-axis__marker');
+      if (marker) marker.style.left = axes[i].pos + '%';
+    }
+  }
+
+  else if (template === 'suggestion') {
+    var set = content[contentIdx % content.length];
+    var titleEl = clone.querySelector('.w-text--title');
+    var metaEl = clone.querySelector('.w-text--meta');
+    if (titleEl) titleEl.textContent = set.title;
+    if (metaEl) metaEl.textContent = set.meta;
+    var tagGroup = clone.querySelector('.w-tag-group');
+    if (tagGroup) {
+      tagGroup.innerHTML = set.tags.map(function(t) {
+        return '<span class="w-badge">' + t + '</span>';
+      }).join('');
+    }
+    var img = clone.querySelector('.w-img--hero img');
+    if (img) img.src = 'https://picsum.photos/seed/' + set.title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) + '/400/300';
+  }
+
+  else if (template === 'grouped') {
+    var setIdx = contentIdx % content.length;
+    var groups = content[setIdx];
+    var sections = clone.querySelectorAll('.w-section');
+    for (var i = 0; i < sections.length && i < groups.length; i++) {
+      var sTitle = sections[i].querySelector('.w-section__title .w-text--label');
+      if (sTitle) sTitle.textContent = groups[i].section;
+      var rows = sections[i].querySelectorAll('.w-row');
+      for (var j = 0; j < rows.length && j < groups[i].items.length; j++) {
+        var titleEl = rows[j].querySelector('.w-text--title');
+        var metaEl = rows[j].querySelector('.w-text--meta');
+        if (titleEl) titleEl.textContent = groups[i].items[j].title;
+        if (metaEl) metaEl.textContent = groups[i].items[j].meta;
+      }
+    }
+  }
+}
+
+// ============================================
 // Audit state — flags + notes in localStorage
 // ============================================
 
@@ -1875,6 +2136,13 @@ function buildVariantItem(source, auditName, size) {
   clone.className = clone.className.replace(/w-shell--\w+/g, '').trim();
   clone.style.cssText = '';
   clone.classList.add('w-shell--' + size);
+
+  // Apply different dummy content per size so variants look distinct
+  var template = source.dataset.template;
+  var sizeIdx = ALL_SIZES.indexOf(size);
+  if (template && sizeIdx >= 0) {
+    applyDummyContent(clone, template, sizeIdx);
+  }
 
   var wrapper = document.createElement('div');
   wrapper.className = 'variant-item variant-item--' + size +
