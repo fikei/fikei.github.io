@@ -1587,6 +1587,11 @@ body {
 .grid-item__platform-icon--youtube-music { background: var(--color-youtube-music); }
 
 /* Expanded listen cards — show artist/track in details */
+.grid-item--listen.grid-item--expanded-medium .grid-item__overlay,
+.grid-item--listen.grid-item--expanded-large .grid-item__overlay {
+  display: none;
+}
+
 .grid-item--listen.grid-item--expanded-medium .grid-item__format-badge,
 .grid-item--listen.grid-item--expanded-large .grid-item__format-badge {
   opacity: 1;
