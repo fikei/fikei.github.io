@@ -7693,6 +7693,47 @@ Return JSON:
   }
 
   // ============================================
+  // Migration v2: Enrich listen links with music metadata
+  // ============================================
+  // Backfills .music property on listen links that were migrated
+  // before extractMusicMetadata existed.
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v1';
+
+  async function enrichListenLinks() {
+    if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
+
+    const allLinks = getAllLinks();
+    const needsEnrich = allLinks.filter(l => l.category === 'listen' && !l.music);
+    if (needsEnrich.length === 0) {
+      localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
+      return;
+    }
+
+    console.log(`%c[enrich-listen] Enriching ${needsEnrich.length} listen links with music metadata`, 'color: #1DB954; font-weight: bold');
+
+    let enriched = 0;
+    for (const link of needsEnrich) {
+      try {
+        const music = await extractMusicMetadata(link.url, link.title, link.description, null);
+        if (music) {
+          updateLink(link.id, { music });
+          enriched++;
+          console.log(`%c[enrich-listen] ✓ ${link.domain}:`, 'color: #1DB954', music.artist || link.title);
+        }
+      } catch (e) {
+        console.warn(`[enrich-listen] Failed for ${link.domain}:`, e.message);
+      }
+    }
+
+    localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
+
+    if (enriched > 0) {
+      console.log(`%c[enrich-listen] Enriched ${enriched}/${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
+      renderGrid();
+    }
+  }
+
+  // ============================================
   // Rule-based Categorizer (fallback)
   // ============================================
   const PATTERNS = {
@@ -10853,6 +10894,8 @@ Return JSON:
 
     // Run one-time migration: watch → listen for music links
     migrateWatchToListen();
+    // Backfill music metadata on existing listen links (async, non-blocking)
+    enrichListenLinks();
 
     // Stale-while-revalidate: render from localStorage immediately
     renderFilters();
