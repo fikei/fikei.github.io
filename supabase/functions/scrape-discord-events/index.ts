@@ -316,7 +316,21 @@ serve(async (req) => {
   }
 
   try {
-    const { guildId, channelId, lookbackDays: rawLookback } = await req.json()
+    let body: Record<string, unknown>
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Request body must be valid JSON with guildId and channelId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const { guildId, channelId, lookbackDays: rawLookback } = body as {
+      guildId?: string
+      channelId?: string
+      lookbackDays?: number
+    }
 
     if (!guildId || !channelId) {
       return new Response(
