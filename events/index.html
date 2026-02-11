@@ -639,6 +639,33 @@ body {
   padding-top: 4px;
 }
 
+/* Enriched event data */
+.day-detail__desc {
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  line-height: var(--leading-relaxed);
+  margin-top: var(--space-1);
+  max-height: 3.6em;
+  overflow: hidden;
+}
+
+.day-detail__img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.event-thumb {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  margin-right: var(--space-1);
+}
+
 /* Week View */
 .week-view { margin-bottom: var(--space-8); }
 
@@ -1476,6 +1503,66 @@ body {
     } catch (e) { log('Cache save failed: ' + e.message); }
   }
 
+  // --- Supabase L2 Cache ---
+  const SUPABASE_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+  const CACHE_EVENTS_URL = SUPABASE_URL + '/functions/v1/cache-events';
+
+  async function loadSupabaseCachedEvents() {
+    if (!supabaseClient) { log('L2 cache: client not available'); return null; }
+    try {
+      const enabledIds = state.sources.filter(s => s.enabled).map(s => s.id);
+      if (enabledIds.length === 0) return null;
+      const cutoff = new Date(Date.now() - SUPABASE_CACHE_TTL).toISOString();
+      const today = new Date().toISOString().split('T')[0];
+      log(`L2 cache: querying ${enabledIds.length} source(s)`);
+      const { data, error } = await supabaseClient
+        .from('events')
+        .select('*')
+        .in('source_id', enabledIds)
+        .gte('scraped_at', cutoff)
+        .gte('date', today)
+        .order('date', { ascending: true });
+      if (error) { log('L2 cache: query error — ' + error.message); return null; }
+      if (!data || data.length === 0) { log('L2 cache: empty'); return null; }
+      const events = data.map(row => ({
+        date: row.date, time: row.time || '', name: row.name, venue: row.venue,
+        address: row.address || '', city: row.city || '', genre: row.genre || '',
+        price: row.price || '', ages: row.ages || '', promoter: row.promoter || '',
+        url: row.url, source: row.source_id,
+        contentType: row.content_type || getSourceCategory(row.source_id),
+        description: row.description || '', imageUrl: row.image_url || '',
+        enrichedTags: row.tags || [],
+      }));
+      log(`L2 cache: loaded ${events.length} events`);
+      return events;
+    } catch (e) { log('L2 cache: error — ' + e.message); return null; }
+  }
+
+  async function saveEventsToSupabase(events) {
+    if (!events || events.length === 0) return;
+    try {
+      log(`L2 cache: saving ${events.length} events...`);
+      const payload = events.map(ev => ({
+        source: ev.source, date: ev.date, time: ev.time || '', name: ev.name,
+        venue: ev.venue, address: ev.address || '', city: ev.city || '',
+        genre: ev.genre || '', price: ev.price || '', ages: ev.ages || '',
+        promoter: ev.promoter || '', url: ev.url, contentType: ev.contentType || '',
+      }));
+      const resp = await fetch(CACHE_EVENTS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ events: payload }),
+      });
+      if (!resp.ok) { log('L2 cache: save failed — ' + resp.status); return; }
+      const result = await resp.json();
+      log(`L2 cache: cached=${result.cached} updated=${result.updated} enrichQueued=${result.enrichQueued}`);
+    } catch (e) { log('L2 cache: save error — ' + e.message); }
+  }
+
   // --- Auto-detect source type from URL ---
   function detectSourceType(url) {
     const u = url.toLowerCase();
@@ -1547,22 +1634,48 @@ body {
     throw new Error('All fetch methods failed for ' + url);
   }
 
-  // --- Fetch All Sources ---
+  // --- Fetch All Sources (three-tier: L1 localStorage → L2 Supabase → scrape) ---
   async function fetchAllSources() {
-    // Try cache first for instant load
-    const cached = loadCachedEvents();
-    if (cached) {
-      state.events = cached;
+    // L1: localStorage (15-min TTL)
+    const cachedL1 = loadCachedEvents();
+    if (cachedL1) {
+      state.events = cachedL1;
       state.events.forEach(ev => { ev.contentType = getSourceCategory(ev.source); });
-      calAutoNavigate();
-      updateFilters();
-      updateContentTypeFilter();
-      render();
-      // Refresh in background
-      fetchAllSourcesNetwork();
+      calAutoNavigate(); updateFilters(); updateContentTypeFilter(); render();
+      log('L1 hit: rendered from localStorage');
+      checkL2OrScrape(); // background
       return;
     }
+    // L2: Supabase (2-hour TTL)
+    log('L1 miss: checking L2 (Supabase)');
+    const cachedL2 = await loadSupabaseCachedEvents();
+    if (cachedL2 && cachedL2.length > 0) {
+      state.events = cachedL2;
+      state.events.forEach(ev => { ev.contentType = getSourceCategory(ev.source); });
+      calAutoNavigate(); updateFilters(); updateContentTypeFilter(); render();
+      saveEventCache(); // populate L1
+      log('L2 hit: rendered from Supabase');
+      return;
+    }
+    // Both miss: scrape
+    log('L1+L2 miss: scraping sources');
     await fetchAllSourcesNetwork();
+  }
+
+  async function checkL2OrScrape() {
+    try {
+      const cachedL2 = await loadSupabaseCachedEvents();
+      if (!cachedL2 || cachedL2.length === 0) {
+        log('L2 stale: background scrape');
+        await fetchAllSourcesNetwork();
+      } else if (cachedL2.length > state.events.length + 5) {
+        log(`L2 fresher (${cachedL2.length} vs ${state.events.length}): updating`);
+        state.events = cachedL2;
+        state.events.forEach(ev => { ev.contentType = getSourceCategory(ev.source); });
+        updateFilters(); updateContentTypeFilter(); render();
+        saveEventCache();
+      }
+    } catch (e) { log('L2 background check failed: ' + e.message); }
   }
 
   async function fetchAllSourcesNetwork() {
@@ -1623,7 +1736,10 @@ body {
     const failedNames = Object.keys(state.sourceErrors).map(id => state.sources.find(s => s.id === id)?.name || id);
     if (failedNames.length > 0) log(`Failed sources: ${failedNames.join(', ')}`);
     el.style.display = 'none';
-    saveEventCache();
+    saveEventCache(); // L1
+    if (state.events.length > 0) {
+      saveEventsToSupabase(state.events).catch(e => log('L2 save failed: ' + e.message)); // L2 async
+    }
     calAutoNavigate();
     updateFilters();
     updateContentTypeFilter();
@@ -2500,17 +2616,25 @@ body {
     tbody.innerHTML = sorted.map(ev => {
       const sourceIds = ev.sources || [ev.source];
       const sourceName = sourceIds.map(sid => state.sources.find(s => s.id === sid)?.name || sid).join(' + ');
+      const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
       const nameCell = ev.url && ev.url !== '#'
-        ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener">${escHtml(ev.name)}</a>`
-        : escHtml(ev.name);
+        ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener"${titleAttr}>${escHtml(ev.name)}</a>`
+        : `<span${titleAttr}>${escHtml(ev.name)}</span>`;
       const dateDisplay = formatDate(ev.date) + (ev.time ? `<small>${escHtml(ev.time)}</small>` : '');
       // Venue + city combined
       const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
-      // Genre as inline tags
-      const genreHtml = ev.genre ? ev.genre.split(/,\s*/).slice(0, 4).map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('') : '';
+      // Genre + enriched tags
+      const allTags = ev.genre ? ev.genre.split(/,\s*/).slice(0, 4) : [];
+      if (ev.enrichedTags && ev.enrichedTags.length > 0) {
+        for (const t of ev.enrichedTags) {
+          if (allTags.length < 4 && !allTags.some(g => g.toLowerCase() === t.toLowerCase())) allTags.push(t);
+        }
+      }
+      const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
+      const thumbHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="event-thumb" alt="" loading="lazy">` : '';
       return `<tr>
         <td class="col-date">${dateDisplay}</td>
-        <td class="col-name">${nameCell}</td>
+        <td class="col-name">${thumbHtml}${nameCell}</td>
         <td class="col-venue">${venueHtml}</td>
         <td class="col-genre">${genreHtml}</td>
         <td class="col-price">${escHtml(ev.price)}</td>
@@ -2843,14 +2967,22 @@ body {
         if (ev.price) metaParts.push(`<span>${escHtml(ev.price)}</span>`);
         if (ev.ages) metaParts.push(`<span>${escHtml(ev.ages)}</span>`);
         if (ev.promoter) metaParts.push(`<span>${escHtml(ev.promoter)}</span>`);
-        const genreHtml = ev.genre
-          ? ev.genre.split(/,\s*/).slice(0, 6).map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('')
-          : '';
+        const allTags = ev.genre ? ev.genre.split(/,\s*/).slice(0, 6) : [];
+        if (ev.enrichedTags && ev.enrichedTags.length > 0) {
+          for (const t of ev.enrichedTags) {
+            if (allTags.length < 6 && !allTags.some(g => g.toLowerCase() === t.toLowerCase())) allTags.push(t);
+          }
+        }
+        const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
+        const descHtml = ev.description ? `<div class="day-detail__desc">${escHtml(ev.description)}</div>` : '';
+        const imgHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="day-detail__img" alt="" loading="lazy">` : '';
         return `<li class="day-detail__item">
+          ${imgHtml}
           <div class="day-detail__time">${escHtml(ev.time || '\u2014')}</div>
           <div class="day-detail__info">
             <div class="day-detail__name">${nameHtml}</div>
             <div class="day-detail__meta">${metaParts.join('')}</div>
+            ${descHtml}
           </div>
           <div class="day-detail__tags">${genreHtml}</div>
         </li>`;
