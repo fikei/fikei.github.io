@@ -1837,8 +1837,10 @@ body {
   }
 
   // --- ScreenSlate Parser ---
-  // ScreenSlate JSON API — confirmed endpoint from Chrome Network tab:
-  // https://www.screenslate.com/api/screenings/date?_format=json&date=YYYYMMDD&field_city_target_id=ID
+  // Two-phase approach:
+  //   1) /api/screenings/date — returns showtimes with minimal fields: { nid, field_time, field_note, field_timestamp }
+  //   2) /jsonapi/node/screening — batch-fetch full details (title, venue, series, URL) by nid
+  // City IDs: 10969 = NYC, 10970 = SF Bay Area
   const SCREENSLATE_CITY_IDS = {
     'bay-area': '10970',
     'new-york': '10969',
@@ -1847,9 +1849,10 @@ body {
   async function fetchScreenSlate(source) {
     const baseUrl = 'https://www.screenslate.com';
     const cityId = SCREENSLATE_CITY_IDS[source.region] || '';
-    const allEvents = [];
 
-    // Fetch today + next 6 days
+    // Phase 1: Fetch showtimes per day from the date API
+    const allShowtimes = []; // { nid, time, note, timestamp, dateStr }
+
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
       const d = new Date(Date.now() + dayOffset * 86400000);
       const dateStr = d.toISOString().split('T')[0];
@@ -1860,10 +1863,11 @@ body {
       try {
         log(`ScreenSlate: fetching ${dateStr} (city=${cityId})`);
         const text = await proxyFetch(apiUrl);
-        const events = parseScreenSlateJson(text, source.id, dateStr, baseUrl);
-        allEvents.push(...events);
+        const items = parseScreenSlateShowtimes(text);
+        items.forEach(item => { item.dateStr = dateStr; });
+        allShowtimes.push(...items);
         if (dayOffset === 0) {
-          log(`ScreenSlate: day 1 (${dateStr}) returned ${events.length} events`);
+          log(`ScreenSlate: day 1 (${dateStr}) returned ${items.length} showtimes`);
         }
       } catch (e) {
         log(`ScreenSlate: fetch failed for ${dateStr}: ${e.message}`);
@@ -1872,145 +1876,169 @@ body {
       }
     }
 
-    // Dedupe by name+date+venue
-    const seen = new Set();
-    const deduped = allEvents.filter(e => {
-      const key = `${e.name}|${e.date}|${e.venue}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+    if (allShowtimes.length === 0) {
+      log('ScreenSlate: no showtimes found across all days');
+      return [];
+    }
+
+    // Phase 2: Collect unique nids and batch-enrich via JSON:API
+    const uniqueNids = [...new Set(allShowtimes.map(s => s.nid))];
+    log(`ScreenSlate: ${allShowtimes.length} showtimes, ${uniqueNids.length} unique screenings — enriching via JSON:API`);
+    const enrichmentMap = await enrichScreenSlateNids(uniqueNids, baseUrl);
+    log(`ScreenSlate: enriched ${enrichmentMap.size} of ${uniqueNids.length} screenings`);
+
+    // Phase 3: Group showtimes by nid+date → one event per screening per day
+    const groups = new Map();
+    allShowtimes.forEach(s => {
+      const key = `${s.nid}|${s.dateStr}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
     });
 
-    log(`ScreenSlate: ${deduped.length} events total (${allEvents.length} before dedup)`);
-    return deduped;
+    const events = [];
+    groups.forEach((showtimes) => {
+      const first = showtimes[0];
+      const enriched = enrichmentMap.get(first.nid) || {};
+
+      // Combine all times for this screening on this day
+      const times = showtimes.map(s => {
+        const note = s.note ? ` (${s.note})` : '';
+        return s.time + note;
+      });
+
+      // Clean title — ScreenSlate titles often include " at Venue Name" suffix
+      let name = enriched.title || `Screening #${first.nid}`;
+      const venue = enriched.venue || '';
+      if (venue && name.toLowerCase().endsWith(' at ' + venue.toLowerCase())) {
+        name = name.substring(0, name.length - (' at ' + venue).length);
+      }
+
+      const series = enriched.series || '';
+      const price = enriched.price || '';
+      const url = enriched.url || '';
+      const pathAlias = enriched.path || '';
+      const eventUrl = url.startsWith('http') ? url : (pathAlias ? baseUrl + pathAlias : '');
+
+      events.push({
+        date: first.dateStr,
+        time: times.join(', '),
+        name, venue,
+        address: enriched.address || '',
+        city: '',
+        genre: series || 'film',
+        price, ages: '',
+        url: eventUrl,
+        source: source.id,
+      });
+    });
+
+    if (events.length > 0) {
+      events.slice(0, 3).forEach(e => log(`  ScreenSlate: "${e.name}" @ ${e.venue} [${e.time}]`));
+    }
+
+    log(`ScreenSlate: ${events.length} events total (from ${allShowtimes.length} showtimes)`);
+    return events;
   }
 
-  function parseScreenSlateJson(text, sourceId, dateStr, baseUrl) {
+  // Parse the date API response: array of { nid, field_time, field_note, field_timestamp }
+  function parseScreenSlateShowtimes(text) {
     let data;
     try {
       data = JSON.parse(text);
     } catch (e) {
-      log(`ScreenSlate: JSON parse failed, logging raw response`);
-      log(`ScreenSlate: first 500 chars: ${text.substring(0, 500)}`);
+      log(`ScreenSlate: JSON parse failed: ${text.substring(0, 200)}`);
       return [];
     }
-
-    // Log structure for debugging
-    const type = Array.isArray(data) ? `array[${data.length}]` : typeof data;
-    log(`ScreenSlate JSON: type=${type}, keys=${Object.keys(data || {}).slice(0, 10).join(',')}`);
-
-    // Handle various response shapes
-    let items = [];
-    if (Array.isArray(data)) {
-      items = data;
-    } else if (data.venues || data.listings || data.screenings || data.events || data.results || data.items) {
-      items = data.venues || data.listings || data.screenings || data.events || data.results || data.items;
-      if (!Array.isArray(items)) items = [items];
-    } else {
-      // Unknown structure — dump keys and first item for debugging
-      log(`ScreenSlate: unknown JSON structure. Top keys: ${JSON.stringify(Object.keys(data))}`);
-      if (typeof data === 'object') {
-        const firstKey = Object.keys(data)[0];
-        if (firstKey) {
-          const sample = data[firstKey];
-          log(`ScreenSlate: data["${firstKey}"] type=${Array.isArray(sample) ? 'array[' + sample.length + ']' : typeof sample}`);
-          if (Array.isArray(sample)) {
-            items = sample;
-          } else if (typeof sample === 'object' && sample !== null) {
-            log(`ScreenSlate: data["${firstKey}"] keys=${JSON.stringify(Object.keys(sample).slice(0, 15))}`);
-            // Maybe it's venue-keyed: { "Venue Name": [ listings... ] }
-            const allVals = Object.values(data);
-            if (allVals.every(v => Array.isArray(v))) {
-              log(`ScreenSlate: looks venue-grouped — ${Object.keys(data).length} venues`);
-              return parseScreenSlateVenueGrouped(data, sourceId, dateStr, baseUrl);
-            }
-          }
-        }
-      }
-
-      // Last resort: log a sample of the raw data
-      const sample = JSON.stringify(data).substring(0, 1000);
-      log(`ScreenSlate: raw sample: ${sample}`);
+    if (!Array.isArray(data)) {
+      log(`ScreenSlate: expected array, got ${typeof data}`);
       return [];
     }
-
-    log(`ScreenSlate: parsing ${items.length} items`);
-
-    // Log first item structure
-    if (items.length > 0) {
-      const first = items[0];
-      log(`ScreenSlate: item[0] keys: ${JSON.stringify(Object.keys(first).slice(0, 20))}`);
-      log(`ScreenSlate: item[0] sample: ${JSON.stringify(first).substring(0, 500)}`);
-    }
-
-    const events = [];
-    items.forEach((item, i) => {
-      // Adaptive field extraction — try common Drupal JSON API field names
-      const name = item.title || item.name || item.field_title || item.media_title || item.screening_title || '';
-      if (!name) return;
-
-      const venue = item.venue || item.venue_name || item.field_venue || item.location || '';
-      const time = item.time || item.field_time || item.showtime || item.showtimes || '';
-      const series = item.series || item.field_series || '';
-      const director = item.director || item.field_director || '';
-      const year = item.year || item.field_year || '';
-      const runtime = item.runtime || item.field_runtime || '';
-      const url = item.url || item.link || item.path || item.screening_link || item.field_url || '';
-
-      const genreParts = [];
-      if (series) genreParts.push(typeof series === 'string' ? series : series.name || series.title || '');
-      if (director) genreParts.push(director);
-      if (year) genreParts.push(String(year));
-      if (runtime) genreParts.push(String(runtime));
-
-      const ev = {
-        date: dateStr,
-        time: typeof time === 'string' ? time : (Array.isArray(time) ? time.join(', ') : ''),
-        name: typeof name === 'string' ? name : (name.value || name.title || String(name)),
-        venue: typeof venue === 'string' ? venue : (venue.name || venue.title || String(venue)),
-        address: '', city: '',
-        genre: genreParts.join(' · ') || 'film',
-        price: '', ages: '',
-        url: url.startsWith('http') ? url : (url ? baseUrl + url : ''),
-        source: sourceId,
-      };
-
-      if (i < 3) log(`  ScreenSlate: "${ev.name}" @ ${ev.venue} ${ev.time}`);
-      events.push(ev);
-    });
-
-    return events;
+    return data
+      .filter(item => item.nid)
+      .map(item => ({
+        nid: String(item.nid),
+        time: item.field_time || '',
+        note: item.field_note || '',
+        timestamp: item.field_timestamp || '',
+      }));
   }
 
-  // Handle response grouped by venue: { "Venue Name": [listings...], ... }
-  function parseScreenSlateVenueGrouped(data, sourceId, dateStr, baseUrl) {
-    const events = [];
-    Object.entries(data).forEach(([venueName, listings]) => {
-      if (!Array.isArray(listings)) return;
-      listings.forEach((item, i) => {
-        const name = item.title || item.name || item.media_title || '';
-        if (!name) return;
+  // Batch-fetch screening details via JSON:API — returns Map<nid, { title, venue, address, series, url, path, price }>
+  async function enrichScreenSlateNids(nids, baseUrl) {
+    const result = new Map();
+    const BATCH_SIZE = 40;
 
-        const time = item.time || item.showtime || item.showtimes || '';
-        const series = item.series || '';
-        const url = item.url || item.link || item.path || item.screening_link || '';
+    for (let i = 0; i < nids.length; i += BATCH_SIZE) {
+      const batch = nids.slice(i, i + BATCH_SIZE);
+      const filterParams = batch.map((nid, idx) =>
+        `filter[drupal_internal__nid][value][${idx}]=${nid}`
+      ).join('&');
+      const apiUrl = `${baseUrl}/jsonapi/node/screening?${filterParams}`
+        + `&filter[drupal_internal__nid][operator]=IN`
+        + `&include=field_venue,field_series`
+        + `&fields[node--screening]=title,drupal_internal__nid,field_url,path,field_venue,field_series`
+        + `&fields[node--venue]=title,field_address,field_ticket_info`
+        + `&fields[node--series]=title`;
 
-        events.push({
-          date: dateStr,
-          time: typeof time === 'string' ? time : (Array.isArray(time) ? time.join(', ') : ''),
-          name: typeof name === 'string' ? name : String(name),
-          venue: venueName,
-          address: '', city: '',
-          genre: series ? String(series) : 'film',
-          price: '', ages: '',
-          url: url.startsWith('http') ? url : (url ? baseUrl + url : ''),
-          source: sourceId,
-        });
+      try {
+        log(`ScreenSlate: enriching batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} nids)`);
+        const text = await proxyFetch(apiUrl);
+        const json = JSON.parse(text);
 
-        if (events.length <= 3) log(`  ScreenSlate: "${name}" @ ${venueName} ${time}`);
-      });
-    });
-    return events;
+        // Build lookup for included entities (venues, series) by type+id
+        const included = new Map();
+        if (Array.isArray(json.included)) {
+          json.included.forEach(ent => {
+            included.set(`${ent.type}:${ent.id}`, ent);
+          });
+        }
+
+        if (Array.isArray(json.data)) {
+          json.data.forEach(node => {
+            const nid = String(node.attributes?.drupal_internal__nid || '');
+            if (!nid) return;
+
+            // Resolve venue
+            let venue = '', address = '', price = '';
+            const venueRef = node.relationships?.field_venue?.data;
+            if (venueRef) {
+              const venueEnt = included.get(`${venueRef.type}:${venueRef.id}`);
+              if (venueEnt) {
+                venue = venueEnt.attributes?.title || '';
+                address = venueEnt.attributes?.field_address || '';
+                price = venueEnt.attributes?.field_ticket_info || '';
+              }
+            }
+
+            // Resolve series
+            let series = '';
+            const seriesRef = node.relationships?.field_series?.data;
+            if (seriesRef) {
+              const seriesEnt = included.get(`${seriesRef.type}:${seriesRef.id}`);
+              if (seriesEnt) {
+                series = seriesEnt.attributes?.title || '';
+              }
+            }
+
+            // field_url is a Drupal link field: { uri, title, options } or string
+            const fieldUrl = node.attributes?.field_url;
+            const url = typeof fieldUrl === 'string' ? fieldUrl
+              : (fieldUrl?.uri || fieldUrl?.url || '');
+
+            result.set(nid, {
+              title: node.attributes?.title || '',
+              venue, address, series, price,
+              url,
+              path: node.attributes?.path?.alias || '',
+            });
+          });
+        }
+      } catch (e) {
+        log(`ScreenSlate: enrichment batch failed: ${e.message}`);
+      }
+    }
+
+    return result;
   }
 
   // Parse "Event Title: Artists @ Venue Name (City)" or "Event @ Venue (City)"
