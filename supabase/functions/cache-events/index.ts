@@ -22,11 +22,11 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   })
 }
 
-// Generate MD5 event key matching the DB helper function
+// Generate SHA-256 event key matching the DB helper function
 async function generateEventKey(source: string, date: string, name: string, venue: string): Promise<string> {
   const normalized = `${source}|${date}|${name.trim().toLowerCase()}|${venue.trim().toLowerCase()}`
   const data = new TextEncoder().encode(normalized)
-  const hashBuffer = await crypto.subtle.digest('MD5', data)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')

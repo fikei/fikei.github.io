@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Identity (composite key for deduplication)
-  event_key TEXT UNIQUE NOT NULL,   -- MD5(source_id|date|name|venue)
+  event_key TEXT UNIQUE NOT NULL,   -- SHA256(source_id|date|name|venue)
   source_id TEXT NOT NULL,          -- Source identifier (e.g. '19hz-bayarea')
 
   -- Core scraped data
@@ -84,7 +84,7 @@ CREATE OR REPLACE FUNCTION generate_event_key(
   p_venue TEXT
 ) RETURNS TEXT AS $$
 BEGIN
-  RETURN md5(p_source_id || '|' || p_date::text || '|' || lower(trim(p_name)) || '|' || lower(trim(p_venue)));
+  RETURN encode(sha256(convert_to(p_source_id || '|' || p_date::text || '|' || lower(trim(p_name)) || '|' || lower(trim(p_venue)), 'UTF8')), 'hex');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 

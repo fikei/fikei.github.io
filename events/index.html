@@ -2967,9 +2967,13 @@ body {
         if (ev.price) metaParts.push(`<span>${escHtml(ev.price)}</span>`);
         if (ev.ages) metaParts.push(`<span>${escHtml(ev.ages)}</span>`);
         if (ev.promoter) metaParts.push(`<span>${escHtml(ev.promoter)}</span>`);
-        const genreHtml = ev.genre
-          ? ev.genre.split(/,\s*/).slice(0, 6).map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('')
-          : '';
+        const allTags = ev.genre ? ev.genre.split(/,\s*/).slice(0, 6) : [];
+        if (ev.enrichedTags && ev.enrichedTags.length > 0) {
+          for (const t of ev.enrichedTags) {
+            if (allTags.length < 6 && !allTags.some(g => g.toLowerCase() === t.toLowerCase())) allTags.push(t);
+          }
+        }
+        const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
         const descHtml = ev.description ? `<div class="day-detail__desc">${escHtml(ev.description)}</div>` : '';
         const imgHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="day-detail__img" alt="" loading="lazy">` : '';
         return `<li class="day-detail__item">
