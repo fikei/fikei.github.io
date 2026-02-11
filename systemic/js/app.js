@@ -269,10 +269,11 @@ class SystemicApp {
 
     try {
 
-      // Fetch manifest and template registry in parallel
-      const [manifestRes, registryRes] = await Promise.all([
+      // Fetch manifest, template registry, and widget registry in parallel
+      const [manifestRes, registryRes, widgetRegRes] = await Promise.all([
         fetch('/design-system/manifest.json'),
-        fetch('/design-system/template-registry.json')
+        fetch('/design-system/template-registry.json'),
+        fetch('/design-system/widget-registry.json')
       ]);
 
       if (!manifestRes.ok) throw new Error(`Failed to load manifest: ${manifestRes.status}`);
@@ -280,6 +281,7 @@ class SystemicApp {
 
       const manifest = await manifestRes.json();
       const registry = await registryRes.json();
+      const widgetRegistry = widgetRegRes.ok ? await widgetRegRes.json() : null;
 
       this.debugLog('LOCAL', 'Loaded manifest:', {
         tokens: Object.keys(manifest.tokens),
@@ -291,7 +293,7 @@ class SystemicApp {
       });
 
       // Transform manifest into Systemic design system format
-      const designSystem = this.transformManifestToDesignSystem(manifest, registry);
+      const designSystem = this.transformManifestToDesignSystem(manifest, registry, widgetRegistry);
       this.debugLog('LOCAL', `Transformed: ${designSystem.components?.length} components, first template HTML starts with: ${designSystem.components?.find(c => c.type?.startsWith('template-'))?.variants?.[0]?.html?.slice(0, 80)}...`);
 
       // Save it (update if already exists)
@@ -312,9 +314,9 @@ class SystemicApp {
   }
 
   /**
-   * Transform manifest.json + template-registry.json into Systemic's design system format
+   * Transform manifest.json + template-registry.json + widget-registry.json into Systemic's design system format
    */
-  transformManifestToDesignSystem(manifest, registry) {
+  transformManifestToDesignSystem(manifest, registry, widgetRegistry) {
     const id = 'local-ctrl-design-system';
 
     // Build token data
@@ -468,6 +470,38 @@ class SystemicApp {
       }
     }
 
+    // Add widgets from widget-registry.json, grouped by template
+    if (widgetRegistry?.widgets && registry?.templates) {
+      for (const [widgetId, widget] of Object.entries(widgetRegistry.widgets)) {
+        const tmpl = registry.templates[widget.template];
+        if (!tmpl) continue;
+        const validSet = new Set(tmpl.validSizes || []);
+        components.push({
+          type: `widget-${widgetId}`,
+          name: widget.name,
+          templateRef: widget.template,
+          category: widget.category,
+          archetype: widget.archetype,
+          variants: ALL_SIZES.map(size => ({
+            name: `${widgetId} @ ${size}`,
+            classes: ['w-shell', `w-shell--${size}`, 'w-body', tmpl.bodyModifier],
+            html: this.generateTemplatePreviewHTML(widget.template, size, tmpl),
+            usageCount: validSet.has(size) ? 1 : 0
+          })),
+          totalUsage: ALL_SIZES.length,
+          validSizes: tmpl.validSizes || [],
+          guidelines: {
+            whenToUse: [`${widget.name} — ${widget.archetype} widget for ${widget.category}`],
+            whenNotToUse: tmpl.validSizes
+              ? [`Uses ${this.formatComponentName(widget.template)} template. Recommended sizes: ${tmpl.validSizes.join(', ')}`]
+              : []
+          },
+          source: `widget:${widget.template}`,
+          boardsStatus: tmpl.boardsStatus
+        });
+      }
+    }
+
     return {
       id,
       name: 'CTRL Design System',
@@ -477,7 +511,8 @@ class SystemicApp {
       createdAt: manifest.version,
       updatedAt: manifest.version,
       manifest,
-      registry
+      registry,
+      widgetRegistry
     };
   }
 
@@ -978,9 +1013,13 @@ class SystemicApp {
     ];
     const grouped = {};
     const ungrouped = [];
+    const widgetsByTemplate = {};
     for (const c of components) {
       const key = c.source || '';
-      if (key) {
+      if (key.startsWith('widget:')) {
+        const tmplName = key.slice(7);
+        (widgetsByTemplate[tmplName] = widgetsByTemplate[tmplName] || []).push(c);
+      } else if (key) {
         (grouped[key] = grouped[key] || []).push(c);
       } else {
         ungrouped.push(c);
@@ -1004,6 +1043,18 @@ class SystemicApp {
         if (source === 'template-registry.json') name = name.replace(/^Template:\s*/, '');
         const count = c.variants?.length || 0;
         componentOptions += `<option value="${c.type}">${name} (${count})</option>`;
+
+        // After each template, render its widgets as indented options
+        if (source === 'template-registry.json') {
+          const tmplKey = c.type.replace('template-', '');
+          const widgets = widgetsByTemplate[tmplKey];
+          if (widgets) {
+            for (const w of widgets) {
+              const wCount = w.variants?.length || 0;
+              componentOptions += `<option value="${w.type}">\u00A0\u00A0\u00A0\u00A0${w.name} (${wCount})</option>`;
+            }
+          }
+        }
       }
       componentOptions += `</optgroup>`;
     }
