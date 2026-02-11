@@ -375,18 +375,18 @@
 | | ~~Define w-shell, w-header, w-body, w-footer structure~~ | Complete (in widgets.css) |
 | | ~~Write CSS for all components using design tokens~~ | Complete (in widgets.css) |
 | | ~~Migrate existing widget-complete to w-shell~~ | Complete (completed in Phase 2.5a) |
-| **Template Render Functions** | | In Progress |
+| **Template Render Functions** | | Complete |
 | | ~~Implement verdict renderer~~ | Complete (Phase 2.5a migration) |
 | | ~~Implement list renderer~~ | Complete (Phase 2.5a migration) |
 | | ~~Implement stats renderer~~ | Complete (Phase 2.5a migration) |
 | | ~~Implement spectrum renderer~~ | Complete (Phase 2.5a migration) |
 | | ~~Implement split renderer~~ | Complete (Phase 2.5a migration) |
 | | ~~Implement narrative renderer~~ | Complete (Phase 2.5a migration) |
-| | Implement comparison renderer | Pending |
-| | Implement choices renderer | Pending |
-| | Implement checklist renderer | Pending |
+| | ~~Implement comparison renderer~~ | Complete (Phase 2.5a) |
+| | ~~Implement choices renderer~~ | Complete (Phase 2.5a) |
+| | ~~Implement checklist renderer~~ | Complete (Phase 2.5a) |
 | | ~~Implement suggestion renderer~~ | Complete (Phase 2.5a migration) |
-| | Implement grouped renderer | Pending |
+| | ~~Implement grouped renderer~~ | Complete (Phase 2.5a) |
 
 #### Dynamic AI-Evaluated Categories
 

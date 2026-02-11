@@ -14,14 +14,14 @@ export const discoverMore: WidgetDefinition = {
       {
         type: 'min_items',
         weight: 1.0,
-        params: { min: 3 }
+        params: { min: 2 }
       },
       {
         type: 'variety',
         weight: 0.6,
         params: {
-          minUniqueDomains: 2,
-          scoreAtDomains: 4
+          minUniqueDomains: 1,
+          scoreAtDomains: 3
         }
       },
       {

@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks - ctrl.rodeo</title>
+    <link rel="stylesheet" href="/design-system/tokens.css">
+    <link rel="stylesheet" href="/design-system/components.css">
+    <style>
+        /* Base */
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-primary);
+            font-size: var(--text-xs);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Tasks App Layout */
+        .tasks-app {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--space-4);
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: var(--space-1);
+            border-bottom: 1px solid var(--border-subtle);
+            margin-bottom: var(--space-6);
+        }
+
+        .tab-nav button {
+            background: none;
+            border: none;
+            color: var(--fg-muted);
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+            padding: var(--space-2) var(--space-4);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-nav button:hover {
+            color: var(--fg);
+        }
+
+        .tab-nav button.active {
+            color: var(--fg);
+            border-bottom-color: var(--fg);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Section Header */
+        .section-header {
+            margin-bottom: var(--space-6);
+        }
+
+        .section-header h2 {
+            margin: 0 0 var(--space-1) 0;
+            font-size: var(--text-xl);
+        }
+
+        .section-description {
+            color: var(--fg-muted);
+            font-size: var(--text-sm);
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: var(--space-1);
+            flex-wrap: wrap;
+            margin-bottom: var(--space-4);
+            padding: var(--space-4);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+        }
+
+        .filter-token {
+            padding: var(--space-1) var(--space-2);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--fg-muted);
+            font-family: var(--font-mono);
+            font-size: var(--text-xs);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-token:hover {
+            color: var(--fg);
+            border-color: var(--fg);
+        }
+
+        .filter-token.active {
+            background: var(--fg);
+            color: var(--bg);
+            border-color: var(--fg);
+        }
+
+        /* Action Cards */
+        .action-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .action-card {
+            padding: var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-left: 3px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .action-card:hover {
+            border-color: var(--fg-muted);
+        }
+
+        .action-card.priority-high {
+            border-left-color: #cc0000;
+        }
+
+        .action-card.priority-medium {
+            border-left-color: #ff9900;
+        }
+
+        .action-card.priority-low {
+            border-left-color: #00cc00;
+        }
+
+        .action-card-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
+        }
+
+        .category-badge {
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+        }
+
+        .category-badge.pay { background: #cc0000; color: white; }
+        .category-badge.schedule { background: #0099cc; color: white; }
+        .category-badge.confirm { background: #ff9900; color: white; }
+        .category-badge.reply { background: #9900cc; color: white; }
+        .category-badge.review { background: #00cc00; color: white; }
+        .category-badge.action { background: #cc00cc; color: white; }
+
+        .urgency-indicator {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--text-xs);
+            color: var(--fg-muted);
+        }
+
+        .urgency-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .urgency-dot.high { background: #cc0000; }
+        .urgency-dot.medium { background: #ff9900; }
+        .urgency-dot.low { background: #00cc00; }
+
+        .action-card-title {
+            font-size: var(--text-md);
+            margin-bottom: var(--space-1);
+            font-weight: 500;
+        }
+
+        .action-card-meta {
+            color: var(--fg-muted);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-4);
+        }
+
+        .action-card-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-10) var(--space-4);
+            color: var(--fg-muted);
+        }
+
+        .empty-state h3 {
+            margin-bottom: var(--space-2);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        .stat-card {
+            padding: var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+        }
+
+        .stat-label {
+            font-size: var(--text-xs);
+            color: var(--fg-muted);
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+            margin-bottom: var(--space-1);
+        }
+
+        .stat-value {
+            font-size: var(--text-2xl);
+            font-weight: 600;
+            margin-bottom: var(--space-1);
+        }
+
+        .stat-change {
+            font-size: var(--text-xs);
+            color: var(--fg-muted);
+        }
+
+        .stat-change.positive { color: #00cc00; }
+        .stat-change.negative { color: #cc0000; }
+
+        /* Chart Placeholder */
+        .chart-placeholder {
+            padding: var(--space-10);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            text-align: center;
+            color: var(--fg-muted);
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Form Groups */
+        .form-group {
+            margin-bottom: var(--space-6);
+        }
+
+        .form-label {
+            display: block;
+            font-size: var(--text-sm);
+            font-weight: 500;
+            margin-bottom: var(--space-2);
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: var(--space-2);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--fg);
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--fg);
+        }
+
+        /* Account Section */
+        .account-section {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+        }
+
+        .account-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--fg-muted);
+        }
+
+        .account-info h3 {
+            margin: 0 0 var(--space-1) 0;
+            font-size: var(--text-md);
+        }
+
+        .account-info p {
+            margin: 0;
+            font-size: var(--text-sm);
+            color: var(--fg-muted);
+        }
+
+        /* Toggle Switch */
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-2) 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border-subtle);
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--fg);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--fg);
+        }
+
+        input:checked + .toggle-slider:before {
+            background-color: var(--bg);
+            transform: translateX(24px);
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: var(--space-4);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: var(--space-2);
+            text-align: left;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .data-table th {
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            font-weight: 500;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--bg-elevated);
+        }
+
+        /* Sign-in Overlay */
+        .sign-in-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .sign-in-overlay.hidden {
+            display: none;
+        }
+
+        .sign-in-modal {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: var(--space-10);
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .sign-in-modal h2 {
+            margin-bottom: var(--space-4);
+        }
+
+        .sign-in-modal p {
+            color: var(--fg-muted);
+            margin-bottom: var(--space-6);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: var(--space-2) var(--space-4);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .btn--filled {
+            background: var(--fg);
+            color: var(--bg);
+            border-color: var(--fg);
+        }
+
+        .btn--filled:hover {
+            opacity: 0.9;
+        }
+
+        .btn--ghost {
+            background: transparent;
+            color: var(--fg);
+        }
+
+        .btn--ghost:hover {
+            background: var(--bg-elevated);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tasks-app {
+                padding: var(--space-2);
+            }
+
+            .action-card-buttons {
+                flex-direction: column;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Page Header -->
+    <header class="page-header">
+        <nav class="breadcrumb">
+            <a href="/">ctrl.rodeo</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">Tasks</span>
+        </nav>
+    </header>
+
+    <!-- Main App -->
+    <main class="tasks-app">
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-button active" data-tab="feed">Feed</button>
+            <button class="tab-button" data-tab="analytics">Analytics</button>
+            <button class="tab-button" data-tab="settings">Settings</button>
+            <button class="tab-button" data-tab="history">History</button>
+        </nav>
+
+        <!-- Feed View -->
+        <div class="tab-content active" id="feed">
+            <div class="section-header">
+                <h2>Action Feed</h2>
+                <p class="section-description">Emails requiring your action, detected automatically</p>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <button class="filter-token active" data-category="all">All</button>
+                <button class="filter-token" data-category="pay">Pay</button>
+                <button class="filter-token" data-category="schedule">Schedule</button>
+                <button class="filter-token" data-category="confirm">Confirm</button>
+                <button class="filter-token" data-category="reply">Reply</button>
+                <button class="filter-token" data-category="review">Review</button>
+                <button class="filter-token" data-category="action">Action</button>
+            </div>
+
+            <!-- Action Cards -->
+            <div class="action-list">
+                <div class="action-card priority-high" data-category="pay">
+                    <div class="action-card-header">
+                        <span class="category-badge pay">Pay</span>
+                        <div class="urgency-indicator">
+                            <span class="urgency-dot high"></span>
+                            <span>High Priority</span>
+                        </div>
+                    </div>
+                    <h3 class="action-card-title">Invoice #2024-0215 Due Feb 15</h3>
+                    <p class="action-card-meta">From: billing@acmeservices.com • 2 hours ago</p>
+                    <div class="action-card-buttons">
+                        <button class="btn btn--filled" data-action="confirm">Confirm Payment</button>
+                        <button class="btn btn--ghost" data-action="dismiss">Dismiss</button>
+                    </div>
+                </div>
+
+                <div class="action-card priority-medium" data-category="schedule">
+                    <div class="action-card-header">
+                        <span class="category-badge schedule">Schedule</span>
+                        <div class="urgency-indicator">
+                            <span class="urgency-dot medium"></span>
+                            <span>Medium Priority</span>
+                        </div>
+                    </div>
+                    <h3 class="action-card-title">Confirm Meeting: Q1 Planning Session</h3>
+                    <p class="action-card-meta">From: sarah@company.com • 4 hours ago</p>
+                    <div class="action-card-buttons">
+                        <button class="btn btn--filled" data-action="confirm">Add to Calendar</button>
+                        <button class="btn btn--ghost" data-action="dismiss">Dismiss</button>
+                    </div>
+                </div>
+
+                <div class="action-card priority-low" data-category="confirm">
+                    <div class="action-card-header">
+                        <span class="category-badge confirm">Confirm</span>
+                        <div class="urgency-indicator">
+                            <span class="urgency-dot low"></span>
+                            <span>Low Priority</span>
+                        </div>
+                    </div>
+                    <h3 class="action-card-title">Please Confirm Your Attendance</h3>
+                    <p class="action-card-meta">From: events@conference.io • 1 day ago</p>
+                    <div class="action-card-buttons">
+                        <button class="btn btn--filled" data-action="confirm">Confirm</button>
+                        <button class="btn btn--ghost" data-action="dismiss">Dismiss</button>
+                    </div>
+                </div>
+
+                <div class="action-card priority-medium" data-category="reply">
+                    <div class="action-card-header">
+                        <span class="category-badge reply">Reply</span>
+                        <div class="urgency-indicator">
+                            <span class="urgency-dot medium"></span>
+                            <span>Medium Priority</span>
+                        </div>
+                    </div>
+                    <h3 class="action-card-title">Waiting on Your Feedback</h3>
+                    <p class="action-card-meta">From: john@partner.com • 1 day ago</p>
+                    <div class="action-card-buttons">
+                        <button class="btn btn--filled" data-action="confirm">Reply</button>
+                        <button class="btn btn--ghost" data-action="dismiss">Dismiss</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State (hidden by default) -->
+            <div class="empty-state" style="display: none;">
+                <h3>No Actions Required</h3>
+                <p>You're all caught up! We'll notify you when new actions are detected.</p>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div class="tab-content" id="analytics">
+            <div class="section-header">
+                <h2>Analytics</h2>
+                <p class="section-description">Track your email action patterns and response times</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Items This Week</div>
+                    <div class="stat-value">24</div>
+                    <div class="stat-change positive">↑ 12% from last week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Response Rate</div>
+                    <div class="stat-value">87%</div>
+                    <div class="stat-change positive">↑ 5% from last week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Time to Action</div>
+                    <div class="stat-value">4.2h</div>
+                    <div class="stat-change negative">↓ 15% slower</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Dismiss Rate</div>
+                    <div class="stat-value">13%</div>
+                    <div class="stat-change">→ No change</div>
+                </div>
+            </div>
+
+            <!-- Processing History -->
+            <div class="section-header">
+                <h2>Processing History</h2>
+                <p class="section-description">Action items detected over time</p>
+            </div>
+            <div class="chart-placeholder">
+                <p>Chart visualization coming soon</p>
+            </div>
+        </div>
+
+        <!-- Settings View -->
+        <div class="tab-content" id="settings">
+            <div class="section-header">
+                <h2>Settings</h2>
+                <p class="section-description">Configure your Tasks experience</p>
+            </div>
+
+            <!-- Connected Account -->
+            <div class="form-group">
+                <label class="form-label">Connected Account</label>
+                <div class="account-section">
+                    <div class="account-avatar"></div>
+                    <div class="account-info">
+                        <h3>user@gmail.com</h3>
+                        <p>Connected via Google</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task List Selection -->
+            <div class="form-group">
+                <label class="form-label" for="task-list">Default Task List</label>
+                <select id="task-list" class="form-select">
+                    <option>My Tasks</option>
+                    <option>Work Tasks</option>
+                    <option>Personal</option>
+                </select>
+            </div>
+
+            <!-- Notification Preferences -->
+            <div class="form-group">
+                <label class="form-label">Notification Preferences</label>
+                <div class="toggle-group">
+                    <span>Real-time notifications</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-group">
+                    <span>Daily digest email</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Sender Rules -->
+            <div class="form-group">
+                <label class="form-label">Sender Rules</label>
+                <p class="section-description" style="margin-bottom: var(--space-4);">
+                    Customize how emails from specific senders are handled
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Sender</th>
+                            <th>Category</th>
+                            <th>Auto-action</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>billing@*</td>
+                            <td>Pay</td>
+                            <td>High priority</td>
+                            <td><button class="btn btn--ghost btn--sm">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>noreply@*</td>
+                            <td>Confirm</td>
+                            <td>Auto-dismiss</td>
+                            <td><button class="btn btn--ghost btn--sm">Edit</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button class="btn btn--filled" style="margin-top: var(--space-4);">Add Rule</button>
+            </div>
+        </div>
+
+        <!-- History View -->
+        <div class="tab-content" id="history">
+            <div class="section-header">
+                <h2>History</h2>
+                <p class="section-description">All detected action items and their outcomes</p>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <input type="text" class="form-input" placeholder="Search emails..." style="flex: 1; max-width: 300px;">
+                <select class="form-select" style="width: auto;">
+                    <option>All Statuses</option>
+                    <option>Completed</option>
+                    <option>Dismissed</option>
+                    <option>Pending</option>
+                </select>
+            </div>
+
+            <!-- History Table -->
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Sender</th>
+                        <th>Subject</th>
+                        <th>Category</th>
+                        <th>Urgency</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Feb 10, 2:30 PM</td>
+                        <td>billing@acmeservices.com</td>
+                        <td>Invoice #2024-0215 Due</td>
+                        <td><span class="category-badge pay">Pay</span></td>
+                        <td>
+                            <div class="urgency-indicator">
+                                <span class="urgency-dot high"></span>
+                                <span>High</span>
+                            </div>
+                        </td>
+                        <td>Pending</td>
+                    </tr>
+                    <tr>
+                        <td>Feb 10, 10:15 AM</td>
+                        <td>sarah@company.com</td>
+                        <td>Q1 Planning Session</td>
+                        <td><span class="category-badge schedule">Schedule</span></td>
+                        <td>
+                            <div class="urgency-indicator">
+                                <span class="urgency-dot medium"></span>
+                                <span>Medium</span>
+                            </div>
+                        </td>
+                        <td>Pending</td>
+                    </tr>
+                    <tr>
+                        <td>Feb 9, 4:22 PM</td>
+                        <td>newsletter@startup.com</td>
+                        <td>Weekly Update</td>
+                        <td><span class="category-badge review">Review</span></td>
+                        <td>
+                            <div class="urgency-indicator">
+                                <span class="urgency-dot low"></span>
+                                <span>Low</span>
+                            </div>
+                        </td>
+                        <td>Dismissed</td>
+                    </tr>
+                    <tr>
+                        <td>Feb 9, 11:30 AM</td>
+                        <td>support@service.io</td>
+                        <td>Your Support Ticket #12345</td>
+                        <td><span class="category-badge reply">Reply</span></td>
+                        <td>
+                            <div class="urgency-indicator">
+                                <span class="urgency-dot medium"></span>
+                                <span>Medium</span>
+                            </div>
+                        </td>
+                        <td>Completed</td>
+                    </tr>
+                    <tr>
+                        <td>Feb 8, 3:15 PM</td>
+                        <td>events@conference.io</td>
+                        <td>Confirm Your Attendance</td>
+                        <td><span class="category-badge confirm">Confirm</span></td>
+                        <td>
+                            <div class="urgency-indicator">
+                                <span class="urgency-dot low"></span>
+                                <span>Low</span>
+                            </div>
+                        </td>
+                        <td>Completed</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Sign-in Overlay -->
+    <div class="sign-in-overlay hidden" id="signInOverlay">
+        <div class="sign-in-modal">
+            <h2>Welcome to Tasks</h2>
+            <p>Connect your Google account to start triaging your emails with AI assistance.</p>
+            <button class="btn btn--filled" id="signInButton">
+                Connect with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- API Client -->
+    <script src="api.js"></script>
+    <script>
+        // Tab Switching
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.getAttribute('data-tab');
+                
+                // Remove active class from all tabs and contents
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                button.classList.add('active');
+                document.getElementById(targetTab).classList.add('active');
+            });
+        });
+
+        // Filter Token Toggling
+        const filterTokens = document.querySelectorAll('.filter-token');
+        const actionCards = document.querySelectorAll('.action-card');
+
+        filterTokens.forEach(token => {
+            token.addEventListener('click', () => {
+                const category = token.getAttribute('data-category');
+                
+                // Toggle active state
+                filterTokens.forEach(t => t.classList.remove('active'));
+                token.classList.add('active');
+                
+                // Filter cards
+                if (category === 'all') {
+                    actionCards.forEach(card => card.style.display = 'block');
+                } else {
+                    actionCards.forEach(card => {
+                        const cardCategory = card.getAttribute('data-category');
+                        card.style.display = cardCategory === category ? 'block' : 'none';
+                    });
+                }
+            });
+        });
+
+        // Action Button Handlers
+        const confirmButtons = document.querySelectorAll('[data-action="confirm"]');
+        const dismissButtons = document.querySelectorAll('[data-action="dismiss"]');
+
+        confirmButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const card = e.target.closest('.action-card');
+                const title = card.querySelector('.action-card-title').textContent;
+                console.log('Confirmed:', title);
+                
+                // Remove card with animation
+                card.style.opacity = '0.5';
+                setTimeout(() => card.remove(), 300);
+            });
+        });
+
+        dismissButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const card = e.target.closest('.action-card');
+                const title = card.querySelector('.action-card-title').textContent;
+                console.log('Dismissed:', title);
+                
+                // Remove card with animation
+                card.style.opacity = '0.5';
+                setTimeout(() => card.remove(), 300);
+            });
+        });
+
+        // Sign-in State Management
+        const signInOverlay = document.getElementById('signInOverlay');
+        const signInButton = document.getElementById('signInButton');
+
+        // Check for OAuth callback code in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const authCode = urlParams.get('code');
+        if (authCode) {
+            TasksAPI.handleCallback(authCode).then(result => {
+                if (result.success) {
+                    window.history.replaceState({}, '', window.location.pathname);
+                    signInOverlay.classList.add('hidden');
+                    loadDashboardData();
+                }
+            });
+        }
+
+        // Check stored auth state
+        if (TasksAPI.isAuthenticated()) {
+            signInOverlay.classList.add('hidden');
+            loadDashboardData();
+        } else {
+            signInOverlay.classList.remove('hidden');
+        }
+
+        signInButton.addEventListener('click', async () => {
+            const result = await TasksAPI.connectGoogle();
+            if (!result.success) {
+                // Demo mode: just hide overlay
+                console.log('Running in demo mode — no Supabase configured');
+                signInOverlay.classList.add('hidden');
+            }
+        });
+
+        // Load real data when authenticated
+        async function loadDashboardData() {
+            const user = TasksAPI.getUser();
+            if (!user) return;
+
+            // Update account email in settings
+            const accountEmail = document.querySelector('.account-info h3');
+            if (accountEmail && user.email) {
+                accountEmail.textContent = user.email;
+            }
+
+            // Load stats for analytics tab
+            const statsResult = await TasksAPI.getStats(7);
+            if (statsResult.success && statsResult.data?.stats) {
+                const stats = statsResult.data.stats;
+                const statValues = document.querySelectorAll('.stat-value');
+                if (statValues[0]) statValues[0].textContent = stats.total_processed;
+                if (statValues[1]) {
+                    const rate = stats.total_processed > 0
+                        ? Math.round(((stats.confirmed + stats.auto_created) / stats.total_processed) * 100)
+                        : 0;
+                    statValues[1].textContent = rate + '%';
+                }
+                if (statValues[3]) statValues[3].textContent = Math.round(stats.dismiss_rate * 100) + '%';
+            }
+        }
+
+        // Toggle Switch Behavior (already handled by CSS, but logging for demo)
+        const toggleSwitches = document.querySelectorAll('.toggle-switch input');
+        
+        toggleSwitches.forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const label = e.target.closest('.toggle-group').querySelector('span').textContent;
+                console.log(`${label}: ${e.target.checked ? 'enabled' : 'disabled'}`);
+            });
+        });
+
+        // Log page load
+        console.log('Tasks dashboard loaded');
+        console.log('Current tab:', document.querySelector('.tab-button.active').textContent);
+    </script>
+</body>
+</html>

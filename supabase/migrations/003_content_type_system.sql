@@ -99,25 +99,45 @@ ALTER TABLE domain_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE classification_log ENABLE ROW LEVEL SECURITY;
 
 -- Content types are readable by all
-CREATE POLICY "Content types are readable by all"
-ON content_types FOR SELECT
-USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Content types are readable by all' AND tablename = 'content_types') THEN
+    CREATE POLICY "Content types are readable by all"
+    ON content_types FOR SELECT
+    USING (true);
+  END IF;
+END $$;
 
 -- Domain profiles are readable by all (cache is shared)
-CREATE POLICY "Domain profiles are readable by all"
-ON domain_profiles FOR SELECT
-USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Domain profiles are readable by all' AND tablename = 'domain_profiles') THEN
+    CREATE POLICY "Domain profiles are readable by all"
+    ON domain_profiles FOR SELECT
+    USING (true);
+  END IF;
+END $$;
 
 -- Domain profiles can be created/updated by authenticated users
-CREATE POLICY "Authenticated users can upsert domain profiles"
-ON domain_profiles FOR ALL
-USING (auth.role() = 'authenticated');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Authenticated users can upsert domain profiles' AND tablename = 'domain_profiles') THEN
+    CREATE POLICY "Authenticated users can upsert domain profiles"
+    ON domain_profiles FOR ALL
+    USING (auth.role() = 'authenticated');
+  END IF;
+END $$;
 
 -- Classification log: users can only see their own
-CREATE POLICY "Users can view their own classification logs"
-ON classification_log FOR SELECT
-USING (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view their own classification logs' AND tablename = 'classification_log') THEN
+    CREATE POLICY "Users can view their own classification logs"
+    ON classification_log FOR SELECT
+    USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
-CREATE POLICY "Users can insert their own classification logs"
-ON classification_log FOR INSERT
-WITH CHECK (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert their own classification logs' AND tablename = 'classification_log') THEN
+    CREATE POLICY "Users can insert their own classification logs"
+    ON classification_log FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;

@@ -96,7 +96,7 @@ Return JSON format:
   },
 
   // Metadata
-  categories: ['wear', 'tech', 'home', 'all'],
+  categories: ['wear'],
   tags: ['analysis', 'dimensions', 'ai', 'positioning'],
   enabled: true,
 

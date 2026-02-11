@@ -1,8 +1,16 @@
 {
   "mcpServers": {
-    "supabase": {
+    "supabase-boards": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=yfhudwakpgzswiylhfbh"
+    },
+    "supabase-ops": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=ycilriwjnmcelkspmfmg"
+    },
+    "supabase-systemic": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=atdqdfpdeytfuvvpsasz"
     }
   }
 }

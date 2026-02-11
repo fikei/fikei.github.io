@@ -117,16 +117,28 @@ ALTER TABLE image_strategies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE strategy_performance ENABLE ROW LEVEL SECURITY;
 
 -- Strategies are readable by all
-CREATE POLICY "Image strategies are readable by all"
-ON image_strategies FOR SELECT
-USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Image strategies are readable by all' AND tablename = 'image_strategies') THEN
+    CREATE POLICY "Image strategies are readable by all"
+    ON image_strategies FOR SELECT
+    USING (true);
+  END IF;
+END $$;
 
 -- Performance data is readable by all (for transparency)
-CREATE POLICY "Strategy performance is readable by all"
-ON strategy_performance FOR SELECT
-USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Strategy performance is readable by all' AND tablename = 'strategy_performance') THEN
+    CREATE POLICY "Strategy performance is readable by all"
+    ON strategy_performance FOR SELECT
+    USING (true);
+  END IF;
+END $$;
 
 -- Only system can insert performance data (via service role)
-CREATE POLICY "System can insert performance data"
-ON strategy_performance FOR INSERT
-WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'System can insert performance data' AND tablename = 'strategy_performance') THEN
+    CREATE POLICY "System can insert performance data"
+    ON strategy_performance FOR INSERT
+    WITH CHECK (true);
+  END IF;
+END $$;
