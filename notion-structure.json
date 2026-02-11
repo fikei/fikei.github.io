@@ -2,6 +2,620 @@
   "root": "Ctrl",
   "sections": [
     {
+      "title": "Boards",
+      "icon": "\ud83d\udccb",
+      "file": "docs/boards/README.md",
+      "source": "ai",
+      "children": [
+        {
+          "title": "PRDs",
+          "icon": "\ud83d\udcc4",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Boards MVP",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/boards-mvp.md",
+              "source": "human"
+            },
+            {
+              "title": "Collaborative Boards",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/collaborative-boards.md",
+              "source": "human"
+            },
+            {
+              "title": "Corporate Management",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/corporate-management.md",
+              "source": "human"
+            },
+            {
+              "title": "Generative Widget Ecosystem",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/generative-widget-ecosystem.md",
+              "source": "human"
+            },
+            {
+              "title": "Widget Design System",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/widget-design-system.md",
+              "source": "human"
+            },
+            {
+              "title": "Widget Instrumentation",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/widget-instrumentation.md",
+              "source": "human"
+            },
+            {
+              "title": "Content Type and Image Systems",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/content-type-and-image-systems.md",
+              "source": "human"
+            },
+            {
+              "title": "Image Validation & Enrichment",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/prd/image-validation-enrichment.md",
+              "source": "human"
+            },
+            {
+              "title": "AI Widgets",
+              "icon": "\ud83e\udd16",
+              "file": "docs/boards/prd/ai-widgets.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Technical",
+          "icon": "\ud83d\udcd0",
+          "source": "ai",
+          "children": [
+            {
+              "title": "AI Widget System",
+              "icon": "\ud83e\udd16",
+              "file": "docs/boards/technical/ai-widget-system.md",
+              "source": "human"
+            },
+            {
+              "title": "AI Widget Pipeline",
+              "icon": "\ud83d\udd04",
+              "file": "docs/boards/technical/ai-widget-pipeline.md",
+              "source": "human"
+            },
+            {
+              "title": "Widget Architecture",
+              "icon": "\ud83d\udcd0",
+              "file": "docs/boards/technical/widget-architecture.md",
+              "source": "human"
+            },
+            {
+              "title": "Content Type System",
+              "icon": "\ud83d\udcc4",
+              "file": "docs/boards/technical/content-type-system.md",
+              "source": "human"
+            },
+            {
+              "title": "Core Systems Architecture",
+              "icon": "\ud83d\udd27",
+              "file": "docs/boards/technical/core-systems-architecture.md",
+              "source": "ai"
+            },
+            {
+              "title": "Database Schema",
+              "icon": "\ud83d\uddc3\ufe0f",
+              "file": "docs/boards/technical/database-schema.md",
+              "source": "ai"
+            },
+            {
+              "title": "Client Architecture",
+              "icon": "\ud83d\udda5\ufe0f",
+              "file": "docs/boards/technical/client-architecture.md",
+              "source": "ai"
+            },
+            {
+              "title": "Auth System",
+              "icon": "\ud83d\udd10",
+              "file": "docs/boards/technical/auth-system.md",
+              "source": "ai"
+            },
+            {
+              "title": "Sync Protocol",
+              "icon": "\ud83d\udd04",
+              "file": "docs/boards/technical/sync-protocol.md",
+              "source": "ai"
+            },
+            {
+              "title": "API Reference",
+              "icon": "\ud83d\udce1",
+              "file": "docs/boards/technical/api-reference.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "UX",
+          "icon": "\ud83c\udfa8",
+          "file": "docs/boards/ux/index.md",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Pins",
+              "icon": "\ud83d\udccc",
+              "file": "docs/boards/ux/pins/index.md",
+              "source": "ai",
+              "children": [
+                {
+                  "title": "Link Capture & Enrichment",
+                  "icon": "\u2728",
+                  "file": "docs/boards/ux/pins/link-capture.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "AI Categorization",
+                  "icon": "\ud83e\udde0",
+                  "file": "docs/boards/ux/pins/ai-categorization.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Multi-Format Content",
+                  "icon": "\ud83d\udce6",
+                  "file": "docs/boards/ux/pins/multi-format.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Flexible Tagging",
+                  "icon": "\ud83c\udff7\ufe0f",
+                  "file": "docs/boards/ux/pins/tagging.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Mobile Capture",
+                  "icon": "\ud83d\udcf1",
+                  "file": "docs/boards/ux/pins/mobile-capture.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Link Management",
+                  "icon": "\ud83d\udd17",
+                  "file": "docs/boards/ux/pins/link-management.md",
+                  "source": "ai"
+                }
+              ]
+            },
+            {
+              "title": "Widgets",
+              "icon": "\ud83e\udd16",
+              "file": "docs/boards/ux/widgets/index.md",
+              "source": "ai",
+              "children": [
+                {
+                  "title": "AI Recommendations",
+                  "icon": "\ud83d\udca1",
+                  "file": "docs/boards/ux/widgets/ai-recommendations.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Taste & Pattern Surfacing",
+                  "icon": "\ud83d\udcca",
+                  "file": "docs/boards/ux/widgets/taste-patterns.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Widget Catalog",
+                  "icon": "\ud83d\udcda",
+                  "file": "docs/boards/ux/widgets/widget-catalog.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Widget Preferences",
+                  "icon": "\u2699\ufe0f",
+                  "file": "docs/boards/ux/widgets/widget-preferences.md",
+                  "source": "ai"
+                }
+              ]
+            },
+            {
+              "title": "Boards",
+              "icon": "\ud83d\udccb",
+              "file": "docs/boards/ux/boards/index.md",
+              "source": "ai",
+              "children": [
+                {
+                  "title": "Visual Grid Browsing",
+                  "icon": "\ud83d\udcd0",
+                  "file": "docs/boards/ux/boards/grid-layout.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Search & Retrieval",
+                  "icon": "\ud83d\udd0d",
+                  "file": "docs/boards/ux/boards/search.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Collection Sharing",
+                  "icon": "\ud83d\udc65",
+                  "file": "docs/boards/ux/boards/sharing.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Cross-Category Connections",
+                  "icon": "\ud83d\udd00",
+                  "file": "docs/boards/ux/boards/cross-category.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Events Integration",
+                  "icon": "\ud83d\udcc5",
+                  "file": "docs/boards/ux/boards/events.md",
+                  "source": "ai"
+                }
+              ]
+            },
+            {
+              "title": "Users",
+              "icon": "\ud83d\udc64",
+              "source": "ai",
+              "children": [
+                {
+                  "title": "Authentication",
+                  "icon": "\ud83d\udd10",
+                  "file": "docs/boards/ux/users/authentication.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Onboarding",
+                  "icon": "\ud83d\ude80",
+                  "file": "docs/boards/ux/users/onboarding.md",
+                  "source": "ai"
+                },
+                {
+                  "title": "Settings & Preferences",
+                  "icon": "\u2699\ufe0f",
+                  "file": "docs/boards/ux/users/settings.md",
+                  "source": "ai"
+                }
+              ]
+            },
+            {
+              "title": "Admin Panel",
+              "icon": "\ud83d\udee0\ufe0f",
+              "file": "docs/boards/ux/admin-panel.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Research",
+          "icon": "\ud83d\udd0d",
+          "file": "docs/boards/research/index.md",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Widget Catalog",
+              "icon": "\ud83d\udcda",
+              "file": "docs/boards/research/widget-catalog.md",
+              "source": "ai"
+            },
+            {
+              "title": "Widget Design Components",
+              "icon": "\ud83e\udde9",
+              "file": "docs/boards/research/widget-design-components.md",
+              "source": "ai"
+            },
+            {
+              "title": "Widget Template Patterns",
+              "icon": "\ud83d\udcc4",
+              "file": "docs/boards/research/widget-template-patterns.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Plan",
+          "icon": "\ud83d\udcca",
+          "file": "docs/boards/plan/index.md",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Phase 1: Foundation",
+              "icon": "\ud83c\udfd7\ufe0f",
+              "file": "docs/boards/plan/phase-1-foundation.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 2: Core Experience",
+              "icon": "\ud83c\udfaf",
+              "file": "docs/boards/plan/phase-2-core-experience.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 3: AI Intelligence",
+              "icon": "\ud83e\udd16",
+              "file": "docs/boards/plan/phase-3-ai-intelligence.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 4: Sharing & Collaboration",
+              "icon": "\ud83d\udc65",
+              "file": "docs/boards/plan/phase-4-sharing-collaboration.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 5: UX Polish",
+              "icon": "\u2728",
+              "file": "docs/boards/plan/phase-5-ux-polish.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 6: Performance & Scale",
+              "icon": "\u26a1",
+              "file": "docs/boards/plan/phase-6-performance.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 7: Platform Expansion",
+              "icon": "\ud83d\ude80",
+              "file": "docs/boards/plan/phase-7-platform-expansion.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 8: Automated Pin Creation",
+              "icon": "\ud83d\udd04",
+              "file": "docs/boards/plan/phase-8-automated-pins.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 9: Bulk Import",
+              "icon": "\ud83d\udce5",
+              "file": "docs/boards/plan/phase-9-bulk-import.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 10: Image Validation",
+              "icon": "\ud83d\uddbc\ufe0f",
+              "file": "docs/boards/plan/phase-10-image-validation.md",
+              "source": "ai"
+            },
+            {
+              "title": "Backlog",
+              "icon": "\ud83d\udcdd",
+              "file": "docs/boards/plan/backlog.md",
+              "source": "ai"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Design System",
+      "icon": "\ud83c\udfa8",
+      "file": "docs/design-system/README.md",
+      "source": "ai",
+      "children": [
+        {
+          "title": "Component Library",
+          "icon": "\ud83e\udde9",
+          "file": "design-system/README.md",
+          "source": "human"
+        },
+        {
+          "title": "PRDs",
+          "icon": "\ud83d\udcc4",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Validation Pipeline",
+              "icon": "\u2705",
+              "file": "docs/design-system/prd/design-system-validation-pipeline.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Technical",
+          "icon": "\ud83d\udcd0",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Tech Stack",
+              "icon": "\ud83d\udee0\ufe0f",
+              "file": "docs/design-system/technical/tech-stack.md",
+              "source": "ai"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Systemic",
+      "icon": "\ud83d\udd04",
+      "file": "docs/systemic/README.md",
+      "source": "ai",
+      "children": [
+        {
+          "title": "PRDs",
+          "icon": "\ud83d\udcc4",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Variant Audit",
+              "icon": "\ud83d\udccb",
+              "file": "docs/systemic/prd/variant-audit.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Plan",
+          "icon": "\ud83d\udcca",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Variant Audit Plan",
+              "icon": "\ud83d\udcca",
+              "file": "docs/systemic/plan/variant-audit.md",
+              "source": "ai"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Soundscape",
+      "icon": "\ud83c\udfb5",
+      "file": "docs/soundscape/README.md",
+      "source": "ai",
+      "children": [
+        {
+          "title": "Technical",
+          "icon": "\ud83d\udcd0",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Control System Design",
+              "icon": "\ud83d\udcd0",
+              "file": "docs/soundscape/technical/control-system-design.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Plan",
+          "icon": "\ud83d\udcca",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Project Plan",
+              "icon": "\ud83d\udccb",
+              "file": "docs/soundscape/plan/project-plan.md",
+              "source": "ai"
+            },
+            {
+              "title": "Implementation Plan",
+              "icon": "\ud83d\udee0\ufe0f",
+              "file": "docs/soundscape/plan/implementation-plan.md",
+              "source": "ai"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Events",
+      "icon": "\ud83d\udcc5",
+      "file": "docs/events/README.md",
+      "source": "ai",
+      "children": [
+        {
+          "title": "PRDs",
+          "icon": "\ud83d\udcc4",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Discord Channel Source",
+              "icon": "\ud83d\udccb",
+              "file": "docs/events/prd/discord-channel-source.md",
+              "source": "ai"
+            },
+            {
+              "title": "Discord Bot Setup",
+              "icon": "\ud83e\udd16",
+              "file": "docs/events/prd/discord-bot-setup.md",
+              "source": "ai"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Tasks",
+      "icon": "\u2709\ufe0f",
+      "file": "docs/tasks/README.md",
+      "source": "ai",
+      "children": [
+        {
+          "title": "PRDs",
+          "icon": "\ud83d\udcc4",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Tasks PRD",
+              "icon": "\ud83d\udccb",
+              "file": "docs/tasks/prd/tasks.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Technical",
+          "icon": "\ud83d\udcd0",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Tasks System",
+              "icon": "\u2709\ufe0f",
+              "file": "docs/tasks/technical/tasks-system.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Plan",
+          "icon": "\ud83d\udcca",
+          "file": "docs/tasks/plan/index.md",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Phase 1: Foundation",
+              "icon": "\ud83c\udfd7\ufe0f",
+              "file": "docs/tasks/plan/phase-1-foundation.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 2: AI Classification",
+              "icon": "\ud83e\udd16",
+              "file": "docs/tasks/plan/phase-2-ai-classification.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 3: Web Dashboard",
+              "icon": "\ud83d\udcca",
+              "file": "docs/tasks/plan/phase-3-web-dashboard.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 4: Gmail Extension",
+              "icon": "\ud83d\udce7",
+              "file": "docs/tasks/plan/phase-4-gmail-extension.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 5: iOS App",
+              "icon": "\ud83d\udcf1",
+              "file": "docs/tasks/plan/phase-5-ios-app.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 6: Launch",
+              "icon": "\ud83d\ude80",
+              "file": "docs/tasks/plan/phase-6-launch.md",
+              "source": "ai"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Favicon",
+      "icon": "\ud83d\uddbc\ufe0f",
+      "file": "docs/favicon/README.md",
+      "source": "ai"
+    },
+    {
       "title": "Strategy",
       "icon": "\ud83c\udfaf",
       "source": "human",
@@ -19,630 +633,116 @@
           "source": "ai"
         },
         {
+          "title": "User Personas",
+          "icon": "\ud83d\udc64",
+          "file": "docs/strategy/personas.md",
+          "source": "ai"
+        },
+        {
           "title": "Decision Log",
           "icon": "\ud83d\udccb",
           "file": "docs/strategy/decision-log.md",
           "source": "human"
-        },
-        {
-          "title": "PRDs",
-          "icon": "\ud83d\udcc4",
-          "source": "human",
-          "children": [
-            {
-              "title": "Boards MVP",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/boards-mvp.md",
-              "source": "human"
-            },
-            {
-              "title": "Collaborative Boards",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/collaborative-boards.md",
-              "source": "human"
-            },
-            {
-              "title": "Corporate Management",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/corporate-management.md",
-              "source": "human"
-            },
-            {
-              "title": "Generative Widget Ecosystem",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/generative-widget-ecosystem.md",
-              "source": "human"
-            },
-            {
-              "title": "Widget Design System",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/widget-design-system.md",
-              "source": "human"
-            },
-            {
-              "title": "Widget Instrumentation",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/widget-instrumentation.md",
-              "source": "human"
-            },
-            {
-              "title": "Content Type and Image Systems",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/content-type-and-image-systems.md",
-              "source": "human"
-            },
-            {
-              "title": "AI Widgets",
-              "icon": "\ud83e\udd16",
-              "file": "docs/strategy/prds/ai-widgets.md",
-              "source": "ai"
-            },
-            {
-              "title": "Design System Validation Pipeline",
-              "icon": "\u2705",
-              "file": "docs/strategy/prds/design-system-validation-pipeline.md",
-              "source": "ai"
-            },
-            {
-              "title": "NotionSync Platform",
-              "icon": "\ud83d\udd04",
-              "file": "docs/strategy/prds/notion-sync-platform.md",
-              "source": "ai"
-            },
-            {
-              "title": "Tasks - Email Triage",
-              "icon": "\u2709\ufe0f",
-              "file": "docs/strategy/prds/tasks.md",
-              "source": "ai"
-            }
-          ]
         }
       ]
     },
     {
-      "title": "User Experience",
-      "icon": "\ud83c\udfa8",
-      "file": "docs/ux/index.md",
+      "title": "Ops",
+      "icon": "\ud83d\udd27",
+      "file": "docs/ops/README.md",
       "source": "ai",
-      "children": [
-        {
-          "title": "User Personas",
-          "icon": "\ud83d\udc64",
-          "file": "docs/ux/personas.md",
-          "source": "ai"
-        },
-        {
-          "title": "Components",
-          "icon": "\ud83e\udde9",
-          "source": "ai",
-          "children": [
-            {
-              "title": "Pins",
-              "icon": "\ud83d\udccc",
-              "file": "docs/ux/pins/index.md",
-              "source": "ai",
-              "children": [
-                {
-                  "title": "Link Capture & Enrichment",
-                  "icon": "\u2728",
-                  "file": "docs/ux/pins/link-capture.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "AI Categorization",
-                  "icon": "\ud83e\udde0",
-                  "file": "docs/ux/pins/ai-categorization.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Multi-Format Content",
-                  "icon": "\ud83d\udce6",
-                  "file": "docs/ux/pins/multi-format.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Flexible Tagging",
-                  "icon": "\ud83c\udff7\ufe0f",
-                  "file": "docs/ux/pins/tagging.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Mobile Capture",
-                  "icon": "\ud83d\udcf1",
-                  "file": "docs/ux/pins/mobile-capture.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Link Management",
-                  "icon": "\ud83d\udd17",
-                  "file": "docs/ux/pins/link-management.md",
-                  "source": "ai"
-                }
-              ]
-            },
-            {
-              "title": "Widgets",
-              "icon": "\ud83e\udd16",
-              "file": "docs/ux/widgets/index.md",
-              "source": "ai",
-              "children": [
-                {
-                  "title": "AI Recommendations",
-                  "icon": "\ud83d\udca1",
-                  "file": "docs/ux/widgets/ai-recommendations.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Taste & Pattern Surfacing",
-                  "icon": "\ud83d\udcca",
-                  "file": "docs/ux/widgets/taste-patterns.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Widget Preferences",
-                  "icon": "\u2699\ufe0f",
-                  "file": "docs/ux/widgets/widget-preferences.md",
-                  "source": "ai"
-                }
-              ]
-            },
-            {
-              "title": "Boards",
-              "icon": "\ud83d\udccb",
-              "file": "docs/ux/boards/index.md",
-              "source": "ai",
-              "children": [
-                {
-                  "title": "Visual Grid Browsing",
-                  "icon": "\ud83d\udcd0",
-                  "file": "docs/ux/boards/grid-layout.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Search & Retrieval",
-                  "icon": "\ud83d\udd0d",
-                  "file": "docs/ux/boards/search.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Collection Sharing",
-                  "icon": "\ud83d\udc65",
-                  "file": "docs/ux/boards/sharing.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Cross-Category Connections",
-                  "icon": "\ud83d\udd00",
-                  "file": "docs/ux/boards/cross-category.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Events Integration",
-                  "icon": "\ud83d\udcc5",
-                  "file": "docs/ux/boards/events.md",
-                  "source": "ai"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "title": "Actions",
-          "icon": "\u26a1",
-          "source": "ai",
-          "children": [
-            {
-              "title": "User Profiles & Roles",
-              "icon": "\ud83d\udc64",
-              "source": "ai",
-              "children": [
-                {
-                  "title": "Authentication",
-                  "icon": "\ud83d\udd10",
-                  "file": "docs/ux/users/authentication.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Onboarding",
-                  "icon": "\ud83d\ude80",
-                  "file": "docs/ux/users/onboarding.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Settings & Preferences",
-                  "icon": "\u2699\ufe0f",
-                  "file": "docs/ux/users/settings.md",
-                  "source": "ai"
-                }
-              ]
-            },
-            {
-              "title": "Admin Panel",
-              "icon": "\ud83d\udee0\ufe0f",
-              "file": "docs/ux/admin-panel.md",
-              "source": "ai"
-            }
-          ]
-        },
-        {
-          "title": "Research",
-          "icon": "\ud83d\udd0d",
-          "source": "ai",
-          "children": [
-            {
-              "title": "Widget Catalog",
-              "icon": "\ud83d\udcda",
-              "file": "docs/ux/research/widget-catalog.md",
-              "source": "ai"
-            },
-            {
-              "title": "Widget Design Components",
-              "icon": "\ud83e\udde9",
-              "file": "docs/ux/research/widget-design-components.md",
-              "source": "ai"
-            },
-            {
-              "title": "Widget Template Patterns",
-              "icon": "\ud83d\udcc4",
-              "file": "docs/ux/research/widget-template-patterns.md",
-              "source": "ai"
-            }
-          ]
-        },
-        {
-          "title": "CTRL Design System",
-          "icon": "\ud83c\udfa8",
-          "file": "design-system/README.md",
-          "source": "human"
-        }
-      ]
-    },
-    {
-      "title": "Execution",
-      "icon": "\ud83d\udd28",
-      "source": "ai",
-      "children": [
-        {
-          "title": "Bugs",
-          "icon": "\ud83d\udc1b",
-          "file": "docs/execution/BUGS.md",
-          "source": "ai"
-        },
-        {
-          "title": "Project Plan",
-          "icon": "\ud83d\udcca",
-          "file": "docs/execution/project-plan/index.md",
-          "source": "ai",
-          "children": [
-            {
-              "title": "Phase 1: Foundation",
-              "icon": "\ud83c\udfd7\ufe0f",
-              "file": "docs/execution/project-plan/phase-1-foundation.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 2: Core Experience",
-              "icon": "\ud83c\udfaf",
-              "file": "docs/execution/project-plan/phase-2-core-experience.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 3: AI Intelligence",
-              "icon": "\ud83e\udd16",
-              "file": "docs/execution/project-plan/phase-3-ai-intelligence.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 4: Sharing & Collaboration",
-              "icon": "\ud83d\udc65",
-              "file": "docs/execution/project-plan/phase-4-sharing-collaboration.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 5: UX Polish",
-              "icon": "\u2728",
-              "file": "docs/execution/project-plan/phase-5-ux-polish.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 6: Performance & Scale",
-              "icon": "\u26a1",
-              "file": "docs/execution/project-plan/phase-6-performance.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 7: Platform Expansion",
-              "icon": "\ud83d\ude80",
-              "file": "docs/execution/project-plan/phase-7-platform-expansion.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 8: Automated Pin Creation",
-              "icon": "\ud83d\udd04",
-              "file": "docs/execution/project-plan/phase-8-automated-pins.md",
-              "source": "ai"
-            },
-            {
-              "title": "Phase 9: Bulk Import",
-              "icon": "\ud83d\udce5",
-              "file": "docs/execution/project-plan/phase-9-bulk-import.md",
-              "source": "ai"
-            },
-            {
-              "title": "Backlog",
-              "icon": "\ud83d\udcdd",
-              "file": "docs/execution/project-plan/backlog.md",
-              "source": "ai"
-            },
-            {
-              "title": "Tasks Project Plan",
-              "icon": "\u2709\ufe0f",
-              "file": "docs/execution/project-plan/tasks/index.md",
-              "source": "ai",
-              "children": [
-                {
-                  "title": "Phase 1: Foundation",
-                  "icon": "\ud83c\udfd7\ufe0f",
-                  "file": "docs/execution/project-plan/tasks/phase-1-foundation.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Phase 2: AI Classification",
-                  "icon": "\ud83e\udd16",
-                  "file": "docs/execution/project-plan/tasks/phase-2-ai-classification.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Phase 3: Web Dashboard",
-                  "icon": "\ud83d\udcca",
-                  "file": "docs/execution/project-plan/tasks/phase-3-web-dashboard.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Phase 4: Gmail Extension",
-                  "icon": "\ud83d\udce7",
-                  "file": "docs/execution/project-plan/tasks/phase-4-gmail-extension.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Phase 5: iOS App",
-                  "icon": "\ud83d\udcf1",
-                  "file": "docs/execution/project-plan/tasks/phase-5-ios-app.md",
-                  "source": "ai"
-                },
-                {
-                  "title": "Phase 6: Launch",
-                  "icon": "\ud83d\ude80",
-                  "file": "docs/execution/project-plan/tasks/phase-6-launch.md",
-                  "source": "ai"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "Infrastructure",
-      "icon": "\ud83c\udfd7",
-      "source": "human",
       "children": [
         {
           "title": "Architecture",
-          "icon": "\ud83d\udcd0",
-          "source": "human",
-          "children": [
-            {
-              "title": "System Overview",
-              "icon": "\ud83d\uddfa\ufe0f",
-              "file": "docs/infrastructure/architecture.md",
-              "source": "human"
-            },
-            {
-              "title": "Deployment",
-              "icon": "\ud83d\ude80",
-              "file": "docs/infrastructure/deployment.md",
-              "source": "human"
-            },
-            {
-              "title": "Security",
-              "icon": "\ud83d\udd12",
-              "file": "docs/infrastructure/security.md",
-              "source": "human"
-            },
-            {
-              "title": "Monitoring",
-              "icon": "\ud83d\udcc8",
-              "file": "docs/infrastructure/monitoring.md",
-              "source": "human"
-            },
-            {
-              "title": "Dependencies",
-              "icon": "\ud83d\udd17",
-              "file": "docs/infrastructure/dependencies.md",
-              "source": "ai"
-            },
-            {
-              "title": "Known Risks",
-              "icon": "\u26a0\ufe0f",
-              "file": "docs/infrastructure/risks.md",
-              "source": "ai"
-            }
-          ]
+          "icon": "\ud83d\uddfa\ufe0f",
+          "file": "docs/ops/architecture.md",
+          "source": "human"
         },
         {
-          "title": "Technical Design",
-          "icon": "\ud83d\udcd0",
-          "source": "human",
-          "children": [
-            {
-              "title": "AI Widget System",
-              "icon": "\ud83e\udd16",
-              "file": "docs/infrastructure/technical-design/ai-widget-system.md",
-              "source": "human"
-            },
-            {
-              "title": "Content Type System",
-              "icon": "\ud83d\udcc4",
-              "file": "docs/infrastructure/technical-design/content-type-system.md",
-              "source": "human"
-            },
-            {
-              "title": "Widget Architecture",
-              "icon": "\ud83d\udcd0",
-              "file": "docs/infrastructure/technical-design/widget-architecture.md",
-              "source": "human"
-            },
-            {
-              "title": "AI Widget Pipeline",
-              "icon": "\ud83d\udd04",
-              "file": "docs/infrastructure/technical-design/ai-widget-pipeline.md",
-              "source": "human"
-            },
-            {
-              "title": "Core Systems Architecture",
-              "icon": "\ud83d\udd27",
-              "file": "docs/infrastructure/technical-design/core-systems-architecture.md",
-              "source": "ai"
-            },
-            {
-              "title": "Database Schema",
-              "icon": "\ud83d\uddc3\ufe0f",
-              "file": "docs/infrastructure/technical-design/database-schema.md",
-              "source": "ai"
-            },
-            {
-              "title": "Client Architecture",
-              "icon": "\ud83d\udda5\ufe0f",
-              "file": "docs/infrastructure/technical-design/client-architecture.md",
-              "source": "ai"
-            },
-            {
-              "title": "Auth System",
-              "icon": "\ud83d\udd10",
-              "file": "docs/infrastructure/technical-design/auth-system.md",
-              "source": "ai"
-            },
-            {
-              "title": "Sync Protocol",
-              "icon": "\ud83d\udd04",
-              "file": "docs/infrastructure/technical-design/sync-protocol.md",
-              "source": "ai"
-            },
-            {
-              "title": "API Reference",
-              "icon": "\ud83d\udce1",
-              "file": "docs/infrastructure/technical-design/api-reference.md",
-              "source": "ai"
-            },
-            {
-              "title": "Tech Stack",
-              "icon": "\ud83d\udee0\ufe0f",
-              "file": "docs/infrastructure/technical-design/tech-stack.md",
-              "source": "ai"
-            },
-            {
-              "title": "Content Type and Image Systems Tech",
-              "icon": "\ud83d\udcc4",
-              "file": "docs/infrastructure/technical-design/content-type-and-image-systems.md",
-              "source": "human"
-            },
-            {
-              "title": "Notion Bidirectional Sync",
-              "icon": "\ud83d\udd04",
-              "file": "docs/execution/NOTION-BIDIRECTIONAL-SYNC.md",
-              "source": "ai"
-            },
-            {
-              "title": "Notion Sync Guide",
-              "icon": "\ud83d\udcd6",
-              "file": "docs/infrastructure/NOTION-SYNC-GUIDE.md",
-              "source": "ai"
-            },
-            {
-              "title": "Tasks System",
-              "icon": "\u2709\ufe0f",
-              "file": "docs/infrastructure/technical-design/tasks-system.md",
-              "source": "ai"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "Playground",
-      "icon": "\ud83e\uddea",
-      "source": "human",
-      "children": [
-        {
-          "title": "Soundscape",
-          "icon": "\ud83c\udfb5",
-          "source": "human",
-          "children": [
-            {
-              "title": "Soundscape Project Plan",
-              "icon": "\ud83d\udccb",
-              "file": "soundscape/PROJECT_PLAN.md",
-              "source": "human"
-            },
-            {
-              "title": "Control System Design",
-              "icon": "\ud83d\udcd0",
-              "file": "soundscape/CONTROL_SYSTEM_DESIGN.md",
-              "source": "human"
-            }
-          ]
+          "title": "Deployment",
+          "icon": "\ud83d\ude80",
+          "file": "docs/ops/deployment.md",
+          "source": "human"
         },
         {
-          "title": "Systemic",
-          "icon": "\ud83d\udd04",
-          "source": "human",
-          "children": [
-            {
-              "title": "Variant Audit PRD",
-              "icon": "\ud83d\udccb",
-              "file": "docs/playground/systemic/prd-variant-audit.md",
-              "source": "ai"
-            },
-            {
-              "title": "Variant Audit Project Plan",
-              "icon": "\ud83d\udcca",
-              "file": "docs/playground/systemic/project-plan-variant-audit.md",
-              "source": "ai"
-            }
-          ]
+          "title": "Security",
+          "icon": "\ud83d\udd12",
+          "file": "docs/ops/security.md",
+          "source": "human"
         },
         {
-          "title": "Tasks",
-          "icon": "\u2709\ufe0f",
-          "source": "ai",
-          "children": [
-            {
-              "title": "Tasks PRD",
-              "icon": "\ud83d\udccb",
-              "file": "docs/strategy/prds/tasks.md",
-              "source": "ai"
-            },
-            {
-              "title": "Tasks Technical Design",
-              "icon": "\ud83d\udcd0",
-              "file": "docs/infrastructure/technical-design/tasks-system.md",
-              "source": "ai"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "Operations",
-      "icon": "\ud83d\udcc5",
-      "source": "human",
-      "children": [
+          "title": "Monitoring",
+          "icon": "\ud83d\udcc8",
+          "file": "docs/ops/monitoring.md",
+          "source": "human"
+        },
+        {
+          "title": "Dependencies",
+          "icon": "\ud83d\udd17",
+          "file": "docs/ops/dependencies.md",
+          "source": "ai"
+        },
+        {
+          "title": "Known Risks",
+          "icon": "\u26a0\ufe0f",
+          "file": "docs/ops/risks.md",
+          "source": "ai"
+        },
         {
           "title": "Costs",
           "icon": "\ud83d\udcb0",
           "file": "COSTS.md",
           "source": "human"
+        },
+        {
+          "title": "Bugs",
+          "icon": "\ud83d\udc1b",
+          "file": "docs/ops/bugs.md",
+          "source": "ai"
+        },
+        {
+          "title": "Ops Changelog",
+          "icon": "\ud83d\udcdd",
+          "file": "docs/ops/ops-changelog.md",
+          "source": "ai"
+        },
+        {
+          "title": "Notion Sync",
+          "icon": "\ud83d\udd04",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Sync Guide",
+              "icon": "\ud83d\udcd6",
+              "file": "docs/ops/notion-sync/guide.md",
+              "source": "ai"
+            },
+            {
+              "title": "Bidirectional Sync",
+              "icon": "\ud83d\udd04",
+              "file": "docs/ops/notion-sync/bidirectional-sync.md",
+              "source": "ai"
+            },
+            {
+              "title": "Platform PRD",
+              "icon": "\ud83d\udccb",
+              "file": "docs/ops/notion-sync/platform-prd.md",
+              "source": "ai"
+            }
+          ]
+        },
+        {
+          "title": "Setup",
+          "icon": "\ud83d\udee0\ufe0f",
+          "source": "ai",
+          "children": [
+            {
+              "title": "AI Agent System",
+              "icon": "\ud83e\udd16",
+              "file": "docs/ops/setup/ai-agent-system.md",
+              "source": "ai"
+            }
+          ]
         },
         {
           "title": "AI Agents",
