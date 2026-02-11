@@ -3,15 +3,106 @@
 // applies heuristic pre-filter, then uses Claude Haiku to extract
 // structured event data from free-form text.
 //
-// POST /functions/v1/scrape-discord-events
-// Body: { guildId, channelId, lookbackDays? }
-// Returns: { events: [...], meta: { messagesScanned, candidateMessages, eventsExtracted, lookbackDays } }
+// Supports server-side caching: events are stored in discord_event_cache
+// and refreshed by cron every 4 hours. Client reads get cached results instantly.
+//
+// Actions:
+//   POST { guildId, channelId }                     -> read cache (or scrape if stale/missing)
+//   POST { action: "refresh", guildId, channelId }  -> force scrape + cache (for cron)
+//   POST { action: "refresh-all" }                  -> refresh all cached channels (for cron)
+//
+// Returns: { events: [...], meta: { ... }, cached: boolean }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
+
+// Cache TTL: 4 hours (cron refreshes every 4h)
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000
+
+// --- Supabase client ---
+
+function getSupabase() {
+  const url = Deno.env.get('SUPABASE_URL')!
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  return createClient(url, key)
+}
+
+// --- Cache operations ---
+
+interface CacheRow {
+  guild_id: string
+  channel_id: string
+  events: unknown[]
+  meta: Record<string, unknown>
+  last_message_id: string | null
+  fetched_at: string
+  expires_at: string
+}
+
+async function readCache(guildId: string, channelId: string): Promise<CacheRow | null> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('discord_event_cache')
+    .select('*')
+    .eq('guild_id', guildId)
+    .eq('channel_id', channelId)
+    .single()
+
+  if (error || !data) return null
+  return data as CacheRow
+}
+
+async function writeCache(
+  guildId: string,
+  channelId: string,
+  events: unknown[],
+  meta: Record<string, unknown>,
+  lastMessageId?: string
+): Promise<void> {
+  const supabase = getSupabase()
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + CACHE_TTL_MS)
+
+  const row = {
+    guild_id: guildId,
+    channel_id: channelId,
+    events,
+    meta,
+    last_message_id: lastMessageId || null,
+    fetched_at: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  }
+
+  const { error } = await supabase
+    .from('discord_event_cache')
+    .upsert(row, { onConflict: 'guild_id,channel_id' })
+
+  if (error) {
+    console.error('Cache write failed:', error.message)
+  } else {
+    console.log(`Cache written: ${guildId}/${channelId} | ${events.length} events, expires ${expiresAt.toISOString()}`)
+  }
+}
+
+async function getAllCachedChannels(): Promise<Array<{ guild_id: string; channel_id: string }>> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('discord_event_cache')
+    .select('guild_id, channel_id')
+
+  if (error || !data) return []
+  return data
+}
+
+function isCacheFresh(cache: CacheRow): boolean {
+  return new Date(cache.expires_at) > new Date()
 }
 
 // --- Discord API helpers ---
@@ -80,9 +171,8 @@ async function fetchAllMessages(
     const batch = await fetchDiscordMessages(channelId, botToken, after)
     if (batch.length === 0) break
     all.push(...batch)
-    // Messages come newest-first from Discord; get oldest ID for next page
     after = batch[batch.length - 1].id
-    if (batch.length < 100) break // no more pages
+    if (batch.length < 100) break
   }
 
   return all.slice(0, maxMessages)
@@ -115,34 +205,15 @@ const VENUE_PATTERNS = [
 function scoreMessage(msg: DiscordMessage): number {
   const text = msg.content + ' ' + (msg.embeds || []).map(e => `${e.title || ''} ${e.description || ''}`).join(' ')
   let score = 0
-
-  // Date signals (+3)
   if (DATE_PATTERNS.some(p => p.test(text))) score += 3
-
-  // Time signals (+2)
   if (TIME_PATTERNS.some(p => p.test(text))) score += 2
-
-  // Price signals (+1)
   if (PRICE_PATTERNS.some(p => p.test(text))) score += 1
-
-  // Venue/location signals (+1)
   if (VENUE_PATTERNS.some(p => p.test(text))) score += 1
-
-  // URL present (+1)
   if (/https?:\/\//.test(text)) score += 1
-
-  // Long message (+1)
   if (text.length > 50) score += 1
-
-  // Bot/webhook (+1) — often automated event posts
   if (msg.author.bot) score += 1
-
-  // Reply/thread (-2) — discussion, not announcement
   if (msg.message_reference) score -= 2
-
-  // Very short (-2)
   if (text.length < 20) score -= 2
-
   return score
 }
 
@@ -239,19 +310,17 @@ async function extractEventsWithAI(
     if (!resp.ok) {
       const errText = await resp.text()
       console.error(`Claude API error: ${resp.status} ${errText}`)
-      continue // skip batch on error, don't fail entire scrape
+      continue
     }
 
     const data = await resp.json()
     const text = data.content?.[0]?.text || ''
 
     try {
-      // Strip markdown code fences if present
       const cleaned = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim()
       const parsed = JSON.parse(cleaned)
 
       if (Array.isArray(parsed)) {
-        // Add Discord permalink as fallback URL
         for (const event of parsed) {
           if (!event.url && batch[0]) {
             event.url = messagePermalink(guildId, channelId, batch[0].id)
@@ -270,33 +339,24 @@ async function extractEventsWithAI(
 // --- Post-extraction validation ---
 
 function validateEvent(event: ExtractedEvent): boolean {
-  // Must have a date
   if (!event.date || !/^\d{4}-\d{2}-\d{2}$/.test(event.date)) return false
-
-  // Must have a name
   if (!event.name || event.name.trim().length < 2) return false
-
-  // Date must parse and be within reasonable range (not more than 1 year out)
   const d = new Date(event.date)
   if (isNaN(d.getTime())) return false
   const oneYearOut = new Date()
   oneYearOut.setFullYear(oneYearOut.getFullYear() + 1)
   if (d > oneYearOut) return false
-
   return true
 }
 
 function deduplicateEvents(events: ExtractedEvent[]): ExtractedEvent[] {
   const seen = new Map<string, ExtractedEvent>()
-
   for (const event of events) {
     const key = `${event.date}|${event.name.toLowerCase().replace(/[^a-z0-9]/g, '')}|${(event.venue || '').toLowerCase().replace(/[^a-z0-9]/g, '')}`
-
     const existing = seen.get(key)
     if (!existing) {
       seen.set(key, event)
     } else {
-      // Merge: prefer the more complete record
       for (const field of ['time', 'venue', 'address', 'city', 'genre', 'price', 'ages', 'promoter', 'url'] as const) {
         if (!existing[field] && event[field]) {
           (existing as Record<string, string>)[field] = event[field]
@@ -304,8 +364,50 @@ function deduplicateEvents(events: ExtractedEvent[]): ExtractedEvent[] {
       }
     }
   }
-
   return Array.from(seen.values())
+}
+
+// --- Full scrape pipeline (fetches Discord, runs AI, writes cache) ---
+
+async function scrapeAndCache(
+  guildId: string,
+  channelId: string,
+  lookbackDays: number
+): Promise<{ events: ExtractedEvent[]; meta: Record<string, unknown> }> {
+  const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
+  if (!botToken) throw new Error('DISCORD_BOT_TOKEN not configured')
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
+
+  console.log(`Scraping channel ${channelId} (${lookbackDays}d lookback)`)
+  const messages = await fetchAllMessages(channelId, botToken, lookbackDays)
+  console.log(`Fetched ${messages.length} messages`)
+
+  const candidates = messages.filter(m => scoreMessage(m) >= CANDIDATE_THRESHOLD)
+  console.log(`${candidates.length} candidates passed heuristic filter`)
+
+  let events: ExtractedEvent[] = []
+  const meta: Record<string, unknown> = {
+    messagesScanned: messages.length,
+    candidateMessages: candidates.length,
+    eventsExtracted: 0,
+    lookbackDays,
+    scrapedAt: new Date().toISOString(),
+  }
+
+  if (candidates.length > 0) {
+    const rawEvents = await extractEventsWithAI(candidates, apiKey, guildId, channelId)
+    console.log(`AI extracted ${rawEvents.length} raw events`)
+    const valid = rawEvents.filter(validateEvent)
+    events = deduplicateEvents(valid)
+    console.log(`After validation: ${valid.length}, after dedup: ${events.length}`)
+    meta.eventsExtracted = events.length
+  }
+
+  const lastMessageId = messages.length > 0 ? messages[0].id : undefined
+  await writeCache(guildId, channelId, events, meta, lastMessageId)
+
+  return { events, meta }
 }
 
 // --- Main handler ---
@@ -322,10 +424,43 @@ serve(async (req) => {
     } catch {
       return new Response(
         JSON.stringify({ error: 'Request body must be valid JSON with guildId and channelId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: jsonHeaders }
       )
     }
 
+    const action = (body.action as string) || 'read'
+
+    // --- refresh-all: cron refreshes every cached channel ---
+    if (action === 'refresh-all') {
+      const channels = await getAllCachedChannels()
+      if (channels.length === 0) {
+        return new Response(
+          JSON.stringify({ refreshed: 0, message: 'No cached channels to refresh' }),
+          { headers: jsonHeaders }
+        )
+      }
+
+      const lookbackDays = Math.min(Math.max((body.lookbackDays as number) || 7, 1), 30)
+      const results: Array<{ guildId: string; channelId: string; events: number; error?: string }> = []
+
+      for (const ch of channels) {
+        try {
+          const result = await scrapeAndCache(ch.guild_id, ch.channel_id, lookbackDays)
+          results.push({ guildId: ch.guild_id, channelId: ch.channel_id, events: result.events.length })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error'
+          console.error(`Failed to refresh ${ch.guild_id}/${ch.channel_id}: ${msg}`)
+          results.push({ guildId: ch.guild_id, channelId: ch.channel_id, events: 0, error: msg })
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ refreshed: results.length, results }),
+        { headers: jsonHeaders }
+      )
+    }
+
+    // --- All other actions need guildId + channelId ---
     const { guildId, channelId, lookbackDays: rawLookback } = body as {
       guildId?: string
       channelId?: string
@@ -335,68 +470,44 @@ serve(async (req) => {
     if (!guildId || !channelId) {
       return new Response(
         JSON.stringify({ error: 'guildId and channelId are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: jsonHeaders }
       )
     }
 
     const lookbackDays = Math.min(Math.max(rawLookback || 7, 1), 30)
 
-    const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
-    if (!botToken) {
+    // --- refresh: force scrape + cache for a single channel ---
+    if (action === 'refresh') {
+      const result = await scrapeAndCache(guildId, channelId, lookbackDays)
       return new Response(
-        JSON.stringify({ error: 'DISCORD_BOT_TOKEN not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ...result, cached: false }),
+        { headers: jsonHeaders }
       )
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    // --- read (default): serve from cache, scrape if stale/missing ---
+    const cache = await readCache(guildId, channelId)
 
-    // 1. Fetch messages from Discord
-    console.log(`Fetching messages from channel ${channelId} (${lookbackDays}d lookback)`)
-    const messages = await fetchAllMessages(channelId, botToken, lookbackDays)
-    console.log(`Fetched ${messages.length} messages`)
-
-    // 2. Pre-filter with heuristic scoring
-    const candidates = messages.filter(m => scoreMessage(m) >= CANDIDATE_THRESHOLD)
-    console.log(`${candidates.length} candidates passed heuristic filter (threshold=${CANDIDATE_THRESHOLD})`)
-
-    if (candidates.length === 0) {
+    if (cache && isCacheFresh(cache)) {
+      console.log(`Cache hit: ${guildId}/${channelId} | ${(cache.events as unknown[]).length} events`)
       return new Response(
         JSON.stringify({
-          events: [],
-          meta: { messagesScanned: messages.length, candidateMessages: 0, eventsExtracted: 0, lookbackDays },
+          events: cache.events,
+          meta: { ...cache.meta, cachedAt: cache.fetched_at },
+          cached: true,
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: jsonHeaders }
       )
     }
 
-    // 3. AI extraction
-    const rawEvents = await extractEventsWithAI(candidates, apiKey, guildId, channelId)
-    console.log(`AI extracted ${rawEvents.length} raw events`)
-
-    // 4. Validate and deduplicate
-    const valid = rawEvents.filter(validateEvent)
-    const events = deduplicateEvents(valid)
-    console.log(`After validation: ${valid.length}, after dedup: ${events.length}`)
-
+    // Cache miss or stale — scrape live and cache
+    console.log(`Cache ${cache ? 'stale' : 'miss'}: ${guildId}/${channelId}, scraping live`)
+    const result = await scrapeAndCache(guildId, channelId, lookbackDays)
     return new Response(
-      JSON.stringify({
-        events,
-        meta: {
-          messagesScanned: messages.length,
-          candidateMessages: candidates.length,
-          eventsExtracted: events.length,
-          lookbackDays,
-        },
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ ...result, cached: false }),
+      { headers: jsonHeaders }
     )
+
   } catch (err) {
     console.error('scrape-discord-events error:', err)
 
@@ -409,7 +520,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ error }),
-      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status, headers: jsonHeaders }
     )
   }
 })
