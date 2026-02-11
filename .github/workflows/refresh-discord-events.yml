@@ -19,8 +19,8 @@ jobs:
         run: |
           LOOKBACK="${{ github.event.inputs.lookback_days || '7' }}"
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "${{ secrets.SUPABASE_BOARDS_URL }}/functions/v1/scrape-discord-events" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/scrape-discord-events" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
             -d "{\"action\": \"refresh-all\", \"lookbackDays\": $LOOKBACK}")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)

@@ -44,23 +44,11 @@ supabase secrets set DISCORD_BOT_TOKEN="your-bot-token-here"
 
 ## Step 5: Configure GitHub Repository Secrets
 
-The scheduled cache refresh requires two GitHub repository secrets for the Actions workflow.
+The scheduled cache refresh uses the existing `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` repository secrets (same ones used by the Notion sync workflow).
 
-Go to: **https://github.com/fikei/fikei.github.io/settings/secrets/actions**
+**Already configured:** ✅ `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` exist in repo secrets.
 
-**Add these two secrets:**
-
-1. **`SUPABASE_BOARDS_URL`**
-   - Click **"New repository secret"**
-   - Name: `SUPABASE_BOARDS_URL`
-   - Value: `https://yfhudwakpgzswiylhfbh.supabase.co`
-   - Click **"Add secret"**
-
-2. **`SUPABASE_SERVICE_ROLE_KEY`**
-   - Click **"New repository secret"**
-   - Name: `SUPABASE_SERVICE_ROLE_KEY`
-   - Value: Go to [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/yfhudwakpgzswiylhfbh/settings/api) → under **Project API keys**, click **"Reveal"** next to `service_role` → copy that value
-   - Click **"Add secret"**
+> **Note:** These secrets must point to the **Boards** project (`yfhudwakpgzswiylhfbh`). If `SUPABASE_URL` currently points to the Ops project, update it to `https://yfhudwakpgzswiylhfbh.supabase.co`, or add a separate `SUPABASE_BOARDS_URL` secret and update the workflow.
 
 **Verify:** Go to **Actions** tab → **"Refresh Discord Events Cache"** → click **"Run workflow"** → check output.
 
@@ -190,6 +178,6 @@ Client opens app
 | "DISCORD_BOT_TOKEN not configured" | Secret not set | Run `supabase secrets set DISCORD_BOT_TOKEN=...` |
 | 0 events extracted from many messages | Messages are image-only flyers, or very short | Check debug log — candidates < threshold means messages didn't match heuristic |
 | "MESSAGE_CONTENT intent required" | Intent not enabled in Developer Portal | Go to Bot tab → enable MESSAGE CONTENT INTENT |
-| GitHub Actions cron fails | Missing repo secrets | Add `SUPABASE_BOARDS_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Settings → Secrets |
+| GitHub Actions cron fails | Missing repo secrets | Verify `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` exist in Settings → Secrets → Actions |
 | "Unexpected end of JSON input" | Edge Function called with empty body | Fixed — function now returns 400 with clear error message |
 | Cache returns stale events | Cron not running or secrets missing | Check Actions tab → Refresh Discord Events Cache → recent runs |

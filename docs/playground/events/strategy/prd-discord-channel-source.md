@@ -543,8 +543,8 @@ A cron workflow refreshes all cached channels every 4 hours:
 - **Manual trigger:** Supports `workflow_dispatch` with configurable `lookback_days`
 - **Action:** Calls the Edge Function with `{ "action": "refresh-all" }`
 - **Required GitHub secrets:**
-  - `SUPABASE_BOARDS_URL` — `https://yfhudwakpgzswiylhfbh.supabase.co`
-  - `SUPABASE_SERVICE_ROLE_KEY` — Service role key from Supabase Dashboard → Settings → API
+  - `SUPABASE_URL` — Boards project URL (already configured)
+  - `SUPABASE_SERVICE_KEY` — Service role key (already configured)
 
 This means:
 - **Clients always get fast cached responses** (no Discord API latency)
