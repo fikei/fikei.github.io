@@ -1837,29 +1837,20 @@ body {
   }
 
   // --- ScreenSlate Parser ---
-  // ScreenSlate has a JSON API: /date?_format=json&date=YYYYMMDD&field_city_target_id=ID
-  // ScreenSlate city IDs (from field_city_target_id parameter)
-  const SCREENSLATE_CITY_IDS = {
-    'bay-area': '10970',
-    'new-york': '10969',
+  // ScreenSlate Drupal JSON API
+  // Chrome Network tab shows XHR to: date?_format=json&date=YYYYMMDD&field_city_target_id=ID
+  // The full path likely includes city slug: /listings/{city-slug}/date
+  const SCREENSLATE_CITIES = {
+    'bay-area': { id: '10970', slug: 'sf-bay-area' },
+    'new-york': { id: '10969', slug: 'new-york' },
   };
 
-  // URL path patterns to try — discovered via Chrome Network tab inspection.
-  // ScreenSlate is Drupal with a Views REST export. The XHR shows "date?_format=json"
-  // in the Name column, but we need the full path. Try candidates in order.
-  const SCREENSLATE_PATH_PATTERNS = [
-    '/listings/date',      // Most likely: REST export under /listings/
-    '/screenings/date',    // Alternative: content-type based path
-    '/api/date',           // Common API prefix
-    '/date',               // Bare path (known to fail, but included as fallback)
-  ];
-
-  // Cache the working path pattern so we don't re-discover on every source
-  let _screenSlateWorkingPath = null;
+  // Cache the working URL template so we don't re-discover on every request
+  let _screenSlateWorkingTemplate = null;
 
   async function fetchScreenSlate(source) {
     const baseUrl = 'https://www.screenslate.com';
-    const cityId = SCREENSLATE_CITY_IDS[source.region] || '';
+    const city = SCREENSLATE_CITIES[source.region] || { id: '', slug: '' };
     const allEvents = [];
 
     // Fetch today + next 6 days for a week of listings
@@ -1869,58 +1860,59 @@ body {
       const dateParam = dateStr.replace(/-/g, ''); // 20260210
 
       try {
-        log(`ScreenSlate: fetching ${dateStr}${cityId ? ' (city=' + cityId + ')' : ''}`);
+        log(`ScreenSlate: fetching ${dateStr} (${city.slug}, city=${city.id})`);
 
         let text = null;
 
-        // If we already discovered the working path, use it directly
-        if (_screenSlateWorkingPath) {
-          const apiUrl = buildScreenSlateUrl(baseUrl, _screenSlateWorkingPath, dateParam, cityId);
+        // If we already discovered the working template, use it directly
+        if (_screenSlateWorkingTemplate) {
+          const apiUrl = _screenSlateWorkingTemplate
+            .replace('{date}', dateParam)
+            .replace('{cityId}', city.id)
+            .replace('{citySlug}', city.slug);
           text = await proxyFetch(apiUrl);
-          // Validate it's actually JSON, not an error page
-          if (text && looksLikeJson(text)) {
-            // good
-          } else {
-            log(`ScreenSlate: cached path ${_screenSlateWorkingPath} returned non-JSON, re-discovering...`);
-            _screenSlateWorkingPath = null;
+          if (!looksLikeListingData(text)) {
+            log(`ScreenSlate: cached template failed, re-discovering...`);
+            _screenSlateWorkingTemplate = null;
             text = null;
           }
         }
 
-        // Auto-discover: try each path pattern until one returns valid JSON
+        // Auto-discover: try URL patterns until one returns actual listing data
         if (!text) {
-          for (const pathPattern of SCREENSLATE_PATH_PATTERNS) {
-            const apiUrl = buildScreenSlateUrl(baseUrl, pathPattern, dateParam, cityId);
-            log(`  ScreenSlate: trying ${pathPattern} → ${apiUrl}`);
+          const templates = buildScreenSlateUrlCandidates(baseUrl, city);
+          for (const { label, url } of templates) {
+            const apiUrl = url.replace('{date}', dateParam);
+            log(`  ScreenSlate: trying ${label} → ${apiUrl}`);
             try {
               const resp = await proxyFetch(apiUrl);
-              if (resp && looksLikeJson(resp)) {
-                log(`  ScreenSlate: ✓ ${pathPattern} returned valid JSON (${resp.length} chars)`);
-                _screenSlateWorkingPath = pathPattern;
+              if (looksLikeListingData(resp)) {
+                log(`  ScreenSlate: ✓ ${label} returned listing data (${resp.length} chars)`);
+                // Save template with {date} placeholder for reuse
+                _screenSlateWorkingTemplate = url;
                 text = resp;
                 break;
               } else {
                 const preview = (resp || '').substring(0, 200);
-                log(`  ScreenSlate: ✗ ${pathPattern} returned non-JSON: ${preview}`);
+                log(`  ScreenSlate: ✗ ${label}: ${preview}`);
               }
             } catch (pathErr) {
-              log(`  ScreenSlate: ✗ ${pathPattern} failed: ${pathErr.message}`);
+              log(`  ScreenSlate: ✗ ${label} failed: ${pathErr.message}`);
             }
           }
         }
 
         if (!text) {
-          throw new Error('All ScreenSlate URL patterns failed. Check console for details.');
+          throw new Error('All ScreenSlate URL patterns failed. Check console — need full XHR URL from Network tab.');
         }
 
         const events = parseScreenSlateJson(text, source.id, dateStr, baseUrl);
         allEvents.push(...events);
         if (dayOffset === 0) {
-          log(`ScreenSlate: day 1 (${dateStr}) returned ${events.length} events via ${_screenSlateWorkingPath}`);
+          log(`ScreenSlate: day 1 (${dateStr}) returned ${events.length} events`);
         }
       } catch (e) {
         log(`ScreenSlate: fetch failed for ${dateStr}: ${e.message}`);
-        // If first day fails, abort — don't spam 6 more failing requests
         if (dayOffset === 0) throw e;
         break;
       }
@@ -1939,24 +1931,59 @@ body {
     return deduped;
   }
 
-  function buildScreenSlateUrl(baseUrl, pathPattern, dateParam, cityId) {
-    let url = `${baseUrl}${pathPattern}?_format=json&date=${dateParam}`;
-    if (cityId) url += `&field_city_target_id=${cityId}`;
-    return url;
+  function buildScreenSlateUrlCandidates(baseUrl, city) {
+    // Try city-slug paths first (most likely for Drupal Views with contextual filter),
+    // then generic paths, then alternative formats
+    const candidates = [];
+    const qs = `date={date}&field_city_target_id=${city.id}`;
+
+    if (city.slug) {
+      // City-specific paths — REST export at /listings/{city}/date
+      candidates.push({
+        label: `/listings/${city.slug}/date?_format=json`,
+        url: `${baseUrl}/listings/${city.slug}/date?_format=json&${qs}`,
+      });
+      candidates.push({
+        label: `/listings/${city.slug}/date?_format=hal_json`,
+        url: `${baseUrl}/listings/${city.slug}/date?_format=hal_json&${qs}`,
+      });
+      candidates.push({
+        label: `/listings/${city.slug}/date (no format)`,
+        url: `${baseUrl}/listings/${city.slug}/date?${qs}`,
+      });
+    }
+    // Generic paths
+    candidates.push({
+      label: `/listings/date?_format=json`,
+      url: `${baseUrl}/listings/date?_format=json&${qs}`,
+    });
+    candidates.push({
+      label: `/listings/date?_format=hal_json`,
+      url: `${baseUrl}/listings/date?_format=hal_json&${qs}`,
+    });
+    candidates.push({
+      label: `/screenings/date?_format=json`,
+      url: `${baseUrl}/screenings/date?_format=json&${qs}`,
+    });
+    candidates.push({
+      label: `/api/date?_format=json`,
+      url: `${baseUrl}/api/date?_format=json&${qs}`,
+    });
+    return candidates;
   }
 
-  function looksLikeJson(text) {
-    if (!text || text.length < 2) return false;
+  function looksLikeListingData(text) {
+    if (!text || text.length < 10) return false;
     const trimmed = text.trimStart();
-    // JSON starts with [ or { — not with < (HTML) or whitespace-only
-    if (trimmed[0] === '[' || trimmed[0] === '{') {
-      // Extra check: make sure it's not a Drupal error message wrapped in JSON
-      // "No route found" errors come back as JSON: {"message":"..."}
-      if (trimmed.includes('"No route found')) return false;
-      if (trimmed.includes('"message":"The requested URL')) return false;
-      return true;
-    }
-    return false;
+    // Must start with [ or {
+    if (trimmed[0] !== '[' && trimmed[0] !== '{') return false;
+    // Reject known Drupal error messages
+    if (trimmed.includes('"No route found')) return false;
+    if (trimmed.includes('"Not acceptable format')) return false;
+    if (trimmed.includes('"message":"The requested URL')) return false;
+    // Reject tiny error objects like {"message":"..."} — real listing data is larger
+    if (trimmed.length < 100 && trimmed.includes('"message"')) return false;
+    return true;
   }
 
   function parseScreenSlateJson(text, sourceId, dateStr, baseUrl) {
