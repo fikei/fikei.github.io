@@ -216,6 +216,13 @@ When working on this project, always follow these guidelines:
 
 Claude Code is authorized to perform the following operations **without asking for confirmation**:
 
+### Session Startup (MANDATORY — every session)
+1. **Always create a new unique branch at the start of every session** — never reuse an existing feature branch from a previous session
+2. Branch naming: `claude/<topic>-<random-5-chars>` (e.g., `claude/fix-events-nav-Xk9mT`)
+3. Base the new branch on `master` (pull latest first) unless the user explicitly says to continue work on a specific branch
+4. Stay on that branch for the entire session — do not switch branches mid-session unless the user asks
+5. If the working tree has uncommitted changes from a previous session, stash them before creating the new branch
+
 ### Git & GitHub
 - **Always create a PR to merge into master** — never push to master directly
 - **Assign all PRs to `fikei`** so they appear in the GitHub mobile app for quick merge
