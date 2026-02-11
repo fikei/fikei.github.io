@@ -2454,7 +2454,7 @@ body {
       throw new Error(err.error || `Discord fetch failed: ${resp.status}`);
     }
     const data = await resp.json();
-    log(`Discord "${source.name}": scanned ${data.meta?.messagesScanned || '?'} msgs, ${data.meta?.candidateMessages || '?'} candidates, ${data.events?.length || 0} events`);
+    log(`Discord "${source.name}": ${data.events?.length || 0} events${data.cached ? ' (cached)' : ` (live: ${data.meta?.messagesScanned || '?'} msgs scanned)`}`);
     return (data.events || []).map(ev => ({
       ...ev,
       source: source.id,
