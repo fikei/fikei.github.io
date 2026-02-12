@@ -544,7 +544,7 @@ A cron workflow refreshes all cached channels every 4 hours:
 - **Action:** Calls the Edge Function with `{ "action": "refresh-all" }`
 - **Required GitHub secrets:**
   - `SUPABASE_BOARDS_URL` — Boards project URL (`https://yfhudwakpgzswiylhfbh.supabase.co`)
-  - `SUPABASE_SERVICE_KEY` — Service role key (shared with Notion sync workflow)
+  - `SUPABASE_BOARDS_SERVICE_KEY` — Boards service role key
 
 This means:
 - **Clients always get fast cached responses** (no Discord API latency)
