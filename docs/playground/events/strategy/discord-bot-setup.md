@@ -47,7 +47,7 @@ supabase secrets set DISCORD_BOT_TOKEN="your-bot-token-here"
 The scheduled cache refresh requires two GitHub repository secrets:
 
 - **`SUPABASE_BOARDS_URL`** — `https://yfhudwakpgzswiylhfbh.supabase.co` ✅ Added
-- **`SUPABASE_SERVICE_KEY`** — Service role key from Supabase Dashboard → Settings → API ✅ Already configured
+- **`SUPABASE_BOARDS_SERVICE_KEY`** — Boards service role key from [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/yfhudwakpgzswiylhfbh/settings/api) → Reveal `service_role` ⬅️ **Add this**
 
 **Verify:** Go to **Actions** tab → **"Refresh Discord Events Cache"** → click **"Run workflow"** → check output.
 
@@ -177,6 +177,6 @@ Client opens app
 | "DISCORD_BOT_TOKEN not configured" | Secret not set | Run `supabase secrets set DISCORD_BOT_TOKEN=...` |
 | 0 events extracted from many messages | Messages are image-only flyers, or very short | Check debug log — candidates < threshold means messages didn't match heuristic |
 | "MESSAGE_CONTENT intent required" | Intent not enabled in Developer Portal | Go to Bot tab → enable MESSAGE CONTENT INTENT |
-| GitHub Actions cron fails | Missing repo secrets | Verify `SUPABASE_BOARDS_URL` and `SUPABASE_SERVICE_KEY` exist in Settings → Secrets → Actions |
+| GitHub Actions cron fails | Missing repo secrets | Verify `SUPABASE_BOARDS_URL` and `SUPABASE_BOARDS_SERVICE_KEY` exist in Settings → Secrets → Actions |
 | "Unexpected end of JSON input" | Edge Function called with empty body | Fixed — function now returns 400 with clear error message |
 | Cache returns stale events | Cron not running or secrets missing | Check Actions tab → Refresh Discord Events Cache → recent runs |
