@@ -2,9 +2,9 @@
 
 ## Events — Discord Channel Event Source
 
-**Version:** 1.0
-**Status:** Draft
-**Last Updated:** 2026-02-08
+**Version:** 1.1
+**Status:** Shipped (Phase 1 + Caching)
+**Last Updated:** 2026-02-11
 **Depends On:** Events Aggregator (`/events/`), Supabase Boards project (`yfhudwakpgzswiylhfbh`)
 
 ---
@@ -161,13 +161,40 @@ Discord-extracted events use the same model as all other sources. No changes to 
 └──────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────┐
+│  GitHub Actions Cron (every 4 hours)                             │
+│  .github/workflows/refresh-discord-events.yml                    │
+│                                                                  │
+│  POST { action: "refresh-all" }                                  │
+│       │                                                          │
+│       ▼                                                          │
+│  Supabase Edge Function: scrape-discord-events                   │
+│       │                                                          │
+│       ▼                                                          │
+│  discord_event_cache table (Supabase)                            │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
 │  Supabase Edge Function: scrape-discord-events                   │
 │                                                                  │
-│  1. Receive { guildId, channelId } from client                   │
-│  2. Fetch messages from Discord API (bot token in env)           │
-│  3. Pre-filter messages (heuristic: date-like patterns)          │
-│  4. Batch to Claude Haiku for structured extraction              │
-│  5. Validate + deduplicate extracted events                      │
+│  Actions:                                                        │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │ { guildId, channelId }         → Read cache (default)   │     │
+│  │   └─ If fresh: return cached events                     │     │
+│  │   └─ If stale/missing: scrape + cache + return          │     │
+│  │                                                         │     │
+│  │ { action: "refresh", guildId, channelId }               │     │
+│  │   └─ Force scrape + update cache + return               │     │
+│  │                                                         │     │
+│  │ { action: "refresh-all" }                               │     │
+│  │   └─ Refresh all cached channels (cron job)             │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                                                                  │
+│  Pipeline (per channel):                                         │
+│  1. Fetch messages from Discord API (bot token in env)           │
+│  2. Pre-filter messages (heuristic: date-like patterns)          │
+│  3. Batch to Claude Haiku for structured extraction              │
+│  4. Validate + deduplicate extracted events                      │
+│  5. Write to discord_event_cache table                           │
 │  6. Return events[] in standard schema                           │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -177,20 +204,47 @@ Discord-extracted events use the same model as all other sources. No changes to 
 **Project:** Boards (`yfhudwakpgzswiylhfbh`)
 **Runtime:** Deno (TypeScript)
 **Secrets:** `DISCORD_BOT_TOKEN`, `ANTHROPIC_API_KEY`
+**Source:** `supabase/functions/scrape-discord-events/index.ts`
 
 #### Endpoint
 
 ```
 POST /functions/v1/scrape-discord-events
-Authorization: Bearer <supabase-anon-key>
+Authorization: Bearer <supabase-anon-key> or <supabase-service-role-key>
 Content-Type: application/json
+```
 
+#### Actions
+
+**1. Read (default — client calls this)**
+```json
 {
   "guildId": "123456789",
   "channelId": "987654321",
-  "lookbackDays": 7        // optional, default 7, max 30
+  "lookbackDays": 7
 }
 ```
+Returns cached events if fresh (< 4 hours old). If cache is stale or missing, scrapes live and caches the result.
+
+**2. Refresh (force single channel)**
+```json
+{
+  "action": "refresh",
+  "guildId": "123456789",
+  "channelId": "987654321",
+  "lookbackDays": 7
+}
+```
+Always scrapes live and updates cache, regardless of TTL.
+
+**3. Refresh All (cron job)**
+```json
+{
+  "action": "refresh-all",
+  "lookbackDays": 7
+}
+```
+Refreshes all channels in the `discord_event_cache` table. Called by GitHub Actions every 4 hours.
 
 #### Response
 
@@ -211,6 +265,7 @@ Content-Type: application/json
       "url": "https://discord.com/channels/123/987/111222333"
     }
   ],
+  "cached": true,
   "meta": {
     "messagesScanned": 147,
     "candidateMessages": 23,
@@ -439,36 +494,75 @@ Optionally, pre-populate common Discord event channels as stock sources:
 
 ---
 
-## 6. Caching Strategy
+## 6. Caching Strategy ✅ Shipped
 
 ### 6.1 Server-Side Cache
 
-The Edge Function should cache results in Supabase storage or a database table to avoid redundant Discord API calls and LLM invocations.
+The Edge Function caches results in a Supabase database table to avoid redundant Discord API calls and LLM invocations. A GitHub Actions cron job refreshes the cache every 4 hours.
 
 | Field | Value |
 |---|---|
-| Cache key | `discord-events:{guildId}:{channelId}` |
-| TTL | 30 minutes (configurable) |
+| Cache key | `(guild_id, channel_id)` UNIQUE constraint |
+| TTL | **4 hours** (aligned with cron schedule) |
 | Storage | Supabase table `discord_event_cache` |
-| Invalidation | On manual refresh, or when TTL expires |
+| Invalidation | On `refresh` action, `refresh-all` cron, or when TTL expires on next read |
+| Cron schedule | Every 4 hours via GitHub Actions (`0 */4 * * *`) |
 
 #### Cache Table Schema
 
 ```sql
+-- Migration: supabase/migrations/010_discord_event_cache.sql
 CREATE TABLE discord_event_cache (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   guild_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,
-  events JSONB NOT NULL,
-  meta JSONB,
-  last_message_id TEXT,          -- for incremental fetching
-  created_at TIMESTAMPTZ DEFAULT now(),
+  events JSONB NOT NULL DEFAULT '[]',
+  meta JSONB DEFAULT '{}',
+  last_message_id TEXT,
+  fetched_at TIMESTAMPTZ DEFAULT now(),
   expires_at TIMESTAMPTZ NOT NULL,
   UNIQUE(guild_id, channel_id)
 );
+
+-- Indexes
+CREATE INDEX idx_discord_cache_lookup ON discord_event_cache (guild_id, channel_id);
+CREATE INDEX idx_discord_cache_expires ON discord_event_cache (expires_at);
+
+-- RLS: public read, service role write
+ALTER TABLE discord_event_cache ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read cache" ON discord_event_cache FOR SELECT USING (true);
+CREATE POLICY "Service role can write cache" ON discord_event_cache FOR ALL USING (true) WITH CHECK (true);
 ```
 
-### 6.2 Incremental Fetching
+### 6.2 Scheduled Refresh (GitHub Actions)
+
+A cron workflow refreshes all cached channels every 4 hours:
+
+- **Workflow:** `.github/workflows/refresh-discord-events.yml`
+- **Schedule:** `0 */4 * * *` (every 4 hours)
+- **Manual trigger:** Supports `workflow_dispatch` with configurable `lookback_days`
+- **Action:** Calls the Edge Function with `{ "action": "refresh-all" }`
+- **Required GitHub secrets:**
+  - `SUPABASE_BOARDS_URL` — Boards project URL (`https://yfhudwakpgzswiylhfbh.supabase.co`)
+  - `SUPABASE_SERVICE_KEY` — Service role key (shared with Notion sync workflow)
+
+This means:
+- **Clients always get fast cached responses** (no Discord API latency)
+- **Fresh data within 4 hours** of any new Discord message
+- **Zero client-side cost** for Discord API calls or AI extraction after initial cache population
+
+### 6.3 Cache Read Flow
+
+```
+Client POST { guildId, channelId }
+  │
+  ├─ Cache exists + fresh (< 4h)? → Return cached events { cached: true }
+  │
+  └─ Cache missing or stale?
+       └─ Scrape Discord → AI extract → Write cache → Return { cached: false }
+```
+
+### 6.4 Incremental Fetching
 
 After the first full scrape, subsequent fetches only need to get *new* messages (those after `last_message_id`). This reduces:
 - Discord API calls (fewer pages to fetch)
@@ -482,9 +576,9 @@ Next fetch:   GET /messages?after={last_message_id}&limit=100
               → prune events older than lookback window
 ```
 
-### 6.3 Client-Side Cache
+### 6.5 Client-Side Cache
 
-The existing `CACHE_KEY` / `CACHE_MAX_AGE` (15 min) system applies to Discord events the same as all other sources. No changes needed.
+The existing `CACHE_KEY` / `CACHE_MAX_AGE` (15 min) system applies to Discord events the same as all other sources. No changes needed. The server-side cache operates independently above this layer.
 
 ---
 
@@ -533,24 +627,25 @@ The existing `CACHE_KEY` / `CACHE_MAX_AGE` (15 min) system applies to Discord ev
 
 ## 9. Scope & Phasing
 
-### Phase 1: Core (MVP)
+### Phase 1: Core (MVP) ✅ Shipped
 
-- [ ] Discord bot application setup (permissions, intents)
-- [ ] Supabase Edge Function: `scrape-discord-events`
-  - [ ] Discord API message fetching with pagination
-  - [ ] Snowflake-based lookback window
-  - [ ] Heuristic pre-filter
-  - [ ] Claude Haiku extraction with structured prompt
-  - [ ] Post-extraction validation and deduplication
-- [ ] Client: `fetchDiscord()` function
-- [ ] Client: source type routing for `type: 'discord'`
-- [ ] Client: "Add Discord Channel" UI in source modal
-- [ ] Basic error handling and user feedback
+- [x] Discord bot application setup (permissions, intents)
+- [x] Supabase Edge Function: `scrape-discord-events`
+  - [x] Discord API message fetching with pagination
+  - [x] Snowflake-based lookback window
+  - [x] Heuristic pre-filter
+  - [x] Claude Haiku extraction with structured prompt
+  - [x] Post-extraction validation and deduplication
+- [x] Client: `fetchDiscord()` function
+- [x] Client: source type routing for `type: 'discord'`
+- [ ] Client: "Add Discord Channel" UI in source modal *(deferred — using stock sources for now)*
+- [x] Basic error handling and user feedback
 
-### Phase 2: Polish
+### Phase 2: Polish (Partial) — Caching Shipped
 
-- [ ] Server-side caching with `discord_event_cache` table
-- [ ] Incremental fetching (only new messages)
+- [x] Server-side caching with `discord_event_cache` table
+- [x] Scheduled cache refresh via GitHub Actions cron (every 4 hours)
+- [ ] Incremental fetching (only new messages) *(architecture supports it via `last_message_id`, not yet implemented)*
 - [ ] Bot invite flow with success confirmation
 - [ ] Channel picker (list channels the bot can see, let user select)
 - [ ] Stock Discord sources for known community servers
@@ -567,15 +662,18 @@ The existing `CACHE_KEY` / `CACHE_MAX_AGE` (15 min) system applies to Discord ev
 
 ## 10. Cost Estimation
 
-| Component | Unit Cost | Per Scrape (typical) | Monthly (daily refresh) |
-|---|---|---|---|
-| Discord API | Free | 2-3 requests | ~90 requests |
-| Claude Haiku input | $0.25/MTok | ~5K tokens (~$0.001) | ~$0.03 |
-| Claude Haiku output | $1.25/MTok | ~2K tokens (~$0.003) | ~$0.09 |
-| Supabase Edge Function | Free tier | 1 invocation | ~30 invocations |
-| **Total per channel** | | **~$0.004** | **~$0.12** |
+With the scheduled cache (6 refreshes/day per channel):
 
-With 10 Discord channels active: ~$1.20/month. Well within Supabase free tier and Claude API budget.
+| Component | Unit Cost | Per Scrape (typical) | Monthly (6x/day refresh) |
+|---|---|---|---|
+| Discord API | Free | 2-3 requests | ~540 requests |
+| Claude Haiku input | $0.25/MTok | ~5K tokens (~$0.001) | ~$0.18 |
+| Claude Haiku output | $1.25/MTok | ~2K tokens (~$0.003) | ~$0.54 |
+| Supabase Edge Function | Free tier | 1 invocation | ~180 invocations |
+| GitHub Actions | Free tier | 1 workflow run | ~180 runs |
+| **Total per channel** | | **~$0.004** | **~$0.72** |
+
+With 10 Discord channels active: ~$7.20/month. Well within Supabase free tier, Claude API budget, and GitHub Actions free tier (2,000 min/month).
 
 ---
 
@@ -593,7 +691,7 @@ With 10 Discord channels active: ~$1.20/month. Well within Supabase free tier an
 
 ## 12. Design Decisions (Resolved)
 
-1. **Poll, not push** — Regular polling on refresh (no persistent bot process). The Edge Function fetches messages on-demand when the client requests. No WebSocket listener, no running bot.
+1. **Scheduled cache, not push** — A GitHub Actions cron job refreshes the cache every 4 hours. Clients read from the cache for instant responses. No WebSocket listener, no running bot, no on-demand scraping latency for end users.
 2. **Shared bot** — One ctrl.rodeo bot application invited to all servers. Users get an invite link; no per-user bot setup. Simpler onboarding, single token to manage.
 3. **Cross-source deduplication** — When the same event appears in multiple sources (e.g., 19hz AND a Discord channel), we deduplicate by matching on `(date, name_normalized, venue_normalized)`. Merged events combine the richest data from each source and carry **both source tags** so the event shows up under either source filter. See Section 14 below.
 

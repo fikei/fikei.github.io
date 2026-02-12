@@ -2,7 +2,15 @@
 
 ## Overview
 
-This connects the ctrl.rodeo Events app to the Agape Discord `#events` channel. A bot reads messages, AI extracts event details, and they show up in the calendar/list view.
+This connects the ctrl.rodeo Events app to Discord `#events` channels. A bot reads messages, AI extracts event details, and they show up in the calendar/list view.
+
+**Architecture:** A GitHub Actions cron job refreshes the cache every 4 hours. Clients read from the server-side cache for instant responses — no Discord API latency for end users.
+
+**Key files:**
+- `supabase/functions/scrape-discord-events/index.ts` — Edge Function
+- `supabase/migrations/010_discord_event_cache.sql` — Cache table
+- `.github/workflows/refresh-discord-events.yml` — Cron workflow
+- `events/index.html` — Client `fetchDiscord()` function
 
 ---
 
@@ -10,13 +18,15 @@ This connects the ctrl.rodeo Events app to the Agape Discord `#events` channel. 
 
 **Done.** Application ID: `1470922378652553371`
 
-**Still needed on the Developer Portal:**
-1. Go to [discord.com/developers/applications/1470922378652553371](https://discord.com/developers/applications/1470922378652553371)
-2. **Bot** tab → Click **"Reset Token"** → copy the token (you'll need it for Step 3)
-3. **Bot** tab → Under **Privileged Gateway Intents**, enable **MESSAGE CONTENT INTENT** (toggle ON)
-4. Save changes
+## Step 2: Enable MESSAGE CONTENT INTENT
 
-## Step 2: Set the Client ID in the App
+**Done.** Enabled in Discord Developer Portal.
+
+1. Go to [discord.com/developers/applications/1470922378652553371](https://discord.com/developers/applications/1470922378652553371)
+2. **Bot** tab → Under **Privileged Gateway Intents**, enable **MESSAGE CONTENT INTENT** (toggle ON)
+3. Save changes
+
+## Step 3: Set the Client ID in the App
 
 **Done.** Client ID `1470922378652553371` is set in `events/index.html`.
 
@@ -25,16 +35,26 @@ The invite URL is:
 https://discord.com/oauth2/authorize?client_id=1470922378652553371&scope=bot&permissions=68608
 ```
 
-## Step 3: Store the Bot Token as a Supabase Secret
+## Step 4: Store the Bot Token as a Supabase Secret
 
 ```bash
 supabase link --project-ref yfhudwakpgzswiylhfbh
 supabase secrets set DISCORD_BOT_TOKEN="your-bot-token-here"
 ```
 
-## Step 4: Deploy the Edge Function
+## Step 5: Configure GitHub Repository Secrets
+
+The scheduled cache refresh requires two GitHub repository secrets:
+
+- **`SUPABASE_BOARDS_URL`** — `https://yfhudwakpgzswiylhfbh.supabase.co` ✅ Added
+- **`SUPABASE_SERVICE_KEY`** — Service role key from Supabase Dashboard → Settings → API ✅ Already configured
+
+**Verify:** Go to **Actions** tab → **"Refresh Discord Events Cache"** → click **"Run workflow"** → check output.
+
+## Step 6: Deploy the Edge Function
 
 ```bash
+supabase link --project-ref yfhudwakpgzswiylhfbh
 supabase functions deploy scrape-discord-events
 ```
 
@@ -43,34 +63,41 @@ Verify it's running:
 supabase functions list
 ```
 
-## Step 5: Ask Admins to Invite the Bot
+## Step 7: Run the Database Migration
+
+The cache table migration should already be applied. If not:
+
+```bash
+supabase link --project-ref yfhudwakpgzswiylhfbh
+supabase db push --linked
+```
+
+This creates the `discord_event_cache` table with RLS policies.
+
+## Step 8: Ask Admins to Invite the Bot
 
 Send this to Gavin (gavaiken) or Charles (charles_irl):
 
 ---
 
-> **Message to admins:**
+> Hey! I built a calendar app that pulls events from different sources into one view. I'd love to add the `#events` channel as a source — a bot would read messages every few hours, auto-extract event details (dates, times, venues) using AI, and show them in a calendar view I can share a link to each week.
 >
-> Hey! I built a calendar app that pulls events from different sources into one view. I'd love to add our `#events` channel as a source — it would scrape the messages and auto-extract event details (dates, times, venues) so we have a nice calendar/list view I can share a link to each week.
+> **What I need from you:**
 >
-> To make it work I need you to:
->
-> 1. **Click this invite link** to add my bot to the server:
+> 1. **Click this invite link** to add the bot:
 >    `https://discord.com/oauth2/authorize?client_id=1470922378652553371&scope=bot&permissions=68608`
->    (replace 1470922378652553371 with your actual Application ID)
 >
-> 2. **Make sure the bot can see `#events`** — it needs:
+> 2. **Make sure the bot can see `#events`** — it just needs:
 >    - View Channel
 >    - Read Message History
->    - Send Messages (for posting the weekly digest link)
 >
-> The bot is read-only by default — it just fetches messages when I refresh the app. It doesn't post anything unless I add a weekly digest feature later. It also doesn't store any messages — just extracts event info (date, time, venue, etc.) and discards the rest.
+> The bot is completely read-only — it just fetches messages periodically to extract event info. It never posts, reacts, or stores message content. Only the extracted event data (date, time, venue, etc.) is cached.
 >
-> That's it! Once the bot is in, I just need the Server ID and `#events` Channel ID (right-click → Copy ID with Developer Mode on).
+> Once the bot's in, I just need the **Server ID** and **Channel ID** (right-click → Copy ID with Developer Mode on).
 
 ---
 
-## Step 6: Get Server & Channel IDs
+## Step 9: Get Server & Channel IDs
 
 Once the bot is invited, you need two IDs:
 
@@ -78,7 +105,7 @@ Once the bot is invited, you need two IDs:
 2. **Server ID**: Right-click the server name in the sidebar → "Copy Server ID"
 3. **Channel ID**: Right-click `#events` → "Copy Channel ID"
 
-## Step 7: Add the Source
+## Step 10: Add the Source
 
 Either:
 
@@ -96,13 +123,35 @@ Add this to the `STOCK_SOURCES` array:
 { id: 'discord-agape-events', name: 'Agape #events', category: 'other', type: 'discord', url: null, region: 'bay-area', description: 'House events from Discord', discord: { guildId: 'PASTE_SERVER_ID', channelId: 'PASTE_CHANNEL_ID', guildName: 'Agape', channelName: '#events' } },
 ```
 
-## Step 8: Test
+## Step 11: Test
 
 1. Open the Events app
 2. Enable the Agape #events source
 3. Check the debug log (bottom of page) for:
-   - `Discord "Agape #events": scanned X msgs, Y candidates, Z events`
+   - `Discord "Agape #events": X events (cached)` — if cache hit
+   - `Discord "Agape #events": X events (live: scanned Y msgs, Z candidates)` — if cache miss
 4. Events should appear in the calendar/list view
+
+---
+
+## Architecture: Scheduled Cache
+
+```
+GitHub Actions (every 4h)
+  └─ POST { action: "refresh-all" }
+       └─ Edge Function scrapes ALL cached channels
+            └─ Writes to discord_event_cache table
+
+Client opens app
+  └─ POST { guildId, channelId }
+       └─ Edge Function reads cache
+            ├─ Fresh? → Return cached events instantly
+            └─ Stale? → Scrape live → cache → return
+```
+
+**Cache TTL:** 4 hours (aligned with cron schedule)
+**Cache table:** `discord_event_cache` (migration 010)
+**Cron workflow:** `.github/workflows/refresh-discord-events.yml`
 
 ---
 
@@ -128,3 +177,6 @@ Add this to the `STOCK_SOURCES` array:
 | "DISCORD_BOT_TOKEN not configured" | Secret not set | Run `supabase secrets set DISCORD_BOT_TOKEN=...` |
 | 0 events extracted from many messages | Messages are image-only flyers, or very short | Check debug log — candidates < threshold means messages didn't match heuristic |
 | "MESSAGE_CONTENT intent required" | Intent not enabled in Developer Portal | Go to Bot tab → enable MESSAGE CONTENT INTENT |
+| GitHub Actions cron fails | Missing repo secrets | Verify `SUPABASE_BOARDS_URL` and `SUPABASE_SERVICE_KEY` exist in Settings → Secrets → Actions |
+| "Unexpected end of JSON input" | Edge Function called with empty body | Fixed — function now returns 400 with clear error message |
+| Cache returns stale events | Cron not running or secrets missing | Check Actions tab → Refresh Discord Events Cache → recent runs |
