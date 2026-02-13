@@ -2888,6 +2888,89 @@ body {
   opacity: 0.7;
 }
 
+/* ============================================
+   Bookmarklet Promo Banner
+   ============================================ */
+.capture-promo {
+  display: none; /* JS shows it */
+  position: fixed;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  max-width: 400px;
+  width: calc(100% - 32px);
+  animation: promo-slide-up 0.3s ease;
+}
+
+@keyframes promo-slide-up {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.capture-promo__inner {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.capture-promo__text {
+  flex: 1;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+
+.capture-promo__cta {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--bg);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.capture-promo__cta:hover {
+  background: transparent;
+  color: var(--bg);
+  border-color: var(--bg);
+}
+
+.capture-promo__dismiss {
+  background: transparent;
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: var(--space-1);
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.capture-promo__dismiss:hover {
+  opacity: 1;
+}
+
+/* Hide promo on mobile — they have quick-add bar & PWA instead */
+@media (max-width: 600px) {
+  .capture-promo {
+    display: none !important;
+  }
+}
+
 /* Quick-Add Bar — mobile-first always-visible URL input */
 .quick-add {
   display: none; /* hidden on desktop */
@@ -3652,6 +3735,15 @@ body {
   </section>
 
   <div class="listen-player" id="listenPlayer"></div>
+
+  <!-- Bookmarklet Promo Banner (desktop) -->
+  <div class="capture-promo" id="capturePromo">
+    <div class="capture-promo__inner">
+      <div class="capture-promo__text">Save links faster — drag the bookmarklet to your bookmarks bar</div>
+      <button class="capture-promo__cta" id="promoShowTools">Get it</button>
+      <button class="capture-promo__dismiss" id="promoDismiss" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
 
   <!-- Quick-Add Bar (mobile) -->
   <div class="quick-add" id="quickAdd">
@@ -10936,7 +11028,7 @@ Return JSON:
   // ============================================
   function openModal(m) { m.classList.add('modal--visible', 'overlay--visible'); }
   function closeModal(m) { m.classList.remove('modal--visible', 'overlay--visible'); }
-  function closeAll() { [addModal, scanModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -12168,6 +12260,8 @@ Return JSON:
     const urlParams = new URLSearchParams(window.location.search);
     const addUrl = urlParams.get('add');
     if (addUrl) {
+      // Mark this session as deep-link arrival (suppress bookmarklet promo)
+      sessionStorage.setItem('boards_arrived_via_deeplink', '1');
       // Clean up the URL bar
       const cleanLocation = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanLocation);
@@ -12437,6 +12531,109 @@ Return JSON:
       }, 0);
     });
   }
+
+  // ============================================
+  // Bookmarklet Promo Banner (desktop only)
+  // ============================================
+  // Smart display logic:
+  //  - Only shows on desktop (CSS hides on mobile)
+  //  - Shows after user's 3rd link add (engaged user, not first-timer)
+  //  - Dismiss: snoozes for 7 days, then reappears once
+  //  - Dismiss twice: gone for 30 days
+  //  - Opening Tools modal = "installed", never show again
+  //  - Deep link (?add=) arrivals = already using a tool, skip
+
+  const PROMO_KEY = 'boards_promo_bookmarklet';
+  const capturePromo = document.getElementById('capturePromo');
+  const promoShowTools = document.getElementById('promoShowTools');
+  const promoDismiss = document.getElementById('promoDismiss');
+
+  function getPromoState() {
+    try { return JSON.parse(localStorage.getItem(PROMO_KEY)) || {}; } catch { return {}; }
+  }
+
+  function setPromoState(updates) {
+    const state = { ...getPromoState(), ...updates };
+    localStorage.setItem(PROMO_KEY, JSON.stringify(state));
+    return state;
+  }
+
+  function shouldShowPromo() {
+    // Never show on mobile (CSS enforces too, but skip logic entirely)
+    if (window.innerWidth <= 600) return false;
+
+    const state = getPromoState();
+
+    // User already found the tools / bookmarklet — done forever
+    if (state.installed) return false;
+
+    // Arrived via deep link this session — they're already using a capture tool
+    if (sessionStorage.getItem('boards_arrived_via_deeplink')) return false;
+
+    // Check dismiss history
+    if (state.dismissedAt) {
+      const dismissCount = state.dismissCount || 1;
+      const cooldownDays = dismissCount >= 2 ? 30 : 7;
+      const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
+      if (Date.now() - state.dismissedAt < cooldownMs) return false;
+    }
+
+    // Only show after 3+ links have been added
+    const links = getAllLinks();
+    if (links.length < 3) return false;
+
+    return true;
+  }
+
+  function showPromo() {
+    if (!capturePromo || !shouldShowPromo()) return;
+    capturePromo.style.display = 'block';
+  }
+
+  function hidePromo() {
+    if (capturePromo) capturePromo.style.display = 'none';
+  }
+
+  // "Get it" button → open Tools modal, mark as installed
+  if (promoShowTools) {
+    promoShowTools.onclick = () => {
+      hidePromo();
+      setPromoState({ installed: true });
+      if (toolsModal) openModal(toolsModal);
+    };
+  }
+
+  // Dismiss button → snooze with escalating cooldown
+  if (promoDismiss) {
+    promoDismiss.onclick = () => {
+      hidePromo();
+      const state = getPromoState();
+      const dismissCount = (state.dismissCount || 0) + 1;
+      setPromoState({ dismissedAt: Date.now(), dismissCount });
+    };
+  }
+
+  // Mark tools modal opens as "installed" (user found it on their own)
+  if (fabTools) {
+    const origFabToolsClick = fabTools.onclick;
+    fabTools.onclick = (e) => {
+      setPromoState({ installed: true });
+      hidePromo();
+      if (origFabToolsClick) origFabToolsClick(e);
+    };
+  }
+
+  // Hook into link additions — show promo after successful add
+  // We wrap processLinks to check after each batch
+  const _origProcessLinks = processLinks;
+  processLinks = async function(text) {
+    await _origProcessLinks(text);
+    // Short delay so the toast clears first
+    setTimeout(showPromo, 2000);
+  };
+
+  // Also check on page load (returning user with 3+ links)
+  setTimeout(showPromo, 3000);
 
   // Continuous clipboard scanning - check when tab becomes visible or gains focus
   let lastClipboardCheck = 0;
