@@ -136,16 +136,41 @@ body {
 
 /* Table overrides — column widths */
 .data-table-wrap { margin-bottom: var(--space-8); }
-.data-table .col-date { width: 90px; white-space: nowrap; }
-.data-table .col-date small { color: var(--fg-muted); font-size: var(--text-2xs); display: block; }
+.data-table .col-date { width: 80px; white-space: nowrap; }
+.data-table .col-time { width: 60px; white-space: nowrap; font-size: var(--text-2xs); color: var(--fg-muted); }
 .data-table .col-name { min-width: 180px; }
 .data-table .col-venue { min-width: 120px; }
 .data-table .col-city { min-width: 80px; white-space: nowrap; }
+.data-table .col-type { width: 70px; font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-wider); color: var(--fg-muted); }
 .data-table .col-genre { min-width: 100px; }
-.data-table .col-price { width: 70px; white-space: nowrap; font-size: var(--text-2xs); }
+.data-table .col-price { width: 70px; white-space: nowrap; font-size: var(--text-2xs); position: relative; }
+.data-table .col-price[title] { cursor: help; }
 .data-table .col-ages { width: 50px; white-space: nowrap; font-size: var(--text-2xs); text-align: center; }
 .data-table .col-promoter { min-width: 80px; font-size: var(--text-2xs); color: var(--fg-muted); }
 .data-table .col-source { width: 90px; white-space: nowrap; }
+
+/* Source token — color-coded, clickable */
+.token--source {
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+  background: transparent;
+}
+.token--source:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* Disabled region in onboarding */
+.onboarding__region--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  position: relative;
+}
+.onboarding__region--disabled-hint {
+  display: block;
+  font-size: 8px;
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
 
 .event-link {
   color: var(--fg);
@@ -856,6 +881,8 @@ body {
 
 /* ---- Responsive: Tablet (768px) ---- */
 @media (max-width: 768px) {
+  .data-table .col-time,
+  .data-table .col-type,
   .data-table .col-genre,
   .data-table .col-ages,
   .data-table .col-promoter { display: none; }
@@ -946,6 +973,8 @@ body {
   .filter-bar { gap: var(--space-2); }
 
   /* Table columns */
+  .data-table .col-time,
+  .data-table .col-type,
   .data-table .col-genre,
   .data-table .col-price,
   .data-table .col-ages,
@@ -991,6 +1020,9 @@ body {
         <div class="onboarding__step">
           <div class="onboarding__step-label">Your region</div>
           <div class="onboarding__regions" id="onboardingRegions"></div>
+          <div id="regionError" style="display: none; font-size: var(--text-xs); color: var(--fg-subtle); margin-top: var(--space-2); padding: var(--space-2); border: var(--border-thin) solid var(--border-subtle);">
+            We currently only support the Bay Area. More regions coming soon.
+          </div>
         </div>
 
         <div class="onboarding__sources" id="onboardingSources">
@@ -1021,7 +1053,7 @@ body {
     <!-- Sources bar -->
     <div class="sources-bar">
       <div class="sources-bar__chips" id="sourceChips"></div>
-      <button class="btn btn--sm btn--dashed" id="addSourceBtn">+ Add Source</button>
+      <button class="btn btn--sm btn--dashed" id="addSourceBtn">Manage Sources</button>
       <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
         Filter
@@ -1060,8 +1092,10 @@ body {
         <thead>
           <tr>
             <th class="col-date" data-sort="date">Date <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-time" data-sort="time">Time <span class="data-table__sort">&#9650;</span></th>
             <th class="col-name" data-sort="name">Event <span class="data-table__sort">&#9650;</span></th>
             <th class="col-venue" data-sort="venue">Venue <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-type" data-sort="contentType">Type <span class="data-table__sort">&#9650;</span></th>
             <th class="col-genre" data-sort="genre">Genre <span class="data-table__sort">&#9650;</span></th>
             <th class="col-price" data-sort="price">Price <span class="data-table__sort">&#9650;</span></th>
             <th class="col-ages" data-sort="ages">Ages <span class="data-table__sort">&#9650;</span></th>
@@ -1158,7 +1192,15 @@ body {
   <!-- Add Source Modal — DS: .modal + .form-group + .form-label + .form-hint -->
   <div class="modal" id="addSourceModal">
     <div class="modal__content">
-      <h2 class="modal__title">Add Event Source</h2>
+      <h2 class="modal__title">Manage Sources</h2>
+
+      <!-- Active sources with remove -->
+      <div class="form-group" id="activeSourcesGroup">
+        <label class="form-label">Your Sources</label>
+        <div id="activeSourcesList" style="border: var(--border-thin) solid var(--border-subtle); max-height: 200px; overflow-y: auto;"></div>
+      </div>
+
+      <div style="font-size: var(--text-2xs); color: var(--fg-subtle); text-align: center; text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: var(--space-3) 0;">add more</div>
 
       <!-- Stock sources not yet added -->
       <div class="form-group" id="stockSourcesGroup">
@@ -1167,6 +1209,7 @@ body {
       </div>
 
       <div style="font-size: var(--text-2xs); color: var(--fg-subtle); text-align: center; text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: var(--space-3) 0;">or add custom</div>
+      <div style="font-size: var(--text-2xs); color: var(--fg-subtle); text-align: center; margin-bottom: var(--space-2);">Non-Bay Area sources may have limited support.</div>
 
       <!-- Source type tabs: URL | Discord -->
       <div class="source-tab-bar" style="display: flex; gap: 0; margin-bottom: var(--space-3); border: var(--border-thin) solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden;">
@@ -1304,6 +1347,7 @@ body {
   const STOCK_SOURCES = [
     // Bay Area
     { id: '19hz-bayarea', name: '19hz Bay Area', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_BayArea.php', region: 'bay-area', description: 'Electronic music & nightlife' },
+    { id: 'ra-bayarea', name: 'Resident Advisor SF', category: 'music', type: 'ra', url: 'https://ra.co/events/us/sanfrancisco', region: 'bay-area', description: 'Electronic music events' },
     { id: 'sf-punchline', name: 'Punchline SF', category: 'comedy', type: 'html', url: 'https://www.punchlinecomedyclub.com/events', region: 'bay-area', description: 'Stand-up comedy' },
     { id: 'cobbs-sf', name: "Cobb's Comedy Club", category: 'comedy', type: 'html', url: 'https://www.cobbscomedy.com/events', region: 'bay-area', description: 'Comedy & variety' },
     { id: 'roxie-sf', name: 'Roxie Theater', category: 'film', type: 'rss', url: 'https://roxie.com/feed/', region: 'bay-area', description: 'Independent & arthouse cinema' },
@@ -1318,11 +1362,14 @@ body {
   ];
 
   const CONTENT_TYPES = {
-    music: 'Music',
-    film: 'Film',
-    comedy: 'Comedy',
-    theater: 'Theater',
-    other: 'Other',
+    'music': 'Music',
+    'dj-set': 'DJ Set',
+    'live-music': 'Live',
+    'festival': 'Festival',
+    'film': 'Film',
+    'comedy': 'Comedy',
+    'theater': 'Theater',
+    'other': 'Other',
   };
 
   // ============================================
@@ -1474,6 +1521,94 @@ body {
     if (src?.category) return src.category;
     const stock = STOCK_SOURCES.find(s => s.id === sourceId);
     return stock?.category || 'other';
+  }
+
+  // --- Event Type Detection ---
+  function detectEventType(ev) {
+    const cat = ev.contentType;
+    if (cat && cat !== 'other' && cat !== 'music') return cat;
+    const text = ((ev.name || '') + ' ' + (ev.genre || '')).toLowerCase();
+    if (/\b(festival|fest)\b/.test(text)) return 'festival';
+    if (/\b(dj\b|selector|b2b|all.night.long|rave|warehouse|afterparty|club\s*night)/.test(text)) return 'dj-set';
+    if (/\b(live|concert|performance|showcase|residency|band)\b/.test(text) && cat === 'music') return 'live-music';
+    if (/\b(comedy|stand.?up|open.?mic|improv)\b/.test(text)) return 'comedy';
+    if (/\b(screening|film|movie|cinema|double.feature)\b/.test(text)) return 'film';
+    if (/\b(theater|theatre|play|musical|opera|ballet)\b/.test(text)) return 'theater';
+    return cat || 'other';
+  }
+
+  // --- Genre Cleanup ---
+  const GENRE_TYPE_WORDS = new Set(['concert', 'festival', 'live', 'performance', 'screening', 'film', 'movie', 'show', 'event', 'dj set', 'club night', 'party']);
+  function cleanGenreField(genreStr) {
+    if (!genreStr) return '';
+    const tags = genreStr.split(/,\s*/).map(tag => {
+      tag = tag.trim();
+      if (!tag) return null;
+      if (GENRE_TYPE_WORDS.has(tag.toLowerCase())) return null;
+      return tag.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }).filter(Boolean);
+    return [...new Set(tags)].join(', ');
+  }
+
+  // --- Genre Inference ---
+  function inferGenreFromContext(ev) {
+    if (ev.genre && ev.genre.trim()) return ev.genre;
+    const text = ((ev.name || '') + ' ' + (ev.description || '')).toLowerCase();
+    if (/\b(techno|industrial\s*techno|minimal\s*techno)\b/.test(text)) return 'Techno';
+    if (/\b(house|deep\s*house|tech\s*house|progressive\s*house)\b/.test(text)) return 'House';
+    if (/\b(drum.?n.?bass|d&b|dnb|jungle)\b/.test(text)) return 'Drum & Bass';
+    if (/\b(dubstep|riddim)\b/.test(text)) return 'Dubstep';
+    if (/\b(trance|psytrance)\b/.test(text)) return 'Trance';
+    if (/\b(ambient|drone)\b/.test(text)) return 'Ambient';
+    if (/\b(breaks|breakbeat)\b/.test(text)) return 'Breaks';
+    if (/\b(disco|nu.?disco)\b/.test(text)) return 'Disco';
+    if (/\b(jazz|bebop|swing)\b/.test(text)) return 'Jazz';
+    if (/\b(hip.?hop|rap|trap)\b/.test(text)) return 'Hip-Hop';
+    if (/\b(rock|punk|indie|alternative)\b/.test(text)) return 'Rock';
+    if (/\b(pop|synth.?pop|electro.?pop)\b/.test(text)) return 'Pop';
+    if (/\b(metal|hardcore|metalcore)\b/.test(text)) return 'Metal';
+    if (/\b(reggae|dancehall|dub)\b/.test(text)) return 'Reggae';
+    if (/\b(r&b|soul|funk)\b/.test(text)) return 'R&B / Soul';
+    if (/\b(edm|electronic)\b/.test(text)) return 'Electronic';
+    const sourceId = ev.source || (ev.sources && ev.sources[0]);
+    if (sourceId && (sourceId.includes('19hz') || sourceId.includes('ra'))) return 'Electronic';
+    return '';
+  }
+
+  // --- Time Sorting ---
+  function parseTimeForSort(timeStr) {
+    if (!timeStr) return '99:99';
+    const match = timeStr.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/i);
+    if (!match) return timeStr;
+    let hours = parseInt(match[1]);
+    const mins = match[2] || '00';
+    const meridiem = (match[3] || '').toLowerCase();
+    if (meridiem === 'pm' && hours !== 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+    return `${hours.toString().padStart(2, '0')}:${mins}`;
+  }
+
+  // --- Price Formatting ---
+  function formatPriceDisplay(priceStr) {
+    if (!priceStr || priceStr === '-') return { short: '', full: null };
+    const trimmed = priceStr.trim();
+    if (/^(free|tba|tbd|\?)$/i.test(trimmed)) return { short: trimmed, full: null };
+    const prices = trimmed.match(/\$\d+(\.\d{2})?/g);
+    if (!prices || prices.length === 0) {
+      if (trimmed.length > 12) return { short: trimmed.substring(0, 10) + '…', full: trimmed };
+      return { short: trimmed, full: null };
+    }
+    if (prices.length === 1) return { short: prices[0], full: trimmed !== prices[0] ? trimmed : null };
+    const nums = prices.map(p => parseFloat(p.replace('$', '')));
+    return { short: '$' + Math.min(...nums) + '+', full: trimmed };
+  }
+
+  // --- Source Color ---
+  function getSourceColor(sourceId) {
+    let hash = 0;
+    for (let i = 0; i < sourceId.length; i++) hash = sourceId.charCodeAt(i) + ((hash << 5) - hash);
+    const hue = Math.abs(hash % 360);
+    return 'hsl(' + hue + ', 45%, 60%)';
   }
 
   // --- Event Cache ---
@@ -1696,6 +1831,7 @@ body {
         log(`Source "${source.name}": type=${type}, url=${source.url}`);
         let events;
         if (type === 'screenslate') events = await fetchScreenSlate(source);
+        else if (type === 'ra') events = await fetchRA(source);
         else if (type === 'html') events = await fetchHtml(source);
         else if (type === 'ical') events = await fetchIcal(source);
         else if (type === 'json') events = await fetchJson(source);
@@ -1727,9 +1863,10 @@ body {
     // Replace events with fresh data
     state.events = dedupedEvents;
 
-    // Assign content type to each event from its source
+    // Assign content type to each event from its source, then detect specific type
     state.events.forEach(ev => {
       ev.contentType = getSourceCategory(ev.source);
+      ev.contentType = detectEventType(ev);
     });
 
     log(`Total events loaded: ${state.events.length}`);
@@ -1793,7 +1930,10 @@ body {
     if (!na || !nb) return false;
     if (na === nb) return true;
     if (na.includes(nb) || nb.includes(na)) return true;
-    return levenshtein(na, nb) <= 3;
+    // Scale threshold with name length: 3 for short names, up to 15% for longer ones
+    const maxLen = Math.max(na.length, nb.length);
+    const threshold = maxLen < 20 ? 3 : Math.floor(maxLen * 0.15);
+    return levenshtein(na, nb) <= threshold;
   }
 
   function venuesMatch(a, b) {
@@ -1805,15 +1945,18 @@ body {
   }
 
   function mergeGenreTags(a, b) {
-    const tags = new Set([
-      ...(a || '').split(/,\s*/).filter(Boolean),
-      ...(b || '').split(/,\s*/).filter(Boolean),
-    ]);
-    return Array.from(tags).join(', ');
+    const seen = new Set();
+    const tags = [];
+    [...(a || '').split(/,\s*/).filter(Boolean), ...(b || '').split(/,\s*/).filter(Boolean)].forEach(t => {
+      const key = t.toLowerCase().trim();
+      if (!seen.has(key)) { seen.add(key); tags.push(t.trim()); }
+    });
+    return tags.join(', ');
   }
 
   function deduplicateAcrossSources(events) {
     const merged = [];
+    let dedupCount = 0;
 
     for (const ev of events) {
       let found = false;
@@ -1824,6 +1967,8 @@ body {
         if (existing.venue && ev.venue && !venuesMatch(existing.venue, ev.venue)) continue;
 
         // It's a duplicate — merge data and source tags
+        dedupCount++;
+        log(`  Dedup merge: "${ev.name}" (${ev.source}) -> "${existing.name}" (${existing.source})`);
         existing.time = (existing.time || '').length >= (ev.time || '').length ? existing.time : ev.time;
         existing.name = existing.name.length >= ev.name.length ? existing.name : ev.name;
         existing.venue = (existing.venue || '').length >= (ev.venue || '').length ? existing.venue : ev.venue;
@@ -1846,6 +1991,7 @@ body {
       if (!found) merged.push({ ...ev });
     }
 
+    log(`Dedup summary: ${events.length} raw -> ${merged.length} unique (${dedupCount} merged)`);
     return merged;
   }
 
@@ -1866,6 +2012,81 @@ body {
   async function fetchHtml(source) {
     const text = await proxyFetch(source.url);
     return parseHtmlTable(text, source.id, source.url);
+  }
+
+  // --- Resident Advisor Scraper ---
+  async function fetchRA(source) {
+    log('RA: fetching ' + source.url);
+    const text = await proxyFetch(source.url);
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    const events = [];
+
+    // RA uses structured event listings — try multiple selector strategies
+    // Strategy 1: JSON-LD structured data
+    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+    ldScripts.forEach(script => {
+      try {
+        const data = JSON.parse(script.textContent);
+        const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
+        items.forEach(item => {
+          if (item['@type'] !== 'MusicEvent' && item['@type'] !== 'Event') return;
+          const name = item.name || '';
+          const startDate = item.startDate || '';
+          const venue = item.location?.name || '';
+          const city = item.location?.address?.addressLocality || '';
+          const url = item.url || '';
+          const genre = (item.genre || '');
+          if (name && startDate) {
+            const d = new Date(startDate);
+            const date = d.toISOString().split('T')[0];
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            const time = hours + ':' + mins;
+            events.push({ date, time, name, venue, city, genre, url, source: source.id, contentType: 'music' });
+          }
+        });
+      } catch (e) { /* ignore invalid JSON-LD */ }
+    });
+
+    if (events.length > 0) {
+      log('RA: found ' + events.length + ' events via JSON-LD');
+      return events;
+    }
+
+    // Strategy 2: Parse event listing HTML elements
+    const items = doc.querySelectorAll('[data-testid*="event"], [class*="EventCard"], [class*="event-item"], article');
+    items.forEach(item => {
+      const nameEl = item.querySelector('h3, h4, [class*="title"], [class*="Title"]');
+      const venueEl = item.querySelector('[class*="venue"], [class*="Venue"], [class*="location"]');
+      const timeEl = item.querySelector('time, [datetime], [class*="date"], [class*="Date"]');
+      const linkEl = item.querySelector('a[href*="/events/"]');
+      const name = nameEl?.textContent?.trim() || '';
+      const venue = venueEl?.textContent?.trim() || '';
+      const dateAttr = timeEl?.getAttribute('datetime') || timeEl?.textContent?.trim() || '';
+      const url = linkEl?.getAttribute('href') || '';
+      if (!name) return;
+      let date = '', time = '';
+      if (dateAttr) {
+        try {
+          const d = new Date(dateAttr);
+          if (!isNaN(d.getTime())) {
+            date = d.toISOString().split('T')[0];
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            if (hours !== '00' || mins !== '00') time = hours + ':' + mins;
+          }
+        } catch (e) { /* parse error */ }
+      }
+      if (!date) {
+        const parsed = parseFuzzyDate(dateAttr);
+        if (parsed) date = parsed;
+      }
+      const fullUrl = url.startsWith('http') ? url : (url.startsWith('/') ? 'https://ra.co' + url : '');
+      events.push({ date: date || '', time, name, venue, city: '', genre: 'Electronic', url: fullUrl, source: source.id, contentType: 'music' });
+    });
+
+    log('RA: found ' + events.length + ' events via HTML parsing');
+    return events;
   }
 
   // ============================================
@@ -2616,31 +2837,42 @@ body {
     tbody.innerHTML = sorted.map(ev => {
       const sourceIds = ev.sources || [ev.source];
       const sourceName = sourceIds.map(sid => state.sources.find(s => s.id === sid)?.name || sid).join(' + ');
+      const sourceColor = getSourceColor(sourceIds[0]);
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
       const nameCell = ev.url && ev.url !== '#'
         ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener"${titleAttr}>${escHtml(ev.name)}</a>`
         : `<span${titleAttr}>${escHtml(ev.name)}</span>`;
-      const dateDisplay = formatDate(ev.date) + (ev.time ? `<small>${escHtml(ev.time)}</small>` : '');
+      // Date (no time) and Time (separate)
+      const dateDisplay = formatDate(ev.date);
+      const timeDisplay = ev.time ? escHtml(ev.time) : '';
       // Venue + city combined
       const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
-      // Genre + enriched tags
-      const allTags = ev.genre ? ev.genre.split(/,\s*/).slice(0, 4) : [];
+      // Type
+      const typeLabel = CONTENT_TYPES[ev.contentType] || '';
+      // Genre: clean then infer if empty
+      const cleanedGenre = cleanGenreField(ev.genre) || inferGenreFromContext(ev);
+      const allTags = cleanedGenre ? cleanedGenre.split(/,\s*/).slice(0, 4) : [];
       if (ev.enrichedTags && ev.enrichedTags.length > 0) {
         for (const t of ev.enrichedTags) {
           if (allTags.length < 4 && !allTags.some(g => g.toLowerCase() === t.toLowerCase())) allTags.push(t);
         }
       }
       const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
+      // Price with tooltip
+      const priceData = formatPriceDisplay(ev.price);
+      const priceTitle = priceData.full ? ` title="${escHtml(priceData.full)}"` : '';
       const thumbHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="event-thumb" alt="" loading="lazy">` : '';
       return `<tr>
         <td class="col-date">${dateDisplay}</td>
+        <td class="col-time">${timeDisplay}</td>
         <td class="col-name">${thumbHtml}${nameCell}</td>
         <td class="col-venue">${venueHtml}</td>
+        <td class="col-type">${escHtml(typeLabel)}</td>
         <td class="col-genre">${genreHtml}</td>
-        <td class="col-price">${escHtml(ev.price)}</td>
+        <td class="col-price"${priceTitle}>${escHtml(priceData.short)}</td>
         <td class="col-ages">${escHtml(ev.ages)}</td>
         <td class="col-promoter">${escHtml(ev.promoter)}</td>
-        <td class="col-source"><span class="token token--static">${escHtml(sourceName)}</span></td>
+        <td class="col-source"><span class="token token--source" data-source-id="${escHtml(sourceIds[0])}" style="border-color: ${sourceColor}; color: ${sourceColor};">${escHtml(sourceName)}</span></td>
       </tr>`;
     }).join('');
 
@@ -3095,11 +3327,46 @@ body {
 
   // --- Sorting ---
   // --- Stock sources in Add Source modal ---
+  // --- Active Sources in Modal ---
+  function renderActiveSourcesList() {
+    const list = document.getElementById('activeSourcesList');
+    if (!list) return;
+    const active = state.sources.filter(s => s.enabled);
+    if (active.length === 0) {
+      list.innerHTML = '<p style="padding: var(--space-3); font-size: var(--text-xs); color: var(--fg-muted);">No sources added yet</p>';
+      return;
+    }
+    list.innerHTML = active.map(s => {
+      const catLabel = CONTENT_TYPES[s.category] || s.category || '';
+      return `<div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-bottom: var(--border-thin) solid var(--border-subtle);">
+        <div style="flex: 1; min-width: 0;">
+          <span style="font-size: var(--text-xs);">${escHtml(s.name)}</span>
+          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
+        </div>
+        <button class="btn btn--ghost btn--sm remove-source-btn" data-source-id="${escHtml(s.id)}" style="flex-shrink: 0; font-size: var(--text-2xs); color: var(--fg-subtle);">
+          &times;
+        </button>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.remove-source-btn').forEach(btn => {
+      btn.addEventListener('click', () => removeSource(btn.dataset.sourceId));
+    });
+  }
+
+  function removeSource(sourceId) {
+    state.sources = state.sources.filter(s => s.id !== sourceId);
+    saveSources();
+    renderActiveSourcesList();
+    renderStockSourcesList();
+    renderSourceChips();
+  }
+
   function renderStockSourcesList() {
     const list = document.getElementById('stockSourcesList');
     const group = document.getElementById('stockSourcesGroup');
     const existingIds = new Set(state.sources.map(s => s.id));
-    const available = STOCK_SOURCES.filter(s => !existingIds.has(s.id));
+    // Only show Bay Area stock sources
+    const available = STOCK_SOURCES.filter(s => s.region === 'bay-area' && !existingIds.has(s.id));
 
     if (available.length === 0) {
       group.style.display = 'none';
@@ -3108,13 +3375,11 @@ body {
     group.style.display = '';
     list.innerHTML = available.map(s => {
       const catLabel = CONTENT_TYPES[s.category] || s.category;
-      const regionName = REGIONS.find(r => r.id === s.region)?.name || s.region;
       return `<label class="onboarding__source" style="padding: var(--space-2) var(--space-3);">
         <input type="checkbox" value="${escHtml(s.id)}" class="stock-source-cb">
         <div class="onboarding__source-info">
           <span class="onboarding__source-name" style="font-size: var(--text-xs);">${escHtml(s.name)}</span>
           <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
-          <span class="onboarding__cat-tag">${escHtml(regionName)}</span>
         </div>
       </label>`;
     }).join('');
@@ -3138,6 +3403,7 @@ body {
     return [...events].sort((a, b) => {
       let aVal = a[key] || '', bVal = b[key] || '';
       if (key === 'date') { aVal = aVal || '9999-12-31'; bVal = bVal || '9999-12-31'; }
+      if (key === 'time') { aVal = parseTimeForSort(a.time); bVal = parseTimeForSort(b.time); }
       const cmp = aVal.localeCompare(bVal);
       return dir === 'asc' ? cmp : -cmp;
     });
@@ -3187,6 +3453,16 @@ body {
       });
     });
 
+    // Source token click → filter by source
+    document.getElementById('eventsBody').addEventListener('click', (e) => {
+      const token = e.target.closest('.token--source');
+      if (!token) return;
+      const sourceId = token.dataset.sourceId;
+      if (!sourceId) return;
+      state.filters.source = state.filters.source === sourceId ? '' : sourceId;
+      render();
+    });
+
     // Add Source modal
     const modal = document.getElementById('addSourceModal');
     let activeSourceTab = 'url';
@@ -3209,6 +3485,7 @@ body {
 
     document.getElementById('addSourceBtn').addEventListener('click', () => {
       modal.classList.add('modal--visible');
+      renderActiveSourcesList();
       switchSourceTab('url');
       document.getElementById('sourceName').value = '';
       document.getElementById('sourceUrl').value = '';
@@ -3435,17 +3712,32 @@ body {
     const container = document.getElementById('onboarding');
     container.style.display = '';
 
-    // Render region buttons
+    // Render region buttons — Bay Area active, others disabled
     const regionsEl = document.getElementById('onboardingRegions');
-    regionsEl.innerHTML = REGIONS.map(r =>
-      `<button class="onboarding__region" data-region="${escHtml(r.id)}">${escHtml(r.name)}</button>`
-    ).join('');
+    regionsEl.innerHTML = REGIONS.map(r => {
+      const isBayArea = r.id === 'bay-area';
+      if (isBayArea) {
+        return `<button class="onboarding__region active" data-region="${escHtml(r.id)}">${escHtml(r.name)}</button>`;
+      }
+      return `<button class="onboarding__region onboarding__region--disabled" data-region="${escHtml(r.id)}">${escHtml(r.name)}<span class="onboarding__region--disabled-hint">Coming Soon</span></button>`;
+    }).join('');
 
-    regionsEl.querySelectorAll('.onboarding__region').forEach(btn => {
+    // Auto-select Bay Area
+    onboardingSelectedRegion = 'bay-area';
+
+    regionsEl.querySelectorAll('.onboarding__region:not(.onboarding__region--disabled)').forEach(btn => {
       btn.addEventListener('click', () => {
         onboardingSelectedRegion = btn.dataset.region;
         regionsEl.querySelectorAll('.onboarding__region').forEach(b => b.classList.toggle('active', b === btn));
+        document.getElementById('regionError').style.display = 'none';
         renderOnboardingSources();
+      });
+    });
+
+    // Show error message when unavailable region is clicked
+    regionsEl.querySelectorAll('.onboarding__region--disabled').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('regionError').style.display = '';
       });
     });
 
@@ -3455,7 +3747,7 @@ body {
       if (e.key === 'Enter') { e.preventDefault(); addOnboardingCustom(); }
     });
 
-    // Show all sources immediately
+    // Show Bay Area sources immediately
     renderOnboardingSources();
   }
 
@@ -3475,10 +3767,8 @@ body {
     const sourcesWrap = document.getElementById('onboardingSources');
     const list = document.getElementById('onboardingList');
 
-    // Show all sources initially, filter by region when one is selected
-    const regionSources = onboardingSelectedRegion
-      ? STOCK_SOURCES.filter(s => s.region === onboardingSelectedRegion)
-      : STOCK_SOURCES;
+    // Only show Bay Area stock sources (other regions coming soon)
+    const regionSources = STOCK_SOURCES.filter(s => s.region === 'bay-area');
 
     const allSources = [...regionSources, ...onboardingCustomSources];
 
