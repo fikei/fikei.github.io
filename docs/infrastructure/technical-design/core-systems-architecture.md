@@ -265,11 +265,61 @@ The two-tier enrichment model is designed to generalize beyond URL pins. Each ne
 | Pin Type | Client Enrichment | Server Enrichment |
 |----------|------------------|-------------------|
 | **Link** (current) | CORS scrape for OG tags, images | AI classification, domain profiling, image strategies |
+| **Image** (✅ implemented) | Read EXIF data, generate thumbnail | Vision AI: `scan-image` extracts products, URLs, categories |
 | **Note** (planned) | Markdown parse, extract inline URLs | NLP: topic extraction, entity recognition, auto-categorize |
-| **Image** (planned) | Read EXIF data, generate thumbnail | Vision AI: describe content, suggest category, detect objects |
 | **File** (planned) | File type detection, size/format | Content extraction (PDF text, CSV preview), summarize |
 
 The enrichment queue, confidence scoring, category assignment, and Supabase sync are pin-type-agnostic — only the enrichment strategies change per type.
+
+### Image Pin Enrichment (scan-image)
+
+**Edge Function**: `scan-image` (`supabase/functions/scan-image/index.ts`)
+
+Analyzes uploaded images using Claude Vision (Sonnet 4) to extract structured data. Use cases:
+- **Screenshot scanning**: User shares a browser screenshot → extract visible URLs and identify content
+- **Product recognition**: User photographs a product → identify brand, suggest category, find product URL
+- **Receipt/invoice scanning** (planned): Capture merchant info, categorize purchases
+
+**Request**:
+```json
+{
+  "image": "base64EncodedImageData",
+  "mimeType": "image/jpeg"
+}
+```
+
+**Response**:
+```json
+{
+  "items": [
+    {
+      "title": "Nike Air Max 90",
+      "description": "White and red sneakers",
+      "url": "https://nike.com/air-max-90",
+      "category": "wear",
+      "confidence": 0.85
+    }
+  ]
+}
+```
+
+The Vision API prompt instructs Claude to:
+1. Identify all products, brands, or content visible in the image
+2. Extract any URLs if the image is a screenshot
+3. Suggest product URLs if brands are recognizable
+4. Categorize each item into one of the 8 standard categories
+5. Return confidence scores (0-1)
+
+**Model**: `claude-sonnet-4-20250514` — superior vision capabilities compared to Haiku
+
+**Response handling**: The function parses Claude's JSON response and validates/sanitizes:
+- Titles truncated to 200 chars
+- Descriptions to 500 chars
+- URLs to 2000 chars
+- Categories validated against the standard set
+- Confidence clamped to 0-1 range
+
+If multiple items are identified in a single image (e.g., a product photo showing shoes + jacket), each item becomes a separate pin candidate.
 
 ---
 
@@ -452,6 +502,7 @@ This creates a positive feedback loop: better enrichment leads to better widgets
 All three systems share:
 - **Supabase PostgreSQL** for persistence (links, domain_profiles, strategy_performance tables)
 - **Claude 3 Haiku** for AI operations (categorization, content type classification, widget generation)
+- **Claude Sonnet 4** for vision tasks (image scanning with `scan-image`)
 - **Domain profile cache** used by both enrichment (to skip AI classification) and widgets (brand resolution)
 - **localStorage** as the primary client-side data store
 
@@ -478,7 +529,8 @@ All three systems share:
 | Pin Creation | `boards/index.html` (~L5935) | `smartCategorize()` — AI/rules category assignment |
 | Pin Enrichment | `boards/index.html` (~L5645) | `fetchMetadata()` — client-side CORS proxy scraping |
 | Pin Enrichment | `boards/index.html` (~L5358) | Enrichment queue with retry logic |
-| Pin Enrichment | `supabase/functions/enrich-link/index.ts` | Server-side AI classification + image resolution |
+| Pin Enrichment | `supabase/functions/enrich-link/index.ts` | Server-side AI classification + image resolution (for links) |
+| Pin Enrichment | `supabase/functions/scan-image/index.ts` | Vision AI for image pins (extract products, URLs, categories) |
 | Widgets | `supabase/functions/generate-widget/index.ts` | Main edge function (AI call, validation, enrichment) |
 | Widgets | `supabase/functions/generate-widget/config/schema.ts` | Widget definition types |
 | Widgets | `supabase/functions/generate-widget/config/registry.ts` | Widget loader, eligibility evaluator, prompt builder |
@@ -496,4 +548,4 @@ All three systems share:
 
 ---
 
-*Last updated: 2026-02-06*
+*Last updated: 2026-02-13*

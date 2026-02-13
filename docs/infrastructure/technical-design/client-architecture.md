@@ -165,14 +165,16 @@ Accepts an optional `newIds` parameter to animate newly added cards.
 5.  Render from localStorage (renderFilters, renderGrid)     ◄── first paint
 6.  Initialize widget system
 7.  Generate widgets for hero/footer zones
-8.  Register supabase.auth.onAuthStateChange() listener
-9.  Check URL hash for magic link callback
-10. Get session from Supabase
-11. [if logged in] Fetch cloud data → merge → re-render       ◄── second paint
-12. Process pending saves to Supabase
-13. Re-categorize any uncategorized items
-14. Check clipboard for URLs
-15. Start 30s polling for cross-device sync
+8.  Register service worker for PWA support                   ◄── offline + share target
+9.  Register supabase.auth.onAuthStateChange() listener
+10. Check URL hash for magic link callback
+11. Check URL query params for deep link (?add=URL)           ◄── handle PWA shares
+12. Get session from Supabase
+13. [if logged in] Fetch cloud data → merge → re-render       ◄── second paint
+14. Process pending saves to Supabase
+15. Re-categorize any uncategorized items
+16. Check clipboard for URLs
+17. Start 30s polling for cross-device sync
 ```
 
 ---
@@ -193,6 +195,8 @@ No event bus or pub/sub. Direct DOM event listeners attached during init and ren
 | Kebab menu click | `.kebab-btn` | Show context menu |
 | Paste | `document` | Check for URLs, offer to add |
 | Visibility change | `document` | Check clipboard on tab focus |
+| Deep link | `?add=URL` param | Auto-open add modal with URL pre-filled |
+| PWA share | Share sheet → share_target | Redirect to `?add=URL` |
 
 ### Side Effects
 
@@ -239,4 +243,81 @@ exportWidgetFeedback()
 
 ---
 
-*Last updated: 2026-02-05*
+## PWA Infrastructure
+
+Boards is a Progressive Web App with offline support, installability, and native share sheet integration.
+
+### Service Worker (`boards/sw.js`)
+
+Registered during `init()` at ~L11714. Provides:
+- **Offline support**: Cache-first strategy for core pages (`/boards/`, `/boards/index.html`, `/boards/pwa-share.html`)
+- **Installability**: Meets PWA criteria (manifest, HTTPS, service worker, display mode)
+- **Share target handling**: Intercepts OS-level shares and routes to the share landing page
+
+**Cache strategy**:
+- HTML navigation: Network-first with cache fallback (stay current, work offline)
+- Other requests: Network-only (don't cache API calls or dynamic content)
+
+**Version**: `boards-v1` — increment cache name to force refresh on deploy
+
+### Web App Manifest (`images/icons/favicons/site.webmanifest`)
+
+Linked in `<head>` at ~L11. Defines:
+- **Identity**: "Boards — ctrl.rodeo" with black theme
+- **Icons**: 192x192 and 512x512 PNG icons for home screen
+- **Display mode**: `standalone` (hides browser chrome when installed)
+- **Start URL**: `/boards/` (open to main app on launch)
+- **Share target**: OS share sheet → `/boards/pwa-share.html?url=...&text=...&title=...`
+
+### Share Target Flow
+
+```
+User shares URL from another app (Safari, Chrome, social media)
+    │
+    ▼
+OS invokes share_target action
+    │
+    ▼
+GET /boards/pwa-share.html?url={url}&text={text}&title={title}
+    │
+    ▼
+pwa-share.html extracts URL from params (priority: url > text > title)
+    │
+    ▼
+JavaScript redirect: window.location.replace('/boards/?add=' + encodeURIComponent(url))
+    │
+    ▼
+Main app init() detects ?add=URL query param
+    │
+    ▼
+Auto-open add modal with URL pre-filled
+    │
+    ▼
+URL cleaned from address bar (replaces state to hide query param)
+```
+
+**Why the intermediate page?** The share_target action must be a GET request to a static page. We can't directly open the main app with `start_url` params because the manifest's `start_url` is fixed. So `pwa-share.html` acts as a thin redirect layer that normalizes the shared data and forwards to the main app.
+
+### Deep Link Handler
+
+Query param support added to `init()` at ~L11751:
+
+```javascript
+const urlParams = new URLSearchParams(window.location.search);
+const addUrl = urlParams.get('add');
+if (addUrl) {
+  // Auto-open add modal with URL
+  // Clean URL bar: window.history.replaceState({}, '', cleanLocation)
+}
+```
+
+**Use cases**:
+1. **PWA share target**: `?add=https://example.com` (from OS share sheet)
+2. **Bookmarklet**: `javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))`
+3. **Share link**: Manual URL like `https://ctrl.rodeo/boards/?add=https://example.com`
+
+All three produce the same result: the add modal opens with the URL pre-filled and ready to save.
+
+---
+
+*Last updated: 2026-02-13*
