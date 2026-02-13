@@ -1520,6 +1520,8 @@ body {
   function saveSources() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
     saveSettings();
+    // Cloud sync (fire-and-forget)
+    saveSourcesCloud();
   }
 
   function saveSettings() {
@@ -1540,6 +1542,63 @@ body {
         if (settings.sort) state.sort = settings.sort;
       }
     } catch (e) { /* ignore */ }
+  }
+
+  // --- Cloud Source Sync (Supabase user_event_sources) ---
+  let _cloudSyncDebounce = null;
+
+  async function saveSourcesCloud() {
+    if (!supabaseClient || !currentUser) return;
+    // Debounce: wait 1s after last change before saving
+    clearTimeout(_cloudSyncDebounce);
+    _cloudSyncDebounce = setTimeout(async () => {
+      try {
+        const payload = {
+          user_id: currentUser.id,
+          sources: state.sources,
+          settings: { view: state.view, sort: state.sort },
+          region: localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area',
+          onboarded: state.onboarded,
+        };
+        const { error } = await supabaseClient
+          .from('user_event_sources')
+          .upsert(payload, { onConflict: 'user_id' });
+        if (error) log('Cloud sync save error: ' + error.message);
+        else log('Cloud sync: sources saved for ' + currentUser.email);
+      } catch (e) { log('Cloud sync save failed: ' + e.message); }
+    }, 1000);
+  }
+
+  async function loadSourcesCloud() {
+    if (!supabaseClient || !currentUser) return false;
+    try {
+      const { data, error } = await supabaseClient
+        .from('user_event_sources')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+      if (error || !data) {
+        log('Cloud sync: no saved sources found' + (error ? ' (' + error.message + ')' : ''));
+        return false;
+      }
+      const cloudSources = data.sources;
+      if (!Array.isArray(cloudSources) || cloudSources.length === 0) return false;
+
+      // Use cloud sources as the source of truth
+      state.sources = cloudSources;
+      state.onboarded = data.onboarded ?? true;
+      if (data.settings?.view) state.view = data.settings.view;
+      if (data.settings?.sort) state.sort = data.settings.sort;
+      if (data.region) localStorage.setItem('ctrl-rodeo-events-region', data.region);
+
+      // Persist to localStorage so L1 cache works
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sources: state.sources, view: state.view, sort: state.sort }));
+      if (state.onboarded) localStorage.setItem(ONBOARDED_KEY, '1');
+
+      log(`Cloud sync: loaded ${cloudSources.length} sources for ${currentUser.email}`);
+      return true;
+    } catch (e) { log('Cloud sync load failed: ' + e.message); return false; }
   }
 
   // Get category for a source
@@ -2002,10 +2061,13 @@ body {
     const na = normalizeForDedup(a), nb = normalizeForDedup(b);
     if (!na || !nb) return false;
     if (na === nb) return true;
-    if (na.includes(nb) || nb.includes(na)) return true;
-    // Scale threshold with name length: 3 for short names, up to 15% for longer ones
+    // Substring match only when the shorter name is substantial (>= 60% of longer)
+    const shorter = na.length <= nb.length ? na : nb;
+    const longer = na.length > nb.length ? na : nb;
+    if (shorter.length >= 8 && shorter.length >= longer.length * 0.6 && longer.includes(shorter)) return true;
+    // Scale threshold with name length: 2 for short names, up to 12% for longer ones
     const maxLen = Math.max(na.length, nb.length);
-    const threshold = maxLen < 20 ? 3 : Math.floor(maxLen * 0.15);
+    const threshold = maxLen < 15 ? 2 : Math.floor(maxLen * 0.12);
     return levenshtein(na, nb) <= threshold;
   }
 
@@ -2034,6 +2096,8 @@ body {
     for (const ev of events) {
       let found = false;
       for (const existing of merged) {
+        // Never dedup events that lack a date — we can't confirm they're the same day
+        if (!existing.date || !ev.date) continue;
         // Must match on date + name; venue match required if both have venues
         if (existing.date !== ev.date) continue;
         if (!namesMatch(existing.name, ev.name)) continue;
@@ -3942,6 +4006,20 @@ body {
         if (currentUser && wasLoggedOut) {
           document.getElementById('authModal').classList.remove('auth-modal--visible');
           log('Logged in as ' + currentUser.email);
+          // Sync sources from cloud on login
+          loadSourcesCloud().then(loaded => {
+            if (loaded) {
+              log('Cloud sync: restored sources after login');
+              if (state.onboarded && state.sources.length > 0) {
+                document.getElementById('eventsContent').style.display = '';
+                document.getElementById('onboarding')?.remove();
+                fetchAllSources();
+              }
+            } else {
+              // First login: push current localStorage sources to cloud
+              saveSourcesCloud();
+            }
+          });
         }
       });
     }
@@ -3993,11 +4071,17 @@ body {
   }
 
   // --- Init ---
-  function init() {
+  async function init() {
     loadSettings();
     loadSources();
     bindEvents();
     initAuth();
+
+    // If logged in, try loading sources from cloud (overrides localStorage)
+    if (currentUser && supabaseClient) {
+      const cloudLoaded = await loadSourcesCloud();
+      if (cloudLoaded) log('Init: using cloud sources');
+    }
 
     if (!state.onboarded && state.sources.length === 0) {
       showOnboarding();
