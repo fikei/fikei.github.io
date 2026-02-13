@@ -34,6 +34,14 @@
 
 ## Recent Milestones
 
+### Add Pin Stability ✅
+**Completed: 2026-02-09 | Verified: 2026-02-13**
+
+- **3 bugs fixed**: UUID generation for link IDs, missing apikey header on categorize, image_scores column removed from sync payload
+- **2 edge functions**: `validate-image` deployed, `categorize` redeployed with `--no-verify-jwt`
+- **Improved error logging**: `syncLinkToSupabase()` now logs response body on failure
+- **Still open**: Migration 007 (image_scores columns) not yet applied; allorigins.win CORS proxy intermittent
+
 ### Listen Category ✅
 **Completed: 2026-02-09**
 
@@ -122,8 +130,8 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Push notifications | FCM/APNs setup required | Human |
 | Run migration `007_image_validation.sql` against Supabase (Phase 10) | Supabase Dashboard → SQL Editor | Human |
 | Deploy `enrich-link` edge function with Tier 2 validation (Phase 10) | `supabase functions deploy enrich-link` | Human |
-| Deploy new `validate-image` edge function for Tier 3 (Phase 10) | `supabase functions deploy validate-image` | Human |
-| Verify `ANTHROPIC_API_KEY` is set in Supabase function secrets (Phase 10) | Dashboard → Edge Functions → Secrets | Human |
+| ~~Deploy new `validate-image` edge function for Tier 3 (Phase 10)~~ | ~~`supabase functions deploy validate-image`~~ | ~~Done 2026-02-09~~ |
+| ~~Verify `ANTHROPIC_API_KEY` is set in Supabase function secrets (Phase 10)~~ | ~~Confirmed working — categorize returns 200~~ | ~~Done 2026-02-13~~ |
 | Backfill Tier 1 scores for existing pins via console script (Phase 10) | Run `imageQualityReport()` after deploy to baseline | Human |
 
 ---

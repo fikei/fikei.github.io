@@ -54,4 +54,9 @@ Active bugs and known issues requiring attention.
 
 | Bug | Description | Fixed | Resolution |
 |-----|-------------|-------|------------|
-| - | - | - | - |
+| BUG-017 | `generateId()` produced short hash strings (e.g. "a1b2c3") but `links` table requires UUID primary key — caused 400 on insert | 2026-02-09 | Changed to `crypto.randomUUID()` (`boards/index.html:7331`) |
+| BUG-018 | `categorizeWithAI()` fetch missing `apikey` header — caused 401 from Supabase edge function | 2026-02-09 | Added `'apikey': SUPABASE_ANON_KEY` to categorize request headers (`boards/index.html:~7675`) |
+| BUG-019 | `syncLinkToSupabase()` payload included `image_scores` column that doesn't exist on live DB (migration 007 never applied) — caused PGRST204 | 2026-02-09 | Removed `image_scores` from sync payload (`boards/index.html:~8079`) |
+| BUG-020 | `syncLinkToSupabase()` only logged HTTP status on failure, not response body — made debugging impossible | 2026-02-09 | Now logs `errBody` via `await res.text()` on non-OK responses |
+| BUG-021 | `validate-image` edge function was never deployed to Supabase — caused CORS preflight failure on image validation calls | 2026-02-09 | Deployed via `supabase functions deploy validate-image` |
+| BUG-022 | `categorize` edge function required JWT verification but client sends anon key — caused 401 | 2026-02-09 | Redeployed with `--no-verify-jwt`; confirmed 200 response 2026-02-13 |
