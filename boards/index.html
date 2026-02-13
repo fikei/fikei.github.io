@@ -8184,6 +8184,18 @@ Return JSON:
         fetch(`${SUPABASE_URL}/rest/v1/expanded_cards?user_id=eq.${currentUser.id}&select=cards&limit=1`, { headers })
       ]);
 
+      // Check for auth failures before parsing JSON
+      if (linksRes.status === 401 || orderRes.status === 401 || expandedRes.status === 401) {
+        console.warn('[fetch] 401 Unauthorized — token expired, stopping polling');
+        stopPolling();
+        return null;
+      }
+
+      if (!linksRes.ok || !orderRes.ok || !expandedRes.ok) {
+        console.warn(`[fetch] HTTP error: links=${linksRes.status} order=${orderRes.status} expanded=${expandedRes.status}`);
+        return null;
+      }
+
       const [linksData, orderData, expandedData] = await Promise.all([
         linksRes.json(),
         orderRes.json(),
@@ -10953,6 +10965,11 @@ Return JSON:
 
       // Process any links saved from shared boards while logged out
       await processPendingSaves();
+    }
+
+    if (event === 'TOKEN_REFRESHED' && currentUser) {
+      // Token was refreshed — restart polling if it was stopped due to 401
+      startPolling();
     }
   }
 
