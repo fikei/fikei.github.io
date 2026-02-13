@@ -1,5 +1,6 @@
 {
   "root": "Ctrl",
+  "file": "docs/README.md",
   "sections": [
     {
       "title": "Boards",
