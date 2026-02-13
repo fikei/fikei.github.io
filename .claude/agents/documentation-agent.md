@@ -31,37 +31,35 @@ The agent maintains awareness of the full documentation tree and where each type
 
 ```
 docs/
-├── strategy/                    # WHAT we're building and WHY
-│   ├── vision-and-roadmap.md   #   Product direction (rarely changes)
-│   ├── decision-log.md         #   ADRs — architecture decisions
-│   └── prds/                   #   Product requirements by feature
-│       └── {feature-name}.md
-│
-├── execution/                   # WHEN and HOW MUCH is done
-│   ├── BUGS.md                 #   Active bug registry
-│   ├── project-plan/           #   Phases > Epics > Stories > Tasks
-│   │   ├── index.md            #     Master index with rollup stats
-│   │   ├── phase-{n}-*.md      #     One file per phase
-│   │   └── backlog.md          #     Unscheduled future work
-│   └── archive/                #   Completed/deprecated plans
-│
-├── infrastructure/              # HOW it's built
-│   ├── architecture.md         #   System overview
-│   ├── technical-design/       #   Detailed specs per system
+├── <product>/                   # One directory per product (boards, design-system, systemic, etc.)
+│   ├── README.md               #   Product overview, status, key links
+│   ├── prd/                    #   Product requirements (what & why)
+│   │   └── {feature-name}.md
+│   ├── technical/              #   Technical design (how it's built)
 │   │   └── {system-name}.md
-│   ├── security.md             #   Security practices
+│   ├── ux/                     #   User experience (wireframes, flows)
+│   │   └── {feature-area}/
+│   ├── research/               #   References & competitive analysis
+│   └── plan/                   #   Execution plan (phases, tasks, backlog)
+│       ├── index.md            #     Master index with rollup stats
+│       ├── phase-{n}-*.md      #     One file per phase
+│       └── backlog.md          #     Unscheduled future work
+│
+├── strategy/                    # Cross-cutting: WHAT we're building and WHY
+│   ├── vision-and-roadmap.md
+│   ├── brand-positioning.md
+│   ├── personas.md
+│   └── decision-log.md
+│
+├── ops/                         # Cross-cutting: HOW it's run
+│   ├── architecture.md         #   System overview
 │   ├── deployment.md           #   Deploy procedures
-│   ├── dependencies.md         #   External dependencies
-│   └── risks.md                #   Known risks
+│   ├── security.md             #   Security practices
+│   ├── bugs.md                 #   Active bug registry
+│   ├── notion-sync/            #   Notion sync docs
+│   └── setup/                  #   Onboarding guides
 │
-├── ux/                          # WHAT users experience
-│   ├── {feature-area}/         #   One directory per product area
-│   │   ├── index.md            #     Feature overview
-│   │   └── {capability}.md     #     Specific capabilities
-│   └── research/               #   UX research & patterns
-│
-└── setup/                       # HOW to get started
-    └── {topic}.md
+└── archive/                     # Superseded/legacy docs (never deleted)
 ```
 
 ### Sub-Product Mapping
@@ -70,14 +68,16 @@ Each sub-product maps to specific locations in the documentation tree:
 
 | Sub-Product | PRD | Project Plan | Tech Spec | UX Docs |
 |-------------|-----|-------------|-----------|---------|
-| **Boards** | `prds/boards-mvp.md` | Phase 1-2 | `technical-design/client-architecture.md` | `ux/boards/` |
-| **AI Widgets** | `prds/ai-widgets.md`, `prds/generative-widget-ecosystem.md` | Phase 3 | `technical-design/ai-widget-system.md`, `ai-widget-pipeline.md`, `widget-architecture.md` | `ux/widgets/` |
-| **Content Types** | `prds/content-type-and-image-systems.md` | Phase 3 | `technical-design/content-type-system.md` | `ux/pins/ai-categorization.md` |
-| **Design System** | `prds/widget-design-system.md` | Phase 3 | — | `design-system/README.md` |
-| **Sharing** | `prds/collaborative-boards.md` | Phase 4 | `technical-design/auth-system.md` | `ux/boards/sharing.md` |
-| **Notion Sync** | `prds/notion-sync-platform.md` | — | `technical-design/sync-protocol.md` | — |
-| **Soundscape** | — | — | — | `docs/playground/soundscape/` |
-| **Systemic** | `prds/design-system-validation-pipeline.md` | — | — | `docs/playground/systemic/` |
+| **Boards** | `docs/boards/prd/boards-mvp.md` | `docs/boards/plan/` (Phase 1-2) | `docs/boards/technical/client-architecture.md` | `docs/boards/ux/boards/` |
+| **AI Widgets** | `docs/boards/prd/ai-widgets.md`, `generative-widget-ecosystem.md` | `docs/boards/plan/` (Phase 3) | `docs/boards/technical/ai-widget-system.md`, `ai-widget-pipeline.md`, `widget-architecture.md` | `docs/boards/ux/widgets/` |
+| **Content Types** | `docs/boards/prd/content-type-and-image-systems.md` | `docs/boards/plan/` (Phase 3) | `docs/boards/technical/content-type-system.md` | `docs/boards/ux/pins/ai-categorization.md` |
+| **Design System** | `docs/boards/prd/widget-design-system.md` | — | — | `design-system/README.md` |
+| **Sharing** | `docs/boards/prd/collaborative-boards.md` | `docs/boards/plan/` (Phase 4) | `docs/boards/technical/auth-system.md` | `docs/boards/ux/boards/sharing.md` |
+| **Notion Sync** | `docs/ops/notion-sync/platform-prd.md` | — | `docs/boards/technical/sync-protocol.md` | — |
+| **Soundscape** | — | `docs/soundscape/plan/` | `docs/soundscape/technical/` | — |
+| **Systemic** | `docs/systemic/prd/variant-audit.md` | `docs/systemic/plan/` | — | — |
+| **Events** | `docs/events/prd/` | — | — | — |
+| **Tasks** | `docs/tasks/prd/tasks.md` | `docs/tasks/plan/` | `docs/tasks/technical/tasks-system.md` | — |
 
 ---
 
@@ -382,7 +382,7 @@ The sub-functions are still individually addressable via `/<command> <sub-functi
 
 - **Type**: Story
 - **Title**: Implement drag-and-drop pin reordering
-- **Filed to**: `docs/execution/project-plan/phase-5-ux-polish.md`
+- **Filed to**: `docs/boards/plan/phase-5-ux-polish.md`
 - **Under Epic**: Board Interactions
 - **Status**: Pending
 - **Index updated**: Phase 5 count now 4/70
@@ -612,7 +612,7 @@ This moves 57 items across phases. Approve? [Y/N]
 | `found_in` | string | No | Branch or commit where discovered |
 
 **Process**:
-1. Read `docs/execution/BUGS.md`
+1. Read `docs/ops/bugs.md`
 2. Determine next bug ID (format: `BUG-{NNN}`)
 3. Append to correct severity section
 4. If severity is `critical` or `high`, also add a task to the active phase's project plan
@@ -625,7 +625,7 @@ This moves 57 items across phases. Approve? [Y/N]
 - **ID**: BUG-017
 - **Title**: Widget preview fails for URLs with query params
 - **Severity**: High
-- **Filed to**: `docs/execution/BUGS.md` (High priority section)
+- **Filed to**: `docs/ops/bugs.md` (High priority section)
 - **Plan task created**: Phase 3 / Widget Rendering / "Fix BUG-017: query param handling"
 - **Possible duplicate of**: BUG-009 (URL encoding issues) — review recommended
 ```
@@ -705,7 +705,7 @@ This moves 57 items across phases. Approve? [Y/N]
 
 **Output**:
 ```markdown
-## UX Doc Updated — `docs/ux/widgets/ai-recommendations.md`
+## UX Doc Updated — `docs/boards/ux/widgets/ai-recommendations.md`
 
 ### Changes
 - Marked "Product Grid widget" as ✅ Shipped
@@ -751,7 +751,7 @@ This moves 57 items across phases. Approve? [Y/N]
 | Category color coding | ⏳ Planned | ✅ Shipped (`boards/index.html:1420`) |
 
 ### Missing UX Docs
-- No UX doc exists for admin panel features → should create `docs/ux/admin/index.md`
+- No UX doc exists for admin panel features → should create `docs/boards/ux/admin/index.md`
 ```
 
 ---
@@ -801,8 +801,8 @@ This moves 57 items across phases. Approve? [Y/N]
 ### Changed on {compare}
 | File | Type | Summary |
 |------|------|---------|
-| `docs/execution/project-plan/phase-3-ai-intelligence.md` | Plan | 5 tasks marked complete |
-| `docs/infrastructure/technical-design/ai-widget-system.md` | Arch | New "Template Registry" section |
+| `docs/boards/plan/phase-3-ai-intelligence.md` | Plan | 5 tasks marked complete |
+| `docs/boards/technical/ai-widget-system.md` | Arch | New "Template Registry" section |
 
 ### Potential Conflicts
 - `BUGS.md` edited in both branches (different sections — auto-mergeable)
@@ -1673,7 +1673,7 @@ curl -X POST "$SUPABASE_OPS_URL/functions/v1/documentation-agent" \
 
 ### Relationship to NotionSync PRD (Pillar 2)
 
-The [NotionSync Platform PRD](../../docs/strategy/prds/notion-sync-platform.md) defines a "Doc Management Agent" under Pillar 2 (Documentation Management). That agent operates on the **Notion side** — health checks on Notion pages, comment-driven updates via `@agent` commands. This Documentation Agent operates on the **Git side** — managing content accuracy, plan integrity, and documentation hygiene in the repository.
+The [NotionSync Platform PRD](../../docs/ops/notion-sync/platform-prd.md) defines a "Doc Management Agent" under Pillar 2 (Documentation Management). That agent operates on the **Notion side** — health checks on Notion pages, comment-driven updates via `@agent` commands. This Documentation Agent operates on the **Git side** — managing content accuracy, plan integrity, and documentation hygiene in the repository.
 
 **Data flow**: Documentation Agent updates content in Git → Documentation Sync pushes to Notion → NotionSync Pillar 2 Phase B (future) processes Notion comments → changes flow back to Git.
 
@@ -1781,7 +1781,7 @@ Path 1: Natural Language          Path 2: Slash Commands         Path 3: GitHub 
          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        Documentation Files (Git)                            │
-│  docs/execution/  docs/infrastructure/  docs/ux/  docs/strategy/            │
+│  docs/<product>/  docs/strategy/  docs/ops/  docs/archive/                  │
 └─────────────────────────────────────────────────────────────────────────────┘
          │
          ▼

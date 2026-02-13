@@ -1130,7 +1130,7 @@ interface ScrapingMonitor {
 | `supabase/functions/generate-widget/config/registry.ts` | Widget loader and runtime evaluation |
 | `supabase/functions/generate-widget/config/widgets/*.ts` | Individual widget configurations |
 | `boards/index.html` | Client app - Widget registry, rendering, feedback |
-| `docs/infrastructure/technical-design/ai-widget-system.md` | This documentation |
+| `docs/boards/technical/ai-widget-system.md` | This documentation |
 
 ---
 

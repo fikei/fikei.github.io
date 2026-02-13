@@ -13,7 +13,7 @@ This file provides context to Claude Code and other AI development tools for wor
 The core insight: **what you experience informs what you create.** ctrl.rodeo makes the connection between input and output visible, searchable, and actionable. It starts with creatives — artists, designers, musicians — and expands to anyone whose life is richer when intentionally curated.
 
 See [Brand Positioning](./docs/strategy/brand-positioning.md) for full positioning statement, voice & tone, and development implications.
-See [User Personas](./docs/ux/personas.md) for detailed personas with Jobs To Be Done and the persona-to-feature matrix.
+See [User Personas](./docs/strategy/personas.md) for detailed personas with Jobs To Be Done and the persona-to-feature matrix.
 
 ### Brand Principles (Guide All Feature Decisions)
 1. **Input shapes output** — surface connections and patterns in what users collect
@@ -68,7 +68,7 @@ When working on this project, always follow these guidelines:
    - Always remind about: secrets, deployments, merges, or external service setup
 
 4. **Maintain unified project plan tracking via `/plan`**
-   - All tasks are tracked in `docs/execution/project-plan/` (one file per phase + index)
+   - All tasks are tracked in `docs/<product>/plan/` (one file per phase + index)
    - **Do not manually edit plan files** — use Documentation Agent commands:
      - `/plan` — auto-detects: updates from branch commits (feature branch) or audits integrity (master)
      - `/plan add <description>` — files new work to correct phase/epic by sub-product
@@ -110,12 +110,14 @@ When working on this project, always follow these guidelines:
      - ~~Strike through~~ the old content in the original location
      - Add a link to the new location: "→ Moved to [New Page Name](path/to/new-file.md)"
      - This preserves traceability and helps users find relocated content
-   - Documentation locations:
-     - PRDs → `docs/strategy/prds/`
-     - Tech specs → `docs/infrastructure/technical-design/`
-     - Project plans → `docs/execution/`
-     - UX documentation → `docs/ux/`
-     - Archived docs → `*/archive/`
+   - Documentation locations (product-based structure — see `docs/README.md` for full map):
+     - PRDs → `docs/<product>/prd/`
+     - Tech specs → `docs/<product>/technical/`
+     - Project plans → `docs/<product>/plan/`
+     - UX documentation → `docs/<product>/ux/`
+     - Cross-cutting strategy → `docs/strategy/`
+     - Ops & infrastructure → `docs/ops/`
+     - Archived docs → `docs/archive/`
 
 6. **Maintain an explicit changelog via `/pm changelog`**
    - After completing significant work, use `/pm changelog` to generate entries
@@ -153,10 +155,10 @@ When working on this project, always follow these guidelines:
     - It marks features as ✅ Shipped, generates ASCII wireframes from HTML/CSS, and adds file references
     - Run `/ux` (no args) to audit all UX docs against the codebase
     - UX doc locations:
-      - Boards features → `docs/ux/boards/`
-      - User features → `docs/ux/users/`
-      - Widget features → `docs/ux/widgets/`
-      - Pin features → `docs/ux/pins/`
+      - Boards features → `docs/boards/ux/boards/`
+      - User features → `docs/boards/ux/users/`
+      - Widget features → `docs/boards/ux/widgets/`
+      - Pin features → `docs/boards/ux/pins/`
 
 12. **Check widget design comments before working on widgets**
     - At the start of every prompt involving widget work, check for existing design audit comments
@@ -202,11 +204,11 @@ When working on this project, always follow these guidelines:
     - When wrapping up a session: "Recommended: `/pm changelog` to capture what was done."
 
     **These commands replace direct editing of:**
-    - `docs/execution/project-plan/*.md` → use `/plan`
-    - `docs/execution/BUGS.md` → use `/capture bug ...`
-    - `docs/execution/project-plan/backlog.md` → use `/capture work ...`
-    - `docs/infrastructure/technical-design/*.md` → use `/arch`
-    - `docs/ux/**/*.md` → use `/ux`
+    - `docs/<product>/plan/*.md` → use `/plan`
+    - `docs/ops/bugs.md` → use `/capture bug ...`
+    - `docs/<product>/plan/backlog.md` → use `/capture work ...`
+    - `docs/<product>/technical/*.md` → use `/arch`
+    - `docs/<product>/ux/**/*.md` → use `/ux`
     - `docs/strategy/decision-log.md` → use `/arch decide ...` or `/pm decide ...`
     - `CHANGELOG.md` → use `/pm changelog`
 
@@ -252,11 +254,17 @@ Claude Code is authorized to perform the following operations **without asking f
 ├── .claude/                # Claude Code configuration
 │   ├── agents/             # AI agent definitions
 │   └── settings.json       # Claude Code settings
-├── docs/                   # Technical & product documentation
-│   ├── strategy/           # PRDs, vision, decision log
-│   ├── execution/          # Sprints, shipped, blocked, project plans
-│   ├── infrastructure/     # Architecture, deployment, technical design
-│   └── setup/              # Setup guides
+├── docs/                   # Product-based documentation (see docs/README.md)
+│   ├── boards/             # Boards app docs (prd/, technical/, ux/, plan/)
+│   ├── design-system/      # Design system docs
+│   ├── systemic/           # Systemic analyzer docs
+│   ├── soundscape/         # Soundscape docs
+│   ├── events/             # Events system docs
+│   ├── tasks/              # Tasks system docs
+│   ├── favicon/            # Favicon generator docs
+│   ├── strategy/           # Cross-cutting: vision, brand, personas, decisions
+│   ├── ops/                # Cross-cutting: architecture, deployment, bugs, setup
+│   └── archive/            # Superseded/legacy docs (never deleted)
 ├── boards/                 # Link curation app (Boards)
 ├── soundscape/             # Audio-reactive visualization
 ├── systemic/               # Design system analyzer
@@ -372,7 +380,7 @@ curl -X POST "$SUPABASE_BOARDS_URL/functions/v1/generate-widget" \
 **Key Files**:
 - `boards/index.html` - Main application (256KB)
 - `supabase/functions/enrich-link/` - Content enrichment
-- `docs/strategy/prds/boards-mvp.md` - Product requirements
+- `docs/boards/prd/boards-mvp.md` - Product requirements
 
 **AI Integration**: Automatic content type detection, category suggestion
 
@@ -380,7 +388,7 @@ curl -X POST "$SUPABASE_BOARDS_URL/functions/v1/generate-widget" \
 **Purpose**: Intelligent product recommendations
 **Key Files**:
 - `supabase/functions/generate-widget/` - Widget generation
-- `docs/infrastructure/technical-design/ai-widget-system.md` - Architecture details
+- `docs/boards/technical/ai-widget-system.md` - Architecture details
 
 **AI Integration**: Claude Haiku for product recommendations, 47+ brand integrations
 
@@ -451,9 +459,9 @@ See `.claude/agents/documentation-agent.md` for full specifications.
 ## Common Tasks
 
 ### Adding a New Feature
-1. Create PRD in `/docs/strategy/prds/feature-name.md`
-2. Run `/pm plan docs/strategy/prds/feature-name.md` to generate plan entries
-3. Create technical spec in `/docs/infrastructure/technical-design/feature-name.md`
+1. Create PRD in `/docs/<product>/prd/feature-name.md`
+2. Run `/pm plan docs/<product>/prd/feature-name.md` to generate plan entries
+3. Create technical spec in `/docs/<product>/technical/feature-name.md`
 4. Implement with continuous commits
 5. During development: `/capture` for new work/bugs discovered
 6. Before PR: `/branch` to check doc state, `/plan` to update plan
@@ -488,17 +496,18 @@ See `.claude/agents/documentation-agent.md` for full specifications.
 
 ## Current Sprint Focus
 
-Check `docs/execution/project-plan/index.md` for current priorities and phase status.
+Check `docs/boards/plan/index.md` for current priorities and phase status.
 
 ---
 
 ## Related Documents
 - [Brand Positioning](./docs/strategy/brand-positioning.md) - Tagline, positioning statement, brand principles
-- [User Personas](./docs/ux/personas.md) - Audience personas with JTBD and feature matrix
-- [Project Plan](./docs/execution/project-plan/index.md) - Current task tracking (single source of truth)
+- [User Personas](./docs/strategy/personas.md) - Audience personas with JTBD and feature matrix
+- [Project Plan](./docs/boards/plan/index.md) - Current task tracking (single source of truth)
 - [CHANGELOG.md](./CHANGELOG.md) - History of all changes
-- [Backlog](./docs/execution/project-plan/backlog.md) - Future work items
-- [Bugs](./docs/execution/BUGS.md) - Active bug registry
-- [docs/infrastructure/technical-design/ai-widget-system.md](./docs/infrastructure/technical-design/ai-widget-system.md) - AI architecture
+- [Backlog](./docs/boards/plan/backlog.md) - Future work items
+- [Bugs](./docs/ops/bugs.md) - Active bug registry
+- [AI Widget Architecture](./docs/boards/technical/ai-widget-system.md) - AI architecture
 - [design-system/README.md](./design-system/README.md) - Design system guide
 - [Documentation Agent](/.claude/agents/documentation-agent.md) - Full command specifications
+- [Documentation Index](./docs/README.md) - Full documentation navigation map

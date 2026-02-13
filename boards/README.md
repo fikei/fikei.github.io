@@ -121,11 +121,11 @@ The ultimate personal curation tool - a place to save, organize, and rediscover 
 
 ## Technical Documentation
 
-- [PRD: Boards MVP](../docs/strategy/prds/boards-mvp.md)
-- [PRD: Collaborative Boards](../docs/strategy/prds/collaborative-boards.md)
-- [PRD: Content Type System](../docs/strategy/prds/content-type-system.md)
-- [TECH: AI Widget System](../docs/infrastructure/technical-design/ai-widget-system.md)
-- [TECH: Content Type & Image Systems](../docs/infrastructure/technical-design/content-type-system.md)
+- [PRD: Boards MVP](../docs/boards/prd/boards-mvp.md)
+- [PRD: Collaborative Boards](../docs/boards/prd/collaborative-boards.md)
+- [PRD: Content Type System](../docs/boards/prd/content-type-and-image-systems.md)
+- [TECH: AI Widget System](../docs/boards/technical/ai-widget-system.md)
+- [TECH: Content Type & Image Systems](../docs/boards/technical/content-type-system.md)
 
 ---
 

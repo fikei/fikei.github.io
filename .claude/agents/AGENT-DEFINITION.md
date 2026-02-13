@@ -67,7 +67,7 @@ After completing any task:
 - Always remind about: secrets, deployments, merges, external setup
 
 ### 4. Track Everything
-- Update `docs/execution/UNIFIED-PROJECT-PLAN.md` as work progresses
+- Update `docs/boards/plan/index.md` as work progresses
 - Update `CHANGELOG.md` after significant work
 - Announce doc changes with file path and summary
 
@@ -172,5 +172,5 @@ After completing any task:
 | `.claude/agents/security-compliance-agent.md` | Security checks and patterns |
 | `.claude/agents/continuous-improvement-agent.md` | Metrics and experiment framework |
 | `.claude/agents/chief-of-staff-agent.md` | Orchestration and escalation protocol |
-| `docs/infrastructure/NOTION-SYNC-GUIDE.md` | Operational guide for Notion sync |
-| `docs/strategy/prds/notion-sync-platform.md` | Full PRD for sync platform |
+| `docs/ops/notion-sync/guide.md` | Operational guide for Notion sync |
+| `docs/ops/notion-sync/platform-prd.md` | Full PRD for sync platform |

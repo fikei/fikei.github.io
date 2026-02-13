@@ -314,7 +314,7 @@ Tracks which markdown files have been synced to Notion.
 
 | Column | Type | Default | Notes |
 |--------|------|---------|-------|
-| `page_path` | text | PK | e.g., "docs/execution/BUGS.md" |
+| `page_path` | text | PK | e.g., "docs/ops/bugs.md" |
 | `notion_page_id` | text | | Notion page UUID |
 | `github_hash` | text | | MD5 of markdown content |
 | `notion_last_edited` | timestamptz | | |

@@ -242,7 +242,7 @@ Syncs documentation from GitHub to Notion. Used by GitHub Actions.
 ```json
 {
   "action": "update-page",
-  "pagePath": "docs/execution/BUGS.md",
+  "pagePath": "docs/ops/bugs.md",
   "content": "# Bugs\n...",
   "contentHash": "abc123..."
 }
@@ -253,7 +253,7 @@ Syncs documentation from GitHub to Notion. Used by GitHub Actions.
 {
   "action": "check-changes",
   "pages": [
-    { "path": "docs/execution/BUGS.md", "hash": "abc123..." }
+    { "path": "docs/ops/bugs.md", "hash": "abc123..." }
   ]
 }
 ```
