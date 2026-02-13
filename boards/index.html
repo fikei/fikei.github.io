@@ -2353,10 +2353,219 @@ body {
 }
 
 /* ============================================
-   Tools Modal
+   Tools Modal — Tabs + Coached Install
    ============================================ */
-.tools-list {
+.tools-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--subtle);
+}
+
+.tools-tab {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tools-tab:hover {
+  color: var(--fg);
+}
+
+.tools-tab--active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+.tools-panel {
   padding: var(--space-4);
+}
+
+.tools-panel--hidden {
+  display: none;
+}
+
+/* Coach — step-by-step install */
+.tools-coach__step {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--subtle);
+}
+
+.tools-coach__step:last-child {
+  border-bottom: none;
+}
+
+.tools-coach__step--inactive {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.tools-coach__step--done {
+  opacity: 0.4;
+}
+
+.tools-coach__step--done .tools-coach__step-num {
+  background: transparent;
+  color: var(--muted);
+}
+
+.tools-coach__step--done .tools-coach__step-num::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.tools-coach__step-num {
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--fg);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tools-coach__step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tools-coach__step-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.tools-coach__step-desc {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+  line-height: 1.5;
+}
+
+.tools-coach__step-desc kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  color: var(--fg);
+}
+
+.tools-coach__next,
+.tools-coach__done {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tools-coach__next:hover,
+.tools-coach__done:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.tools-coach__drag-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  border: 2px dashed var(--subtle);
+  margin-bottom: var(--space-3);
+}
+
+.tools-coach__bookmarklet {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  text-decoration: none;
+  cursor: grab;
+  transition: transform 0.15s;
+  user-select: none;
+}
+
+.tools-coach__bookmarklet:hover {
+  transform: scale(1.05);
+}
+
+.tools-coach__bookmarklet:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.tools-coach__arrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  animation: arrow-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes arrow-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.tools-coach__alt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.tools-coach__link-btn {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tools-coach__link-btn:hover {
+  opacity: 0.7;
+}
+
+/* Shared tools-list styles (used in Share Link and PWA tabs) */
+.tools-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -2380,10 +2589,40 @@ body {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--muted);
+  line-height: 1.5;
 }
 
-.tools-list__bookmarklet {
-  display: inline-block;
+.tools-list__example {
+  font-size: 10px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  word-break: break-all;
+}
+
+.tools-list__url-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tools-list__url {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.tools-list__url:focus {
+  border-color: var(--fg);
+  outline: none;
+}
+
+.tools-list__copy {
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-mono);
   font-size: 10px;
@@ -2392,31 +2631,14 @@ body {
   background: var(--fg);
   color: var(--bg);
   border: 1px solid var(--fg);
-  text-decoration: none;
-  cursor: grab;
-  text-align: center;
+  cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
 }
 
-.tools-list__bookmarklet:hover {
+.tools-list__copy:hover {
   background: var(--bg);
   color: var(--fg);
-}
-
-.tools-list__url {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  background: var(--surface);
-  color: var(--fg);
-  border: 1px solid var(--subtle);
-  cursor: pointer;
-}
-
-.tools-list__url:focus {
-  border-color: var(--fg);
-  outline: none;
 }
 
 .tools-list__btn {
@@ -2889,7 +3111,7 @@ body {
 }
 
 /* ============================================
-   Bookmarklet Promo Banner
+   Capture Tool Promo Banner
    ============================================ */
 .capture-promo {
   display: none; /* JS shows it */
@@ -2900,10 +3122,10 @@ body {
   z-index: 999;
   background: var(--fg);
   color: var(--bg);
-  border: 1px solid var(--fg);
   font-family: var(--font-mono);
-  max-width: 400px;
+  max-width: 420px;
   width: calc(100% - 32px);
+  border: 1px solid var(--fg);
   animation: promo-slide-up 0.3s ease;
 }
 
@@ -2919,12 +3141,29 @@ body {
   gap: var(--space-3);
 }
 
-.capture-promo__text {
+.capture-promo__icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.capture-promo__body {
   flex: 1;
+  min-width: 0;
+}
+
+.capture-promo__text {
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1.4;
+  font-weight: 500;
+}
+
+.capture-promo__subtext {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+  letter-spacing: 0.02em;
 }
 
 .capture-promo__cta {
@@ -2956,7 +3195,7 @@ body {
   font-size: 14px;
   padding: var(--space-1);
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.4;
   transition: opacity 0.15s;
 }
 
@@ -2964,10 +3203,10 @@ body {
   opacity: 1;
 }
 
-/* Hide promo on mobile — they have quick-add bar & PWA instead */
+/* On mobile: promo shows PWA install instead of bookmarklet */
 @media (max-width: 600px) {
   .capture-promo {
-    display: none !important;
+    bottom: 110px; /* above quick-add bar */
   }
 }
 
@@ -3736,11 +3975,15 @@ body {
 
   <div class="listen-player" id="listenPlayer"></div>
 
-  <!-- Bookmarklet Promo Banner (desktop) -->
+  <!-- Capture Tool Promo Banner -->
   <div class="capture-promo" id="capturePromo">
     <div class="capture-promo__inner">
-      <div class="capture-promo__text">Save links faster — drag the bookmarklet to your bookmarks bar</div>
-      <button class="capture-promo__cta" id="promoShowTools">Get it</button>
+      <div class="capture-promo__icon">⚡</div>
+      <div class="capture-promo__body">
+        <div class="capture-promo__text" id="promoText">Save links in one click from any page</div>
+        <div class="capture-promo__subtext" id="promoSubtext">Set up the bookmarklet — takes 10 seconds</div>
+      </div>
+      <button class="capture-promo__cta" id="promoShowTools">Set up</button>
       <button class="capture-promo__dismiss" id="promoDismiss" aria-label="Dismiss">&times;</button>
     </div>
   </div>
@@ -4026,29 +4269,89 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
-  <!-- Tools Modal -->
+  <!-- Tools Modal — step-by-step install coach -->
   <div class="modal modal--small" id="toolsModal">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
-        <h2 class="modal__title">Capture Tools</h2>
+        <h2 class="modal__title" id="toolsTitle">Capture Tools</h2>
         <button class="modal__close" data-close>&times;</button>
       </div>
-      <div class="tools-list">
-        <div class="tools-list__item">
-          <div class="tools-list__label">Bookmarklet</div>
-          <div class="tools-list__desc">Drag to your bookmarks bar for one-click saving</div>
-          <a class="tools-list__bookmarklet" id="bookmarkletLink" href="javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))" onclick="event.preventDefault(); toast('Drag this to your bookmarks bar!');">+ Save to Boards</a>
+
+      <!-- Tab bar -->
+      <div class="tools-tabs" id="toolsTabs">
+        <button class="tools-tab tools-tab--active" data-tab="bookmarklet">Bookmarklet</button>
+        <button class="tools-tab" data-tab="sharelink">Share Link</button>
+        <button class="tools-tab" data-tab="pwa">Install App</button>
+      </div>
+
+      <!-- Bookmarklet tab — coached install flow -->
+      <div class="tools-panel" id="toolsPanel-bookmarklet">
+        <div class="tools-coach" id="bookmarkletCoach">
+          <!-- Step 1: Show bookmarks bar -->
+          <div class="tools-coach__step" id="bmStep1">
+            <div class="tools-coach__step-num">1</div>
+            <div class="tools-coach__step-body">
+              <div class="tools-coach__step-title">Show your bookmarks bar</div>
+              <div class="tools-coach__step-desc">
+                Press <kbd id="bmShortcut">Ctrl+Shift+B</kbd> if it's hidden
+              </div>
+              <button class="tools-coach__next" id="bmStep1Next">My bar is visible →</button>
+            </div>
+          </div>
+          <!-- Step 2: Drag the bookmarklet -->
+          <div class="tools-coach__step tools-coach__step--inactive" id="bmStep2">
+            <div class="tools-coach__step-num">2</div>
+            <div class="tools-coach__step-body">
+              <div class="tools-coach__step-title">Drag this button to your bookmarks bar</div>
+              <div class="tools-coach__step-desc">Click and hold, then drag up to your bookmarks bar and release</div>
+              <div class="tools-coach__drag-target">
+                <a class="tools-coach__bookmarklet" id="bookmarkletLink" href="javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))" draggable="true">+ Save to Boards</a>
+                <div class="tools-coach__arrow" id="bmDragArrow">↑ drag up</div>
+              </div>
+              <div class="tools-coach__alt" id="bmCopyAlt">
+                Can't drag? <button class="tools-coach__link-btn" id="bmCopyLink">Copy link instead</button> and manually create a bookmark.
+              </div>
+            </div>
+          </div>
+          <!-- Step 3: Test it -->
+          <div class="tools-coach__step tools-coach__step--inactive" id="bmStep3">
+            <div class="tools-coach__step-num">3</div>
+            <div class="tools-coach__step-body">
+              <div class="tools-coach__step-title">You're all set!</div>
+              <div class="tools-coach__step-desc">Click "+ Save to Boards" in your bookmarks bar on any page to save it here.</div>
+              <button class="tools-coach__done" id="bmDone">Done</button>
+            </div>
+          </div>
         </div>
-        <div class="tools-list__item">
-          <div class="tools-list__label">Share Link</div>
-          <div class="tools-list__desc">Send any URL to Boards via link</div>
-          <input class="tools-list__url" id="toolsShareUrl" value="https://ctrl.rodeo/boards/?add=" readonly onclick="this.select();">
+      </div>
+
+      <!-- Share Link tab -->
+      <div class="tools-panel tools-panel--hidden" id="toolsPanel-sharelink">
+        <div class="tools-list">
+          <div class="tools-list__item">
+            <div class="tools-list__label">Share URL</div>
+            <div class="tools-list__desc">Append any URL to this link to save it to Boards. Works with Apple Shortcuts, IFTTT, Tasker, and any automation tool.</div>
+            <div class="tools-list__url-row">
+              <input class="tools-list__url" id="toolsShareUrl" value="https://ctrl.rodeo/boards/?add=" readonly onclick="this.select();">
+              <button class="tools-list__copy" id="toolsShareCopy">Copy</button>
+            </div>
+          </div>
+          <div class="tools-list__item">
+            <div class="tools-list__label">Example</div>
+            <div class="tools-list__desc tools-list__example">ctrl.rodeo/boards/?add=https://example.com/cool-thing</div>
+          </div>
         </div>
-        <div class="tools-list__item">
-          <div class="tools-list__label">Install App</div>
-          <div class="tools-list__desc">Add Boards to your home screen for share sheet access</div>
-          <button class="tools-list__btn" id="installPwaBtn">Install</button>
+      </div>
+
+      <!-- PWA Install tab -->
+      <div class="tools-panel tools-panel--hidden" id="toolsPanel-pwa">
+        <div class="tools-list">
+          <div class="tools-list__item">
+            <div class="tools-list__label">Install Boards App</div>
+            <div class="tools-list__desc">Add Boards to your home screen. On mobile, this lets you share links directly from any app to Boards.</div>
+            <button class="tools-list__btn" id="installPwaBtn">Install</button>
+          </div>
         </div>
       </div>
     </div>
@@ -9811,7 +10114,9 @@ Return JSON:
     videoInput.click();
   };
 
-  // Tools button in FAB menu
+  // ============================================
+  // Tools Modal — Tabs + Coached Bookmarklet Install
+  // ============================================
   const fabTools = document.getElementById('fabTools');
   const toolsModal = document.getElementById('toolsModal');
 
@@ -9821,10 +10126,104 @@ Return JSON:
       openModal(toolsModal);
     };
 
-    // Close handlers for tools modal
     toolsModal.querySelectorAll('[data-close]').forEach(el => {
       el.onclick = () => closeModal(toolsModal);
     });
+  }
+
+  // Tab navigation
+  const toolsTabs = document.querySelectorAll('.tools-tab');
+  toolsTabs.forEach(tab => {
+    tab.onclick = () => {
+      const target = tab.dataset.tab;
+      // Update tabs
+      toolsTabs.forEach(t => t.classList.toggle('tools-tab--active', t === tab));
+      // Update panels
+      document.querySelectorAll('.tools-panel').forEach(p => {
+        p.classList.toggle('tools-panel--hidden', p.id !== `toolsPanel-${target}`);
+      });
+    };
+  });
+
+  // Detect OS for keyboard shortcut
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const bmShortcut = document.getElementById('bmShortcut');
+  if (bmShortcut) {
+    bmShortcut.textContent = isMac ? '⌘+Shift+B' : 'Ctrl+Shift+B';
+  }
+
+  // Coach step flow
+  const bmStep1 = document.getElementById('bmStep1');
+  const bmStep2 = document.getElementById('bmStep2');
+  const bmStep3 = document.getElementById('bmStep3');
+  const bmStep1Next = document.getElementById('bmStep1Next');
+  const bmCopyLink = document.getElementById('bmCopyLink');
+  const bmDone = document.getElementById('bmDone');
+  const bookmarkletLink = document.getElementById('bookmarkletLink');
+
+  function advanceToStep(stepNum) {
+    if (stepNum >= 2 && bmStep1) {
+      bmStep1.classList.add('tools-coach__step--done');
+      bmStep1.classList.remove('tools-coach__step--inactive');
+    }
+    if (stepNum >= 2 && bmStep2) {
+      bmStep2.classList.remove('tools-coach__step--inactive');
+    }
+    if (stepNum >= 3 && bmStep2) {
+      bmStep2.classList.add('tools-coach__step--done');
+    }
+    if (stepNum >= 3 && bmStep3) {
+      bmStep3.classList.remove('tools-coach__step--inactive');
+    }
+  }
+
+  if (bmStep1Next) {
+    bmStep1Next.onclick = () => advanceToStep(2);
+  }
+
+  // Detect when bookmarklet is dragged (dragend means they tried)
+  if (bookmarkletLink) {
+    bookmarkletLink.addEventListener('dragend', () => {
+      advanceToStep(3);
+    });
+    // Prevent click from navigating (it's a bookmarklet javascript: URL)
+    bookmarkletLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      toast('Drag this button to your bookmarks bar — don\'t click it here!');
+    });
+  }
+
+  // Copy link fallback
+  if (bmCopyLink) {
+    bmCopyLink.onclick = async () => {
+      const bmUrl = "javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))";
+      try {
+        await navigator.clipboard.writeText(bmUrl);
+        toast('Copied! Create a new bookmark and paste this as the URL.');
+        advanceToStep(3);
+      } catch {
+        toast('Could not copy — try right-clicking the button instead', true);
+      }
+    };
+  }
+
+  if (bmDone) {
+    bmDone.onclick = () => closeModal(toolsModal);
+  }
+
+  // Share URL copy button
+  const toolsShareCopy = document.getElementById('toolsShareCopy');
+  const toolsShareUrl = document.getElementById('toolsShareUrl');
+  if (toolsShareCopy && toolsShareUrl) {
+    toolsShareCopy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(toolsShareUrl.value);
+        toolsShareCopy.textContent = 'Copied';
+        setTimeout(() => { toolsShareCopy.textContent = 'Copy'; }, 2000);
+      } catch {
+        toolsShareUrl.select();
+      }
+    };
   }
 
   // PWA Install prompt
@@ -9838,13 +10237,11 @@ Return JSON:
   });
 
   if (installBtn) {
-    // Disable by default (enabled when beforeinstallprompt fires)
     installBtn.disabled = true;
     installBtn.textContent = 'Not available';
 
-    // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
-      installBtn.textContent = 'Installed';
+      installBtn.textContent = 'Installed ✓';
       installBtn.disabled = true;
     }
 
@@ -9853,7 +10250,7 @@ Return JSON:
       deferredInstallPrompt.prompt();
       const result = await deferredInstallPrompt.userChoice;
       if (result.outcome === 'accepted') {
-        installBtn.textContent = 'Installed';
+        installBtn.textContent = 'Installed ✓';
         installBtn.disabled = true;
       }
       deferredInstallPrompt = null;
@@ -12533,20 +12930,33 @@ Return JSON:
   }
 
   // ============================================
-  // Bookmarklet Promo Banner (desktop only)
+  // Capture Tool Promo Banner
   // ============================================
-  // Smart display logic:
-  //  - Only shows on desktop (CSS hides on mobile)
-  //  - Shows after user's 3rd link add (engaged user, not first-timer)
-  //  - Dismiss: snoozes for 7 days, then reappears once
-  //  - Dismiss twice: gone for 30 days
-  //  - Opening Tools modal = "installed", never show again
-  //  - Deep link (?add=) arrivals = already using a tool, skip
+  // Smart promotion for capture tools:
+  //
+  // DESKTOP: promotes bookmarklet install
+  //   - Shows after 3rd link add (engaged user)
+  //   - "Set up" opens Tools modal to bookmarklet coach
+  //   - Dismiss ×1 → snooze 7 days, then shows once more with softer copy
+  //   - Dismiss ×2 → gone for 90 days
+  //   - Dismiss ×3 → gone permanently
+  //   - Opening Tools modal = "set up", never shows again
+  //   - Deep link arrival = already using tools, skip this session
+  //
+  // MOBILE: promotes PWA install (share sheet access)
+  //   - Same trigger logic but different copy
+  //   - "Install" triggers PWA beforeinstallprompt
+  //   - If already installed as PWA, never shows
 
-  const PROMO_KEY = 'boards_promo_bookmarklet';
+  const PROMO_KEY = 'boards_capture_promo';
   const capturePromo = document.getElementById('capturePromo');
   const promoShowTools = document.getElementById('promoShowTools');
   const promoDismiss = document.getElementById('promoDismiss');
+  const promoText = document.getElementById('promoText');
+  const promoSubtext = document.getElementById('promoSubtext');
+  const promoIcon = capturePromo?.querySelector('.capture-promo__icon');
+  const isMobile = window.innerWidth <= 600;
+  const isPwaInstalled = window.matchMedia('(display-mode: standalone)').matches;
 
   function getPromoState() {
     try { return JSON.parse(localStorage.getItem(PROMO_KEY)) || {}; } catch { return {}; }
@@ -12559,34 +12969,60 @@ Return JSON:
   }
 
   function shouldShowPromo() {
-    // Never show on mobile (CSS enforces too, but skip logic entirely)
-    if (window.innerWidth <= 600) return false;
-
     const state = getPromoState();
 
-    // User already found the tools / bookmarklet — done forever
+    // Already set up tools — done forever
     if (state.installed) return false;
 
-    // Arrived via deep link this session — they're already using a capture tool
+    // Arrived via deep link or share target — already using a capture tool
     if (sessionStorage.getItem('boards_arrived_via_deeplink')) return false;
 
-    // Check dismiss history
+    // Mobile: skip if already installed as PWA
+    if (isMobile && isPwaInstalled) return false;
+
+    // Mobile: skip if PWA install isn't available (can't act on the promo)
+    if (isMobile && !deferredInstallPrompt) return false;
+
+    // Escalating dismiss: 7d → 90d → permanent
     if (state.dismissedAt) {
-      const dismissCount = state.dismissCount || 1;
-      const cooldownDays = dismissCount >= 2 ? 30 : 7;
-      const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
-      if (Date.now() - state.dismissedAt < cooldownMs) return false;
+      const count = state.dismissCount || 1;
+      if (count >= 3) return false; // permanent dismiss
+      const cooldownDays = count >= 2 ? 90 : 7;
+      if (Date.now() - state.dismissedAt < cooldownDays * 86400000) return false;
     }
 
-    // Only show after 3+ links have been added
+    // Only show after 3+ links (engaged user)
     const links = getAllLinks();
     if (links.length < 3) return false;
 
     return true;
   }
 
+  function configurePromo() {
+    if (!capturePromo) return;
+    const state = getPromoState();
+    const dismissCount = state.dismissCount || 0;
+    const isReturn = dismissCount > 0;
+
+    if (isMobile) {
+      // Mobile: promote PWA install
+      if (promoIcon) promoIcon.textContent = '📱';
+      if (promoText) promoText.textContent = 'Share links from any app to Boards';
+      if (promoSubtext) promoSubtext.textContent = 'Install the app to your home screen';
+      if (promoShowTools) promoShowTools.textContent = 'Install';
+    } else if (isReturn) {
+      // Desktop return: softer copy
+      if (promoIcon) promoIcon.textContent = '💡';
+      if (promoText) promoText.textContent = 'Still pasting links? There\'s a faster way';
+      if (promoSubtext) promoSubtext.textContent = 'One-click saving from any page';
+      if (promoShowTools) promoShowTools.textContent = 'Show me';
+    }
+    // else: default desktop copy from HTML
+  }
+
   function showPromo() {
     if (!capturePromo || !shouldShowPromo()) return;
+    configurePromo();
     capturePromo.style.display = 'block';
   }
 
@@ -12594,16 +13030,29 @@ Return JSON:
     if (capturePromo) capturePromo.style.display = 'none';
   }
 
-  // "Get it" button → open Tools modal, mark as installed
+  // CTA button
   if (promoShowTools) {
     promoShowTools.onclick = () => {
       hidePromo();
       setPromoState({ installed: true });
-      if (toolsModal) openModal(toolsModal);
+      if (isMobile && deferredInstallPrompt) {
+        // Mobile: trigger PWA install
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(result => {
+          if (result.outcome === 'accepted' && installBtn) {
+            installBtn.textContent = 'Installed ✓';
+            installBtn.disabled = true;
+          }
+          deferredInstallPrompt = null;
+        });
+      } else if (toolsModal) {
+        // Desktop: open Tools modal to bookmarklet tab
+        openModal(toolsModal);
+      }
     };
   }
 
-  // Dismiss button → snooze with escalating cooldown
+  // Dismiss button — escalating cooldown
   if (promoDismiss) {
     promoDismiss.onclick = () => {
       hidePromo();
@@ -12613,7 +13062,7 @@ Return JSON:
     };
   }
 
-  // Mark tools modal opens as "installed" (user found it on their own)
+  // Mark tools modal opens as "set up" (user found it themselves)
   if (fabTools) {
     const origFabToolsClick = fabTools.onclick;
     fabTools.onclick = (e) => {
@@ -12623,13 +13072,11 @@ Return JSON:
     };
   }
 
-  // Hook into link additions — show promo after successful add
-  // We wrap processLinks to check after each batch
+  // Show promo after successful link adds
   const _origProcessLinks = processLinks;
   processLinks = async function(text) {
     await _origProcessLinks(text);
-    // Short delay so the toast clears first
-    setTimeout(showPromo, 2000);
+    setTimeout(showPromo, 2500);
   };
 
   // Also check on page load (returning user with 3+ links)
