@@ -566,6 +566,19 @@
               "source": "ai"
             }
           ]
+        },
+        {
+          "title": "Setup Guides",
+          "icon": "\ud83d\udcd6",
+          "source": "ai",
+          "children": [
+            {
+              "title": "Capture Tools Setup",
+              "icon": "\ud83d\udce5",
+              "file": "docs/setup/capture-tools-setup.md",
+              "source": "ai"
+            }
+          ]
         }
       ]
     },
