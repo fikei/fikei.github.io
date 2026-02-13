@@ -118,7 +118,7 @@ Normal          Hover           Selected        Loading
 | **AI Categorization** | ✅ Shipped | Rules-based + AI hybrid classification | [AI Categorization](./ai-categorization.md) |
 | **Multi-Format Content** | ⚠️ Partial | Links + photos + videos; notes/files planned | [Multi-Format](./multi-format.md) |
 | **Flexible Tagging** | ⚠️ Partial | Categories + sub-tags; freeform tags planned | [Tagging](./tagging.md) |
-| **Mobile Capture** | ⚠️ Partial | Responsive + clipboard; Share Target planned | [Mobile Capture](./mobile-capture.md) |
+| **Mobile Capture** | ✅ Shipped | Quick-add bar, PWA share target, image scanning, bookmarklet, deep links | [Mobile Capture](./mobile-capture.md) |
 | **Link Management** | ✅ Shipped | Editing, deleting, organizing pins | [Link Management](./link-management.md) |
 
 ---
