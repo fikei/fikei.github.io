@@ -2644,6 +2644,30 @@ body {
     return { title, venue, city };
   }
 
+  // Strip venue name prefix/suffix from event title (e.g., "Roxie - Film Name" -> "Film Name")
+  function stripVenueFromTitle(name, venue) {
+    if (!name || !venue) return name;
+    const vLower = venue.toLowerCase().trim();
+    const nLower = name.toLowerCase();
+    // "Venue - Event" or "Venue: Event" or "Venue | Event"
+    const prefixPatterns = [' - ', ': ', ' | ', ' — ', ' – '];
+    for (const sep of prefixPatterns) {
+      const prefix = vLower + sep;
+      if (nLower.startsWith(prefix)) return name.substring(prefix.length).trim();
+      // Also check short venue name (first word)
+      const shortVenue = vLower.split(/\s+/)[0];
+      if (shortVenue.length >= 4 && nLower.startsWith(shortVenue + sep)) {
+        return name.substring(shortVenue.length + sep.length).trim();
+      }
+    }
+    // "Event - Venue" or "Event @ Venue" suffix
+    for (const sep of prefixPatterns) {
+      const suffix = sep + vLower;
+      if (nLower.endsWith(suffix)) return name.substring(0, name.length - suffix.length).trim();
+    }
+    return name;
+  }
+
   // --- iCal Parser ---
   async function fetchIcal(source) {
     const text = await proxyFetch(source.url);
@@ -2912,9 +2936,10 @@ body {
       const sourceName = sourceIds.map(sid => state.sources.find(s => s.id === sid)?.name || sid).join(' + ');
       const sourceColor = getSourceColor(sourceIds[0]);
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
+      const displayName = stripVenueFromTitle(ev.name, ev.venue);
       const nameCell = ev.url && ev.url !== '#'
-        ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener"${titleAttr}>${escHtml(ev.name)}</a>`
-        : `<span${titleAttr}>${escHtml(ev.name)}</span>`;
+        ? `<a href="${escHtml(ev.url)}" class="event-link" target="_blank" rel="noopener"${titleAttr}>${escHtml(displayName)}</a>`
+        : `<span${titleAttr}>${escHtml(displayName)}</span>`;
       // Date (no time) and Time (separate)
       const dateDisplay = formatDate(ev.date);
       const timeDisplay = ev.time ? escHtml(ev.time) : '';
