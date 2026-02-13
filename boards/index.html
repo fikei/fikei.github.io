@@ -11818,6 +11818,13 @@ Return JSON:
       document.documentElement.classList.add('light');
     }
 
+    // Register service worker for PWA + share target
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/boards/sw.js').catch(err => {
+        console.log('[sw] Registration failed:', err);
+      });
+    }
+
     // Check if user is logged in (quick check before full session validation)
     const quickSession = getStoredSession();
 

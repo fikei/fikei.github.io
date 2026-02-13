@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saving to Boards...</title>
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: "Space Grotesk", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .saving {
+      text-align: center;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body>
+  <div class="saving">Saving to Boards...</div>
+  <script>
+    // Extract shared data from query params
+    const params = new URLSearchParams(window.location.search);
+    const sharedUrl = params.get('url') || '';
+    const sharedText = params.get('text') || '';
+    const sharedTitle = params.get('title') || '';
+
+    // Try to find a URL in the shared data
+    // Priority: url param > URLs in text > text itself
+    let targetUrl = sharedUrl;
+
+    if (!targetUrl && sharedText) {
+      // Extract URL from shared text (common on Android where URL is in text field)
+      const urlMatch = sharedText.match(/https?:\/\/[^\s]+/);
+      if (urlMatch) {
+        targetUrl = urlMatch[0];
+      } else {
+        targetUrl = sharedText;
+      }
+    }
+
+    if (targetUrl) {
+      // Redirect to main Boards app with the URL to add
+      window.location.replace('/boards/?add=' + encodeURIComponent(targetUrl));
+    } else {
+      // No URL found — redirect to Boards anyway
+      document.querySelector('.saving').textContent = 'No link found. Opening Boards...';
+      setTimeout(() => window.location.replace('/boards/'), 1500);
+    }
+  </script>
+</body>
+</html>
