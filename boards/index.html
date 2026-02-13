@@ -2216,6 +2216,96 @@ body {
 }
 
 /* ============================================
+   Tools Modal
+   ============================================ */
+.tools-list {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tools-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tools-list__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+}
+
+.tools-list__desc {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.tools-list__bookmarklet {
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  text-decoration: none;
+  cursor: grab;
+  text-align: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tools-list__bookmarklet:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.tools-list__url {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+}
+
+.tools-list__url:focus {
+  border-color: var(--fg);
+  outline: none;
+}
+
+.tools-list__btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tools-list__btn:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.tools-list__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ============================================
    Overlay (Detail View)
    ============================================ */
 .overlay {
@@ -3456,6 +3546,10 @@ body {
             <span class="fab-menu__item-icon">▶</span>
             Video
           </button>
+          <button class="fab-menu__item" id="fabTools">
+            <span class="fab-menu__item-icon">⚙</span>
+            Tools
+          </button>
         </div>
         <button class="fab-menu__trigger" id="fabTrigger" aria-label="Add content">+</button>
       </div>
@@ -3678,6 +3772,34 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           <button class="theme-toggle" id="themeToggle">
             <div class="theme-toggle__knob"></div>
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tools Modal -->
+  <div class="modal modal--small" id="toolsModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Capture Tools</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="tools-list">
+        <div class="tools-list__item">
+          <div class="tools-list__label">Bookmarklet</div>
+          <div class="tools-list__desc">Drag to your bookmarks bar for one-click saving</div>
+          <a class="tools-list__bookmarklet" id="bookmarkletLink" href="javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))" onclick="event.preventDefault(); toast('Drag this to your bookmarks bar!');">+ Save to Boards</a>
+        </div>
+        <div class="tools-list__item">
+          <div class="tools-list__label">Share Link</div>
+          <div class="tools-list__desc">Send any URL to Boards via link</div>
+          <input class="tools-list__url" id="toolsShareUrl" value="https://ctrl.rodeo/boards/?add=" readonly onclick="this.select();">
+        </div>
+        <div class="tools-list__item">
+          <div class="tools-list__label">Install App</div>
+          <div class="tools-list__desc">Add Boards to your home screen for share sheet access</div>
+          <button class="tools-list__btn" id="installPwaBtn">Install</button>
         </div>
       </div>
     </div>
@@ -9424,6 +9546,55 @@ Return JSON:
     fabMenu.classList.remove('fab-menu--open');
     videoInput.click();
   };
+
+  // Tools button in FAB menu
+  const fabTools = document.getElementById('fabTools');
+  const toolsModal = document.getElementById('toolsModal');
+
+  if (fabTools && toolsModal) {
+    fabTools.onclick = () => {
+      fabMenu.classList.remove('fab-menu--open');
+      openModal(toolsModal);
+    };
+
+    // Close handlers for tools modal
+    toolsModal.querySelectorAll('[data-close]').forEach(el => {
+      el.onclick = () => closeModal(toolsModal);
+    });
+  }
+
+  // PWA Install prompt
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('installPwaBtn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (installBtn) installBtn.disabled = false;
+  });
+
+  if (installBtn) {
+    // Disable by default (enabled when beforeinstallprompt fires)
+    installBtn.disabled = true;
+    installBtn.textContent = 'Not available';
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      installBtn.textContent = 'Installed';
+      installBtn.disabled = true;
+    }
+
+    installBtn.onclick = async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const result = await deferredInstallPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        installBtn.textContent = 'Installed';
+        installBtn.disabled = true;
+      }
+      deferredInstallPrompt = null;
+    };
+  }
 
   // Photo upload handler
   photoInput.onchange = async (e) => {
