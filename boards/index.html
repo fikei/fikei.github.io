@@ -6898,6 +6898,7 @@ Return JSON:
     const link = data.links.find(l => l.id === linkId);
     if (!link) return;
     const music = link.music || {};
+    console.log('[player] openPlayer:', { linkId, domain: link.domain, platformId: music.platformId, embedUrl: music.embedUrl, url: link.url });
     let embedUrl = music.embedUrl;
     let embedType = music.embedType || 'iframe';
     let embedHeight = music.embedHeight || 80;
@@ -6905,6 +6906,7 @@ Return JSON:
     if (!embedUrl) {
       const domain = link.domain || '';
       const result = generateEmbedUrl(link.url, music.platformId, domain);
+      console.log('[player] generateEmbedUrl result:', result);
       if (result) {
         embedUrl = result.embedUrl;
         embedType = result.embedType;
@@ -6929,6 +6931,7 @@ Return JSON:
       embedType: embedType,
       embedHeight: embedHeight
     };
+    console.log('[player] currentPlayer:', { embedUrl: currentPlayer.embedUrl, platform: currentPlayer.platform, artist: currentPlayer.artist, track: currentPlayer.track });
     renderPlayer();
   }
 
@@ -7876,9 +7879,14 @@ Return JSON:
 
   function generateEmbedUrl(url, platformId, domain) {
     try {
-      if (domain.includes('spotify.com') && platformId) {
-        const p = platformId.split(':');
-        if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2], embedType: 'iframe', embedHeight: 80 };
+      if (domain.includes('spotify.com')) {
+        if (platformId) {
+          const p = platformId.split(':');
+          if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2], embedType: 'iframe', embedHeight: 80 };
+        }
+        // Fallback: parse embed URL directly from the Spotify URL
+        const sm = url.match(/open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
+        if (sm) return { embedUrl: 'https://open.spotify.com/embed/' + sm[1] + '/' + sm[2], embedType: 'iframe', embedHeight: 80 };
       }
       if (domain.includes('soundcloud.com')) {
         return { embedUrl: 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) + '&auto_play=false&hide_related=true&show_comments=false&visual=false', embedType: 'iframe', embedHeight: 166 };
