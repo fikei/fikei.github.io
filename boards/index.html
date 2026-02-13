@@ -1751,6 +1751,235 @@ body {
 }
 
 /* ============================================
+   Listen Player
+   ============================================ */
+.listen-player {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: var(--bg);
+  border-top: 0px solid var(--fg);
+  z-index: 1000;
+  overflow: hidden;
+  transition: height 0.2s ease, border-top 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+.listen-player--active {
+  height: 80px;
+  border-top: 2px solid var(--fg);
+}
+.listen-player--tall {
+  height: 166px;
+}
+.listen-player__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  height: 32px;
+  flex-shrink: 0;
+}
+.listen-player__art {
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.listen-player__art--placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.listen-player__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.listen-player__artist {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.listen-player__track {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.listen-player__close {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--fg);
+  background: transparent;
+  color: var(--fg);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.listen-player__close:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+.listen-player__embed {
+  flex: 1;
+  width: 100%;
+  border: none;
+}
+.listen-player__fallback {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.listen-player__fallback-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 16px;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.listen-player__fallback-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+.listen-player__fallback-btn--spotify:hover { background: #1DB954; border-color: #1DB954; }
+.listen-player__fallback-btn--soundcloud:hover { background: #FF5500; border-color: #FF5500; }
+.listen-player__fallback-btn--apple-music:hover { background: #FA243C; border-color: #FA243C; }
+.listen-player__fallback-btn--youtube-music:hover { background: #FF0000; border-color: #FF0000; }
+.listen-player__fallback-btn--bandcamp:hover { background: #629AA9; border-color: #629AA9; }
+.grid--player-active {
+  padding-bottom: 90px;
+}
+
+/* Extended Listen Row Metadata */
+.listen-row__meta--extended {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.listen-row__meta-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.listen-row__meta-secondary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.listen-row:hover .listen-row__meta-secondary {
+  opacity: 1;
+}
+.listen-row__explicit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  background: var(--fg);
+  color: var(--bg);
+  width: 12px;
+  height: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.listen-row__album,
+.listen-row__genre,
+.listen-row__year,
+.listen-row__bpm,
+.listen-row__key,
+.listen-row__label {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+/* Play Button Overlay on Album Art */
+.listen-row__art-wrapper {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.listen-row__art-wrapper .listen-row__art,
+.listen-row__art-wrapper .listen-row__art--placeholder {
+  width: 40px;
+  height: 40px;
+}
+.listen-row__play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--fg);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  z-index: 2;
+}
+.listen-row:hover .listen-row__play-btn {
+  opacity: 0.9;
+}
+.listen-row--playing .listen-row__play-btn {
+  opacity: 1;
+}
+.listen-row--playing {
+  background: var(--subtle);
+}
+
+@media (max-width: 768px) {
+  .listen-player--active { height: 60px; }
+  .listen-player--tall { height: 140px; }
+  .listen-player__close { width: 32px; height: 32px; font-size: 18px; }
+  .listen-row__meta-secondary { opacity: 1; }
+  .grid--player-active { padding-bottom: 70px; }
+}
+
+/* ============================================
    Empty State
    ============================================ */
 .empty-state {
@@ -3098,6 +3327,8 @@ body {
   <section class="widget-section widget-zone widget-zone--footer" id="widgetFooter" data-zone="footer">
     <div class="widget-section__content" id="widgetFooterContent"></div>
   </section>
+
+  <div class="listen-player" id="listenPlayer"></div>
 
   <!-- Bottom Navigation -->
   <nav class="bottom-nav" id="bottomNav">
@@ -6657,6 +6888,100 @@ Return JSON:
   }
 
   // ============================================
+  // Listen Player
+  // ============================================
+  let currentPlayer = { linkId: null, embedUrl: null, platform: null, artist: null, track: null, albumArt: null, url: null };
+
+  function openPlayer(linkId) {
+    if (currentPlayer.linkId === linkId) { closePlayer(); return; }
+    const links = load();
+    const link = links.find(l => l.id === linkId);
+    if (!link) return;
+    const music = link.music || {};
+    let embedUrl = music.embedUrl;
+    let embedType = music.embedType || 'iframe';
+    let embedHeight = music.embedHeight || 80;
+    // Lazy backfill: generate embed URL if missing
+    if (!embedUrl) {
+      const domain = link.domain || '';
+      const result = generateEmbedUrl(link.url, music.platformId, domain);
+      if (result) {
+        embedUrl = result.embedUrl;
+        embedType = result.embedType;
+        embedHeight = result.embedHeight;
+        // Persist to localStorage
+        if (!link.music) link.music = {};
+        link.music.embedUrl = embedUrl;
+        link.music.embedType = embedType;
+        link.music.embedHeight = embedHeight;
+        save(links);
+      }
+    }
+    const platform = getMusicPlatform(link.domain) || '';
+    currentPlayer = {
+      linkId: linkId,
+      embedUrl: embedUrl || null,
+      platform: platform,
+      artist: music.artist || link.domain || '',
+      track: music.trackTitle || link.title || '',
+      albumArt: link.image || null,
+      url: link.url,
+      embedType: embedType,
+      embedHeight: embedHeight
+    };
+    renderPlayer();
+  }
+
+  function closePlayer() {
+    currentPlayer = { linkId: null, embedUrl: null, platform: null, artist: null, track: null, albumArt: null, url: null };
+    renderPlayer();
+  }
+
+  function renderPlayer() {
+    const el = document.getElementById('listenPlayer');
+    if (!el) return;
+    // Update playing state on rows
+    document.querySelectorAll('.listen-row--playing').forEach(r => r.classList.remove('listen-row--playing'));
+    if (!currentPlayer.linkId) {
+      el.className = 'listen-player';
+      el.innerHTML = '';
+      document.querySelector('.grid')?.classList.remove('grid--player-active');
+      return;
+    }
+    const playingRow = document.querySelector('.listen-row[data-id="' + currentPlayer.linkId + '"]');
+    if (playingRow) playingRow.classList.add('listen-row--playing');
+    const isTall = currentPlayer.embedHeight > 100;
+    el.className = 'listen-player listen-player--active' + (isTall ? ' listen-player--tall' : '');
+    document.querySelector('.grid')?.classList.add('grid--player-active');
+    const artHtml = currentPlayer.albumArt
+      ? '<img class="listen-player__art" src="' + esc(secureImg(currentPlayer.albumArt)) + '" alt="">'
+      : '<div class="listen-player__art listen-player__art--placeholder">' + esc(currentPlayer.artist.charAt(0).toUpperCase()) + '</div>';
+    if (currentPlayer.embedUrl) {
+      el.innerHTML = '<div class="listen-player__header">' +
+        artHtml +
+        '<div class="listen-player__info">' +
+          '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' +
+          '<span class="listen-player__track">' + esc(currentPlayer.track) + '</span>' +
+        '</div>' +
+        '<button class="listen-player__close" onclick="closePlayer()">&times;</button>' +
+      '</div>' +
+      '<iframe class="listen-player__embed" src="' + esc(currentPlayer.embedUrl) + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>';
+    } else {
+      el.innerHTML = '<div class="listen-player__header">' +
+        artHtml +
+        '<div class="listen-player__info">' +
+          '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' +
+          '<span class="listen-player__track">' + esc(currentPlayer.track) + '</span>' +
+        '</div>' +
+        '<button class="listen-player__close" onclick="closePlayer()">&times;</button>' +
+      '</div>' +
+      '<div class="listen-player__fallback">' +
+        '<a class="listen-player__fallback-btn listen-player__fallback-btn--' + esc(currentPlayer.platform) + '" href="' + esc(currentPlayer.url) + '" target="_blank" rel="noopener">Play on ' + esc(cap(currentPlayer.platform || 'Web')) + '</a>' +
+      '</div>';
+    }
+  }
+
+  // ============================================
   // Music Metadata Extraction
   // ============================================
   // Extracts structured music metadata from platform oEmbed APIs.
@@ -6677,7 +7002,10 @@ Return JSON:
       platformId: null,
       isExplicit: null,
       key: null,            // musical key (e.g. "Cm", "F#")
-      label: null
+      label: null,
+      embedUrl: null,
+      embedType: null,
+      embedHeight: null
     };
 
     try {
@@ -6721,6 +7049,7 @@ Return JSON:
         if (d) {
           meta.artist = meta.artist || (d.provider_name === 'Spotify' ? (d.author_name || null) : null);
           meta.trackTitle = meta.trackTitle || d.title || null;
+          if (d.html) { const m = d.html.match(/src=["']([^"']+)["']/); if (m) { meta.embedUrl = m[1]; meta.embedType = 'iframe'; meta.embedHeight = d.height || 152; } }
         }
       }
 
@@ -6732,6 +7061,7 @@ Return JSON:
         if (d) {
           meta.artist = meta.artist || d.author_name || null;
           meta.trackTitle = meta.trackTitle || d.title || null;
+          if (d.html) { const m = d.html.match(/src=["']([^"']+)["']/); if (m) { meta.embedUrl = m[1]; meta.embedType = 'iframe'; meta.embedHeight = d.height || 166; } }
         }
       }
 
@@ -6773,6 +7103,12 @@ Return JSON:
           meta.trackTitle = meta.trackTitle || bySplit[1].trim();
           meta.artist = meta.artist || bySplit[2].trim();
         }
+      }
+
+      // Fallback: generate embed URL if oEmbed didn't provide one
+      if (!meta.embedUrl) {
+        const embedResult = generateEmbedUrl(url, meta.platformId, domain);
+        if (embedResult) { meta.embedUrl = embedResult.embedUrl; meta.embedType = embedResult.embedType; meta.embedHeight = embedResult.embedHeight; }
       }
 
       // Detect explicit from title
@@ -7536,6 +7872,29 @@ Return JSON:
     }
 
     return meta;
+  }
+
+  function generateEmbedUrl(url, platformId, domain) {
+    try {
+      if (domain.includes('spotify.com') && platformId) {
+        const p = platformId.split(':');
+        if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2], embedType: 'iframe', embedHeight: 80 };
+      }
+      if (domain.includes('soundcloud.com')) {
+        return { embedUrl: 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) + '&auto_play=false&hide_related=true&show_comments=false&visual=false', embedType: 'iframe', embedHeight: 166 };
+      }
+      if (domain.includes('music.apple.com')) {
+        const m = url.match(/music\.apple\.com\/(\w+)\/(album|playlist|artist|station)\/[^\/]+\/(\d+)/);
+        if (m) return { embedUrl: 'https://embed.music.apple.com/' + m[1] + '/' + m[2] + '/' + m[3], embedType: 'iframe', embedHeight: 150 };
+      }
+      if (domain.includes('music.youtube.com')) {
+        const vid = url.match(/[?&]v=([^&]+)/);
+        const list = url.match(/[?&]list=([^&]+)/);
+        if (vid) return { embedUrl: 'https://www.youtube.com/embed/' + vid[1], embedType: 'iframe', embedHeight: 200 };
+        if (list) return { embedUrl: 'https://www.youtube.com/embed/videoseries?list=' + list[1], embedType: 'iframe', embedHeight: 200 };
+      }
+      return null;
+    } catch(e) { return null; }
   }
 
   function decodeEntities(text) {
@@ -8801,18 +9160,36 @@ Return JSON:
         const artHtml = hasImg
           ? `<img class="listen-row__art" src="${secureImg(l.image)}" alt="" loading="lazy">`
           : `<div class="listen-row__art listen-row__art--placeholder">${initial}</div>`;
+        const isPlaying = currentPlayer.linkId === l.id;
+        const explicitBadge = music?.isExplicit ? '<span class="listen-row__explicit">E</span>' : '';
+        const albumMeta = music?.albumTitle ? `<span class="listen-row__album">${esc(music.albumTitle)}</span>` : '';
+        const genreMeta = music?.genre ? `<span class="listen-row__genre">${esc(music.genre)}</span>` : '';
+        const yearMeta = music?.releaseDate ? `<span class="listen-row__year">${esc(music.releaseDate.substring(0,4))}</span>` : '';
+        const bpmMeta = music?.bpm ? `<span class="listen-row__bpm">${music.bpm} BPM</span>` : '';
+        const keyMeta = music?.key ? `<span class="listen-row__key">${esc(music.key)}</span>` : '';
+        const labelMeta = music?.label ? `<span class="listen-row__label">${esc(music.label)}</span>` : '';
+        const hasSecondary = music?.albumTitle || music?.genre || music?.releaseDate || music?.bpm || music?.key || music?.label;
 
-        html += `<a class="listen-row" href="${l.url}" target="_blank" rel="noopener" data-id="${l.id}">
-          ${artHtml}
+        html += `<div class="listen-row${isPlaying ? ' listen-row--playing' : ''}" data-id="${l.id}">
+          <div class="listen-row__art-wrapper">
+            ${artHtml}
+            <button class="listen-row__play-btn" aria-label="Play">${isPlaying ? '&#9646;&#9646;' : '&#9654;'}</button>
+          </div>
           <div class="listen-row__info">
             <span class="listen-row__artist">${platformDot} ${esc(artistName)}</span>
             <span class="listen-row__track">${esc(trackName)}</span>
           </div>
-          <div class="listen-row__meta">
-            ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}
-            ${dur ? `<span class="listen-row__duration">${dur}</span>` : ''}
+          <div class="listen-row__meta listen-row__meta--extended">
+            <div class="listen-row__meta-primary">
+              ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}
+              ${dur ? `<span class="listen-row__duration">${dur}</span>` : ''}
+              ${explicitBadge}
+            </div>
+            ${hasSecondary ? `<div class="listen-row__meta-secondary">
+              ${albumMeta}${genreMeta}${yearMeta}${bpmMeta}${keyMeta}${labelMeta}
+            </div>` : ''}
           </div>
-        </a>`;
+        </div>`;
         continue;
       }
 
@@ -9172,6 +9549,7 @@ Return JSON:
     if (t) {
       currentFilter = t.dataset.category;
       currentSubTag = null; // Reset sub-tag when changing category
+      if (currentPlayer.linkId && currentFilter !== 'listen') closePlayer();
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
       renderGrid();
@@ -9200,6 +9578,7 @@ Return JSON:
       const btn = e.target.closest('.listen-view-toggle__btn');
       if (btn) {
         listenView = btn.dataset.view;
+        if (listenView !== 'list' && currentPlayer.linkId) closePlayer();
         localStorage.setItem(LISTEN_VIEW_KEY, listenView);
         listenViewToggle.querySelectorAll('.listen-view-toggle__btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -9223,7 +9602,16 @@ Return JSON:
     }
   });
 
+  // Escape key closes player
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && currentPlayer.linkId) closePlayer();
+  });
+
   grid.onclick = async (e) => {
+    // Handle listen row click → open player
+    const lr = e.target.closest('.listen-row');
+    if (lr) { e.preventDefault(); const id = lr.dataset.id; if (id) openPlayer(id); return; }
+
     // Handle action buttons in expanded card
     const action = e.target.closest('[data-action]');
     if (action) {
