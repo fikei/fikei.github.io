@@ -375,3 +375,14 @@ Design system analyzer and documentation generator.
 | SPA/JavaScript rendering support | Pending |
 | CSS-in-JS token extraction | Pending |
 | Multi-page crawl depth optimization | Pending |
+
+---
+
+## Listen: Unified Player
+
+| Story | Status |
+|-------|--------|
+| **Replace platform-specific iframe embeds with a single custom audio player** — Consistent UI regardless of source platform | Pending |
+| **Support full track playback across Spotify, SoundCloud, Apple Music, YouTube Music, Bandcamp** — All major music platforms | Pending |
+| **Investigate platform APIs/SDKs for playback** — Spotify Web Playback SDK, SoundCloud Widget API, etc. | Pending |
+| **Related PRs** — #35, #36, #38, #40, #41 | Reference |

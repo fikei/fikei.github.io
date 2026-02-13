@@ -1704,21 +1704,21 @@ body {
   min-width: 0;
 }
 
-.listen-row__artist {
+.listen-row__track {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.listen-row__track {
+.listen-row__artist {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1923,11 +1923,16 @@ body {
   line-height: 1;
   letter-spacing: 0;
 }
+.listen-row__bpm,
+.listen-row__key {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--fg);
+  opacity: 0.7;
+}
 .listen-row__album,
 .listen-row__genre,
 .listen-row__year,
-.listen-row__bpm,
-.listen-row__key,
 .listen-row__label {
   font-size: 8px;
   font-family: var(--font-mono);
@@ -9173,7 +9178,7 @@ Return JSON:
         const bpmMeta = music?.bpm ? `<span class="listen-row__bpm">${music.bpm} BPM</span>` : '';
         const keyMeta = music?.key ? `<span class="listen-row__key">${esc(music.key)}</span>` : '';
         const labelMeta = music?.label ? `<span class="listen-row__label">${esc(music.label)}</span>` : '';
-        const hasSecondary = music?.albumTitle || music?.genre || music?.releaseDate || music?.bpm || music?.key || music?.label;
+        const hasSecondary = fmt || music?.isExplicit || music?.albumTitle || music?.genre || music?.releaseDate || music?.label;
 
         html += `<div class="listen-row${isPlaying ? ' listen-row--playing' : ''}" data-id="${l.id}">
           <div class="listen-row__art-wrapper">
@@ -9181,17 +9186,16 @@ Return JSON:
             <button class="listen-row__play-btn" aria-label="Play">${isPlaying ? '&#9646;&#9646;' : '&#9654;'}</button>
           </div>
           <div class="listen-row__info">
-            <span class="listen-row__artist">${platformDot} ${esc(artistName)}</span>
             <span class="listen-row__track">${esc(trackName)}</span>
+            <span class="listen-row__artist">${platformDot} ${esc(artistName)}</span>
           </div>
           <div class="listen-row__meta listen-row__meta--extended">
             <div class="listen-row__meta-primary">
-              ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}
+              ${bpmMeta}${keyMeta}
               ${dur ? `<span class="listen-row__duration">${dur}</span>` : ''}
-              ${explicitBadge}
             </div>
             ${hasSecondary ? `<div class="listen-row__meta-secondary">
-              ${albumMeta}${genreMeta}${yearMeta}${bpmMeta}${keyMeta}${labelMeta}
+              ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}${explicitBadge}${albumMeta}${genreMeta}${yearMeta}${labelMeta}
             </div>` : ''}
           </div>
         </div>`;
