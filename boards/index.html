@@ -2216,6 +2216,143 @@ body {
 }
 
 /* ============================================
+   Scan Results Modal
+   ============================================ */
+.scan-results {
+  padding: var(--space-4);
+}
+
+.scan-results__loading {
+  text-align: center;
+  padding: var(--space-6);
+}
+
+.scan-results__spinner {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.scan-results__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.scan-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.scan-result-item:hover {
+  border-color: var(--fg);
+}
+
+.scan-result-item--selected {
+  border-color: var(--fg);
+  background: var(--surface);
+}
+
+.scan-result-item__check {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--fg);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.scan-result-item--selected .scan-result-item__check {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.scan-result-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scan-result-item__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.scan-result-item__desc {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
+
+.scan-result-item__url {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.scan-result-item__category {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--subtle);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.scan-results__actions {
+  margin-top: var(--space-4);
+  display: flex;
+  gap: var(--space-2);
+}
+
+.scan-results__add-all {
+  flex: 1;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.scan-results__add-all:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.scan-results__add-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
    Tools Modal
    ============================================ */
 .tools-list {
@@ -3575,6 +3712,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <div class="add-form__status" id="formStatus"></div>
         <button type="submit" class="add-form__submit">Add</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Scan Results Modal -->
+  <div class="modal" id="scanModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Scan Results</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="scan-results" id="scanResults">
+        <div class="scan-results__loading" id="scanLoading">
+          <div class="scan-results__spinner">Analyzing image...</div>
+        </div>
+        <div class="scan-results__list" id="scanList"></div>
+        <div class="scan-results__actions" id="scanActions" style="display:none;">
+          <button class="scan-results__add-all" id="scanAddAll">Add All Links</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -9051,10 +9208,20 @@ Return JSON:
   const fabTrigger = $('fabTrigger');
   const fabShareLink = $('fabShareLink');
   const fabPhotoUpload = $('fabPhotoUpload');
+  const fabScanImage = $('fabScanImage');
   const fabVideoUpload = $('fabVideoUpload');
   const photoInput = $('photoInput');
+  const scanInput = $('scanInput');
   const videoInput = $('videoInput');
   const bottomThemeToggle = $('bottomThemeToggle');
+
+  // Scan Modal DOM
+  const scanModal = $('scanModal');
+  const scanResults = $('scanResults');
+  const scanLoading = $('scanLoading');
+  const scanList = $('scanList');
+  const scanActions = $('scanActions');
+  const scanAddAll = $('scanAddAll');
 
   // Progress DOM
   const progressBar = $('progressBar');
@@ -9542,6 +9709,11 @@ Return JSON:
     photoInput.click();
   };
 
+  fabScanImage.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    scanInput.click();
+  };
+
   fabVideoUpload.onclick = () => {
     fabMenu.classList.remove('fab-menu--open');
     videoInput.click();
@@ -9679,6 +9851,141 @@ Return JSON:
     videoInput.value = '';
     toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
   };
+
+  // ============================================
+  // Image Scan Feature
+  // ============================================
+  let scanSelectedItems = new Set();
+
+  if (fabScanImage && scanInput) {
+    scanInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Show modal with loading state
+      scanLoading.style.display = '';
+      scanList.innerHTML = '';
+      scanActions.style.display = 'none';
+      scanSelectedItems.clear();
+      openModal(scanModal);
+
+      try {
+        // Convert to base64
+        const base64 = await fileToBase64(file);
+        const mimeType = file.type || 'image/jpeg';
+
+        // Call scan-image edge function
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/scan-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ image: base64, mimeType })
+        });
+
+        if (!res.ok) throw new Error('Scan failed');
+
+        const data = await res.json();
+        const items = data.items || [];
+
+        scanLoading.style.display = 'none';
+
+        if (items.length === 0) {
+          scanList.innerHTML = '<div style="text-align:center;padding:var(--space-6);font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);">No items found in image</div>';
+          return;
+        }
+
+        // Render results
+        items.forEach((item, i) => {
+          const el = document.createElement('div');
+          el.className = 'scan-result-item scan-result-item--selected';
+          scanSelectedItems.add(i);
+
+          el.innerHTML = `
+            <div class="scan-result-item__check">✓</div>
+            <div class="scan-result-item__info">
+              <div class="scan-result-item__title">${esc(item.title)}</div>
+              <div class="scan-result-item__desc">${esc(item.description)}</div>
+              ${item.url ? `<div class="scan-result-item__url">${esc(item.url)}</div>` : ''}
+            </div>
+            <div class="scan-result-item__category">${esc(item.category)}</div>
+          `;
+
+          el.onclick = () => {
+            if (scanSelectedItems.has(i)) {
+              scanSelectedItems.delete(i);
+              el.classList.remove('scan-result-item--selected');
+            } else {
+              scanSelectedItems.add(i);
+              el.classList.add('scan-result-item--selected');
+            }
+            updateScanAddButton(items);
+          };
+
+          scanList.appendChild(el);
+        });
+
+        // Show add button
+        scanActions.style.display = '';
+        updateScanAddButton(items);
+
+        // Store items for add handler
+        scanModal._items = items;
+
+      } catch (err) {
+        console.error('[scan] Error:', err);
+        scanLoading.style.display = 'none';
+        scanList.innerHTML = '<div style="text-align:center;padding:var(--space-6);font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);">Failed to analyze image. Try again.</div>';
+      }
+
+      scanInput.value = '';
+    };
+  }
+
+  function updateScanAddButton(items) {
+    const count = scanSelectedItems.size;
+    const hasUrls = [...scanSelectedItems].some(i => items[i]?.url);
+    scanAddAll.textContent = count === 0 ? 'Select items' : `Add ${count} item${count > 1 ? 's' : ''}`;
+    scanAddAll.disabled = count === 0 || !hasUrls;
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // Remove data:image/...;base64, prefix
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (scanAddAll) {
+    scanAddAll.onclick = () => {
+      const items = scanModal._items || [];
+      const selected = [...scanSelectedItems].map(i => items[i]).filter(item => item?.url);
+
+      if (selected.length === 0) {
+        toast('No items with URLs selected', true);
+        return;
+      }
+
+      // Process all selected URLs
+      const urlText = selected.map(item => item.url).join('\n');
+      closeModal(scanModal);
+      processLinks(urlText);
+    };
+  }
+
+  // Close handlers for scan modal
+  if (scanModal) {
+    scanModal.querySelectorAll('[data-close]').forEach(el => {
+      el.onclick = () => closeModal(scanModal);
+    });
+  }
 
   // Bottom theme toggle
   bottomThemeToggle.onclick = () => {
@@ -10629,7 +10936,7 @@ Return JSON:
   // ============================================
   function openModal(m) { m.classList.add('modal--visible', 'overlay--visible'); }
   function closeModal(m) { m.classList.remove('modal--visible', 'overlay--visible'); }
-  function closeAll() { [addModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
+  function closeAll() { [addModal, scanModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
