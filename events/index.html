@@ -138,7 +138,8 @@ body {
 .data-table-wrap { margin-bottom: var(--space-8); }
 .data-table th { font-size: var(--text-2xs); }
 .data-table .col-date { width: 80px; white-space: nowrap; }
-.data-table .col-time { width: 44px; white-space: nowrap; font-size: var(--text-2xs); color: var(--fg-muted); }
+.data-table .col-time { width: 44px; max-width: 52px; white-space: nowrap; font-size: var(--text-2xs); color: var(--fg-muted); padding-left: 4px; padding-right: 2px; }
+.data-table .col-time .data-table__sort { display: none; }
 .data-table .col-name { min-width: 180px; }
 .data-table .col-venue { min-width: 120px; }
 .data-table .col-city { min-width: 80px; white-space: nowrap; }
