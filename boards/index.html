@@ -7056,6 +7056,22 @@ Return JSON:
           meta.trackTitle = meta.trackTitle || d.title || null;
           if (d.html) { const m = d.html.match(/src=["']([^"']+)["']/); if (m) { meta.embedUrl = m[1]; meta.embedType = 'iframe'; meta.embedHeight = d.height || 152; } }
         }
+        // Spotify title: "Track - song and lyrics by Artist | Spotify"
+        if (!meta.artist && title) {
+          const spTitle = title.match(/^(.+?)\s*-\s*(?:song and lyrics by|Song by|Album by)\s+(.+?)\s*\|/i);
+          if (spTitle) {
+            meta.trackTitle = meta.trackTitle || spTitle[1].trim();
+            meta.artist = spTitle[2].trim();
+          }
+        }
+        // Spotify description: "Listen to Track on Spotify. Type · Artist · Year"
+        if (!meta.artist && description) {
+          const spDesc = description.match(/(?:Song|Album|Playlist|EP)\s*[·]\s*(.+?)\s*[·]\s*(\d{4})/i);
+          if (spDesc) {
+            meta.artist = spDesc[1].trim();
+            meta.releaseDate = meta.releaseDate || spDesc[2];
+          }
+        }
       }
 
       // SoundCloud
@@ -7098,15 +7114,21 @@ Return JSON:
 
       // ── Step 4: Fallback parsing from page title ──
       if (!meta.artist && title) {
-        // Common patterns: "Artist - Track" or "Track by Artist" or "Track | Artist"
-        const dashSplit = title.match(/^(.+?)\s*[-–—]\s*(.+?)(?:\s*\|.*)?$/);
-        const bySplit = title.match(/^(.+?)\s+by\s+(.+?)(?:\s*\|.*)?$/i);
+        // Strip common platform suffixes: "| Spotify", "| SoundCloud", "| Bandcamp", etc.
+        const cleanTitle = title.replace(/\s*\|\s*(?:Spotify|SoundCloud|Bandcamp|Apple Music|YouTube Music|Tidal|Deezer)\s*$/i, '').trim();
+        // Common patterns: "Artist - Track" or "Track by Artist" or "Track · Artist"
+        const dashSplit = cleanTitle.match(/^(.+?)\s*[-–—]\s*(.+)$/);
+        const bySplit = cleanTitle.match(/^(.+?)\s+by\s+(.+)$/i);
+        const dotSplit = cleanTitle.match(/^(.+?)\s*[·]\s*(.+)$/);
         if (dashSplit) {
           meta.artist = meta.artist || dashSplit[1].trim();
           meta.trackTitle = meta.trackTitle || dashSplit[2].trim();
         } else if (bySplit) {
           meta.trackTitle = meta.trackTitle || bySplit[1].trim();
           meta.artist = meta.artist || bySplit[2].trim();
+        } else if (dotSplit) {
+          meta.trackTitle = meta.trackTitle || dotSplit[1].trim();
+          meta.artist = meta.artist || dotSplit[2].trim();
         }
       }
 
@@ -8227,13 +8249,14 @@ Return JSON:
   // ============================================
   // Backfills .music property on listen links that were migrated
   // before extractMusicMetadata existed.
-  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v1';
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v2';
 
   async function enrichListenLinks() {
     if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
 
     const allLinks = getAllLinks();
-    const needsEnrich = allLinks.filter(l => l.category === 'listen' && !l.music);
+    // v2: also re-enrich links that have music but missing artist (improved parsing)
+    const needsEnrich = allLinks.filter(l => l.category === 'listen' && (!l.music || !l.music.artist));
     if (needsEnrich.length === 0) {
       localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
       return;
@@ -8244,7 +8267,7 @@ Return JSON:
     let enriched = 0;
     for (const link of needsEnrich) {
       try {
-        const music = await extractMusicMetadata(link.url, link.title, link.description, null);
+        const music = await extractMusicMetadata(link.url, link.title, link.description || '', null);
         if (music) {
           updateLink(link.id, { music });
           enriched++;
