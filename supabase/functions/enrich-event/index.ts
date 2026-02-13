@@ -53,8 +53,12 @@ interface EnrichResult {
   description?: string | null
   imageUrl?: string | null
   tags?: string[]
+  genre?: string | null
+  content_type?: string | null
   error?: string
 }
+
+const VALID_CONTENT_TYPES = ['music', 'dj-set', 'live-music', 'festival', 'film', 'comedy', 'theater', 'other']
 
 async function fetchPage(url: string): Promise<string | null> {
   try {
@@ -170,10 +174,83 @@ function extractMetadata(html: string, pageUrl: string): {
   }
 }
 
+// --- AI Classification (Claude Haiku) ---
+async function classifyWithAI(event: {
+  name: string, venue: string, genre: string, content_type: string,
+  description: string, tags: string[]
+}): Promise<{ genre: string, content_type: string } | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) {
+    console.log('[enrich-event] ANTHROPIC_API_KEY not set, skipping AI classification')
+    return null
+  }
+
+  const desc = (event.description || '').substring(0, 300)
+  const prompt = `You are classifying a live event. Given the event details below, return a JSON object with two fields:
+
+1. "genre" — the music/art genre (e.g. "Techno", "House", "Hip-Hop", "Jazz", "Rock", "Comedy", "Film", "Indie", "Drum & Bass"). Use the most specific genre that fits. If multiple genres apply, comma-separate up to 3. Return "" if truly unknown.
+
+2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, other
+
+Event name: ${event.name}
+Venue: ${event.venue}
+Current genre: ${event.genre || 'unknown'}
+Current type: ${event.content_type || 'unknown'}
+Description: ${desc}
+Tags: ${event.tags.join(', ')}
+
+Respond with JSON only: {"genre": "...", "content_type": "..."}`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('[enrich-event] AI API error:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+
+    if (match) {
+      const result = JSON.parse(match[0])
+      // Validate content_type
+      if (result.content_type && !VALID_CONTENT_TYPES.includes(result.content_type)) {
+        result.content_type = ''
+      }
+      return {
+        genre: typeof result.genre === 'string' ? result.genre : '',
+        content_type: typeof result.content_type === 'string' ? result.content_type : '',
+      }
+    }
+  } catch (e) {
+    console.error('[enrich-event] AI classification error:', e)
+  }
+
+  return null
+}
+
 async function enrichSingleEvent(
   supabase: ReturnType<typeof createClient>,
   eventId: string,
-  eventUrl: string
+  eventUrl: string,
+  eventName: string,
+  eventVenue: string,
+  eventGenre: string,
+  eventContentType: string,
 ): Promise<EnrichResult> {
   await supabase
     .from('events')
@@ -199,7 +276,21 @@ async function enrichSingleEvent(
 
   const metadata = extractMetadata(html, eventUrl)
 
-  const hasData = metadata.description || metadata.imageUrl || metadata.tags.length > 0
+  // AI classification — clean up genre and content type
+  const aiResult = await classifyWithAI({
+    name: eventName,
+    venue: eventVenue,
+    genre: eventGenre,
+    content_type: eventContentType,
+    description: metadata.description || '',
+    tags: metadata.tags,
+  })
+
+  if (aiResult) {
+    console.log(`[enrich-event] AI: "${eventName}" → genre="${aiResult.genre}" type="${aiResult.content_type}"`)
+  }
+
+  const hasData = metadata.description || metadata.imageUrl || metadata.tags.length > 0 || aiResult
   if (!hasData) {
     await supabase
       .from('events')
@@ -214,6 +305,8 @@ async function enrichSingleEvent(
       description: metadata.description,
       image_url: metadata.imageUrl,
       tags: metadata.tags.length > 0 ? metadata.tags : null,
+      ...(aiResult?.genre ? { genre: aiResult.genre } : {}),
+      ...(aiResult?.content_type ? { content_type: aiResult.content_type } : {}),
       enrichment_status: 'completed',
       enriched_at: new Date().toISOString(),
       enrichment_error: null,
@@ -231,6 +324,8 @@ async function enrichSingleEvent(
     description: metadata.description,
     imageUrl: metadata.imageUrl,
     tags: metadata.tags,
+    genre: aiResult?.genre || null,
+    content_type: aiResult?.content_type || null,
   }
 }
 
@@ -261,7 +356,7 @@ serve(async (req: Request) => {
 
     const { data: events, error: fetchErr } = await supabase
       .from('events')
-      .select('id, url, enrichment_status')
+      .select('id, url, name, venue, genre, content_type, enrichment_status')
       .in('id', eventIds)
       .in('enrichment_status', ['pending', 'failed'])
 
@@ -281,7 +376,11 @@ serve(async (req: Request) => {
     let failed = 0
 
     for (const event of events) {
-      const result = await enrichSingleEvent(supabase, event.id, event.url)
+      const result = await enrichSingleEvent(
+        supabase, event.id, event.url,
+        event.name || '', event.venue || '',
+        event.genre || '', event.content_type || '',
+      )
       results.push(result)
       if (result.success) succeeded++
       else failed++

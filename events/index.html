@@ -1494,11 +1494,12 @@ body {
       log('Removed legacy demo source');
     }
 
-    // Ensure existing sources have category from catalog
+    // Sync source names and categories from stock catalog
     state.sources.forEach(s => {
-      if (!s.category) {
-        const stock = STOCK_SOURCES.find(ss => ss.id === s.id);
-        if (stock) s.category = stock.category;
+      const stock = STOCK_SOURCES.find(ss => ss.id === s.id);
+      if (stock) {
+        if (!s.category) s.category = stock.category;
+        if (s.name !== stock.name) s.name = stock.name;
       }
     });
 
