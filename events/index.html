@@ -1764,25 +1764,35 @@ body {
   async function saveEventsToSupabase(events) {
     if (!events || events.length === 0) return;
     try {
-      log(`L2 cache: saving ${events.length} events...`);
-      const payload = events.map(ev => ({
+      const all = events.map(ev => ({
         source: ev.source, date: ev.date, time: ev.time || '', name: ev.name,
         venue: ev.venue, address: ev.address || '', city: ev.city || '',
         genre: ev.genre || '', price: ev.price || '', ages: ev.ages || '',
         promoter: ev.promoter || '', url: ev.url, contentType: ev.contentType || '',
       }));
-      const resp = await fetch(CACHE_EVENTS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-          'apikey': SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ events: payload }),
-      });
-      if (!resp.ok) { log('L2 cache: save failed — ' + resp.status); return; }
-      const result = await resp.json();
-      log(`L2 cache: cached=${result.cached} updated=${result.updated} enrichQueued=${result.enrichQueued}`);
+      // Batch in chunks of 400 (server max is 500)
+      const BATCH = 400;
+      const batches = [];
+      for (let i = 0; i < all.length; i += BATCH) batches.push(all.slice(i, i + BATCH));
+      log(`L2 cache: saving ${all.length} events in ${batches.length} batch(es)...`);
+      let totalCached = 0, totalUpdated = 0, totalEnriched = 0;
+      for (const batch of batches) {
+        const resp = await fetch(CACHE_EVENTS_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ events: batch }),
+        });
+        if (!resp.ok) { log('L2 cache: batch save failed — ' + resp.status); continue; }
+        const result = await resp.json();
+        totalCached += result.cached || 0;
+        totalUpdated += result.updated || 0;
+        totalEnriched += result.enrichQueued || 0;
+      }
+      log(`L2 cache: cached=${totalCached} updated=${totalUpdated} enrichQueued=${totalEnriched}`);
     } catch (e) { log('L2 cache: save error — ' + e.message); }
   }
 
