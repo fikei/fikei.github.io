@@ -147,7 +147,7 @@ body {
 .data-table .col-genre { min-width: 100px; }
 .data-table .col-price { width: 70px; white-space: nowrap; font-size: var(--text-2xs); position: relative; }
 .data-table .col-price[title] { cursor: help; }
-.data-table .col-ages { width: 50px; white-space: nowrap; font-size: var(--text-2xs); text-align: center; }
+.data-table .col-ages { display: none; }
 .data-table .col-promoter { display: none; }
 .data-table .col-source { width: 90px; white-space: nowrap; }
 
@@ -1374,12 +1374,12 @@ body {
 
   const STOCK_SOURCES = [
     // Bay Area
-    { id: '19hz-bayarea', name: '19hz Bay Area', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_BayArea.php', region: 'bay-area', description: 'Electronic music & nightlife' },
+    { id: '19hz-bayarea', name: '19hz', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_BayArea.php', region: 'bay-area', description: 'Electronic music & nightlife' },
     { id: 'ra-bayarea', name: 'Resident Advisor SF', category: 'music', type: 'ra', url: 'https://ra.co/events/us/sanfrancisco', region: 'bay-area', description: 'Electronic music events' },
     { id: 'sf-punchline', name: 'Punchline SF', category: 'comedy', type: 'html', url: 'https://www.punchlinecomedyclub.com/events', region: 'bay-area', description: 'Stand-up comedy' },
     { id: 'cobbs-sf', name: "Cobb's Comedy Club", category: 'comedy', type: 'html', url: 'https://www.cobbscomedy.com/events', region: 'bay-area', description: 'Comedy & variety' },
     { id: 'roxie-sf', name: 'Roxie Theater', category: 'film', type: 'rss', url: 'https://roxie.com/feed/', region: 'bay-area', description: 'Independent & arthouse cinema' },
-    { id: 'screenslate-sf', name: 'Screen Slate SF Bay', category: 'film', type: 'screenslate', url: 'https://www.screenslate.com/listings', region: 'bay-area', description: 'Repertory & arthouse cinema' },
+    { id: 'screenslate-sf', name: 'Screen Slate', category: 'film', type: 'screenslate', url: 'https://www.screenslate.com/listings', region: 'bay-area', description: 'Repertory & arthouse cinema' },
     // Los Angeles
     { id: '19hz-losangeles', name: '19hz Los Angeles', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_LosAngeles.php', region: 'los-angeles', description: 'Electronic music & nightlife' },
     // New York
