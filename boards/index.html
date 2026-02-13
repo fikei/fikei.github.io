@@ -1347,6 +1347,40 @@ body {
   color: #c00;
 }
 
+/* Streaming services "Available on" chips */
+.grid-item__streaming {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
+.grid-item__streaming-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.grid-item__streaming-chip {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--subtle);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.grid-item__streaming-chip .grid-item__platform-icon {
+  width: 5px;
+  height: 5px;
+}
+
 .grid-item__action--danger:hover {
   background: #c00;
   color: #fff;
@@ -1600,6 +1634,267 @@ body {
   background: transparent;
   color: var(--muted);
   width: fit-content;
+}
+
+/* ============================================
+   Watch Variant
+   ============================================ */
+:root {
+  --color-youtube: #FF0000;
+  --color-netflix: #E50914;
+  --color-vimeo: #1AB7EA;
+  --color-disney-plus: #113CCF;
+  --color-hulu: #1CE783;
+  --color-hbo-max: #6D00D3;
+  --color-prime-video: #00A8E1;
+  --color-apple-tv: #A2AAAD;
+  --color-letterboxd: #00E054;
+  --color-imdb: #F5C518;
+  --color-rotten-tomatoes: #FA320A;
+  --color-mubi: #0B0F10;
+  --color-criterion: #000000;
+  --color-peacock: #000000;
+  --color-paramount-plus: #0064FF;
+  --color-crunchyroll: #F47521;
+}
+
+/* Watch variant — no grayscale on poster art */
+.grid-item--watch .grid-item__image {
+  filter: none;
+}
+
+.grid-item--watch:hover .grid-item__image {
+  filter: none;
+}
+
+/* Watch overlay: title + creator/year two-line layout */
+.grid-item--watch .grid-item__overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Video title line */
+.grid-item__video-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Video meta line (creator / year) */
+.grid-item__video-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Watch format badge hover */
+.grid-item--watch:hover .grid-item__format-badge {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .grid-item--watch:active .grid-item__format-badge,
+  .grid-item--watch.grid-item--tapped .grid-item__format-badge {
+    opacity: 1;
+  }
+}
+
+/* Video platform icon dots */
+.grid-item__platform-icon--youtube { background: var(--color-youtube); }
+.grid-item__platform-icon--netflix { background: var(--color-netflix); }
+.grid-item__platform-icon--vimeo { background: var(--color-vimeo); }
+.grid-item__platform-icon--disney-plus { background: var(--color-disney-plus); }
+.grid-item__platform-icon--hulu { background: var(--color-hulu); }
+.grid-item__platform-icon--hbo-max { background: var(--color-hbo-max); }
+.grid-item__platform-icon--prime-video { background: var(--color-prime-video); }
+.grid-item__platform-icon--apple-tv { background: var(--color-apple-tv); }
+.grid-item__platform-icon--letterboxd { background: var(--color-letterboxd); }
+.grid-item__platform-icon--imdb { background: var(--color-imdb); }
+.grid-item__platform-icon--rotten-tomatoes { background: var(--color-rotten-tomatoes); }
+.grid-item__platform-icon--mubi { background: var(--color-mubi); }
+.grid-item__platform-icon--criterion { background: var(--color-criterion); }
+.grid-item__platform-icon--peacock { background: var(--color-peacock); }
+.grid-item__platform-icon--paramount-plus { background: var(--color-paramount-plus); }
+.grid-item__platform-icon--crunchyroll { background: var(--color-crunchyroll); }
+
+/* Expanded watch cards */
+.grid-item--watch.grid-item--expanded-medium .grid-item__overlay,
+.grid-item--watch.grid-item--expanded-large .grid-item__overlay {
+  display: none;
+}
+
+.grid-item--watch.grid-item--expanded-medium .grid-item__format-badge,
+.grid-item--watch.grid-item--expanded-large .grid-item__format-badge {
+  opacity: 1;
+  position: static;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  width: fit-content;
+}
+
+/* ============================================
+   Watch Grid Override
+   ============================================ */
+.grid--watch {
+  gap: 8px;
+}
+
+/* ============================================
+   Watch View Toggle
+   ============================================ */
+.watch-view-toggle {
+  display: none;
+  align-items: center;
+  gap: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--subtle);
+}
+
+.watch-view-toggle--visible {
+  display: flex;
+}
+
+.watch-view-toggle__btn {
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px solid var(--subtle);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.watch-view-toggle__btn:first-child {
+  border-right: none;
+}
+
+.watch-view-toggle__btn:hover {
+  color: var(--fg);
+}
+
+.watch-view-toggle__btn.active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+/* ============================================
+   Watch List View
+   ============================================ */
+.grid--watch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 var(--space-4);
+  padding-bottom: 80px;
+}
+
+.watch-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: background 0.1s;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.watch-row:hover {
+  background: var(--surface);
+}
+
+.watch-row__poster {
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.watch-row__poster--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  width: 40px;
+  height: 56px;
+}
+
+.watch-row__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.watch-row__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watch-row__creator {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watch-row__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.watch-row__runtime {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+.watch-row__type {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 1px 4px;
+  border: 1px solid var(--subtle);
 }
 
 /* ============================================
@@ -3957,6 +4252,16 @@ body {
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="0" width="6" height="6"/><rect x="8" y="0" width="6" height="6"/><rect x="0" y="8" width="6" height="6"/><rect x="8" y="8" width="6" height="6"/></svg>
     </button>
     <button class="listen-view-toggle__btn" data-view="list" aria-label="List view">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="1" width="14" height="2"/><rect x="0" y="6" width="14" height="2"/><rect x="0" y="11" width="14" height="2"/></svg>
+    </button>
+  </div>
+
+  <!-- Watch view toggle (grid/list) — visible only when watch filter active -->
+  <div class="watch-view-toggle" id="watchViewToggle">
+    <button class="watch-view-toggle__btn active" data-view="grid" aria-label="Grid view">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="0" width="6" height="6"/><rect x="8" y="0" width="6" height="6"/><rect x="0" y="8" width="6" height="6"/><rect x="8" y="8" width="6" height="6"/></svg>
+    </button>
+    <button class="watch-view-toggle__btn" data-view="list" aria-label="List view">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="1" width="14" height="2"/><rect x="0" y="6" width="14" height="2"/><rect x="0" y="11" width="14" height="2"/></svg>
     </button>
   </div>
@@ -7664,6 +7969,30 @@ Return JSON:
     return null;
   }
 
+  // Returns the platform key from a link's domain for video/watch icon rendering.
+  // e.g. "netflix.com" → "netflix", "youtube.com" → "youtube"
+  function getVideoPlatform(domain) {
+    if (!domain) return null;
+    const d = domain.toLowerCase();
+    if (d.includes('youtube.com') || d.includes('youtu.be')) return 'youtube';
+    if (d.includes('netflix.com')) return 'netflix';
+    if (d.includes('vimeo.com')) return 'vimeo';
+    if (d.includes('disneyplus.com') || d.includes('disney+')) return 'disney-plus';
+    if (d.includes('hulu.com')) return 'hulu';
+    if (d.includes('hbomax.com') || d.includes('max.com')) return 'hbo-max';
+    if (d.includes('primevideo.com') || d.includes('amazon.com')) return 'prime-video';
+    if (d.includes('tv.apple.com')) return 'apple-tv';
+    if (d.includes('letterboxd.com')) return 'letterboxd';
+    if (d.includes('imdb.com')) return 'imdb';
+    if (d.includes('rottentomatoes.com')) return 'rotten-tomatoes';
+    if (d.includes('mubi.com')) return 'mubi';
+    if (d.includes('criterionchannel.com') || d.includes('criterion.com')) return 'criterion';
+    if (d.includes('peacocktv.com')) return 'peacock';
+    if (d.includes('paramountplus.com')) return 'paramount-plus';
+    if (d.includes('crunchyroll.com')) return 'crunchyroll';
+    return null;
+  }
+
   // ============================================
   // Listen Player
   // ============================================
@@ -7918,6 +8247,230 @@ Return JSON:
 
     // Return null if we got nothing useful
     const hasData = meta.artist || meta.trackTitle || meta.platformId || meta.contentFormat;
+    return hasData ? meta : null;
+  }
+
+  // ============================================
+  // Video Metadata Extraction
+  // ============================================
+  // Extracts structured video/film metadata from URL patterns, OG tags, and oEmbed APIs.
+  // Returns a video object to persist on the link for future rendering.
+  // Fields: title, type, creator, year, runtime, genre, platform, platformId,
+  //         rating, contentFormat, seriesInfo
+  // videoTags: optional og:video tags already scraped by fetchMetadata
+  async function extractVideoMetadata(url, title, description, videoTags) {
+    const meta = {
+      title: null,          // Cleaned film/show title
+      type: null,           // 'movie' | 'tv-show' | 'documentary' | 'short' | 'anime' | 'video' | 'trailer'
+      creator: null,        // Director / channel name / creator
+      year: null,           // Release year
+      runtime: null,        // Duration in seconds
+      genre: null,          // Primary genre
+      platform: null,       // Detected from domain
+      platformId: null,     // Platform-specific ID
+      rating: null,         // Content rating (PG, R, TV-14, etc.)
+      contentFormat: null,  // 'movie' | 'series' | 'episode' | 'clip' | 'trailer'
+      seriesInfo: null      // { season, episode } for TV shows
+    };
+
+    try {
+      const domain = new URL(url).hostname;
+      const path = new URL(url).pathname;
+
+      // Set platform from domain
+      meta.platform = getVideoPlatform(domain);
+
+      // ── Step 1: Apply og:video tags from HTML scrape (free, already fetched) ──
+      if (videoTags) {
+        if (videoTags.duration) meta.runtime = videoTags.duration;
+        if (videoTags.releaseDate) {
+          const yearMatch = videoTags.releaseDate.match(/(\d{4})/);
+          if (yearMatch) meta.year = parseInt(yearMatch[1], 10);
+        }
+        if (videoTags.director) meta.creator = videoTags.director;
+        if (videoTags.series) meta.type = 'tv-show';
+        // Infer type from og:type
+        if (videoTags.ogType) {
+          const ogTypeMap = {
+            'video.movie': 'movie', 'video.tv_show': 'tv-show',
+            'video.episode': 'tv-show', 'video.other': 'video'
+          };
+          meta.type = ogTypeMap[videoTags.ogType] || meta.type;
+          if (videoTags.ogType === 'video.episode') meta.contentFormat = 'episode';
+        }
+      }
+
+      // ── Step 2: Infer type from URL structure ──
+      if (!meta.type) {
+        if (/\/movie[s]?[\/]/i.test(path) || /\/film[s]?[\/]/i.test(path)) meta.type = 'movie';
+        else if (/\/tv[\/]/i.test(path) || /\/show[s]?[\/]/i.test(path) || /\/series[\/]/i.test(path)) meta.type = 'tv-show';
+        else if (/\/documentary/i.test(path)) meta.type = 'documentary';
+        else if (/\/short/i.test(path)) meta.type = 'short';
+        else if (/\/anime/i.test(path)) meta.type = 'anime';
+        else if (/\/trailer/i.test(path)) meta.type = 'trailer';
+      }
+
+      // ── Step 3: Platform-specific metadata extraction ──
+
+      // YouTube
+      if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+        let videoId = null;
+        if (domain.includes('youtu.be')) {
+          videoId = path.slice(1).split(/[?#]/)[0];
+        } else {
+          const match = url.match(/[?&]v=([^&]+)/);
+          if (match) videoId = match[1];
+        }
+        if (videoId) meta.platformId = `youtube:${videoId}`;
+        meta.type = meta.type || 'video';
+        meta.contentFormat = meta.contentFormat || 'clip';
+        // Try to extract channel from title: "Video Title - Channel Name"
+        // or "Video Title | Channel Name"
+      }
+
+      // Netflix
+      if (domain.includes('netflix.com')) {
+        const titleMatch = path.match(/\/title\/(\d+)/);
+        if (titleMatch) meta.platformId = `netflix:${titleMatch[1]}`;
+        // Netflix URLs: /title/80100172 (movie or show)
+        meta.type = meta.type || 'movie'; // default, will be refined by AI
+      }
+
+      // Letterboxd
+      if (domain.includes('letterboxd.com')) {
+        const filmMatch = path.match(/\/film\/([^\/]+)/);
+        if (filmMatch) {
+          meta.platformId = `letterboxd:${filmMatch[1]}`;
+          meta.type = 'movie'; // Letterboxd is always movies
+          // Clean title: Letterboxd page titles are "Film Name (Year) | Letterboxd"
+        }
+      }
+
+      // IMDb
+      if (domain.includes('imdb.com')) {
+        const imdbMatch = path.match(/\/title\/(tt\d+)/);
+        if (imdbMatch) meta.platformId = `imdb:${imdbMatch[1]}`;
+      }
+
+      // Vimeo
+      if (domain.includes('vimeo.com')) {
+        const vimeoMatch = path.match(/^\/(\d+)/);
+        if (vimeoMatch) meta.platformId = `vimeo:${vimeoMatch[1]}`;
+        meta.type = meta.type || 'video';
+        // Try oEmbed for more metadata
+        const oembed = await fetchOembed(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`, `vimeo:${url}`);
+        if (oembed) {
+          meta.creator = meta.creator || oembed.author_name || null;
+          meta.title = meta.title || oembed.title || null;
+          if (oembed.duration) meta.runtime = oembed.duration;
+        }
+      }
+
+      // Disney+
+      if (domain.includes('disneyplus.com')) {
+        const dpMatch = path.match(/\/(movies|series)\/([^\/]+)\/([^\/]+)/);
+        if (dpMatch) {
+          meta.platformId = `disney-plus:${dpMatch[3]}`;
+          meta.type = dpMatch[1] === 'movies' ? 'movie' : 'tv-show';
+        }
+      }
+
+      // HBO Max / Max
+      if (domain.includes('max.com') || domain.includes('hbomax.com')) {
+        const maxMatch = path.match(/\/(movie|series|feature)\/([^\/]+)/);
+        if (maxMatch) {
+          meta.platformId = `hbo-max:${maxMatch[2]}`;
+          meta.type = maxMatch[1] === 'series' ? 'tv-show' : 'movie';
+        }
+      }
+
+      // Amazon Prime Video
+      if (domain.includes('primevideo.com') || (domain.includes('amazon.com') && path.includes('/video/'))) {
+        const primeMatch = path.match(/\/detail\/([^\/]+)/);
+        if (primeMatch) meta.platformId = `prime-video:${primeMatch[1]}`;
+      }
+
+      // Apple TV+
+      if (domain.includes('tv.apple.com')) {
+        const atvMatch = path.match(/\/(movie|show|episode)\/([^\/]+)/);
+        if (atvMatch) {
+          meta.type = atvMatch[1] === 'show' ? 'tv-show' : (atvMatch[1] === 'movie' ? 'movie' : 'tv-show');
+          meta.platformId = `apple-tv:${atvMatch[2]}`;
+        }
+      }
+
+      // Crunchyroll
+      if (domain.includes('crunchyroll.com')) {
+        meta.type = meta.type || 'anime';
+        const crMatch = path.match(/\/(?:series|watch)\/([^\/]+)/);
+        if (crMatch) meta.platformId = `crunchyroll:${crMatch[1]}`;
+      }
+
+      // ── Step 4: Fallback parsing from page title ──
+      if (title) {
+        let cleanTitle = title;
+
+        // Strip common platform suffixes
+        cleanTitle = cleanTitle
+          .replace(/\s*[-–—|]\s*(YouTube|Netflix|Hulu|Amazon|Prime Video|Disney\+?|HBO|Max|Apple TV\+?|Vimeo|Letterboxd|IMDb|Rotten Tomatoes|Mubi|Criterion|Crunchyroll|Watch on.*|Official Trailer.*)$/i, '')
+          .replace(/\s*\|\s*.*$/, '') // Remove everything after last pipe
+          .trim();
+
+        // Extract year from title: "Film Name (2023)"
+        if (!meta.year) {
+          const yearMatch = cleanTitle.match(/\((\d{4})\)/);
+          if (yearMatch) {
+            meta.year = parseInt(yearMatch[1], 10);
+            cleanTitle = cleanTitle.replace(/\s*\(\d{4}\)\s*/, ' ').trim();
+          }
+        }
+
+        // Extract creator from IMDb-style: "Film Name (2023) - IMDb" already stripped
+        // Try "Directed by Creator" in description
+        if (!meta.creator && description) {
+          const dirMatch = description.match(/(?:directed by|dir[.:]\s*|a film by)\s+([^.,:]+)/i);
+          if (dirMatch) meta.creator = dirMatch[1].trim();
+        }
+
+        // Detect trailer from title
+        if (!meta.type && /trailer|teaser/i.test(title)) {
+          meta.type = 'trailer';
+          cleanTitle = cleanTitle.replace(/\s*[-–—:]?\s*(?:official\s+)?(?:trailer|teaser)\s*\d*/i, '').trim();
+        }
+
+        // Set video title
+        meta.title = meta.title || cleanTitle || null;
+      }
+
+      // Detect type from title/description keywords
+      if (!meta.type && (title || description)) {
+        const text = `${title || ''} ${description || ''}`.toLowerCase();
+        if (/\bdocumentary\b|\bdocu\b/.test(text)) meta.type = 'documentary';
+        else if (/\bseries\b|\bseason\s+\d|\bepisode\s+\d|\btv show\b/.test(text)) meta.type = 'tv-show';
+        else if (/\banime\b/.test(text)) meta.type = 'anime';
+        else if (/\bshort film\b/.test(text)) meta.type = 'short';
+      }
+
+      // Default type
+      meta.type = meta.type || 'video';
+      meta.contentFormat = meta.contentFormat || meta.type;
+
+      // Extract series info from title/URL
+      if (meta.type === 'tv-show') {
+        const seMatch = (title || '').match(/[Ss](\d+)\s*[Ee](\d+)/);
+        if (seMatch) {
+          meta.seriesInfo = { season: parseInt(seMatch[1], 10), episode: parseInt(seMatch[2], 10) };
+          meta.contentFormat = 'episode';
+        }
+      }
+
+      console.log('%c[video-meta] Extracted:', 'color: #E50914', meta);
+    } catch (e) {
+      console.warn('[video-meta] Extraction failed:', e.message);
+    }
+
+    // Return null if we got nothing useful
+    const hasData = meta.title || meta.platform || meta.platformId || meta.type !== 'video';
     return hasData ? meta : null;
   }
 
@@ -8221,9 +8774,9 @@ Return JSON:
   const ENRICHMENT_MAX_RETRIES = 3;
   const ENRICHMENT_RETRY_DELAYS = [2000, 4000, 8000]; // Exponential backoff: 2s, 4s, 8s
 
-  function queueServerEnrichment(linkId, url, title, description) {
+  function queueServerEnrichment(linkId, url, title, description, opts = {}) {
     console.log('%c[ENRICH] Queuing for server enrichment:', 'color: #e74c3c; font-weight: bold', url);
-    enrichmentQueue.push({ linkId, url, title, description, retryCount: 0 });
+    enrichmentQueue.push({ linkId, url, title, description, retryCount: 0, ...opts });
 
     // Don't auto-process - requires API key setup
     // processEnrichmentQueue();
@@ -8255,7 +8808,9 @@ Return JSON:
             currentImage: currentImage,
             skipIfHasImage: !forceRefresh && !!currentImage,
             skipClassification: item.skipClassification || false,
-            forceRefresh: forceRefresh
+            forceRefresh: forceRefresh,
+            category: item.category || null,
+            enrichWatch: item.enrichWatch || false
           }
         });
 
@@ -8389,6 +8944,32 @@ Return JSON:
             console.log('%c[ENRICH] Keeping existing image (use Refresh Image to override)', 'color: #f39c12');
           }
         }
+
+        // Merge AI-enriched video metadata into existing video field
+        if (result.video) {
+          const existing = link.video || {};
+          link.video = {
+            ...existing,
+            // AI-generated fields (only overwrite if not already set or AI provides them)
+            summary: result.video.summary || existing.summary || null,
+            streamingServices: result.video.streamingServices?.length ? result.video.streamingServices : existing.streamingServices || [],
+            // Augment metadata — AI fills gaps from client-side extraction
+            type: existing.type || result.video.type || null,
+            genre: existing.genre || result.video.genre || null,
+            year: existing.year || result.video.year || null,
+            creator: existing.creator || result.video.creator || null,
+            rating: existing.rating || result.video.rating || null,
+            // Preserve client-side fields
+            title: existing.title || null,
+            platform: existing.platform || null,
+            platformId: existing.platformId || null,
+            runtime: existing.runtime || null,
+            contentFormat: existing.contentFormat || null,
+            seriesInfo: existing.seriesInfo || null
+          };
+          console.log('%c[ENRICH] Video metadata merged:', 'color: #E50914', link.video);
+        }
+
         save(data);
         renderGrid();
 
@@ -8662,6 +9243,27 @@ Return JSON:
         console.log('%c[FETCH] og:music tags found:', 'color: #1DB954', meta.musicTags);
       }
 
+      // Extract og:video tags for video metadata (free — already have the HTML)
+      const videoDuration = html.match(/<meta[^>]*property=["'](?:og:)?video:duration["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?video:duration["']/i);
+      const videoReleaseDate = html.match(/<meta[^>]*property=["'](?:og:)?video:release_date["'][^>]*content=["']([^"']*)["']/i) ||
+                               html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?video:release_date["']/i);
+      const videoDirector = html.match(/<meta[^>]*property=["'](?:og:)?video:director["'][^>]*content=["']([^"']*)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?video:director["']/i);
+      const videoSeries = html.match(/<meta[^>]*property=["'](?:og:)?video:series["'][^>]*content=["']([^"']*)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["'](?:og:)?video:series["']/i);
+
+      const isVideoOgType = ogType && ogType[1]?.startsWith('video');
+      if (videoDuration || videoReleaseDate || videoDirector || videoSeries || isVideoOgType) {
+        meta.videoTags = {};
+        if (videoDuration) meta.videoTags.duration = parseInt(videoDuration[1], 10) || null;
+        if (videoReleaseDate) meta.videoTags.releaseDate = videoReleaseDate[1];
+        if (videoDirector) meta.videoTags.director = decodeEntities(videoDirector[1]);
+        if (videoSeries) meta.videoTags.series = decodeEntities(videoSeries[1]);
+        if (isVideoOgType) meta.videoTags.ogType = ogType[1];
+        console.log('%c[FETCH] og:video tags found:', 'color: #E50914', meta.videoTags);
+      }
+
     } catch (parseErr) {
       // Parse error - continue with defaults
     }
@@ -8764,6 +9366,17 @@ Return JSON:
         artists: ['artist', 'band', 'singer', 'rapper', 'producer', 'dj', 'musician', 'composer'],
         mixes: ['mix', 'set', 'live', 'session', 'boiler room', 'essential mix', 'radio']
       }
+    },
+    watch: {
+      tags: ['movies', 'tv-shows', 'documentaries', 'shorts', 'anime', 'videos'],
+      keywords: {
+        movies: ['movie', 'film', 'cinema', 'feature', 'theatrical', 'blockbuster'],
+        'tv-shows': ['series', 'show', 'season', 'episode', 'tv', 'sitcom', 'drama series', 'miniseries'],
+        documentaries: ['documentary', 'docu', 'docuseries', 'true story'],
+        shorts: ['short', 'short film'],
+        anime: ['anime', 'manga', 'crunchyroll', 'funimation', 'isekai', 'shonen'],
+        videos: ['video', 'clip', 'vlog', 'tutorial', 'review', 'trailer', 'teaser']
+      }
     }
   };
 
@@ -8774,6 +9387,16 @@ Return JSON:
   function detectSubTag(link) {
     const category = link.category;
     if (!SUB_TAGS[category]) return null;
+
+    // Prefer structured metadata type for watch items
+    if (category === 'watch' && link.video?.type) {
+      const typeToTag = {
+        'movie': 'movies', 'tv-show': 'tv-shows', 'documentary': 'documentaries',
+        'short': 'shorts', 'anime': 'anime', 'video': 'videos', 'trailer': 'videos'
+      };
+      const mapped = typeToTag[link.video.type];
+      if (mapped && SUB_TAGS.watch.tags.includes(mapped)) return mapped;
+    }
 
     const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
     const { keywords } = SUB_TAGS[category];
@@ -9543,6 +10166,8 @@ Return JSON:
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
   const LISTEN_VIEW_KEY = 'boards-listen-view';
   let listenView = localStorage.getItem(LISTEN_VIEW_KEY) || 'list'; // 'grid' | 'list'
+  const WATCH_VIEW_KEY = 'boards-watch-view';
+  let watchView = localStorage.getItem(WATCH_VIEW_KEY) || 'grid'; // 'grid' | 'list'
 
   // ============================================
   // DOM
@@ -9596,6 +10221,8 @@ Return JSON:
 
   // Listen View Toggle DOM
   const listenViewToggle = $('listenViewToggle');
+  // Watch View Toggle DOM
+  const watchViewToggle = $('watchViewToggle');
 
   // Bottom Navigation DOM
   const bottomNav = $('bottomNav');
@@ -9689,6 +10316,10 @@ Return JSON:
     if (listenViewToggle) {
       listenViewToggle.classList.toggle('listen-view-toggle--visible', currentFilter === 'listen');
     }
+    // Show/hide watch view toggle
+    if (watchViewToggle) {
+      watchViewToggle.classList.toggle('watch-view-toggle--visible', currentFilter === 'watch');
+    }
   }
 
   function renderSubTags() {
@@ -9775,6 +10406,11 @@ Return JSON:
     const isListenList = currentFilter === 'listen' && listenView === 'list';
     grid.classList.toggle('grid--listen', currentFilter === 'listen' && listenView === 'grid');
     grid.classList.toggle('grid--listen-list', isListenList);
+
+    // Toggle watch grid/list override
+    const isWatchList = currentFilter === 'watch' && watchView === 'list';
+    grid.classList.toggle('grid--watch', currentFilter === 'watch' && watchView === 'grid');
+    grid.classList.toggle('grid--watch-list', isWatchList);
 
     const newIdSet = new Set(newIds);
     const allLinks = getAllLinks();
@@ -9924,6 +10560,44 @@ Return JSON:
         }
       }
 
+      // Build video-specific details for expanded watch cards
+      const _video = l.category === 'watch' ? l.video : null;
+      let videoDetailsHtml = '';
+      if (_video) {
+        const parts = [];
+        if (_video.creator) parts.push(`<span>${esc(_video.creator)}</span>`);
+        if (_video.year) parts.push(`<span>${_video.year}</span>`);
+        if (_video.genre) parts.push(`<span>${esc(_video.genre)}</span>`);
+        if (_video.runtime) parts.push(`<span>${formatDuration(_video.runtime)}</span>`);
+        if (_video.rating) parts.push(`<span>${esc(_video.rating)}</span>`);
+        if (parts.length > 0) {
+          videoDetailsHtml = `<div class="grid-item__details-meta">${parts.join('')}</div>`;
+        }
+
+        // Streaming services "Available on" chips
+        if (_video.streamingServices && _video.streamingServices.length > 0) {
+          const chips = _video.streamingServices.map(svc => {
+            // Map service name to platform key for color dot
+            const svcLower = svc.toLowerCase();
+            let platformKey = null;
+            if (svcLower.includes('netflix')) platformKey = 'netflix';
+            else if (svcLower.includes('hulu')) platformKey = 'hulu';
+            else if (svcLower.includes('disney')) platformKey = 'disney-plus';
+            else if (svcLower.includes('hbo') || svcLower.includes('max')) platformKey = 'hbo-max';
+            else if (svcLower.includes('prime') || svcLower.includes('amazon')) platformKey = 'prime-video';
+            else if (svcLower.includes('apple')) platformKey = 'apple-tv';
+            else if (svcLower.includes('peacock')) platformKey = 'peacock';
+            else if (svcLower.includes('paramount')) platformKey = 'paramount-plus';
+            else if (svcLower.includes('crunchyroll')) platformKey = 'crunchyroll';
+            else if (svcLower.includes('mubi')) platformKey = 'mubi';
+            else if (svcLower.includes('criterion')) platformKey = 'criterion';
+            const dot = platformKey ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platformKey}"></span>` : '';
+            return `<span class="grid-item__streaming-chip">${dot}${esc(svc)}</span>`;
+          }).join('');
+          videoDetailsHtml += `<div class="grid-item__streaming"><span class="grid-item__streaming-label">Available on</span>${chips}</div>`;
+        }
+      }
+
       const detailsHtml = `
         <div class="grid-item__menu-container">
           <button class="grid-item__menu-btn" data-action="menu" aria-label="More options"></button>
@@ -9939,10 +10613,10 @@ Return JSON:
           </div>
         </div>
         <div class="grid-item__details">
-          <h2 class="grid-item__details-title">${esc(_music?.trackTitle || l.title)}</h2>
-          <p class="grid-item__details-domain">${esc(_music?.artist || l.domain)}</p>
-          ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
-          ${musicDetailsHtml}
+          <h2 class="grid-item__details-title">${esc(_video?.title || _music?.trackTitle || l.title)}</h2>
+          <p class="grid-item__details-domain">${esc(_video?.creator || _music?.artist || l.domain)}</p>
+          ${(_video?.summary || l.description) ? `<p class="grid-item__details-description">${esc(_video?.summary || l.description)}</p>` : ''}
+          ${videoDetailsHtml}${musicDetailsHtml}
           <div class="grid-item__details-meta">
             <span>${cap(l.category)}</span>
             ${contentTypeDisplay ? `<span>${contentTypeDisplay}</span>` : ''}
@@ -9958,6 +10632,38 @@ Return JSON:
       const isListen = l.category === 'listen';
       const listenClass = isListen ? ' grid-item--listen' : '';
       const music = isListen ? l.music : null;
+
+      // Determine if this is a watch (video) card
+      const isWatch = l.category === 'watch';
+      const watchClass = isWatch ? ' grid-item--watch' : '';
+      const video = isWatch ? l.video : null;
+
+      // ── List view for watch cards ──
+      if (isWatchList && isWatch) {
+        const platform = getVideoPlatform(l.domain);
+        const platformDot = platform ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platform}"></span>` : '';
+        const videoTitle = video?.title || l.title;
+        const creatorOrYear = video?.creator || (video?.year ? String(video.year) : l.domain);
+        const dur = video?.runtime ? formatDuration(video.runtime) : '';
+        const typ = video?.type ? cap(video.type.replace('-', ' ')) : '';
+
+        const posterHtml = hasImg
+          ? `<img class="watch-row__poster" src="${secureImg(l.image)}" alt="" loading="lazy">`
+          : `<div class="watch-row__poster watch-row__poster--placeholder">${initial}</div>`;
+
+        html += `<a class="watch-row" href="${l.url}" target="_blank" rel="noopener" data-id="${l.id}">
+          ${posterHtml}
+          <div class="watch-row__info">
+            <span class="watch-row__title">${esc(videoTitle)}</span>
+            <span class="watch-row__creator">${platformDot} ${esc(creatorOrYear)}</span>
+          </div>
+          <div class="watch-row__meta">
+            ${typ ? `<span class="watch-row__type">${esc(typ)}</span>` : ''}
+            ${dur ? `<span class="watch-row__runtime">${dur}</span>` : ''}
+          </div>
+        </a>`;
+        continue;
+      }
 
       // ── List view for listen cards ──
       if (isListenList && isListen) {
@@ -10016,21 +10722,38 @@ Return JSON:
         }
       }
 
+      // Build format badge for watch cards
+      if (isWatch) {
+        const platform = getVideoPlatform(l.domain);
+        const platformDot = platform ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platform}"></span>` : '';
+        const typ = video?.type ? cap(video.type.replace('-', ' ')) : '';
+        const dur = video?.runtime ? formatDuration(video.runtime) : '';
+        const badgeText = [typ, dur].filter(Boolean).join(' · ');
+        if (badgeText || platformDot) {
+          formatBadgeHtml = `<span class="grid-item__format-badge">${platformDot}${badgeText ? esc(badgeText) : ''}</span>`;
+        }
+      }
+
       if (hasImg) {
         // Show sub-tag when filtered into a category, otherwise show category
         const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
           ? (getSubTag(l) || l.category)
           : l.category;
 
-        // Listen cards use artist/track overlay instead of title/domain
+        // Listen/watch cards use specialized overlay instead of title/domain
         let overlayHtml;
         if (isListen && music && (music.artist || music.trackTitle)) {
           overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__artist">${esc(music.artist || '')}</span><span class="grid-item__track">${esc(music.trackTitle || l.title)}</span></div>`;
+        } else if (isWatch && video && (video.title || video.creator)) {
+          const metaLine = video.creator ? video.creator : (video.year ? String(video.year) : l.domain);
+          overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__video-title">${esc(video.title || l.title)}</span><span class="grid-item__video-meta">${esc(metaLine)}</span></div>`;
         } else {
           overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>`;
         }
 
-        html += `<article class="grid-item${listenClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        const categoryClass = listenClass || watchClass;
+
+        html += `<article class="grid-item${categoryClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           ${overlayHtml}
@@ -10042,7 +10765,9 @@ Return JSON:
         const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
           ? (getSubTag(l) || l.category)
           : l.category;
-        html += `<article class="grid-item grid-item--placeholder${listenClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        const categoryClass = listenClass || watchClass;
+
+        html += `<article class="grid-item grid-item--placeholder${categoryClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
@@ -10572,6 +11297,12 @@ Return JSON:
             music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
           }
 
+          // Extract video metadata if categorized as watch or content_type is video
+          let video = null;
+          if (cat.category === 'watch' || contentType.type === 'video') {
+            video = await extractVideoMetadata(url, meta.title, meta.description, meta.videoTags);
+          }
+
           // Update the link with full data
           const linkUpdate = {
             title: meta.title,
@@ -10585,6 +11316,7 @@ Return JSON:
             loading: false // Mark as loaded
           };
           if (music) linkUpdate.music = music;
+          if (video) linkUpdate.video = video;
           updateLink(id, linkUpdate);
 
           renderFilters();
@@ -10592,12 +11324,16 @@ Return JSON:
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
 
           // Queue for server enrichment if needed
-          const needsEnrichment = contentType.confidence < 0.7 || !meta.image;
+          const isWatchItem = cat.category === 'watch' || contentType.type === 'video';
+          const needsEnrichment = contentType.confidence < 0.7 || !meta.image || isWatchItem;
           if (needsEnrichment) {
             if (!meta.image) {
               queueImageResolution(id, url, meta.title, meta.description, contentType.type);
             }
-            queueServerEnrichment(id, url, meta.title, meta.description);
+            queueServerEnrichment(id, url, meta.title, meta.description, {
+              category: cat.category,
+              enrichWatch: isWatchItem
+            });
           }
 
           // Queue Tier 3 AI vision validation for images that passed Tier 1
@@ -10682,6 +11418,26 @@ Return JSON:
     const activeBtn = listenViewToggle.querySelector(`[data-view="${listenView}"]`);
     if (activeBtn) {
       listenViewToggle.querySelectorAll('.listen-view-toggle__btn').forEach(b => b.classList.remove('active'));
+      activeBtn.classList.add('active');
+    }
+  }
+
+  // Watch view toggle handler
+  if (watchViewToggle) {
+    watchViewToggle.onclick = (e) => {
+      const btn = e.target.closest('.watch-view-toggle__btn');
+      if (btn) {
+        watchView = btn.dataset.view;
+        localStorage.setItem(WATCH_VIEW_KEY, watchView);
+        watchViewToggle.querySelectorAll('.watch-view-toggle__btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderGrid();
+      }
+    };
+    // Restore saved toggle state
+    const activeBtn = watchViewToggle.querySelector(`[data-view="${watchView}"]`);
+    if (activeBtn) {
+      watchViewToggle.querySelectorAll('.watch-view-toggle__btn').forEach(b => b.classList.remove('active'));
       activeBtn.classList.add('active');
     }
   }
@@ -10781,6 +11537,10 @@ Return JSON:
             if (cat.category === 'listen' || contentType.type === 'music') {
               music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
             }
+            let video = null;
+            if (cat.category === 'watch' || contentType.type === 'video') {
+              video = await extractVideoMetadata(link.url, meta.title, meta.description, meta.videoTags);
+            }
             const linkUpdate = {
               title: meta.title || link.title,
               description: meta.description || link.description,
@@ -10792,9 +11552,20 @@ Return JSON:
               type_signals: contentType.signals
             };
             if (music) linkUpdate.music = music;
+            if (video) linkUpdate.video = video;
             updateLink(id, linkUpdate);
             renderFilters();
             renderGrid();
+
+            // Queue watch items for AI enrichment (summary + streaming)
+            const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
+            if (isWatchRerun) {
+              queueServerEnrichment(id, link.url, meta.title, meta.description, {
+                category: cat.category,
+                enrichWatch: true
+              });
+            }
+
             toast('Enrichment complete');
           } catch (err) {
             console.error('[rerun-enrichment]', err);
@@ -11646,6 +12417,12 @@ Return JSON:
             music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
           }
 
+          // Extract video metadata if categorized as watch or content_type is video
+          let video = null;
+          if (cat.category === 'watch' || contentType.type === 'video') {
+            video = await extractVideoMetadata(url, meta.title, meta.description, meta.videoTags);
+          }
+
           const linkUpdate = {
             title: meta.title,
             description: meta.description,
@@ -11658,14 +12435,19 @@ Return JSON:
             loading: false
           };
           if (music) linkUpdate.music = music;
+          if (video) linkUpdate.video = video;
           updateLink(id, linkUpdate);
 
           renderFilters();
           renderGrid();
 
-          if (contentType.confidence < 0.7 || !meta.image) {
+          const isWatchItem2 = cat.category === 'watch' || contentType.type === 'video';
+          if (contentType.confidence < 0.7 || !meta.image || isWatchItem2) {
             if (!meta.image) queueImageResolution(id, url, meta.title, meta.description, contentType.type);
-            queueServerEnrichment(id, url, meta.title, meta.description);
+            queueServerEnrichment(id, url, meta.title, meta.description, {
+              category: cat.category,
+              enrichWatch: isWatchItem2
+            });
           }
 
           if (currentUser) {

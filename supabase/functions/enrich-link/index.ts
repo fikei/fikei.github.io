@@ -1,9 +1,9 @@
 // Supabase Edge Function: enrich-link
-// Handles AI classification and image resolution for links
+// Handles AI classification, image resolution, and watch enrichment for links
 //
 // POST /functions/v1/enrich-link
-// Body: { url, title?, description?, linkId?, skipClassification?, skipImage? }
-// Returns: { content_type, type_confidence, type_source, image_url, image_source, cached }
+// Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, category? }
+// Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -36,7 +36,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, title, description, linkId, skipClassification, skipImage } = await req.json()
+    const { url, title, description, linkId, skipClassification, skipImage, enrichWatch, category } = await req.json()
 
     if (!url) {
       return new Response(
@@ -144,6 +144,18 @@ serve(async (req) => {
     }
 
     // ========================================
+    // STEP 2.5: Watch Enrichment (AI-generated summary + metadata)
+    // ========================================
+    let videoMeta: Record<string, any> | null = null
+    if (enrichWatch || category === 'watch' || contentType === 'video') {
+      console.log('[enrich-link] Step 2.5: Watch enrichment')
+      videoMeta = await enrichWatchWithAI(url, title, description)
+      if (videoMeta) {
+        console.log('[enrich-link] Watch enrichment result:', videoMeta)
+      }
+    }
+
+    // ========================================
     // STEP 3: Update link in database (if linkId provided)
     // ========================================
     if (linkId) {
@@ -159,6 +171,9 @@ serve(async (req) => {
       if (imageScores) {
         updatePayload.image_scores = imageScores
       }
+      if (videoMeta) {
+        updatePayload.video = videoMeta
+      }
       await supabase
         .from('links')
         .update(updatePayload)
@@ -166,7 +181,7 @@ serve(async (req) => {
     }
 
     // Return result
-    const response = {
+    const response: Record<string, any> = {
       content_type: contentType,
       type_confidence: typeConfidence,
       type_source: typeSource,
@@ -174,6 +189,9 @@ serve(async (req) => {
       image_source: imageSource,
       image_scores: imageScores,
       cached
+    }
+    if (videoMeta) {
+      response.video = videoMeta
     }
 
     console.log('[enrich-link] Complete:', response)
@@ -255,6 +273,79 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`
     }
   } catch (e) {
     console.error('[enrich-link] AI classification error:', e)
+  }
+
+  return null
+}
+
+// ========================================
+// Watch Enrichment using AI
+// ========================================
+async function enrichWatchWithAI(url: string, title: string, description: string): Promise<Record<string, any> | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+
+  if (!apiKey) {
+    console.log('[enrich-link] No ANTHROPIC_API_KEY, skipping watch enrichment')
+    return null
+  }
+
+  const prompt = `Given this video/film link, provide structured metadata. Be concise and accurate.
+
+URL: ${url}
+Title: ${title || 'N/A'}
+Description: ${description?.slice(0, 500) || 'N/A'}
+
+Return JSON only:
+{
+  "summary": "2-3 sentence summary of what this film/show/video is about. Write in present tense, no spoilers.",
+  "type": "movie|tv-show|documentary|short|anime|video|trailer",
+  "genre": "primary genre (e.g. drama, comedy, thriller, sci-fi, horror, action, romance, animation)",
+  "year": year as number or null if unknown,
+  "creator": "director name for films, showrunner for TV, channel name for YouTube, or null",
+  "streamingServices": ["list of major streaming services where this is typically available, e.g. Netflix, Hulu, Disney+, Amazon Prime Video, HBO Max, Apple TV+"],
+  "rating": "content rating (G, PG, PG-13, R, NC-17, TV-Y, TV-G, TV-PG, TV-14, TV-MA) or null"
+}`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (!response.ok) {
+      console.error('[enrich-link] Watch enrichment API error:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+
+    if (match) {
+      const result = JSON.parse(match[0])
+      // Validate and clean the result
+      const validTypes = ['movie', 'tv-show', 'documentary', 'short', 'anime', 'video', 'trailer']
+      return {
+        summary: typeof result.summary === 'string' ? result.summary.slice(0, 500) : null,
+        type: validTypes.includes(result.type) ? result.type : null,
+        genre: typeof result.genre === 'string' ? result.genre : null,
+        year: typeof result.year === 'number' && result.year > 1800 && result.year < 2100 ? result.year : null,
+        creator: typeof result.creator === 'string' ? result.creator : null,
+        streamingServices: Array.isArray(result.streamingServices) ? result.streamingServices.filter((s: any) => typeof s === 'string').slice(0, 10) : [],
+        rating: typeof result.rating === 'string' ? result.rating : null
+      }
+    }
+  } catch (e) {
+    console.error('[enrich-link] Watch enrichment error:', e)
   }
 
   return null
