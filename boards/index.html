@@ -2493,18 +2493,7 @@ body {
   color: var(--bg);
 }
 
-.tools-coach__drag-target {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-3);
-  border: 2px dashed var(--subtle);
-  margin-bottom: var(--space-3);
-}
-
-.tools-coach__bookmarklet {
-  display: inline-block;
+.tools-coach__copy-btn {
   padding: var(--space-2) var(--space-4);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -2513,55 +2502,32 @@ body {
   background: var(--fg);
   color: var(--bg);
   border: 1px solid var(--fg);
-  text-decoration: none;
-  cursor: grab;
-  transition: transform 0.15s;
-  user-select: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-.tools-coach__bookmarklet:hover {
-  transform: scale(1.05);
+.tools-coach__copy-btn:hover {
+  background: var(--bg);
+  color: var(--fg);
 }
 
-.tools-coach__bookmarklet:active {
-  cursor: grabbing;
-  transform: scale(0.98);
-}
-
-.tools-coach__arrow {
+.tools-coach__copied {
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--muted);
-  animation: arrow-bounce 1.5s ease-in-out infinite;
+  color: var(--fg);
+  margin-top: var(--space-2);
 }
 
-@keyframes arrow-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-.tools-coach__alt {
+.tools-coach__hint {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--muted);
   line-height: 1.5;
-}
-
-.tools-coach__link-btn {
-  background: none;
-  border: none;
-  color: var(--fg);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-}
-
-.tools-coach__link-btn:hover {
-  opacity: 0.7;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--subtle);
 }
 
 /* Shared tools-list styles (used in Share Link and PWA tabs) */
@@ -4290,42 +4256,43 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <button class="tools-tab" data-tab="pwa">Install App</button>
       </div>
 
-      <!-- Bookmarklet tab — coached install flow -->
+      <!-- Bookmarklet tab — copy-based install flow -->
       <div class="tools-panel" id="toolsPanel-bookmarklet">
         <div class="tools-coach" id="bookmarkletCoach">
-          <!-- Step 1: Show bookmarks bar -->
+          <!-- Step 1: Copy the bookmarklet -->
           <div class="tools-coach__step" id="bmStep1">
             <div class="tools-coach__step-num">1</div>
             <div class="tools-coach__step-body">
-              <div class="tools-coach__step-title">Show your bookmarks bar</div>
-              <div class="tools-coach__step-desc">
-                Press <kbd id="bmShortcut">Ctrl+Shift+B</kbd> if it's hidden
-              </div>
-              <button class="tools-coach__next" id="bmStep1Next">My bar is visible →</button>
+              <div class="tools-coach__step-title">Copy the bookmarklet code</div>
+              <div class="tools-coach__step-desc">This is a special link that saves the current page to Boards.</div>
+              <button class="tools-coach__copy-btn" id="bmCopyCode">Copy to clipboard</button>
+              <div class="tools-coach__copied" id="bmCopiedMsg" style="display:none;">✓ Copied</div>
             </div>
           </div>
-          <!-- Step 2: Drag the bookmarklet -->
+          <!-- Step 2: Create bookmark -->
           <div class="tools-coach__step tools-coach__step--inactive" id="bmStep2">
             <div class="tools-coach__step-num">2</div>
             <div class="tools-coach__step-body">
-              <div class="tools-coach__step-title">Drag this button to your bookmarks bar</div>
-              <div class="tools-coach__step-desc">Click and hold, then drag up to your bookmarks bar and release</div>
-              <div class="tools-coach__drag-target">
-                <a class="tools-coach__bookmarklet" id="bookmarkletLink" href="javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))" draggable="true">+ Save to Boards</a>
-                <div class="tools-coach__arrow" id="bmDragArrow">↑ drag up</div>
+              <div class="tools-coach__step-title">Create a new bookmark</div>
+              <div class="tools-coach__step-desc" id="bmStep2Desc">
+                Right-click your bookmarks bar → <strong>Add page</strong> (or <strong>Add bookmark</strong>)
               </div>
-              <div class="tools-coach__alt" id="bmCopyAlt">
-                Can't drag? <button class="tools-coach__link-btn" id="bmCopyLink">Copy link instead</button> and manually create a bookmark.
+              <div class="tools-coach__hint">
+                No bookmarks bar? Press <kbd id="bmShortcut">Ctrl+Shift+B</kbd> to show it.
               </div>
+              <button class="tools-coach__next" id="bmStep2Next">I've opened "Add bookmark" →</button>
             </div>
           </div>
-          <!-- Step 3: Test it -->
+          <!-- Step 3: Paste the URL -->
           <div class="tools-coach__step tools-coach__step--inactive" id="bmStep3">
             <div class="tools-coach__step-num">3</div>
             <div class="tools-coach__step-body">
-              <div class="tools-coach__step-title">You're all set!</div>
-              <div class="tools-coach__step-desc">Click "+ Save to Boards" in your bookmarks bar on any page to save it here.</div>
-              <button class="tools-coach__done" id="bmDone">Done</button>
+              <div class="tools-coach__step-title">Paste as the URL</div>
+              <div class="tools-coach__step-desc">
+                Set the name to <strong>+ Save to Boards</strong><br>
+                Paste (<kbd id="bmPasteShortcut">Ctrl+V</kbd>) into the <strong>URL</strong> field, then save.
+              </div>
+              <button class="tools-coach__done" id="bmDone">Done — I've saved it</button>
             </div>
           </div>
         </div>
@@ -10150,21 +10117,29 @@ Return JSON:
     };
   });
 
-  // Detect OS for keyboard shortcut
+  // Detect OS for keyboard shortcuts and browser-specific instructions
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isFirefox = navigator.userAgent.includes('Firefox');
   const bmShortcut = document.getElementById('bmShortcut');
-  if (bmShortcut) {
-    bmShortcut.textContent = isMac ? '⌘+Shift+B' : 'Ctrl+Shift+B';
+  const bmPasteShortcut = document.getElementById('bmPasteShortcut');
+  const bmStep2Desc = document.getElementById('bmStep2Desc');
+  if (bmShortcut) bmShortcut.textContent = isMac ? '⌘+Shift+B' : 'Ctrl+Shift+B';
+  if (bmPasteShortcut) bmPasteShortcut.textContent = isMac ? '⌘+V' : 'Ctrl+V';
+  if (bmStep2Desc) {
+    bmStep2Desc.innerHTML = isFirefox
+      ? 'Right-click your bookmarks bar → <strong>Add Bookmark…</strong>'
+      : 'Right-click your bookmarks bar → <strong>Add page</strong>';
   }
 
-  // Coach step flow
+  // Coach step flow — copy-based install
+  const BOOKMARKLET_CODE = "javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))";
   const bmStep1 = document.getElementById('bmStep1');
   const bmStep2 = document.getElementById('bmStep2');
   const bmStep3 = document.getElementById('bmStep3');
-  const bmStep1Next = document.getElementById('bmStep1Next');
-  const bmCopyLink = document.getElementById('bmCopyLink');
+  const bmCopyCode = document.getElementById('bmCopyCode');
+  const bmCopiedMsg = document.getElementById('bmCopiedMsg');
+  const bmStep2Next = document.getElementById('bmStep2Next');
   const bmDone = document.getElementById('bmDone');
-  const bookmarkletLink = document.getElementById('bookmarkletLink');
 
   function advanceToStep(stepNum) {
     if (stepNum >= 2 && bmStep1) {
@@ -10182,36 +10157,35 @@ Return JSON:
     }
   }
 
-  if (bmStep1Next) {
-    bmStep1Next.onclick = () => advanceToStep(2);
-  }
-
-  // Detect when bookmarklet is dragged (dragend means they tried)
-  if (bookmarkletLink) {
-    bookmarkletLink.addEventListener('dragend', () => {
-      advanceToStep(3);
-    });
-    // Prevent click from navigating (it's a bookmarklet javascript: URL)
-    bookmarkletLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      toast('Drag this button to your bookmarks bar — don\'t click it here!');
-    });
-  }
-
-  // Copy link fallback
-  if (bmCopyLink) {
-    bmCopyLink.onclick = async () => {
-      const bmUrl = "javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))";
+  // Step 1: Copy bookmarklet code to clipboard
+  if (bmCopyCode) {
+    bmCopyCode.onclick = async () => {
       try {
-        await navigator.clipboard.writeText(bmUrl);
-        toast('Copied! Create a new bookmark and paste this as the URL.');
-        advanceToStep(3);
+        await navigator.clipboard.writeText(BOOKMARKLET_CODE);
+        bmCopyCode.textContent = '✓ Copied';
+        bmCopyCode.disabled = true;
+        if (bmCopiedMsg) bmCopiedMsg.style.display = '';
+        advanceToStep(2);
       } catch {
-        toast('Could not copy — try right-clicking the button instead', true);
+        // Fallback: select text in a temp input
+        const tmp = document.createElement('input');
+        tmp.value = BOOKMARKLET_CODE;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        tmp.remove();
+        bmCopyCode.textContent = '✓ Copied';
+        advanceToStep(2);
       }
     };
   }
 
+  // Step 2: User confirms they opened "Add bookmark"
+  if (bmStep2Next) {
+    bmStep2Next.onclick = () => advanceToStep(3);
+  }
+
+  // Step 3: Done
   if (bmDone) {
     bmDone.onclick = () => closeModal(toolsModal);
   }
