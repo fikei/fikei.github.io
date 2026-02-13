@@ -2661,6 +2661,93 @@ body {
   opacity: 0.7;
 }
 
+/* Quick-Add Bar — mobile-first always-visible URL input */
+.quick-add {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 600px) {
+  .quick-add {
+    display: flex;
+    position: fixed;
+    bottom: 56px; /* above bottom-nav */
+    left: 0;
+    right: 0;
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg);
+    border-top: 1px solid var(--subtle);
+    z-index: 49;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .quick-add__input {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    background: var(--surface);
+    color: var(--fg);
+    border: 1px solid var(--subtle);
+    outline: none;
+  }
+
+  .quick-add__input:focus {
+    border-color: var(--fg);
+  }
+
+  .quick-add__input::placeholder {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .quick-add__paste {
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--fg);
+    color: var(--bg);
+    border: 1px solid var(--fg);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .quick-add__paste:active {
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .quick-add__submit {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
+    background: var(--fg);
+    color: var(--bg);
+    border: 1px solid var(--fg);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .quick-add__submit:active {
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  /* Adjust grid bottom padding to not overlap quick-add bar */
+  .grid {
+    padding-bottom: 120px;
+  }
+}
+
 /* ============================================
    Dev Menu
    ============================================ */
@@ -3338,6 +3425,13 @@ body {
   </section>
 
   <div class="listen-player" id="listenPlayer"></div>
+
+  <!-- Quick-Add Bar (mobile) -->
+  <div class="quick-add" id="quickAdd">
+    <input type="text" class="quick-add__input" id="quickAddInput" placeholder="Paste a link" autocomplete="off" autocapitalize="off" inputmode="url">
+    <button class="quick-add__paste" id="quickAddPaste">Paste</button>
+    <button class="quick-add__submit" id="quickAddSubmit" aria-label="Add link">+</button>
+  </div>
 
   <!-- Bottom Navigation -->
   <nav class="bottom-nav" id="bottomNav">
@@ -11585,6 +11679,17 @@ Return JSON:
     generateWidgets();
     console.log(`[perf] init: ${(performance.now() - initStart).toFixed(0)}ms`);
 
+    // Handle deep link: ?add=URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const addUrl = urlParams.get('add');
+    if (addUrl) {
+      // Clean up the URL bar
+      const cleanLocation = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', cleanLocation);
+      // Process the link
+      processLinks(addUrl);
+    }
+
     // Listen for auth changes
     supabase.auth.onAuthStateChange(onAuthStateChange);
 
@@ -11780,6 +11885,73 @@ Return JSON:
   };
 
   init();
+
+  // ============================================
+  // Quick-Add Bar (mobile)
+  // ============================================
+  const quickAddInput = document.getElementById('quickAddInput');
+  const quickAddPaste = document.getElementById('quickAddPaste');
+  const quickAddSubmit = document.getElementById('quickAddSubmit');
+
+  if (quickAddInput) {
+    // Paste button — reads clipboard and fills input or processes directly
+    quickAddPaste.onclick = async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const urls = extractUrls(text);
+        if (urls.length > 0) {
+          // Process directly if clipboard has URLs
+          processLinks(text);
+          quickAddInput.value = '';
+        } else {
+          // Paste text into input for manual editing
+          quickAddInput.value = text;
+          quickAddInput.focus();
+        }
+      } catch (e) {
+        // Fallback: focus input so user can manually paste
+        quickAddInput.focus();
+        toast('Tap and hold to paste', true);
+      }
+    };
+
+    // Submit button — processes whatever is in the input
+    quickAddSubmit.onclick = () => {
+      const text = quickAddInput.value.trim();
+      if (!text) {
+        quickAddInput.focus();
+        return;
+      }
+      const urls = extractUrls(text);
+      if (urls.length > 0) {
+        processLinks(text);
+        quickAddInput.value = '';
+      } else {
+        toast('No valid URL found', true);
+      }
+    };
+
+    // Enter key submits
+    quickAddInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        quickAddSubmit.click();
+      }
+    });
+
+    // Auto-detect paste into input
+    quickAddInput.addEventListener('paste', (e) => {
+      // Let the paste happen naturally, then process after a tick
+      setTimeout(() => {
+        const text = quickAddInput.value.trim();
+        const urls = extractUrls(text);
+        if (urls.length > 0) {
+          processLinks(text);
+          quickAddInput.value = '';
+        }
+      }, 0);
+    });
+  }
 
   // Continuous clipboard scanning - check when tab becomes visible or gains focus
   let lastClipboardCheck = 0;
