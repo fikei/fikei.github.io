@@ -6894,8 +6894,8 @@ Return JSON:
 
   function openPlayer(linkId) {
     if (currentPlayer.linkId === linkId) { closePlayer(); return; }
-    const links = load();
-    const link = links.find(l => l.id === linkId);
+    const data = load();
+    const link = data.links.find(l => l.id === linkId);
     if (!link) return;
     const music = link.music || {};
     let embedUrl = music.embedUrl;
@@ -6914,7 +6914,7 @@ Return JSON:
         link.music.embedUrl = embedUrl;
         link.music.embedType = embedType;
         link.music.embedHeight = embedHeight;
-        save(links);
+        save(data);
       }
     }
     const platform = getMusicPlatform(link.domain) || '';
