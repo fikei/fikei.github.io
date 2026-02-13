@@ -149,7 +149,15 @@ function extractMetadata(html: string, pageUrl: string): {
     }
   }
 
-  const tagSelectors = '.tag, .genre, .category, [rel="tag"], .event-tag, .event-category'
+  // Genre-specific selectors
+  const genreSelectors = '.genre, .event-genre, [itemprop="genre"], .music-genre, .style, .event-style'
+  doc.querySelectorAll(genreSelectors).forEach((el: Element) => {
+    const t = el.textContent?.trim().toLowerCase()
+    if (t && t.length > 1 && t.length < 50 && !tags.includes(t)) tags.push(t)
+  })
+
+  // General tag selectors
+  const tagSelectors = '.tag, .category, [rel="tag"], .event-tag, .event-category'
   doc.querySelectorAll(tagSelectors).forEach((el: Element) => {
     const t = el.textContent?.trim().toLowerCase()
     if (t && t.length > 1 && t.length < 50 && !tags.includes(t)) tags.push(t)
