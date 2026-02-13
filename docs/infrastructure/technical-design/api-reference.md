@@ -219,6 +219,67 @@ Categorizes a pin using Claude AI.
 
 ---
 
+### POST /scan-image
+
+Analyzes uploaded images using Claude Vision to extract products, URLs, and content.
+
+**Auth**: API key or Bearer token
+
+**Request**:
+```json
+{
+  "image": "base64EncodedImageData",
+  "mimeType": "image/jpeg"
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `image` | string | Yes | Base64-encoded image data (no data URI prefix) |
+| `mimeType` | string | No | `image/jpeg`, `image/png`, `image/webp`, or `image/gif` (default: `image/jpeg`) |
+
+**Response (200)**:
+```json
+{
+  "items": [
+    {
+      "title": "Nike Air Max 90",
+      "description": "Classic white and red sneakers",
+      "url": "https://nike.com/air-max-90",
+      "category": "wear",
+      "confidence": 0.85
+    },
+    {
+      "title": "iPhone screenshot of Notion page",
+      "description": "A Notion workspace showing project tasks",
+      "url": null,
+      "category": "use",
+      "confidence": 0.70
+    }
+  ]
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `items` | array | Identified products, content, or items in the image |
+| `items[].title` | string | Short descriptive name (max 200 chars) |
+| `items[].description` | string | Brief description (max 500 chars) |
+| `items[].url` | string/null | Suggested URL if identifiable (brand site, product page), null otherwise |
+| `items[].category` | string | `home`, `wear`, `watch`, `listen`, `use`, `eat`, `go`, `follow`, `read`, or `uncategorized` |
+| `items[].confidence` | number | 0-1 confidence score |
+
+**Use cases**:
+- **Screenshot scanning**: Extract URLs from browser screenshots or app shares
+- **Product recognition**: Identify brands/products from photos
+- **Receipt/invoice scanning**: Extract merchant info and categorize purchases (planned)
+
+**Model**: Claude Sonnet 4 (`claude-sonnet-4-20250514`)
+
+**Source**: `supabase/functions/scan-image/index.ts`
+
+---
+
 ## Edge Functions (Ops Project)
 
 Base URL: `https://ycilriwjnmcelkspmfmg.supabase.co/functions/v1`
@@ -318,4 +379,4 @@ Body matches the `links` table schema. See [Database Schema](./database-schema.m
 
 ---
 
-*Last updated: 2026-02-05*
+*Last updated: 2026-02-13*

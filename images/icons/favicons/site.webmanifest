@@ -1,6 +1,9 @@
 {
-  "name": "My App",
-  "short_name": "App",
+  "name": "Boards — ctrl.rodeo",
+  "short_name": "Boards",
+  "description": "Save, organize, and curate your links",
+  "start_url": "/boards/",
+  "scope": "/",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
@@ -15,5 +18,14 @@
   ],
   "theme_color": "#000000",
   "background_color": "#000000",
-  "display": "standalone"
+  "display": "standalone",
+  "share_target": {
+    "action": "/boards/pwa-share.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

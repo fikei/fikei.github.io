@@ -296,6 +296,20 @@ URL Input
 
 ---
 
+## Mobile-First Capture
+
+Boards now includes multiple mobile-first capture methods — see full details in [Mobile Capture](./mobile-capture.md):
+
+| Method | Status | Description |
+|--------|--------|-------------|
+| **Quick-Add Bar** | ✅ Shipped | Always-visible URL input at bottom of mobile viewport |
+| **PWA Share Target** | ✅ Shipped | Share from any app directly to Boards |
+| **Deep Link Handler** | ✅ Shipped | `?add=URL` auto-adds links on page load |
+| **Bookmarklet** | ✅ Shipped | One-click save from any page via bookmark bar |
+| **Image Scan** | ✅ Shipped | Claude Vision extracts products/URLs from photos |
+
+---
+
 ## Planned
 
 ### Short-term
@@ -309,7 +323,6 @@ URL Input
 - Availability tracking — check if products are in stock
 - Archive snapshots — save page content in case it goes offline
 - Email-to-add — send links to a unique email address
-- Bookmarklet — drag to bookmark bar for quick adding
 
 ### Long-term
 - Server-side scraping fallback (eliminate CORS proxy dependency)

@@ -6,6 +6,31 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-13] - Link Capture Improvements: Mobile, PWA, Bookmarklet, Image Scan
+
+### Added
+- **Mobile Quick-Add Bar** — Always-visible URL input at bottom of mobile viewport. Paste button reads clipboard and auto-submits. Auto-processes on paste event. No more modal tap dance on mobile.
+- **Deep Link Handler** — `?add=URL` query parameter auto-adds links on page load. Enables Apple Shortcuts, Tasker, IFTTT, and any external automation to send URLs to Boards.
+- **PWA Share Target** — Updated `site.webmanifest` with branded name ("Boards — ctrl.rodeo"), `share_target` config, `start_url`, and `scope`. New `boards/pwa-share.html` landing page extracts shared URL/text and redirects to `?add=URL`. New `boards/sw.js` service worker enables PWA installability with network-first caching.
+- **Bookmarklet** — Drag-to-install "Save to Boards" link in new Tools modal. One click on any page redirects to `boards/?add=<current-url>`.
+- **Tools Modal** — New modal (FAB menu → Tools) with bookmarklet, share URL for automations, and PWA install button with status detection (available/installed/not available).
+- **Image Scanning** — New `scan-image` Supabase edge function using Claude Vision API. Analyzes photos to identify products, brands, URLs, and content. Returns structured items with title, description, URL, category, and confidence score. Scan button in FAB menu with results modal for multi-select batch adding.
+- **Bookmarklet Promo Banner** — Smart desktop-only banner suggests bookmarklet after 3rd link add. Escalating dismiss cooldown (7 days → 30 days). Auto-suppressed for deep-link arrivals, mobile users, and users who find Tools on their own.
+
+### Changed
+- **`site.webmanifest`** — Updated from generic "My App" to branded "Boards — ctrl.rodeo" with description, start_url, scope, and share_target.
+- **FAB menu** — Added Scan Image and Tools buttons alongside existing Share Link, Photo, and Video.
+- **`closeAll()`** — Now includes toolsModal and scanModal.
+
+### Documentation
+- **Phase 7 project plan** — Added Epic 7.1 Quick Capture Tools (all stories complete), renumbered existing epics.
+- **UX: mobile-capture.md** — Updated to ✅ Shipped with full JTBD table, wireframes, and technical notes.
+- **UX: link-capture.md** — Updated with new capture methods.
+- **Architecture docs** — Added PWA and image scanning technical design.
+- **Setup guide** — New `docs/setup/capture-tools-setup.md` covering all capture tools.
+
+---
+
 ## [2026-02-09] - Listen Category: Music as First-Class Content
 
 ### Added

@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-09 (Full audit — all branches merged, counts reconciled)
+> **Last Updated**: 2026-02-13 (Phase 7 Quick Capture Tools completed)
 
 ---
 
@@ -24,7 +24,7 @@
 | [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 11/140 |
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/60 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/15 |
-| [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | Pending | 0/17 |
+| [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | IN PROGRESS | 21/38 |
 | [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/54 |
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/132 |
 | [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 47/102 |
@@ -33,6 +33,16 @@
 ---
 
 ## Recent Milestones
+
+### Quick Capture Tools ✅
+**Completed: 2026-02-13**
+
+- **Mobile quick-add bar** — always-visible URL input on mobile, paste button, auto-submit
+- **Deep linking** — `?add=URL` query param for universal link capture
+- **PWA Share Target** — Boards appears in mobile share sheets (manifest + service worker)
+- **Bookmarklet** — drag-to-install for one-click desktop capture
+- **Tools modal** — centralized access to all capture methods + PWA install
+- **Image scanning** — Claude Vision API extracts products/brands/URLs from photos
 
 ### Listen Category ✅
 **Completed: 2026-02-09**
@@ -92,12 +102,12 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 4: Sharing & Collaboration | 11 | 1 | 128 | 0 |
 | Phase 5: UX Polish | 3 | 0 | 57 | 0 |
 | Phase 6: Performance | 1 | 0 | 14 | 0 |
-| Phase 7: Platform Expansion | 0 | 0 | 11 | 0 |
+| Phase 7: Platform Expansion | 21 | 0 | 17 | 0 |
 | Phase 8: Automated Pins | 0 | 0 | 54 | 0 |
 | Phase 9: Bulk Import | 0 | 0 | 132 | 0 |
 | Phase 10: Image Validation | 47 | 0 | 55 | 0 |
 | Backlog | 1 | 0 | 108 | 0 |
-| **TOTAL** | **253** | **5** | **816** | **0** |
+| **TOTAL** | **274** | **5** | **822** | **0** |
 
 ---
 

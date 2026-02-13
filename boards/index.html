@@ -2216,6 +2216,455 @@ body {
 }
 
 /* ============================================
+   Scan Results Modal
+   ============================================ */
+.scan-results {
+  padding: var(--space-4);
+}
+
+.scan-results__loading {
+  text-align: center;
+  padding: var(--space-6);
+}
+
+.scan-results__spinner {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.scan-results__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.scan-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.scan-result-item:hover {
+  border-color: var(--fg);
+}
+
+.scan-result-item--selected {
+  border-color: var(--fg);
+  background: var(--surface);
+}
+
+.scan-result-item__check {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--fg);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.scan-result-item--selected .scan-result-item__check {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.scan-result-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scan-result-item__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.scan-result-item__desc {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
+
+.scan-result-item__url {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.scan-result-item__category {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--subtle);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.scan-results__actions {
+  margin-top: var(--space-4);
+  display: flex;
+  gap: var(--space-2);
+}
+
+.scan-results__add-all {
+  flex: 1;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.scan-results__add-all:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.scan-results__add-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   Tools Modal — Tabs + Coached Install
+   ============================================ */
+.tools-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--subtle);
+}
+
+.tools-tab {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tools-tab:hover {
+  color: var(--fg);
+}
+
+.tools-tab--active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+.tools-panel {
+  padding: var(--space-4);
+}
+
+.tools-panel--hidden {
+  display: none;
+}
+
+/* Coach — step-by-step install */
+.tools-coach__step {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--subtle);
+}
+
+.tools-coach__step:last-child {
+  border-bottom: none;
+}
+
+.tools-coach__step--inactive {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.tools-coach__step--done {
+  opacity: 0.4;
+}
+
+.tools-coach__step--done .tools-coach__step-num {
+  background: transparent;
+  color: var(--muted);
+}
+
+.tools-coach__step--done .tools-coach__step-num::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.tools-coach__step-num {
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--fg);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tools-coach__step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tools-coach__step-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.tools-coach__step-desc {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+  line-height: 1.5;
+}
+
+.tools-coach__step-desc kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  color: var(--fg);
+}
+
+.tools-coach__next,
+.tools-coach__done {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tools-coach__next:hover,
+.tools-coach__done:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.tools-coach__drag-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  border: 2px dashed var(--subtle);
+  margin-bottom: var(--space-3);
+}
+
+.tools-coach__bookmarklet {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  text-decoration: none;
+  cursor: grab;
+  transition: transform 0.15s;
+  user-select: none;
+}
+
+.tools-coach__bookmarklet:hover {
+  transform: scale(1.05);
+}
+
+.tools-coach__bookmarklet:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.tools-coach__arrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  animation: arrow-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes arrow-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.tools-coach__alt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.tools-coach__link-btn {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tools-coach__link-btn:hover {
+  opacity: 0.7;
+}
+
+/* Shared tools-list styles (used in Share Link and PWA tabs) */
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tools-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tools-list__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+}
+
+.tools-list__desc {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.tools-list__example {
+  font-size: 10px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  word-break: break-all;
+}
+
+.tools-list__url-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tools-list__url {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.tools-list__url:focus {
+  border-color: var(--fg);
+  outline: none;
+}
+
+.tools-list__copy {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tools-list__copy:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.tools-list__btn {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tools-list__btn:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.tools-list__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ============================================
    Overlay (Detail View)
    ============================================ */
 .overlay {
@@ -2659,6 +3108,193 @@ body {
 
 .clipboard-prompt__btn--dismiss:hover {
   opacity: 0.7;
+}
+
+/* ============================================
+   Capture Tool Promo Banner
+   ============================================ */
+.capture-promo {
+  display: none; /* JS shows it */
+  position: fixed;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  max-width: 420px;
+  width: calc(100% - 32px);
+  border: 1px solid var(--fg);
+  animation: promo-slide-up 0.3s ease;
+}
+
+@keyframes promo-slide-up {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.capture-promo__inner {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.capture-promo__icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.capture-promo__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.capture-promo__text {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.capture-promo__subtext {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+
+.capture-promo__cta {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--bg);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.capture-promo__cta:hover {
+  background: transparent;
+  color: var(--bg);
+  border-color: var(--bg);
+}
+
+.capture-promo__dismiss {
+  background: transparent;
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: var(--space-1);
+  flex-shrink: 0;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.capture-promo__dismiss:hover {
+  opacity: 1;
+}
+
+/* On mobile: promo shows PWA install instead of bookmarklet */
+@media (max-width: 600px) {
+  .capture-promo {
+    bottom: 110px; /* above quick-add bar */
+  }
+}
+
+/* Quick-Add Bar — mobile-first always-visible URL input */
+.quick-add {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 600px) {
+  .quick-add {
+    display: flex;
+    position: fixed;
+    bottom: 56px; /* above bottom-nav */
+    left: 0;
+    right: 0;
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg);
+    border-top: 1px solid var(--subtle);
+    z-index: 49;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .quick-add__input {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    background: var(--surface);
+    color: var(--fg);
+    border: 1px solid var(--subtle);
+    outline: none;
+  }
+
+  .quick-add__input:focus {
+    border-color: var(--fg);
+  }
+
+  .quick-add__input::placeholder {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .quick-add__paste {
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--fg);
+    color: var(--bg);
+    border: 1px solid var(--fg);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .quick-add__paste:active {
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .quick-add__submit {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base);
+    background: var(--fg);
+    color: var(--bg);
+    border: 1px solid var(--fg);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .quick-add__submit:active {
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  /* Adjust grid bottom padding to not overlap quick-add bar */
+  .grid {
+    padding-bottom: 120px;
+  }
 }
 
 /* ============================================
@@ -3339,6 +3975,26 @@ body {
 
   <div class="listen-player" id="listenPlayer"></div>
 
+  <!-- Capture Tool Promo Banner -->
+  <div class="capture-promo" id="capturePromo">
+    <div class="capture-promo__inner">
+      <div class="capture-promo__icon">⚡</div>
+      <div class="capture-promo__body">
+        <div class="capture-promo__text" id="promoText">Save links in one click from any page</div>
+        <div class="capture-promo__subtext" id="promoSubtext">Set up the bookmarklet — takes 10 seconds</div>
+      </div>
+      <button class="capture-promo__cta" id="promoShowTools">Set up</button>
+      <button class="capture-promo__dismiss" id="promoDismiss" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+
+  <!-- Quick-Add Bar (mobile) -->
+  <div class="quick-add" id="quickAdd">
+    <input type="text" class="quick-add__input" id="quickAddInput" placeholder="Paste a link" autocomplete="off" autocapitalize="off" inputmode="url">
+    <button class="quick-add__paste" id="quickAddPaste">Paste</button>
+    <button class="quick-add__submit" id="quickAddSubmit" aria-label="Add link">+</button>
+  </div>
+
   <!-- Bottom Navigation -->
   <nav class="bottom-nav" id="bottomNav">
     <div class="bottom-nav__left">
@@ -3361,6 +4017,10 @@ body {
           <button class="fab-menu__item" id="fabVideoUpload">
             <span class="fab-menu__item-icon">▶</span>
             Video
+          </button>
+          <button class="fab-menu__item" id="fabTools">
+            <span class="fab-menu__item-icon">⚙</span>
+            Tools
           </button>
         </div>
         <button class="fab-menu__trigger" id="fabTrigger" aria-label="Add content">+</button>
@@ -3387,6 +4047,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <div class="add-form__status" id="formStatus"></div>
         <button type="submit" class="add-form__submit">Add</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Scan Results Modal -->
+  <div class="modal" id="scanModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title">Scan Results</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div class="scan-results" id="scanResults">
+        <div class="scan-results__loading" id="scanLoading">
+          <div class="scan-results__spinner">Analyzing image...</div>
+        </div>
+        <div class="scan-results__list" id="scanList"></div>
+        <div class="scan-results__actions" id="scanActions" style="display:none;">
+          <button class="scan-results__add-all" id="scanAddAll">Add All Links</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3584,6 +4264,94 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           <button class="theme-toggle" id="themeToggle">
             <div class="theme-toggle__knob"></div>
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tools Modal — step-by-step install coach -->
+  <div class="modal modal--small" id="toolsModal">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title" id="toolsTitle">Capture Tools</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tools-tabs" id="toolsTabs">
+        <button class="tools-tab tools-tab--active" data-tab="bookmarklet">Bookmarklet</button>
+        <button class="tools-tab" data-tab="sharelink">Share Link</button>
+        <button class="tools-tab" data-tab="pwa">Install App</button>
+      </div>
+
+      <!-- Bookmarklet tab — coached install flow -->
+      <div class="tools-panel" id="toolsPanel-bookmarklet">
+        <div class="tools-coach" id="bookmarkletCoach">
+          <!-- Step 1: Show bookmarks bar -->
+          <div class="tools-coach__step" id="bmStep1">
+            <div class="tools-coach__step-num">1</div>
+            <div class="tools-coach__step-body">
+              <div class="tools-coach__step-title">Show your bookmarks bar</div>
+              <div class="tools-coach__step-desc">
+                Press <kbd id="bmShortcut">Ctrl+Shift+B</kbd> if it's hidden
+              </div>
+              <button class="tools-coach__next" id="bmStep1Next">My bar is visible →</button>
+            </div>
+          </div>
+          <!-- Step 2: Drag the bookmarklet -->
+          <div class="tools-coach__step tools-coach__step--inactive" id="bmStep2">
+            <div class="tools-coach__step-num">2</div>
+            <div class="tools-coach__step-body">
+              <div class="tools-coach__step-title">Drag this button to your bookmarks bar</div>
+              <div class="tools-coach__step-desc">Click and hold, then drag up to your bookmarks bar and release</div>
+              <div class="tools-coach__drag-target">
+                <a class="tools-coach__bookmarklet" id="bookmarkletLink" href="javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))" draggable="true">+ Save to Boards</a>
+                <div class="tools-coach__arrow" id="bmDragArrow">↑ drag up</div>
+              </div>
+              <div class="tools-coach__alt" id="bmCopyAlt">
+                Can't drag? <button class="tools-coach__link-btn" id="bmCopyLink">Copy link instead</button> and manually create a bookmark.
+              </div>
+            </div>
+          </div>
+          <!-- Step 3: Test it -->
+          <div class="tools-coach__step tools-coach__step--inactive" id="bmStep3">
+            <div class="tools-coach__step-num">3</div>
+            <div class="tools-coach__step-body">
+              <div class="tools-coach__step-title">You're all set!</div>
+              <div class="tools-coach__step-desc">Click "+ Save to Boards" in your bookmarks bar on any page to save it here.</div>
+              <button class="tools-coach__done" id="bmDone">Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Share Link tab -->
+      <div class="tools-panel tools-panel--hidden" id="toolsPanel-sharelink">
+        <div class="tools-list">
+          <div class="tools-list__item">
+            <div class="tools-list__label">Share URL</div>
+            <div class="tools-list__desc">Append any URL to this link to save it to Boards. Works with Apple Shortcuts, IFTTT, Tasker, and any automation tool.</div>
+            <div class="tools-list__url-row">
+              <input class="tools-list__url" id="toolsShareUrl" value="https://ctrl.rodeo/boards/?add=" readonly onclick="this.select();">
+              <button class="tools-list__copy" id="toolsShareCopy">Copy</button>
+            </div>
+          </div>
+          <div class="tools-list__item">
+            <div class="tools-list__label">Example</div>
+            <div class="tools-list__desc tools-list__example">ctrl.rodeo/boards/?add=https://example.com/cool-thing</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PWA Install tab -->
+      <div class="tools-panel tools-panel--hidden" id="toolsPanel-pwa">
+        <div class="tools-list">
+          <div class="tools-list__item">
+            <div class="tools-list__label">Install Boards App</div>
+            <div class="tools-list__desc">Add Boards to your home screen. On mobile, this lets you share links directly from any app to Boards.</div>
+            <button class="tools-list__btn" id="installPwaBtn">Install</button>
+          </div>
         </div>
       </div>
     </div>
@@ -8835,10 +9603,20 @@ Return JSON:
   const fabTrigger = $('fabTrigger');
   const fabShareLink = $('fabShareLink');
   const fabPhotoUpload = $('fabPhotoUpload');
+  const fabScanImage = $('fabScanImage');
   const fabVideoUpload = $('fabVideoUpload');
   const photoInput = $('photoInput');
+  const scanInput = $('scanInput');
   const videoInput = $('videoInput');
   const bottomThemeToggle = $('bottomThemeToggle');
+
+  // Scan Modal DOM
+  const scanModal = $('scanModal');
+  const scanResults = $('scanResults');
+  const scanLoading = $('scanLoading');
+  const scanList = $('scanList');
+  const scanActions = $('scanActions');
+  const scanAddAll = $('scanAddAll');
 
   // Progress DOM
   const progressBar = $('progressBar');
@@ -9326,10 +10104,158 @@ Return JSON:
     photoInput.click();
   };
 
+  fabScanImage.onclick = () => {
+    fabMenu.classList.remove('fab-menu--open');
+    scanInput.click();
+  };
+
   fabVideoUpload.onclick = () => {
     fabMenu.classList.remove('fab-menu--open');
     videoInput.click();
   };
+
+  // ============================================
+  // Tools Modal — Tabs + Coached Bookmarklet Install
+  // ============================================
+  const fabTools = document.getElementById('fabTools');
+  const toolsModal = document.getElementById('toolsModal');
+
+  if (fabTools && toolsModal) {
+    fabTools.onclick = () => {
+      fabMenu.classList.remove('fab-menu--open');
+      openModal(toolsModal);
+    };
+
+    toolsModal.querySelectorAll('[data-close]').forEach(el => {
+      el.onclick = () => closeModal(toolsModal);
+    });
+  }
+
+  // Tab navigation
+  const toolsTabs = document.querySelectorAll('.tools-tab');
+  toolsTabs.forEach(tab => {
+    tab.onclick = () => {
+      const target = tab.dataset.tab;
+      // Update tabs
+      toolsTabs.forEach(t => t.classList.toggle('tools-tab--active', t === tab));
+      // Update panels
+      document.querySelectorAll('.tools-panel').forEach(p => {
+        p.classList.toggle('tools-panel--hidden', p.id !== `toolsPanel-${target}`);
+      });
+    };
+  });
+
+  // Detect OS for keyboard shortcut
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const bmShortcut = document.getElementById('bmShortcut');
+  if (bmShortcut) {
+    bmShortcut.textContent = isMac ? '⌘+Shift+B' : 'Ctrl+Shift+B';
+  }
+
+  // Coach step flow
+  const bmStep1 = document.getElementById('bmStep1');
+  const bmStep2 = document.getElementById('bmStep2');
+  const bmStep3 = document.getElementById('bmStep3');
+  const bmStep1Next = document.getElementById('bmStep1Next');
+  const bmCopyLink = document.getElementById('bmCopyLink');
+  const bmDone = document.getElementById('bmDone');
+  const bookmarkletLink = document.getElementById('bookmarkletLink');
+
+  function advanceToStep(stepNum) {
+    if (stepNum >= 2 && bmStep1) {
+      bmStep1.classList.add('tools-coach__step--done');
+      bmStep1.classList.remove('tools-coach__step--inactive');
+    }
+    if (stepNum >= 2 && bmStep2) {
+      bmStep2.classList.remove('tools-coach__step--inactive');
+    }
+    if (stepNum >= 3 && bmStep2) {
+      bmStep2.classList.add('tools-coach__step--done');
+    }
+    if (stepNum >= 3 && bmStep3) {
+      bmStep3.classList.remove('tools-coach__step--inactive');
+    }
+  }
+
+  if (bmStep1Next) {
+    bmStep1Next.onclick = () => advanceToStep(2);
+  }
+
+  // Detect when bookmarklet is dragged (dragend means they tried)
+  if (bookmarkletLink) {
+    bookmarkletLink.addEventListener('dragend', () => {
+      advanceToStep(3);
+    });
+    // Prevent click from navigating (it's a bookmarklet javascript: URL)
+    bookmarkletLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      toast('Drag this button to your bookmarks bar — don\'t click it here!');
+    });
+  }
+
+  // Copy link fallback
+  if (bmCopyLink) {
+    bmCopyLink.onclick = async () => {
+      const bmUrl = "javascript:void(window.location='https://ctrl.rodeo/boards/?add='+encodeURIComponent(window.location.href))";
+      try {
+        await navigator.clipboard.writeText(bmUrl);
+        toast('Copied! Create a new bookmark and paste this as the URL.');
+        advanceToStep(3);
+      } catch {
+        toast('Could not copy — try right-clicking the button instead', true);
+      }
+    };
+  }
+
+  if (bmDone) {
+    bmDone.onclick = () => closeModal(toolsModal);
+  }
+
+  // Share URL copy button
+  const toolsShareCopy = document.getElementById('toolsShareCopy');
+  const toolsShareUrl = document.getElementById('toolsShareUrl');
+  if (toolsShareCopy && toolsShareUrl) {
+    toolsShareCopy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(toolsShareUrl.value);
+        toolsShareCopy.textContent = 'Copied';
+        setTimeout(() => { toolsShareCopy.textContent = 'Copy'; }, 2000);
+      } catch {
+        toolsShareUrl.select();
+      }
+    };
+  }
+
+  // PWA Install prompt
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('installPwaBtn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (installBtn) installBtn.disabled = false;
+  });
+
+  if (installBtn) {
+    installBtn.disabled = true;
+    installBtn.textContent = 'Not available';
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      installBtn.textContent = 'Installed ✓';
+      installBtn.disabled = true;
+    }
+
+    installBtn.onclick = async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const result = await deferredInstallPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        installBtn.textContent = 'Installed ✓';
+        installBtn.disabled = true;
+      }
+      deferredInstallPrompt = null;
+    };
+  }
 
   // Photo upload handler
   photoInput.onchange = async (e) => {
@@ -9414,6 +10340,141 @@ Return JSON:
     videoInput.value = '';
     toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
   };
+
+  // ============================================
+  // Image Scan Feature
+  // ============================================
+  let scanSelectedItems = new Set();
+
+  if (fabScanImage && scanInput) {
+    scanInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Show modal with loading state
+      scanLoading.style.display = '';
+      scanList.innerHTML = '';
+      scanActions.style.display = 'none';
+      scanSelectedItems.clear();
+      openModal(scanModal);
+
+      try {
+        // Convert to base64
+        const base64 = await fileToBase64(file);
+        const mimeType = file.type || 'image/jpeg';
+
+        // Call scan-image edge function
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/scan-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ image: base64, mimeType })
+        });
+
+        if (!res.ok) throw new Error('Scan failed');
+
+        const data = await res.json();
+        const items = data.items || [];
+
+        scanLoading.style.display = 'none';
+
+        if (items.length === 0) {
+          scanList.innerHTML = '<div style="text-align:center;padding:var(--space-6);font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);">No items found in image</div>';
+          return;
+        }
+
+        // Render results
+        items.forEach((item, i) => {
+          const el = document.createElement('div');
+          el.className = 'scan-result-item scan-result-item--selected';
+          scanSelectedItems.add(i);
+
+          el.innerHTML = `
+            <div class="scan-result-item__check">✓</div>
+            <div class="scan-result-item__info">
+              <div class="scan-result-item__title">${esc(item.title)}</div>
+              <div class="scan-result-item__desc">${esc(item.description)}</div>
+              ${item.url ? `<div class="scan-result-item__url">${esc(item.url)}</div>` : ''}
+            </div>
+            <div class="scan-result-item__category">${esc(item.category)}</div>
+          `;
+
+          el.onclick = () => {
+            if (scanSelectedItems.has(i)) {
+              scanSelectedItems.delete(i);
+              el.classList.remove('scan-result-item--selected');
+            } else {
+              scanSelectedItems.add(i);
+              el.classList.add('scan-result-item--selected');
+            }
+            updateScanAddButton(items);
+          };
+
+          scanList.appendChild(el);
+        });
+
+        // Show add button
+        scanActions.style.display = '';
+        updateScanAddButton(items);
+
+        // Store items for add handler
+        scanModal._items = items;
+
+      } catch (err) {
+        console.error('[scan] Error:', err);
+        scanLoading.style.display = 'none';
+        scanList.innerHTML = '<div style="text-align:center;padding:var(--space-6);font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);">Failed to analyze image. Try again.</div>';
+      }
+
+      scanInput.value = '';
+    };
+  }
+
+  function updateScanAddButton(items) {
+    const count = scanSelectedItems.size;
+    const hasUrls = [...scanSelectedItems].some(i => items[i]?.url);
+    scanAddAll.textContent = count === 0 ? 'Select items' : `Add ${count} item${count > 1 ? 's' : ''}`;
+    scanAddAll.disabled = count === 0 || !hasUrls;
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // Remove data:image/...;base64, prefix
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (scanAddAll) {
+    scanAddAll.onclick = () => {
+      const items = scanModal._items || [];
+      const selected = [...scanSelectedItems].map(i => items[i]).filter(item => item?.url);
+
+      if (selected.length === 0) {
+        toast('No items with URLs selected', true);
+        return;
+      }
+
+      // Process all selected URLs
+      const urlText = selected.map(item => item.url).join('\n');
+      closeModal(scanModal);
+      processLinks(urlText);
+    };
+  }
+
+  // Close handlers for scan modal
+  if (scanModal) {
+    scanModal.querySelectorAll('[data-close]').forEach(el => {
+      el.onclick = () => closeModal(scanModal);
+    });
+  }
 
   // Bottom theme toggle
   bottomThemeToggle.onclick = () => {
@@ -10364,7 +11425,7 @@ Return JSON:
   // ============================================
   function openModal(m) { m.classList.add('modal--visible', 'overlay--visible'); }
   function closeModal(m) { m.classList.remove('modal--visible', 'overlay--visible'); }
-  function closeAll() { [addModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -11553,6 +12614,13 @@ Return JSON:
       document.documentElement.classList.add('light');
     }
 
+    // Register service worker for PWA + share target
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/boards/sw.js').catch(err => {
+        console.log('[sw] Registration failed:', err);
+      });
+    }
+
     // Check if user is logged in (quick check before full session validation)
     const quickSession = getStoredSession();
 
@@ -11584,6 +12652,19 @@ Return JSON:
     initWidgetSystem();
     generateWidgets();
     console.log(`[perf] init: ${(performance.now() - initStart).toFixed(0)}ms`);
+
+    // Handle deep link: ?add=URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const addUrl = urlParams.get('add');
+    if (addUrl) {
+      // Mark this session as deep-link arrival (suppress bookmarklet promo)
+      sessionStorage.setItem('boards_arrived_via_deeplink', '1');
+      // Clean up the URL bar
+      const cleanLocation = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', cleanLocation);
+      // Process the link
+      processLinks(addUrl);
+    }
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange(onAuthStateChange);
@@ -11780,6 +12861,226 @@ Return JSON:
   };
 
   init();
+
+  // ============================================
+  // Quick-Add Bar (mobile)
+  // ============================================
+  const quickAddInput = document.getElementById('quickAddInput');
+  const quickAddPaste = document.getElementById('quickAddPaste');
+  const quickAddSubmit = document.getElementById('quickAddSubmit');
+
+  if (quickAddInput) {
+    // Paste button — reads clipboard and fills input or processes directly
+    quickAddPaste.onclick = async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const urls = extractUrls(text);
+        if (urls.length > 0) {
+          // Process directly if clipboard has URLs
+          processLinks(text);
+          quickAddInput.value = '';
+        } else {
+          // Paste text into input for manual editing
+          quickAddInput.value = text;
+          quickAddInput.focus();
+        }
+      } catch (e) {
+        // Fallback: focus input so user can manually paste
+        quickAddInput.focus();
+        toast('Tap and hold to paste', true);
+      }
+    };
+
+    // Submit button — processes whatever is in the input
+    quickAddSubmit.onclick = () => {
+      const text = quickAddInput.value.trim();
+      if (!text) {
+        quickAddInput.focus();
+        return;
+      }
+      const urls = extractUrls(text);
+      if (urls.length > 0) {
+        processLinks(text);
+        quickAddInput.value = '';
+      } else {
+        toast('No valid URL found', true);
+      }
+    };
+
+    // Enter key submits
+    quickAddInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        quickAddSubmit.click();
+      }
+    });
+
+    // Auto-detect paste into input
+    quickAddInput.addEventListener('paste', (e) => {
+      // Let the paste happen naturally, then process after a tick
+      setTimeout(() => {
+        const text = quickAddInput.value.trim();
+        const urls = extractUrls(text);
+        if (urls.length > 0) {
+          processLinks(text);
+          quickAddInput.value = '';
+        }
+      }, 0);
+    });
+  }
+
+  // ============================================
+  // Capture Tool Promo Banner
+  // ============================================
+  // Smart promotion for capture tools:
+  //
+  // DESKTOP: promotes bookmarklet install
+  //   - Shows after 3rd link add (engaged user)
+  //   - "Set up" opens Tools modal to bookmarklet coach
+  //   - Dismiss ×1 → snooze 7 days, then shows once more with softer copy
+  //   - Dismiss ×2 → gone for 90 days
+  //   - Dismiss ×3 → gone permanently
+  //   - Opening Tools modal = "set up", never shows again
+  //   - Deep link arrival = already using tools, skip this session
+  //
+  // MOBILE: promotes PWA install (share sheet access)
+  //   - Same trigger logic but different copy
+  //   - "Install" triggers PWA beforeinstallprompt
+  //   - If already installed as PWA, never shows
+
+  const PROMO_KEY = 'boards_capture_promo';
+  const capturePromo = document.getElementById('capturePromo');
+  const promoShowTools = document.getElementById('promoShowTools');
+  const promoDismiss = document.getElementById('promoDismiss');
+  const promoText = document.getElementById('promoText');
+  const promoSubtext = document.getElementById('promoSubtext');
+  const promoIcon = capturePromo?.querySelector('.capture-promo__icon');
+  const isMobile = window.innerWidth <= 600;
+  const isPwaInstalled = window.matchMedia('(display-mode: standalone)').matches;
+
+  function getPromoState() {
+    try { return JSON.parse(localStorage.getItem(PROMO_KEY)) || {}; } catch { return {}; }
+  }
+
+  function setPromoState(updates) {
+    const state = { ...getPromoState(), ...updates };
+    localStorage.setItem(PROMO_KEY, JSON.stringify(state));
+    return state;
+  }
+
+  function shouldShowPromo() {
+    const state = getPromoState();
+
+    // Already set up tools — done forever
+    if (state.installed) return false;
+
+    // Arrived via deep link or share target — already using a capture tool
+    if (sessionStorage.getItem('boards_arrived_via_deeplink')) return false;
+
+    // Mobile: skip if already installed as PWA
+    if (isMobile && isPwaInstalled) return false;
+
+    // Mobile: skip if PWA install isn't available (can't act on the promo)
+    if (isMobile && !deferredInstallPrompt) return false;
+
+    // Escalating dismiss: 7d → 90d → permanent
+    if (state.dismissedAt) {
+      const count = state.dismissCount || 1;
+      if (count >= 3) return false; // permanent dismiss
+      const cooldownDays = count >= 2 ? 90 : 7;
+      if (Date.now() - state.dismissedAt < cooldownDays * 86400000) return false;
+    }
+
+    // Only show after 3+ links (engaged user)
+    const links = getAllLinks();
+    if (links.length < 3) return false;
+
+    return true;
+  }
+
+  function configurePromo() {
+    if (!capturePromo) return;
+    const state = getPromoState();
+    const dismissCount = state.dismissCount || 0;
+    const isReturn = dismissCount > 0;
+
+    if (isMobile) {
+      // Mobile: promote PWA install
+      if (promoIcon) promoIcon.textContent = '📱';
+      if (promoText) promoText.textContent = 'Share links from any app to Boards';
+      if (promoSubtext) promoSubtext.textContent = 'Install the app to your home screen';
+      if (promoShowTools) promoShowTools.textContent = 'Install';
+    } else if (isReturn) {
+      // Desktop return: softer copy
+      if (promoIcon) promoIcon.textContent = '💡';
+      if (promoText) promoText.textContent = 'Still pasting links? There\'s a faster way';
+      if (promoSubtext) promoSubtext.textContent = 'One-click saving from any page';
+      if (promoShowTools) promoShowTools.textContent = 'Show me';
+    }
+    // else: default desktop copy from HTML
+  }
+
+  function showPromo() {
+    if (!capturePromo || !shouldShowPromo()) return;
+    configurePromo();
+    capturePromo.style.display = 'block';
+  }
+
+  function hidePromo() {
+    if (capturePromo) capturePromo.style.display = 'none';
+  }
+
+  // CTA button
+  if (promoShowTools) {
+    promoShowTools.onclick = () => {
+      hidePromo();
+      setPromoState({ installed: true });
+      if (isMobile && deferredInstallPrompt) {
+        // Mobile: trigger PWA install
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(result => {
+          if (result.outcome === 'accepted' && installBtn) {
+            installBtn.textContent = 'Installed ✓';
+            installBtn.disabled = true;
+          }
+          deferredInstallPrompt = null;
+        });
+      } else if (toolsModal) {
+        // Desktop: open Tools modal to bookmarklet tab
+        openModal(toolsModal);
+      }
+    };
+  }
+
+  // Dismiss button — escalating cooldown
+  if (promoDismiss) {
+    promoDismiss.onclick = () => {
+      hidePromo();
+      const state = getPromoState();
+      const dismissCount = (state.dismissCount || 0) + 1;
+      setPromoState({ dismissedAt: Date.now(), dismissCount });
+    };
+  }
+
+  // Mark tools modal opens as "set up" (user found it themselves)
+  if (fabTools) {
+    const origFabToolsClick = fabTools.onclick;
+    fabTools.onclick = (e) => {
+      setPromoState({ installed: true });
+      hidePromo();
+      if (origFabToolsClick) origFabToolsClick(e);
+    };
+  }
+
+  // Show promo after successful link adds
+  const _origProcessLinks = processLinks;
+  processLinks = async function(text) {
+    await _origProcessLinks(text);
+    setTimeout(showPromo, 2500);
+  };
+
+  // Also check on page load (returning user with 3+ links)
+  setTimeout(showPromo, 3000);
 
   // Continuous clipboard scanning - check when tab becomes visible or gains focus
   let lastClipboardCheck = 0;
