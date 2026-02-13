@@ -2002,10 +2002,13 @@ body {
     const na = normalizeForDedup(a), nb = normalizeForDedup(b);
     if (!na || !nb) return false;
     if (na === nb) return true;
-    if (na.includes(nb) || nb.includes(na)) return true;
-    // Scale threshold with name length: 3 for short names, up to 15% for longer ones
+    // Substring match only when the shorter name is substantial (>= 60% of longer)
+    const shorter = na.length <= nb.length ? na : nb;
+    const longer = na.length > nb.length ? na : nb;
+    if (shorter.length >= 8 && shorter.length >= longer.length * 0.6 && longer.includes(shorter)) return true;
+    // Scale threshold with name length: 2 for short names, up to 12% for longer ones
     const maxLen = Math.max(na.length, nb.length);
-    const threshold = maxLen < 20 ? 3 : Math.floor(maxLen * 0.15);
+    const threshold = maxLen < 15 ? 2 : Math.floor(maxLen * 0.12);
     return levenshtein(na, nb) <= threshold;
   }
 
@@ -2034,6 +2037,8 @@ body {
     for (const ev of events) {
       let found = false;
       for (const existing of merged) {
+        // Never dedup events that lack a date — we can't confirm they're the same day
+        if (!existing.date || !ev.date) continue;
         // Must match on date + name; venue match required if both have venues
         if (existing.date !== ev.date) continue;
         if (!namesMatch(existing.name, ev.name)) continue;
