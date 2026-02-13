@@ -1772,7 +1772,7 @@ body {
   border-top: 2px solid var(--fg);
 }
 .listen-player--tall {
-  height: 166px;
+  height: 152px;
 }
 .listen-player__header {
   display: flex;
@@ -1881,7 +1881,7 @@ body {
 .listen-player__fallback-btn--youtube-music:hover { background: #FF0000; border-color: #FF0000; }
 .listen-player__fallback-btn--bandcamp:hover { background: #629AA9; border-color: #629AA9; }
 .grid--player-active {
-  padding-bottom: 90px;
+  padding-bottom: 160px;
 }
 
 /* Extended Listen Row Metadata */
@@ -1978,10 +1978,9 @@ body {
 
 @media (max-width: 768px) {
   .listen-player--active { height: 60px; }
-  .listen-player--tall { height: 140px; }
-  .listen-player__close { width: 32px; height: 32px; font-size: 18px; }
+  .listen-player--tall { height: 152px; }
   .listen-row__meta-secondary { opacity: 1; }
-  .grid--player-active { padding-bottom: 70px; }
+  .grid--player-active { padding-bottom: 160px; }
 }
 
 /* ============================================
@@ -6958,7 +6957,7 @@ Return JSON:
     }
     const playingRow = document.querySelector('.listen-row[data-id="' + currentPlayer.linkId + '"]');
     if (playingRow) playingRow.classList.add('listen-row--playing');
-    const isTall = currentPlayer.embedHeight > 100;
+    const isTall = currentPlayer.embedHeight > 80;
     el.className = 'listen-player listen-player--active' + (isTall ? ' listen-player--tall' : '');
     document.querySelector('.grid')?.classList.add('grid--player-active');
     const artHtml = currentPlayer.albumArt
@@ -6967,16 +6966,10 @@ Return JSON:
     const platformLabel = cap(currentPlayer.platform || 'Web');
     const listenLink = '<a class="listen-player__open-btn listen-player__open-btn--' + esc(currentPlayer.platform) + '" href="' + esc(currentPlayer.url) + '" target="_blank" rel="noopener">Listen on ' + esc(platformLabel) + '</a>';
     if (currentPlayer.embedUrl) {
-      el.innerHTML = '<div class="listen-player__header">' +
-        artHtml +
-        '<div class="listen-player__info">' +
-          (currentPlayer.artist ? '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' : '') +
-          '<span class="listen-player__track">' + esc(currentPlayer.track) + '</span>' +
-        '</div>' +
-        listenLink +
-      '</div>' +
-      '<iframe class="listen-player__embed" src="' + esc(currentPlayer.embedUrl) + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>';
+      // Embed mode: show only the iframe — platform embeds have their own UI
+      el.innerHTML = '<iframe class="listen-player__embed" src="' + esc(currentPlayer.embedUrl) + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>';
     } else {
+      // Fallback mode: show header with art, info, and listen link
       el.innerHTML = '<div class="listen-player__header">' +
         artHtml +
         '<div class="listen-player__info">' +
@@ -7886,11 +7879,11 @@ Return JSON:
       if (domain.includes('spotify.com')) {
         if (platformId) {
           const p = platformId.split(':');
-          if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2], embedType: 'iframe', embedHeight: 80 };
+          if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2], embedType: 'iframe', embedHeight: 152 };
         }
         // Fallback: parse embed URL directly from the Spotify URL
         const sm = url.match(/open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
-        if (sm) return { embedUrl: 'https://open.spotify.com/embed/' + sm[1] + '/' + sm[2], embedType: 'iframe', embedHeight: 80 };
+        if (sm) return { embedUrl: 'https://open.spotify.com/embed/' + sm[1] + '/' + sm[2], embedType: 'iframe', embedHeight: 152 };
       }
       if (domain.includes('soundcloud.com')) {
         return { embedUrl: 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) + '&auto_play=false&hide_related=true&show_comments=false&visual=false', embedType: 'iframe', embedHeight: 166 };
