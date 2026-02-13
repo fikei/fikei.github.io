@@ -1827,23 +1827,28 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.listen-player__close {
-  width: 24px;
-  height: 24px;
+.listen-player__open-btn {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
   border: 1px solid var(--fg);
-  background: transparent;
   color: var(--fg);
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  text-decoration: none;
   flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
 }
-.listen-player__close:hover {
+.listen-player__open-btn:hover {
   background: var(--fg);
   color: var(--bg);
 }
+.listen-player__open-btn--spotify:hover { background: #1DB954; border-color: #1DB954; }
+.listen-player__open-btn--soundcloud:hover { background: #FF5500; border-color: #FF5500; }
+.listen-player__open-btn--apple-music:hover { background: #FA243C; border-color: #FA243C; }
+.listen-player__open-btn--youtube-music:hover { background: #FF0000; border-color: #FF0000; }
+.listen-player__open-btn--bandcamp:hover { background: #629AA9; border-color: #629AA9; }
 .listen-player__embed {
   flex: 1;
   width: 100%;
@@ -6893,7 +6898,7 @@ Return JSON:
   let currentPlayer = { linkId: null, embedUrl: null, platform: null, artist: null, track: null, albumArt: null, url: null };
 
   function openPlayer(linkId) {
-    if (currentPlayer.linkId === linkId) { closePlayer(); return; }
+    if (currentPlayer.linkId === linkId) return; // Already playing this track
     const data = load();
     const link = data.links.find(l => l.id === linkId);
     if (!link) return;
@@ -6924,8 +6929,8 @@ Return JSON:
       linkId: linkId,
       embedUrl: embedUrl || null,
       platform: platform,
-      artist: music.artist || link.domain || '',
-      track: music.trackTitle || link.title || '',
+      artist: music.artist || (music.trackTitle ? link.domain : ''),
+      track: music.trackTitle || link.title || link.domain || '',
       albumArt: link.image || null,
       url: link.url,
       embedType: embedType,
@@ -6959,27 +6964,26 @@ Return JSON:
     const artHtml = currentPlayer.albumArt
       ? '<img class="listen-player__art" src="' + esc(secureImg(currentPlayer.albumArt)) + '" alt="">'
       : '<div class="listen-player__art listen-player__art--placeholder">' + esc(currentPlayer.artist.charAt(0).toUpperCase()) + '</div>';
+    const platformLabel = cap(currentPlayer.platform || 'Web');
+    const listenLink = '<a class="listen-player__open-btn listen-player__open-btn--' + esc(currentPlayer.platform) + '" href="' + esc(currentPlayer.url) + '" target="_blank" rel="noopener">Listen on ' + esc(platformLabel) + '</a>';
     if (currentPlayer.embedUrl) {
       el.innerHTML = '<div class="listen-player__header">' +
         artHtml +
         '<div class="listen-player__info">' +
-          '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' +
+          (currentPlayer.artist ? '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' : '') +
           '<span class="listen-player__track">' + esc(currentPlayer.track) + '</span>' +
         '</div>' +
-        '<button class="listen-player__close" onclick="closePlayer()">&times;</button>' +
+        listenLink +
       '</div>' +
       '<iframe class="listen-player__embed" src="' + esc(currentPlayer.embedUrl) + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>';
     } else {
       el.innerHTML = '<div class="listen-player__header">' +
         artHtml +
         '<div class="listen-player__info">' +
-          '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' +
+          (currentPlayer.artist ? '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' : '') +
           '<span class="listen-player__track">' + esc(currentPlayer.track) + '</span>' +
         '</div>' +
-        '<button class="listen-player__close" onclick="closePlayer()">&times;</button>' +
-      '</div>' +
-      '<div class="listen-player__fallback">' +
-        '<a class="listen-player__fallback-btn listen-player__fallback-btn--' + esc(currentPlayer.platform) + '" href="' + esc(currentPlayer.url) + '" target="_blank" rel="noopener">Play on ' + esc(cap(currentPlayer.platform || 'Web')) + '</a>' +
+        listenLink +
       '</div>';
     }
   }
@@ -8749,7 +8753,7 @@ Return JSON:
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
   const LISTEN_VIEW_KEY = 'boards-listen-view';
-  let listenView = localStorage.getItem(LISTEN_VIEW_KEY) || 'grid'; // 'grid' | 'list'
+  let listenView = localStorage.getItem(LISTEN_VIEW_KEY) || 'list'; // 'grid' | 'list'
 
   // ============================================
   // DOM
@@ -9160,8 +9164,8 @@ Return JSON:
       if (isListenList && isListen) {
         const platform = getMusicPlatform(l.domain);
         const platformDot = platform ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platform}"></span>` : '';
-        const artistName = music?.artist || l.domain;
-        const trackName = music?.trackTitle || l.title;
+        const artistName = music?.artist || (music?.trackTitle ? l.domain : '');
+        const trackName = music?.trackTitle || l.title || l.domain;
         const dur = music?.duration ? formatDuration(music.duration) : '';
         const fmt = music?.contentFormat ? cap(music.contentFormat.replace('-', ' ')) : '';
 
@@ -9610,10 +9614,6 @@ Return JSON:
     }
   });
 
-  // Escape key closes player
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && currentPlayer.linkId) closePlayer();
-  });
 
   grid.onclick = async (e) => {
     // Handle listen row click → open player
