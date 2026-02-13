@@ -3007,7 +3007,11 @@ body {
         : `<span${titleAttr}>${escHtml(displayName)}</span>`;
       // Date (no time) and Time (separate)
       const dateDisplay = formatDate(ev.date);
-      const timeDisplay = ev.time ? escHtml(ev.time) : '';
+      // Show only start time; full range in tooltip
+      const timeRaw = ev.time || '';
+      const timeStart = timeRaw.split(/[-–]/)[0].split('(')[0].trim();
+      const timeDisplay = timeStart ? escHtml(timeStart) : '';
+      const timeTip = (timeRaw !== timeStart && timeRaw) ? ` title="${escHtml(timeRaw)}"` : '';
       // Venue + city combined
       const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
       // Type
@@ -3027,7 +3031,7 @@ body {
       const thumbHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="event-thumb" alt="" loading="lazy">` : '';
       return `<tr>
         <td class="col-date">${dateDisplay}</td>
-        <td class="col-time">${timeDisplay}</td>
+        <td class="col-time"${timeTip}>${timeDisplay}</td>
         <td class="col-name">${thumbHtml}${nameCell}</td>
         <td class="col-venue">${venueHtml}</td>
         <td class="col-type">${escHtml(typeLabel)}</td>
