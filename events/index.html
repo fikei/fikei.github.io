@@ -234,7 +234,8 @@ body {
 .data-table .col-price[title] { cursor: help; }
 .data-table .col-ages { display: none; }
 .data-table .col-promoter { display: none; }
-.data-table .col-source { width: 90px; white-space: nowrap; }
+.data-table .col-source { width: 90px; }
+.data-table .col-source .token--source + .token--source { margin-left: 3px; }
 
 /* Source token — color-coded, clickable */
 .token--source {
@@ -3409,8 +3410,11 @@ body {
     const tbody = document.getElementById('eventsBody');
     tbody.innerHTML = sorted.map(ev => {
       const sourceIds = ev.sources || [ev.source];
-      const sourceName = sourceIds.map(sid => state.sources.find(s => s.id === sid)?.name || sid).join(' + ');
-      const sourceColor = getSourceColor(sourceIds[0]);
+      const sourceTagsHtml = sourceIds.map(sid => {
+        const sName = state.sources.find(s => s.id === sid)?.name || sid;
+        const sColor = getSourceColor(sid);
+        return `<span class="token token--source" data-source-id="${escHtml(sid)}" style="border-color: ${sColor}; color: ${sColor};">${escHtml(sName)}</span>`;
+      }).join(' ');
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
       const displayName = stripVenueFromTitle(ev.name, ev.venue);
       const nameCell = ev.url && ev.url !== '#'
@@ -3450,7 +3454,7 @@ body {
         <td class="col-price"${priceTitle}>${escHtml(priceData.short)}</td>
         <td class="col-ages">${escHtml(ev.ages)}</td>
         <td class="col-promoter">${escHtml(ev.promoter)}</td>
-        <td class="col-source"><span class="token token--source" data-source-id="${escHtml(sourceIds[0])}" style="border-color: ${sourceColor}; color: ${sourceColor};">${escHtml(sourceName)}</span></td>
+        <td class="col-source">${sourceTagsHtml}</td>
       </tr>`;
     }).join('');
 
