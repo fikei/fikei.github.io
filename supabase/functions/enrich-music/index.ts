@@ -1,14 +1,14 @@
 // Supabase Edge Function: enrich-music
-// Enriches music links with BPM, key, genre, label from external APIs
+// Enriches music links with genre, label from external APIs
+// BPM/key are fetched client-side via GetSongBPM (Cloudflare blocks server-side)
 //
 // POST /functions/v1/enrich-music
 // Body: { artist: string, track: string, album?: string }
-// Returns: { bpm?, key?, genre?, label?, sources, cached, confidence }
+// Returns: { genre?, label?, album?, releaseDate?, genreTags?, sources, cached, confidence }
 //
 // APIs used:
-//   - MusicBrainz (free, no key) → genre, label, album
-//   - GetSongBPM (free, key required) → BPM, musical key
-//   - Last.fm (free, key required) → genre tags
+//   - MusicBrainz (free, no key) → genre, label, album, releaseDate
+//   - Last.fm (free, key required) → genre tags (track-level, then artist-level fallback)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -23,6 +23,21 @@ const corsHeaders = {
 function normalizeLookupKey(artist: string, track: string): string {
   const norm = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim()
   return `${norm(artist)}:${norm(track)}`
+}
+
+/** Fuzzy compare two strings (lowercase, strip non-alphanumeric) */
+function fuzzyMatch(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^\w]/g, '')
+  return norm(a) === norm(b)
+}
+
+/** Check if artist name roughly matches (handles "feat." variations, "&" vs "and") */
+function artistMatches(query: string, candidate: string): boolean {
+  if (fuzzyMatch(query, candidate)) return true
+  // Try matching just the primary artist (before "feat", "ft", "&", "and", ",")
+  const primaryQuery = query.split(/\s*(?:feat\.?|ft\.?|&|and|,|featuring)\s*/i)[0].trim()
+  const primaryCandidate = candidate.split(/\s*(?:feat\.?|ft\.?|&|and|,|featuring)\s*/i)[0].trim()
+  return fuzzyMatch(primaryQuery, primaryCandidate)
 }
 
 // ── Cache ──
@@ -69,6 +84,7 @@ async function setCache(supabase: any, artist: string, track: string, metadata: 
 // ── MusicBrainz ──
 // Free, no auth. 50 req/sec. Must send User-Agent.
 // Returns: genre, label, album, releaseDate
+// Improved: filters results by artist match, prefers original releases
 
 async function queryMusicBrainz(artist: string, track: string): Promise<{
   genre?: string
@@ -79,7 +95,7 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
 } | null> {
   try {
     const query = encodeURIComponent(`"${track}" AND artist:"${artist}"`)
-    const url = `https://musicbrainz.org/ws/2/recording/?query=${query}&fmt=json&limit=3`
+    const url = `https://musicbrainz.org/ws/2/recording/?query=${query}&fmt=json&limit=10`
 
     const resp = await fetch(url, {
       headers: {
@@ -99,15 +115,97 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
       return null
     }
 
-    const rec = data.recordings[0]
-    const confidence = (rec.score || 0) / 100
-    const release = rec.releases?.[0]
+    // Find the best matching recording:
+    // 1. Must match artist name (fuzzy)
+    // 2. Prefer higher score
+    let bestRec = null
+    let bestScore = 0
+
+    for (const rec of data.recordings) {
+      const score = rec.score || 0
+      // Check if any artist-credit matches our query
+      const artists = rec['artist-credit'] || []
+      const hasArtistMatch = artists.some((ac: any) =>
+        artistMatches(artist, ac.artist?.name || '') ||
+        artistMatches(artist, ac.name || '')
+      )
+
+      if (hasArtistMatch && score > bestScore) {
+        bestRec = rec
+        bestScore = score
+      }
+    }
+
+    // Fallback: if no artist match found, use first result but lower confidence
+    if (!bestRec) {
+      console.log('[musicbrainz] No exact artist match, using first result with lower confidence')
+      bestRec = data.recordings[0]
+      bestScore = (data.recordings[0].score || 0) * 0.5 // Halve confidence
+    }
+
+    const confidence = bestScore / 100
+
+    // Find the best release: prefer "Album" type, non-compilation, with a label
+    const releases = bestRec.releases || []
+    let bestRelease = null
+
+    // Priority 1: Official album release with label
+    for (const rel of releases) {
+      const group = rel['release-group']
+      const isAlbum = group?.['primary-type'] === 'Album'
+      const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
+      const hasLabel = rel['label-info']?.[0]?.label?.name
+      if (isAlbum && isNotCompilation && hasLabel) {
+        bestRelease = rel
+        break
+      }
+    }
+
+    // Priority 2: Any album release (even without label)
+    if (!bestRelease) {
+      for (const rel of releases) {
+        const group = rel['release-group']
+        if (group?.['primary-type'] === 'Album' && !group?.['secondary-types']?.includes('Compilation')) {
+          bestRelease = rel
+          break
+        }
+      }
+    }
+
+    // Priority 3: Single release
+    if (!bestRelease) {
+      for (const rel of releases) {
+        const group = rel['release-group']
+        if (group?.['primary-type'] === 'Single') {
+          bestRelease = rel
+          break
+        }
+      }
+    }
+
+    // Priority 4: First release that has a label
+    if (!bestRelease) {
+      for (const rel of releases) {
+        if (rel['label-info']?.[0]?.label?.name) {
+          bestRelease = rel
+          break
+        }
+      }
+    }
+
+    // Fallback: first release
+    if (!bestRelease && releases.length) {
+      bestRelease = releases[0]
+    }
+
+    // Extract genre from recording tags
+    const genre = bestRec.tags?.[0]?.name || null
 
     return {
-      genre: rec.tags?.[0]?.name || null,
-      label: release?.['label-info']?.[0]?.label?.name || null,
-      album: release?.title || null,
-      releaseDate: release?.date || null,
+      genre,
+      label: bestRelease?.['label-info']?.[0]?.label?.name || null,
+      album: bestRelease?.title || null,
+      releaseDate: bestRelease?.date || null,
       confidence,
     }
   } catch (e) {
@@ -116,51 +214,9 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
   }
 }
 
-// ── GetSongBPM ──
-// Free with API key. Returns BPM + musical key.
-
-async function queryGetSongBPM(artist: string, track: string): Promise<{
-  bpm?: number
-  key?: string
-  confidence: number
-} | null> {
-  try {
-    const apiKey = Deno.env.get('GETSONGBPM_API_KEY')
-    if (!apiKey) {
-      console.log('[getsongbpm] No API key')
-      return null
-    }
-
-    // Search by artist + track
-    const query = encodeURIComponent(`${artist} ${track}`)
-    const url = `https://api.getsongbpm.com/search/?api_key=${apiKey}&type=both&lookup=${query}`
-
-    const resp = await fetch(url)
-    if (!resp.ok) {
-      console.error('[getsongbpm] HTTP', resp.status)
-      return null
-    }
-
-    const data = await resp.json()
-    if (!data.search?.length) {
-      console.log('[getsongbpm] No results')
-      return null
-    }
-
-    const hit = data.search[0]
-    return {
-      bpm: hit.tempo ? parseInt(hit.tempo, 10) : undefined,
-      key: hit.key_of || hit.song_key || undefined,
-      confidence: 0.8,
-    }
-  } catch (e) {
-    console.error('[getsongbpm] Error:', e.message)
-    return null
-  }
-}
-
 // ── Last.fm ──
 // Free with API key. 5 req/sec. Returns genre tags.
+// Improved: falls back to artist.getTopTags when track tags are empty
 
 async function queryLastfm(artist: string, track: string): Promise<{
   genre?: string
@@ -174,21 +230,61 @@ async function queryLastfm(artist: string, track: string): Promise<{
       return null
     }
 
-    const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}&format=json`
+    // Try track-level tags first
+    const trackUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}&format=json`
 
-    const resp = await fetch(url)
-    if (!resp.ok) {
-      console.error('[lastfm] HTTP', resp.status)
+    const trackResp = await fetch(trackUrl)
+    let tags: string[] = []
+
+    if (trackResp.ok) {
+      const trackData = await trackResp.json()
+      if (!trackData.error && trackData.track) {
+        tags = (trackData.track.toptags?.tag || []).map((t: any) => t.name).slice(0, 5)
+      }
+    }
+
+    // If no track tags, try track.getTopTags (sometimes has more)
+    if (tags.length === 0) {
+      try {
+        const topTagsUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getTopTags&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}&format=json`
+        const topTagsResp = await fetch(topTagsUrl)
+        if (topTagsResp.ok) {
+          const topTagsData = await topTagsResp.json()
+          if (!topTagsData.error && topTagsData.toptags?.tag) {
+            tags = topTagsData.toptags.tag.map((t: any) => t.name).slice(0, 5)
+          }
+        }
+      } catch (e) {
+        console.log('[lastfm] track.getTopTags failed:', e.message)
+      }
+    }
+
+    // If still no tags, fall back to artist-level tags
+    if (tags.length === 0) {
+      console.log('[lastfm] No track tags, trying artist tags for:', artist)
+      try {
+        const artistUrl = `https://ws.audioscrobbler.com/2.0/?method=artist.getTopTags&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&format=json`
+        const artistResp = await fetch(artistUrl)
+        if (artistResp.ok) {
+          const artistData = await artistResp.json()
+          if (!artistData.error && artistData.toptags?.tag) {
+            tags = artistData.toptags.tag
+              .filter((t: any) => t.count > 0)
+              .map((t: any) => t.name)
+              .slice(0, 5)
+            console.log('[lastfm] Got artist tags:', tags)
+          }
+        }
+      } catch (e) {
+        console.log('[lastfm] artist.getTopTags failed:', e.message)
+      }
+    }
+
+    if (tags.length === 0) {
+      console.log('[lastfm] No tags found at all')
       return null
     }
 
-    const data = await resp.json()
-    if (data.error || !data.track) {
-      console.log('[lastfm] No results')
-      return null
-    }
-
-    const tags = (data.track.toptags?.tag || []).map((t: any) => t.name).slice(0, 5)
     return {
       genre: tags[0] || undefined,
       genreTags: tags.length ? tags : undefined,
@@ -237,10 +333,10 @@ serve(async (req) => {
       )
     }
 
-    // Query all 3 APIs in parallel
-    const [mb, gsb, lfm] = await Promise.all([
+    // Query MusicBrainz + Last.fm in parallel
+    // (GetSongBPM removed — blocked by Cloudflare from server-side, called client-side instead)
+    const [mb, lfm] = await Promise.all([
       queryMusicBrainz(artist, track),
-      queryGetSongBPM(artist, track),
       queryLastfm(artist, track),
     ])
 
@@ -251,8 +347,6 @@ serve(async (req) => {
       confidence: 0,
     }
 
-    if (gsb?.bpm) { result.bpm = gsb.bpm; result.sources.bpm = 'getsongbpm' }
-    if (gsb?.key) { result.key = gsb.key; result.sources.key = 'getsongbpm' }
     if (mb?.label) { result.label = mb.label; result.sources.label = 'musicbrainz' }
     if (mb?.genre) { result.genre = mb.genre; result.sources.genre = 'musicbrainz' }
     if (lfm?.genre && !result.genre) { result.genre = lfm.genre; result.sources.genre = 'lastfm' }
@@ -261,7 +355,7 @@ serve(async (req) => {
     if (mb?.releaseDate) { result.releaseDate = mb.releaseDate }
 
     // Average confidence
-    const scores = [mb?.confidence, gsb?.confidence, lfm?.confidence].filter((c): c is number => c != null)
+    const scores = [mb?.confidence, lfm?.confidence].filter((c): c is number => c != null)
     result.confidence = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
 
     // Cache merged result
