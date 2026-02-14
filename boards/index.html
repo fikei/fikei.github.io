@@ -5104,6 +5104,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     { name: 'tool', keywords: ['app', 'tool', 'dashboard', 'login'], patterns: ['app.', '/app/', '/dashboard'] }
   ];
 
+  // Multi-topic domains: content varies per page, never cache at domain level
+  const MULTI_TOPIC_DOMAINS = ['wikipedia.org', 'reddit.com', 'amazon.com', 'ebay.com', 'etsy.com', 'youtube.com', 'youtu.be', 'github.com', 'twitter.com', 'x.com', 'instagram.com', 'tiktok.com', 'pinterest.com', 'tumblr.com', 'medium.com', 'substack.com', 'news.ycombinator.com', 'google.com'];
+  function isMultiTopicDomain(domain) {
+    return MULTI_TOPIC_DOMAINS.some(d => domain === d || domain.endsWith('.' + d));
+  }
+
   // Domain profile cache (in-memory, persisted to localStorage)
   const DOMAIN_CACHE_KEY = 'boards_domain_profiles';
   let domainProfileCache = {};
@@ -5111,6 +5117,12 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   function loadDomainCache() {
     try {
       domainProfileCache = JSON.parse(localStorage.getItem(DOMAIN_CACHE_KEY) || '{}');
+      // Purge stale entries for multi-topic domains
+      let purged = false;
+      for (const d of Object.keys(domainProfileCache)) {
+        if (isMultiTopicDomain(d)) { delete domainProfileCache[d]; purged = true; }
+      }
+      if (purged) saveDomainCache();
     } catch { domainProfileCache = {}; }
   }
 
@@ -5130,8 +5142,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       const text = `${title} ${description}`.toLowerCase();
       console.log('%c[CLASSIFY] Parsed:', 'color: #2ecc71', { domain, path });
 
-      // Check domain cache first
-      if (domainProfileCache[domain]?.primaryType) {
+      // Check domain cache first (skip multi-topic domains — content varies per page)
+      if (domainProfileCache[domain]?.primaryType && !isMultiTopicDomain(domain)) {
         const result = {
           type: domainProfileCache[domain].primaryType,
           confidence: domainProfileCache[domain].confidence ?? 0.9,
@@ -5225,13 +5237,15 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`;
       const match = text.match(/\{[\s\S]*\}/);
       if (match) {
         const result = JSON.parse(match[0]);
-        // Cache the result
-        domainProfileCache[domain] = {
-          primaryType: result.type,
-          confidence: result.confidence,
-          updatedAt: Date.now()
-        };
-        saveDomainCache();
+        // Cache the result (skip multi-topic domains)
+        if (!isMultiTopicDomain(domain)) {
+          domainProfileCache[domain] = {
+            primaryType: result.type,
+            confidence: result.confidence,
+            updatedAt: Date.now()
+          };
+          saveDomainCache();
+        }
         return { ...result, source: 'ai' };
       }
     } catch (e) {
@@ -9749,8 +9763,16 @@ Return JSON:
   // Load domain->category cache from localStorage
   function loadCategoryCache() {
     try {
-      const d = localStorage.getItem(CATEGORY_CACHE_KEY);
-      return d ? JSON.parse(d) : {};
+      const parsed = JSON.parse(localStorage.getItem(CATEGORY_CACHE_KEY) || '{}');
+      // Purge stale entries for multi-topic domains
+      let purged = false;
+      for (const d of Object.keys(parsed)) {
+        if (isMultiTopicDomain(d)) { delete parsed[d]; purged = true; }
+      }
+      if (purged) {
+        try { localStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(parsed)); } catch {}
+      }
+      return parsed;
     } catch { return {}; }
   }
 
@@ -9766,8 +9788,8 @@ Return JSON:
     const domain = link.domain || new URL(link.url).hostname;
     const startTime = performance.now();
 
-    // Check cache first (domain-level)
-    if (categoryCache[domain]) {
+    // Check cache first (domain-level, skip multi-topic domains)
+    if (categoryCache[domain] && !isMultiTopicDomain(domain)) {
       const ms = (performance.now() - startTime).toFixed(0);
       console.log(`%c[categorize] ${domain}`, 'color: #888',
         `\n  → ${categoryCache[domain]} (cached)`,
@@ -9807,8 +9829,8 @@ Return JSON:
         `\n  💭 ${data.reason || data.error || 'no reason'}`,
         `\n  ⏱ ${ms}ms`);
 
-      // Cache the result by domain
-      if (data.category && data.category !== 'uncategorized') {
+      // Cache the result by domain (skip multi-topic domains)
+      if (data.category && data.category !== 'uncategorized' && !isMultiTopicDomain(domain)) {
         categoryCache[domain] = data.category;
         saveCategoryCache(categoryCache);
       }
