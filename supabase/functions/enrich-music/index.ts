@@ -115,42 +115,36 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
       return null
     }
 
-    // Find the best matching recording:
-    // 1. Must match artist name (fuzzy)
-    // 2. Prefer higher score
-    let bestRec = null
-    let bestScore = 0
-
-    for (const rec of data.recordings) {
-      const score = rec.score || 0
-      // Check if any artist-credit matches our query
+    // Filter recordings that match our artist
+    const matchedRecordings = data.recordings.filter((rec: any) => {
       const artists = rec['artist-credit'] || []
-      const hasArtistMatch = artists.some((ac: any) =>
+      return artists.some((ac: any) =>
         artistMatches(artist, ac.artist?.name || '') ||
         artistMatches(artist, ac.name || '')
       )
+    })
 
-      if (hasArtistMatch && score > bestScore) {
-        bestRec = rec
-        bestScore = score
+    // Use matched recordings, or fall back to all with lower confidence
+    const useRecordings = matchedRecordings.length > 0 ? matchedRecordings : data.recordings
+    const confidenceMultiplier = matchedRecordings.length > 0 ? 1 : 0.5
+    if (matchedRecordings.length === 0) {
+      console.log('[musicbrainz] No exact artist match, using all results with lower confidence')
+    }
+
+    const bestRec = useRecordings[0]
+    const confidence = ((bestRec.score || 0) / 100) * confidenceMultiplier
+
+    // Collect ALL releases across matched recordings for better album selection
+    const allReleases: any[] = []
+    for (const rec of useRecordings) {
+      for (const rel of (rec.releases || [])) {
+        allReleases.push(rel)
       }
     }
-
-    // Fallback: if no artist match found, use first result but lower confidence
-    if (!bestRec) {
-      console.log('[musicbrainz] No exact artist match, using first result with lower confidence')
-      bestRec = data.recordings[0]
-      bestScore = (data.recordings[0].score || 0) * 0.5 // Halve confidence
-    }
-
-    const confidence = bestScore / 100
-
-    // Find the best release: prefer "Album" type, non-compilation, with a label
-    const releases = bestRec.releases || []
     let bestRelease = null
 
     // Priority 1: Official album release with label
-    for (const rel of releases) {
+    for (const rel of allReleases) {
       const group = rel['release-group']
       const isAlbum = group?.['primary-type'] === 'Album'
       const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
@@ -163,7 +157,7 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
 
     // Priority 2: Any album release (even without label)
     if (!bestRelease) {
-      for (const rel of releases) {
+      for (const rel of allReleases) {
         const group = rel['release-group']
         if (group?.['primary-type'] === 'Album' && !group?.['secondary-types']?.includes('Compilation')) {
           bestRelease = rel
@@ -172,30 +166,47 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
       }
     }
 
-    // Priority 3: Single release
+    // Priority 3: Single release (non-compilation)
     if (!bestRelease) {
-      for (const rel of releases) {
+      for (const rel of allReleases) {
         const group = rel['release-group']
-        if (group?.['primary-type'] === 'Single') {
+        const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
+        if (group?.['primary-type'] === 'Single' && isNotCompilation) {
           bestRelease = rel
           break
         }
       }
     }
 
-    // Priority 4: First release that has a label
+    // Priority 4: EP release (non-compilation)
     if (!bestRelease) {
-      for (const rel of releases) {
-        if (rel['label-info']?.[0]?.label?.name) {
+      for (const rel of allReleases) {
+        const group = rel['release-group']
+        const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
+        if (group?.['primary-type'] === 'EP' && isNotCompilation) {
           bestRelease = rel
           break
         }
       }
     }
 
-    // Fallback: first release
-    if (!bestRelease && releases.length) {
-      bestRelease = releases[0]
+    // Priority 5: Any non-compilation release with a label
+    if (!bestRelease) {
+      for (const rel of allReleases) {
+        const group = rel['release-group']
+        const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
+          && !group?.['secondary-types']?.includes('Soundtrack')
+        if (isNotCompilation && rel['label-info']?.[0]?.label?.name) {
+          bestRelease = rel
+          break
+        }
+      }
+    }
+
+    // Do NOT fall back to compilations — returning a compilation album name
+    // (like "F*** You I'm F.A.P!") is worse than returning nothing
+    if (!bestRelease) {
+      console.log('[musicbrainz] Only compilations found, skipping album/label')
     }
 
     // Extract genre from recording tags
