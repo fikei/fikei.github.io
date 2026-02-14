@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-14 (Visual Standards System shipped)
+> **Last Updated**: 2026-02-14 (Visual Standards System shipped, Phase 11 Instagram Import PRD added)
 
 ---
 
@@ -28,6 +28,7 @@
 | [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/54 |
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/132 |
 | [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 68/126 |
+| [Phase 11: Instagram Import](./phase-11-instagram-import.md) | Pending | 0/73 |
 | [Backlog](./backlog.md) | Future | 1/110 |
 
 ---
@@ -116,8 +117,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 8: Automated Pins | 0 | 0 | 54 | 0 |
 | Phase 9: Bulk Import | 0 | 0 | 132 | 0 |
 | Phase 10: Image Validation | 68 | 0 | 58 | 0 |
+| Phase 11: Instagram Import | 0 | 0 | 73 | 0 |
 | Backlog | 1 | 0 | 108 | 0 |
-| **TOTAL** | **295** | **5** | **825** | **0** |
+| **TOTAL** | **295** | **5** | **898** | **0** |
 
 ---
 

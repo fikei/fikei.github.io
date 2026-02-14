@@ -56,7 +56,7 @@
   --fg: #fff;
   --surface: #1a1a1a;
   --border: #fff;
-  --muted: #888;
+  --muted: #999;
   --subtle: #333;
 
   /* Design System token bridge — maps DS token names to Boards values */
@@ -111,7 +111,7 @@
   --fg: #000;
   --surface: #fff;
   --border: #000;
-  --muted: #888;
+  --muted: #999;
   --subtle: #e0e0e0;
 
   /* DS bridge — light mode overrides */
@@ -952,6 +952,16 @@ body {
   transition: transform 0.1s, opacity 0.1s;
 }
 
+.grid-item:focus {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.grid-item--selected {
+  outline: 3px solid var(--fg);
+  outline-offset: 0;
+}
+
 .grid-item.dragging {
   opacity: 0.4;
   transform: scale(0.95);
@@ -1021,12 +1031,26 @@ body {
 
 @media (hover: none) {
   .grid-item__overlay {
-    opacity: 0;
+    opacity: 1;
     padding: var(--space-2);
+    background: linear-gradient(transparent 30%, rgba(0,0,0,0.85));
+    border-top: none;
   }
-  .grid-item:active .grid-item__overlay,
+  .grid-item__overlay .grid-item__title,
+  .grid-item__overlay .grid-item__artist,
+  .grid-item__overlay .grid-item__video-title {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grid-item__overlay .grid-item__domain,
+  .grid-item__overlay .grid-item__track,
+  .grid-item__overlay .grid-item__video-meta {
+    font-size: 8px;
+    opacity: 0.7;
+  }
   .grid-item:active .grid-item__category,
-  .grid-item--tapped .grid-item__overlay,
   .grid-item--tapped .grid-item__category {
     opacity: 1;
   }
@@ -1317,6 +1341,28 @@ body {
   gap: var(--space-3);
 }
 
+.pin-notes {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--subtle);
+  padding: var(--space-2) 0;
+  margin: var(--space-3) 0;
+  resize: none;
+  width: 100%;
+  outline: none;
+}
+
+.pin-notes:focus {
+  border-bottom-color: var(--muted);
+}
+
+.pin-notes::placeholder {
+  color: var(--muted);
+}
+
 .grid-item__actions {
   display: flex;
   gap: var(--space-2);
@@ -1368,6 +1414,21 @@ body {
 .grid-item__streaming-chip .grid-item__platform-icon {
   width: 5px;
   height: 5px;
+}
+
+.grid-item__mood-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mood-tag {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--subtle);
+  color: var(--muted);
 }
 
 /* Watch card: no line clamp — summaries are pre-truncated to ~60 words */
@@ -2166,6 +2227,14 @@ body {
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.listen-player__meta {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4348,9 +4417,9 @@ body {
     </div>
   </div>
 
-  <nav class="filters" id="filters">
+  <nav class="filters" id="filters" role="tablist">
     <input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off">
-    <button class="filter-token filter-token--active" data-category="all">All</button>
+    <button class="filter-token filter-token--active" data-category="all" role="tab" aria-selected="true">All</button>
   </nav>
 
   <nav class="sub-tags" id="subTags"></nav>
@@ -4453,11 +4522,11 @@ body {
   <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple>
 
   <!-- Add Modal -->
-  <div class="modal" id="addModal">
+  <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
-        <h2 class="modal__title">Add Links</h2>
+        <h2 class="modal__title" id="addModalTitle">Add Links</h2>
         <button class="modal__close" data-close>&times;</button>
       </div>
       <form id="addForm" class="add-form">
@@ -4471,11 +4540,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Scan Results Modal -->
-  <div class="modal" id="scanModal">
+  <div class="modal" id="scanModal" role="dialog" aria-modal="true" aria-labelledby="scanModalTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
-        <h2 class="modal__title">Scan Results</h2>
+        <h2 class="modal__title" id="scanModalTitle">Scan Results</h2>
         <button class="modal__close" data-close>&times;</button>
       </div>
       <div class="scan-results" id="scanResults">
@@ -4514,23 +4583,35 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Category Modal -->
-  <div class="modal modal--small" id="categoryModal">
+  <div class="modal modal--small" id="categoryModal" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
-        <h2 class="modal__title">Move to Category</h2>
+        <h2 class="modal__title" id="categoryModalTitle">Move to Category</h2>
         <button class="modal__close" data-close>&times;</button>
       </div>
       <div class="category-list" id="categoryList"></div>
     </div>
   </div>
 
-  <!-- Content Type Modal -->
-  <div class="modal modal--small" id="contentTypeModal">
+  <!-- Organize Modal (consolidated category + content type) -->
+  <div class="modal modal--small" id="organizeModal" role="dialog" aria-modal="true" aria-labelledby="organizeModalTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
-        <h2 class="modal__title">Change Content Type</h2>
+        <h2 class="modal__title" id="organizeModalTitle">Organize</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div id="organizeContent"></div>
+    </div>
+  </div>
+
+  <!-- Content Type Modal -->
+  <div class="modal modal--small" id="contentTypeModal" role="dialog" aria-modal="true" aria-labelledby="contentTypeModalTitle">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title" id="contentTypeModalTitle">Change Content Type</h2>
         <button class="modal__close" data-close>&times;</button>
       </div>
       <div class="category-list" id="contentTypeList"></div>
@@ -4538,7 +4619,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Share Modal -->
-  <div class="modal modal--small" id="shareModal">
+  <div class="modal modal--small" id="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
@@ -4616,7 +4697,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
-  <div class="toast-container" id="toastContainer"></div>
+  <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <!-- Auth Modal -->
   <div class="auth-modal" id="authModal">
@@ -4690,7 +4771,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Tools Modal — step-by-step install coach -->
-  <div class="modal modal--small" id="toolsModal">
+  <div class="modal modal--small" id="toolsModal" role="dialog" aria-modal="true" aria-labelledby="toolsTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
@@ -4822,11 +4903,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   <div class="widget-context" id="widgetContext"></div>
 
   <!-- Admin Panel Modal -->
-  <div class="modal" id="adminModal">
+  <div class="modal" id="adminModal" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content admin-panel">
       <div class="modal__header">
-        <h2 class="modal__title">Admin Panel</h2>
+        <h2 class="modal__title" id="adminModalTitle">Admin Panel</h2>
         <button class="modal__close" data-close>&times;</button>
       </div>
       <div style="padding: var(--space-4);">
@@ -4933,7 +5014,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Widget PRD Modal -->
-  <div class="modal" id="widgetPrdModal">
+  <div class="modal" id="widgetPrdModal" role="dialog" aria-modal="true" aria-labelledby="widgetPrdTitle">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content widget-prd-modal">
       <div class="modal__header">
@@ -4947,7 +5028,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Confirm Modal -->
-  <div class="modal modal--small" id="confirmModal">
+  <div class="modal modal--small" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal__backdrop"></div>
     <div class="modal__content">
       <div class="modal__header">
@@ -4996,12 +5077,17 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   let isOnline = true; // Track online status for offline support
 
   // ============================================
+  // App Configuration
+  // ============================================
+  const APP_CONFIG = {
+    adminEmails: ['fike101@gmail.com']
+  };
+
+  // ============================================
   // Admin System
   // ============================================
-  const ADMIN_EMAILS = ['fike101@gmail.com'];
-
   function isAdmin() {
-    return currentUser && ADMIN_EMAILS.includes(currentUser.email);
+    return currentUser && APP_CONFIG.adminEmails.includes(currentUser.email);
   }
 
   // ============================================
@@ -6415,6 +6501,10 @@ Return JSON:
     const userPrefs = widgetFeedback.userPrefs || {};
 
     try {
+      // Add 10s timeout to widget generation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
         headers: {
@@ -6427,8 +6517,11 @@ Return JSON:
           items: itemsPayload,
           category: currentCategory,
           userPrefs: userPrefs
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -6488,7 +6581,11 @@ Return JSON:
       return result;
     } catch (e) {
       console.error('[widget] AI error:', e);
-      trackWidgetEvent('error', widget.id, { error: e.message });
+      trackWidgetEvent('error', widget.id, { error: e.message, timeout: e.name === 'AbortError' });
+      // Return timeout marker for rendering fallback
+      if (e.name === 'AbortError') {
+        return { _timeout: true };
+      }
     }
 
     return null;
@@ -6642,7 +6739,7 @@ Return JSON:
         // Phase 1: Track click for instrumentation
         const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
+          <a href="${esc(sug.productUrl)}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
             <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
@@ -7072,6 +7169,32 @@ Return JSON:
    * @returns {string} Rendered HTML
    */
   function renderWidgetWithTemplate(widget, items, aiResult) {
+    // Handle timeout or error case - render retry UI
+    if (aiResult && aiResult._timeout) {
+      const category = currentFilter || 'all';
+      const resolvedName = resolveWidgetVars(widget.name, category);
+      return `
+        <div class="w-shell">
+          ${renderWidgetHeader(widget)}
+          <div class="w-body" style="padding:var(--sp-md);text-align:center">
+            <span class="w-text w-text--note" style="cursor:pointer" onclick="refreshWidget('${esc(widget.id)}')">Tap to retry</span>
+          </div>
+        </div>`;
+    }
+
+    // Handle null/failed generation - render retry UI
+    if (!aiResult) {
+      const category = currentFilter || 'all';
+      const resolvedName = resolveWidgetVars(widget.name, category);
+      return `
+        <div class="w-shell">
+          ${renderWidgetHeader(widget)}
+          <div class="w-body" style="padding:var(--sp-md);text-align:center">
+            <span class="w-text w-text--note" style="cursor:pointer" onclick="refreshWidget('${esc(widget.id)}')">Tap to retry</span>
+          </div>
+        </div>`;
+    }
+
     // Determine template name from widget config
     const templateName = widget.template?.name || widget.template?.layout || null;
     const fallbackName = widget.template?.fallback || null;
@@ -8185,7 +8308,10 @@ Return JSON:
       albumArt: link.image || null,
       url: link.url,
       embedType: embedType,
-      embedHeight: embedHeight
+      embedHeight: embedHeight,
+      bpm: music.bpm || null,
+      key: music.key || music.musical_key || null,
+      genre: music.genre || null
     };
     console.log('[player] currentPlayer:', { embedUrl: currentPlayer.embedUrl, platform: currentPlayer.platform, artist: currentPlayer.artist, track: currentPlayer.track });
     renderPlayer();
@@ -8222,11 +8348,19 @@ Return JSON:
       el.innerHTML = '<iframe class="listen-player__embed" src="' + esc(currentPlayer.embedUrl) + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>';
     } else {
       // Fallback mode: show header with art, info, and listen link
+      // Build metadata line: BPM · Key · Genre
+      const metaParts = [];
+      if (currentPlayer.bpm) metaParts.push(currentPlayer.bpm + ' BPM');
+      if (currentPlayer.key) metaParts.push(esc(currentPlayer.key));
+      if (currentPlayer.genre) metaParts.push(esc(currentPlayer.genre));
+      const metaLine = metaParts.length > 0 ? '<span class="listen-player__meta">' + metaParts.join(' · ') + '</span>' : '';
+
       el.innerHTML = '<div class="listen-player__header">' +
         artHtml +
         '<div class="listen-player__info">' +
           (currentPlayer.artist ? '<span class="listen-player__artist">' + esc(currentPlayer.artist) + '</span>' : '') +
           '<span class="listen-player__track">' + esc(currentPlayer.track) + '</span>' +
+          metaLine +
         '</div>' +
         listenLink +
       '</div>';
@@ -9249,8 +9383,10 @@ Return JSON:
     try {
       const u = new URL(url);
       const dominated = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id',
-        'fbclid', 'gclid', 'tw_source', 'tw_adid', 'sl_source_ad_platform', 'sl_source_campaign_id',
-        'sl_source_placement', 'sl_source_ad_id', 'adset_name', 'ad_name', 'campaign_id', 'ad_id', 'media_type'];
+        'fbclid', 'gclid', 'twclid', 'msclkid', 'mc_cid', 'mc_eid', '_ga', '_gid', '_gl',
+        'tw_source', 'tw_adid', 'sl_source_ad_platform', 'sl_source_campaign_id',
+        'sl_source_placement', 'sl_source_ad_id', 'adset_name', 'ad_name', 'campaign_id', 'ad_id', 'media_type',
+        'ref', 'ref_src', 'ref_url', 'source', 'igshid', 'si', 'feature'];
       for (const p of dominated) u.searchParams.delete(p);
       return u.toString();
     } catch { return url; }
@@ -9358,7 +9494,8 @@ Return JSON:
         let img = ogImg[1];
         // Skip logos, favicons, icons
         const imgLower = img.toLowerCase();
-        if (imgLower.includes('logo') || imgLower.includes('favicon') || imgLower.includes('icon') || imgLower.includes('sprite') || imgLower.includes('profile')) {
+        const isLogoPath = /\/(logo|favicon|icon|sprite|profile|avatar)\b[^/]*\.(png|jpg|jpeg|svg|gif|webp|ico)/i.test(imgLower) || /\/(logos?|favicons?|icons?|sprites?)\//i.test(imgLower);
+        if (isLogoPath) {
           // Try to find a product image instead
           const productImg = html.match(/<img[^>]*class\s*=\s*["'][^"']*product[^"']*["'][^>]*src\s*=\s*["']([^"']+)["']/i) ||
                             html.match(/<img[^>]*src\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*["'][^"']*product[^"']*["']/i) ||
@@ -9373,7 +9510,8 @@ Return JSON:
                 const src = imgTag.match(/src\s*=\s*["']([^"']+)["']/i);
                 if (src && src[1]) {
                   const srcLower = src[1].toLowerCase();
-                  if (!srcLower.includes('logo') && !srcLower.includes('favicon') && !srcLower.includes('icon') && !srcLower.includes('sprite') && !srcLower.includes('profile') && !srcLower.includes('avatar')) {
+                  const isSrcLogo = /\/(logo|favicon|icon|sprite|profile|avatar)\b[^/]*\.(png|jpg|jpeg|svg|gif|webp|ico)/i.test(srcLower) || /\/(logos?|favicons?|icons?|sprites?)\//i.test(srcLower);
+                  if (!isSrcLogo) {
                     img = src[1];
                     break;
                   }
@@ -9466,14 +9604,14 @@ Return JSON:
       if (domain.includes('spotify.com')) {
         if (platformId) {
           const p = platformId.split(':');
-          if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2], embedType: 'iframe', embedHeight: 152 };
+          if (p.length >= 3) return { embedUrl: 'https://open.spotify.com/embed/' + p[1] + '/' + p[2] + '?theme=0', embedType: 'iframe', embedHeight: 152 };
         }
         // Fallback: parse embed URL directly from the Spotify URL
         const sm = url.match(/open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
-        if (sm) return { embedUrl: 'https://open.spotify.com/embed/' + sm[1] + '/' + sm[2], embedType: 'iframe', embedHeight: 152 };
+        if (sm) return { embedUrl: 'https://open.spotify.com/embed/' + sm[1] + '/' + sm[2] + '?theme=0', embedType: 'iframe', embedHeight: 152 };
       }
       if (domain.includes('soundcloud.com')) {
-        return { embedUrl: 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) + '&auto_play=false&hide_related=true&show_comments=false&visual=false', embedType: 'iframe', embedHeight: 166 };
+        return { embedUrl: 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) + '&auto_play=false&hide_related=true&show_comments=false&visual=false&color=%23333333', embedType: 'iframe', embedHeight: 166 };
       }
       if (domain.includes('music.apple.com')) {
         const m = url.match(/music\.apple\.com\/(\w+)\/(album|playlist|artist|station)\/[^\/]+\/(\d+)/);
@@ -10071,6 +10209,8 @@ Return JSON:
   }
 
   // Supabase sync functions (async, background, using raw fetch)
+  let syncRetryQueue = [];
+
   async function syncLinkToSupabase(link) {
     if (!currentUser) {
       console.log('[sync] Skipped - not logged in');
@@ -10116,10 +10256,24 @@ Return JSON:
       if (!res.ok) {
         const errBody = await res.text();
         console.error('[sync] Upload failed:', res.status, errBody);
+        toast('Sync failed — changes saved locally', true);
+        // Queue for retry on next sync
+        if (!syncRetryQueue.find(l => l.id === link.id)) {
+          syncRetryQueue.push(link);
+        }
       } else {
         console.log('[sync] Uploaded:', link.url);
+        // Remove from retry queue if present
+        syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
       }
-    } catch (e) { console.error('[sync] Error:', e); }
+    } catch (e) {
+      console.error('[sync] Error:', e);
+      toast('Sync failed — changes saved locally', true);
+      // Queue for retry on next sync
+      if (!syncRetryQueue.find(l => l.id === link.id)) {
+        syncRetryQueue.push(link);
+      }
+    }
   }
 
   async function syncOrderToSupabase(orderIds) {
@@ -10172,6 +10326,16 @@ Return JSON:
 
     const data = load();
     console.log('[sync] Syncing', data.links.length, 'links to Supabase');
+
+    // Retry any failed syncs from previous runs first
+    if (syncRetryQueue.length > 0) {
+      console.log('[sync] Retrying', syncRetryQueue.length, 'previously failed syncs');
+      const retryLinks = [...syncRetryQueue];
+      syncRetryQueue = [];
+      for (const link of retryLinks) {
+        await syncLinkToSupabase(link);
+      }
+    }
 
     // Sync all links
     for (const link of data.links) {
@@ -10251,6 +10415,7 @@ Return JSON:
       return { links, categories, linkOrder, expanded };
     } catch (e) {
       console.error('Supabase fetch error:', e);
+      toast('Cloud sync failed — using local data', true);
       return null;
     }
   }
@@ -10339,7 +10504,80 @@ Return JSON:
     save(data);
     syncLinkToSupabase(newLink); // Background sync
     syncOrderToSupabase(data.linkOrder); // Background sync
+    trackRecentlyAdded(link.url); // Suppress clipboard prompt for recently added URLs
+
+    // Onboarding: track first pin and show hints
+    checkOnboardingMilestones(data.links.length);
+
     return { success: true };
+  }
+
+  // ============================================
+  // Onboarding System
+  // ============================================
+  const ONBOARDING_KEY = 'boards_onboarding';
+
+  function loadOnboarding() {
+    const stored = localStorage.getItem(ONBOARDING_KEY);
+    return stored ? JSON.parse(stored) : {
+      hasSeenFirstPin: false,
+      hints: {
+        cardDetails: false,
+        categorySwipe: false,
+        searchBar: false
+      }
+    };
+  }
+
+  function saveOnboarding(state) {
+    localStorage.setItem(ONBOARDING_KEY, JSON.stringify(state));
+  }
+
+  function checkOnboardingMilestones(totalLinks) {
+    const onboarding = loadOnboarding();
+
+    // First pin celebration
+    if (totalLinks === 1 && !onboarding.hasSeenFirstPin) {
+      toast('First pin saved! ✨');
+      onboarding.hasSeenFirstPin = true;
+      saveOnboarding(onboarding);
+      // Add CSS pulse animation to the new card
+      setTimeout(() => {
+        const cards = document.querySelectorAll('.grid-item');
+        if (cards.length > 0) {
+          cards[0].style.animation = 'pulse 0.6s ease-out';
+        }
+      }, 100);
+    }
+
+    // Feature hints
+    if (totalLinks === 3 && !onboarding.hints.cardDetails) {
+      setTimeout(() => {
+        toast('Tip: tap any card to see details');
+        onboarding.hints.cardDetails = true;
+        saveOnboarding(onboarding);
+      }, 1500);
+    }
+
+    if (totalLinks === 5 && !onboarding.hints.categorySwipe) {
+      setTimeout(() => {
+        toast('Tip: swipe through categories to browse');
+        onboarding.hints.categorySwipe = true;
+        saveOnboarding(onboarding);
+      }, 1500);
+    }
+  }
+
+  function showCategoryHint() {
+    const onboarding = loadOnboarding();
+    if (!onboarding.hints.searchBar && currentFilter !== 'all') {
+      const links = getAllLinks().filter(l => l.category === currentFilter);
+      if (links.length > 0) {
+        toast('Tip: try the search bar to find specific pins');
+        onboarding.hints.searchBar = true;
+        saveOnboarding(onboarding);
+      }
+    }
   }
 
   function updateLink(id, updates) {
@@ -10408,6 +10646,22 @@ Return JSON:
   let searchQuery = '';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
+
+  // Validate expanded cards on initial load - remove orphaned entries
+  (function validateExpandedCards() {
+    const data = load();
+    const validLinkIds = new Set(data.links.map(l => l.id));
+    const cleanedCards = {};
+    for (const [id, state] of Object.entries(expandedCards)) {
+      if (validLinkIds.has(id)) {
+        cleanedCards[id] = state;
+      }
+    }
+    if (Object.keys(cleanedCards).length !== Object.keys(expandedCards).length) {
+      expandedCards = cleanedCards;
+      saveExpandedCards(expandedCards);
+    }
+  })();
   const LISTEN_VIEW_KEY = 'boards-listen-view';
   let listenView = localStorage.getItem(LISTEN_VIEW_KEY) || 'list'; // 'grid' | 'list'
   const WATCH_VIEW_KEY = 'boards-watch-view';
@@ -10520,7 +10774,8 @@ Return JSON:
     for (const l of links) counts[l.category] = (counts[l.category] || 0) + 1;
 
     let html = `<input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off" value="${esc(searchQuery)}">`;
-    html += `<button class="filter-token ${currentFilter === 'all' ? 'filter-token--active' : ''}" data-category="all">All</button>`;
+    const allActive = currentFilter === 'all';
+    html += `<button class="filter-token ${allActive ? 'filter-token--active' : ''}" data-category="all" role="tab" aria-selected="${allActive}">All</button>`;
 
     const sorted = Object.entries(cats)
       .filter(([n]) => counts[n] > 0 && n !== 'uncategorized')
@@ -10528,9 +10783,10 @@ Return JSON:
 
     for (const [name] of sorted) {
       const c = counts[name] || 0;
-      const active = currentFilter === name ? 'filter-token--active' : '';
+      const active = currentFilter === name;
+      const activeClass = active ? 'filter-token--active' : '';
       const badge = name === 'uncategorized' && c > 0 ? ` (${c})` : '';
-      html += `<button class="filter-token ${active}" data-category="${name}">${cap(name)}${badge}</button>`;
+      html += `<button class="filter-token ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${cap(name)}${badge}</button>`;
     }
 
     filters.innerHTML = html;
@@ -10641,7 +10897,8 @@ Return JSON:
       (link.domain && link.domain.toLowerCase().includes(q)) ||
       (link.description && link.description.toLowerCase().includes(q)) ||
       (link.category && link.category.toLowerCase().includes(q)) ||
-      (link.url && link.url.toLowerCase().includes(q))
+      (link.url && link.url.toLowerCase().includes(q)) ||
+      (link.notes && link.notes.toLowerCase().includes(q))
     );
   }
 
@@ -10786,7 +11043,8 @@ Return JSON:
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
       const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
-      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="Enrichment failed - click Refresh Image to retry">!</span>` : '';
+      const errorReason = l.enrichment_error || 'Enrichment failed';
+      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="${esc(errorReason)} — tap to refresh" onclick="toast('${esc(errorReason)}. Retrying...'); handleAction('refresh', '${esc(l.id)}'); event.stopPropagation();" style="cursor:pointer" aria-label="${esc(errorReason)}">!</span>` : '';
       const loadingClass = l.loading ? ' grid-item--loading' : '';
 
       // Build music-specific details for expanded listen cards
@@ -10842,6 +11100,18 @@ Return JSON:
           videoDetailsHtml += `<div class="grid-item__streaming">${chips}</div>`;
         }
 
+        // Mood tags from TMDB keywords/genres (max 3)
+        const moodTags = [];
+        if (_video.keywords && Array.isArray(_video.keywords)) {
+          moodTags.push(..._video.keywords.slice(0, 3));
+        } else if (_video.genres && Array.isArray(_video.genres)) {
+          moodTags.push(..._video.genres.slice(0, 3));
+        }
+        if (moodTags.length > 0) {
+          const tags = moodTags.map(tag => `<span class="mood-tag">${esc(tag)}</span>`).join('');
+          videoDetailsHtml += `<div class="grid-item__mood-tags">${tags}</div>`;
+        }
+
         // TMDB attribution (required by TMDB terms)
         if (_video.tmdbUrl) {
           videoDetailsHtml += `<div class="grid-item__tmdb-attribution"><a href="${esc(_video.tmdbUrl)}" target="_blank" rel="noopener">Data provided by TMDB</a></div>`;
@@ -10875,12 +11145,9 @@ Return JSON:
         <div class="grid-item__menu-container">
           <button class="grid-item__menu-btn" data-action="menu" aria-label="More options"></button>
           <div class="grid-item__menu" data-menu-id="${l.id}">
-            <button class="grid-item__menu-item" data-action="share">Share Link</button>
-            <button class="grid-item__menu-item" data-action="refresh-image">Refresh Image</button>
-            <button class="grid-item__menu-item" data-action="rerun-enrichment">Rerun Enrichment</button>
-            <div class="grid-item__menu-divider"></div>
-            <button class="grid-item__menu-item" data-action="category">Change Category</button>
-            <button class="grid-item__menu-item" data-action="content-type">Change Content Type</button>
+            <button class="grid-item__menu-item" data-action="share">Share</button>
+            <button class="grid-item__menu-item" data-action="refresh">Refresh</button>
+            <button class="grid-item__menu-item" data-action="organize">Organize</button>
             <div class="grid-item__menu-divider"></div>
             <button class="grid-item__menu-item" data-action="delete" style="color: #c00;">Delete</button>
           </div>
@@ -10900,6 +11167,7 @@ Return JSON:
               <span>${dateStr}</span>
             </div>
           `}
+          <textarea class="pin-notes" placeholder="Add a note..." rows="2" data-link-id="${l.id}">${esc(l.notes || '')}</textarea>
           <div class="grid-item__actions">
             <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
             ${watchActionsHtml}
@@ -11014,6 +11282,20 @@ Return JSON:
         }
       }
 
+      // Build format badge for GitHub links (code preview)
+      const isGitHub = l.domain && l.domain.toLowerCase().includes('github.com');
+      if (isGitHub && !isListen && !isWatch) {
+        const metaParts = [];
+        if (l.stars) metaParts.push(`★ ${l.stars}`);
+        if (l.language) metaParts.push(esc(l.language));
+        const badgeText = metaParts.join(' · ');
+        if (badgeText) {
+          formatBadgeHtml = `<span class="grid-item__format-badge">⌥ ${badgeText}</span>`;
+        } else {
+          formatBadgeHtml = `<span class="grid-item__format-badge">⌥</span>`;
+        }
+      }
+
       if (hasImg) {
         // Show sub-tag when filtered into a category, otherwise show category
         const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
@@ -11033,9 +11315,9 @@ Return JSON:
 
         const categoryClass = listenClass || watchClass;
 
-        html += `<article class="grid-item${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy">
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
@@ -11047,7 +11329,7 @@ Return JSON:
           : l.category;
         const categoryClass = listenClass || watchClass;
 
-        html += `<article class="grid-item grid-item--placeholder${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item grid-item--placeholder${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
@@ -11743,6 +12025,8 @@ Return JSON:
       renderGrid();
       generateWidgets();
       updateShareButton();
+      // Onboarding: show search hint when first filtering to a category
+      showCategoryHint();
     }
   };
 
@@ -11811,6 +12095,32 @@ Return JSON:
   });
 
 
+  // Keyboard navigation for grid (#5)
+  grid.addEventListener('keydown', (e) => {
+    const item = e.target.closest('.grid-item');
+    if (!item) return;
+    const items = Array.from(grid.querySelectorAll('.grid-item[tabindex]'));
+    const idx = items.indexOf(item);
+    if (idx < 0) return;
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      item.click();
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (idx < items.length - 1) items[idx + 1].focus();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (idx > 0) items[idx - 1].focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      items[0]?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      items[items.length - 1]?.focus();
+    }
+  });
+
   grid.onclick = async (e) => {
     // Handle listen row click → open player
     const lr = e.target.closest('.listen-row');
@@ -11868,26 +12178,11 @@ Return JSON:
           }
         }
         return;
-      } else if (actionType === 'refresh-image') {
+      } else if (actionType === 'refresh') {
+        // Consolidated: re-enrich metadata + refresh image
         const link = getAllLinks().find(l => l.id === id);
         if (link) {
-          toast('Refreshing image via AI...');
-          console.log('%c[REFRESH] Force refreshing image for:', 'color: #9b59b6; font-weight: bold', link.url);
-          // Use server enrichment with forceRefresh flag
-          enrichmentQueue.push({
-            linkId: link.id,
-            url: link.url,
-            title: link.title,
-            description: link.description,
-            forceRefresh: true // This will override the existing image
-          });
-          processEnrichmentQueue();
-        }
-        return;
-      } else if (actionType === 'rerun-enrichment') {
-        const link = getAllLinks().find(l => l.id === id);
-        if (link) {
-          toast('Re-enriching link...');
+          toast('Refreshing...');
           try {
             const meta = await fetchMetadata(link.url);
             const cat = await smartCategorize(meta);
@@ -11908,29 +12203,49 @@ Return JSON:
               confidence: cat.confidence,
               content_type: contentType.type,
               type_confidence: contentType.confidence,
-              type_signals: contentType.signals
+              type_signals: contentType.signals,
+              enrichment_failed: false
             };
             if (music) linkUpdate.music = music;
             if (video) linkUpdate.video = video;
             updateLink(id, linkUpdate);
+            // Also force refresh image via server
+            enrichmentQueue.push({ linkId: link.id, url: link.url, title: meta.title || link.title, description: meta.description || link.description, forceRefresh: true });
+            processEnrichmentQueue();
             renderFilters();
             renderGrid();
-
-            // Queue watch items for AI enrichment (summary + streaming)
             const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
             if (isWatchRerun) {
-              queueServerEnrichment(id, link.url, meta.title, meta.description, {
-                category: cat.category,
-                enrichWatch: true
-              });
+              queueServerEnrichment(id, link.url, meta.title, meta.description, { category: cat.category, enrichWatch: true });
             }
-
-            toast('Enrichment complete');
+            toast('Refreshed');
           } catch (err) {
-            console.error('[rerun-enrichment]', err);
-            toast('Enrichment failed', true);
+            console.error('[refresh]', err);
+            toast('Refresh failed', true);
           }
         }
+        return;
+      } else if (actionType === 'refresh-image') {
+        // Legacy: keep for error badge tap-to-retry
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          toast('Refreshing...');
+          enrichmentQueue.push({ linkId: link.id, url: link.url, title: link.title, description: link.description, forceRefresh: true });
+          processEnrichmentQueue();
+        }
+        return;
+      } else if (actionType === 'organize') {
+        // Consolidated: show organize modal with category + content type
+        organizeTargetId = id;
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          renderOrganizeModal(link);
+          openModal(organizeModal);
+        }
+        return;
+      } else if (actionType === 'rerun-enrichment') {
+        // Legacy: redirect to consolidated refresh
+        handleAction('refresh', id);
         return;
       } else if (actionType === 'toggle-watched') {
         const link = getAllLinks().find(l => l.id === id);
@@ -12002,6 +12317,18 @@ Return JSON:
     saveExpandedCards(expandedCards);
     renderGrid();
   };
+
+  // Notes textarea blur handler - save notes
+  document.addEventListener('blur', (e) => {
+    if (e.target.classList.contains('pin-notes')) {
+      const linkId = e.target.dataset.linkId;
+      const notes = e.target.value.trim();
+      if (linkId) {
+        updateLink(linkId, { notes });
+        console.log('[notes] Saved notes for link:', linkId);
+      }
+    }
+  }, true);
 
   // Drag and drop reordering (links + widgets)
   let draggedId = null;
@@ -12568,11 +12895,80 @@ Return JSON:
   widgetPrdModal.querySelector('.modal__close').onclick = () => closeModal(widgetPrdModal);
 
   // ============================================
+  // Organize Modal (consolidated category + content type)
+  // ============================================
+  const organizeModal = $('organizeModal');
+  const organizeContent = $('organizeContent');
+  let organizeTargetId = null;
+  organizeModal.querySelector('.modal__backdrop').onclick = () => closeModal(organizeModal);
+  organizeModal.querySelector('.modal__close').onclick = () => closeModal(organizeModal);
+
+  function renderOrganizeModal(link) {
+    const cats = getCategoryNames();
+    const types = ['article', 'product', 'music', 'video', 'image', 'social', 'other'];
+    let html = '<div style="padding: var(--space-4);">';
+    html += '<label style="font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--muted); display: block; margin-bottom: var(--space-2);">Category</label>';
+    html += '<div class="category-list">';
+    for (const name of Object.keys(cats)) {
+      const active = link.category === name ? ' style="border-color: var(--fg); font-weight: bold;"' : '';
+      html += `<button class="category-list__item" data-organize-cat="${name}"${active}>${cap(name)}</button>`;
+    }
+    html += '</div>';
+    html += '<label style="font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--muted); display: block; margin: var(--space-4) 0 var(--space-2);">Content Type</label>';
+    html += '<div class="category-list">';
+    for (const t of types) {
+      const active = link.content_type === t ? ' style="border-color: var(--fg); font-weight: bold;"' : '';
+      html += `<button class="category-list__item" data-organize-type="${t}"${active}>${cap(t)}</button>`;
+    }
+    html += '</div></div>';
+    organizeContent.innerHTML = html;
+  }
+
+  organizeContent.addEventListener('click', (e) => {
+    const catBtn = e.target.closest('[data-organize-cat]');
+    const typeBtn = e.target.closest('[data-organize-type]');
+    if (catBtn && organizeTargetId) {
+      updateLink(organizeTargetId, { category: catBtn.dataset.organizeCat });
+      renderFilters();
+      renderGrid();
+      generateWidgets();
+      closeModal(organizeModal);
+      toast('Moved to ' + cap(catBtn.dataset.organizeCat));
+    }
+    if (typeBtn && organizeTargetId) {
+      updateLink(organizeTargetId, { content_type: typeBtn.dataset.organizeType });
+      renderGrid();
+      closeModal(organizeModal);
+      toast('Type set to ' + cap(typeBtn.dataset.organizeType));
+    }
+  });
+
+  // ============================================
   // Helpers
   // ============================================
-  function openModal(m) { m.classList.add('modal--visible', 'overlay--visible'); }
-  function closeModal(m) { m.classList.remove('modal--visible', 'overlay--visible'); }
-  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
+  function openModal(m) {
+    m._previousFocus = document.activeElement;
+    m.classList.add('modal--visible', 'overlay--visible');
+    // Focus first focusable element
+    const focusable = m.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length) setTimeout(() => focusable[0].focus(), 50);
+    // Trap focus
+    m._trapHandler = (e) => {
+      if (e.key !== 'Tab') return;
+      const f = m.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    m.addEventListener('keydown', m._trapHandler);
+  }
+  function closeModal(m) {
+    m.classList.remove('modal--visible', 'overlay--visible');
+    if (m._trapHandler) { m.removeEventListener('keydown', m._trapHandler); m._trapHandler = null; }
+    if (m._previousFocus) { m._previousFocus.focus(); m._previousFocus = null; }
+  }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -12652,6 +13048,7 @@ Return JSON:
     closeModal(categoryModal);
     renderFilters();
     renderGrid();
+    generateWidgets(); // #15: re-trigger widgets on category change
     toast('Moved to ' + cap(cat));
   }
 
@@ -13627,7 +14024,16 @@ Return JSON:
       const cloudData = await fetchFromSupabase();
       if (cloudData) {
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-        expandedCards = cloudData.expanded;
+        // Validate expanded cards - remove orphaned entries
+        const validLinkIds = new Set(cloudData.links.map(l => l.id));
+        expandedCards = {};
+        if (cloudData.expanded) {
+          for (const [id, state] of Object.entries(cloudData.expanded)) {
+            if (validLinkIds.has(id)) {
+              expandedCards[id] = state;
+            }
+          }
+        }
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
         renderFilters();
         renderGrid();
@@ -13904,7 +14310,16 @@ Return JSON:
 
         // Always update from cloud (source of truth)
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-        expandedCards = cloudData.expanded;
+        // Validate expanded cards - remove orphaned entries
+        const validLinkIds = new Set(cloudData.links.map(l => l.id));
+        expandedCards = {};
+        if (cloudData.expanded) {
+          for (const [id, state] of Object.entries(cloudData.expanded)) {
+            if (validLinkIds.has(id)) {
+              expandedCards[id] = state;
+            }
+          }
+        }
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
         renderFilters();
         renderGrid();
@@ -13983,7 +14398,16 @@ Return JSON:
 
       // Save the new data
       save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-      expandedCards = cloudData.expanded;
+      // Validate expanded cards - remove orphaned entries
+      const validLinkIds = new Set(cloudData.links.map(l => l.id));
+      expandedCards = {};
+      if (cloudData.expanded) {
+        for (const [id, state] of Object.entries(cloudData.expanded)) {
+          if (validLinkIds.has(id)) {
+            expandedCards[id] = state;
+          }
+        }
+      }
       localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
 
       // Re-render with animation for new items
@@ -13996,13 +14420,15 @@ Return JSON:
     }
   }
 
+  const recentlyAddedUrls = [];
+
   async function checkClipboardForUrls() {
     try {
       const text = await navigator.clipboard.readText();
       const urls = extractUrls(text);
       if (urls.length > 0) {
-        // Check if these URLs are already saved
-        const newUrls = urls.filter(url => !findByUrl(url));
+        // Check if these URLs are already saved or recently added
+        const newUrls = urls.filter(url => !findByUrl(url) && !recentlyAddedUrls.includes(url));
         if (newUrls.length > 0) {
           showClipboardPrompt(newUrls, text);
         }
@@ -14010,6 +14436,11 @@ Return JSON:
     } catch (e) {
       // Permission denied or not supported - that's fine
     }
+  }
+
+  function trackRecentlyAdded(url) {
+    recentlyAddedUrls.push(url);
+    if (recentlyAddedUrls.length > 10) recentlyAddedUrls.shift();
   }
 
   function showClipboardPrompt(urls, originalText) {
