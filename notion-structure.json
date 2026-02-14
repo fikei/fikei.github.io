@@ -94,6 +94,12 @@
               "icon": "\u2709\ufe0f",
               "file": "docs/strategy/prds/tasks.md",
               "source": "ai"
+            },
+            {
+              "title": "Instagram Reels & Saves Import",
+              "icon": "\ud83d\udcf8",
+              "file": "docs/strategy/prds/instagram-import.md",
+              "source": "ai"
             }
           ]
         }
@@ -366,6 +372,18 @@
               "title": "Phase 9: Bulk Import",
               "icon": "\ud83d\udce5",
               "file": "docs/execution/project-plan/phase-9-bulk-import.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 10: Image Validation & Enrichment",
+              "icon": "\ud83d\uddbc\ufe0f",
+              "file": "docs/execution/project-plan/phase-10-image-validation.md",
+              "source": "ai"
+            },
+            {
+              "title": "Phase 11: Instagram Import",
+              "icon": "\ud83d\udcf8",
+              "file": "docs/execution/project-plan/phase-11-instagram-import.md",
               "source": "ai"
             },
             {
