@@ -369,6 +369,12 @@
               "source": "ai"
             },
             {
+              "title": "Phase 10: Image Validation & Enrichment",
+              "icon": "\ud83d\uddbc\ufe0f",
+              "file": "docs/execution/project-plan/phase-10-image-validation.md",
+              "source": "ai"
+            },
+            {
               "title": "Backlog",
               "icon": "\ud83d\udcdd",
               "file": "docs/execution/project-plan/backlog.md",

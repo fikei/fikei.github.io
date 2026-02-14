@@ -150,6 +150,72 @@ Budget management for AI vision API calls.
 
 ---
 
+## Epic 10.2b: Visual Standards System
+
+> Three-layer config-driven framework defining image quality and aesthetic expectations. Layer 0 (gate) actively blocks bad images. Layers 1 and 2 define scoring prompts for future AI vision ranking and currently shape generate-widget AI prompts.
+
+### Story 1: Product Gate (Layer 0) — URL Pattern & Technical Checks
+
+Synchronous, zero-cost checks that reject images before any AI evaluation.
+
+| Task | Status |
+|------|--------|
+| Define blocked URL patterns: stock watermarks (Shutterstock, Getty), ad networks (doubleclick, googlesyndication), tracking pixels, data URIs, default social share images, emoji CDNs | Complete |
+| Define technical thresholds: min 400x300, max aspect 3.5:1, min 5KB file size | Complete |
+| Define blocked compositions list (UI screenshots, memes, logo collages, QR codes, slides, stock handshakes) | Complete |
+| Define soft preferences (professional lighting, clear subject, high contrast, human curated feel) | Complete |
+| Implement `checkGateUrlPatterns()` — synchronous URL pattern rejection | Complete |
+| Implement `checkGateTechnical()` — synchronous dimension/size rejection | Complete |
+| Implement `buildGatePrompt()` — for Claude Vision scoring prompts | Complete |
+| Wire gate into `enrich-link`: `isRejectedByGate()` at all 5 scrape checkpoints | Complete |
+| Wire gate into `enrich-link`: `checkGateTechnical()` in Tier 2 validation after dimension extraction | Complete |
+
+**Key files**: `supabase/functions/generate-widget/config/visual-standards.ts`, `supabase/functions/enrich-link/index.ts`
+
+### Story 2: Content Type Standards (Layer 1)
+
+Per-type scoring definitions for what a "good" image looks like given its content type.
+
+| Task | Status |
+|------|--------|
+| Define standards for all 9 content types: product, article, video, music, repository, social, document, tool, unknown | Complete |
+| Each type specifies: expected_subject, good_framing, good_backgrounds, anti_patterns, aspect_preference | Complete |
+| Add digital product safeguards: `product` type scoped to physical only, `tool` type rejects physical product framing | Complete |
+| Implement `buildContentTypePrompt()` — generates type context for AI prompts | Complete |
+| Add explicit "product = physical only" guidance in prompt when type is product | Complete |
+| Wire content type scoring into Claude Vision image scorer (`buildImageScoringPrompt()`) | Pending |
+
+**Key files**: `supabase/functions/generate-widget/config/visual-standards.ts`
+
+### Story 3: Category Aesthetics (Layer 2)
+
+Per-category visual tone definitions for board categories.
+
+| Task | Status |
+|------|--------|
+| Define aesthetics for all 9 categories: home, wear, watch, listen, use, eat, go, follow, read | Complete |
+| Each category specifies: palette (hex colors), mood, textures, lighting, compositions, anti_patterns | Complete |
+| Add digital product safeguards: `use` category uses `device-hero` not `product-hero`, anti-pattern for physical product shots on software | Complete |
+| Implement `buildCategoryPrompt()` — generates category context for AI prompts | Complete |
+| Wire category context into generate-widget AI prompt (alongside brand + design system constraints) | Complete |
+| Wire category scoring into Claude Vision image scorer (`buildImageScoringPrompt()`) | Pending |
+
+**Key files**: `supabase/functions/generate-widget/config/visual-standards.ts`, `supabase/functions/generate-widget/index.ts`
+
+### Story 4: Combined Image Scoring Prompt
+
+Build a combined scorer prompt that sends candidate images to Claude Vision for ranking.
+
+| Task | Status |
+|------|--------|
+| Implement `buildImageScoringPrompt(contentType, category)` — combines gate + type + category prompts | Complete |
+| Wire into async Tier 3 evaluation to pick best candidate image from multiple options | Pending |
+| Score each candidate across gate_pass, content_type_score, category_score, combined_score | Pending |
+
+**Key files**: `supabase/functions/generate-widget/config/visual-standards.ts`
+
+---
+
 ## Epic 10.3: Composite Scoring Engine
 
 > Combine dimension scores into a single quality tier that drives downstream behavior.
@@ -301,7 +367,8 @@ Surface validation data in the image editor (depends on Epic 3.5 Story 6).
 |------|---------|-------|--------|
 | 10.1 Heuristic Validation | 4 | 28 | Complete (27/28) |
 | 10.2 AI Vision Scoring | 5 | 23 | Complete (20/23) |
+| 10.2b Visual Standards | 4 | 24 | IN PROGRESS (21/24) |
 | 10.3 Composite Scoring | 2 | 11 | Pending |
 | 10.4 Enrichment Router | 4 | 26 | Pending |
 | 10.5 Feedback Loop | 3 | 14 | Pending |
-| **Total** | **18** | **102** | **IN PROGRESS (47/102)** |
+| **Total** | **22** | **126** | **IN PROGRESS (68/126)** |

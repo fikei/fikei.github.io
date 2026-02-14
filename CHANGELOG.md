@@ -6,6 +6,31 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-14] - Visual Standards System for Image Quality & Aesthetics
+
+### Added
+- **Three-layer visual standards framework** (`supabase/functions/generate-widget/config/visual-standards.ts`) — defines image quality and aesthetic expectations across the entire platform:
+  - **Layer 0 — Product Gate**: Universal pass/fail for any image. Blocks stock watermarks (Shutterstock, Getty), ad network pixels, tracking URLs, data URIs, default social share images, emoji CDNs. Rejects images below 400x300, aspect ratios beyond 3.5:1, files under 5KB. Defines blocked compositions: UI screenshots, text-only images, memes, logo collages, QR codes, presentation slides, spreadsheets, cookie popups, stock handshakes. Soft preferences for professional lighting, clear subject, high contrast, "human curated feel."
+  - **Layer 1 — Content Type Standards**: Scores 0.0-1.0 per content type. Defines expected subject, good framing, good backgrounds, anti-patterns, and aspect preference for all 9 types: product, article, video, music, repository, social, document, tool, unknown.
+  - **Layer 2 — Category Aesthetics**: Scores 0.0-1.0 per board category. Defines palette (hex colors), mood, textures, lighting, compositions, and anti-patterns for all 9 categories: home, wear, watch, listen, use, eat, go, follow, read.
+- **6 exported functions**: `buildGatePrompt()`, `buildContentTypePrompt()`, `buildCategoryPrompt()`, `buildImageScoringPrompt()`, `checkGateUrlPatterns()`, `checkGateTechnical()`
+- **Digital product safeguards** — explicit separation between physical and digital products:
+  - `product` content type scoped to physical/tangible items with anti-patterns for app screenshots, software interfaces, browser mockups
+  - `tool` content type explicitly rejects physical product framing (flat-lay, centered-product, on-model)
+  - `use` category composition renamed from `product-hero` to `device-hero`; anti-pattern added for physical product shots applied to software
+  - `buildContentTypePrompt()` injects explicit guidance when type is `product`: digital products should be classified as `tool` instead
+
+### Changed
+- **`enrich-link` edge function** — gate layer now active in image resolution pipeline:
+  - New `isRejectedByGate()` function combines existing logo/placeholder checks with `checkGateUrlPatterns()` for pre-network rejection
+  - `scrapeImage()` runs gate at all 5 candidate checkpoints (og:image, twitter:image, JSON-LD, Shopify CDN, srcset)
+  - `validateImageTier2()` runs `checkGateUrlPatterns()` after placeholder check and `checkGateTechnical()` after dimension extraction
+- **`generate-widget` edge function** — category aesthetic context injected into AI prompts:
+  - Imports `buildCategoryPrompt()` from visual-standards.ts
+  - Injects category mood, palette, textures, lighting, compositions, and anti-patterns into prompt alongside brand and design system constraints
+
+---
+
 ## [2026-02-13] - Link Capture Improvements: Mobile, PWA, Bookmarklet, Image Scan
 
 ### Added
