@@ -144,15 +144,48 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 2.5: Watch Enrichment (AI-generated summary + metadata)
+    // STEP 2.5: Watch Enrichment — TMDB first, AI fills gaps
     // ========================================
     let videoMeta: Record<string, any> | null = null
     if (enrichWatch || category === 'watch' || contentType === 'video') {
-      console.log('[enrich-link] Step 2.5: Watch enrichment')
-      videoMeta = await enrichWatchWithAI(url, title, description)
-      if (videoMeta) {
-        console.log('[enrich-link] Watch enrichment result:', videoMeta)
+      console.log('[enrich-link] Step 2.5: Watch enrichment (TMDB → AI)')
+
+      // 1. Try TMDB first (structured, real-time data)
+      const tmdbResult = await lookupTMDB(title || '', null, null)
+
+      // 2. Only call AI if TMDB left gaps
+      const needsAI = !tmdbResult
+        || !tmdbResult.overview
+        || !tmdbResult.streamingServices?.length
+
+      let aiResult: Record<string, any> | null = null
+      if (needsAI) {
+        console.log('[enrich-link] TMDB incomplete, calling AI for gaps')
+        aiResult = await enrichWatchWithAI(url, title, description)
+      } else {
+        console.log('[enrich-link] TMDB complete, skipping AI call')
       }
+
+      // 3. Merge: TMDB is primary, AI fills gaps
+      videoMeta = {
+        summary: tmdbResult?.overview || aiResult?.summary || null,
+        type: aiResult?.type || (tmdbResult ? inferTypeFromTMDB(tmdbResult.mediaType) : null),
+        genre: tmdbResult?.genres?.[0] || aiResult?.genre || null,
+        year: tmdbResult?.year || aiResult?.year || null,
+        creator: tmdbResult?.creator || aiResult?.creator || null,
+        rating: aiResult?.rating || null,
+        runtime: tmdbResult?.runtime ? tmdbResult.runtime * 60 : null,
+        voteAverage: tmdbResult?.voteAverage || null,
+        tmdbId: tmdbResult?.tmdbId || null,
+        imdbId: tmdbResult?.imdbId || null,
+        tmdbUrl: tmdbResult?.tmdbUrl || null,
+        posterPath: tmdbResult?.posterPath || null,
+        streamingServices: tmdbResult?.streamingServices?.length
+          ? tmdbResult.streamingServices
+          : aiResult?.streamingServices || [],
+      }
+
+      console.log('[enrich-link] Watch enrichment result:', videoMeta)
     }
 
     // ========================================
@@ -279,7 +312,205 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0}`
 }
 
 // ========================================
-// Watch Enrichment using AI
+// Watch Enrichment using TMDB
+// ========================================
+
+interface TMDBResult {
+  tmdbId: number
+  mediaType: 'movie' | 'tv'
+  imdbId: string | null
+  title: string
+  overview: string | null
+  year: number | null
+  runtime: number | null   // minutes
+  genres: string[]
+  voteAverage: number | null
+  creator: string | null
+  posterPath: string | null
+  streamingServices: Array<{ name: string, type: string, logoPath: string | null }>
+  tmdbUrl: string
+}
+
+/**
+ * Look up a title on TMDB. Tries movie search first, then TV.
+ * Uses append_to_response to get details + watch providers + credits in one call.
+ */
+async function lookupTMDB(rawTitle: string, type: string | null, year: number | null): Promise<TMDBResult | null> {
+  const tmdbKey = Deno.env.get('TMDB_API_KEY')
+  if (!tmdbKey || !rawTitle) {
+    console.log('[tmdb] No TMDB_API_KEY or title, skipping')
+    return null
+  }
+
+  // Clean title: strip common suffixes
+  const cleanTitle = rawTitle
+    .replace(/\s*[\|\-–—]\s*(Netflix|YouTube|Hulu|Disney\+?|HBO|Max|Prime Video|Apple TV\+?|Vimeo|IMDb|Letterboxd|Rotten Tomatoes|Watch|Stream|Official).*$/i, '')
+    .replace(/\s*\(\d{4}\)\s*$/, '')  // strip trailing (2024)
+    .replace(/\s*-\s*IMDb\s*$/i, '')
+    .trim()
+
+  if (!cleanTitle) return null
+  console.log('[tmdb] Searching for:', cleanTitle, type ? `(${type})` : '', year || '')
+
+  const baseUrl = 'https://api.themoviedb.org/3'
+  const headers = {
+    'Authorization': `Bearer ${Deno.env.get('TMDB_READ_TOKEN') || ''}`,
+    'Accept': 'application/json'
+  }
+  // Use API key auth (simpler, no bearer token needed)
+  const authParam = `api_key=${tmdbKey}`
+
+  try {
+    // Determine search order based on type hint
+    const searchOrder: Array<'movie' | 'tv'> =
+      type === 'tv-show' || type === 'anime' ? ['tv', 'movie'] : ['movie', 'tv']
+
+    let searchResult: { id: number, mediaType: 'movie' | 'tv' } | null = null
+
+    for (const mediaType of searchOrder) {
+      const yearParam = year
+        ? (mediaType === 'movie' ? `&year=${year}` : `&first_air_date_year=${year}`)
+        : ''
+      const searchUrl = `${baseUrl}/search/${mediaType}?${authParam}&query=${encodeURIComponent(cleanTitle)}${yearParam}`
+
+      console.log('[tmdb] Search:', mediaType, cleanTitle)
+      const searchResp = await fetch(searchUrl)
+
+      if (!searchResp.ok) {
+        console.error('[tmdb] Search error:', searchResp.status)
+        continue
+      }
+
+      const searchData = await searchResp.json()
+      const results = searchData.results || []
+
+      if (results.length > 0) {
+        // Pick best match: exact title match > first result (sorted by popularity)
+        const titleLower = cleanTitle.toLowerCase()
+        const exactMatch = results.find((r: any) => {
+          const rTitle = (mediaType === 'movie' ? r.title : r.name)?.toLowerCase()
+          return rTitle === titleLower
+        })
+        const best = exactMatch || results[0]
+        searchResult = { id: best.id, mediaType }
+        console.log('[tmdb] Found:', mediaType, best.id, mediaType === 'movie' ? best.title : best.name)
+        break
+      }
+    }
+
+    if (!searchResult) {
+      console.log('[tmdb] No results found for:', cleanTitle)
+      return null
+    }
+
+    // Get details + watch providers + credits in one call
+    const appendParts = ['watch/providers', 'credits']
+    if (searchResult.mediaType === 'tv') {
+      appendParts.push('external_ids')  // TV needs this for imdb_id
+    }
+    const detailsUrl = `${baseUrl}/${searchResult.mediaType}/${searchResult.id}?${authParam}&append_to_response=${appendParts.join(',')}`
+
+    console.log('[tmdb] Getting details for:', searchResult.mediaType, searchResult.id)
+    const detailsResp = await fetch(detailsUrl)
+
+    if (!detailsResp.ok) {
+      console.error('[tmdb] Details error:', detailsResp.status)
+      return null
+    }
+
+    const details = await detailsResp.json()
+
+    // Extract fields based on media type
+    const isMovie = searchResult.mediaType === 'movie'
+    const tmdbTitle = isMovie ? details.title : details.name
+    const releaseDate = isMovie ? details.release_date : details.first_air_date
+    const releaseYear = releaseDate ? parseInt(releaseDate.split('-')[0], 10) : null
+    const runtime = isMovie ? details.runtime : (details.episode_run_time?.[0] || null)
+    const genres = (details.genres || []).map((g: any) => g.name)
+
+    // Extract creator/director
+    let creator: string | null = null
+    if (isMovie) {
+      const director = details.credits?.crew?.find((c: any) => c.job === 'Director')
+      creator = director?.name || null
+    } else {
+      creator = details.created_by?.[0]?.name || null
+    }
+
+    // Extract IMDB ID
+    const imdbId = isMovie ? (details.imdb_id || null) : (details.external_ids?.imdb_id || null)
+
+    // Extract US streaming providers
+    const usProviders = details['watch/providers']?.results?.US || {}
+    const streamingServices: Array<{ name: string, type: string, logoPath: string | null }> = []
+
+    // Flatrate (subscription streaming) first
+    for (const provider of (usProviders.flatrate || [])) {
+      streamingServices.push({
+        name: provider.provider_name,
+        type: 'flatrate',
+        logoPath: provider.logo_path || null
+      })
+    }
+    // Then free/ads
+    for (const provider of (usProviders.free || [])) {
+      streamingServices.push({
+        name: provider.provider_name,
+        type: 'free',
+        logoPath: provider.logo_path || null
+      })
+    }
+    // Then rent/buy (limited to top 3)
+    const rentBuy = [...(usProviders.rent || []), ...(usProviders.buy || [])]
+    const seenRentBuy = new Set<string>()
+    for (const provider of rentBuy) {
+      if (!seenRentBuy.has(provider.provider_name) && seenRentBuy.size < 3) {
+        seenRentBuy.add(provider.provider_name)
+        streamingServices.push({
+          name: provider.provider_name,
+          type: 'rent',
+          logoPath: provider.logo_path || null
+        })
+      }
+    }
+
+    const tmdbUrl = `https://www.themoviedb.org/${searchResult.mediaType}/${searchResult.id}`
+
+    console.log('[tmdb] Enrichment complete:', tmdbTitle, `(${releaseYear})`,
+      streamingServices.length, 'providers', imdbId || 'no imdb')
+
+    return {
+      tmdbId: searchResult.id,
+      mediaType: searchResult.mediaType,
+      imdbId,
+      title: tmdbTitle,
+      overview: details.overview || null,
+      year: releaseYear,
+      runtime,
+      genres,
+      voteAverage: details.vote_average || null,
+      creator,
+      posterPath: details.poster_path || null,
+      streamingServices,
+      tmdbUrl
+    }
+  } catch (e) {
+    console.error('[tmdb] Lookup error:', e)
+    return null
+  }
+}
+
+/**
+ * Infer content type from TMDB media type
+ */
+function inferTypeFromTMDB(mediaType: 'movie' | 'tv'): string {
+  if (mediaType === 'movie') return 'movie'
+  if (mediaType === 'tv') return 'tv-show'
+  return 'video'
+}
+
+// ========================================
+// Watch Enrichment using AI (fallback)
 // ========================================
 async function enrichWatchWithAI(url: string, title: string, description: string): Promise<Record<string, any> | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')

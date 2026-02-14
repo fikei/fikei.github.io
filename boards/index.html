@@ -1381,6 +1381,56 @@ body {
   height: 5px;
 }
 
+/* IMDB/Wikipedia reference link */
+.grid-item__ref-link {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+.grid-item__ref-link:hover {
+  color: var(--fg);
+}
+.grid-item__ref-link--imdb::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #F5C518;
+}
+.grid-item__ref-link--wikipedia::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #636363;
+}
+
+/* TMDB attribution */
+.grid-item__tmdb-attribution {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  color: var(--muted);
+  margin-top: 6px;
+  opacity: 0.6;
+}
+.grid-item__tmdb-attribution a {
+  color: inherit;
+  text-decoration: none;
+}
+.grid-item__tmdb-attribution a:hover {
+  text-decoration: underline;
+}
+
 .grid-item__action--danger:hover {
   background: #c00;
   color: #fff;
@@ -8939,25 +8989,30 @@ Return JSON:
           }
         }
 
-        // Merge AI-enriched video metadata into existing video field
+        // Merge server-enriched video metadata (TMDB + AI) into existing video field
         if (result.video) {
           const existing = link.video || {};
           link.video = {
             ...existing,
-            // AI-generated fields (only overwrite if not already set or AI provides them)
+            // Server-enriched fields (TMDB + AI) — overwrite with better data
             summary: result.video.summary || existing.summary || null,
             streamingServices: result.video.streamingServices?.length ? result.video.streamingServices : existing.streamingServices || [],
-            // Augment metadata — AI fills gaps from client-side extraction
+            voteAverage: result.video.voteAverage || existing.voteAverage || null,
+            tmdbId: result.video.tmdbId || existing.tmdbId || null,
+            imdbId: result.video.imdbId || existing.imdbId || null,
+            tmdbUrl: result.video.tmdbUrl || existing.tmdbUrl || null,
+            posterPath: result.video.posterPath || existing.posterPath || null,
+            // Augment metadata — server fills gaps from client-side extraction
             type: existing.type || result.video.type || null,
             genre: existing.genre || result.video.genre || null,
             year: existing.year || result.video.year || null,
             creator: existing.creator || result.video.creator || null,
             rating: existing.rating || result.video.rating || null,
+            runtime: result.video.runtime || existing.runtime || null,
             // Preserve client-side fields
             title: existing.title || null,
             platform: existing.platform || null,
             platformId: existing.platformId || null,
-            runtime: existing.runtime || null,
             contentFormat: existing.contentFormat || null,
             seriesInfo: existing.seriesInfo || null
           };
@@ -10604,8 +10659,9 @@ Return JSON:
         // Streaming services "Available on" chips
         if (_video.streamingServices && _video.streamingServices.length > 0) {
           const chips = _video.streamingServices.map(svc => {
-            // Map service name to platform key for color dot
-            const svcLower = svc.toLowerCase();
+            // Handle both string (legacy AI) and object (TMDB) format
+            const serviceName = typeof svc === 'string' ? svc : svc.name;
+            const svcLower = serviceName.toLowerCase();
             let platformKey = null;
             if (svcLower.includes('netflix')) platformKey = 'netflix';
             else if (svcLower.includes('hulu')) platformKey = 'hulu';
@@ -10619,9 +10675,27 @@ Return JSON:
             else if (svcLower.includes('mubi')) platformKey = 'mubi';
             else if (svcLower.includes('criterion')) platformKey = 'criterion';
             const dot = platformKey ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platformKey}"></span>` : '';
-            return `<span class="grid-item__streaming-chip">${dot}${esc(svc)}</span>`;
+            return `<span class="grid-item__streaming-chip">${dot}${esc(serviceName)}</span>`;
           }).join('');
           videoDetailsHtml += `<div class="grid-item__streaming"><span class="grid-item__streaming-label">Available on</span>${chips}</div>`;
+        }
+
+        // TMDB attribution
+        if (_video.tmdbUrl) {
+          videoDetailsHtml += `<div class="grid-item__tmdb-attribution"><a href="${esc(_video.tmdbUrl)}" target="_blank" rel="noopener">Data provided by TMDB</a></div>`;
+        }
+      }
+
+      // Build external reference link for watch items (IMDB preferred, Wikipedia fallback)
+      let refLinkHtml = '';
+      if (isWatch && _video) {
+        // Check for IMDB ID from TMDB enrichment or from client-side extraction (platformId: 'imdb:tt...')
+        const imdbId = _video.imdbId || (_video.platformId && _video.platformId.startsWith('imdb:') ? _video.platformId.slice(5) : null);
+        if (imdbId) {
+          refLinkHtml = `<a href="https://www.imdb.com/title/${esc(imdbId)}/" target="_blank" rel="noopener" class="grid-item__ref-link grid-item__ref-link--imdb">View on IMDb</a>`;
+        } else if (_video.title) {
+          const wikiQuery = encodeURIComponent(_video.title + (_video.year ? ' (' + _video.year + ' film)' : ''));
+          refLinkHtml = `<a href="https://en.wikipedia.org/wiki/Special:Search?search=${wikiQuery}" target="_blank" rel="noopener" class="grid-item__ref-link grid-item__ref-link--wikipedia">View on Wikipedia</a>`;
         }
       }
 
@@ -10643,6 +10717,7 @@ Return JSON:
           <h2 class="grid-item__details-title">${esc(_video?.title || _music?.trackTitle || l.title)}</h2>
           <p class="grid-item__details-domain">${esc(_video?.creator || _music?.artist || l.domain)}</p>
           ${(_video?.summary || l.description) ? `<p class="grid-item__details-description">${esc(_video?.summary || l.description)}</p>` : ''}
+          ${refLinkHtml}
           ${videoDetailsHtml}${musicDetailsHtml}
           <div class="grid-item__details-meta">
             <span>${cap(l.category)}</span>
