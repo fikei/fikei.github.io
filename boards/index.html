@@ -2973,6 +2973,16 @@ body {
   cursor: not-allowed;
 }
 
+.tools-list__installed {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  opacity: 0.6;
+  padding: var(--space-2) 0;
+}
+
 /* ============================================
    Overlay (Detail View)
    ============================================ */
@@ -3512,95 +3522,65 @@ body {
   opacity: 1;
 }
 
-/* On mobile: promo shows PWA install instead of bookmarklet */
+/* On mobile: promo shows above mobile paste bar */
 @media (max-width: 600px) {
   .capture-promo {
-    bottom: 110px; /* above quick-add bar */
+    bottom: 110px; /* above mobile-paste bar */
   }
 }
 
-/* Quick-Add Bar — mobile-first always-visible URL input */
-.quick-add {
-  display: none; /* hidden on desktop */
+/* Mobile Paste Button — clipboard-aware full-width paste action */
+.mobile-paste {
+  display: none;
 }
 
 @media (max-width: 600px) {
-  .quick-add {
-    display: flex;
+  .mobile-paste {
+    display: block;
     position: fixed;
     bottom: 56px; /* above bottom-nav */
     left: 0;
     right: 0;
     padding: var(--space-2) var(--space-4);
-    background: var(--bg);
-    border-top: 1px solid var(--subtle);
     z-index: 49;
-    gap: var(--space-2);
-    align-items: center;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
   }
 
-  .quick-add__input {
-    flex: 1;
-    padding: var(--space-2) var(--space-3);
+  .mobile-paste--visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .mobile-paste__btn {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
     font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    background: var(--surface);
-    color: var(--fg);
-    border: 1px solid var(--subtle);
-    outline: none;
-  }
-
-  .quick-add__input:focus {
-    border-color: var(--fg);
-  }
-
-  .quick-add__input::placeholder {
-    color: var(--muted);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .quick-add__paste {
-    padding: var(--space-2) var(--space-3);
-    font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     background: var(--fg);
     color: var(--bg);
     border: 1px solid var(--fg);
     cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .quick-add__paste:active {
-    background: var(--bg);
-    color: var(--fg);
-  }
-
-  .quick-add__submit {
-    width: 32px;
-    height: 32px;
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    font-family: var(--font-mono);
-    font-size: var(--font-size-base);
-    background: var(--fg);
-    color: var(--bg);
-    border: 1px solid var(--fg);
-    cursor: pointer;
-    flex-shrink: 0;
   }
 
-  .quick-add__submit:active {
+  .mobile-paste__btn:active {
     background: var(--bg);
     color: var(--fg);
   }
 
-  /* Adjust grid bottom padding to not overlap quick-add bar */
+  .mobile-paste__domain {
+    opacity: 0.6;
+  }
+
+  /* Adjust grid bottom padding to not overlap mobile paste bar */
   .grid {
     padding-bottom: 120px;
   }
@@ -4415,18 +4395,19 @@ body {
       <div class="capture-promo__icon">⚡</div>
       <div class="capture-promo__body">
         <div class="capture-promo__text" id="promoText">Save links in one click from any page</div>
-        <div class="capture-promo__subtext" id="promoSubtext">Set up the bookmarklet — takes 10 seconds</div>
+        <div class="capture-promo__subtext" id="promoSubtext">Add the browser extension</div>
       </div>
-      <button class="capture-promo__cta" id="promoShowTools">Set up</button>
+      <button class="capture-promo__cta" id="promoShowTools">Install</button>
       <button class="capture-promo__dismiss" id="promoDismiss" aria-label="Dismiss">&times;</button>
     </div>
   </div>
 
-  <!-- Quick-Add Bar (mobile) -->
-  <div class="quick-add" id="quickAdd">
-    <input type="text" class="quick-add__input" id="quickAddInput" placeholder="Paste a link" autocomplete="off" autocapitalize="off" inputmode="url">
-    <button class="quick-add__paste" id="quickAddPaste">Paste</button>
-    <button class="quick-add__submit" id="quickAddSubmit" aria-label="Add link">+</button>
+  <!-- Mobile Paste Button (clipboard-aware) -->
+  <div class="mobile-paste" id="mobilePaste">
+    <button class="mobile-paste__btn" id="mobilePasteBtn">
+      <span>Paste link</span>
+      <span class="mobile-paste__domain" id="mobilePasteDomain"></span>
+    </button>
   </div>
 
   <!-- Bottom Navigation -->
@@ -4717,15 +4698,28 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <button class="modal__close" data-close>&times;</button>
       </div>
 
-      <!-- Tab bar -->
+      <!-- Tab bar (browser-aware: Chrome shows Extension, others show Bookmarklet) -->
       <div class="tools-tabs" id="toolsTabs">
-        <button class="tools-tab tools-tab--active" data-tab="bookmarklet">Bookmarklet</button>
+        <button class="tools-tab tools-tab--active" data-tab="extension" id="toolsTabExtension" style="display:none;">Extension</button>
+        <button class="tools-tab tools-tab--active" data-tab="bookmarklet" id="toolsTabBookmarklet">Bookmarklet</button>
         <button class="tools-tab" data-tab="sharelink">Share Link</button>
         <button class="tools-tab" data-tab="pwa">Install App</button>
       </div>
 
-      <!-- Bookmarklet tab — copy-based install flow -->
-      <div class="tools-panel" id="toolsPanel-bookmarklet">
+      <!-- Extension tab — Chrome Web Store install -->
+      <div class="tools-panel tools-panel--hidden" id="toolsPanel-extension">
+        <div class="tools-list">
+          <div class="tools-list__item">
+            <div class="tools-list__label">Browser Extension</div>
+            <div class="tools-list__desc">Save the current page to Boards with one click from your toolbar.</div>
+            <button class="tools-list__btn" id="installExtensionBtn">Install Extension</button>
+            <div class="tools-list__installed" id="extensionInstalledMsg" style="display:none;">✓ Extension installed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bookmarklet tab — copy-based install flow (fallback for non-Chrome) -->
+      <div class="tools-panel tools-panel--hidden" id="toolsPanel-bookmarklet">
         <div class="tools-coach" id="bookmarkletCoach">
           <!-- Step 1: Copy the bookmarklet -->
           <div class="tools-coach__step" id="bmStep1">
@@ -11352,7 +11346,7 @@ Return JSON:
   };
 
   // ============================================
-  // Tools Modal — Tabs + Coached Bookmarklet Install
+  // Tools Modal — Tabs + Extension / Bookmarklet Install
   // ============================================
   const fabTools = document.getElementById('fabTools');
   const toolsModal = document.getElementById('toolsModal');
@@ -11368,12 +11362,52 @@ Return JSON:
     });
   }
 
+  // Extension detection
+  function isExtensionInstalled() {
+    return document.documentElement.hasAttribute('data-boards-extension');
+  }
+
+  // Browser-aware tab visibility: Chrome → Extension tab, others → Bookmarklet tab
+  const isChrome = /Chrome/.test(navigator.userAgent) && !/Edg|OPR/.test(navigator.userAgent);
+  const toolsTabExtension = document.getElementById('toolsTabExtension');
+  const toolsTabBookmarklet = document.getElementById('toolsTabBookmarklet');
+  const extensionPanel = document.getElementById('toolsPanel-extension');
+  const bookmarkletPanel = document.getElementById('toolsPanel-bookmarklet');
+
+  if (isChrome && toolsTabExtension && toolsTabBookmarklet) {
+    // Chrome: show Extension tab as default, hide Bookmarklet
+    toolsTabExtension.style.display = '';
+    toolsTabExtension.classList.add('tools-tab--active');
+    toolsTabBookmarklet.style.display = 'none';
+    toolsTabBookmarklet.classList.remove('tools-tab--active');
+    if (extensionPanel) extensionPanel.classList.remove('tools-panel--hidden');
+    if (bookmarkletPanel) bookmarkletPanel.classList.add('tools-panel--hidden');
+  }
+  // Non-Chrome: Bookmarklet tab is default (already set in HTML)
+
+  // Extension install button
+  const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/boards-save-links/EXTENSION_ID';
+  const installExtensionBtn = document.getElementById('installExtensionBtn');
+  const extensionInstalledMsg = document.getElementById('extensionInstalledMsg');
+
+  if (installExtensionBtn) {
+    if (isExtensionInstalled()) {
+      installExtensionBtn.style.display = 'none';
+      if (extensionInstalledMsg) extensionInstalledMsg.style.display = '';
+    } else {
+      installExtensionBtn.onclick = () => {
+        window.open(EXTENSION_STORE_URL, '_blank');
+      };
+    }
+  }
+
   // Tab navigation
   const toolsTabs = document.querySelectorAll('.tools-tab');
   toolsTabs.forEach(tab => {
     tab.onclick = () => {
+      if (tab.style.display === 'none') return;
       const target = tab.dataset.tab;
-      // Update tabs
+      // Update tabs (only visible ones)
       toolsTabs.forEach(t => t.classList.toggle('tools-tab--active', t === tab));
       // Update panels
       document.querySelectorAll('.tools-panel').forEach(p => {
@@ -14129,13 +14163,35 @@ Return JSON:
   }
 
   function showClipboardPrompt(urls, originalText) {
+    const isMobileView = window.innerWidth <= 600;
+    const count = urls.length;
+    const preview = urls[0].replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+
+    // On mobile: show the paste button bar
+    if (isMobileView) {
+      const pasteBar = document.getElementById('mobilePaste');
+      const pasteBtn = document.getElementById('mobilePasteBtn');
+      const domainEl = document.getElementById('mobilePasteDomain');
+      if (!pasteBar || !pasteBtn) return;
+
+      domainEl.textContent = count === 1 ? preview : count + ' links';
+      pasteBtn.dataset.clipboardText = originalText;
+      pasteBar.classList.add('mobile-paste--visible');
+
+      // Clear any previous auto-hide timer
+      if (pasteBar._hideTimer) clearTimeout(pasteBar._hideTimer);
+      pasteBar._hideTimer = setTimeout(() => {
+        pasteBar.classList.remove('mobile-paste--visible');
+      }, 10000);
+      return;
+    }
+
+    // Desktop: floating clipboard prompt
     const existing = document.querySelector('.clipboard-prompt');
     if (existing) existing.remove();
 
     const prompt = document.createElement('div');
     prompt.className = 'clipboard-prompt';
-    const count = urls.length;
-    const preview = urls[0].replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
     prompt.innerHTML = `
       <span class="clipboard-prompt__text">${count === 1 ? preview : count + ' links'} in clipboard</span>
       <button class="clipboard-prompt__btn clipboard-prompt__btn--add">Add</button>
@@ -14190,70 +14246,20 @@ Return JSON:
   init();
 
   // ============================================
-  // Quick-Add Bar (mobile)
+  // Mobile Paste Button
   // ============================================
-  const quickAddInput = document.getElementById('quickAddInput');
-  const quickAddPaste = document.getElementById('quickAddPaste');
-  const quickAddSubmit = document.getElementById('quickAddSubmit');
+  const mobilePasteBtn = document.getElementById('mobilePasteBtn');
+  const mobilePasteBar = document.getElementById('mobilePaste');
 
-  if (quickAddInput) {
-    // Paste button — reads clipboard and fills input or processes directly
-    quickAddPaste.onclick = async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        const urls = extractUrls(text);
-        if (urls.length > 0) {
-          // Process directly if clipboard has URLs
-          processLinks(text);
-          quickAddInput.value = '';
-        } else {
-          // Paste text into input for manual editing
-          quickAddInput.value = text;
-          quickAddInput.focus();
-        }
-      } catch (e) {
-        // Fallback: focus input so user can manually paste
-        quickAddInput.focus();
-        toast('Tap and hold to paste', true);
-      }
-    };
-
-    // Submit button — processes whatever is in the input
-    quickAddSubmit.onclick = () => {
-      const text = quickAddInput.value.trim();
-      if (!text) {
-        quickAddInput.focus();
-        return;
-      }
-      const urls = extractUrls(text);
-      if (urls.length > 0) {
+  if (mobilePasteBtn) {
+    mobilePasteBtn.onclick = () => {
+      const text = mobilePasteBtn.dataset.clipboardText;
+      if (text) {
+        if (mobilePasteBar._hideTimer) clearTimeout(mobilePasteBar._hideTimer);
+        mobilePasteBar.classList.remove('mobile-paste--visible');
         processLinks(text);
-        quickAddInput.value = '';
-      } else {
-        toast('No valid URL found', true);
       }
     };
-
-    // Enter key submits
-    quickAddInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        quickAddSubmit.click();
-      }
-    });
-
-    // Auto-detect paste into input
-    quickAddInput.addEventListener('paste', (e) => {
-      // Let the paste happen naturally, then process after a tick
-      setTimeout(() => {
-        const text = quickAddInput.value.trim();
-        const urls = extractUrls(text);
-        if (urls.length > 0) {
-          processLinks(text);
-          quickAddInput.value = '';
-        }
-      }, 0);
-    });
   }
 
   // ============================================
@@ -14261,12 +14267,13 @@ Return JSON:
   // ============================================
   // Smart promotion for capture tools:
   //
-  // DESKTOP: promotes bookmarklet install
+  // DESKTOP: promotes browser extension install (Chrome) or bookmarklet (others)
   //   - Shows after 3rd link add (engaged user)
-  //   - "Set up" opens Tools modal to bookmarklet coach
+  //   - "Install" opens Chrome Web Store (or Tools modal for non-Chrome)
   //   - Dismiss ×1 → snooze 7 days, then shows once more with softer copy
   //   - Dismiss ×2 → gone for 90 days
   //   - Dismiss ×3 → gone permanently
+  //   - Extension detected = never shows again
   //   - Opening Tools modal = "set up", never shows again
   //   - Deep link arrival = already using tools, skip this session
   //
@@ -14300,6 +14307,12 @@ Return JSON:
 
     // Already set up tools — done forever
     if (state.installed) return false;
+
+    // Desktop: skip if extension is installed
+    if (!isMobile && isExtensionInstalled()) {
+      setPromoState({ installed: true });
+      return false;
+    }
 
     // Arrived via deep link or share target — already using a capture tool
     if (sessionStorage.getItem('boards_arrived_via_deeplink')) return false;
@@ -14342,9 +14355,9 @@ Return JSON:
       if (promoIcon) promoIcon.textContent = '💡';
       if (promoText) promoText.textContent = 'Still pasting links? There\'s a faster way';
       if (promoSubtext) promoSubtext.textContent = 'One-click saving from any page';
-      if (promoShowTools) promoShowTools.textContent = 'Show me';
+      if (promoShowTools) promoShowTools.textContent = 'Install';
     }
-    // else: default desktop copy from HTML
+    // else: default desktop copy from HTML (promotes extension)
   }
 
   function showPromo() {
@@ -14372,8 +14385,11 @@ Return JSON:
           }
           deferredInstallPrompt = null;
         });
+      } else if (isChrome) {
+        // Desktop Chrome: open extension store
+        window.open(EXTENSION_STORE_URL, '_blank');
       } else if (toolsModal) {
-        // Desktop: open Tools modal to bookmarklet tab
+        // Desktop non-Chrome: open Tools modal to bookmarklet tab
         openModal(toolsModal);
       }
     };
