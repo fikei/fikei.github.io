@@ -344,9 +344,12 @@ async function lookupTMDB(rawTitle: string, type: string | null, year: number | 
 
   // Clean title: strip common suffixes
   const cleanTitle = rawTitle
-    .replace(/\s*[\|\-–—]\s*(Netflix|YouTube|Hulu|Disney\+?|HBO|Max|Prime Video|Apple TV\+?|Vimeo|IMDb|Letterboxd|Rotten Tomatoes|Watch|Stream|Official).*$/i, '')
+    .replace(/\s*[\|\-–—]\s*(Netflix|YouTube|Hulu|Disney\+?|HBO|Max|Prime Video|Apple TV\+?|Vimeo|IMDb|Letterboxd|Rotten Tomatoes|Watch|Stream|Official|Wikipedia|Wiki|Fandom).*$/i, '')
     .replace(/\s*\(\d{4}\)\s*$/, '')  // strip trailing (2024)
-    .replace(/\s*-\s*IMDb\s*$/i, '')
+    .replace(/\s*-\s*(IMDb|Wikipedia)\s*$/i, '')
+    .replace(/\s*\(TV series\)\s*$/i, '')  // strip "(TV series)" from Wikipedia titles
+    .replace(/\s*\(film\)\s*$/i, '')  // strip "(film)" from Wikipedia titles
+    .replace(/\s*\(TV programme\)\s*$/i, '')
     .trim()
 
   if (!cleanTitle) return null
