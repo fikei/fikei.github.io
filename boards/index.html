@@ -9326,58 +9326,38 @@ Return JSON:
     await processEnrichmentQueue();
   }
 
-  // Auto-enrich watch items missing TMDB data (runs once on load)
-  let hasRunTMDBBackfill = false;
-  function backfillWatchTMDB() {
-    if (hasRunTMDBBackfill) return;
-    hasRunTMDBBackfill = true;
+  // Auto-enrich rich content items missing metadata (runs once on load)
+  // Iterates RICH_CONTENT config — adding a new category automatically backfills affected items
+  let hasRunRichBackfill = false;
+  function backfillRichContent() {
+    if (hasRunRichBackfill) return;
+    hasRunRichBackfill = true;
 
     const links = getAllLinks();
-    const watchLinks = links.filter(l =>
-      l.category === 'watch' &&
-      l.video &&
-      !l.video.tmdbId  // Missing TMDB data
-    );
 
-    if (watchLinks.length === 0) {
-      console.log('%c[TMDB-BACKFILL] All watch items have TMDB data', 'color: #01d277');
-      return;
-    }
+    for (const [category, config] of Object.entries(RICH_CONTENT)) {
+      // Find items that need enrichment:
+      // 1. Items in this category with no metadata field at all (new feature, never enriched)
+      // 2. Items in this category that fail the backfillCheck (partial enrichment)
+      const needsEnrichment = links.filter(l =>
+        l.category === category &&
+        (!l[config.metaField] || config.backfillCheck(l))
+      );
 
-    console.log('%c[TMDB-BACKFILL] Found', 'color: #E50914; font-weight: bold', watchLinks.length, 'watch items missing TMDB data, queuing for enrichment');
+      if (needsEnrichment.length === 0) {
+        console.log(`%c[BACKFILL] All ${category} items enriched`, 'color: #01d277');
+        continue;
+      }
 
-    for (const link of watchLinks) {
-      queueServerEnrichment(link.id, link.url, link.title, link.description, {
-        category: 'watch',
-        enrichWatch: true
-      });
-    }
-  }
+      console.log(`%c[BACKFILL] ${needsEnrichment.length} ${category} items need enrichment`,
+        'color: #f59e0b; font-weight: bold');
 
-  let hasRunBookBackfill = false;
-  function backfillBookOpenLibrary() {
-    if (hasRunBookBackfill) return;
-    hasRunBookBackfill = true;
-
-    const links = getAllLinks();
-    const bookLinks = links.filter(l =>
-      l.category === 'read' &&
-      l.book &&
-      !l.book.openLibraryKey  // Missing Open Library data
-    );
-
-    if (bookLinks.length === 0) {
-      console.log('%c[BOOK-BACKFILL] All book items have Open Library data', 'color: #553b08');
-      return;
-    }
-
-    console.log('%c[BOOK-BACKFILL] Found', 'color: #553b08; font-weight: bold', bookLinks.length, 'book items missing Open Library data, queuing for enrichment');
-
-    for (const link of bookLinks) {
-      queueServerEnrichment(link.id, link.url, link.title, link.description, {
-        category: 'read',
-        enrichBook: true
-      });
+      for (const link of needsEnrichment) {
+        queueServerEnrichment(link.id, link.url, link.title, link.description, {
+          category,
+          [config.enrichFlag]: true
+        });
+      }
     }
   }
 
@@ -14260,11 +14240,8 @@ Return JSON:
     // Re-check uncategorized items on load
     recategorizeUncategorized();
 
-    // Backfill TMDB data for watch items that don't have it
-    backfillWatchTMDB();
-
-    // Backfill Open Library data for book items that don't have it
-    backfillBookOpenLibrary();
+    // Backfill enrichment for rich content categories (watch, read, etc.)
+    backfillRichContent();
 
     // Retry image resolution for items with null images
     retryFailedImages();

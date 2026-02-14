@@ -1218,7 +1218,8 @@ const KNOWN_GOOD_SOURCES = [
   /mosaic\.scdn\.co\//,
   /image\.tmdb\.org\//,
   /m\.media-amazon\.com\//,
-  /images-na\.ssl-images-amazon\.com\//
+  /images-na\.ssl-images-amazon\.com\//,
+  /covers\.openlibrary\.org\//
 ]
 
 // Card context minimum dimensions
@@ -1486,7 +1487,7 @@ async function resolveFavicon(url: string): Promise<{ url: string, source: 'favi
 // ========================================
 
 // Known-good sources skip AI evaluation entirely
-const KNOWN_GOOD_SOURCES = [
+const KNOWN_GOOD_SOURCES_T3 = [
   /img\.youtube\.com\/vi\//,
   /i\.vimeocdn\.com\//,
   /opengraph\.githubassets\.com\//,
@@ -1494,7 +1495,8 @@ const KNOWN_GOOD_SOURCES = [
   /mosaic\.scdn\.co\//,
   /image\.tmdb\.org\//,
   /m\.media-amazon\.com\//,
-  /images-na\.ssl-images-amazon\.com\//
+  /images-na\.ssl-images-amazon\.com\//,
+  /covers\.openlibrary\.org\//
 ]
 
 const TIER3_WEIGHTS = {
@@ -1538,7 +1540,7 @@ async function evaluateImageQuality(
   contentType: string
 ): Promise<Tier3Result | null> {
   // Known-good sources get automatic high scores
-  if (KNOWN_GOOD_SOURCES.some(p => p.test(imageUrl))) {
+  if (KNOWN_GOOD_SOURCES_T3.some(p => p.test(imageUrl))) {
     console.log('[tier3] Known-good source, bypassing AI:', imageUrl)
     const scores = {
       accuracy: 0.9, visual_quality: 0.9, aesthetic_fit: 0.8,
