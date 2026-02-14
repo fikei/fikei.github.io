@@ -36,6 +36,8 @@ const ALLOWED_DOMAINS = [
   'dice.fm',
   'ra.co',
   'songkick.com',
+  'garysguide.com',
+  'bonobonetwork.com',
 ]
 
 function isDomainAllowed(url: string): boolean {

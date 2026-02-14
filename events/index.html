@@ -1387,6 +1387,11 @@ body {
     { id: 'screenslate-nyc', name: 'Screen Slate', category: 'film', type: 'screenslate', url: 'https://www.screenslate.com/listings', region: 'new-york', description: 'Repertory & arthouse cinema' },
     // Seattle
     { id: '19hz-seattle', name: '19hz Seattle', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_Seattle.php', region: 'seattle', description: 'Electronic music & nightlife' },
+    // Bay Area — Tech & Networking
+    { id: 'garysguide-sf', name: "Gary's Guide SF", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=sf', region: 'bay-area', description: 'Tech & startup events' },
+    { id: 'bonobo-sf', name: 'Bonobo Network', category: 'social', type: 'bonobo', url: 'https://www.bonobonetwork.com/events', region: 'bay-area', description: 'Social & community events' },
+    // New York — Tech & Networking
+    { id: 'garysguide-nyc', name: "Gary's Guide NYC", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=nyc', region: 'new-york', description: 'Tech & startup events' },
   ];
 
   const CONTENT_TYPES = {
@@ -1397,6 +1402,8 @@ body {
     'film': 'Film',
     'comedy': 'Comedy',
     'theater': 'Theater',
+    'tech': 'Tech',
+    'social': 'Social',
     'other': 'Other',
   };
 
@@ -1622,6 +1629,8 @@ body {
     if (/\b(comedy|stand.?up|open.?mic|improv)\b/.test(text)) return 'comedy';
     if (/\b(screening|film|movie|cinema|double.feature)\b/.test(text)) return 'film';
     if (/\b(theater|theatre|play|musical|opera|ballet)\b/.test(text)) return 'theater';
+    if (/\b(tech|startup|hack|ai\b|ml\b|demo\s*day|pitch|saas|devops|blockchain|web3|crypto|meetup|networking|workshop)\b/i.test(text)) return 'tech';
+    if (/\b(social|mixer|happy\s*hour|brunch|picnic|party|gathering|community)\b/i.test(text) && cat === 'social') return 'social';
     return cat || 'other';
   }
 
@@ -1799,6 +1808,8 @@ body {
   // --- Auto-detect source type from URL ---
   function detectSourceType(url) {
     const u = url.toLowerCase();
+    if (u.includes('garysguide.com')) return 'garysguide';
+    if (u.includes('bonobonetwork.com')) return 'bonobo';
     if (u.includes('screenslate.com')) return 'screenslate';
     if (u.includes('19hz.info')) return 'html';
     if (u.endsWith('.ics') || u.includes('.ics?') || u.startsWith('webcal://')) return 'ical';
@@ -1971,6 +1982,8 @@ body {
         let events;
         if (type === 'screenslate') events = await fetchScreenSlate(source);
         else if (type === 'ra') events = await fetchRA(source);
+        else if (type === 'garysguide') events = await fetchGarysGuide(source);
+        else if (type === 'bonobo') events = await fetchBonobo(source);
         else if (type === 'html') events = await fetchHtml(source);
         else if (type === 'ical') events = await fetchIcal(source);
         else if (type === 'json') events = await fetchJson(source);
@@ -2235,6 +2248,279 @@ body {
     });
 
     log('RA: found ' + events.length + ' events via HTML parsing');
+    return events;
+  }
+
+  // --- Gary's Guide Scraper ---
+  // garysguide.com lists tech/startup events organized by week.
+  // Strategy: JSON-LD → semantic HTML → link list fallback
+  async function fetchGarysGuide(source) {
+    log("GarysGuide: fetching " + source.url);
+    const text = await proxyFetch(source.url);
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    const events = [];
+    const baseUrl = 'https://www.garysguide.com';
+
+    // Strategy 1: JSON-LD structured data
+    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+    ldScripts.forEach(script => {
+      try {
+        const data = JSON.parse(script.textContent);
+        const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
+        items.forEach(item => {
+          if (!item['@type'] || !['Event', 'SocialEvent', 'BusinessEvent', 'EducationEvent'].includes(item['@type'])) return;
+          const name = item.name || '';
+          const startDate = item.startDate || '';
+          const venue = item.location?.name || item.location?.address?.name || '';
+          const city = item.location?.address?.addressLocality || '';
+          const address = item.location?.address?.streetAddress || '';
+          const url = item.url || '';
+          const description = item.description || '';
+          if (name && startDate) {
+            const d = new Date(startDate);
+            const date = d.toISOString().split('T')[0];
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            const time = (hours !== '00' || mins !== '00') ? hours + ':' + mins : '';
+            events.push({ date, time, name, venue, city, address, genre: 'Tech', url: url.startsWith('http') ? url : baseUrl + url, source: source.id, contentType: 'tech', description });
+          }
+        });
+      } catch (e) { /* ignore invalid JSON-LD */ }
+    });
+
+    if (events.length > 0) {
+      log('GarysGuide: found ' + events.length + ' events via JSON-LD');
+      return events;
+    }
+
+    // Strategy 2: Parse event listing HTML elements
+    // GarysGuide uses divs/spans for event entries with links to /events/{id}/{slug}
+    let currentWeekDate = '';
+    const allElements = doc.querySelectorAll('h2, h3, h4, [class*="week"], [class*="event"], [class*="listing"], a[href*="/events/"]');
+
+    // First, try to find week headers and event containers
+    const containers = doc.querySelectorAll('[class*="event"], [class*="listing"], [class*="item"], article, li');
+    containers.forEach(container => {
+      const linkEl = container.querySelector('a[href*="/events/"]');
+      if (!linkEl) return;
+      const href = linkEl.getAttribute('href') || '';
+      // Skip non-event links (e.g., /events?region=)
+      if (href.includes('?') && !href.includes('/events/')) return;
+      const name = linkEl.textContent?.trim() || '';
+      if (!name || name.length < 3) return;
+
+      // Look for date info in sibling/parent elements
+      let dateText = '';
+      const dateEl = container.querySelector('time, [datetime], [class*="date"], [class*="Date"], [class*="when"]');
+      if (dateEl) {
+        dateText = dateEl.getAttribute('datetime') || dateEl.textContent?.trim() || '';
+      }
+
+      // Look for venue
+      let venue = '';
+      const venueEl = container.querySelector('[class*="venue"], [class*="location"], [class*="place"], [class*="where"]');
+      if (venueEl) venue = venueEl.textContent?.trim() || '';
+
+      // Look for time
+      let timeText = '';
+      const timeEl = container.querySelector('[class*="time"], [class*="Time"]');
+      if (timeEl) timeText = timeEl.textContent?.trim() || '';
+
+      let date = '', time = '';
+      if (dateText) {
+        try {
+          const d = new Date(dateText);
+          if (!isNaN(d.getTime())) {
+            date = d.toISOString().split('T')[0];
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            if (hours !== '00' || mins !== '00') time = hours + ':' + mins;
+          }
+        } catch (e) { /* parse error */ }
+      }
+      if (!date) {
+        const parsed = parseFuzzyDate(dateText || container.textContent);
+        if (parsed) date = parsed;
+      }
+
+      const fullUrl = href.startsWith('http') ? href : baseUrl + href;
+      events.push({ date: date || '', time: time || timeText, name, venue, city: '', genre: 'Tech', url: fullUrl, source: source.id, contentType: 'tech' });
+    });
+
+    if (events.length > 0) {
+      log('GarysGuide: found ' + events.length + ' events via container parsing');
+      return events;
+    }
+
+    // Strategy 3: Link-list fallback — extract all event links
+    const eventLinks = doc.querySelectorAll('a[href*="/events/"]');
+    const seen = new Set();
+    eventLinks.forEach(link => {
+      const href = link.getAttribute('href') || '';
+      // Must be an individual event page (has an event ID segment)
+      if (!href.match(/\/events\/[a-z0-9]+\//i) && !href.match(/\/events\/[a-z0-9]+$/i)) return;
+      if (href.includes('?')) return; // skip query pages
+      const fullUrl = href.startsWith('http') ? href : baseUrl + href;
+      if (seen.has(fullUrl)) return;
+      seen.add(fullUrl);
+
+      const name = link.textContent?.trim() || '';
+      if (!name || name.length < 3) return;
+
+      // Try to extract date from surrounding context
+      let date = '';
+      const parent = link.parentElement;
+      if (parent) {
+        // Walk up to find a week header
+        let el = parent;
+        for (let i = 0; i < 5 && el; i++) {
+          const prev = el.previousElementSibling;
+          if (prev) {
+            const text = prev.textContent || '';
+            // Match "WEEK OF FEB 09" or similar date headers
+            const weekMatch = text.match(/WEEK\s+OF\s+(\w+\s+\d{1,2})/i);
+            if (weekMatch) {
+              const parsed = parseFuzzyDate(weekMatch[1]);
+              if (parsed) { date = parsed; break; }
+            }
+            // Match "Monday, February 10" or similar
+            const dateMatch = text.match(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+(\w+\s+\d{1,2})/i);
+            if (dateMatch) {
+              const parsed = parseFuzzyDate(dateMatch[2]);
+              if (parsed) { date = parsed; break; }
+            }
+          }
+          el = el.parentElement;
+        }
+      }
+
+      events.push({ date: date || '', time: '', name, venue: '', city: '', genre: 'Tech', url: fullUrl, source: source.id, contentType: 'tech' });
+    });
+
+    log('GarysGuide: found ' + events.length + ' events via link fallback');
+    return events;
+  }
+
+  // --- Bonobo Network Scraper (Squarespace) ---
+  // bonobonetwork.com is built on Squarespace. Events available via:
+  //   1. Squarespace JSON API (?format=json)
+  //   2. JSON-LD structured data
+  //   3. HTML element parsing fallback
+  async function fetchBonobo(source) {
+    log('Bonobo: fetching ' + source.url);
+    const events = [];
+    const baseUrl = 'https://www.bonobonetwork.com';
+
+    // Strategy 1: Squarespace JSON endpoint
+    try {
+      const jsonUrl = source.url + (source.url.includes('?') ? '&' : '?') + 'format=json';
+      log('Bonobo: trying Squarespace JSON endpoint');
+      const text = await proxyFetch(jsonUrl);
+      const data = JSON.parse(text);
+      const items = data.items || data.upcoming || [];
+      if (items.length > 0) {
+        items.forEach(item => {
+          const name = item.title || '';
+          if (!name) return;
+          const startMs = item.startDate;
+          let date = '', time = '';
+          if (startMs) {
+            const d = new Date(startMs);
+            date = d.toISOString().split('T')[0];
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            if (hours !== '00' || mins !== '00') time = hours + ':' + mins;
+          }
+          const venue = item.location?.addressTitle || item.location?.addressLine1 || '';
+          const city = item.location?.addressLine2 || '';
+          const url = item.fullUrl ? baseUrl + item.fullUrl : (item.sourceUrl || '');
+          const description = item.excerpt || item.body?.replace(/<[^>]+>/g, '').substring(0, 300) || '';
+          const imageUrl = item.assetUrl || '';
+          events.push({ date, time, name, venue, city, genre: '', url, source: source.id, contentType: 'social', description, imageUrl });
+        });
+        log('Bonobo: found ' + events.length + ' events via Squarespace JSON');
+        return events;
+      }
+    } catch (e) {
+      log('Bonobo: Squarespace JSON failed: ' + e.message);
+    }
+
+    // Strategy 2: Fetch HTML and parse
+    let text;
+    try {
+      text = await proxyFetch(source.url);
+    } catch (e) {
+      log('Bonobo: HTML fetch failed: ' + e.message);
+      throw e;
+    }
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+
+    // Strategy 2a: JSON-LD
+    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+    ldScripts.forEach(script => {
+      try {
+        const data = JSON.parse(script.textContent);
+        const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
+        items.forEach(item => {
+          if (!item['@type'] || !['Event', 'SocialEvent'].includes(item['@type'])) return;
+          const name = item.name || '';
+          const startDate = item.startDate || '';
+          if (!name || !startDate) return;
+          const d = new Date(startDate);
+          const date = d.toISOString().split('T')[0];
+          const hours = d.getHours().toString().padStart(2, '0');
+          const mins = d.getMinutes().toString().padStart(2, '0');
+          const time = (hours !== '00' || mins !== '00') ? hours + ':' + mins : '';
+          const venue = item.location?.name || '';
+          const city = item.location?.address?.addressLocality || '';
+          const url = item.url || '';
+          events.push({ date, time, name, venue, city, genre: '', url, source: source.id, contentType: 'social' });
+        });
+      } catch (e) { /* ignore */ }
+    });
+
+    if (events.length > 0) {
+      log('Bonobo: found ' + events.length + ' events via JSON-LD');
+      return events;
+    }
+
+    // Strategy 2b: Squarespace event list HTML structure
+    const eventEls = doc.querySelectorAll('.eventlist-event, [class*="eventlist"], [class*="summary-item"], article[class*="event"], [data-type="events"] article');
+    eventEls.forEach(el => {
+      const titleEl = el.querySelector('.eventlist-title a, [class*="title"] a, h1 a, h2 a, h3 a');
+      const dateEl = el.querySelector('time, .event-date, [class*="date"], [datetime]');
+      const venueEl = el.querySelector('[class*="location"], [class*="venue"], [class*="address"]');
+      const excerptEl = el.querySelector('[class*="excerpt"], [class*="description"], .eventlist-description');
+
+      const name = titleEl?.textContent?.trim() || el.querySelector('h1, h2, h3')?.textContent?.trim() || '';
+      if (!name) return;
+
+      let date = '', time = '';
+      const dateAttr = dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '';
+      if (dateAttr) {
+        try {
+          const d = new Date(dateAttr);
+          if (!isNaN(d.getTime())) {
+            date = d.toISOString().split('T')[0];
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            if (hours !== '00' || mins !== '00') time = hours + ':' + mins;
+          }
+        } catch (e) { /* ignore */ }
+      }
+      if (!date) {
+        const parsed = parseFuzzyDate(dateAttr);
+        if (parsed) date = parsed;
+      }
+
+      const venue = venueEl?.textContent?.trim() || '';
+      const href = titleEl?.getAttribute('href') || '';
+      const url = href.startsWith('http') ? href : (href ? baseUrl + href : '');
+
+      events.push({ date: date || '', time, name, venue, city: '', genre: '', url, source: source.id, contentType: 'social' });
+    });
+
+    log('Bonobo: found ' + events.length + ' events via HTML parsing');
     return events;
   }
 
