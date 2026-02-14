@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-13 (Phase 7 Quick Capture Tools completed)
+> **Last Updated**: 2026-02-14 (Events: RA GraphQL, Gary's Guide, Bonobo sources + multi-source tags)
 
 ---
 
@@ -27,12 +27,23 @@
 | [Phase 7: Platform Expansion](./phase-7-platform-expansion.md) | IN PROGRESS | 21/38 |
 | [Phase 8: Automated Pin Creation](./phase-8-automated-pins.md) | Pending | 0/54 |
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/132 |
-| [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 47/102 |
+| [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 68/126 |
+| [Phase 11: Instagram Import](./phase-11-instagram-import.md) | Pending | 0/73 |
 | [Backlog](./backlog.md) | Future | 1/110 |
 
 ---
 
 ## Recent Milestones
+
+### Visual Standards System ✅
+**Completed: 2026-02-14**
+
+- **Three-layer framework** for image quality and aesthetics (`visual-standards.ts`)
+- **Layer 0 — Product Gate**: synchronous URL pattern + technical checks, wired into enrich-link at all scrape checkpoints
+- **Layer 1 — Content Type Standards**: per-type framing/anti-pattern definitions for all 9 content types
+- **Layer 2 — Category Aesthetics**: per-category palette/mood/texture/lighting/compositions for all 9 categories
+- **Digital product safeguards**: product type scoped to physical items, tool type rejects product-shot framing
+- **generate-widget integration**: category aesthetic context injected into AI prompts
 
 ### Quick Capture Tools ✅
 **Completed: 2026-02-13**
@@ -59,11 +70,17 @@
 - Loads manifest + registry, exposes `validate()`, `auditDOM()`, `annotate()` APIs
 
 ### Events Page ✅
-**Completed: 2026-02-09**
+**Completed: 2026-02-09 | Updated: 2026-02-14**
 
 - **Standalone events aggregator** at `/events/index.html`
 - ScreenSlate JSON API integration with day/week calendar views
 - Location filtering, source filtering with status chips, error handling
+- **Resident Advisor** — GraphQL API scraper (`eventListings` query, ~72 events/area)
+- **Gary's Guide** — Tech/startup events (SF + NYC, ~63 events/region via table parsing)
+- **Bonobo Network** — Social/community events (SF, ~8 events via Squarespace JSON)
+- **Tech & Social content types** with keyword detection
+- **Multi-source dedup tags** — events from multiple sources show separate color-coded tags
+- **Edge function POST proxy** — `fetch-source` supports custom method/body/headers for GraphQL
 
 ### Brand Positioning & Persona Framework ✅
 **Completed: 2026-02-08**
@@ -105,9 +122,10 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 7: Platform Expansion | 21 | 0 | 17 | 0 |
 | Phase 8: Automated Pins | 0 | 0 | 54 | 0 |
 | Phase 9: Bulk Import | 0 | 0 | 132 | 0 |
-| Phase 10: Image Validation | 47 | 0 | 55 | 0 |
+| Phase 10: Image Validation | 68 | 0 | 58 | 0 |
+| Phase 11: Instagram Import | 0 | 0 | 73 | 0 |
 | Backlog | 1 | 0 | 108 | 0 |
-| **TOTAL** | **274** | **5** | **822** | **0** |
+| **TOTAL** | **295** | **5** | **898** | **0** |
 
 ---
 

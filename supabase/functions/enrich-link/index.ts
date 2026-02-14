@@ -8,6 +8,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Visual standards — product gate for URL pattern and technical checks
+import { checkGateUrlPatterns, checkGateTechnical } from '../generate-widget/config/visual-standards.ts'
+
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1110,12 +1113,11 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
 
     if (ogMatch?.[1]) {
       const imageUrl = resolveUrl(ogMatch[1])
-      // Skip if it looks like a logo/placeholder
-      if (!isLikelyLogo(imageUrl)) {
+      if (!isRejectedByGate(imageUrl)) {
         console.log('[scrape] Found og:image:', imageUrl)
         return { url: imageUrl, source: 'scraped' }
       }
-      console.log('[scrape] Skipping og:image (likely logo):', imageUrl)
+      console.log('[scrape] Skipping og:image (rejected by gate):', imageUrl)
     }
 
     // 2. Try twitter:image (handle both single and double quotes)
@@ -1124,7 +1126,7 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
 
     if (twitterMatch?.[1]) {
       const imageUrl = resolveUrl(twitterMatch[1])
-      if (!isLikelyLogo(imageUrl)) {
+      if (!isRejectedByGate(imageUrl)) {
         console.log('[scrape] Found twitter:image:', imageUrl)
         return { url: imageUrl, source: 'scraped' }
       }
@@ -1140,7 +1142,7 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
         if (product?.image) {
           const productImage = Array.isArray(product.image) ? product.image[0] : product.image
           const imageUrl = typeof productImage === 'string' ? productImage : productImage?.url
-          if (imageUrl && !isLikelyLogo(imageUrl)) {
+          if (imageUrl && !isRejectedByGate(resolveUrl(imageUrl))) {
             console.log('[scrape] Found JSON-LD product image:', imageUrl)
             return { url: resolveUrl(imageUrl), source: 'scraped' }
           }
@@ -1152,7 +1154,7 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
 
     // 4. Try Shopify CDN pattern (common in Shopify stores)
     const shopifyMatch = html.match(/https:\/\/cdn\.shopify\.com\/s\/files\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i)
-    if (shopifyMatch?.[0] && !isLikelyLogo(shopifyMatch[0])) {
+    if (shopifyMatch?.[0] && !isRejectedByGate(shopifyMatch[0])) {
       console.log('[scrape] Found Shopify CDN image:', shopifyMatch[0])
       return { url: shopifyMatch[0], source: 'scraped' }
     }
@@ -1163,7 +1165,7 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
       const srcsetParts = srcsetMatch[1].split(',').map(s => s.trim())
       // Get the largest image (usually last in srcset)
       const largestSrc = srcsetParts[srcsetParts.length - 1]?.split(' ')[0]
-      if (largestSrc && !isLikelyLogo(largestSrc)) {
+      if (largestSrc && !isRejectedByGate(resolveUrl(largestSrc))) {
         console.log('[scrape] Found srcset image:', largestSrc)
         return { url: resolveUrl(largestSrc), source: 'scraped' }
       }
@@ -1203,6 +1205,21 @@ function isLikelyLogo(url: string): boolean {
 
 function isPlaceholderUrl(url: string): boolean {
   return PLACEHOLDER_URL_PATTERNS.some(p => p.test(url))
+}
+
+/**
+ * Combined URL-level rejection: logo patterns + placeholder patterns + visual standards gate.
+ * Runs before any network requests.
+ */
+function isRejectedByGate(url: string): boolean {
+  if (isLikelyLogo(url)) return true
+  if (isPlaceholderUrl(url)) return true
+  const gateCheck = checkGateUrlPatterns(url)
+  if (!gateCheck.pass) {
+    console.log('[gate] URL rejected by visual standards:', gateCheck.reason)
+    return true
+  }
+  return false
 }
 
 // ========================================
@@ -1282,6 +1299,19 @@ async function validateImageTier2(imageUrl: string, cardContext: string = 'grid'
       checks: [{ check: 'placeholder_url', pass: false }]
     }
   }
+
+  // Visual standards gate — URL pattern check (ad networks, stock watermarks, data URIs)
+  const gateUrlCheck = checkGateUrlPatterns(imageUrl)
+  if (!gateUrlCheck.pass) {
+    checks.push({ check: 'visual_gate_url', pass: false, detail: gateUrlCheck.reason })
+    return {
+      pass: false,
+      reason: 'visual_gate_url_rejected',
+      scores: { visual_quality: 0, distinctiveness: 0 },
+      checks
+    }
+  }
+  checks.push({ check: 'visual_gate_url', pass: true })
 
   try {
     // HEAD request to get metadata without downloading full image
@@ -1375,10 +1405,26 @@ async function validateImageTier2(imageUrl: string, cardContext: string = 'grid'
         dimensions = extractDimensions(bytes, contentType!)
 
         if (dimensions) {
+          // Visual standards gate — technical checks (min resolution, aspect ratio, file size)
+          const gateTechCheck = checkGateTechnical(dimensions, fileSize || null)
+          if (!gateTechCheck.pass) {
+            checks.push({ check: 'visual_gate_technical', pass: false, detail: gateTechCheck.reason })
+            return {
+              pass: false,
+              reason: 'visual_gate_technical_rejected',
+              scores: { visual_quality: 0, distinctiveness: 0 },
+              checks,
+              dimensions,
+              fileSize,
+              contentType
+            }
+          }
+          checks.push({ check: 'visual_gate_technical', pass: true, detail: `${dimensions.width}x${dimensions.height}` })
+
           const thresholds = CARD_THRESHOLDS[cardContext] || CARD_THRESHOLDS.grid
           const aspect = dimensions.width / dimensions.height
 
-          // Resolution check
+          // Card-context-specific resolution check (stricter than gate for larger display contexts)
           if (dimensions.width < 50 || dimensions.height < 50) {
             visualQuality = 0
             checks.push({ check: 'dimensions', pass: false, detail: `${dimensions.width}x${dimensions.height} (below absolute minimum 50px)` })

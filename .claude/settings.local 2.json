@@ -60,8 +60,7 @@
       "Bash(git -C /Users/ian/Documents/GitHub/fikei.github.io add docs/archive/root-legacy/decision-log-soundscape-v2-branch.md notion-structure.json)",
       "Bash(git -C /Users/ian/Documents/GitHub/fikei.github.io push -u origin claude/docs-restructure-v2)",
       "Bash(gh pr close:*)",
-      "Bash(git reset:*)",
-      "Bash(git branch:*)"
+      "Bash(git stash:*)"
     ]
   }
 }

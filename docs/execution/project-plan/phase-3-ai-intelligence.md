@@ -49,6 +49,8 @@
 | | imageQueue for background processing | Complete |
 | | Platform APIs (YouTube, Vimeo, GitHub) | Complete |
 | | Integrate into link add flow | Complete |
+| **Platform-Specific Previews** | | Complete |
+| | GitHub link preview with stars + language badge | Complete |
 | **Server-Side Resolution** | | Complete |
 | | OG image extraction (no CORS) | Complete |
 | | Unsplash API search | Complete |
@@ -486,8 +488,9 @@ Simple triggers — item count + category filter. Client-side evaluation only.
 | | Server config + frontend entry (swap, 1+ eat item) | Pending |
 | **home: Gap Analysis (#2)** | | Pending |
 | | Server config + frontend entry (grid-split, 5+ home items) | Pending |
-| **watch: Mood (#28)** | | Pending |
-| | Server config + frontend entry (spectrum, 4+ watch items) | Pending |
+| **watch: Mood (#28)** | | Complete |
+| | Server config + frontend entry (spectrum, 4+ watch items) | Complete |
+| | Display mood tags from TMDB keywords/genres in watch cards | Complete |
 | **use: Gap Analysis (#5)** | | Pending |
 | | Server config + frontend entry (quick-add, 3+ use items) | Pending |
 | **wear: Redundancy (#13)** | | Pending |

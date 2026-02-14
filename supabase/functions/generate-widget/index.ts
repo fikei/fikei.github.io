@@ -33,6 +33,9 @@ import {
   boardsTemplateMap,
 } from './config/design-system.ts'
 
+// Visual standards: category aesthetic context for AI prompts
+import { buildCategoryPrompt } from './config/visual-standards.ts'
+
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1296,7 +1299,14 @@ Example: "confidence": 0.85`
     const templateName = widgetDef?.rendering?.template || ''
     const dsConstraint = buildDesignSystemPrompt(templateName)
 
-    const fullPrompt = `${prompt}${brandConstraint}${dsConstraint}${confidenceInstruction}
+    // ==========================================================================
+    // VISUAL STANDARDS: CATEGORY AESTHETIC CONTEXT
+    // Tell the AI about the visual mood/palette of this board category
+    // so recommendations are aesthetically coherent with the board
+    // ==========================================================================
+    const categoryContext = category ? buildCategoryPrompt(category) : ''
+
+    const fullPrompt = `${prompt}${brandConstraint}${dsConstraint}${categoryContext}${confidenceInstruction}
 
 Here are the items to analyze:
 

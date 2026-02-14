@@ -234,7 +234,8 @@ body {
 .data-table .col-price[title] { cursor: help; }
 .data-table .col-ages { display: none; }
 .data-table .col-promoter { display: none; }
-.data-table .col-source { width: 90px; white-space: nowrap; }
+.data-table .col-source { width: 90px; }
+.data-table .col-source .token--source + .token--source { margin-left: 3px; }
 
 /* Source token — color-coded, clickable */
 .token--source {
@@ -2271,78 +2272,140 @@ body {
   }
 
   // --- Resident Advisor Scraper ---
+  // RA is a SPA — HTML scraping returns an empty shell. Use their GraphQL API instead.
+  // Area IDs map RA city slugs to their internal IDs.
+  const RA_AREAS = { 'sanfrancisco': 218, 'losangeles': 8, 'newyork': 9, 'seattle': 208 };
+
   async function fetchRA(source) {
-    log('RA: fetching ' + source.url);
-    const text = await proxyFetch(source.url);
-    const doc = new DOMParser().parseFromString(text, 'text/html');
-    const events = [];
+    log('RA: fetching via GraphQL API');
+    const today = new Date().toISOString().split('T')[0];
+    // Two weeks out
+    const endDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-    // RA uses structured event listings — try multiple selector strategies
-    // Strategy 1: JSON-LD structured data
-    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
-    ldScripts.forEach(script => {
-      try {
-        const data = JSON.parse(script.textContent);
-        const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
-        items.forEach(item => {
-          if (item['@type'] !== 'MusicEvent' && item['@type'] !== 'Event') return;
-          const name = item.name || '';
-          const startDate = item.startDate || '';
-          const venue = item.location?.name || '';
-          const city = item.location?.address?.addressLocality || '';
-          const url = item.url || '';
-          const genre = (item.genre || '');
-          if (name && startDate) {
-            const d = new Date(startDate);
-            const date = d.toISOString().split('T')[0];
-            const hours = d.getHours().toString().padStart(2, '0');
-            const mins = d.getMinutes().toString().padStart(2, '0');
-            const time = hours + ':' + mins;
-            events.push({ date, time, name, venue, city, genre, url, source: source.id, contentType: 'music' });
+    // Extract area slug from source URL (e.g. /events/us/sanfrancisco)
+    const urlParts = source.url.replace(/\/$/, '').split('/');
+    const areaSlug = urlParts[urlParts.length - 1];
+    const areaId = RA_AREAS[areaSlug] || 218;
+    log('RA: area=' + areaSlug + ' areaId=' + areaId);
+
+    const query = `query GET_DEFAULT_EVENTS_LISTING($filters: FilterInputDtoInput, $filterOptions: FilterOptionsInputDtoInput, $page: Int, $pageSize: Int) {
+      eventListings(filters: $filters, filterOptions: $filterOptions, page: $page, pageSize: $pageSize) {
+        data {
+          id listingDate
+          event {
+            id title date startTime endTime contentUrl
+            venue { id name area { id name } }
+            artists { id name }
           }
-        });
-      } catch (e) { /* ignore invalid JSON-LD */ }
-    });
+        }
+        totalResults
+      }
+    }`;
 
-    if (events.length > 0) {
-      log('RA: found ' + events.length + ' events via JSON-LD');
-      return events;
-    }
+    const variables = {
+      filters: { areas: { eq: areaId }, listingDate: { gte: today, lte: endDate } },
+      filterOptions: { eventType: true, genre: true },
+      page: 1, pageSize: 50,
+    };
 
-    // Strategy 2: Parse event listing HTML elements
-    const items = doc.querySelectorAll('[data-testid*="event"], [class*="EventCard"], [class*="event-item"], article');
-    items.forEach(item => {
-      const nameEl = item.querySelector('h3, h4, [class*="title"], [class*="Title"]');
-      const venueEl = item.querySelector('[class*="venue"], [class*="Venue"], [class*="location"]');
-      const timeEl = item.querySelector('time, [datetime], [class*="date"], [class*="Date"]');
-      const linkEl = item.querySelector('a[href*="/events/"]');
-      const name = nameEl?.textContent?.trim() || '';
-      const venue = venueEl?.textContent?.trim() || '';
-      const dateAttr = timeEl?.getAttribute('datetime') || timeEl?.textContent?.trim() || '';
-      const url = linkEl?.getAttribute('href') || '';
-      if (!name) return;
-      let date = '', time = '';
-      if (dateAttr) {
-        try {
-          const d = new Date(dateAttr);
-          if (!isNaN(d.getTime())) {
-            date = d.toISOString().split('T')[0];
-            const hours = d.getHours().toString().padStart(2, '0');
-            const mins = d.getMinutes().toString().padStart(2, '0');
-            if (hours !== '00' || mins !== '00') time = hours + ':' + mins;
+    // Strategy 1: GraphQL via edge function (server-side POST proxy)
+    try {
+      log('RA: trying edge function GraphQL proxy...');
+      const resp = await fetch(FETCH_SOURCE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          url: 'https://ra.co/graphql',
+          method: 'POST',
+          body: JSON.stringify({ query, variables }),
+          headers: { 'Content-Type': 'application/json', 'Referer': 'https://ra.co/events/us/' + areaSlug, 'Origin': 'https://ra.co' },
+        }),
+      });
+
+      if (resp.ok) {
+        const proxyResult = await resp.json();
+        if (proxyResult.content) {
+          const gqlData = JSON.parse(proxyResult.content);
+          if (gqlData.errors) {
+            log('RA: GraphQL errors: ' + JSON.stringify(gqlData.errors.map(e => e.message)));
           }
-        } catch (e) { /* parse error */ }
-      }
-      if (!date) {
-        const parsed = parseFuzzyDate(dateAttr);
-        if (parsed) date = parsed;
-      }
-      const fullUrl = url.startsWith('http') ? url : (url.startsWith('/') ? 'https://ra.co' + url : '');
-      events.push({ date: date || '', time, name, venue, city: '', genre: 'Electronic', url: fullUrl, source: source.id, contentType: 'music' });
-    });
+          const listings = gqlData?.data?.eventListings?.data || [];
+          const totalResults = gqlData?.data?.eventListings?.totalResults || 0;
+          log('RA: GraphQL returned ' + listings.length + ' of ' + totalResults + ' total events');
 
-    log('RA: found ' + events.length + ' events via HTML parsing');
-    return events;
+          if (listings.length > 0) {
+            const events = listings.map(listing => {
+              const ev = listing.event;
+              if (!ev) return null;
+              // Use startTime if available, otherwise fall back to date
+              let date = '', time = '';
+              if (ev.startTime) {
+                const d = new Date(ev.startTime);
+                date = d.toISOString().split('T')[0];
+                const h = d.getHours(), m = d.getMinutes();
+                if (h !== 0 || m !== 0) time = h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+              } else if (ev.date) {
+                date = ev.date.split('T')[0];
+              }
+              return {
+                date, time,
+                name: ev.title || '',
+                venue: ev.venue?.name || '',
+                city: ev.venue?.area?.name || '',
+                genre: 'Electronic',
+                url: ev.contentUrl ? 'https://ra.co' + ev.contentUrl : '',
+                source: source.id,
+                contentType: 'music',
+              };
+            }).filter(Boolean);
+            log('RA: parsed ' + events.length + ' events via GraphQL');
+            return events;
+          }
+        }
+      }
+      log('RA: edge function GraphQL returned no events');
+    } catch (e) { log('RA: edge function error: ' + e.message); }
+
+    // Strategy 2: Fallback — try __NEXT_DATA__ from SSR HTML
+    try {
+      log('RA: trying __NEXT_DATA__ fallback...');
+      const text = await proxyFetch(source.url);
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      const ndScript = doc.querySelector('script#__NEXT_DATA__');
+      if (ndScript) {
+        const nd = JSON.parse(ndScript.textContent);
+        const apollo = nd?.props?.apolloState || {};
+        const eventKeys = Object.keys(apollo).filter(k => k.startsWith('Event:'));
+        const events = eventKeys.map(k => {
+          const ev = apollo[k];
+          if (!ev.startTime) return null;
+          const venue = ev.venue?.__ref ? apollo[ev.venue.__ref] : null;
+          const d = new Date(ev.startTime);
+          return {
+            date: d.toISOString().split('T')[0],
+            time: d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'),
+            name: ev.title || '',
+            venue: venue?.name || '',
+            city: '',
+            genre: 'Electronic',
+            url: ev.contentUrl ? 'https://ra.co' + ev.contentUrl : '',
+            source: source.id,
+            contentType: 'music',
+          };
+        }).filter(Boolean);
+        if (events.length > 0) {
+          log('RA: found ' + events.length + ' events via __NEXT_DATA__ fallback');
+          return events;
+        }
+      }
+    } catch (e) { log('RA: __NEXT_DATA__ fallback failed: ' + e.message); }
+
+    log('RA: no events found');
+    return [];
   }
 
   // --- Gary's Guide Scraper ---
@@ -3347,8 +3410,11 @@ body {
     const tbody = document.getElementById('eventsBody');
     tbody.innerHTML = sorted.map(ev => {
       const sourceIds = ev.sources || [ev.source];
-      const sourceName = sourceIds.map(sid => state.sources.find(s => s.id === sid)?.name || sid).join(' + ');
-      const sourceColor = getSourceColor(sourceIds[0]);
+      const sourceTagsHtml = sourceIds.map(sid => {
+        const sName = state.sources.find(s => s.id === sid)?.name || sid;
+        const sColor = getSourceColor(sid);
+        return `<span class="token token--source" data-source-id="${escHtml(sid)}" style="border-color: ${sColor}; color: ${sColor};">${escHtml(sName)}</span>`;
+      }).join(' ');
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
       const displayName = stripVenueFromTitle(ev.name, ev.venue);
       const nameCell = ev.url && ev.url !== '#'
@@ -3388,7 +3454,7 @@ body {
         <td class="col-price"${priceTitle}>${escHtml(priceData.short)}</td>
         <td class="col-ages">${escHtml(ev.ages)}</td>
         <td class="col-promoter">${escHtml(ev.promoter)}</td>
-        <td class="col-source"><span class="token token--source" data-source-id="${escHtml(sourceIds[0])}" style="border-color: ${sourceColor}; color: ${sourceColor};">${escHtml(sourceName)}</span></td>
+        <td class="col-source">${sourceTagsHtml}</td>
       </tr>`;
     }).join('');
 

@@ -43,6 +43,9 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
+| **XSS Protection** | | Complete |
+| | Escape URLs in widget suggestions with esc() function | Complete |
+| | Validate expanded card state against existing links | Complete |
 | **Restrict CORS Origins** (R4) | | Pending |
 | | Change `Access-Control-Allow-Origin: *` to `https://ctrl.rodeo` in enrich-link | Pending |
 | | Change in generate-widget | Pending |
