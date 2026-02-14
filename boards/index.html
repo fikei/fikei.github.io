@@ -1347,22 +1347,11 @@ body {
   color: #c00;
 }
 
-/* Streaming services "Available on" chips */
+/* Streaming services chips */
 .grid-item__streaming {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: var(--space-2);
-}
-
-.grid-item__streaming-label {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  width: 100%;
-  margin-bottom: 2px;
 }
 
 .grid-item__streaming-chip {
@@ -1381,38 +1370,47 @@ body {
   height: 5px;
 }
 
-/* IMDB/Wikipedia reference link */
-.grid-item__ref-link {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  margin-bottom: 8px;
+/* Watch card: no line clamp — summaries are pre-truncated to ~60 words */
+.grid-item--watch .grid-item__details-description {
+  -webkit-line-clamp: unset;
+  display: block;
+  overflow: visible;
 }
-.grid-item__ref-link:hover {
-  color: var(--fg);
+
+/* IMDb action button accent */
+.grid-item__action--imdb {
+  border-color: #F5C518;
+  color: #F5C518;
 }
-.grid-item__ref-link--imdb::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.grid-item__action--imdb:hover {
   background: #F5C518;
+  color: #000;
 }
-.grid-item__ref-link--wikipedia::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #636363;
+
+/* Watched toggle button */
+.grid-item__action--watched {
+  border-style: dashed;
+  color: var(--muted);
+  border-color: var(--muted);
+}
+.grid-item__action--watched-active {
+  border-style: solid;
+  color: var(--fg);
+  border-color: var(--fg);
+  opacity: 0.7;
+}
+.grid-item__action--watched:hover {
+  background: var(--fg);
+  color: var(--bg);
+  border-style: solid;
+}
+
+/* Watched card — subtle dim on the image */
+.grid-item--watched .grid-item__image {
+  opacity: 0.5;
+}
+.grid-item--watched .grid-item__overlay {
+  opacity: 0.3;
 }
 
 /* TMDB attribution */
@@ -9071,13 +9069,17 @@ Return JSON:
         }
 
         save(data);
-        renderGrid();
 
-        // Sync enrichment to Supabase
+        // Sync enrichment to Supabase (don't await — fire and forget)
         if (currentUser) {
-          await syncLinkToSupabase(link);
+          syncLinkToSupabase(link);
         }
       }
+    }
+
+    // Single re-render after all items processed (avoids flash per item)
+    if (successCount > 0) {
+      renderGrid();
     }
 
     isProcessingEnrichment = false;
@@ -10035,7 +10037,11 @@ Return JSON:
         // Enrichment fields
         content_type: link.content_type || null,
         type_confidence: link.type_confidence || null,
-        image_source: link.image_source || null
+        image_source: link.image_source || null,
+        // Structured metadata (JSONB columns)
+        video: link.video || null,
+        music: link.music || null,
+        watched: link.watched || false
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -10165,7 +10171,11 @@ Return JSON:
         // Enrichment fields from server
         content_type: l.content_type || null,
         type_confidence: l.type_confidence || null,
-        image_source: l.image_source || null
+        image_source: l.image_source || null,
+        // Structured metadata (JSONB)
+        video: l.video || null,
+        music: l.music || null,
+        watched: l.watched || false
       }));
 
       const categories = { uncategorized: { pinned: true } };
@@ -10736,10 +10746,11 @@ Return JSON:
 
       // Build video-specific details for expanded watch cards
       const _video = l.category === 'watch' ? l.video : null;
+      const isWatch = l.category === 'watch';
       let videoDetailsHtml = '';
       if (_video) {
+        // Metadata line: Year · Genre · Runtime · Rating (no creator — shown in title area)
         const parts = [];
-        if (_video.creator) parts.push(`<span>${esc(_video.creator)}</span>`);
         if (_video.year) parts.push(`<span>${_video.year}</span>`);
         if (_video.genre) parts.push(`<span>${esc(_video.genre)}</span>`);
         if (_video.runtime) parts.push(`<span>${formatDuration(_video.runtime)}</span>`);
@@ -10748,10 +10759,9 @@ Return JSON:
           videoDetailsHtml = `<div class="grid-item__details-meta">${parts.join('')}</div>`;
         }
 
-        // Streaming services "Available on" chips
+        // Streaming services chips (no "Available on" label — space is precious)
         if (_video.streamingServices && _video.streamingServices.length > 0) {
           const chips = _video.streamingServices.map(svc => {
-            // Handle both string (legacy AI) and object (TMDB) format
             const serviceName = typeof svc === 'string' ? svc : svc.name;
             const svcLower = serviceName.toLowerCase();
             let platformKey = null;
@@ -10769,27 +10779,37 @@ Return JSON:
             const dot = platformKey ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platformKey}"></span>` : '';
             return `<span class="grid-item__streaming-chip">${dot}${esc(serviceName)}</span>`;
           }).join('');
-          videoDetailsHtml += `<div class="grid-item__streaming"><span class="grid-item__streaming-label">Available on</span>${chips}</div>`;
+          videoDetailsHtml += `<div class="grid-item__streaming">${chips}</div>`;
         }
 
-        // TMDB attribution
+        // TMDB attribution (required by TMDB terms)
         if (_video.tmdbUrl) {
           videoDetailsHtml += `<div class="grid-item__tmdb-attribution"><a href="${esc(_video.tmdbUrl)}" target="_blank" rel="noopener">Data provided by TMDB</a></div>`;
         }
       }
 
-      // Build external reference link for watch items (IMDB preferred, Wikipedia fallback)
-      let refLinkHtml = '';
+      // Truncate summary to ~60 words for display (TMDB overviews can be 80-100+ words)
+      function truncateSummary(text, maxWords) {
+        if (!text) return '';
+        const words = text.split(/\s+/);
+        if (words.length <= maxWords) return text;
+        return words.slice(0, maxWords).join(' ') + '…';
+      }
+
+      // Build action buttons for watch cards (IMDb/Wikipedia merged into actions)
+      let watchActionsHtml = '';
       if (_video) {
-        // Check for IMDB ID from TMDB enrichment or from client-side extraction (platformId: 'imdb:tt...')
         const imdbId = _video.imdbId || (_video.platformId && _video.platformId.startsWith('imdb:') ? _video.platformId.slice(5) : null);
         if (imdbId) {
-          refLinkHtml = `<a href="https://www.imdb.com/title/${esc(imdbId)}/" target="_blank" rel="noopener" class="grid-item__ref-link grid-item__ref-link--imdb">View on IMDb</a>`;
+          watchActionsHtml += `<a href="https://www.imdb.com/title/${esc(imdbId)}/" target="_blank" rel="noopener" class="grid-item__action grid-item__action--imdb" data-action="visit-imdb">IMDb</a>`;
         } else if (_video.title) {
           const wikiQuery = encodeURIComponent(_video.title + (_video.year ? ' (' + _video.year + ' film)' : ''));
-          refLinkHtml = `<a href="https://en.wikipedia.org/wiki/Special:Search?search=${wikiQuery}" target="_blank" rel="noopener" class="grid-item__ref-link grid-item__ref-link--wikipedia">View on Wikipedia</a>`;
+          watchActionsHtml += `<a href="https://en.wikipedia.org/wiki/Special:Search?search=${wikiQuery}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit-wiki">Wiki</a>`;
         }
       }
+
+      // Watched state
+      const isWatched = l.watched || false;
 
       const detailsHtml = `
         <div class="grid-item__menu-container">
@@ -10807,17 +10827,23 @@ Return JSON:
         </div>
         <div class="grid-item__details">
           <h2 class="grid-item__details-title">${esc(_video?.title || _music?.trackTitle || l.title)}</h2>
-          <p class="grid-item__details-domain">${esc(_video?.creator || _music?.artist || l.domain)}</p>
-          ${(_video?.summary || l.description) ? `<p class="grid-item__details-description">${esc(_video?.summary || l.description)}</p>` : ''}
-          ${refLinkHtml}
-          ${videoDetailsHtml}${musicDetailsHtml}
-          <div class="grid-item__details-meta">
-            <span>${cap(l.category)}</span>
-            ${contentTypeDisplay ? `<span>${contentTypeDisplay}</span>` : ''}
-            <span>${dateStr}</span>
-          </div>
+          ${isWatch && _video ? `
+            ${videoDetailsHtml}
+            ${(_video.summary || l.description) ? `<p class="grid-item__details-description">${esc(truncateSummary(_video.summary || l.description, 60))}</p>` : ''}
+          ` : `
+            <p class="grid-item__details-domain">${esc(_music?.artist || l.domain)}</p>
+            ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
+            ${musicDetailsHtml}
+            <div class="grid-item__details-meta">
+              <span>${cap(l.category)}</span>
+              ${contentTypeDisplay ? `<span>${contentTypeDisplay}</span>` : ''}
+              <span>${dateStr}</span>
+            </div>
+          `}
           <div class="grid-item__actions">
             <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
+            ${watchActionsHtml}
+            ${isWatch ? `<button class="grid-item__action grid-item__action--watched${isWatched ? ' grid-item__action--watched-active' : ''}" data-action="toggle-watched">${isWatched ? '✓ Watched' : 'Watched?'}</button>` : ''}
           </div>
         </div>
         <div class="grid-item__resize" data-action="resize"></div>`;
@@ -10827,9 +10853,9 @@ Return JSON:
       const listenClass = isListen ? ' grid-item--listen' : '';
       const music = isListen ? l.music : null;
 
-      // Determine if this is a watch (video) card
-      const isWatch = l.category === 'watch';
+      // Watch card class (isWatch already defined above)
       const watchClass = isWatch ? ' grid-item--watch' : '';
+      const watchedClass = (isWatch && l.watched) ? ' grid-item--watched' : '';
       const video = isWatch ? l.video : null;
 
       // ── List view for watch cards ──
@@ -10947,7 +10973,7 @@ Return JSON:
 
         const categoryClass = listenClass || watchClass;
 
-        html += `<article class="grid-item${categoryClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           ${overlayHtml}
@@ -10961,7 +10987,7 @@ Return JSON:
           : l.category;
         const categoryClass = listenClass || watchClass;
 
-        html += `<article class="grid-item grid-item--placeholder${categoryClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item grid-item--placeholder${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
@@ -11773,6 +11799,23 @@ Return JSON:
             toast('Enrichment failed', true);
           }
         }
+        return;
+      } else if (actionType === 'toggle-watched') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          const nowWatched = !link.watched;
+          updateLink(id, { watched: nowWatched });
+          // Update button in-place without full re-render
+          action.textContent = nowWatched ? '✓ Watched' : 'Watched?';
+          action.classList.toggle('grid-item__action--watched-active', nowWatched);
+          // Also dim the card image if watched
+          if (item) item.classList.toggle('grid-item--watched', nowWatched);
+          if (currentUser) syncLinkToSupabase(link);
+          toast(nowWatched ? 'Marked as watched' : 'Unmarked');
+        }
+        return;
+      } else if (actionType === 'visit-imdb' || actionType === 'visit-wiki') {
+        // Let the <a> tag handle navigation, just stop propagation
         return;
       } else if (actionType === 'category') {
         selectedLink = getAllLinks().find(l => l.id === id);
@@ -13191,7 +13234,13 @@ Return JSON:
           category: link.category || 'uncategorized',
           confidence: link.confidence || 0,
           created_at: link.addedAt || new Date().toISOString(),
-          updated_at: link.updatedAt || null
+          updated_at: link.updatedAt || null,
+          content_type: link.content_type || null,
+          type_confidence: link.type_confidence || null,
+          image_source: link.image_source || null,
+          video: link.video || null,
+          music: link.music || null,
+          watched: link.watched || false
         };
         console.log('[sync] Payload:', JSON.stringify(payload).substring(0, 200));
 
