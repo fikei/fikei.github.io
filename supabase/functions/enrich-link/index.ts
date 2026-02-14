@@ -2,8 +2,8 @@
 // Handles AI classification, image resolution, and watch enrichment for links
 //
 // POST /functions/v1/enrich-link
-// Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, category? }
-// Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video? }
+// Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, enrichBook?, category? }
+// Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video?, book? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -18,11 +18,12 @@ const corsHeaders = {
 }
 
 // Content types and their image resolution strategies
-const CONTENT_TYPES = ['product', 'article', 'video', 'music', 'repository', 'social', 'document', 'tool', 'unknown']
+const CONTENT_TYPES = ['product', 'article', 'book', 'video', 'music', 'repository', 'social', 'document', 'tool', 'unknown']
 
 const IMAGE_STRATEGIES: Record<string, string[]> = {
   product: ['scrape', 'favicon', 'template'],
   article: ['scrape', 'favicon', 'template'],
+  book: ['platform', 'scrape', 'template'],
   video: ['platform', 'scrape', 'template'],
   music: ['platform', 'scrape', 'template'],
   repository: ['platform', 'template'],
@@ -40,7 +41,7 @@ serve(async (req) => {
 
   try {
     const { url, title, description, linkId, skipClassification, skipImage,
-            skipIfHasImage, currentImage, forceRefresh, enrichWatch, category } = await req.json()
+            skipIfHasImage, currentImage, forceRefresh, enrichWatch, enrichBook, category } = await req.json()
 
     // Support skipIfHasImage: skip image resolution if client already has a valid image
     const shouldSkipImage = skipImage || (skipIfHasImage && !!currentImage)
@@ -231,6 +232,14 @@ serve(async (req) => {
       imageLog.push({ strategy: 'skipped', result: 'skip', reason: shouldSkipImage ? 'skipIfHasImage' : 'skipImage' })
     }
 
+    // Truncate summary to ~60 words for card display (shared by watch + book enrichment)
+    const truncSummary = (text: string | null): string | null => {
+      if (!text) return null
+      const words = text.split(/\s+/)
+      if (words.length <= 60) return text
+      return words.slice(0, 60).join(' ') + '…'
+    }
+
     // ========================================
     // STEP 2.5: Watch Enrichment — TMDB first, AI fills gaps
     // ========================================
@@ -252,14 +261,6 @@ serve(async (req) => {
         aiResult = await enrichWatchWithAI(url, title, description)
       } else {
         console.log('[enrich-link] TMDB complete, skipping AI call')
-      }
-
-      // Truncate summary to ~60 words for card display
-      const truncSummary = (text: string | null): string | null => {
-        if (!text) return null
-        const words = text.split(/\s+/)
-        if (words.length <= 60) return text
-        return words.slice(0, 60).join(' ') + '…'
       }
 
       // 3. Merge: TMDB is primary, AI fills gaps
@@ -286,6 +287,48 @@ serve(async (req) => {
     }
 
     // ========================================
+    // STEP 2.6: Book Enrichment — Open Library first, AI fills gaps
+    // ========================================
+    let bookMeta: Record<string, any> | null = null
+    if (enrichBook || category === 'read') {
+      console.log('[enrich-link] Step 2.6: Book enrichment (Open Library → AI)')
+
+      // 1. Try Open Library first (free, structured data)
+      const olResult = await lookupOpenLibrary(title || '')
+
+      // 2. Only call AI if Open Library left gaps
+      const needsAI = !olResult
+        || !olResult.summary
+        || !olResult.author
+        || !olResult.genre
+
+      let aiResult: Record<string, any> | null = null
+      if (needsAI) {
+        console.log('[enrich-link] Open Library incomplete, calling AI for gaps')
+        aiResult = await enrichBookWithAI(url, title, description)
+      } else {
+        console.log('[enrich-link] Open Library complete, skipping AI call')
+      }
+
+      // 3. Merge: Open Library is primary, AI fills gaps
+      bookMeta = {
+        title: olResult?.title || null,
+        author: olResult?.author || aiResult?.author || null,
+        isbn: olResult?.isbn || null,
+        year: olResult?.year || aiResult?.year || null,
+        pages: olResult?.pages || aiResult?.pages || null,
+        genre: olResult?.genre || aiResult?.genre || null,
+        summary: truncSummary(olResult?.summary || aiResult?.summary || null),
+        coverPath: olResult?.coverPath || null,
+        openLibraryKey: olResult?.openLibraryKey || null,
+        goodreadsUrl: null,
+        format: aiResult?.format || 'book'
+      }
+
+      console.log('[enrich-link] Book enrichment result:', bookMeta)
+    }
+
+    // ========================================
     // STEP 3: Update link in database (if linkId provided)
     // ========================================
     if (linkId) {
@@ -303,6 +346,9 @@ serve(async (req) => {
       }
       if (videoMeta) {
         updatePayload.video = videoMeta
+      }
+      if (bookMeta) {
+        updatePayload.book = bookMeta
       }
       await supabase
         .from('links')
@@ -337,6 +383,9 @@ serve(async (req) => {
     }
     if (videoMeta) {
       response.video = videoMeta
+    }
+    if (bookMeta) {
+      response.book = bookMeta
     }
 
     console.log('[enrich-link] Complete:', response)
@@ -375,6 +424,7 @@ Description: ${description?.slice(0, 300) || 'N/A'}
 Content types:
 - product: E-commerce product pages, items for sale
 - article: Blog posts, news articles, written content
+- book: Books, ebooks, audiobooks (Goodreads, Amazon books, Open Library, etc.)
 - video: Video content (YouTube, Vimeo, etc.)
 - music: Music, podcasts, audio content
 - repository: Code repositories, GitHub projects
@@ -692,6 +742,157 @@ Return JSON only:
     }
   } catch (e) {
     console.error('[enrich-link] Watch enrichment error:', e)
+  }
+
+  return null
+}
+
+// ========================================
+// Open Library Lookup for Books
+// ========================================
+async function lookupOpenLibrary(rawTitle: string): Promise<{
+  openLibraryKey: string, title: string, author: string | null, isbn: string | null,
+  year: number | null, pages: number | null, genre: string | null,
+  summary: string | null, coverPath: string | null
+} | null> {
+  if (!rawTitle) {
+    console.log('[openlibrary] No title, skipping')
+    return null
+  }
+
+  // Clean title: strip common suffixes
+  const cleanTitle = rawTitle
+    .replace(/\s*[\|\-–—]\s*(Goodreads|Amazon|Barnes & Noble|Bookshop|Book|Read|Review|Buy|Kindle|Audible|Open Library).*$/i, '')
+    .replace(/\s*by\s+.+$/i, '')
+    .replace(/\s*\(\d{4}\)\s*$/, '')
+    .trim()
+
+  if (!cleanTitle) return null
+  console.log('[openlibrary] Searching for:', cleanTitle)
+
+  try {
+    const searchUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(cleanTitle)}&fields=key,title,author_name,first_publish_year,number_of_pages_median,isbn,cover_i,subject&limit=5`
+    const searchResp = await fetch(searchUrl)
+    if (!searchResp.ok) {
+      console.error('[openlibrary] Search error:', searchResp.status)
+      return null
+    }
+
+    const searchData = await searchResp.json()
+    const results = searchData.docs || []
+
+    if (results.length === 0) {
+      console.log('[openlibrary] No results for:', cleanTitle)
+      return null
+    }
+
+    // Take first result (Open Library ranks by relevance)
+    const book = results[0]
+    const workKey = book.key  // e.g., "/works/OL45883W"
+
+    // Fetch work details for description
+    let summary: string | null = null
+    if (workKey) {
+      try {
+        const workResp = await fetch(`https://openlibrary.org${workKey}.json`)
+        if (workResp.ok) {
+          const workData = await workResp.json()
+          summary = typeof workData.description === 'string'
+            ? workData.description
+            : workData.description?.value || null
+        }
+      } catch (e) {
+        console.error('[openlibrary] Work details error:', e)
+      }
+    }
+
+    // Extract primary subject as genre
+    const genre = book.subject?.[0] || null
+
+    const result = {
+      openLibraryKey: workKey,
+      title: book.title,
+      author: book.author_name?.[0] || null,
+      isbn: book.isbn?.[0] || null,
+      year: book.first_publish_year || null,
+      pages: book.number_of_pages_median || null,
+      genre,
+      summary,
+      coverPath: book.cover_i ? String(book.cover_i) : null
+    }
+
+    console.log('[openlibrary] Found:', result.title, 'by', result.author)
+    return result
+  } catch (e) {
+    console.error('[openlibrary] Lookup error:', e)
+    return null
+  }
+}
+
+// ========================================
+// Book Enrichment using AI (fallback)
+// ========================================
+async function enrichBookWithAI(url: string, title: string, description: string): Promise<Record<string, any> | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) {
+    console.log('[enrich-link] No ANTHROPIC_API_KEY, skipping book enrichment')
+    return null
+  }
+
+  const prompt = `Given this book/reading link, provide structured metadata. Be concise and accurate.
+
+URL: ${url}
+Title: ${title || 'N/A'}
+Description: ${description?.slice(0, 500) || 'N/A'}
+
+Return JSON only:
+{
+  "author": "Primary author name or null",
+  "year": year as number or null,
+  "pages": page count as number or null,
+  "genre": "primary genre (e.g. Fiction, Non-Fiction, Science, Biography, History, Fantasy, Mystery, Self-Help)",
+  "summary": "1-2 sentence description, max 50 words.",
+  "format": "book|ebook|audiobook|article|paper"
+}`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (!response.ok) {
+      console.error('[enrich-link] Book enrichment API error:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+
+    if (match) {
+      const result = JSON.parse(match[0])
+      const validFormats = ['book', 'ebook', 'audiobook', 'article', 'paper']
+      return {
+        author: typeof result.author === 'string' ? result.author : null,
+        year: typeof result.year === 'number' && result.year > 1800 && result.year < 2100 ? result.year : null,
+        pages: typeof result.pages === 'number' && result.pages > 0 ? result.pages : null,
+        genre: typeof result.genre === 'string' ? result.genre : null,
+        summary: typeof result.summary === 'string' ? result.summary.slice(0, 500) : null,
+        format: validFormats.includes(result.format) ? result.format : 'book'
+      }
+    }
+  } catch (e) {
+    console.error('[enrich-link] Book enrichment error:', e)
   }
 
   return null
@@ -1034,7 +1235,8 @@ const KNOWN_GOOD_SOURCES = [
   /mosaic\.scdn\.co\//,
   /image\.tmdb\.org\//,
   /m\.media-amazon\.com\//,
-  /images-na\.ssl-images-amazon\.com\//
+  /images-na\.ssl-images-amazon\.com\//,
+  /covers\.openlibrary\.org\//
 ]
 
 // Card context minimum dimensions
@@ -1331,7 +1533,7 @@ async function resolveFavicon(url: string): Promise<{ url: string, source: 'favi
 // ========================================
 
 // Known-good sources skip AI evaluation entirely
-const KNOWN_GOOD_SOURCES = [
+const KNOWN_GOOD_SOURCES_T3 = [
   /img\.youtube\.com\/vi\//,
   /i\.vimeocdn\.com\//,
   /opengraph\.githubassets\.com\//,
@@ -1339,7 +1541,8 @@ const KNOWN_GOOD_SOURCES = [
   /mosaic\.scdn\.co\//,
   /image\.tmdb\.org\//,
   /m\.media-amazon\.com\//,
-  /images-na\.ssl-images-amazon\.com\//
+  /images-na\.ssl-images-amazon\.com\//,
+  /covers\.openlibrary\.org\//
 ]
 
 const TIER3_WEIGHTS = {
@@ -1383,7 +1586,7 @@ async function evaluateImageQuality(
   contentType: string
 ): Promise<Tier3Result | null> {
   // Known-good sources get automatic high scores
-  if (KNOWN_GOOD_SOURCES.some(p => p.test(imageUrl))) {
+  if (KNOWN_GOOD_SOURCES_T3.some(p => p.test(imageUrl))) {
     console.log('[tier3] Known-good source, bypassing AI:', imageUrl)
     const scores = {
       accuracy: 0.9, visual_quality: 0.9, aesthetic_fit: 0.8,
