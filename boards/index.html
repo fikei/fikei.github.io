@@ -12904,7 +12904,7 @@ Return JSON:
   organizeModal.querySelector('.modal__close').onclick = () => closeModal(organizeModal);
 
   function renderOrganizeModal(link) {
-    const cats = getCategoryNames();
+    const cats = getCategories();
     const types = ['article', 'product', 'music', 'video', 'image', 'social', 'other'];
     let html = '<div style="padding: var(--space-4);">';
     html += '<label style="font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--muted); display: block; margin-bottom: var(--space-2);">Category</label>';
