@@ -10749,7 +10749,7 @@ Return JSON:
 
       // Build external reference link for watch items (IMDB preferred, Wikipedia fallback)
       let refLinkHtml = '';
-      if (isWatch && _video) {
+      if (_video) {
         // Check for IMDB ID from TMDB enrichment or from client-side extraction (platformId: 'imdb:tt...')
         const imdbId = _video.imdbId || (_video.platformId && _video.platformId.startsWith('imdb:') ? _video.platformId.slice(5) : null);
         if (imdbId) {
