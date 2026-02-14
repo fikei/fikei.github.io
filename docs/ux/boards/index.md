@@ -24,6 +24,9 @@ Boards are the primary workspace for organizing and viewing saved pins. Each boa
 | Collaborate on ideas | Share a board | Work with others |
 | Have too many pins | Switch to list view | Scan titles quickly |
 | Curate my aesthetic | Customize the layout | Make it my own |
+| Add context to a pin | Write notes/annotations | Remember why I saved it |
+| Navigate without a mouse | Use keyboard shortcuts | Browse efficiently |
+| Get started as a new user | See helpful hints | Learn the interface |
 
 ---
 
@@ -142,10 +145,14 @@ A board is a container for pins with:
 |-----------|--------|-------------|-------------|
 | **Flexible Tagging** | ⚠️ Partial | Categories, sub-tags, content types; freeform tags planned | [Flexible Tagging](../pins/tagging.md) |
 | **Visual Grid Browsing** | ✅ Shipped | Responsive grid, card expansion, dense flow | [Grid Layout & Display](./grid-layout.md) |
-| **Search & Retrieval** | ✅ Shipped | Live search, category filter, sub-tag filter | [Search & Retrieval](./search.md) |
+| **Search & Retrieval** | ✅ Shipped | Live search, category filter, sub-tag filter, notes search | [Search & Retrieval](./search.md) |
 | **Collection Sharing** | ⚠️ Partial | Export shipped; public boards planned | [Sharing & Collaboration](./sharing.md) |
 | **Cross-Category Connections** | ⚠️ Partial | Sub-tags + widget suggestions; explicit connections planned | [Cross-Category](./cross-category.md) |
 | **Events Integration** | ❌ Planned | Event/venue pins, calendar view | [Events](./events.md) |
+| **Pin Annotations** | ✅ Shipped | Notes field on expanded cards, auto-save, searchable | — |
+| **Keyboard Navigation** | ✅ Shipped | Grid navigation with Enter/Space/Arrows, modal focus trapping | — |
+| **Onboarding System** | ✅ Shipped | First-pin celebration, progressive contextual hints | — |
+| **Accessibility** | ✅ Shipped | ARIA roles, WCAG AA contrast, focus management | — |
 
 ---
 
@@ -207,3 +214,9 @@ A board is a container for pins with:
 - Filter state persisted in URL query params
 - Shared boards use Supabase RLS for access control
 - Board membership stored in separate junction table
+- Notes field auto-saves on blur, searchable via client-side search
+- Keyboard navigation: Enter/Space (open card), Arrow keys (navigate grid), Home/End (first/last)
+- Focus trapping in modals with Tab/Shift+Tab cycling
+- Onboarding state stored in localStorage (`boards_onboarding`)
+- ARIA roles: `role="dialog"`, `role="tablist"`, `aria-live="polite"` for toasts
+- WCAG AA compliant color contrast (--muted: #999)

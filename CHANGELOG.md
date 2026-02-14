@@ -31,6 +31,52 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-14] - Boards UX Audit: Accessibility, Security & Mobile Fixes
+
+### Security
+- **XSS fix in widget suggestions** — All AI-provided URLs are now escaped with `esc()` before injection into href attributes
+- **Sync error handling with retry** — Failed Supabase syncs now show user-facing error toasts and implement automatic retry queue on next sync cycle
+
+### Accessibility
+- **Color contrast fix** — Updated `--muted` from #888 to #999 for WCAG AA compliance
+- **ARIA roles** — Added proper roles to all modals (role=dialog, aria-modal, aria-labelledby), filter bar (role=tablist/tab with aria-selected), and FAB menu
+- **Focus trapping** — Modals now trap focus with Tab/Shift+Tab cycling and restore focus on close
+- **Keyboard navigation** — Card grid supports Enter/Space for select/expand, Arrow keys for movement, Home/End for first/last
+- **Screen reader support** — Toast container has aria-live="polite", all card images have meaningful alt text
+
+### Mobile
+- **Always-visible card overlay** — Touch devices now always show gradient overlay with title and metadata (no hover required)
+- **Dark mode embeds** — Spotify (theme=0) and SoundCloud embeds now respect dark mode
+- **Expanded URL param cleanup** — Now strips fbclid, mc_cid, and other tracking parameters
+- **Logo detection fix** — Resolved false positives via improved path-segment matching
+
+### Added
+- **Notes field** — Expanded cards include auto-saving notes textarea (searchable)
+- **Onboarding system** — First-pin celebration and progressive hints for new users
+- **Listen player metadata** — BPM, key, and genre now displayed in listen category players
+- **GitHub link preview** — Shows stars count and language badge for GitHub repositories
+- **Watch mood tags** — TMDB keywords and genres mapped to mood tags
+- **APP_CONFIG extraction** — Admin emails and config moved out of hardcoded constants
+
+### Changed
+- **Consolidated hamburger menu** — "Refresh Image" + "Rerun Enrichment" merged into single "Refresh" action, "Change Category" + "Change Content Type" merged into new "Organize" modal, "Share Link" renamed to "Share"
+- **Error badge improvements** — Now shows context on tap and triggers refresh/retry
+- **Organize modal** — New unified interface for category and content type changes
+- **Paste deduplication** — Suppresses add prompt for recently added URLs
+- **Widget re-trigger** — Category changes now automatically regenerate relevant widgets
+- **Widget timeout handling** — 10-second timeout with "Tap to retry" fallback for failed widget generation
+- **Enrichment error UI** — Error badge now clickable to trigger retry
+- **Expanded card validation** — Link IDs validated on load to prevent desync from deleted links
+
+### Fixed
+- BUG-027: XSS vulnerability in AI widget suggestions
+- BUG-028: Color contrast fails WCAG AA in muted text
+- BUG-029: No keyboard access to card grid
+- BUG-030: Missing ARIA roles on interactive elements
+- Multiple micro-interaction and mobile UX issues
+
+---
+
 ## [2026-02-13] - Link Capture Improvements: Mobile, PWA, Bookmarklet, Image Scan
 
 ### Added

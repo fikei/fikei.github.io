@@ -287,10 +287,15 @@ Client cache uses generic widget ID but server call uses server widget ID. Cache
 
 | Story | Status |
 |-------|--------|
+| **WCAG AA color contrast compliance** | Complete |
+| **ARIA roles for modals and interactive elements** | Complete |
+| **Focus management (trap, restore)** | Complete |
+| **Keyboard navigation for grid** | Complete |
+| **Meaningful alt text for images** | Complete |
+| **aria-live announcements for dynamic content** | Complete |
 | High contrast mode | Pending |
 | Reduced motion option | Pending |
-| Screen reader optimization | Pending |
-| Focus indicators | Pending |
+| Screen reader optimization (full audit) | Pending |
 
 ---
 
