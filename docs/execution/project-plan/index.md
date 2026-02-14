@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-14 (Visual Standards System shipped, Phase 11 Instagram Import PRD added)
+> **Last Updated**: 2026-02-14 (Events: RA GraphQL, Gary's Guide, Bonobo sources + multi-source tags)
 
 ---
 
@@ -70,11 +70,17 @@
 - Loads manifest + registry, exposes `validate()`, `auditDOM()`, `annotate()` APIs
 
 ### Events Page ✅
-**Completed: 2026-02-09**
+**Completed: 2026-02-09 | Updated: 2026-02-14**
 
 - **Standalone events aggregator** at `/events/index.html`
 - ScreenSlate JSON API integration with day/week calendar views
 - Location filtering, source filtering with status chips, error handling
+- **Resident Advisor** — GraphQL API scraper (`eventListings` query, ~72 events/area)
+- **Gary's Guide** — Tech/startup events (SF + NYC, ~63 events/region via table parsing)
+- **Bonobo Network** — Social/community events (SF, ~8 events via Squarespace JSON)
+- **Tech & Social content types** with keyword detection
+- **Multi-source dedup tags** — events from multiple sources show separate color-coded tags
+- **Edge function POST proxy** — `fetch-source` supports custom method/body/headers for GraphQL
 
 ### Brand Positioning & Persona Framework ✅
 **Completed: 2026-02-08**
