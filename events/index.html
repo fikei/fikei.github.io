@@ -2346,149 +2346,107 @@ body {
   }
 
   // --- Gary's Guide Scraper ---
-  // garysguide.com lists tech/startup events organized by week.
-  // Strategy: JSON-LD → semantic HTML → link list fallback
+  // garysguide.com lists tech/startup events in a table layout.
+  // Structure: font.ftitle > a (event links), font.fdescription (venue/address),
+  // date/time in sibling td cells, day headers in font.fblack > b.
+  // Strategy: table-row parsing → ftitle link fallback
   async function fetchGarysGuide(source) {
     log("GarysGuide: fetching " + source.url);
     const text = await proxyFetch(source.url);
     const doc = new DOMParser().parseFromString(text, 'text/html');
     const events = [];
     const baseUrl = 'https://www.garysguide.com';
+    const seen = new Set();
 
-    // Strategy 1: JSON-LD structured data
-    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
-    ldScripts.forEach(script => {
-      try {
-        const data = JSON.parse(script.textContent);
-        const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
-        items.forEach(item => {
-          if (!item['@type'] || !['Event', 'SocialEvent', 'BusinessEvent', 'EducationEvent'].includes(item['@type'])) return;
-          const name = item.name || '';
-          const startDate = item.startDate || '';
-          const venue = item.location?.name || item.location?.address?.name || '';
-          const city = item.location?.address?.addressLocality || '';
-          const address = item.location?.address?.streetAddress || '';
-          const url = item.url || '';
-          const description = item.description || '';
-          if (name && startDate) {
-            const d = new Date(startDate);
-            const date = d.toISOString().split('T')[0];
-            const hours = d.getHours().toString().padStart(2, '0');
-            const mins = d.getMinutes().toString().padStart(2, '0');
-            const time = (hours !== '00' || mins !== '00') ? hours + ':' + mins : '';
-            events.push({ date, time, name, venue, city, address, genre: 'Tech', url: url.startsWith('http') ? url : baseUrl + url, source: source.id, contentType: 'tech', description });
-          }
-        });
-      } catch (e) { /* ignore invalid JSON-LD */ }
-    });
+    // Strategy 1: Parse table rows containing .ftitle event links
+    // Each event row has: date/time td (width=48) → spacer → price td → spacer → event td
+    // The event td contains font.ftitle > a (name) and font.fdescription (venue, address)
+    // Day headers appear as font.fblack > b with text like "Friday, Feb 13"
+    let currentDayDate = '';
 
-    if (events.length > 0) {
-      log('GarysGuide: found ' + events.length + ' events via JSON-LD');
-      return events;
-    }
+    const allRows = doc.querySelectorAll('tr');
+    allRows.forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      if (!tds || tds.length === 0) return;
 
-    // Strategy 2: Parse event listing HTML elements
-    // GarysGuide uses divs/spans for event entries with links to /events/{id}/{slug}
-    let currentWeekDate = '';
-    const allElements = doc.querySelectorAll('h2, h3, h4, [class*="week"], [class*="event"], [class*="listing"], a[href*="/events/"]');
+      // Check for day header row (e.g., "Friday, Feb 13")
+      const firstTdText = tds[0]?.textContent?.trim() || '';
+      const dayMatch = firstTdText.match(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+([\w]+\.?\s+\d{1,2})/i);
+      if (dayMatch) {
+        const parsed = parseFuzzyDate(dayMatch[2]);
+        if (parsed) currentDayDate = parsed;
+        return;
+      }
 
-    // First, try to find week headers and event containers
-    const containers = doc.querySelectorAll('[class*="event"], [class*="listing"], [class*="item"], article, li');
-    containers.forEach(container => {
-      const linkEl = container.querySelector('a[href*="/events/"]');
+      // Look for event link in this row
+      const titleFont = tr.querySelector('.ftitle');
+      const linkEl = titleFont ? titleFont.querySelector('a') : tr.querySelector('a[href*="/events/"]');
       if (!linkEl) return;
       const href = linkEl.getAttribute('href') || '';
-      // Skip non-event links (e.g., /events?region=)
-      if (href.includes('?') && !href.includes('/events/')) return;
-      const name = linkEl.textContent?.trim() || '';
-      if (!name || name.length < 3) return;
-
-      // Look for date info in sibling/parent elements
-      let dateText = '';
-      const dateEl = container.querySelector('time, [datetime], [class*="date"], [class*="Date"], [class*="when"]');
-      if (dateEl) {
-        dateText = dateEl.getAttribute('datetime') || dateEl.textContent?.trim() || '';
-      }
-
-      // Look for venue
-      let venue = '';
-      const venueEl = container.querySelector('[class*="venue"], [class*="location"], [class*="place"], [class*="where"]');
-      if (venueEl) venue = venueEl.textContent?.trim() || '';
-
-      // Look for time
-      let timeText = '';
-      const timeEl = container.querySelector('[class*="time"], [class*="Time"]');
-      if (timeEl) timeText = timeEl.textContent?.trim() || '';
-
-      let date = '', time = '';
-      if (dateText) {
-        try {
-          const d = new Date(dateText);
-          if (!isNaN(d.getTime())) {
-            date = d.toISOString().split('T')[0];
-            const hours = d.getHours().toString().padStart(2, '0');
-            const mins = d.getMinutes().toString().padStart(2, '0');
-            if (hours !== '00' || mins !== '00') time = hours + ':' + mins;
-          }
-        } catch (e) { /* parse error */ }
-      }
-      if (!date) {
-        const parsed = parseFuzzyDate(dateText || container.textContent);
-        if (parsed) date = parsed;
-      }
-
-      const fullUrl = href.startsWith('http') ? href : baseUrl + href;
-      events.push({ date: date || '', time: time || timeText, name, venue, city: '', genre: 'Tech', url: fullUrl, source: source.id, contentType: 'tech' });
-    });
-
-    if (events.length > 0) {
-      log('GarysGuide: found ' + events.length + ' events via container parsing');
-      return events;
-    }
-
-    // Strategy 3: Link-list fallback — extract all event links
-    const eventLinks = doc.querySelectorAll('a[href*="/events/"]');
-    const seen = new Set();
-    eventLinks.forEach(link => {
-      const href = link.getAttribute('href') || '';
-      // Must be an individual event page (has an event ID segment)
-      if (!href.match(/\/events\/[a-z0-9]+\//i) && !href.match(/\/events\/[a-z0-9]+$/i)) return;
-      if (href.includes('?')) return; // skip query pages
+      if (!href.includes('/events/') || href.includes('?')) return;
       const fullUrl = href.startsWith('http') ? href : baseUrl + href;
       if (seen.has(fullUrl)) return;
       seen.add(fullUrl);
 
-      const name = link.textContent?.trim() || '';
+      const name = linkEl.textContent?.trim() || '';
       if (!name || name.length < 3) return;
 
-      // Try to extract date from surrounding context
-      let date = '';
-      const parent = link.parentElement;
-      if (parent) {
-        // Walk up to find a week header
-        let el = parent;
-        for (let i = 0; i < 5 && el; i++) {
-          const prev = el.previousElementSibling;
-          if (prev) {
-            const text = prev.textContent || '';
-            // Match "WEEK OF FEB 09" or similar date headers
-            const weekMatch = text.match(/WEEK\s+OF\s+(\w+\s+\d{1,2})/i);
-            if (weekMatch) {
-              const parsed = parseFuzzyDate(weekMatch[1]);
-              if (parsed) { date = parsed; break; }
-            }
-            // Match "Monday, February 10" or similar
-            const dateMatch = text.match(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+(\w+\s+\d{1,2})/i);
-            if (dateMatch) {
-              const parsed = parseFuzzyDate(dateMatch[2]);
-              if (parsed) { date = parsed; break; }
-            }
-          }
-          el = el.parentElement;
-        }
+      // Extract venue and city from .fdescription: <b>Venue</b>, Address, City
+      let venue = '', city = '';
+      const descFont = tr.querySelector('.fdescription');
+      if (descFont) {
+        const venueEl = descFont.querySelector('b');
+        if (venueEl) venue = venueEl.textContent?.trim() || '';
+        // Everything after the <b> tag is the address
+        const descText = descFont.textContent?.trim() || '';
+        // Format: "Venue, 123 Street, City" — extract city as last segment
+        const parts = descText.replace(venue, '').replace(/^[\s,]+/, '').split(',').map(s => s.trim()).filter(Boolean);
+        if (parts.length > 0) city = parts[parts.length - 1];
       }
 
-      events.push({ date: date || '', time: '', name, venue: '', city: '', genre: 'Tech', url: fullUrl, source: source.id, contentType: 'tech' });
+      // Extract date and time from sibling td cells
+      let date = currentDayDate || '';
+      let time = '';
+      for (const td of tds) {
+        const tdText = td.textContent?.trim() || '';
+        // Date/time cell: "Feb 13\n5:00pm" (the td with short date + time)
+        const dateTimeMatch = tdText.match(/([\w]+\.?\s+\d{1,2})\s*(\d{1,2}:\d{2}\s*(am|pm)?)/i);
+        if (dateTimeMatch) {
+          const parsed = parseFuzzyDate(dateTimeMatch[1]);
+          if (parsed) date = parsed;
+          time = dateTimeMatch[2].trim();
+          break;
+        }
+        // Just a date cell
+        const dateOnly = tdText.match(/^([\w]+\.?\s+\d{1,2})$/);
+        if (dateOnly) {
+          const parsed = parseFuzzyDate(dateOnly[1]);
+          if (parsed) date = parsed;
+        }
+        // Just a time cell
+        const timeOnly = tdText.match(/^(\d{1,2}:\d{2}\s*(am|pm)?)$/i);
+        if (timeOnly) time = timeOnly[1].trim();
+      }
+
+      events.push({ date, time, name, venue, city, genre: 'Tech', url: fullUrl, source: source.id, contentType: 'tech' });
+    });
+
+    if (events.length > 0) {
+      log('GarysGuide: found ' + events.length + ' events via table parsing');
+      return events;
+    }
+
+    // Strategy 2: Fallback — find all .ftitle links directly
+    const ftitleLinks = doc.querySelectorAll('.ftitle a');
+    ftitleLinks.forEach(link => {
+      const href = link.getAttribute('href') || '';
+      if (!href.includes('/events/') || href.includes('?')) return;
+      const fullUrl = href.startsWith('http') ? href : baseUrl + href;
+      if (seen.has(fullUrl)) return;
+      seen.add(fullUrl);
+      const name = link.textContent?.trim() || '';
+      if (!name || name.length < 3) return;
+      events.push({ date: '', time: '', name, venue: '', city: '', genre: 'Tech', url: fullUrl, source: source.id, contentType: 'tech' });
     });
 
     log('GarysGuide: found ' + events.length + ' events via link fallback');
