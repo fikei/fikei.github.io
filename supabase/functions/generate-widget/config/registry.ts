@@ -37,6 +37,7 @@ import { readerIdentity } from './widgets/reader-identity.ts'
 import { upcomingReleases } from './widgets/upcoming-releases.ts'
 import { soundShelf } from './widgets/sound-shelf.ts'
 import { listenNext } from './widgets/listen-next.ts'
+import { eventsForYou } from './widgets/events-for-you.ts'
 
 // =============================================================================
 // WIDGET REGISTRY
@@ -65,6 +66,7 @@ const registry: WidgetRegistry = {
     'upcoming-releases': upcomingReleases,
     'sound-shelf': soundShelf,
     'listen-next': listenNext,
+    'events-for-you': eventsForYou,
   },
 
   defaults: {
