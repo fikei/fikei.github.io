@@ -166,9 +166,17 @@ serve(async (req) => {
         console.log('[enrich-link] TMDB complete, skipping AI call')
       }
 
+      // Truncate summary to ~60 words for card display
+      const truncSummary = (text: string | null): string | null => {
+        if (!text) return null
+        const words = text.split(/\s+/)
+        if (words.length <= 60) return text
+        return words.slice(0, 60).join(' ') + '…'
+      }
+
       // 3. Merge: TMDB is primary, AI fills gaps
       videoMeta = {
-        summary: tmdbResult?.overview || aiResult?.summary || null,
+        summary: truncSummary(tmdbResult?.overview || aiResult?.summary || null),
         type: aiResult?.type || (tmdbResult ? inferTypeFromTMDB(tmdbResult.mediaType) : null),
         genre: tmdbResult?.genres?.[0] || aiResult?.genre || null,
         year: tmdbResult?.year || aiResult?.year || null,
@@ -531,7 +539,7 @@ Description: ${description?.slice(0, 500) || 'N/A'}
 
 Return JSON only:
 {
-  "summary": "2-3 sentence summary of what this film/show/video is about. Write in present tense, no spoilers.",
+  "summary": "1-2 sentence summary, max 50 words. Present tense, no spoilers.",
   "type": "movie|tv-show|documentary|short|anime|video|trailer",
   "genre": "primary genre (e.g. drama, comedy, thriller, sci-fi, horror, action, romance, animation)",
   "year": year as number or null if unknown,
