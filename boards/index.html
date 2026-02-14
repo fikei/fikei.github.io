@@ -11393,7 +11393,7 @@ Return JSON:
 
       const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
       const errorReason = l.enrichment_error || 'Enrichment failed';
-      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="${esc(errorReason)} — tap to refresh" onclick="toast('${esc(errorReason)}. Retrying...'); handleAction('refresh', '${esc(l.id)}'); event.stopPropagation();" style="cursor:pointer" aria-label="${esc(errorReason)}">!</span>` : '';
+      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="${esc(errorReason)} — tap to refresh" onclick="event.stopPropagation(); toast('${esc(errorReason)}. Retrying...'); var _l = getAllLinks().find(x => x.id === '${esc(l.id)}'); if (_l) { updateLink(_l.id, { enrichment_failed: false }); enrichmentQueue.push({ linkId: _l.id, url: _l.url, title: _l.title, description: _l.description, forceRefresh: true }); processEnrichmentQueue(); }" style="cursor:pointer" aria-label="${esc(errorReason)}">!</span>` : '';
       const loadingClass = l.loading ? ' grid-item--loading' : '';
 
       // Build music-specific details for expanded listen cards
@@ -12499,7 +12499,7 @@ Return JSON:
           }
         }
         return;
-      } else if (actionType === 'refresh') {
+      } else if (actionType === 'refresh' || actionType === 'rerun-enrichment') {
         // Consolidated: re-enrich metadata + refresh image
         const link = getAllLinks().find(l => l.id === id);
         if (link) {
@@ -12575,10 +12575,6 @@ Return JSON:
           renderOrganizeModal(link);
           openModal(organizeModal);
         }
-        return;
-      } else if (actionType === 'rerun-enrichment') {
-        // Legacy: redirect to consolidated refresh
-        handleAction('refresh', id);
         return;
       } else if (actionType === 'toggle-done') {
         const link = getAllLinks().find(l => l.id === id);
