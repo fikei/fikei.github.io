@@ -6306,6 +6306,10 @@ Return JSON:
     const userPrefs = widgetFeedback.userPrefs || {};
 
     try {
+      // Add 10s timeout to widget generation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
         headers: {
@@ -6318,8 +6322,11 @@ Return JSON:
           items: itemsPayload,
           category: currentCategory,
           userPrefs: userPrefs
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -6379,7 +6386,11 @@ Return JSON:
       return result;
     } catch (e) {
       console.error('[widget] AI error:', e);
-      trackWidgetEvent('error', widget.id, { error: e.message });
+      trackWidgetEvent('error', widget.id, { error: e.message, timeout: e.name === 'AbortError' });
+      // Return timeout marker for rendering fallback
+      if (e.name === 'AbortError') {
+        return { _timeout: true };
+      }
     }
 
     return null;
@@ -6533,7 +6544,7 @@ Return JSON:
         // Phase 1: Track click for instrumentation
         const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
-          <a href="${sug.productUrl}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
+          <a href="${esc(sug.productUrl)}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
             <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
@@ -6963,6 +6974,32 @@ Return JSON:
    * @returns {string} Rendered HTML
    */
   function renderWidgetWithTemplate(widget, items, aiResult) {
+    // Handle timeout or error case - render retry UI
+    if (aiResult && aiResult._timeout) {
+      const category = currentFilter || 'all';
+      const resolvedName = resolveWidgetVars(widget.name, category);
+      return `
+        <div class="w-shell">
+          ${renderWidgetHeader(widget)}
+          <div class="w-body" style="padding:var(--sp-md);text-align:center">
+            <span class="w-text w-text--note" style="cursor:pointer" onclick="refreshWidget('${esc(widget.id)}')">Tap to retry</span>
+          </div>
+        </div>`;
+    }
+
+    // Handle null/failed generation - render retry UI
+    if (!aiResult) {
+      const category = currentFilter || 'all';
+      const resolvedName = resolveWidgetVars(widget.name, category);
+      return `
+        <div class="w-shell">
+          ${renderWidgetHeader(widget)}
+          <div class="w-body" style="padding:var(--sp-md);text-align:center">
+            <span class="w-text w-text--note" style="cursor:pointer" onclick="refreshWidget('${esc(widget.id)}')">Tap to retry</span>
+          </div>
+        </div>`;
+    }
+
     // Determine template name from widget config
     const templateName = widget.template?.name || widget.template?.layout || null;
     const fallbackName = widget.template?.fallback || null;
@@ -10016,6 +10053,8 @@ Return JSON:
   }
 
   // Supabase sync functions (async, background, using raw fetch)
+  let syncRetryQueue = [];
+
   async function syncLinkToSupabase(link) {
     if (!currentUser) {
       console.log('[sync] Skipped - not logged in');
@@ -10061,10 +10100,24 @@ Return JSON:
       if (!res.ok) {
         const errBody = await res.text();
         console.error('[sync] Upload failed:', res.status, errBody);
+        toast('Sync failed — changes saved locally', true);
+        // Queue for retry on next sync
+        if (!syncRetryQueue.find(l => l.id === link.id)) {
+          syncRetryQueue.push(link);
+        }
       } else {
         console.log('[sync] Uploaded:', link.url);
+        // Remove from retry queue if present
+        syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
       }
-    } catch (e) { console.error('[sync] Error:', e); }
+    } catch (e) {
+      console.error('[sync] Error:', e);
+      toast('Sync failed — changes saved locally', true);
+      // Queue for retry on next sync
+      if (!syncRetryQueue.find(l => l.id === link.id)) {
+        syncRetryQueue.push(link);
+      }
+    }
   }
 
   async function syncOrderToSupabase(orderIds) {
@@ -10117,6 +10170,16 @@ Return JSON:
 
     const data = load();
     console.log('[sync] Syncing', data.links.length, 'links to Supabase');
+
+    // Retry any failed syncs from previous runs first
+    if (syncRetryQueue.length > 0) {
+      console.log('[sync] Retrying', syncRetryQueue.length, 'previously failed syncs');
+      const retryLinks = [...syncRetryQueue];
+      syncRetryQueue = [];
+      for (const link of retryLinks) {
+        await syncLinkToSupabase(link);
+      }
+    }
 
     // Sync all links
     for (const link of data.links) {
@@ -10196,6 +10259,7 @@ Return JSON:
       return { links, categories, linkOrder, expanded };
     } catch (e) {
       console.error('Supabase fetch error:', e);
+      toast('Cloud sync failed — using local data', true);
       return null;
     }
   }
@@ -10353,6 +10417,22 @@ Return JSON:
   let searchQuery = '';
   let selectedLink = null;
   let expandedCards = loadExpandedCards(); // { [id]: 'medium' | 'large' }
+
+  // Validate expanded cards on initial load - remove orphaned entries
+  (function validateExpandedCards() {
+    const data = load();
+    const validLinkIds = new Set(data.links.map(l => l.id));
+    const cleanedCards = {};
+    for (const [id, state] of Object.entries(expandedCards)) {
+      if (validLinkIds.has(id)) {
+        cleanedCards[id] = state;
+      }
+    }
+    if (Object.keys(cleanedCards).length !== Object.keys(expandedCards).length) {
+      expandedCards = cleanedCards;
+      saveExpandedCards(expandedCards);
+    }
+  })();
   const LISTEN_VIEW_KEY = 'boards-listen-view';
   let listenView = localStorage.getItem(LISTEN_VIEW_KEY) || 'list'; // 'grid' | 'list'
   const WATCH_VIEW_KEY = 'boards-watch-view';
@@ -10731,7 +10811,7 @@ Return JSON:
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
       const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
-      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="Enrichment failed - click Refresh Image to retry">!</span>` : '';
+      const errorBadge = l.enrichment_failed ? `<span class="grid-item__error-badge" title="Enrichment failed - tap to retry" onclick="handleAction('refresh-image', '${esc(l.id)}'); event.stopPropagation();" style="cursor:pointer">!</span>` : '';
       const loadingClass = l.loading ? ' grid-item--loading' : '';
 
       // Build music-specific details for expanded listen cards
@@ -13459,7 +13539,16 @@ Return JSON:
       const cloudData = await fetchFromSupabase();
       if (cloudData) {
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-        expandedCards = cloudData.expanded;
+        // Validate expanded cards - remove orphaned entries
+        const validLinkIds = new Set(cloudData.links.map(l => l.id));
+        expandedCards = {};
+        if (cloudData.expanded) {
+          for (const [id, state] of Object.entries(cloudData.expanded)) {
+            if (validLinkIds.has(id)) {
+              expandedCards[id] = state;
+            }
+          }
+        }
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
         renderFilters();
         renderGrid();
@@ -13736,7 +13825,16 @@ Return JSON:
 
         // Always update from cloud (source of truth)
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-        expandedCards = cloudData.expanded;
+        // Validate expanded cards - remove orphaned entries
+        const validLinkIds = new Set(cloudData.links.map(l => l.id));
+        expandedCards = {};
+        if (cloudData.expanded) {
+          for (const [id, state] of Object.entries(cloudData.expanded)) {
+            if (validLinkIds.has(id)) {
+              expandedCards[id] = state;
+            }
+          }
+        }
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
         renderFilters();
         renderGrid();
@@ -13812,7 +13910,16 @@ Return JSON:
 
       // Save the new data
       save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-      expandedCards = cloudData.expanded;
+      // Validate expanded cards - remove orphaned entries
+      const validLinkIds = new Set(cloudData.links.map(l => l.id));
+      expandedCards = {};
+      if (cloudData.expanded) {
+        for (const [id, state] of Object.entries(cloudData.expanded)) {
+          if (validLinkIds.has(id)) {
+            expandedCards[id] = state;
+          }
+        }
+      }
       localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
 
       // Re-render with animation for new items
