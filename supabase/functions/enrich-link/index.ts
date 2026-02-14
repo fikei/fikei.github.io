@@ -176,6 +176,7 @@ serve(async (req) => {
 
       // 3. Merge: TMDB is primary, AI fills gaps
       videoMeta = {
+        title: tmdbResult?.title || null,  // Clean canonical title from TMDB
         summary: truncSummary(tmdbResult?.overview || aiResult?.summary || null),
         type: aiResult?.type || (tmdbResult ? inferTypeFromTMDB(tmdbResult.mediaType) : null),
         genre: tmdbResult?.genres?.[0] || aiResult?.genre || null,
