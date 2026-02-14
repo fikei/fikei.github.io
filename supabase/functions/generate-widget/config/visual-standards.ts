@@ -136,7 +136,7 @@ export interface ContentTypeStandard {
 export const CONTENT_TYPE_STANDARDS: Record<string, ContentTypeStandard> = {
   product: {
     content_type: 'product',
-    expected_subject: 'the product itself, clearly visible and identifiable',
+    expected_subject: 'the physical/tangible product itself, clearly visible and identifiable',
     good_framing: [
       'centered-product',               // product as hero, clean framing
       'flat-lay',                        // overhead product arrangement
@@ -155,6 +155,9 @@ export const CONTENT_TYPE_STANDARDS: Record<string, ContentTypeStandard> = {
       'heavy-text-overlay-on-product',   // price tags, sale banners covering product
       'low-res-upscaled',               // pixelated enlargement
       'cad-render-wireframe',           // 3D model, not final product
+      'app-screenshot-as-product',       // digital product UI passed off as product shot
+      'software-interface-hero',         // SaaS/tool screenshot — should be type "tool"
+      'browser-window-mockup',           // laptop/phone mockup of a website
     ],
     aspect_preference: 'square',
   },
@@ -288,11 +291,12 @@ export const CONTENT_TYPE_STANDARDS: Record<string, ContentTypeStandard> = {
 
   tool: {
     content_type: 'tool',
-    expected_subject: 'the tool interface, key feature, or product identity',
+    expected_subject: 'the tool interface, key feature, or product identity — NOT a physical product shot',
     good_framing: [
       'app-screenshot-clean',            // the tool in use, no browser chrome
       'feature-highlight',               // a specific capability showcased
       'product-logo-designed',           // intentional brand mark
+      'device-mockup-contextual',        // device with app shown in real environment
     ],
     good_backgrounds: [
       'app-canvas',                      // the tool's own UI
@@ -303,6 +307,8 @@ export const CONTENT_TYPE_STANDARDS: Record<string, ContentTypeStandard> = {
       'landing-page-full-screenshot',    // entire marketing page as image
       'pricing-table',                   // comparison grid
       'testimonial-section',             // customer quotes
+      'physical-product-photography',    // flat-lay, centered-product, on-model framing
+      'ecommerce-style-hero',           // white-background product shot for a digital tool
     ],
     aspect_preference: 'landscape',
   },
@@ -437,7 +443,7 @@ export const CATEGORY_AESTHETICS: Record<string, CategoryAesthetic> = {
     textures: ['glass-ui', 'metal-hardware', 'matte-plastic', 'screen-glow', 'anodized-aluminum'],
     lighting: 'controlled — studio product lighting or screen-lit environments',
     compositions: [
-      'product-hero',                    // single tool/device, clean background
+      'device-hero',                     // single device/hardware, clean background
       'app-interface-clean',             // UI screenshot without browser chrome
       'desk-setup',                      // workspace with tools in context
       'feature-detail',                  // close-up on a specific capability
@@ -449,6 +455,7 @@ export const CATEGORY_AESTHETICS: Record<string, CategoryAesthetic> = {
       'marketing-landing-page',          // full marketing page as image
       'comparison-table-screenshot',     // pricing grids
       'unboxing-cardboard',             // packaging, not the product
+      'physical-product-shot-for-software', // flat-lay/centered-product framing for apps/SaaS
     ],
   },
 
@@ -581,12 +588,17 @@ export function buildContentTypePrompt(contentType: string): string {
   const standard = CONTENT_TYPE_STANDARDS[contentType]
   if (!standard) return ''
 
+  let extra = ''
+  if (contentType === 'product') {
+    extra = `\nIMPORTANT: "product" means a physical/tangible item (clothing, furniture, electronics hardware). Digital products (apps, SaaS, websites) should be classified as "tool" instead — do NOT apply product-shot framing (flat-lay, centered-product, on-model) to software or digital services.`
+  }
+
   return `
 CONTENT TYPE CONTEXT ("${standard.content_type}"):
 The image should depict: ${standard.expected_subject}
 Good framing for this type: ${standard.good_framing.join(', ')}
 Avoid: ${standard.anti_patterns.join(', ')}
-Preferred aspect ratio: ${standard.aspect_preference}`
+Preferred aspect ratio: ${standard.aspect_preference}${extra}`
 }
 
 /**
