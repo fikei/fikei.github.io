@@ -8863,8 +8863,8 @@ Return JSON:
     console.log('%c[ENRICH] Queuing for server enrichment:', 'color: #e74c3c; font-weight: bold', url);
     enrichmentQueue.push({ linkId, url, title, description, retryCount: 0, ...opts });
 
-    // Don't auto-process - requires API key setup
-    // processEnrichmentQueue();
+    // Auto-process the queue
+    processEnrichmentQueue();
   }
 
   // Helper to sleep for retry delays
@@ -9058,6 +9058,13 @@ Return JSON:
             seriesInfo: existing.seriesInfo || null
           };
           console.log('%c[ENRICH] Video metadata merged:', 'color: #E50914', link.video);
+
+          // Use TMDB poster as image fallback for watch items
+          if (!link.image && link.video.posterPath) {
+            link.image = `https://image.tmdb.org/t/p/w500${link.video.posterPath}`;
+            link.image_source = 'tmdb';
+            console.log('%c[ENRICH] Using TMDB poster as image:', 'color: #01d277', link.image);
+          }
         }
 
         save(data);
