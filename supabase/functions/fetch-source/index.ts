@@ -35,6 +35,10 @@ const ALLOWED_DOMAINS = [
   'alamodrafthouse.com',
   'drafthouse.com',
   'www.drafthouse.com',
+  'garysguide.com',
+  'www.garysguide.com',
+  'bonobonetwork.com',
+  'www.bonobonetwork.com',
 ]
 
 function isDomainAllowed(url: string): boolean {
