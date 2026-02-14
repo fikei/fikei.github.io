@@ -225,11 +225,13 @@ Claude Code is authorized to perform the following operations **without asking f
 
 ### Git & GitHub
 - **Always create a PR to merge into master** — never push to master directly
+- **Always merge the PR to master when finished** — do not leave PRs open for manual merge
 - **Assign all PRs to `fikei`** so they appear in the GitHub mobile app for quick merge
 - **Create and push branches** for feature work
 - **Close stale branches** after successful merges
 
 ### Supabase Deployment
+- **Always deploy any updated Supabase edge functions after merge** — if any files in `supabase/functions/` changed, run `supabase functions deploy <function-name>` immediately after merging without asking
 - **Deploy edge functions** via `supabase functions deploy` after merging to master
 - **Run database migrations** when migration files are part of a merged PR
 - **Check function logs** for debugging (`supabase functions logs`)
