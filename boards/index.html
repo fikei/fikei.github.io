@@ -9059,11 +9059,14 @@ Return JSON:
           };
           console.log('%c[ENRICH] Video metadata merged:', 'color: #E50914', link.video);
 
-          // Use TMDB poster as image fallback for watch items
-          if (!link.image && link.video.posterPath) {
-            link.image = `https://image.tmdb.org/t/p/w500${link.video.posterPath}`;
-            link.image_source = 'tmdb';
-            console.log('%c[ENRICH] Using TMDB poster as image:', 'color: #01d277', link.image);
+          // Use TMDB poster for watch items — always prefer it over scraped OG images
+          if (link.video.posterPath) {
+            const tmdbPoster = `https://image.tmdb.org/t/p/w500${link.video.posterPath}`;
+            if (link.image !== tmdbPoster) {
+              console.log('%c[ENRICH] Using TMDB poster:', 'color: #01d277', tmdbPoster, '(replacing:', link.image || 'none', ')');
+              link.image = tmdbPoster;
+              link.image_source = 'tmdb';
+            }
           }
         }
 
@@ -9110,6 +9113,34 @@ Return JSON:
 
     // Start processing
     await processEnrichmentQueue();
+  }
+
+  // Auto-enrich watch items missing TMDB data (runs once on load)
+  let hasRunTMDBBackfill = false;
+  function backfillWatchTMDB() {
+    if (hasRunTMDBBackfill) return;
+    hasRunTMDBBackfill = true;
+
+    const links = getAllLinks();
+    const watchLinks = links.filter(l =>
+      l.category === 'watch' &&
+      l.video &&
+      !l.video.tmdbId  // Missing TMDB data
+    );
+
+    if (watchLinks.length === 0) {
+      console.log('%c[TMDB-BACKFILL] All watch items have TMDB data', 'color: #01d277');
+      return;
+    }
+
+    console.log('%c[TMDB-BACKFILL] Found', 'color: #E50914; font-weight: bold', watchLinks.length, 'watch items missing TMDB data, queuing for enrichment');
+
+    for (const link of watchLinks) {
+      queueServerEnrichment(link.id, link.url, link.title, link.description, {
+        category: 'watch',
+        enrichWatch: true
+      });
+    }
   }
 
   // ============================================
@@ -13669,6 +13700,9 @@ Return JSON:
 
     // Re-check uncategorized items on load
     recategorizeUncategorized();
+
+    // Backfill TMDB data for watch items that don't have it
+    backfillWatchTMDB();
 
     // Check clipboard for URLs
     checkClipboardForUrls();
