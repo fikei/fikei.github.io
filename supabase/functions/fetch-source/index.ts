@@ -3,7 +3,7 @@
 // Returns raw HTML/RSS/XML content with proper browser-like headers.
 //
 // POST /functions/v1/fetch-source
-// Body: { url: string }
+// Body: { url: string, method?: string, body?: string, headers?: Record<string,string> }
 // Returns: { content: string, status: number, contentType: string }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -39,6 +39,8 @@ const ALLOWED_DOMAINS = [
   'www.garysguide.com',
   'bonobonetwork.com',
   'www.bonobonetwork.com',
+  'ra.co',
+  'www.ra.co',
 ]
 
 function isDomainAllowed(url: string): boolean {
@@ -83,7 +85,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { url } = await req.json()
+    const { url, method: reqMethod, body: reqBody, headers: customHeaders } = await req.json()
 
     if (!url || typeof url !== 'string') {
       return new Response(JSON.stringify({ error: 'url is required' }), {
@@ -100,18 +102,28 @@ serve(async (req: Request) => {
       })
     }
 
-    console.log(`[fetch-source] Fetching: ${url}`)
+    const upstreamMethod = (reqMethod || 'GET').toUpperCase()
+    console.log(`[fetch-source] ${upstreamMethod} ${url}`)
 
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'identity',
-        'Cache-Control': 'no-cache',
-      },
+    const fetchHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
+      'Cache-Control': 'no-cache',
+      ...(customHeaders || {}),
+    }
+
+    const fetchOptions: RequestInit = {
+      method: upstreamMethod,
+      headers: fetchHeaders,
       redirect: 'follow',
-    })
+    }
+    if (reqBody && upstreamMethod !== 'GET') {
+      fetchOptions.body = reqBody
+    }
+
+    const resp = await fetch(url, fetchOptions)
 
     console.log(`[fetch-source] Response: ${resp.status} ${resp.statusText} (${resp.headers.get('content-type')})`)
 
