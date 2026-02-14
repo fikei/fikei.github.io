@@ -143,60 +143,57 @@ async function queryMusicBrainz(artist: string, track: string): Promise<{
     }
     let bestRelease = null
 
-    // Priority 1: Official album release with label
+    // Helper: check if release is an original (not compilation, DJ-mix, soundtrack, etc.)
+    const EXCLUDED_TYPES = ['Compilation', 'DJ-mix', 'Soundtrack', 'Mixtape/Street', 'Remix']
+    const isOriginalRelease = (rel: any) => {
+      const secTypes = rel['release-group']?.['secondary-types'] || []
+      return !secTypes.some((t: string) => EXCLUDED_TYPES.includes(t))
+    }
+
+    // Priority 1: Original album with label
     for (const rel of allReleases) {
       const group = rel['release-group']
-      const isAlbum = group?.['primary-type'] === 'Album'
-      const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
-      const hasLabel = rel['label-info']?.[0]?.label?.name
-      if (isAlbum && isNotCompilation && hasLabel) {
+      if (group?.['primary-type'] === 'Album' && isOriginalRelease(rel) && rel['label-info']?.[0]?.label?.name) {
         bestRelease = rel
         break
       }
     }
 
-    // Priority 2: Any album release (even without label)
+    // Priority 2: Original album (even without label)
     if (!bestRelease) {
       for (const rel of allReleases) {
         const group = rel['release-group']
-        if (group?.['primary-type'] === 'Album' && !group?.['secondary-types']?.includes('Compilation')) {
+        if (group?.['primary-type'] === 'Album' && isOriginalRelease(rel)) {
           bestRelease = rel
           break
         }
       }
     }
 
-    // Priority 3: Single release (non-compilation)
+    // Priority 3: Single (non-compilation)
     if (!bestRelease) {
       for (const rel of allReleases) {
-        const group = rel['release-group']
-        const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
-        if (group?.['primary-type'] === 'Single' && isNotCompilation) {
+        if (rel['release-group']?.['primary-type'] === 'Single' && isOriginalRelease(rel)) {
           bestRelease = rel
           break
         }
       }
     }
 
-    // Priority 4: EP release (non-compilation)
+    // Priority 4: EP (non-compilation)
     if (!bestRelease) {
       for (const rel of allReleases) {
-        const group = rel['release-group']
-        const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
-        if (group?.['primary-type'] === 'EP' && isNotCompilation) {
+        if (rel['release-group']?.['primary-type'] === 'EP' && isOriginalRelease(rel)) {
           bestRelease = rel
           break
         }
       }
     }
 
-    // Priority 5: Any non-compilation release with a label
+    // Priority 5: Any original release with a label
     if (!bestRelease) {
       for (const rel of allReleases) {
-        const group = rel['release-group']
-        const isNotCompilation = !group?.['secondary-types']?.includes('Compilation')
-          && !group?.['secondary-types']?.includes('Soundtrack')
-        if (isNotCompilation && rel['label-info']?.[0]?.label?.name) {
+        if (isOriginalRelease(rel) && rel['label-info']?.[0]?.label?.name) {
           bestRelease = rel
           break
         }
