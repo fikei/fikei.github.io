@@ -4234,13 +4234,17 @@ body {
       const signalCount = profile.artists.length + profile.genres.length + profile.keywords.length;
       if (signalCount === 0) return;
 
+      // Region filter: only recommend events from user's active sources
+      const region = localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area';
+      const sourceIds = STOCK_SOURCES.filter(function(s) { return s.region === region; }).map(function(s) { return s.id; });
+
       const resp = await fetch(SUPABASE_URL + '/functions/v1/recommend-events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ profile: profile, filters: { maxResults: 6 } }),
+        body: JSON.stringify({ profile: profile, filters: { maxResults: 6, sourceIds: sourceIds } }),
       });
 
       if (!resp.ok) return;

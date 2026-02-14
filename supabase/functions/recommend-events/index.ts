@@ -42,6 +42,7 @@ interface EventProfile {
 interface EventFilters {
   dateRange?: { start: string; end: string }
   contentTypes?: string[]
+  sourceIds?: string[]
   maxResults?: number
 }
 
@@ -104,6 +105,10 @@ async function fetchUpcomingEvents(
 
   if (filters.contentTypes?.length) {
     query = query.in('content_type', filters.contentTypes)
+  }
+
+  if (filters.sourceIds?.length) {
+    query = query.in('source_id', filters.sourceIds)
   }
 
   const { data: scrapedEvents, error: scrapedError } = await query
@@ -409,7 +414,7 @@ serve(async (req) => {
       (profile.genres?.length || 0) +
       (profile.keywords?.length || 0)
 
-    console.log(`[recommend-events] Profile: ${profileSignals} signals, ${Object.keys(profile.categories || {}).length} categories`)
+    console.log(`[recommend-events] Profile: ${profileSignals} signals, ${Object.keys(profile.categories || {}).length} categories${filters.sourceIds?.length ? `, region filter: ${filters.sourceIds.length} sources` : ''}`)
 
     // Step 1: Fetch upcoming events
     const allEvents = await fetchUpcomingEvents(filters)
