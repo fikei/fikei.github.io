@@ -18,15 +18,15 @@ const corsHeaders = {
 const CONTENT_TYPES = ['product', 'article', 'video', 'music', 'repository', 'social', 'document', 'tool', 'unknown']
 
 const IMAGE_STRATEGIES: Record<string, string[]> = {
-  product: ['scrape', 'search', 'template'],
-  article: ['scrape', 'search', 'template'],
+  product: ['scrape', 'favicon', 'template'],
+  article: ['scrape', 'favicon', 'template'],
   video: ['platform', 'scrape', 'template'],
-  music: ['platform', 'search', 'template'],
+  music: ['platform', 'scrape', 'template'],
   repository: ['platform', 'template'],
   social: ['platform', 'scrape', 'template'],
   document: ['template'],
   tool: ['scrape', 'favicon', 'template'],
-  unknown: ['scrape', 'search', 'template']
+  unknown: ['scrape', 'favicon', 'template']
 }
 
 serve(async (req) => {
@@ -36,7 +36,11 @@ serve(async (req) => {
   }
 
   try {
-    const { url, title, description, linkId, skipClassification, skipImage, enrichWatch, category } = await req.json()
+    const { url, title, description, linkId, skipClassification, skipImage,
+            skipIfHasImage, currentImage, forceRefresh, enrichWatch, category } = await req.json()
+
+    // Support skipIfHasImage: skip image resolution if client already has a valid image
+    const shouldSkipImage = skipImage || (skipIfHasImage && !!currentImage)
 
     if (!url) {
       return new Response(
@@ -54,7 +58,7 @@ serve(async (req) => {
     let typeConfidence = 0
     let typeSource: 'cache' | 'rules' | 'ai' = 'rules'
     let imageUrl: string | null = null
-    let imageSource: 'scraped' | 'platform' | 'searched' | 'generated' | 'template' = 'template'
+    let imageSource: 'scraped' | 'platform' | 'generated' | 'template' | 'favicon' = 'template'
     let imageScores: Record<string, any> | null = null
     let cached = false
 
@@ -99,48 +103,129 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 2: Image Resolution
+    // STEP 2: Image Resolution (with Tier 3 quality gate)
     // ========================================
-    if (!skipImage) {
+    const imageLog: Array<Record<string, any>> = []
+    let bestCandidate: { url: string, source: string, scores: Record<string, any> } | null = null
+
+    if (!shouldSkipImage) {
       console.log('[enrich-link] Step 2: Image resolution for type:', contentType)
 
       const strategies = IMAGE_STRATEGIES[contentType] || IMAGE_STRATEGIES.unknown
 
       for (const strategy of strategies) {
+        const attemptStart = Date.now()
         console.log('[enrich-link] Trying strategy:', strategy)
 
         try {
           const result = await executeImageStrategy(strategy, url, title, description)
-          if (result && result.url) {
-            // Tier 2 validation: check image loads, dimensions, format
-            console.log('[enrich-link] Validating image via Tier 2:', result.url)
-            const validation = await validateImageTier2(result.url)
-
-            if (!validation.pass) {
-              console.log('[enrich-link] Tier 2 rejected:', result.url, validation.reason, validation.checks.filter(c => !c.pass))
-              continue // Try next strategy
-            }
-
-            imageUrl = result.url
-            imageSource = result.source
-            imageScores = {
-              visual_quality: validation.scores.visual_quality,
-              distinctiveness: validation.scores.distinctiveness,
-              tier2_checks: validation.checks,
-              dimensions: validation.dimensions || null,
-              file_size: validation.fileSize || null,
-              content_type_header: validation.contentType || null,
-              evaluated_at: new Date().toISOString(),
-              evaluation_method: 'tier2_technical'
-            }
-            console.log('[enrich-link] Image validated via', strategy, ':', imageUrl,
-              validation.dimensions ? `${validation.dimensions.width}x${validation.dimensions.height}` : '')
-            break
+          if (!result || !result.url) {
+            imageLog.push({ strategy, result: 'no_image', duration_ms: Date.now() - attemptStart })
+            continue
           }
+
+          // Tier 2 validation: check image loads, dimensions, format
+          console.log('[enrich-link] Validating image via Tier 2:', result.url)
+          const validation = await validateImageTier2(result.url)
+
+          if (!validation.pass) {
+            console.log('[enrich-link] Tier 2 rejected:', result.url, validation.reason)
+            imageLog.push({
+              strategy, result: 'tier2_rejected', reason: validation.reason,
+              image_url: result.url, duration_ms: Date.now() - attemptStart,
+              tier2: { pass: false, checks: validation.checks?.filter((c: any) => !c.pass) }
+            })
+            continue
+          }
+
+          const tier2Scores = {
+            visual_quality: validation.scores.visual_quality,
+            distinctiveness: validation.scores.distinctiveness,
+            dimensions: validation.dimensions || null,
+            file_size: validation.fileSize || null,
+            content_type_header: validation.contentType || null
+          }
+
+          // Tier 3: AI vision quality gate
+          const tier3 = await evaluateImageQuality(result.url, title, category || contentType, contentType)
+
+          if (tier3 && tier3.tier === 'rejected') {
+            console.log('[enrich-link] Tier 3 rejected:', result.url, tier3.reason)
+            imageLog.push({
+              strategy, result: 'tier3_rejected', reason: tier3.reason,
+              image_url: result.url, duration_ms: Date.now() - attemptStart,
+              tier2: { pass: true, ...tier2Scores },
+              tier3: tier3.scores
+            })
+            continue
+          }
+
+          if (tier3 && tier3.tier === 'poor') {
+            console.log('[enrich-link] Tier 3 poor quality, saving as candidate:', result.url)
+            if (!bestCandidate) {
+              bestCandidate = {
+                url: result.url,
+                source: result.source,
+                scores: {
+                  ...tier2Scores,
+                  ...tier3.scores,
+                  evaluated_at: new Date().toISOString(),
+                  evaluation_method: 'tier3_ai_vision'
+                }
+              }
+            }
+            imageLog.push({
+              strategy, result: 'tier3_poor', reason: 'Poor quality, kept as candidate',
+              image_url: result.url, duration_ms: Date.now() - attemptStart,
+              tier2: { pass: true, ...tier2Scores },
+              tier3: tier3.scores
+            })
+            continue
+          }
+
+          // Good/excellent or Tier 3 unavailable (budget/error) — accept it
+          imageUrl = result.url
+          imageSource = result.source
+          imageScores = {
+            ...tier2Scores,
+            ...(tier3?.scores || {}),
+            evaluated_at: new Date().toISOString(),
+            evaluation_method: tier3 ? 'tier3_ai_vision' : 'tier2_technical',
+            tier2_checks: validation.checks
+          }
+          imageLog.push({
+            strategy, result: 'accepted',
+            image_url: result.url, duration_ms: Date.now() - attemptStart,
+            tier2: { pass: true, ...tier2Scores },
+            tier3: tier3?.scores || null,
+            tier: tier3?.tier || 'tier2_only'
+          })
+          console.log('[enrich-link] Image accepted via', strategy, ':', imageUrl,
+            tier3 ? `(tier: ${tier3.tier})` : '(tier2 only)',
+            validation.dimensions ? `${validation.dimensions.width}x${validation.dimensions.height}` : '')
+          break
         } catch (e) {
           console.error('[enrich-link] Strategy failed:', strategy, e)
+          imageLog.push({
+            strategy, result: 'error', reason: (e as Error).message,
+            duration_ms: Date.now() - attemptStart
+          })
         }
       }
+
+      // If no excellent/good image found, use best candidate (poor > nothing)
+      if (!imageUrl && bestCandidate) {
+        console.log('[enrich-link] Using best candidate (poor quality):', bestCandidate.url)
+        imageUrl = bestCandidate.url
+        imageSource = bestCandidate.source as any
+        imageScores = bestCandidate.scores
+        imageLog.push({
+          strategy: 'fallback_to_candidate', result: 'accepted_poor',
+          image_url: bestCandidate.url, reason: 'Best available from poor-quality candidates'
+        })
+      }
+    } else {
+      imageLog.push({ strategy: 'skipped', result: 'skip', reason: shouldSkipImage ? 'skipIfHasImage' : 'skipImage' })
     }
 
     // ========================================
@@ -222,6 +307,20 @@ serve(async (req) => {
         .eq('id', linkId)
     }
 
+    // Build image resolution log
+    const imageResolutionLog = {
+      resolved_at: new Date().toISOString(),
+      attempts: imageLog,
+      final_image: imageUrl,
+      final_source: imageUrl ? imageSource : null,
+      final_tier: imageScores?.tier || imageScores?.evaluation_method || null,
+      final_reason: imageUrl
+        ? `Accepted via ${imageSource}${imageScores?.tier ? ` (${imageScores.tier})` : ''}`
+        : (imageLog.length > 0
+          ? `All ${imageLog.length} strategies failed: ${imageLog.map(a => `${a.strategy}(${a.result})`).join(', ')}`
+          : 'Image resolution skipped')
+    }
+
     // Return result
     const response: Record<string, any> = {
       content_type: contentType,
@@ -230,6 +329,7 @@ serve(async (req) => {
       image_url: imageUrl,
       image_source: imageSource,
       image_scores: imageScores,
+      image_resolution_log: imageResolutionLog,
       cached
     }
     if (videoMeta) {
@@ -654,7 +754,7 @@ async function executeImageStrategy(
   url: string,
   title: string,
   description: string
-): Promise<{ url: string, source: 'scraped' | 'platform' | 'searched' | 'generated' | 'template' } | null> {
+): Promise<{ url: string, source: 'scraped' | 'platform' | 'generated' | 'template' | 'favicon' } | null> {
 
   switch (strategy) {
     case 'platform':
@@ -662,9 +762,6 @@ async function executeImageStrategy(
 
     case 'scrape':
       return await scrapeImage(url)
-
-    case 'search':
-      return await searchImage(title)
 
     case 'favicon':
       return await resolveFavicon(url)
@@ -806,9 +903,9 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
       return imgUrl
     }
 
-    // 1. Try og:image first
-    const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i)
-      || html.match(/<meta[^>]*content="([^"]+)"[^>]*property="og:image"/i)
+    // 1. Try og:image first (handle both single and double quotes)
+    const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i)
 
     if (ogMatch?.[1]) {
       const imageUrl = resolveUrl(ogMatch[1])
@@ -820,9 +917,9 @@ async function scrapeImage(url: string): Promise<{ url: string, source: 'scraped
       console.log('[scrape] Skipping og:image (likely logo):', imageUrl)
     }
 
-    // 2. Try twitter:image
-    const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]+)"/i)
-      || html.match(/<meta[^>]*content="([^"]+)"[^>]*name="twitter:image"/i)
+    // 2. Try twitter:image (handle both single and double quotes)
+    const twitterMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i)
 
     if (twitterMatch?.[1]) {
       const imageUrl = resolveUrl(twitterMatch[1])
@@ -1162,39 +1259,10 @@ function extractDimensions(bytes: Uint8Array, contentType: string): { width: num
 }
 
 // Search for image using Unsplash API
-async function searchImage(query: string): Promise<{ url: string, source: 'searched' } | null> {
-  const accessKey = Deno.env.get('UNSPLASH_ACCESS_KEY')
-
-  if (!accessKey || !query) return null
-
-  try {
-    const response = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1`,
-      {
-        headers: {
-          'Authorization': `Client-ID ${accessKey}`
-        }
-      }
-    )
-
-    if (!response.ok) return null
-
-    const data = await response.json()
-    if (data.results?.[0]?.urls?.regular) {
-      return {
-        url: data.results[0].urls.regular,
-        source: 'searched'
-      }
-    }
-  } catch (e) {
-    console.error('[search] Unsplash error:', e)
-  }
-
-  return null
-}
+// searchImage removed — Unsplash search strategy deprecated (no API key, generic results)
 
 // Get high-res favicon
-async function resolveFavicon(url: string): Promise<{ url: string, source: 'scraped' } | null> {
+async function resolveFavicon(url: string): Promise<{ url: string, source: 'favicon' } | null> {
   try {
     const domain = new URL(url).hostname
     // Use Google's favicon service for high-res icons
@@ -1203,11 +1271,301 @@ async function resolveFavicon(url: string): Promise<{ url: string, source: 'scra
     // Verify it exists
     const response = await fetch(faviconUrl, { method: 'HEAD' })
     if (response.ok) {
-      return { url: faviconUrl, source: 'scraped' }
+      return { url: faviconUrl, source: 'favicon' }
     }
   } catch (e) {
     console.error('[favicon] Error:', e)
   }
 
   return null
+}
+
+// ========================================
+// Tier 3: AI Vision Quality Gate
+// ========================================
+
+// Known-good sources skip AI evaluation entirely
+const KNOWN_GOOD_SOURCES = [
+  /img\.youtube\.com\/vi\//,
+  /i\.vimeocdn\.com\//,
+  /opengraph\.githubassets\.com\//,
+  /i\.scdn\.co\//,
+  /mosaic\.scdn\.co\//,
+  /image\.tmdb\.org\//,
+  /m\.media-amazon\.com\//,
+  /images-na\.ssl-images-amazon\.com\//
+]
+
+const TIER3_WEIGHTS = {
+  accuracy: 0.35,
+  visual_quality: 0.25,
+  aesthetic_fit: 0.20,
+  distinctiveness: 0.15,
+  safety: 0.05
+}
+
+function computeTier3Composite(scores: Record<string, number>): number {
+  if (scores.safety === 0) return 0
+  return (
+    (scores.accuracy || 0) * TIER3_WEIGHTS.accuracy +
+    (scores.visual_quality || 0) * TIER3_WEIGHTS.visual_quality +
+    (scores.aesthetic_fit || 0) * TIER3_WEIGHTS.aesthetic_fit +
+    (scores.distinctiveness || 0) * TIER3_WEIGHTS.distinctiveness +
+    (scores.safety || 1) * TIER3_WEIGHTS.safety
+  )
+}
+
+function getTier3Label(composite: number): string {
+  if (composite >= 0.85) return 'excellent'
+  if (composite >= 0.65) return 'good'
+  if (composite >= 0.40) return 'marginal'
+  if (composite >= 0.15) return 'poor'
+  return 'rejected'
+}
+
+interface Tier3Result {
+  scores: Record<string, any>
+  tier: string
+  safety_tier: string
+  reason?: string
+}
+
+async function evaluateImageQuality(
+  imageUrl: string,
+  title: string,
+  category: string,
+  contentType: string
+): Promise<Tier3Result | null> {
+  // Known-good sources get automatic high scores
+  if (KNOWN_GOOD_SOURCES.some(p => p.test(imageUrl))) {
+    console.log('[tier3] Known-good source, bypassing AI:', imageUrl)
+    const scores = {
+      accuracy: 0.9, visual_quality: 0.9, aesthetic_fit: 0.8,
+      distinctiveness: 1.0, safety: 1.0
+    }
+    const composite = computeTier3Composite(scores)
+    return {
+      scores: { ...scores, composite: Math.round(composite * 100) / 100, tier: getTier3Label(composite) },
+      tier: getTier3Label(composite),
+      safety_tier: 'safe'
+    }
+  }
+
+  // Budget check — share the daily budget with validate-image
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  const today = new Date().toISOString().split('T')[0]
+  try {
+    const { data } = await supabase
+      .from('image_validation_cache')
+      .select('scores')
+      .gte('evaluated_at', `${today}T00:00:00Z`)
+    const todayCount = data?.length || 0
+    const estimatedCostCents = todayCount * 0.1
+    if (estimatedCostCents >= 50) { // $0.50/day budget
+      console.log('[tier3] Daily budget exhausted, passing through')
+      return null // null = pass through (don't block)
+    }
+  } catch (e) {
+    console.log('[tier3] Budget check failed, passing through')
+    return null
+  }
+
+  // Check cache first
+  const urlHash = await hashImageUrl(imageUrl)
+  try {
+    const { data: cached } = await supabase
+      .from('image_validation_cache')
+      .select('*')
+      .eq('image_url_hash', urlHash)
+      .single()
+    if (cached && cached.scores) {
+      console.log('[tier3] Cache hit:', imageUrl)
+      return {
+        scores: cached.scores,
+        tier: cached.scores.tier || 'unknown',
+        safety_tier: cached.scores.safety_tier || 'safe'
+      }
+    }
+  } catch {
+    // No cache entry, continue to AI evaluation
+  }
+
+  // AI Vision evaluation
+  const prompt = `Evaluate this image for a pin titled "${title || 'Unknown'}" (category: ${category || 'unknown'}, type: ${contentType || 'unknown'}).
+
+Score each dimension from 0.0 to 1.0:
+
+1. accuracy: Does this image depict "${title || 'the content'}"? 1.0 = clearly shows the specific item/content. 0.0 = completely unrelated.
+
+2. aesthetic_fit: Is the image visually clean, high-contrast, and minimal? 1.0 = editorial quality, no text overlays or watermarks. 0.0 = heavy watermarks, all-text image, extreme visual clutter.
+
+3. distinctiveness: Is this a real, content-specific image (not a logo, favicon, stock placeholder, or generic site asset)? 1.0 = unique content image. 0.0 = logo/placeholder.
+
+4. safety: Content safety classification. Use one of:
+   - "safe": General content, no concerns
+   - "mature": Contains nudity, graphic language, drug references, or mature themes (ALLOWED — do not block)
+   - "blocked": Pornographic content (explicit sexual acts), child exploitation, or extreme gore (BLOCKED)
+   IMPORTANT: Artistic nudity, fashion photography, swimwear, and lingerie are "mature" NOT "blocked". Only classify as "blocked" for exploitative, illegal, or explicitly pornographic content.
+
+Respond with ONLY this JSON, no other text:
+{"accuracy": 0.0, "aesthetic_fit": 0.0, "distinctiveness": 0.0, "safety": "safe"}`
+
+  // Try Claude first, then OpenAI
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const openaiKey = Deno.env.get('OPENAI_API_KEY')
+
+  let aiResult: { scores: Record<string, number>, safety_tier: string, model: string, tokens_used: number } | null = null
+
+  if (anthropicKey) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'url', url: imageUrl } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const text = data.content?.[0]?.text || ''
+        const tokensUsed = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
+        aiResult = parseTier3Response(text, 'claude-sonnet-4-5-20250929', tokensUsed)
+      } else {
+        console.error('[tier3] Claude API error:', response.status)
+      }
+    } catch (e) {
+      console.error('[tier3] Claude evaluation error:', e)
+    }
+  }
+
+  if (!aiResult && openaiKey) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const text = data.choices?.[0]?.message?.content || ''
+        const tokensUsed = (data.usage?.prompt_tokens || 0) + (data.usage?.completion_tokens || 0)
+        aiResult = parseTier3Response(text, 'gpt-4o-mini', tokensUsed)
+      } else {
+        console.error('[tier3] OpenAI API error:', response.status)
+      }
+    } catch (e) {
+      console.error('[tier3] OpenAI evaluation error:', e)
+    }
+  }
+
+  if (!aiResult) {
+    console.log('[tier3] No AI result available, passing through')
+    return null
+  }
+
+  // Compute composite and tier
+  const composite = computeTier3Composite(aiResult.scores)
+  const tier = getTier3Label(composite)
+  const fullScores = {
+    ...aiResult.scores,
+    composite: Math.round(composite * 100) / 100,
+    tier,
+    safety_tier: aiResult.safety_tier,
+    evaluated_at: new Date().toISOString(),
+    evaluation_method: 'tier3_ai_vision',
+    evaluation_model: aiResult.model
+  }
+
+  // Cache the result
+  try {
+    await supabase
+      .from('image_validation_cache')
+      .upsert({
+        image_url_hash: urlHash,
+        image_url: imageUrl,
+        scores: fullScores,
+        evaluated_at: new Date().toISOString(),
+        ttl_days: 30,
+        source_domain: new URL(imageUrl).hostname.replace('www.', ''),
+        content_type: contentType || null
+      })
+  } catch (e) {
+    console.error('[tier3] Cache write error:', e)
+  }
+
+  console.log('[tier3] Evaluated:', imageUrl, '→', tier, `(${composite.toFixed(2)})`)
+
+  return {
+    scores: fullScores,
+    tier,
+    safety_tier: aiResult.safety_tier,
+    reason: tier === 'rejected' || tier === 'poor'
+      ? `${tier}: accuracy=${aiResult.scores.accuracy}, aesthetic_fit=${aiResult.scores.aesthetic_fit}, distinctiveness=${aiResult.scores.distinctiveness}`
+      : undefined
+  }
+}
+
+function parseTier3Response(text: string, model: string, tokensUsed: number) {
+  try {
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return null
+
+    const parsed = JSON.parse(match[0])
+    const safetyTier = ['safe', 'mature', 'blocked'].includes(parsed.safety) ? parsed.safety : 'safe'
+    const safetyScore = safetyTier === 'blocked' ? 0 : 1
+    const clamp = (v: number) => Math.max(0, Math.min(1, Number(v) || 0))
+
+    return {
+      scores: {
+        accuracy: clamp(parsed.accuracy),
+        visual_quality: 0.9, // Tier 2 already validated
+        aesthetic_fit: clamp(parsed.aesthetic_fit),
+        distinctiveness: clamp(parsed.distinctiveness),
+        safety: safetyScore
+      },
+      safety_tier: safetyTier,
+      model,
+      tokens_used: tokensUsed
+    }
+  } catch {
+    return null
+  }
+}
+
+async function hashImageUrl(url: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(url.toLowerCase().trim())
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
