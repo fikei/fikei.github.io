@@ -9048,14 +9048,19 @@ Return JSON:
             creator: existing.creator || result.video.creator || null,
             rating: existing.rating || result.video.rating || null,
             runtime: result.video.runtime || existing.runtime || null,
-            // Preserve client-side fields
-            title: existing.title || null,
+            // Title: prefer TMDB canonical title, then existing client-extracted title
+            title: result.video.title || existing.title || null,
             platform: existing.platform || null,
             platformId: existing.platformId || null,
             contentFormat: existing.contentFormat || null,
             seriesInfo: existing.seriesInfo || null
           };
           console.log('%c[ENRICH] Video metadata merged:', 'color: #E50914', link.video);
+
+          // Update top-level link title with clean TMDB title (removes "- Wikipedia" etc.)
+          if (link.video.title) {
+            link.title = link.video.title;
+          }
 
           // Use TMDB poster for watch items — always prefer it over scraped OG images
           if (link.video.posterPath) {
