@@ -4875,6 +4875,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+  const GETSONGBPM_API_KEY = '2309ca61f21b623b59ee2f734e67a456';
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       detectSessionInUrl: true,
@@ -8113,6 +8114,29 @@ Return JSON:
   // Fields: artist, trackTitle, albumTitle, genre, duration, bpm,
   //         releaseDate, contentFormat, platformId, isExplicit, key, label
   // musicTags: optional og:music tags already scraped by fetchMetadata (avoids re-fetching)
+
+  // Client-side BPM/Key lookup via GetSongBPM
+  // Called from browser to bypass Cloudflare bot protection that blocks server-side
+  async function queryGetSongBPM(artist, track) {
+    if (!GETSONGBPM_API_KEY) return null;
+    try {
+      const query = encodeURIComponent(artist + ' ' + track);
+      const url = 'https://api.getsongbpm.com/search/?api_key=' + GETSONGBPM_API_KEY + '&type=both&lookup=' + query;
+      const resp = await fetch(url);
+      if (!resp.ok) { console.warn('[getsongbpm] HTTP', resp.status); return null; }
+      const data = await resp.json();
+      if (!data.search || !data.search.length) { console.log('[getsongbpm] No results'); return null; }
+      const hit = data.search[0];
+      return {
+        bpm: hit.tempo ? parseInt(hit.tempo, 10) : null,
+        key: hit.key_of || hit.song_key || null
+      };
+    } catch (e) {
+      console.warn('[getsongbpm] Error:', e.message);
+      return null;
+    }
+  }
+
   async function extractMusicMetadata(url, title, description, musicTags) {
     const meta = {
       artist: null,
@@ -8264,25 +8288,42 @@ Return JSON:
 
       console.log('%c[music-meta] Extracted:', 'color: #1DB954', meta);
 
-      // ── Step 6: Server-side enrichment for BPM, key, genre, label ──
-      if (meta.artist && meta.trackTitle && (!meta.bpm || !meta.key)) {
-        try {
-          const enrichResp = await fetch(`${SUPABASE_URL}/functions/v1/enrich-music`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ artist: meta.artist, track: meta.trackTitle, album: meta.albumTitle })
-          });
-          if (enrichResp.ok) {
-            const ed = await enrichResp.json();
-            console.log('%c[music-meta] Enriched:', 'color: #1DB954', ed);
-            if (ed.bpm) meta.bpm = ed.bpm;
-            if (ed.key) meta.key = ed.key;
-            if (ed.genre && !meta.genre) meta.genre = ed.genre;
-            if (ed.label) meta.label = ed.label;
-            if (ed.releaseDate && !meta.releaseDate) meta.releaseDate = ed.releaseDate;
+      // Step 6: Enrichment for genre, label, BPM, key
+      if (meta.artist && meta.trackTitle) {
+        // 6a: Server-side enrichment (genre, label, album via MusicBrainz + Last.fm)
+        if (!meta.genre || !meta.label) {
+          try {
+            const enrichResp = await fetch(`${SUPABASE_URL}/functions/v1/enrich-music`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ artist: meta.artist, track: meta.trackTitle, album: meta.albumTitle })
+            });
+            if (enrichResp.ok) {
+              const ed = await enrichResp.json();
+              console.log('%c[music-meta] Server enriched:', 'color: #1DB954', ed);
+              if (ed.genre && !meta.genre) meta.genre = ed.genre;
+              if (ed.genreTags) meta.genreTags = ed.genreTags;
+              if (ed.label) meta.label = ed.label;
+              if (ed.album && !meta.albumTitle) meta.albumTitle = ed.album;
+              if (ed.releaseDate && !meta.releaseDate) meta.releaseDate = ed.releaseDate;
+            }
+          } catch (enrichErr) {
+            console.warn('[music-meta] Server enrichment failed:', enrichErr.message);
           }
-        } catch (enrichErr) {
-          console.warn('[music-meta] Server enrichment failed:', enrichErr.message);
+        }
+
+        // 6b: Client-side BPM/key via GetSongBPM (browser bypasses Cloudflare bot protection)
+        if (!meta.bpm || !meta.key) {
+          try {
+            const bpmData = await queryGetSongBPM(meta.artist, meta.trackTitle);
+            if (bpmData) {
+              console.log('%c[music-meta] BPM data:', 'color: #1DB954', bpmData);
+              if (bpmData.bpm && !meta.bpm) meta.bpm = bpmData.bpm;
+              if (bpmData.key && !meta.key) meta.key = bpmData.key;
+            }
+          } catch (bpmErr) {
+            console.warn('[music-meta] BPM lookup failed:', bpmErr.message);
+          }
         }
       }
     } catch (e) {
@@ -9685,11 +9726,11 @@ Return JSON:
   }
 
   // ============================================
-  // Migration v2: Enrich listen links with music metadata
+  // Migration v4: Enrich listen links with music metadata + client-side BPM
   // ============================================
   // Backfills .music property on listen links that were migrated
   // before extractMusicMetadata existed.
-  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v3';
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v4';
 
   async function enrichListenLinks() {
     if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
@@ -9699,7 +9740,7 @@ Return JSON:
     const needsEnrich = allLinks.filter(l => {
       if (l.category !== 'listen') return false;
       if (!l.music || !l.music.artist) return true;  // Missing basic metadata
-      if (l.music.artist && l.music.trackTitle && (!l.music.bpm || !l.music.key)) return true;  // Missing extended metadata
+      if (l.music.artist && l.music.trackTitle && (!l.music.bpm || !l.music.key || !l.music.genre || !l.music.label)) return true;  // Missing extended metadata
       return false;
     });
     if (needsEnrich.length === 0) {
@@ -9719,8 +9760,8 @@ Return JSON:
         }
         if (!music || !music.artist || !music.trackTitle) continue;
 
-        // Step 2: Call enrich-music for BPM/key/genre/label
-        if (!music.bpm || !music.key) {
+        // Step 2: Server enrichment for genre/label (MusicBrainz + Last.fm)
+        if (!music.genre || !music.label) {
           try {
             const resp = await fetch(`${SUPABASE_URL}/functions/v1/enrich-music`, {
               method: 'POST',
@@ -9729,16 +9770,29 @@ Return JSON:
             });
             if (resp.ok) {
               const ed = await resp.json();
-              if (ed.bpm) music.bpm = ed.bpm;
-              if (ed.key) music.key = ed.key;
               if (ed.genre && !music.genre) music.genre = ed.genre;
+              if (ed.genreTags) music.genreTags = ed.genreTags;
               if (ed.label) music.label = ed.label;
+              if (ed.album && !music.albumTitle) music.albumTitle = ed.album;
               if (ed.releaseDate && !music.releaseDate) music.releaseDate = ed.releaseDate;
             }
           } catch (e) {
             console.warn(`[enrich-listen] Server enrichment failed for ${link.domain}:`, e.message);
           }
-          // Rate limit: 250ms between calls
+          await new Promise(r => setTimeout(r, 250));
+        }
+
+        // Step 3: Client-side BPM/key via GetSongBPM (browser bypasses Cloudflare)
+        if (!music.bpm || !music.key) {
+          try {
+            const bpmData = await queryGetSongBPM(music.artist, music.trackTitle);
+            if (bpmData) {
+              if (bpmData.bpm && !music.bpm) music.bpm = bpmData.bpm;
+              if (bpmData.key && !music.key) music.key = bpmData.key;
+            }
+          } catch (e) {
+            console.warn(`[enrich-listen] BPM lookup failed for ${link.domain}:`, e.message);
+          }
           await new Promise(r => setTimeout(r, 250));
         }
 
