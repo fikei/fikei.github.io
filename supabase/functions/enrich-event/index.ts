@@ -38,6 +38,13 @@ const ALLOWED_DOMAINS = [
   'songkick.com',
   'garysguide.com',
   'bonobonetwork.com',
+  'hyperallergic.com',
+  'sfmoma.org',
+  'famsf.org',
+  'sfdesignweek.org',
+  'citylights.com',
+  'sfpl.org',
+  'commonwealthclub.org',
 ]
 
 function isDomainAllowed(url: string): boolean {
@@ -60,7 +67,7 @@ interface EnrichResult {
   error?: string
 }
 
-const VALID_CONTENT_TYPES = ['music', 'dj-set', 'live-music', 'festival', 'film', 'comedy', 'theater', 'other']
+const VALID_CONTENT_TYPES = ['music', 'dj-set', 'live-music', 'festival', 'film', 'comedy', 'theater', 'tech', 'social', 'art', 'design', 'literary', 'wellness', 'other']
 
 async function fetchPage(url: string): Promise<string | null> {
   try {

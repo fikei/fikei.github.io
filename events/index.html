@@ -447,6 +447,65 @@ body {
   margin: var(--space-4) 0;
 }
 
+/* Interest grid (onboarding step 2) */
+.interest-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+@media (min-width: 480px) {
+  .interest-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 720px) {
+  .interest-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.interest-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4) var(--space-3);
+  background: transparent;
+  border: var(--border-thin) solid var(--border-subtle);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-default);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  text-align: center;
+  line-height: var(--leading-tight);
+  min-height: 56px;
+}
+
+.interest-card:hover {
+  border-color: var(--border);
+  color: var(--fg);
+  background: var(--bg-surface);
+}
+
+.interest-card.active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.onboarding__step-nav {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-5);
+}
+
+.onboarding__step-count {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+}
+
 .onboarding__actions {
   display: flex;
   gap: var(--space-3);
@@ -1122,39 +1181,79 @@ body {
   <div class="container">
     <p class="page-description">Aggregated events from multiple sources. Location data extracted into address and city columns for filtering.</p>
 
-    <!-- Onboarding (first visit) -->
+    <!-- Onboarding (first visit) — 3-step flow -->
     <div id="onboarding" style="display:none">
       <div class="onboarding">
-        <h2 class="onboarding__title">Choose Sources</h2>
-        <p class="onboarding__desc">Pick the event feeds you want to follow. You can always add or remove sources later.</p>
 
-        <div class="onboarding__step">
-          <div class="onboarding__step-label">Your region</div>
-          <div class="onboarding__regions" id="onboardingRegions"></div>
-          <div id="regionError" style="display: none; font-size: var(--text-xs); color: var(--fg-subtle); margin-top: var(--space-2); padding: var(--space-2); border: var(--border-thin) solid var(--border-subtle);">
-            We currently only support the Bay Area. More regions coming soon.
+        <!-- Step 1: Region -->
+        <div id="onboardingStep1">
+          <h2 class="onboarding__title">Where are you?</h2>
+          <p class="onboarding__desc">We'll show event sources for your region.</p>
+          <div class="onboarding__step">
+            <div class="onboarding__step-label">Your region</div>
+            <div class="onboarding__regions" id="onboardingRegions"></div>
+            <div id="regionError" style="display: none; font-size: var(--text-xs); color: var(--fg-subtle); margin-top: var(--space-2); padding: var(--space-2); border: var(--border-thin) solid var(--border-subtle);">
+              We currently only support the Bay Area. More regions coming soon.
+            </div>
+          </div>
+          <div class="onboarding__step-nav">
+            <span></span>
+            <button class="btn btn--filled" id="onboardingToStep2">Continue</button>
           </div>
         </div>
 
-        <div class="onboarding__sources" id="onboardingSources">
-          <div class="onboarding__step-label">Available sources</div>
-          <div id="onboardingList"></div>
-        </div>
-
-        <div class="onboarding__or">or</div>
-
-        <div class="onboarding__step">
-          <div class="onboarding__step-label">Add your own</div>
-          <div style="display: flex; gap: var(--space-2);">
-            <input type="text" class="input" id="onboardingCustomUrl" placeholder="https://..." style="flex:1;">
-            <button class="btn btn--ghost btn--sm" id="onboardingCustomAdd">Add</button>
+        <!-- Step 2: Interests -->
+        <div id="onboardingStep2" style="display:none">
+          <h2 class="onboarding__title">What are you into?</h2>
+          <p class="onboarding__desc">Pick your interests and we'll suggest the best sources for you.</p>
+          <div class="onboarding__step">
+            <div class="interest-grid" id="interestGrid"></div>
+          </div>
+          <div class="onboarding__step-nav">
+            <button class="btn btn--ghost btn--sm" id="onboardingBackTo1">Back</button>
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+              <button class="btn btn--ghost btn--sm" id="onboardingBrowseAll">Browse all sources</button>
+              <button class="btn btn--filled" id="onboardingToStep3" disabled>Continue <span class="onboarding__step-count" id="interestCount">(0)</span></button>
+            </div>
           </div>
         </div>
 
-        <div class="onboarding__actions">
-          <button class="btn btn--ghost" id="onboardingSkip">Skip</button>
-          <button class="btn btn--filled" id="onboardingStart">Get Started</button>
+        <!-- Step 3: Review Sources -->
+        <div id="onboardingStep3" style="display:none">
+          <h2 class="onboarding__title">Your Sources</h2>
+          <p class="onboarding__desc">We've picked sources based on your interests. Toggle to customize.</p>
+
+          <div class="onboarding__sources onboarding__sources--visible" id="onboardingSources">
+            <div class="onboarding__step-label">Recommended</div>
+            <div id="onboardingList"></div>
+          </div>
+
+          <details style="margin-top: var(--space-4);">
+            <summary style="cursor: pointer; color: var(--fg-muted); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-wider);">
+              All sources <span id="allSourcesCount"></span>
+            </summary>
+            <div id="onboardingAllList" style="margin-top: var(--space-2);"></div>
+          </details>
+
+          <div class="onboarding__or">or</div>
+
+          <div class="onboarding__step">
+            <div class="onboarding__step-label">Add your own</div>
+            <div style="display: flex; gap: var(--space-2);">
+              <input type="text" class="input" id="onboardingCustomUrl" placeholder="https://..." style="flex:1;">
+              <button class="btn btn--ghost btn--sm" id="onboardingCustomAdd">Add</button>
+            </div>
+          </div>
+
+          <div class="onboarding__step-nav">
+            <button class="btn btn--ghost btn--sm" id="onboardingBackTo2">Back</button>
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+              <button class="btn btn--ghost" id="onboardingSkip">Skip</button>
+              <button class="btn btn--filled" id="onboardingStart">Get Started</button>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -1325,6 +1424,13 @@ body {
 
       <div style="font-size: var(--text-2xs); color: var(--fg-subtle); text-align: center; text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: var(--space-3) 0;">add more</div>
 
+      <!-- Pin-based suggestions (logged-in users) -->
+      <div class="form-group" id="suggestedSourcesGroup" style="display:none;">
+        <label class="form-label">Suggested for you <span style="font-weight: normal; color: var(--fg-subtle);">based on your boards</span></label>
+        <div id="suggestedSourcesList" style="max-height: 180px; overflow-y: auto; border: 1px dashed var(--border-subtle); background: var(--bg-surface);"></div>
+        <button class="btn btn--ghost btn--sm" id="addSuggestedBtn" style="margin-top: var(--space-2); width: 100%;">Add all suggested</button>
+      </div>
+
       <!-- Stock sources not yet added -->
       <div class="form-group" id="stockSourcesGroup">
         <label class="form-label">Available Sources</label>
@@ -1485,6 +1591,17 @@ body {
     // Bay Area — Tech & Networking
     { id: 'garysguide-sf', name: "Gary's Guide SF", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=sf', region: 'bay-area', description: 'Tech & startup events' },
     { id: 'bonobo-sf', name: 'Bonobo Network', category: 'social', type: 'bonobo', url: 'https://www.bonobonetwork.com/events', region: 'bay-area', description: 'Social & community events' },
+    // Bay Area — Art
+    { id: 'hyperallergic-sf', name: 'Hyperallergic', category: 'art', type: 'rss', url: 'https://hyperallergic.com/feed/', region: 'bay-area', description: 'Art criticism, gallery openings & exhibitions' },
+    { id: 'sfmoma-events', name: 'SFMOMA', category: 'art', type: 'json', url: 'https://www.sfmoma.org/wp-json/wp/v2/event-series?per_page=20&_fields=title,link,date,excerpt', region: 'bay-area', description: 'Museum events & artist talks' },
+    { id: 'sfmoma-exhibitions', name: 'SFMOMA Exhibitions', category: 'art', type: 'json', url: 'https://www.sfmoma.org/wp-json/wp/v2/exhibition?per_page=20&_fields=title,link,date,excerpt', region: 'bay-area', description: 'Current & upcoming exhibitions' },
+    { id: 'famsf-events', name: 'de Young / Legion of Honor', category: 'art', type: 'html', url: 'https://www.famsf.org/calendar', region: 'bay-area', description: 'Fine arts museum events' },
+    // Bay Area — Design
+    { id: 'sfdesignweek', name: 'SF Design Week', category: 'design', type: 'html', url: 'https://www.sfdesignweek.org/events', region: 'bay-area', description: 'Design talks, workshops & exhibitions' },
+    // Bay Area — Literary
+    { id: 'citylights-sf', name: 'City Lights Books', category: 'literary', type: 'html', url: 'https://citylights.com/events/', region: 'bay-area', description: 'Author readings & poetry events' },
+    { id: 'sfpl-events', name: 'SF Public Library', category: 'literary', type: 'html', url: 'https://sfpl.org/events', region: 'bay-area', description: 'Library programs & author talks' },
+    { id: 'commonwealthclub-sf', name: 'Commonwealth Club', category: 'literary', type: 'html', url: 'https://www.commonwealthclub.org/events', region: 'bay-area', description: 'Speaker events & public affairs' },
     // New York — Tech & Networking
     { id: 'garysguide-nyc', name: "Gary's Guide NYC", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=nyc', region: 'new-york', description: 'Tech & startup events' },
   ];
@@ -1499,6 +1616,10 @@ body {
     'theater': 'Theater',
     'tech': 'Tech',
     'social': 'Social',
+    'art': 'Art',
+    'design': 'Design',
+    'literary': 'Literary',
+    'wellness': 'Wellness',
     'other': 'Other',
   };
 
@@ -1725,6 +1846,10 @@ body {
     if (/\b(screening|film|movie|cinema|double.feature)\b/.test(text)) return 'film';
     if (/\b(theater|theatre|play|musical|opera|ballet)\b/.test(text)) return 'theater';
     if (/\b(tech|startup|hack|ai\b|ml\b|demo\s*day|pitch|saas|devops|blockchain|web3|crypto|meetup|networking|workshop)\b/i.test(text)) return 'tech';
+    if (/\b(gallery|exhibition|art\s*walk|opening\s*reception|museum|installation|sculpture|mural|vernissage)\b/i.test(text)) return 'art';
+    if (/\b(design|architecture|ux\b|creative\s*direction|portfolio|typography|graphic\s*design)\b/i.test(text)) return 'design';
+    if (/\b(reading|author|book\s*launch|poetry|literary|zine|book\s*signing|bookstore|lecture|speaker)\b/i.test(text)) return 'literary';
+    if (/\b(yoga|meditation|wellness|mindfulness|breathwork|healing|sound\s*bath)\b/i.test(text)) return 'wellness';
     if (/\b(social|mixer|happy\s*hour|brunch|picnic|party|gathering|community)\b/i.test(text) && cat === 'social') return 'social';
     return cat || 'other';
   }
@@ -3980,6 +4105,161 @@ body {
     return true;
   }
 
+  // --- Pin-Based Source Suggestions ---
+  const PIN_SIGNAL_MAP = {
+    music: {
+      domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'apple.com/music', 'tidal.com', 'audiomack.com'],
+      categories: ['listen'],
+      contentTypes: ['music'],
+    },
+    film: {
+      domains: ['imdb.com', 'letterboxd.com', 'mubi.com', 'criterion.com', 'netflix.com', 'hulu.com'],
+      categories: ['watch'],
+      contentTypes: ['video'],
+    },
+    tech: {
+      domains: ['github.com', 'gitlab.com', 'stackoverflow.com', 'hackernews.com', 'producthunt.com', 'techcrunch.com'],
+      categories: [],
+      contentTypes: ['repository'],
+    },
+    art: {
+      domains: ['dribbble.com', 'behance.net', 'artsy.net', 'artforum.com', 'contemporaryartdaily.com', 'etsy.com'],
+      categories: [],
+      contentTypes: [],
+    },
+    design: {
+      domains: ['figma.com', 'dribbble.com', 'behance.net', 'designmilk.com', 'dezeen.com', 'archdaily.com'],
+      categories: [],
+      contentTypes: [],
+    },
+    literary: {
+      domains: ['medium.com', 'substack.com', 'longreads.com', 'goodreads.com', 'lithub.com', 'theparisreview.org'],
+      categories: [],
+      contentTypes: ['article'],
+    },
+    comedy: {
+      domains: [],
+      categories: [],
+      contentTypes: [],
+    },
+    social: {
+      domains: [],
+      categories: [],
+      contentTypes: ['social'],
+    },
+  };
+
+  // Maps interest → relevant source ID patterns for the region
+  const SUGGESTION_SOURCE_MAP = {
+    music: ['19hz', 'ra-'],
+    film: ['screenslate', 'roxie'],
+    tech: ['garysguide'],
+    art: ['hyperallergic', 'sfmoma', 'famsf'],
+    design: ['sfdesignweek'],
+    literary: ['citylights', 'sfpl', 'commonwealthclub'],
+    comedy: ['punchline', 'cobbs'],
+    social: ['bonobo'],
+  };
+
+  async function analyzeBoardPinsForSuggestions() {
+    if (!supabaseClient || !currentUser) return null;
+    try {
+      const { data: pins, error } = await supabaseClient
+        .from('links')
+        .select('domain, category, content_type, created_at')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error || !pins || pins.length === 0) return null;
+
+      const now = Date.now();
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      const signals = {};
+      Object.keys(PIN_SIGNAL_MAP).forEach(k => { signals[k] = 0; });
+
+      pins.forEach(pin => {
+        const weight = (new Date(pin.created_at).getTime() > now - thirtyDays) ? 2 : 1;
+        const domain = (pin.domain || '').toLowerCase();
+
+        Object.entries(PIN_SIGNAL_MAP).forEach(([interest, rules]) => {
+          if (rules.domains.some(d => domain.includes(d))) signals[interest] += weight;
+          if (rules.categories.includes(pin.category)) signals[interest] += weight;
+          if (rules.contentTypes.includes(pin.content_type)) signals[interest] += weight;
+        });
+      });
+
+      const suggestions = {};
+      Object.entries(signals).forEach(([interest, score]) => {
+        if (score >= 3) {
+          suggestions[interest] = { score, label: INTEREST_OPTIONS.find(o => o.id === interest)?.label || interest };
+        }
+      });
+
+      return Object.keys(suggestions).length > 0 ? { suggestions, totalPins: pins.length } : null;
+    } catch (err) {
+      log('Pin analysis failed: ' + err.message);
+      return null;
+    }
+  }
+
+  async function renderSuggestedSources() {
+    const group = document.getElementById('suggestedSourcesGroup');
+    const list = document.getElementById('suggestedSourcesList');
+    const addBtn = document.getElementById('addSuggestedBtn');
+
+    const analysis = await analyzeBoardPinsForSuggestions();
+    if (!analysis) { group.style.display = 'none'; return; }
+
+    const region = localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area';
+    const existingIds = new Set(state.sources.map(s => s.id));
+    const suggested = [];
+
+    Object.entries(analysis.suggestions)
+      .sort(([, a], [, b]) => b.score - a.score)
+      .forEach(([interest, info]) => {
+        const patterns = SUGGESTION_SOURCE_MAP[interest] || [];
+        STOCK_SOURCES.forEach(source => {
+          if (source.region !== region) return;
+          if (existingIds.has(source.id)) return;
+          if (suggested.find(s => s.id === source.id)) return;
+          if (patterns.some(p => source.id.includes(p))) {
+            suggested.push({ ...source, reason: info.label });
+          }
+        });
+      });
+
+    if (suggested.length === 0) { group.style.display = 'none'; return; }
+
+    group.style.display = '';
+    list.innerHTML = suggested.map(s => {
+      const catLabel = CONTENT_TYPES[s.category] || s.category;
+      return `<label class="onboarding__source" style="padding: var(--space-2) var(--space-3);">
+        <input type="checkbox" value="${escHtml(s.id)}" class="suggested-source-cb" checked>
+        <div class="onboarding__source-info">
+          <span class="onboarding__source-name" style="font-size: var(--text-xs);">${escHtml(s.name)}</span>
+          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
+          <span style="font-size: var(--text-2xs); color: var(--fg-muted);">${escHtml(s.reason)}</span>
+        </div>
+      </label>`;
+    }).join('');
+
+    addBtn.onclick = () => {
+      const checked = Array.from(list.querySelectorAll('.suggested-source-cb:checked')).map(cb => cb.value);
+      checked.forEach(id => {
+        const stock = STOCK_SOURCES.find(s => s.id === id);
+        if (stock && !state.sources.some(s => s.id === id)) {
+          state.sources.push({ ...stock, enabled: true });
+        }
+      });
+      saveSources();
+      renderActiveSourcesList();
+      renderStockSourcesList();
+      renderSuggestedSources();
+      renderSourceChips();
+      fetchAllSources();
+    };
+  }
+
   function getSortedEvents(events) {
     const { key, dir } = state.sort;
     return [...events].sort((a, b) => {
@@ -4068,6 +4348,7 @@ body {
     document.getElementById('addSourceBtn').addEventListener('click', () => {
       modal.classList.add('modal--visible');
       renderActiveSourcesList();
+      renderSuggestedSources();
       switchSourceTab('url');
       document.getElementById('sourceName').value = '';
       document.getElementById('sourceUrl').value = '';
@@ -4262,7 +4543,7 @@ body {
     });
     document.getElementById('authLogout').addEventListener('click', handleLogout);
 
-    // Onboarding
+    // Onboarding — 3-step flow
     document.getElementById('onboardingStart').addEventListener('click', completeOnboarding);
     document.getElementById('onboardingSkip').addEventListener('click', () => {
       state.sources = [{ ...STOCK_SOURCES.find(s => s.id === '19hz-bayarea'), enabled: true }];
@@ -4272,6 +4553,30 @@ body {
       document.getElementById('onboarding').style.display = 'none';
       document.getElementById('eventsContent').style.display = '';
       fetchAllSources();
+    });
+    document.getElementById('onboardingToStep2').addEventListener('click', () => {
+      document.getElementById('onboardingStep1').style.display = 'none';
+      document.getElementById('onboardingStep2').style.display = '';
+      renderInterestGrid();
+    });
+    document.getElementById('onboardingBackTo1').addEventListener('click', () => {
+      document.getElementById('onboardingStep2').style.display = 'none';
+      document.getElementById('onboardingStep1').style.display = '';
+    });
+    document.getElementById('onboardingToStep3').addEventListener('click', () => {
+      document.getElementById('onboardingStep2').style.display = 'none';
+      document.getElementById('onboardingStep3').style.display = '';
+      renderOnboardingSources();
+    });
+    document.getElementById('onboardingBackTo2').addEventListener('click', () => {
+      document.getElementById('onboardingStep3').style.display = 'none';
+      document.getElementById('onboardingStep2').style.display = '';
+    });
+    document.getElementById('onboardingBrowseAll').addEventListener('click', () => {
+      onboardingSelectedInterests = [];
+      document.getElementById('onboardingStep2').style.display = 'none';
+      document.getElementById('onboardingStep3').style.display = '';
+      renderOnboardingSources();
     });
 
     // Keyboard shortcuts
@@ -4285,10 +4590,21 @@ body {
     });
   }
 
-  // --- Onboarding ---
-  // --- Onboarding ---
+  // --- Onboarding (3-step: region → interests → sources) ---
   let onboardingSelectedRegion = '';
+  let onboardingSelectedInterests = [];
   let onboardingCustomSources = [];
+
+  // Interest categories — map user-facing interest to source categories
+  const INTEREST_OPTIONS = [
+    { id: 'music', label: 'Live Music', categories: ['music'] },
+    { id: 'film', label: 'Film & Cinema', categories: ['film'] },
+    { id: 'tech', label: 'Tech & Startups', categories: ['tech'] },
+    { id: 'art', label: 'Art & Design', categories: ['art', 'design'] },
+    { id: 'comedy', label: 'Comedy', categories: ['comedy'] },
+    { id: 'literary', label: 'Books & Writing', categories: ['literary'] },
+    { id: 'social', label: 'Social', categories: ['social'] },
+  ];
 
   function showOnboarding() {
     const container = document.getElementById('onboarding');
@@ -4312,11 +4628,9 @@ body {
         onboardingSelectedRegion = btn.dataset.region;
         regionsEl.querySelectorAll('.onboarding__region').forEach(b => b.classList.toggle('active', b === btn));
         document.getElementById('regionError').style.display = 'none';
-        renderOnboardingSources();
       });
     });
 
-    // Show error message when unavailable region is clicked
     regionsEl.querySelectorAll('.onboarding__region--disabled').forEach(btn => {
       btn.addEventListener('click', () => {
         document.getElementById('regionError').style.display = '';
@@ -4328,9 +4642,53 @@ body {
     document.getElementById('onboardingCustomUrl').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addOnboardingCustom(); }
     });
+  }
 
-    // Show Bay Area sources immediately
-    renderOnboardingSources();
+  function renderInterestGrid() {
+    const grid = document.getElementById('interestGrid');
+    // Only show interests that have sources in the selected region
+    const regionSources = STOCK_SOURCES.filter(s => s.region === onboardingSelectedRegion);
+    const availableCats = new Set(regionSources.map(s => s.category));
+
+    grid.innerHTML = INTEREST_OPTIONS
+      .filter(opt => opt.categories.some(c => availableCats.has(c)))
+      .map(opt => {
+        const count = regionSources.filter(s => opt.categories.includes(s.category)).length;
+        const isActive = onboardingSelectedInterests.includes(opt.id);
+        return `<button class="interest-card${isActive ? ' active' : ''}" data-interest="${escHtml(opt.id)}">
+          ${escHtml(opt.label)}
+          <span style="font-size: var(--text-2xs); opacity: 0.5; margin-left: var(--space-1);">${count}</span>
+        </button>`;
+      }).join('');
+
+    grid.querySelectorAll('.interest-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const interest = card.dataset.interest;
+        const idx = onboardingSelectedInterests.indexOf(interest);
+        if (idx >= 0) onboardingSelectedInterests.splice(idx, 1);
+        else onboardingSelectedInterests.push(interest);
+        card.classList.toggle('active', onboardingSelectedInterests.includes(interest));
+        updateInterestCount();
+      });
+    });
+    updateInterestCount();
+  }
+
+  function updateInterestCount() {
+    const btn = document.getElementById('onboardingToStep3');
+    const count = document.getElementById('interestCount');
+    const n = onboardingSelectedInterests.length;
+    count.textContent = `(${n})`;
+    btn.disabled = n === 0;
+  }
+
+  function getSourcesForInterests(interests, region) {
+    const relevantCats = new Set();
+    interests.forEach(interest => {
+      const opt = INTEREST_OPTIONS.find(o => o.id === interest);
+      if (opt) opt.categories.forEach(c => relevantCats.add(c));
+    });
+    return STOCK_SOURCES.filter(s => s.region === region && relevantCats.has(s.category));
   }
 
   function addOnboardingCustom() {
@@ -4346,33 +4704,53 @@ body {
   }
 
   function renderOnboardingSources() {
-    const sourcesWrap = document.getElementById('onboardingSources');
     const list = document.getElementById('onboardingList');
+    const allList = document.getElementById('onboardingAllList');
+    const allCount = document.getElementById('allSourcesCount');
+    const region = onboardingSelectedRegion || 'bay-area';
+    const regionSources = STOCK_SOURCES.filter(s => s.region === region);
 
-    // Only show Bay Area stock sources (other regions coming soon)
-    const regionSources = STOCK_SOURCES.filter(s => s.region === 'bay-area');
+    // Recommended sources: based on interests (or all if no interests selected)
+    let recommended;
+    if (onboardingSelectedInterests.length > 0) {
+      recommended = getSourcesForInterests(onboardingSelectedInterests, region);
+    } else {
+      recommended = regionSources;
+    }
 
-    const allSources = [...regionSources, ...onboardingCustomSources];
+    const recommendedIds = new Set(recommended.map(s => s.id));
+    const remaining = regionSources.filter(s => !recommendedIds.has(s.id));
+    const allSources = [...recommended, ...onboardingCustomSources];
 
-    sourcesWrap.classList.add('onboarding__sources--visible');
+    // Render recommended list (pre-checked)
     list.innerHTML = allSources.map(s => {
       const catLabel = CONTENT_TYPES[s.category] || s.category || '';
       const isCustom = s.region === 'custom';
-      const regionObj = REGIONS.find(r => r.id === s.region);
-      const regionLabel = regionObj ? regionObj.name : '';
-      const showRegion = !onboardingSelectedRegion && regionLabel;
       return `<label class="onboarding__source">
-        <input type="checkbox" value="${escHtml(s.id)}">
+        <input type="checkbox" value="${escHtml(s.id)}" checked>
         <div class="onboarding__source-info">
           <span class="onboarding__source-name">${escHtml(s.name)}</span>
           <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
-          ${showRegion ? `<span class="onboarding__cat-tag">${escHtml(regionLabel)}</span>` : ''}
           ${isCustom ? '<span class="onboarding__cat-tag">custom</span>' : ''}
         </div>
       </label>`;
     }).join('');
 
-    list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    // Render remaining sources (unchecked, in "all" expandable)
+    allCount.textContent = `(${remaining.length})`;
+    allList.innerHTML = remaining.map(s => {
+      const catLabel = CONTENT_TYPES[s.category] || s.category || '';
+      return `<label class="onboarding__source">
+        <input type="checkbox" value="${escHtml(s.id)}">
+        <div class="onboarding__source-info">
+          <span class="onboarding__source-name">${escHtml(s.name)}</span>
+          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
+        </div>
+      </label>`;
+    }).join('');
+
+    // Bind checkbox selection UI
+    document.querySelectorAll('#onboardingList input[type="checkbox"], #onboardingAllList input[type="checkbox"]').forEach(cb => {
       cb.addEventListener('change', () => {
         cb.closest('.onboarding__source').classList.toggle('selected', cb.checked);
       });
@@ -4380,13 +4758,12 @@ body {
   }
 
   function completeOnboarding() {
-    const checked = Array.from(document.querySelectorAll('#onboardingList input[type="checkbox"]:checked')).map(cb => cb.value);
+    const checked = Array.from(document.querySelectorAll('#onboardingList input[type="checkbox"]:checked, #onboardingAllList input[type="checkbox"]:checked')).map(cb => cb.value);
     const stockSelected = STOCK_SOURCES.filter(s => checked.includes(s.id));
     const customSelected = onboardingCustomSources.filter(s => checked.includes(s.id));
     const all = [...stockSelected, ...customSelected];
 
     if (all.length === 0) {
-      // Default to 19hz Bay Area
       const def = STOCK_SOURCES.find(s => s.id === '19hz-bayarea');
       if (def) all.push(def);
     }
@@ -4396,6 +4773,10 @@ body {
     localStorage.setItem(ONBOARDED_KEY, '1');
     if (onboardingSelectedRegion) {
       localStorage.setItem('ctrl-rodeo-events-region', onboardingSelectedRegion);
+    }
+    // Save selected interests for future suggestions
+    if (onboardingSelectedInterests.length > 0) {
+      localStorage.setItem('ctrl-rodeo-events-interests', JSON.stringify(onboardingSelectedInterests));
     }
     saveSources();
     document.getElementById('onboarding').style.display = 'none';

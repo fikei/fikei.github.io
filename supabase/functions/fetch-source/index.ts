@@ -21,26 +21,48 @@ const RATE_WINDOW = 60_000
 
 // Allowed URL patterns — only fetch known event source domains
 const ALLOWED_DOMAINS = [
+  // Music & Nightlife
   '19hz.info',
-  'roxie.com',
-  'www.roxie.com',
+  'ra.co',
+  'www.ra.co',
+  // Comedy
   'punchlinecomedyclub.com',
   'www.punchlinecomedyclub.com',
   'cobbscomedy.com',
   'www.cobbscomedy.com',
+  // Film
+  'roxie.com',
+  'www.roxie.com',
   'screenslate.com',
   'www.screenslate.com',
-  'eventbrite.com',
-  'www.eventbrite.com',
   'alamodrafthouse.com',
   'drafthouse.com',
   'www.drafthouse.com',
+  'eventbrite.com',
+  'www.eventbrite.com',
+  // Tech
   'garysguide.com',
   'www.garysguide.com',
+  // Social
   'bonobonetwork.com',
   'www.bonobonetwork.com',
-  'ra.co',
-  'www.ra.co',
+  // Art
+  'hyperallergic.com',
+  'www.hyperallergic.com',
+  'sfmoma.org',
+  'www.sfmoma.org',
+  'famsf.org',
+  'www.famsf.org',
+  // Design
+  'sfdesignweek.org',
+  'www.sfdesignweek.org',
+  // Literary
+  'citylights.com',
+  'www.citylights.com',
+  'sfpl.org',
+  'www.sfpl.org',
+  'commonwealthclub.org',
+  'www.commonwealthclub.org',
 ]
 
 function isDomainAllowed(url: string): boolean {
