@@ -6,6 +6,31 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-14] - Events Aggregator: New Sources, RA GraphQL Fix & Multi-Source Tags
+
+### Added
+- **Gary's Guide event source** — `fetchGarysGuide()` scraper for tech/startup events (SF + NYC). Parses custom table layout with `font.ftitle > a` links, `font.fdescription` venue/address, and day headers. ~63 events per region.
+- **Bonobo Network event source** — `fetchBonobo()` scraper for social/community events (SF). Uses Squarespace JSON API (`?format=json`) with JSON-LD and HTML fallbacks. ~8 upcoming events.
+- **Tech and Social content types** — Added `tech` and `social` to `CONTENT_TYPES` with keyword-based detection in `detectEventType()` (tech: startup, hack, ai, demo day, pitch, etc.; social: mixer, happy hour, brunch, etc.)
+- **Multi-source tags** — Deduped events now show separate color-coded clickable tags per source instead of a single combined tag (e.g. `19hz` `RA` instead of `19hz + RA`)
+
+### Fixed
+- **Resident Advisor scraper** — RA is a SPA returning an empty 765-byte HTML shell. Rewrote `fetchRA()` to use RA's GraphQL API (`ra.co/graphql`, `eventListings` query). Returns ~72 events per area with full metadata. Added `__NEXT_DATA__` fallback.
+- **Edge function POST support** — `fetch-source` now accepts `method`, `body`, and `headers` params for server-side POST proxying (needed for RA GraphQL)
+- **Edge function domain allowlists** — Added `garysguide.com`, `bonobonetwork.com`, and `ra.co` to `fetch-source` and `enrich-event` ALLOWED_DOMAINS. Deployed both functions.
+
+### Changed
+- **CLAUDE.md autonomous operations** — Added rules: always merge PR to master when finished; always deploy updated Supabase edge functions after merge without asking
+
+### PRs
+- #64: Add Gary's Guide and Bonobo Network as event sources
+- #67: Fix Gary's Guide and Bonobo scrapers (parser + edge function deploy)
+- #68: Add auto-merge and auto-deploy rules to CLAUDE.md
+- #70: Fix Resident Advisor: use GraphQL API instead of HTML scraping
+- #78: Show separate source tags for deduped events
+
+---
+
 ## [2026-02-14] - Visual Standards System for Image Quality & Aesthetics
 
 ### Added
