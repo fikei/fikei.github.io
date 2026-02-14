@@ -7189,6 +7189,14 @@ Return JSON:
   // Recommends upcoming events based on Boards content
   // =============================================================================
 
+  // Region → source IDs (must stay in sync with STOCK_SOURCES in events/index.html)
+  const EVENT_SOURCE_REGIONS = {
+    'bay-area': ['19hz-bayarea', 'ra-bayarea', 'sf-punchline', 'cobbs-sf', 'roxie-sf', 'screenslate-sf'],
+    'los-angeles': ['19hz-losangeles'],
+    'new-york': ['19hz-newyork', 'screenslate-nyc'],
+    'seattle': ['19hz-seattle'],
+  };
+
   const EVENTS_STOPWORDS = new Set([
     'the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'has',
     'are', 'was', 'were', 'been', 'being', 'will', 'would', 'could',
@@ -7320,7 +7328,11 @@ Return JSON:
     const signalCount = profile.artists.length + profile.genres.length + profile.keywords.length;
     if (signalCount === 0) return;
 
-    console.log('[events-for-you] Profile:', signalCount, 'signals,', Object.keys(profile.categories).length, 'categories');
+    // Region filter: only recommend events from user's region
+    const region = localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area';
+    const sourceIds = EVENT_SOURCE_REGIONS[region] || EVENT_SOURCE_REGIONS['bay-area'];
+
+    console.log('[events-for-you] Profile:', signalCount, 'signals,', Object.keys(profile.categories).length, 'categories, region:', region);
 
     try {
       const response = await fetch(SUPABASE_URL + '/functions/v1/recommend-events', {
@@ -7331,7 +7343,7 @@ Return JSON:
         },
         body: JSON.stringify({
           profile: profile,
-          filters: { maxResults: 5 },
+          filters: { maxResults: 5, sourceIds: sourceIds },
         }),
       });
 
