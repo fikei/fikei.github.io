@@ -1387,19 +1387,19 @@ body {
   color: #000;
 }
 
-/* Watched toggle button */
-.grid-item__action--watched {
+/* Generic done toggle button (used by Watched, Read, etc.) */
+.grid-item__action--done {
   border-style: dashed;
   color: var(--muted);
   border-color: var(--muted);
 }
-.grid-item__action--watched-active {
+.grid-item__action--done-active {
   border-style: solid;
   color: var(--fg);
   border-color: var(--fg);
   opacity: 0.7;
 }
-.grid-item__action--watched:hover {
+.grid-item__action--done:hover {
   background: var(--fg);
   color: var(--bg);
   border-style: solid;
@@ -1413,7 +1413,31 @@ body {
   opacity: 0.3;
 }
 
-/* TMDB attribution */
+/* Read card — subtle dim on the image */
+.grid-item--read .grid-item__image {
+  opacity: 0.5;
+}
+.grid-item--read .grid-item__overlay {
+  opacity: 0.3;
+}
+
+/* Shared attribution (TMDB, Open Library, etc.) */
+.grid-item__attribution {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  color: var(--muted);
+  margin-top: 6px;
+  opacity: 0.6;
+}
+.grid-item__attribution a {
+  color: inherit;
+  text-decoration: none;
+}
+.grid-item__attribution a:hover {
+  text-decoration: underline;
+}
+
+/* Legacy TMDB attribution — keep for backward compat */
 .grid-item__tmdb-attribution {
   font-family: var(--font-mono);
   font-size: 7px;
@@ -1778,6 +1802,101 @@ body {
 .grid-item__platform-icon--peacock { background: var(--color-peacock); }
 .grid-item__platform-icon--paramount-plus { background: var(--color-paramount-plus); }
 .grid-item__platform-icon--crunchyroll { background: var(--color-crunchyroll); }
+
+/* Book platform icon dots */
+.grid-item__platform-icon--goodreads { background: #553b08; }
+.grid-item__platform-icon--amazon { background: #FF9900; }
+.grid-item__platform-icon--barnes-noble { background: #2a5934; }
+.grid-item__platform-icon--bookshop { background: #5C4033; }
+.grid-item__platform-icon--open-library { background: #e2dcc5; }
+.grid-item__platform-icon--audible { background: #F8991C; }
+.grid-item__platform-icon--librarything { background: #251916; }
+
+/* Book variant — no grayscale on cover art */
+.grid-item--book .grid-item__image {
+  filter: none;
+}
+.grid-item--book:hover .grid-item__image {
+  filter: none;
+}
+
+/* Book overlay: title + author two-line layout */
+.grid-item--book .grid-item__overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Book title line */
+.grid-item__book-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+/* Book meta line (author) */
+.grid-item__book-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Book card: no line clamp — summaries are pre-truncated */
+.grid-item--book .grid-item__details-description {
+  -webkit-line-clamp: unset;
+  display: block;
+  overflow: visible;
+}
+
+/* Goodreads action button accent */
+.grid-item__action--goodreads {
+  border-color: #553b08;
+  color: #553b08;
+}
+.grid-item__action--goodreads:hover {
+  background: #553b08;
+  color: #fff;
+}
+
+/* Book format badge hover */
+.grid-item--book:hover .grid-item__format-badge {
+  opacity: 1;
+}
+@media (hover: none) {
+  .grid-item--book:active .grid-item__format-badge,
+  .grid-item--book.grid-item--tapped .grid-item__format-badge {
+    opacity: 1;
+  }
+}
+
+/* Expanded book cards */
+.grid-item--book.grid-item--expanded-medium .grid-item__overlay,
+.grid-item--book.grid-item--expanded-large .grid-item__overlay {
+  display: none;
+}
+.grid-item--book.grid-item--expanded-medium .grid-item__format-badge,
+.grid-item--book.grid-item--expanded-large .grid-item__format-badge {
+  opacity: 1;
+  position: static;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  width: fit-content;
+}
 
 /* Expanded watch cards */
 .grid-item--watch.grid-item--expanded-medium .grid-item__overlay,
@@ -5012,6 +5131,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     { name: 'article', keywords: ['read', 'blog', 'post', 'article', 'story'], domains: ['medium.com', 'substack.com'], patterns: ['/blog/', '/post/', '/article/'] },
     { name: 'music', keywords: ['listen', 'track', 'album', 'playlist', 'song', 'artist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'music.youtube.com', 'audiomack.com'] },
     { name: 'video', keywords: ['watch', 'video', 'stream'], domains: ['youtube.com', 'youtu.be', 'vimeo.com', 'tiktok.com'] },
+    { name: 'book', keywords: ['book', 'novel', 'author', 'isbn', 'paperback', 'hardcover', 'audiobook'], domains: ['goodreads.com', 'openlibrary.org', 'bookshop.org', 'audible.com', 'librarything.com'], patterns: ['/book/', '/books/', '/dp/'] },
     { name: 'repository', keywords: ['code', 'repo', 'commit', 'fork'], domains: ['github.com', 'gitlab.com', 'bitbucket.org'] },
     { name: 'social', keywords: ['tweet', 'post', 'profile'], domains: ['twitter.com', 'x.com', 'linkedin.com', 'instagram.com', 'threads.net'] },
     { name: 'document', keywords: ['document', 'pdf', 'doc'], patterns: ['.pdf', '.doc', '.xls', 'docs.google.com'] },
@@ -8143,6 +8263,19 @@ Return JSON:
     return null;
   }
 
+  function getBookPlatform(domain) {
+    if (!domain) return null;
+    const d = domain.toLowerCase();
+    if (d.includes('goodreads.com')) return 'goodreads';
+    if (d.includes('amazon.com') || d.includes('kindle')) return 'amazon';
+    if (d.includes('barnesandnoble.com') || d.includes('bn.com')) return 'barnes-noble';
+    if (d.includes('bookshop.org')) return 'bookshop';
+    if (d.includes('openlibrary.org')) return 'open-library';
+    if (d.includes('audible.com')) return 'audible';
+    if (d.includes('librarything.com')) return 'librarything';
+    return null;
+  }
+
   // ============================================
   // Listen Player
   // ============================================
@@ -8831,6 +8964,34 @@ Return JSON:
   // The server returns pre-validated images with full scores (accuracy, aesthetic_fit, distinctiveness, safety).
 
   // ============================================
+  // Book Metadata Extraction (client-side, before server enrichment)
+  // ============================================
+  function extractBookMetadata(url, title, description) {
+    const meta = {
+      title: null, author: null, isbn: null, year: null, pages: null,
+      genre: null, platform: null, goodreadsUrl: null, format: null
+    };
+    try {
+      const u = new URL(url);
+      const domain = u.hostname;
+      const path = u.pathname;
+      meta.platform = getBookPlatform(domain);
+      if (domain.includes('goodreads.com')) meta.goodreadsUrl = url;
+      if (domain.includes('audible.com')) meta.format = 'audiobook';
+      else if (domain.includes('kindle') || path.includes('/kindle/')) meta.format = 'ebook';
+      else if (domain.includes('medium.com') || domain.includes('substack.com')) meta.format = 'article';
+      else if (path.includes('.pdf') || domain.includes('arxiv.org')) meta.format = 'paper';
+      else meta.format = 'book';
+      if (title) {
+        const byMatch = title.match(/\s+by\s+(.+?)(?:\s*[\|\-–—]|$)/i);
+        if (byMatch) meta.author = byMatch[1].trim();
+      }
+      console.log('[BOOK-EXTRACT] Extracted:', meta);
+    } catch (e) { console.error('[BOOK-EXTRACT] Error:', e); }
+    return meta;
+  }
+
+  // ============================================
   // Server-Side Enrichment Queue
   // ============================================
   const enrichmentQueue = [];
@@ -8874,7 +9035,8 @@ Return JSON:
             skipClassification: item.skipClassification || false,
             forceRefresh: forceRefresh,
             category: item.category || null,
-            enrichWatch: item.enrichWatch || false
+            enrichWatch: item.enrichWatch || false,
+            enrichBook: item.enrichBook || false
           }
         });
 
@@ -9079,6 +9241,42 @@ Return JSON:
           }
         }
 
+        // Merge server-enriched book metadata (Open Library + AI) into existing book field
+        if (result.book) {
+          const existing = link.book || {};
+          link.book = {
+            ...existing,
+            // Server-enriched fields — overwrite with better data
+            title: result.book.title || existing.title || null,
+            author: result.book.author || existing.author || null,
+            isbn: result.book.isbn || existing.isbn || null,
+            year: result.book.year || existing.year || null,
+            pages: result.book.pages || existing.pages || null,
+            genre: result.book.genre || existing.genre || null,
+            summary: result.book.summary || existing.summary || null,
+            coverPath: result.book.coverPath || existing.coverPath || null,
+            openLibraryKey: result.book.openLibraryKey || existing.openLibraryKey || null,
+            goodreadsUrl: existing.goodreadsUrl || null,
+            format: existing.format || result.book.format || 'book'
+          };
+          console.log('%c[ENRICH] Book metadata merged:', 'color: #553b08', link.book);
+
+          // Update top-level link title with canonical title
+          if (link.book.title) {
+            link.title = link.book.title;
+          }
+
+          // Use Open Library cover for book items
+          if (link.book.coverPath) {
+            const olCover = `https://covers.openlibrary.org/b/id/${link.book.coverPath}-L.jpg`;
+            if (link.image !== olCover) {
+              console.log('%c[ENRICH] Using Open Library cover:', 'color: #553b08', olCover);
+              link.image = olCover;
+              link.image_source = 'openlibrary';
+            }
+          }
+        }
+
         save(data);
 
         // Sync enrichment to Supabase (don't await — fire and forget)
@@ -9152,6 +9350,33 @@ Return JSON:
       queueServerEnrichment(link.id, link.url, link.title, link.description, {
         category: 'watch',
         enrichWatch: true
+      });
+    }
+  }
+
+  let hasRunBookBackfill = false;
+  function backfillBookOpenLibrary() {
+    if (hasRunBookBackfill) return;
+    hasRunBookBackfill = true;
+
+    const links = getAllLinks();
+    const bookLinks = links.filter(l =>
+      l.category === 'read' &&
+      l.book &&
+      !l.book.openLibraryKey  // Missing Open Library data
+    );
+
+    if (bookLinks.length === 0) {
+      console.log('%c[BOOK-BACKFILL] All book items have Open Library data', 'color: #553b08');
+      return;
+    }
+
+    console.log('%c[BOOK-BACKFILL] Found', 'color: #553b08; font-weight: bold', bookLinks.length, 'book items missing Open Library data, queuing for enrichment');
+
+    for (const link of bookLinks) {
+      queueServerEnrichment(link.id, link.url, link.title, link.description, {
+        category: 'read',
+        enrichBook: true
       });
     }
   }
@@ -9570,6 +9795,113 @@ Return JSON:
     }
   };
 
+  // ============================================
+  // Rich Content Config — drives card rendering, overlays, badges, toggles
+  // Add a new entry here to support a new rich content category (no if/else needed)
+  // ============================================
+  const RICH_CONTENT = {
+    watch: {
+      category: 'watch',
+      metaField: 'video',
+      doneField: 'watched',
+      doneLabel: 'Watched',
+      cssClass: 'watch',
+      doneClass: 'watched',
+      getPlatform: getVideoPlatform,
+      overlay: {
+        titleField: 'title',
+        metaField: 'creator',
+        metaFallback: (meta) => meta.year ? String(meta.year) : null,
+        titleClass: 'video-title',
+        metaClass: 'video-meta',
+      },
+      metaLine: [
+        { field: 'year' },
+        { field: 'genre' },
+        { field: 'runtime', format: formatDuration },
+        { field: 'rating' },
+      ],
+      badge: { typeField: 'type', durationField: 'runtime' },
+      externalLink: (meta) => {
+        const imdbId = meta.imdbId || (meta.platformId && meta.platformId.startsWith('imdb:') ? meta.platformId.slice(5) : null);
+        if (imdbId) return { url: `https://www.imdb.com/title/${imdbId}/`, label: 'IMDb', cssClass: 'imdb' };
+        if (meta.title) {
+          const q = encodeURIComponent(meta.title + (meta.year ? ` (${meta.year} film)` : ''));
+          return { url: `https://en.wikipedia.org/wiki/Special:Search?search=${q}`, label: 'Wiki', cssClass: '' };
+        }
+        return null;
+      },
+      extras: (meta) => {
+        let html = '';
+        if (meta.streamingServices && meta.streamingServices.length > 0) {
+          const chips = meta.streamingServices.map(svc => {
+            const serviceName = typeof svc === 'string' ? svc : svc.name;
+            const svcLower = serviceName.toLowerCase();
+            let platformKey = null;
+            if (svcLower.includes('netflix')) platformKey = 'netflix';
+            else if (svcLower.includes('hulu')) platformKey = 'hulu';
+            else if (svcLower.includes('disney')) platformKey = 'disney-plus';
+            else if (svcLower.includes('hbo') || svcLower.includes('max')) platformKey = 'hbo-max';
+            else if (svcLower.includes('prime') || svcLower.includes('amazon')) platformKey = 'prime-video';
+            else if (svcLower.includes('apple')) platformKey = 'apple-tv';
+            else if (svcLower.includes('peacock')) platformKey = 'peacock';
+            else if (svcLower.includes('paramount')) platformKey = 'paramount-plus';
+            else if (svcLower.includes('crunchyroll')) platformKey = 'crunchyroll';
+            else if (svcLower.includes('mubi')) platformKey = 'mubi';
+            else if (svcLower.includes('criterion')) platformKey = 'criterion';
+            const dot = platformKey ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platformKey}"></span>` : '';
+            return `<span class="grid-item__streaming-chip">${dot}${esc(serviceName)}</span>`;
+          }).join('');
+          html += `<div class="grid-item__streaming">${chips}</div>`;
+        }
+        if (meta.tmdbUrl) {
+          html += `<div class="grid-item__attribution"><a href="${esc(meta.tmdbUrl)}" target="_blank" rel="noopener">Data provided by TMDB</a></div>`;
+        }
+        return html;
+      },
+      summaryField: 'summary',
+      enrichFlag: 'enrichWatch',
+      backfillCheck: (link) => link.video && !link.video.tmdbId,
+    },
+    read: {
+      category: 'read',
+      metaField: 'book',
+      doneField: 'read',
+      doneLabel: 'Read',
+      cssClass: 'book',
+      doneClass: 'read',
+      getPlatform: getBookPlatform,
+      overlay: {
+        titleField: 'title',
+        metaField: 'author',
+        metaFallback: (meta) => meta.year ? String(meta.year) : null,
+        titleClass: 'book-title',
+        metaClass: 'book-meta',
+      },
+      metaLine: [
+        { field: 'year' },
+        { field: 'genre' },
+        { field: 'pages', format: (p) => `${p} pages` },
+      ],
+      badge: { typeField: 'format', durationField: null },
+      externalLink: (meta) => {
+        if (meta.goodreadsUrl) return { url: meta.goodreadsUrl, label: 'Goodreads', cssClass: 'goodreads' };
+        if (meta.title && meta.author) {
+          const q = encodeURIComponent(`${meta.title} ${meta.author}`);
+          return { url: `https://www.goodreads.com/search?q=${q}`, label: 'Goodreads', cssClass: '' };
+        }
+        return null;
+      },
+      extras: (meta) => {
+        if (meta.openLibraryKey) return `<div class="grid-item__attribution"><a href="https://openlibrary.org${esc(meta.openLibraryKey)}" target="_blank" rel="noopener">Data provided by Open Library</a></div>`;
+        return '';
+      },
+      summaryField: 'summary',
+      enrichFlag: 'enrichBook',
+      backfillCheck: (link) => link.book && !link.book.openLibraryKey,
+    },
+  };
+
   let currentSubTag = null; // Current sub-tag filter
   let showSubTagsBar = false; // Beta feature - enable via: window.enableSubTagsBar()
 
@@ -9950,8 +10282,8 @@ Return JSON:
       domains: ['linkedin.com', 'twitter.com', 'x.com', 'instagram.com', 'behance.net', 'dribbble.com']
     },
     read: {
-      kw: ['article', 'essay', 'blog', 'opinion', 'thought', 'idea', 'research', 'paper', 'guide', 'tutorial', 'learn', 'book', 'review', 'news', 'story'],
-      domains: ['medium.com', 'substack.com', 'wikipedia.org', 'news.ycombinator.com', 'nytimes.com', 'theguardian.com']
+      kw: ['article', 'essay', 'blog', 'opinion', 'thought', 'idea', 'research', 'paper', 'guide', 'tutorial', 'learn', 'book', 'review', 'news', 'story', 'novel', 'author', 'isbn', 'paperback', 'hardcover', 'audiobook'],
+      domains: ['medium.com', 'substack.com', 'wikipedia.org', 'news.ycombinator.com', 'nytimes.com', 'theguardian.com', 'goodreads.com', 'openlibrary.org', 'bookshop.org', 'audible.com', 'librarything.com']
     }
   };
 
@@ -10101,7 +10433,9 @@ Return JSON:
         // Structured metadata (JSONB columns)
         video: link.video || null,
         music: link.music || null,
-        watched: link.watched || false
+        book: link.book || null,
+        watched: link.watched || false,
+        read: link.read || false
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -10235,7 +10569,9 @@ Return JSON:
         // Structured metadata (JSONB)
         video: l.video || null,
         music: l.music || null,
-        watched: l.watched || false
+        book: l.book || null,
+        watched: l.watched || false,
+        read: l.read || false
       }));
 
       const categories = { uncategorized: { pinned: true } };
@@ -10804,72 +11140,43 @@ Return JSON:
         }
       }
 
-      // Build video-specific details for expanded watch cards
-      const _video = l.category === 'watch' ? l.video : null;
+      // Rich content config lookup (drives watch, read, and future categories)
+      const richConfig = RICH_CONTENT[l.category] || null;
+      const richMeta = richConfig ? l[richConfig.metaField] : null;
+      const isDone = richConfig?.doneField ? l[richConfig.doneField] : false;
       const isWatch = l.category === 'watch';
-      let videoDetailsHtml = '';
-      if (_video) {
-        // Metadata line: Year · Genre · Runtime · Rating (no creator — shown in title area)
-        const parts = [];
-        if (_video.year) parts.push(`<span>${_video.year}</span>`);
-        if (_video.genre) parts.push(`<span>${esc(_video.genre)}</span>`);
-        if (_video.runtime) parts.push(`<span>${formatDuration(_video.runtime)}</span>`);
-        if (_video.rating) parts.push(`<span>${esc(_video.rating)}</span>`);
-        if (parts.length > 0) {
-          videoDetailsHtml = `<div class="grid-item__details-meta">${parts.join('')}</div>`;
-        }
 
-        // Streaming services chips (no "Available on" label — space is precious)
-        if (_video.streamingServices && _video.streamingServices.length > 0) {
-          const chips = _video.streamingServices.map(svc => {
-            const serviceName = typeof svc === 'string' ? svc : svc.name;
-            const svcLower = serviceName.toLowerCase();
-            let platformKey = null;
-            if (svcLower.includes('netflix')) platformKey = 'netflix';
-            else if (svcLower.includes('hulu')) platformKey = 'hulu';
-            else if (svcLower.includes('disney')) platformKey = 'disney-plus';
-            else if (svcLower.includes('hbo') || svcLower.includes('max')) platformKey = 'hbo-max';
-            else if (svcLower.includes('prime') || svcLower.includes('amazon')) platformKey = 'prime-video';
-            else if (svcLower.includes('apple')) platformKey = 'apple-tv';
-            else if (svcLower.includes('peacock')) platformKey = 'peacock';
-            else if (svcLower.includes('paramount')) platformKey = 'paramount-plus';
-            else if (svcLower.includes('crunchyroll')) platformKey = 'crunchyroll';
-            else if (svcLower.includes('mubi')) platformKey = 'mubi';
-            else if (svcLower.includes('criterion')) platformKey = 'criterion';
-            const dot = platformKey ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platformKey}"></span>` : '';
-            return `<span class="grid-item__streaming-chip">${dot}${esc(serviceName)}</span>`;
-          }).join('');
-          videoDetailsHtml += `<div class="grid-item__streaming">${chips}</div>`;
-        }
+      // Build rich content details (metadata line + extras) from config
+      let richDetailsHtml = '';
+      let richActionsHtml = '';
+      if (richConfig && richMeta) {
+        // Metadata line from config (e.g. Year · Genre · Runtime · Rating)
+        const metaParts = richConfig.metaLine
+          .map(m => {
+            const val = richMeta[m.field];
+            if (val == null) return null;
+            return `<span>${esc(m.format ? m.format(val) : String(val))}</span>`;
+          })
+          .filter(Boolean);
+        if (metaParts.length) richDetailsHtml = `<div class="grid-item__details-meta">${metaParts.join('')}</div>`;
 
-        // TMDB attribution (required by TMDB terms)
-        if (_video.tmdbUrl) {
-          videoDetailsHtml += `<div class="grid-item__tmdb-attribution"><a href="${esc(_video.tmdbUrl)}" target="_blank" rel="noopener">Data provided by TMDB</a></div>`;
+        // Extras (streaming chips, attribution, etc.)
+        richDetailsHtml += richConfig.extras?.(richMeta) || '';
+
+        // External link (IMDb, Goodreads, etc.)
+        const extLink = richConfig.externalLink?.(richMeta);
+        if (extLink) {
+          richActionsHtml = `<a href="${esc(extLink.url)}" target="_blank" rel="noopener" class="grid-item__action${extLink.cssClass ? ' grid-item__action--' + extLink.cssClass : ''}" data-action="visit-ext">${esc(extLink.label)}</a>`;
         }
       }
 
-      // Truncate summary to ~60 words for display (TMDB overviews can be 80-100+ words)
+      // Truncate summary to ~60 words for display
       function truncateSummary(text, maxWords) {
         if (!text) return '';
         const words = text.split(/\s+/);
         if (words.length <= maxWords) return text;
         return words.slice(0, maxWords).join(' ') + '…';
       }
-
-      // Build action buttons for watch cards (IMDb/Wikipedia merged into actions)
-      let watchActionsHtml = '';
-      if (_video) {
-        const imdbId = _video.imdbId || (_video.platformId && _video.platformId.startsWith('imdb:') ? _video.platformId.slice(5) : null);
-        if (imdbId) {
-          watchActionsHtml += `<a href="https://www.imdb.com/title/${esc(imdbId)}/" target="_blank" rel="noopener" class="grid-item__action grid-item__action--imdb" data-action="visit-imdb">IMDb</a>`;
-        } else if (_video.title) {
-          const wikiQuery = encodeURIComponent(_video.title + (_video.year ? ' (' + _video.year + ' film)' : ''));
-          watchActionsHtml += `<a href="https://en.wikipedia.org/wiki/Special:Search?search=${wikiQuery}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit-wiki">Wiki</a>`;
-        }
-      }
-
-      // Watched state
-      const isWatched = l.watched || false;
 
       const detailsHtml = `
         <div class="grid-item__menu-container">
@@ -10886,10 +11193,11 @@ Return JSON:
           </div>
         </div>
         <div class="grid-item__details">
-          <h2 class="grid-item__details-title">${esc(_video?.title || _music?.trackTitle || l.title)}</h2>
-          ${isWatch && _video ? `
-            ${videoDetailsHtml}
-            ${(_video.summary || l.description) ? `<p class="grid-item__details-description">${esc(truncateSummary(_video.summary || l.description, 60))}</p>` : ''}
+          <h2 class="grid-item__details-title">${esc(richMeta?.[richConfig?.overlay?.titleField] || _music?.trackTitle || l.title)}</h2>
+          ${richConfig && richMeta ? `
+            ${richConfig.overlay?.metaField && richMeta[richConfig.overlay.metaField] ? `<p class="grid-item__details-domain">${esc(richMeta[richConfig.overlay.metaField])}</p>` : ''}
+            ${richDetailsHtml}
+            ${(richMeta[richConfig.summaryField] || l.description) ? `<p class="grid-item__details-description">${esc(truncateSummary(richMeta[richConfig.summaryField] || l.description, 60))}</p>` : ''}
           ` : `
             <p class="grid-item__details-domain">${esc(_music?.artist || l.domain)}</p>
             ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
@@ -10902,8 +11210,8 @@ Return JSON:
           `}
           <div class="grid-item__actions">
             <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
-            ${watchActionsHtml}
-            ${isWatch ? `<button class="grid-item__action grid-item__action--watched${isWatched ? ' grid-item__action--watched-active' : ''}" data-action="toggle-watched">${isWatched ? '✓ Watched' : 'Watched?'}</button>` : ''}
+            ${richActionsHtml}
+            ${richConfig?.doneField ? `<button class="grid-item__action grid-item__action--done${isDone ? ' grid-item__action--done-active' : ''}" data-action="toggle-done">${isDone ? '✓ ' + richConfig.doneLabel : richConfig.doneLabel + '?'}</button>` : ''}
           </div>
         </div>
         <div class="grid-item__resize" data-action="resize"></div>`;
@@ -10913,13 +11221,13 @@ Return JSON:
       const listenClass = isListen ? ' grid-item--listen' : '';
       const music = isListen ? l.music : null;
 
-      // Watch card class (isWatch already defined above)
-      const watchClass = isWatch ? ' grid-item--watch' : '';
-      const watchedClass = (isWatch && l.watched) ? ' grid-item--watched' : '';
-      const video = isWatch ? l.video : null;
+      // Rich content class (config-driven: watch, read, future categories)
+      const richClass = richConfig ? ` grid-item--${richConfig.cssClass}` : '';
+      const doneClass = (richConfig?.doneClass && isDone) ? ` grid-item--${richConfig.doneClass}` : '';
 
       // ── List view for watch cards ──
       if (isWatchList && isWatch) {
+        const video = l.video;
         const platform = getVideoPlatform(l.domain);
         const platformDot = platform ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platform}"></span>` : '';
         const videoTitle = video?.title || l.title;
@@ -11002,13 +11310,14 @@ Return JSON:
         }
       }
 
-      // Build format badge for watch cards
-      if (isWatch) {
-        const platform = getVideoPlatform(l.domain);
+      // Build format badge for rich content cards (watch, read, etc.)
+      if (richConfig && richMeta) {
+        const platform = richConfig.getPlatform?.(l.domain);
         const platformDot = platform ? `<span class="grid-item__platform-icon grid-item__platform-icon--${platform}"></span>` : '';
-        const typ = video?.type ? cap(video.type.replace('-', ' ')) : '';
-        const dur = video?.runtime ? formatDuration(video.runtime) : '';
-        const badgeText = [typ, dur].filter(Boolean).join(' · ');
+        const typ = richConfig.badge.typeField ? richMeta[richConfig.badge.typeField] : null;
+        const dur = richConfig.badge.durationField ? richMeta[richConfig.badge.durationField] : null;
+        const parts = [typ ? cap(typ.replace('-', ' ')) : '', dur ? formatDuration(dur) : ''].filter(Boolean);
+        const badgeText = parts.join(' · ');
         if (badgeText || platformDot) {
           formatBadgeHtml = `<span class="grid-item__format-badge">${platformDot}${badgeText ? esc(badgeText) : ''}</span>`;
         }
@@ -11020,20 +11329,22 @@ Return JSON:
           ? (getSubTag(l) || l.category)
           : l.category;
 
-        // Listen/watch cards use specialized overlay instead of title/domain
+        // Listen cards use specialized overlay; rich content cards use config-driven overlay
         let overlayHtml;
         if (isListen && music && (music.artist || music.trackTitle)) {
           overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__artist">${esc(music.artist || '')}</span><span class="grid-item__track">${esc(music.trackTitle || l.title)}</span></div>`;
-        } else if (isWatch && video && (video.title || video.creator)) {
-          const metaLine = video.creator ? video.creator : (video.year ? String(video.year) : l.domain);
-          overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__video-title">${esc(video.title || l.title)}</span><span class="grid-item__video-meta">${esc(metaLine)}</span></div>`;
+        } else if (richConfig && richMeta && richConfig.overlay) {
+          const cfg = richConfig.overlay;
+          const oTitle = richMeta[cfg.titleField] || l.title;
+          const oMeta = richMeta[cfg.metaField] || cfg.metaFallback?.(richMeta) || l.domain;
+          overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__${cfg.titleClass}">${esc(oTitle)}</span><span class="grid-item__${cfg.metaClass}">${esc(oMeta)}</span></div>`;
         } else {
           overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>`;
         }
 
-        const categoryClass = listenClass || watchClass;
+        const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item${categoryClass}${doneClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="" loading="lazy">
           ${overlayHtml}
@@ -11045,9 +11356,9 @@ Return JSON:
         const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
           ? (getSubTag(l) || l.category)
           : l.category;
-        const categoryClass = listenClass || watchClass;
+        const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item grid-item--placeholder${categoryClass}${watchedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
+        html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true">
           ${errorBadge}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
@@ -11630,6 +11941,12 @@ Return JSON:
             video = await extractVideoMetadata(url, meta.title, meta.description, meta.videoTags);
           }
 
+          // Extract book metadata if categorized as read or content_type is book
+          let book = null;
+          if (cat.category === 'read' || contentType.type === 'book') {
+            book = extractBookMetadata(url, meta.title, meta.description);
+          }
+
           // Initialize image resolution log
           const clientLog = [{
             strategy: 'client_cors_proxy',
@@ -11653,6 +11970,7 @@ Return JSON:
           };
           if (music) linkUpdate.music = music;
           if (video) linkUpdate.video = video;
+          if (book) linkUpdate.book = book;
           updateLink(id, linkUpdate);
 
           renderFilters();
@@ -11692,11 +12010,13 @@ Return JSON:
 
           // Queue for server enrichment if needed (server handles scrape + Tier 2 + Tier 3 quality gate)
           const isWatchItem = cat.category === 'watch' || contentType.type === 'video';
-          const needsEnrichment = contentType.confidence < 0.7 || !meta.image || isWatchItem;
+          const isBookItem = cat.category === 'read' || contentType.type === 'book';
+          const needsEnrichment = contentType.confidence < 0.7 || !meta.image || isWatchItem || isBookItem;
           if (needsEnrichment) {
             queueServerEnrichment(id, url, meta.title, meta.description, {
               category: cat.category,
-              enrichWatch: isWatchItem
+              enrichWatch: isWatchItem,
+              enrichBook: isBookItem
             });
           }
 
@@ -11900,6 +12220,10 @@ Return JSON:
             if (cat.category === 'watch' || contentType.type === 'video') {
               video = await extractVideoMetadata(link.url, meta.title, meta.description, meta.videoTags);
             }
+            let book = null;
+            if (cat.category === 'read' || contentType.type === 'book') {
+              book = extractBookMetadata(link.url, meta.title, meta.description);
+            }
             const linkUpdate = {
               title: meta.title || link.title,
               description: meta.description || link.description,
@@ -11912,16 +12236,19 @@ Return JSON:
             };
             if (music) linkUpdate.music = music;
             if (video) linkUpdate.video = video;
+            if (book) linkUpdate.book = book;
             updateLink(id, linkUpdate);
             renderFilters();
             renderGrid();
 
-            // Queue watch items for AI enrichment (summary + streaming)
+            // Queue watch/book items for AI enrichment
             const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
-            if (isWatchRerun) {
+            const isBookRerun = cat.category === 'read' || contentType.type === 'book';
+            if (isWatchRerun || isBookRerun) {
               queueServerEnrichment(id, link.url, meta.title, meta.description, {
                 category: cat.category,
-                enrichWatch: true
+                enrichWatch: isWatchRerun,
+                enrichBook: isBookRerun
               });
             }
 
@@ -11932,21 +12259,22 @@ Return JSON:
           }
         }
         return;
-      } else if (actionType === 'toggle-watched') {
+      } else if (actionType === 'toggle-done') {
         const link = getAllLinks().find(l => l.id === id);
-        if (link) {
-          const nowWatched = !link.watched;
-          updateLink(id, { watched: nowWatched });
+        const richConfig = link ? RICH_CONTENT[link.category] : null;
+        if (link && richConfig?.doneField) {
+          const nowDone = !link[richConfig.doneField];
+          updateLink(id, { [richConfig.doneField]: nowDone });
           // Update button in-place without full re-render
-          action.textContent = nowWatched ? '✓ Watched' : 'Watched?';
-          action.classList.toggle('grid-item__action--watched-active', nowWatched);
-          // Also dim the card image if watched
-          if (item) item.classList.toggle('grid-item--watched', nowWatched);
+          action.textContent = nowDone ? '✓ ' + richConfig.doneLabel : richConfig.doneLabel + '?';
+          action.classList.toggle('grid-item__action--done-active', nowDone);
+          // Also dim the card if done
+          if (item) item.classList.toggle('grid-item--' + richConfig.doneClass, nowDone);
           if (currentUser) syncLinkToSupabase(link);
-          toast(nowWatched ? 'Marked as watched' : 'Unmarked');
+          toast(nowDone ? `Marked as ${richConfig.doneLabel.toLowerCase()}` : 'Unmarked');
         }
         return;
-      } else if (actionType === 'visit-imdb' || actionType === 'visit-wiki') {
+      } else if (actionType === 'visit-imdb' || actionType === 'visit-wiki' || actionType === 'visit-ext') {
         // Let the <a> tag handle navigation, just stop propagation
         return;
       } else if (actionType === 'category') {
@@ -12799,6 +13127,12 @@ Return JSON:
             video = await extractVideoMetadata(url, meta.title, meta.description, meta.videoTags);
           }
 
+          // Extract book metadata if categorized as read or content_type is book
+          let book = null;
+          if (cat.category === 'read' || contentType.type === 'book') {
+            book = extractBookMetadata(url, meta.title, meta.description);
+          }
+
           // Initialize image resolution log for bulk import
           const clientLog2 = [{
             strategy: 'client_cors_proxy',
@@ -12821,6 +13155,7 @@ Return JSON:
           };
           if (music) linkUpdate.music = music;
           if (video) linkUpdate.video = video;
+          if (book) linkUpdate.book = book;
           updateLink(id, linkUpdate);
 
           renderFilters();
@@ -12859,11 +13194,13 @@ Return JSON:
 
           // Queue for server enrichment if needed (server handles scrape + Tier 2 + Tier 3 quality gate)
           const isWatchItem2 = cat.category === 'watch' || contentType.type === 'video';
-          const needsEnrichment2 = contentType.confidence < 0.7 || !meta.image || isWatchItem2;
+          const isBookItem2 = cat.category === 'read' || contentType.type === 'book';
+          const needsEnrichment2 = contentType.confidence < 0.7 || !meta.image || isWatchItem2 || isBookItem2;
           if (needsEnrichment2) {
             queueServerEnrichment(id, url, meta.title, meta.description, {
               category: cat.category,
-              enrichWatch: isWatchItem2
+              enrichWatch: isWatchItem2,
+              enrichBook: isBookItem2
             });
           }
 
@@ -13925,6 +14262,9 @@ Return JSON:
 
     // Backfill TMDB data for watch items that don't have it
     backfillWatchTMDB();
+
+    // Backfill Open Library data for book items that don't have it
+    backfillBookOpenLibrary();
 
     // Retry image resolution for items with null images
     retryFailedImages();
