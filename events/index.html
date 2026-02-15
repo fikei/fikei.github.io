@@ -2129,6 +2129,8 @@ body {
   async function checkL2OrScrape() {
     try {
       const cachedL2 = await loadSupabaseCachedEvents();
+      const enabledCount = state.sources.filter(s => s.enabled).length;
+      const minExpected = Math.max(5, enabledCount * 2);
       if (!cachedL2 || cachedL2.length === 0) {
         log('L2 stale: background scrape');
         await fetchAllSourcesNetwork();
@@ -2138,6 +2140,9 @@ body {
         state.events.forEach(ev => { ev.contentType = getSourceCategory(ev.source); });
         updateFilters(); updateContentTypeFilter(); render();
         saveEventCache();
+      } else if (state.events.length < minExpected) {
+        log(`Cache thin (${state.events.length} < ${minExpected} expected): background scrape`);
+        await fetchAllSourcesNetwork();
       }
     } catch (e) { log('L2 background check failed: ' + e.message); }
   }
