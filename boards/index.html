@@ -9461,6 +9461,12 @@ Return JSON:
           }
         }
 
+        // Update title from oEmbed if server resolved a better one (e.g. YouTube)
+        if (result.title && (!link.title || link.title === extractDomain(link.url))) {
+          console.log('%c[ENRICH] Title updated from oEmbed:', 'color: #27ae60', result.title);
+          link.title = result.title;
+        }
+
         save(data);
 
         // Sync enrichment to Supabase (don't await — fire and forget)
@@ -9665,6 +9671,30 @@ Return JSON:
   async function fetchMetadata(url) {
     const domain = extractDomain(url);
     const meta = { url, title: domain, description: '', image: null, domain };
+
+    // YouTube/Vimeo: use noembed.com oEmbed (CORS-friendly) instead of CORS proxy
+    // YouTube blocks CORS proxies and returns generic "YouTube" page data
+    const oembedDomains = ['youtube.com', 'youtu.be', 'vimeo.com'];
+    if (oembedDomains.some(d => domain.includes(d))) {
+      try {
+        console.log('%c[METADATA] Using noembed oEmbed for:', 'color: #e67e22', url);
+        const oembedResp = await fetchWithTimeout(
+          `https://noembed.com/embed?url=${encodeURIComponent(url)}`, FETCH_TIMEOUT
+        );
+        if (oembedResp.ok) {
+          const data = await oembedResp.json();
+          if (data.title && !data.error) {
+            meta.title = data.title;
+            meta.description = data.author_name ? `By ${data.author_name}` : '';
+            if (data.thumbnail_url) meta.image = data.thumbnail_url;
+            console.log('%c[METADATA] oEmbed success:', 'color: #27ae60', meta.title);
+            return meta;
+          }
+        }
+      } catch (e) {
+        console.warn('[METADATA] oEmbed failed, falling back to CORS proxy:', e.message);
+      }
+    }
 
     // Clean URL to remove tracking params (makes fetch faster)
     const fetchUrl = cleanUrl(url);

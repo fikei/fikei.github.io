@@ -40,7 +40,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, title, description, linkId, skipClassification, skipImage,
+    let { url, title, description, linkId, skipClassification, skipImage,
             skipIfHasImage, currentImage, forceRefresh, enrichWatch, enrichBook, category } = await req.json()
 
     // Support skipIfHasImage: skip image resolution if client already has a valid image
@@ -57,6 +57,24 @@ serve(async (req) => {
 
     const domain = new URL(url).hostname.replace('www.', '')
     const path = new URL(url).pathname
+
+    // ========================================
+    // STEP 0: oEmbed title resolution for platforms that block scraping
+    // YouTube returns generic "YouTube" page data to CORS proxies/scrapers.
+    // Use oEmbed to get real video title, author, and thumbnail.
+    // ========================================
+    const oembedTitle = await resolveOembedMetadata(url, domain)
+    if (oembedTitle) {
+      // Only override if title is missing or generic
+      const genericTitles = ['youtube', 'vimeo', 'watch', '']
+      if (!title || genericTitles.includes(title.toLowerCase().trim())) {
+        console.log('[enrich-link] oEmbed resolved title:', oembedTitle.title)
+        title = oembedTitle.title
+      }
+      if (!description && oembedTitle.author) {
+        description = `By ${oembedTitle.author}`
+      }
+    }
 
     let contentType = 'unknown'
     let typeConfidence = 0
@@ -341,6 +359,10 @@ serve(async (req) => {
         image_source: imageSource,
         image_resolved_at: new Date().toISOString()
       }
+      // Save oEmbed-resolved title to DB (overrides generic "YouTube" etc.)
+      if (oembedTitle) {
+        updatePayload.title = title
+      }
       if (imageScores) {
         updatePayload.image_scores = imageScores
       }
@@ -381,6 +403,11 @@ serve(async (req) => {
       image_resolution_log: imageResolutionLog,
       cached
     }
+    // Include oEmbed-resolved title so client can update its stored data
+    if (oembedTitle) {
+      response.title = title
+      if (oembedTitle.author) response.author = oembedTitle.author
+    }
     if (videoMeta) {
       response.video = videoMeta
     }
@@ -403,6 +430,58 @@ serve(async (req) => {
     )
   }
 })
+
+// ========================================
+// oEmbed Metadata Resolution (YouTube, Vimeo)
+// ========================================
+async function resolveOembedMetadata(
+  url: string,
+  domain: string
+): Promise<{ title: string, author: string | null, thumbnail: string | null } | null> {
+  // YouTube oEmbed (server-side, no CORS issues)
+  if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+    try {
+      const resp = await fetch(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+      )
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.title) {
+          return {
+            title: data.title,
+            author: data.author_name || null,
+            thumbnail: data.thumbnail_url || null
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[oembed] YouTube oEmbed error:', e)
+    }
+  }
+
+  // Vimeo oEmbed
+  if (domain.includes('vimeo.com')) {
+    try {
+      const resp = await fetch(
+        `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`
+      )
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.title) {
+          return {
+            title: data.title,
+            author: data.author_name || null,
+            thumbnail: data.thumbnail_url || null
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[oembed] Vimeo oEmbed error:', e)
+    }
+  }
+
+  return null
+}
 
 // ========================================
 // AI Classification using Anthropic
