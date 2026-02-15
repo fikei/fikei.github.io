@@ -2099,7 +2099,20 @@ body {
   }
 
   // --- Fetch All Sources (three-tier: L1 localStorage → L2 Supabase → scrape) ---
-  async function fetchAllSources() {
+  async function fetchAllSources(forceScrape = false) {
+    if (forceScrape) {
+      log('Sources changed: clearing L1, showing L2 preview then scraping');
+      localStorage.removeItem(CACHE_KEY);
+      const cachedL2 = await loadSupabaseCachedEvents();
+      if (cachedL2 && cachedL2.length > 0) {
+        state.events = cachedL2;
+        state.events.forEach(ev => { ev.contentType = getSourceCategory(ev.source); });
+        calAutoNavigate(); updateFilters(); updateContentTypeFilter(); render();
+        log(`L2 preview: ${cachedL2.length} events while scraping`);
+      }
+      await fetchAllSourcesNetwork();
+      return;
+    }
     // L1: localStorage (15-min TTL)
     const cachedL1 = loadCachedEvents();
     if (cachedL1) {
@@ -4071,6 +4084,7 @@ body {
     renderActiveSourcesList();
     renderStockSourcesList();
     renderSourceChips();
+    fetchAllSources(true);
   }
 
   function renderStockSourcesList() {
@@ -4261,7 +4275,7 @@ body {
       renderStockSourcesList();
       renderSuggestedSources();
       renderSourceChips();
-      fetchAllSources();
+      fetchAllSources(true);
     };
   }
 
@@ -4425,7 +4439,7 @@ body {
         }
       }
 
-      if (added) { modal.classList.remove('modal--visible'); fetchAllSources(); }
+      if (added) { modal.classList.remove('modal--visible'); fetchAllSources(true); }
     });
 
     // View toggle — sync dates across views when switching
@@ -4819,7 +4833,7 @@ body {
               if (state.onboarded && state.sources.length > 0) {
                 document.getElementById('eventsContent').style.display = '';
                 document.getElementById('onboarding')?.remove();
-                fetchAllSources();
+                fetchAllSources(true);
               }
             } else {
               // First login: push current localStorage sources to cloud
