@@ -14748,7 +14748,40 @@ Return JSON:
         const localData = load();
         console.log('[sync] cloud:', cloudData.links.length, 'links, local:', localData.links.length, 'links');
 
-        // Always update from cloud (source of truth)
+        // Merge: push local-only pins to cloud before overwriting
+        const cloudIds = new Set(cloudData.links.map(l => l.id));
+        const localOnly = localData.links.filter(l => !cloudIds.has(l.id));
+        if (localOnly.length > 0) {
+          console.log('[sync] Found', localOnly.length, 'local-only pins — pushing to cloud');
+          for (const link of localOnly) {
+            await syncLinkToSupabase(link);
+          }
+          // Add local-only links to cloud data so they're preserved
+          cloudData.links.push(...localOnly);
+          // Add local-only IDs to order (prepend so they appear at top)
+          const localOnlyIds = localOnly.map(l => l.id);
+          cloudData.linkOrder = [...localOnlyIds, ...cloudData.linkOrder];
+          await syncOrderToSupabase(cloudData.linkOrder);
+          console.log('[sync] Merged', localOnly.length, 'local-only pins to cloud');
+        }
+
+        // Also push local pins that have newer data than cloud (enrichment updates)
+        const cloudMap = new Map(cloudData.links.map(l => [l.id, l]));
+        let updatedCount = 0;
+        for (const local of localData.links) {
+          const cloud = cloudMap.get(local.id);
+          if (cloud && local.updatedAt && (!cloud.updatedAt || new Date(local.updatedAt) > new Date(cloud.updatedAt))) {
+            // Local has newer data — push to cloud and update merged set
+            await syncLinkToSupabase(local);
+            Object.assign(cloud, local);
+            updatedCount++;
+          }
+        }
+        if (updatedCount > 0) {
+          console.log('[sync] Pushed', updatedCount, 'locally-updated pins to cloud');
+        }
+
+        // Update from merged cloud data (source of truth)
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
         // Validate expanded cards - remove orphaned entries
         const validLinkIds = new Set(cloudData.links.map(l => l.id));
