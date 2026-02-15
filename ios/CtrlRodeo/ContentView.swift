@@ -1,7 +1,63 @@
 import SwiftUI
 import WebKit
 
+// MARK: - Root View
+
 struct ContentView: View {
+    @State private var isAuthenticated = SupabaseClient.shared.isAuthenticated
+    @State private var didSkipAuth = false
+    @State private var pendingAuthURL: URL? = nil
+
+    var body: some View {
+        Group {
+            if isAuthenticated || didSkipAuth {
+                BoardsWebView(
+                    isAuthenticated: $isAuthenticated,
+                    pendingAuthURL: $pendingAuthURL
+                )
+            } else {
+                AuthView(
+                    onAuthenticated: {
+                        isAuthenticated = true
+                    },
+                    onSkip: {
+                        didSkipAuth = true
+                    }
+                )
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DeepLinkReceived"))) { notification in
+            guard let url = notification.userInfo?["url"] as? URL else { return }
+            handleAuthDeepLink(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthStateChanged"))) { _ in
+            isAuthenticated = SupabaseClient.shared.isAuthenticated
+        }
+    }
+
+    private func handleAuthDeepLink(_ url: URL) {
+        print("[ContentView] handleAuthDeepLink: \(url)")
+
+        // Check if this is an auth callback (contains access_token in fragment or query)
+        let urlString = url.absoluteString
+        if urlString.contains("access_token") || urlString.contains("token_type") {
+            // Store the URL to pass to WebView for token extraction
+            pendingAuthURL = url
+
+            // If we're on the auth screen, skip to the web view so it can process the token
+            if !isAuthenticated && !didSkipAuth {
+                didSkipAuth = true
+            }
+        }
+    }
+}
+
+// MARK: - BoardsWebView
+
+struct BoardsWebView: View {
+    @Binding var isAuthenticated: Bool
+    @Binding var pendingAuthURL: URL?
+
     @State private var isRefreshing = false
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
@@ -11,7 +67,9 @@ struct ContentView: View {
             WebView(
                 isRefreshing: $isRefreshing,
                 isLoading: $isLoading,
-                errorMessage: $errorMessage
+                errorMessage: $errorMessage,
+                isAuthenticated: $isAuthenticated,
+                pendingAuthURL: $pendingAuthURL
             )
             .ignoresSafeArea()
             .background(Theme.background)
@@ -63,6 +121,8 @@ struct WebView: UIViewRepresentable {
     @Binding var isRefreshing: Bool
     @Binding var isLoading: Bool
     @Binding var errorMessage: String?
+    @Binding var isAuthenticated: Bool
+    @Binding var pendingAuthURL: URL?
 
     func makeUIView(context: Context) -> WKWebView {
         print("[WebView] makeUIView: Creating WKWebView")
@@ -86,8 +146,14 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.addSubview(refreshControl)
         context.coordinator.refreshControl = refreshControl
 
-        // Load the boards URL
-        if let url = URL(string: AppConstants.boardsURL) {
+        // Load the boards URL (or pending auth URL if we have one)
+        if let authURL = pendingAuthURL {
+            print("[WebView] makeUIView: Loading auth URL \(authURL)")
+            webView.load(URLRequest(url: authURL))
+            DispatchQueue.main.async {
+                pendingAuthURL = nil
+            }
+        } else if let url = URL(string: AppConstants.boardsURL) {
             print("[WebView] makeUIView: Loading URL \(url)")
             webView.load(URLRequest(url: url))
         }
@@ -118,13 +184,23 @@ struct WebView: UIViewRepresentable {
                 webView.load(URLRequest(url: url))
             }
         }
+
+        // Load pending auth URL if one arrived
+        if let authURL = pendingAuthURL {
+            print("[WebView] updateUIView: Loading pending auth URL \(authURL)")
+            webView.load(URLRequest(url: authURL))
+            DispatchQueue.main.async {
+                pendingAuthURL = nil
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             isRefreshing: $isRefreshing,
             isLoading: $isLoading,
-            errorMessage: $errorMessage
+            errorMessage: $errorMessage,
+            isAuthenticated: $isAuthenticated
         )
     }
 
@@ -138,14 +214,16 @@ struct WebView: UIViewRepresentable {
         @Binding var isRefreshing: Bool
         @Binding var isLoading: Bool
         @Binding var errorMessage: String?
+        @Binding var isAuthenticated: Bool
 
         private var hasInjectedAuth = false
         private var hasProcessedQueue = false
 
-        init(isRefreshing: Binding<Bool>, isLoading: Binding<Bool>, errorMessage: Binding<String?>) {
+        init(isRefreshing: Binding<Bool>, isLoading: Binding<Bool>, errorMessage: Binding<String?>, isAuthenticated: Binding<Bool>) {
             _isRefreshing = isRefreshing
             _isLoading = isLoading
             _errorMessage = errorMessage
+            _isAuthenticated = isAuthenticated
         }
 
         // MARK: - Navigation Delegate
@@ -202,7 +280,12 @@ struct WebView: UIViewRepresentable {
 
             // Parse auth token from web and store in App Group
             if let auth = try? JSONDecoder().decode(StoredAuth.self, from: authData) {
+                print("[WebView] authBridge: Received auth token, storing...")
                 SupabaseClient.shared.storeAuth(auth)
+                isAuthenticated = true
+
+                // Notify other views that auth state changed
+                NotificationCenter.default.post(name: NSNotification.Name("AuthStateChanged"), object: nil)
             }
         }
 
@@ -292,6 +375,8 @@ struct WebView: UIViewRepresentable {
 
         @objc func handleDeepLink(_ notification: Notification) {
             guard let url = notification.userInfo?["url"] as? URL else { return }
+
+            print("[WebView] handleDeepLink: Loading URL \(url)")
 
             // Navigate to the deep link URL in the web view
             // This handles OAuth callbacks from Supabase

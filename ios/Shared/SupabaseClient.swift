@@ -94,6 +94,26 @@ final class SupabaseClient {
         }
     }
 
+    // MARK: - Magic Link (OTP)
+
+    /// Sends a magic link email via Supabase OTP endpoint
+    func sendMagicLink(email: String) async throws {
+        var request = makeRequest(path: "/auth/v1/otp", method: "POST")
+
+        let body: [String: Any] = [
+            "email": email,
+            "options": [
+                "emailRedirectTo": "\(AppConstants.boardsURL)"
+            ]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw SupabaseError.magicLinkFailed
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeRequest(path: String, method: String) -> URLRequest {
@@ -117,12 +137,14 @@ enum SupabaseError: LocalizedError {
     case notAuthenticated
     case requestFailed
     case enrichmentFailed
+    case magicLinkFailed
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated: return "Not signed in"
         case .requestFailed: return "Failed to save link"
         case .enrichmentFailed: return "Failed to enrich link"
+        case .magicLinkFailed: return "Failed to send magic link"
         }
     }
 }

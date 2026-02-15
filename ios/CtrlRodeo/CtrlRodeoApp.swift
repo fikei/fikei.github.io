@@ -10,16 +10,19 @@ struct CtrlRodeoApp: App {
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    // Handle Universal Links (https:// URLs that match apple-app-site-association)
+                    guard let url = activity.webpageURL else { return }
+                    print("[App] onContinueUserActivity: Universal Link received \(url)")
+                    handleDeepLink(url)
+                }
         }
     }
 
     private func handleDeepLink(_ url: URL) {
-        // Handle ctrlrodeo:// deep links (e.g., auth callbacks)
-        guard url.scheme == AppConstants.urlScheme else { return }
+        print("[App] handleDeepLink: \(url)")
 
-        // Auth callback from Supabase OAuth flow
-        // The web app will handle the actual token exchange
-        // We just need to pass it through to the WebView
+        // Post notification for ContentView/WebView to handle
         NotificationCenter.default.post(
             name: NSNotification.Name("DeepLinkReceived"),
             object: nil,
