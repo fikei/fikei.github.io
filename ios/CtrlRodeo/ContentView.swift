@@ -91,22 +91,15 @@ struct BoardsWebView: View {
                     Theme.background
                         .ignoresSafeArea()
 
-                    VStack(spacing: 20) {
-                        Text(error)
-                            .foregroundColor(Theme.foreground)
+                    VStack(spacing: Theme.space5) {
+                        DSText(error, style: .meta)
                             .multilineTextAlignment(.center)
                             .padding()
 
-                        Button("Retry") {
-                            errorMessage = nil
-                            // Will trigger reload via binding in WebView
-                        }
-                        .foregroundColor(Theme.foreground)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Theme.foreground, lineWidth: 1)
+                        DSButton(
+                            title: "Retry",
+                            action: { errorMessage = nil },
+                            variant: .outlined
                         )
                     }
                 }
