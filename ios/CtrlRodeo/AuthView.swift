@@ -9,8 +9,6 @@ struct AuthView: View {
     @State private var didSend = false
     @State private var errorMessage: String?
 
-    @FocusState private var emailFocused: Bool
-
     var body: some View {
         ZStack {
             Theme.background
@@ -19,143 +17,94 @@ struct AuthView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                // Logo
-                Text("boards")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(Theme.foreground)
-                    .padding(.bottom, 8)
+                // Logo — Georgia serif, matching web display text
+                DSText("boards", style: .display)
+                    .padding(.bottom, Theme.space6)
 
-                // Tagline
-                VStack(spacing: 2) {
-                    Text("Your likes. Your saves.")
-                        .textCase(.uppercase)
-                        .tracking(1)
-                    Text("Your life \u{2014} organized.")
-                        .textCase(.uppercase)
-                        .tracking(1)
+                // Tagline — uppercase label style
+                VStack(spacing: Theme.space1) {
+                    DSText("Your likes. Your saves.", style: .label)
+                    DSText("Your life \u{2014} organized.", style: .label)
                 }
-                .font(.system(size: 10))
-                .foregroundColor(Theme.muted)
-                .padding(.bottom, 32)
+                .padding(.bottom, Theme.space10)
 
                 if didSend {
-                    // Success state
-                    VStack(spacing: 12) {
-                        Image(systemName: "envelope.open")
-                            .font(.system(size: 24))
-                            .foregroundColor(Theme.foreground)
-
-                        Text("CHECK YOUR EMAIL")
-                            .font(.system(size: 10))
-                            .tracking(1)
-                            .foregroundColor(Theme.foreground)
-
-                        Text("We sent a magic link to\n\(email)")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.muted)
-                            .multilineTextAlignment(.center)
-
-                        Button(action: { didSend = false }) {
-                            Text("SEND AGAIN")
-                                .font(.system(size: 10))
-                                .tracking(0.5)
-                                .foregroundColor(Theme.muted)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Rectangle()
-                                        .stroke(Theme.borderSubtle, lineWidth: 1)
-                                )
-                        }
-                        .padding(.top, 4)
-                    }
-                    .padding(.horizontal, 32)
+                    successState
                 } else {
-                    // Email input
-                    VStack(spacing: 16) {
-                        TextField("", text: $email, prompt: Text("email@example.com").foregroundColor(Theme.placeholder))
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
-                            .autocapitalization(.none)
-                            .disableAutocorrection(true)
-                            .foregroundColor(Theme.foreground)
-                            .font(.system(size: 10))
-                            .padding(12)
-                            .background(
-                                Rectangle()
-                                    .stroke(Theme.foreground, lineWidth: 1)
-                            )
-                            .focused($emailFocused)
-
-                        // Send button
-                        Button(action: sendMagicLink) {
-                            Group {
-                                if isSending {
-                                    ProgressView()
-                                        .tint(isValidEmail ? Theme.background : Theme.subtle)
-                                } else {
-                                    Text("SEND MAGIC LINK")
-                                        .font(.system(size: 10))
-                                        .tracking(0.5)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                        }
-                        .foregroundColor(isValidEmail ? Theme.background : Theme.subtle)
-                        .background(
-                            ZStack {
-                                if isValidEmail {
-                                    Rectangle().fill(Theme.foreground)
-                                } else {
-                                    Rectangle().stroke(Theme.borderSubtle, lineWidth: 1)
-                                }
-                            }
-                        )
-                        .disabled(!isValidEmail || isSending)
-
-                        // Error message
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 10))
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(.horizontal, 32)
+                    emailInputState
                 }
 
                 Spacer()
 
                 // Divider
-                HStack(spacing: 12) {
-                    Rectangle()
-                        .fill(Theme.borderSubtle)
-                        .frame(height: 1)
-                    Text("OR")
-                        .font(.system(size: 10))
-                        .tracking(0.5)
-                        .foregroundColor(Theme.muted)
-                    Rectangle()
-                        .fill(Theme.borderSubtle)
-                        .frame(height: 1)
-                }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 16)
+                DSDivider(label: "or")
+                    .padding(.horizontal, Theme.space8)
+                    .padding(.bottom, Theme.space4)
 
-                // Skip button
-                Button(action: onSkip) {
-                    Text("CONTINUE WITHOUT LOGIN")
-                        .font(.system(size: 10))
-                        .tracking(1)
-                        .foregroundColor(Theme.subtle)
-                }
-                .padding(.bottom, 48)
+                // Skip — ghost button, no border
+                DSButton(
+                    title: "Continue without login",
+                    action: onSkip,
+                    variant: .ghost,
+                    size: .small
+                )
+                .padding(.bottom, Theme.space12)
             }
         }
-        .onAppear {
-            emailFocused = false
+    }
+
+    // MARK: - Success State
+
+    private var successState: some View {
+        VStack(spacing: Theme.space3) {
+            Image(systemName: "envelope.open")
+                .font(.system(size: Theme.text3XL))
+                .foregroundColor(Theme.foreground)
+
+            DSText("Check your email", style: .title)
+
+            DSText("We sent a magic link to \(email)", style: .meta)
+                .multilineTextAlignment(.center)
+
+            DSButton(
+                title: "Send again",
+                action: { didSend = false },
+                variant: .outlined,
+                size: .small
+            )
+            .padding(.top, Theme.space1)
         }
+        .padding(.horizontal, Theme.space8)
+    }
+
+    // MARK: - Email Input State
+
+    private var emailInputState: some View {
+        VStack(spacing: Theme.space4) {
+            DSInput(
+                placeholder: "email@example.com",
+                text: $email,
+                keyboardType: .emailAddress,
+                textContentType: .emailAddress
+            )
+
+            DSButton(
+                title: "Send magic link",
+                action: sendMagicLink,
+                variant: .filled,
+                fullWidth: true,
+                disabled: !isValidEmail,
+                loading: isSending
+            )
+
+            if let error = errorMessage {
+                Text(error)
+                    .font(.system(size: Theme.textXS))
+                    .foregroundColor(Theme.error)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, Theme.space8)
     }
 
     // MARK: - Helpers

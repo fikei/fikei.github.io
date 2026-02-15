@@ -11,6 +11,7 @@
 		298DFAC43025203989E65020 /* CtrlRodeoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728A6379CF1F0B47A362A0D1 /* CtrlRodeoApp.swift */; };
 		3FFAC662A702D29683D4DA01 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FBCBB85AA0707A741D4EFA /* ContentView.swift */; };
 		5676404668741E19652BA07A /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B575A42CA03C308482965518 /* AuthView.swift */; };
+		6B23CAC8F28A2018BBC2C35D /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94DDE541E441806054DBA9D4 /* DesignSystem.swift */; };
 		6BB63DB10028F7F640E4F59A /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26338682C91C387B8F02C931 /* Constants.swift */; };
 		72663FD73C994D268DA29A27 /* QueueService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89405C4E8B1D627ACA6871F1 /* QueueService.swift */; };
 		82BB846447A43DF78547DC25 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26338682C91C387B8F02C931 /* Constants.swift */; };
@@ -55,6 +56,7 @@
 		71BA850935A1BD210899C8BE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		728A6379CF1F0B47A362A0D1 /* CtrlRodeoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CtrlRodeoApp.swift; sourceTree = "<group>"; };
 		89405C4E8B1D627ACA6871F1 /* QueueService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueService.swift; sourceTree = "<group>"; };
+		94DDE541E441806054DBA9D4 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		976FCC7260A1776E53897CC8 /* CtrlRodeo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CtrlRodeo.entitlements; sourceTree = "<group>"; };
 		9A112C46BE4BF03936FA33CE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A6015C07711BF1587BCFBA10 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -97,6 +99,7 @@
 				31FBCBB85AA0707A741D4EFA /* ContentView.swift */,
 				976FCC7260A1776E53897CC8 /* CtrlRodeo.entitlements */,
 				728A6379CF1F0B47A362A0D1 /* CtrlRodeoApp.swift */,
+				94DDE541E441806054DBA9D4 /* DesignSystem.swift */,
 				9A112C46BE4BF03936FA33CE /* Info.plist */,
 				71BA850935A1BD210899C8BE /* Theme.swift */,
 			);
@@ -231,6 +234,7 @@
 				82BB846447A43DF78547DC25 /* Constants.swift in Sources */,
 				3FFAC662A702D29683D4DA01 /* ContentView.swift in Sources */,
 				298DFAC43025203989E65020 /* CtrlRodeoApp.swift in Sources */,
+				6B23CAC8F28A2018BBC2C35D /* DesignSystem.swift in Sources */,
 				886C46A480D7A3BCCBB4B450 /* Models.swift in Sources */,
 				AAFDFA1C77F0973A2BB1A75A /* QueueService.swift in Sources */,
 				F6FA76D0AD6549E2B174B376 /* SupabaseClient.swift in Sources */,
