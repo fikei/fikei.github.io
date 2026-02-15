@@ -280,6 +280,21 @@ Client cache uses generic widget ID but server call uses server widget ID. Cache
 | Story | Status |
 |-------|--------|
 | **Collection stats in standard UI** — Move collection stats (item count, domain count, brand count, price range) out of the AI widget system and into the standard category UI. Show as a persistent stats bar or summary row visible for every category, not gated behind AI. Stats should update instantly on add/remove without an AI call. | Pending |
+| **Empty filtered state messaging** (#8) — When filtering to an empty category, show "No [Category] pins yet" with clear-filter and add-pin CTAs instead of blank screen | Pending |
+| **Search term highlighting** (#39) — Wrap matched search terms in `<mark>` tags for visual feedback | Pending |
+| **Scroll position preservation** (#42) — Restore scroll position after filter change or re-render instead of jumping to top | Pending |
+| **Category pills horizontal scroll** (#51) — On mobile, category filter bar should scroll horizontally instead of wrapping to multiple lines | Pending |
+| **Toast notification stacking** (#49) — Queue toasts, dedup identical messages, support priority levels so errors aren't buried | Pending |
+| **Grid density control** (#63) — User-selectable compact/normal/comfortable grid density | Pending |
+| **Image zoom / lightbox** (#60) — Tap card image to open full-resolution lightbox view | Pending |
+| **FAB menu labels on mobile** (#35) — Show text labels alongside icons in the floating action button menu on touch devices | Pending |
+| **Filter combination (AND logic)** (#52) — Support filtering by category AND sub-tag simultaneously | Pending |
+| **Widget suggestion rationale** (#53) — Show "because you saved X" hint text below widget cards, tap to dismiss | Pending |
+| **Pin duplication to multiple categories** (#38) — Allow a pin to appear in more than one category | Pending |
+| **Pin templates** (#41) — Pre-built field templates for common pin types (review, research paper, recipe) | Pending |
+| **Search operators** (#56) — Support `"exact match"`, `-exclude`, `domain:` operators in search | Pending |
+| **Pin archiving (soft delete)** (#59) — Archive pins instead of permanent delete, with restore option | Pending |
+| **Empty filter bar optimization** (#75) — When "All" filter is selected, collapse or hide the filter bar to save space | Pending |
 
 ---
 
@@ -293,6 +308,8 @@ Client cache uses generic widget ID but server call uses server widget ID. Cache
 | **Keyboard navigation for grid** | Complete |
 | **Meaningful alt text for images** | Complete |
 | **aria-live announcements for dynamic content** | Complete |
+| **Keyboard drag-drop alternative** (#21) — Add "Move up/down" to kebab menu and Shift+Arrow for reorder, so keyboard users can sort pins | Pending |
+| **Sub-tag pill touch target size** (#72) — Increase sub-tag pills from 24px to 44px minimum for WCAG touch target compliance | Pending |
 | High contrast mode | Pending |
 | Reduced motion option | Pending |
 | Screen reader optimization (full audit) | Pending |
@@ -390,4 +407,85 @@ Design system analyzer and documentation generator.
 | **Replace platform-specific iframe embeds with a single custom audio player** — Consistent UI regardless of source platform | Pending |
 | **Support full track playback across Spotify, SoundCloud, Apple Music, YouTube Music, Bandcamp** — All major music platforms | Pending |
 | **Investigate platform APIs/SDKs for playback** — Spotify Web Playback SDK, SoundCloud Widget API, etc. | Pending |
+| **DJ metadata (BPM, key, energy)** (#12) — Integrate GetSongBPM or Spotify Audio Features API for BPM, musical key, and energy level on Listen pins. Critical for DJ persona set prep workflow | Pending |
 | **Related PRs** — #35, #36, #38, #40, #41 | Reference |
+
+---
+
+## Bulk Actions & Multi-Select
+
+Selection model and batch operations for power users managing large collections.
+
+> Personas: Researcher, Deep-Dive Enthusiast, DJ, Multidisciplinary Maker
+
+| Story | Status |
+|-------|--------|
+| **Multi-select mode** (#34) — Long-press to enter select mode (gesture-first), tap to toggle, floating action bar for bulk delete/move/export | Pending |
+| **Bulk re-enrichment** (#55) — Select multiple pins, re-run enrichment on all of them in batch | Pending |
+| **Batch import from Pocket/Pinterest/Instagram** (#43) — Import existing collections via file upload or API | Pending |
+| **Export to Notion/Airtable** (#40) — Export filtered collection to external tools via API or structured file | Pending |
+
+---
+
+## Sync & Data Integrity
+
+Reliability improvements for cross-device sync and error handling.
+
+> Personas: all — sync failures are invisible and affect everyone
+
+| Story | Status |
+|-------|--------|
+| **Sync failure notification** (#2) — Show persistent "Changes not synced" banner on network failure with retry queue and sync status indicator | Pending |
+| **Expanded card state cross-device sync** (#29) — Sync expanded/collapsed card state to Supabase so it persists across devices | Pending |
+| **Bookmarklet completion** (#28) — Complete and test the save-to-boards bookmarklet for one-click capture from any browser | Pending |
+| **Pin edit history / versioning** (#54) — Track edit history on pins, allow reverting to previous state | Pending |
+| **Watch "Watched" toggle cross-device sync** (#76) — Persist watched/unwatched state to Supabase for cross-device consistency | Pending |
+
+---
+
+## Micro-Interactions & Polish
+
+Animation, haptic, and refinement work. Low priority but improves perceived quality.
+
+| Story | Status |
+|-------|--------|
+| **Card expansion reflow smoothing** (#47) — Animate card expansion on mobile to prevent layout jank | Pending |
+| **Progressive image loading** (#48) — Add blur-up placeholder or skeleton screens while card images load | Pending |
+| **FAB rotation animation variety** (#64) — Vary or reduce the FAB rotation animation to prevent repetition fatigue | Pending |
+| **Theme toggle haptic feedback** (#65) — Add haptic response on dark/light mode toggle on supported devices | Pending |
+| **Consistent slide-in direction** (#66) — Align new pin and widget entry animations for visual consistency | Pending |
+| **Branded loading spinner** (#67) — Replace generic spinner with Swiss Grid-styled loading indicator | Pending |
+| **Filter change animation** (#73) — Add crossfade or slide transition when switching category filters | Pending |
+| **Duplicate detection URL normalization** (#74) — Normalize URLs (trailing slashes, www prefix, protocol) before duplicate checking | Pending |
+| **Widget dismissal memory** (#58) — Track dismissed widgets and suppress future suggestions of the same type | Pending |
+| **Category pill colors** (#78) — Allow users to customize category pill colors for visual differentiation | Pending |
+
+---
+
+## Progressive Web App & Onboarding
+
+Deepening engagement through install prompts and discovery features.
+
+| Story | Status |
+|-------|--------|
+| **PWA install prompt** (#68) — Show install prompt after repeated visits with "Add to Home Screen" flow | Pending |
+| **Keyboard shortcuts reference** (#69) — Press `?` to show keyboard shortcuts overlay | Pending |
+| **Unread / Read Later tracking** (#44) — Track read/unread state on article pins, filter by unread | Pending |
+| **Recently viewed tracking** (#57) — Track which pins were recently opened/visited, show as a filter or view | Pending |
+| **Widget preference granularity** (#45) — Per-category or per-widget-type enable/disable instead of all-or-nothing | Pending |
+| **Smart auto-boards** (#46) — Rule-based auto-organization (e.g. "all Nike links → Sneakers board") | Pending |
+| **Streaming availability notifications** (#61) — Notify when a Watch pin becomes available on a subscribed streaming service | Pending |
+| **Widget suggestion preview on hover** (#77) — Preview widget content on hover before committing to view | Pending |
+
+---
+
+## Visual Similarity & AI Search
+
+Advanced content discovery features requiring ML infrastructure.
+
+> Personas: Visual Collector, Multidisciplinary Maker, Design Technologist
+
+| Story | Status |
+|-------|--------|
+| **Visual similarity search** (#17) — "Find more like this" using CLIP/image embeddings to surface visually similar pins | Pending |
+| **Grid gap rounding fix** (#70) — Fix sub-pixel rounding inconsistencies at grid edges | Pending |

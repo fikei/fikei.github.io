@@ -3545,7 +3545,7 @@ body {
 }
 
 /* ============================================
-   Toast
+   Toast — prioritized queue with dedup
    ============================================ */
 .toast-container {
   position: fixed;
@@ -3567,12 +3567,34 @@ body {
   color: var(--bg);
   border: 1px solid var(--fg);
   pointer-events: auto;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: toast-in 0.2s ease forwards;
+}
+
+@keyframes toast-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toast--exit {
+  animation: toast-out 0.15s ease forwards;
+}
+
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(-4px); }
 }
 
 .toast--error {
   background: var(--bg);
   color: var(--fg);
   border: 2px solid var(--fg);
+}
+
+.toast--warning {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  opacity: 0.9;
 }
 
 .clipboard-prompt {
@@ -10221,7 +10243,7 @@ Return JSON:
 
     migrationInProgress = true;
     console.log(`%c[migrate] Starting migration of ${allLinks.length} links`, 'color: #8b5cf6; font-weight: bold');
-    toast(`Migrating ${allLinks.length} links...`);
+    toast(`Migrating ${allLinks.length} links...`, { level: 'info', id: 'migration' });
 
     let updated = 0;
     let failed = 0;
@@ -10264,7 +10286,7 @@ Return JSON:
 
     const summary = `Migration complete: ${updated} updated, ${unchanged} unchanged, ${failed} failed`;
     console.log(`%c[migrate] ${summary}`, 'color: #8b5cf6; font-weight: bold');
-    toast(summary);
+    toast(summary, { id: 'migration' });
   }
 
   // ============================================
@@ -10805,7 +10827,7 @@ Return JSON:
     }
 
     // Upload all local links
-    toast('Syncing to cloud...');
+    toast('Syncing to cloud...', { level: 'info', id: 'cloud-sync' });
     for (const link of local.links) {
       await syncLinkToSupabase(link);
     }
@@ -10820,7 +10842,7 @@ Return JSON:
       });
     }
 
-    toast(`Synced ${local.links.length} links to cloud`);
+    toast(`Synced ${local.links.length} links to cloud`, { id: 'cloud-sync' });
   }
 
   function getAllLinks() { return load().links; }
@@ -11926,7 +11948,7 @@ Return JSON:
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    toast(`Uploading ${files.length} photo${files.length > 1 ? 's' : ''}...`);
+    toast(`Uploading ${files.length} photo${files.length > 1 ? 's' : ''}...`, { level: 'info', id: 'photo-upload' });
 
     for (const file of files) {
       try {
@@ -11960,7 +11982,7 @@ Return JSON:
     renderFilters();
     renderGrid();
     photoInput.value = '';
-    toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
+    toast(`${files.length} photo${files.length > 1 ? 's' : ''} added`, { id: 'photo-upload' });
   };
 
   // Video upload handler
@@ -11968,7 +11990,7 @@ Return JSON:
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    toast(`Uploading ${files.length} video${files.length > 1 ? 's' : ''}...`);
+    toast(`Uploading ${files.length} video${files.length > 1 ? 's' : ''}...`, { level: 'info', id: 'video-upload' });
 
     for (const file of files) {
       try {
@@ -12002,7 +12024,7 @@ Return JSON:
     renderFilters();
     renderGrid();
     videoInput.value = '';
-    toast(`${files.length} video${files.length > 1 ? 's' : ''} added`);
+    toast(`${files.length} video${files.length > 1 ? 's' : ''} added`, { id: 'video-upload' });
   };
 
   // ============================================
@@ -12205,7 +12227,7 @@ Return JSON:
     if (placeholders.length > 0) {
       renderFilters();
       renderGrid();
-      toast(`Adding ${placeholders.length} link${placeholders.length > 1 ? 's' : ''}...`);
+      toast(`Adding ${placeholders.length} link${placeholders.length > 1 ? 's' : ''}...`, { level: 'info', id: 'add-links' });
     }
 
     // STEP 2: Fetch metadata and update cards progressively (in background)
@@ -12521,7 +12543,7 @@ Return JSON:
         // Consolidated: re-enrich metadata + refresh image
         const link = getAllLinks().find(l => l.id === id);
         if (link) {
-          toast('Refreshing...');
+          toast('Refreshing...', { level: 'info', id: 'refresh-' + id });
           try {
             const meta = await fetchMetadata(link.url);
             const cat = await smartCategorize(meta);
@@ -12569,10 +12591,10 @@ Return JSON:
                 enrichBook: isBookRerun
               });
             }
-            toast('Refreshed');
+            toast('Refreshed', { id: 'refresh-' + id });
           } catch (err) {
             console.error('[refresh]', err);
-            toast('Refresh failed', true);
+            toast('Refresh failed', { level: 'error', id: 'refresh-' + id });
           }
         }
         return;
@@ -12580,7 +12602,7 @@ Return JSON:
         // Legacy: keep for error badge tap-to-retry
         const link = getAllLinks().find(l => l.id === id);
         if (link) {
-          toast('Refreshing...');
+          toast('Refreshing...', { level: 'info', id: 'refresh-' + id });
           enrichmentQueue.push({ linkId: link.id, url: link.url, title: link.title, description: link.description, forceRefresh: true });
           processEnrichmentQueue();
         }
@@ -13139,9 +13161,9 @@ Return JSON:
 
     if (confirmed) {
       $('devMenu').classList.remove('dev-menu--visible');
-      toast(`Starting enrichment for ${needEnrichment.length} links...`);
+      toast(`Starting enrichment for ${needEnrichment.length} links...`, { level: 'info', id: 'enrichment' });
       await queueAllForEnrichment();
-      toast('Enrichment complete');
+      toast('Enrichment complete', { id: 'enrichment' });
     }
   };
 
@@ -13456,12 +13478,86 @@ Return JSON:
     formStatus.className = 'add-form__status' + (err ? ' add-form__status--error' : '');
   }
 
-  function toast(msg, err) {
-    const t = document.createElement('div');
-    t.className = 'toast' + (err ? ' toast--error' : '');
-    t.textContent = msg;
-    toastContainer.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
+  // ============================================
+  // Toast — prioritized queue with dedup & max visible
+  // ============================================
+  // Priority: error (3) > warning (2) > success (1) > info (0)
+  // Dedup: same message within 2s is suppressed
+  // Max visible: 3 toasts; oldest of lowest priority evicted
+  // Progress: toast with id replaces previous toast with same id
+  const TOAST_CONFIG = {
+    maxVisible: 3,
+    dedupWindow: 2000,
+    durations: { error: 6000, warning: 5000, success: 3000, info: 4000 },
+    priorities: { info: 0, success: 1, warning: 2, error: 3 }
+  };
+  const _toastState = { active: [], recentMessages: [] };
+
+  function toast(msg, errOrOpts) {
+    // Backward compat: toast('msg', true) → error, toast('msg') → success
+    let level = 'success';
+    let id = null;
+    if (errOrOpts === true) {
+      level = 'error';
+    } else if (errOrOpts && typeof errOrOpts === 'object') {
+      level = errOrOpts.level || 'success';
+      id = errOrOpts.id || null;
+    }
+
+    // If id provided, replace existing toast with same id
+    if (id) {
+      const existing = _toastState.active.find(t => t.id === id);
+      if (existing) {
+        existing.el.textContent = msg;
+        existing.el.className = 'toast' + (level === 'error' ? ' toast--error' : level === 'warning' ? ' toast--warning' : '');
+        // Reset timer
+        clearTimeout(existing.timer);
+        existing.timer = setTimeout(() => _dismissToast(existing), TOAST_CONFIG.durations[level]);
+        return;
+      }
+    }
+
+    // Dedup: suppress identical message within window
+    const now = Date.now();
+    _toastState.recentMessages = _toastState.recentMessages.filter(r => now - r.time < TOAST_CONFIG.dedupWindow);
+    if (_toastState.recentMessages.some(r => r.msg === msg)) return;
+    _toastState.recentMessages.push({ msg, time: now });
+
+    // Evict if at max: remove oldest toast of lowest priority
+    while (_toastState.active.length >= TOAST_CONFIG.maxVisible) {
+      const priority = TOAST_CONFIG.priorities[level];
+      // Find lowest-priority active toast
+      let victim = _toastState.active[0];
+      for (const t of _toastState.active) {
+        if (TOAST_CONFIG.priorities[t.level] < TOAST_CONFIG.priorities[victim.level]) victim = t;
+        else if (TOAST_CONFIG.priorities[t.level] === TOAST_CONFIG.priorities[victim.level] && t.time < victim.time) victim = t;
+      }
+      // Don't evict higher-priority toasts for lower-priority ones
+      if (TOAST_CONFIG.priorities[victim.level] > priority) return;
+      _dismissToast(victim, true);
+    }
+
+    // Create toast element
+    const el = document.createElement('div');
+    el.className = 'toast' + (level === 'error' ? ' toast--error' : level === 'warning' ? ' toast--warning' : '');
+    el.textContent = msg;
+    toastContainer.appendChild(el);
+
+    const entry = { el, msg, level, id, time: now, timer: null };
+    entry.timer = setTimeout(() => _dismissToast(entry), TOAST_CONFIG.durations[level]);
+    _toastState.active.push(entry);
+  }
+
+  function _dismissToast(entry, immediate) {
+    clearTimeout(entry.timer);
+    const idx = _toastState.active.indexOf(entry);
+    if (idx > -1) _toastState.active.splice(idx, 1);
+    if (immediate) {
+      entry.el.remove();
+    } else {
+      entry.el.classList.add('toast--exit');
+      setTimeout(() => entry.el.remove(), 150);
+    }
   }
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -13519,7 +13615,7 @@ Return JSON:
     if (placeholders.length > 0) {
       renderFilters();
       renderGrid();
-      toast(`Adding ${placeholders.length} link${placeholders.length > 1 ? 's' : ''}...`);
+      toast(`Adding ${placeholders.length} link${placeholders.length > 1 ? 's' : ''}...`, { level: 'info', id: 'add-links' });
     }
 
     // STEP 2: Fetch metadata progressively in background
