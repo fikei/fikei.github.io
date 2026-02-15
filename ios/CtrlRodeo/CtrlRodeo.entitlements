@@ -6,5 +6,9 @@
 	<array>
 		<string>group.com.ctrlrodeo.boards</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:ctrl.rodeo</string>
+	</array>
 </dict>
 </plist>
