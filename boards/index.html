@@ -9619,8 +9619,10 @@ Return JSON:
         'fbclid', 'gclid', 'twclid', 'msclkid', 'mc_cid', 'mc_eid', '_ga', '_gid', '_gl',
         'tw_source', 'tw_adid', 'sl_source_ad_platform', 'sl_source_campaign_id',
         'sl_source_placement', 'sl_source_ad_id', 'adset_name', 'ad_name', 'campaign_id', 'ad_id', 'media_type',
-        'ref', 'ref_src', 'ref_url', 'source', 'igshid', 'si', 'feature'];
+        'ref', 'ref_src', 'ref_url', 'source', 'igshid', 'feature'];
       for (const p of dominated) u.searchParams.delete(p);
+      // 'si' is a Spotify share identifier, not tracking - preserve for spotify.com
+      if (!u.hostname.includes('spotify.com')) u.searchParams.delete('si');
       return u.toString();
     } catch { return url; }
   }
@@ -10323,11 +10325,11 @@ Return JSON:
   }
 
   // ============================================
-  // Migration v4: Enrich listen links with music metadata + client-side BPM
+  // Migration v5: Enrich listen links - server genre/label + client-side BPM/key
   // ============================================
   // Backfills .music property on listen links that were migrated
   // before extractMusicMetadata existed.
-  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v4';
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v5';
 
   async function enrichListenLinks() {
     if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
@@ -10337,15 +10339,17 @@ Return JSON:
     const needsEnrich = allLinks.filter(l => {
       if (l.category !== 'listen') return false;
       if (!l.music || !l.music.artist) return true;  // Missing basic metadata
-      if (l.music.artist && l.music.trackTitle && (!l.music.bpm || !l.music.key || !l.music.genre || !l.music.label)) return true;  // Missing extended metadata
+      if (!l.music.trackTitle) return true;  // Has artist but no track title
+      if (!l.music.bpm || !l.music.key || !l.music.genre || !l.music.label) return true;  // Missing extended metadata
       return false;
     });
     if (needsEnrich.length === 0) {
+      console.log('%c[enrich-listen] v5: All listen links up to date', 'color: #1DB954');
       localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
       return;
     }
 
-    console.log(`%c[enrich-listen] v3: Enriching ${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
+    console.log(`%c[enrich-listen] v5: Enriching ${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
 
     let enriched = 0;
     for (const link of needsEnrich) {
