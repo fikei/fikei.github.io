@@ -1,10 +1,34 @@
 # AI Widget System - Technical Documentation
 
-**Version:** 6.0
-**Last Updated:** 2026-02-09
+**Version:** 7.0
+**Last Updated:** 2026-02-14
 **Status:** Active
 
-## Recent Updates (v6.0 - Generic Widget Architecture)
+## Recent Updates (v7.0 - Visual Standards System)
+
+### Three-Layer Visual Standards
+- **New file**: `supabase/functions/generate-widget/config/visual-standards.ts` — 684 lines defining image quality and aesthetic expectations across the platform
+- **Layer 0 — Product Gate**: Universal pass/fail for any image. Blocks stock watermarks, ad pixels, tracking URLs, data URIs, images below 400x300, extreme aspect ratios, files under 5KB. Defines blocked compositions (UI screenshots, memes, logo collages, QR codes, slides, stock handshakes). Soft preferences for professional lighting, clear subject, high contrast
+- **Layer 1 — Content Type Standards**: Per-type scoring (0.0-1.0) with expected subject, framing, backgrounds, anti-patterns for all 9 types (product, article, video, music, repository, social, document, tool, unknown)
+- **Layer 2 — Category Aesthetics**: Per-category scoring (0.0-1.0) with palette, mood, textures, lighting, compositions, anti-patterns for all 9 categories (home, wear, watch, listen, use, eat, go, follow, read)
+- **6 exported functions**: `buildGatePrompt()`, `buildContentTypePrompt()`, `buildCategoryPrompt()`, `buildImageScoringPrompt()`, `checkGateUrlPatterns()`, `checkGateTechnical()`
+
+### Integration Points
+- **enrich-link**: Gate (Layer 0) actively blocks bad images — `isRejectedByGate()` runs at all 5 scrape checkpoints + Tier 2 validation runs `checkGateTechnical()` for dimension/aspect enforcement
+- **generate-widget**: Category aesthetic context (Layer 2) injected into AI prompt via `buildCategoryPrompt()` — shapes recommendation tone alongside brand and design system constraints
+
+### Digital Product Safeguards
+- `product` content type scoped to physical/tangible items; anti-patterns block app screenshots, software interfaces, browser mockups
+- `tool` content type explicitly rejects physical product framing (flat-lay, centered-product, on-model)
+- `use` category: `product-hero` renamed to `device-hero`; anti-pattern added for physical product shots applied to software
+- `buildContentTypePrompt()` injects explicit "product = physical only" guidance when type is `product`
+
+### Architecture Decision
+- Visual standards are defined as config, not code — prompt-ready specs that can be consumed by AI scoring, prompt injection, or future Claude Vision image ranking
+- Gate (Layer 0) is synchronous and runs before network requests — zero latency cost
+- Layers 1 and 2 currently only affect generate-widget prompts; not yet consumed by an image scorer (next step: async Tier 3 that sends candidates to Claude Vision with `buildImageScoringPrompt()`)
+
+## Previous Updates (v6.0 - Generic Widget Architecture)
 
 ### Generic Consolidation
 - **18 → 10 generic widgets**: Category-specific widgets collapsed into generic versions with template variables
@@ -114,12 +138,16 @@ The AI Widget System provides intelligent, context-aware UI components that anal
 │  ┌─────────────────────────────▼─────────────────────────────────────┐  │
 │  │                     REQUEST PIPELINE                               │  │
 │  │  1. Validate request (widgetId, prompt, items)                    │  │
-│  │  2. Check server cache                                             │  │
-│  │  3. Call Claude API with prompt + brand constraints               │  │
-│  │  4. Parse JSON response (handle preamble text)                    │  │
-│  │  5. Validate brands → replace unsupported with alternatives       │  │
-│  │  6. Enrich suggestions with product images                        │  │
-│  │  7. Cache and return                                              │  │
+│  │  2. Check eligibility (config-driven rules)                       │  │
+│  │  3. Check server cache                                             │  │
+│  │  4. Build prompt: base + brand constraints + design system        │  │
+│  │     + visual standards (category aesthetics) + confidence         │  │
+│  │  5. Call Claude API with full prompt                               │  │
+│  │  6. Parse JSON response (handle preamble text)                    │  │
+│  │  7. Validate brands → replace unsupported with alternatives       │  │
+│  │  8. Enrich suggestions with product images                        │  │
+│  │  9. Validate HTML against design system class allowlist           │  │
+│  │  10. Cache and return with meta (eligibility, confidence, stats)  │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────────┐│
@@ -1128,7 +1156,10 @@ interface ScrapingMonitor {
 | `supabase/functions/generate-widget/index.ts` | Edge Function - AI generation + scraping |
 | `supabase/functions/generate-widget/config/schema.ts` | TypeScript types for widget definitions |
 | `supabase/functions/generate-widget/config/registry.ts` | Widget loader and runtime evaluation |
+| `supabase/functions/generate-widget/config/design-system.ts` | Design system constraints for AI prompts |
+| `supabase/functions/generate-widget/config/visual-standards.ts` | Three-layer visual standards (gate, content type, category aesthetics) |
 | `supabase/functions/generate-widget/config/widgets/*.ts` | Individual widget configurations |
+| `supabase/functions/enrich-link/index.ts` | Edge Function - Link enrichment + image resolution (consumes Layer 0 gate) |
 | `boards/index.html` | Client app - Widget registry, rendering, feedback |
 | `docs/infrastructure/technical-design/ai-widget-system.md` | This documentation |
 

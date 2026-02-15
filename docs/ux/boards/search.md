@@ -11,7 +11,7 @@ Find pins quickly with inline search and category filtering.
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Search Input | ✅ Shipped | In filter bar |
-| Client-side Search | ✅ Shipped | Filters title, domain, description, category, URL |
+| Client-side Search | ✅ Shipped | Filters title, domain, description, category, URL, notes |
 | Clear with Escape | ✅ Shipped | Keyboard shortcut |
 | Highlight Matches | ⏳ Planned | Visual highlight in results |
 | Keyboard Navigation | ⏳ Planned | j/k, /, ? shortcuts |
@@ -101,10 +101,11 @@ Find pins quickly with inline search and category filtering.
 
 | Input | Matches Against |
 |-------|-----------------|
-| `nike` | Title, domain, description, category, URL |
+| `nike` | Title, domain, description, category, URL, notes |
 | `amazon.com` | Domain and URL |
-| `jacket` | Title and description |
+| `jacket` | Title, description, and notes |
 | `clothing` | Category name |
+| `birthday gift` | Notes field (if you added this annotation) |
 
 ### Keyboard Shortcuts
 
@@ -152,5 +153,7 @@ Find pins quickly with inline search and category filtering.
 - Search state stored in `searchQuery` variable
 - Filter bar re-renders preserve search input value
 - Empty results show contextual empty state
+- **Notes field included in search** - added in latest update
 - File: `boards/index.html:6166-6185` (search functions)
 - CSS: `.search-input` component in same file
+- Search function checks: `title`, `domain`, `description`, `category`, `url`, `notes`

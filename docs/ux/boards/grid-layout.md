@@ -14,6 +14,9 @@ The visual presentation of pins in a responsive, masonry-style grid inspired by 
 | Card Expansion | ✅ Shipped | Medium (2x2) and Large (3x2) |
 | Grid Reflow | ✅ Shipped | Auto gap-filling via `grid-auto-flow: dense` |
 | Grid Flow Priority | ✅ Shipped | Setting to prioritize flow over order |
+| Keyboard Navigation | ✅ Shipped | Enter/Space (open), Arrow keys (navigate), Home/End |
+| Mobile Card Overlay | ✅ Shipped | Always-visible gradient with title on touch devices |
+| Focus Indicators | ✅ Shipped | Visible focus outlines for keyboard users |
 | List View | ⏳ Planned | Alternative dense view |
 | Sort Options | ⏳ Planned | Date, name, domain |
 
@@ -38,6 +41,9 @@ The visual presentation of pins in a responsive, masonry-style grid inspired by 
 | Learn more about a pin | Expand the card | See full details |
 | Use my phone | Have a usable mobile view | Browse on the go |
 | Have many pins | Scroll smoothly | Browse large collections |
+| Navigate with keyboard | Use arrow keys to move between cards | Browse without a mouse |
+| Open a card with keyboard | Press Enter or Space | Access details hands-free |
+| See info on mobile | View card titles without tapping | Preview content while scrolling |
 
 ---
 
@@ -236,6 +242,81 @@ Order Priority (default):          Flow Priority (enabled):
 
 ---
 
+## Keyboard Navigation ✅ IMPLEMENTED
+
+Navigate the grid entirely with keyboard for accessibility and power users.
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| **Arrow Keys** | Navigate between cards (Up/Down/Left/Right) |
+| **Enter** or **Space** | Open/close expanded card details |
+| **Home** | Jump to first card |
+| **End** | Jump to last card |
+| **Tab** | Cycle through interactive elements |
+| **Shift+Tab** | Reverse cycle through interactive elements |
+
+### Focus Management
+
+**Grid Focus:**
+- Cards have `tabindex="0"` to make them keyboard-accessible
+- Visible focus outline: `2px solid var(--fg)` with `2px` offset
+- Selected/expanded cards have thicker outline: `3px solid var(--fg)`
+
+**Modal Focus Trapping:**
+- When a modal opens, focus moves to first interactive element
+- Tab/Shift+Tab cycles only through modal elements
+- Escape closes modal and restores focus to trigger element
+- Clicking backdrop closes modal
+
+**Implementation details:**
+- Grid navigation handler: `boards/index.html` (keyboard event listener on grid)
+- Focus indicators: `.grid-item:focus` and `.grid-item--selected` CSS classes
+- Modal focus trap: Implemented in modal open/close handlers
+
+---
+
+## Mobile Card Overlay ✅ IMPLEMENTED
+
+On touch devices, card overlays are always visible with a gradient background, eliminating the need to tap-and-hold to see titles.
+
+### Before (hover-only)
+```
+┌─────────────┐
+│             │
+│   [image]   │
+│             │
+│ (no overlay)│
+└─────────────┘
+```
+
+### After (always-visible on touch)
+```
+┌─────────────┐
+│             │
+│   [image]   │
+│  ┌────────┐ │
+│  │gradient│ │
+│  │ Title  │ │
+│  │ domain │ │
+│  └────────┘ │
+└─────────────┘
+```
+
+**Design details:**
+- Gradient: `transparent 30%` → `rgba(0,0,0,0.85)` bottom
+- Text size: Title 10px, domain 8px
+- Always visible on `@media (hover: none)` devices
+- No border-top to blend seamlessly
+
+**Implementation details:**
+- CSS: `@media (hover: none)` block in `boards/index.html`
+- Overlay background: `linear-gradient(transparent 30%, rgba(0,0,0,0.85))`
+- Text sizing: Smaller fonts for compact overlay
+
+---
+
 ## Known Extensions / Future States
 
 ### Short-term
@@ -264,3 +345,7 @@ Order Priority (default):          Flow Priority (enabled):
 - Grayscale via CSS filter, removed on hover/expand
 - Card expansion preserved in localStorage via `saveExpandedCards()`
 - Responsive breakpoints: 2 cols (mobile) → 3 → 4 → 5 (1200px+)
+- **Keyboard navigation:** Arrow keys use grid-based position calculation
+- **Focus indicators:** CSS `:focus` and `.grid-item--selected` classes
+- **Mobile overlay:** Always visible via `@media (hover: none)` media query
+- **Focus trapping:** Modal keydown handler cycles Tab through modal elements only

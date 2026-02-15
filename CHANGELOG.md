@@ -6,6 +6,102 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-14] - Events Aggregator: New Sources, RA GraphQL Fix & Multi-Source Tags
+
+### Added
+- **Gary's Guide event source** — `fetchGarysGuide()` scraper for tech/startup events (SF + NYC). Parses custom table layout with `font.ftitle > a` links, `font.fdescription` venue/address, and day headers. ~63 events per region.
+- **Bonobo Network event source** — `fetchBonobo()` scraper for social/community events (SF). Uses Squarespace JSON API (`?format=json`) with JSON-LD and HTML fallbacks. ~8 upcoming events.
+- **Tech and Social content types** — Added `tech` and `social` to `CONTENT_TYPES` with keyword-based detection in `detectEventType()` (tech: startup, hack, ai, demo day, pitch, etc.; social: mixer, happy hour, brunch, etc.)
+- **Multi-source tags** — Deduped events now show separate color-coded clickable tags per source instead of a single combined tag (e.g. `19hz` `RA` instead of `19hz + RA`)
+
+### Fixed
+- **Resident Advisor scraper** — RA is a SPA returning an empty 765-byte HTML shell. Rewrote `fetchRA()` to use RA's GraphQL API (`ra.co/graphql`, `eventListings` query). Returns ~72 events per area with full metadata. Added `__NEXT_DATA__` fallback.
+- **Edge function POST support** — `fetch-source` now accepts `method`, `body`, and `headers` params for server-side POST proxying (needed for RA GraphQL)
+- **Edge function domain allowlists** — Added `garysguide.com`, `bonobonetwork.com`, and `ra.co` to `fetch-source` and `enrich-event` ALLOWED_DOMAINS. Deployed both functions.
+
+### Changed
+- **CLAUDE.md autonomous operations** — Added rules: always merge PR to master when finished; always deploy updated Supabase edge functions after merge without asking
+
+### PRs
+- #64: Add Gary's Guide and Bonobo Network as event sources
+- #67: Fix Gary's Guide and Bonobo scrapers (parser + edge function deploy)
+- #68: Add auto-merge and auto-deploy rules to CLAUDE.md
+- #70: Fix Resident Advisor: use GraphQL API instead of HTML scraping
+- #78: Show separate source tags for deduped events
+
+---
+
+## [2026-02-14] - Visual Standards System for Image Quality & Aesthetics
+
+### Added
+- **Three-layer visual standards framework** (`supabase/functions/generate-widget/config/visual-standards.ts`) — defines image quality and aesthetic expectations across the entire platform:
+  - **Layer 0 — Product Gate**: Universal pass/fail for any image. Blocks stock watermarks (Shutterstock, Getty), ad network pixels, tracking URLs, data URIs, default social share images, emoji CDNs. Rejects images below 400x300, aspect ratios beyond 3.5:1, files under 5KB. Defines blocked compositions: UI screenshots, text-only images, memes, logo collages, QR codes, presentation slides, spreadsheets, cookie popups, stock handshakes. Soft preferences for professional lighting, clear subject, high contrast, "human curated feel."
+  - **Layer 1 — Content Type Standards**: Scores 0.0-1.0 per content type. Defines expected subject, good framing, good backgrounds, anti-patterns, and aspect preference for all 9 types: product, article, video, music, repository, social, document, tool, unknown.
+  - **Layer 2 — Category Aesthetics**: Scores 0.0-1.0 per board category. Defines palette (hex colors), mood, textures, lighting, compositions, and anti-patterns for all 9 categories: home, wear, watch, listen, use, eat, go, follow, read.
+- **6 exported functions**: `buildGatePrompt()`, `buildContentTypePrompt()`, `buildCategoryPrompt()`, `buildImageScoringPrompt()`, `checkGateUrlPatterns()`, `checkGateTechnical()`
+- **Digital product safeguards** — explicit separation between physical and digital products:
+  - `product` content type scoped to physical/tangible items with anti-patterns for app screenshots, software interfaces, browser mockups
+  - `tool` content type explicitly rejects physical product framing (flat-lay, centered-product, on-model)
+  - `use` category composition renamed from `product-hero` to `device-hero`; anti-pattern added for physical product shots applied to software
+  - `buildContentTypePrompt()` injects explicit guidance when type is `product`: digital products should be classified as `tool` instead
+
+### Changed
+- **`enrich-link` edge function** — gate layer now active in image resolution pipeline:
+  - New `isRejectedByGate()` function combines existing logo/placeholder checks with `checkGateUrlPatterns()` for pre-network rejection
+  - `scrapeImage()` runs gate at all 5 candidate checkpoints (og:image, twitter:image, JSON-LD, Shopify CDN, srcset)
+  - `validateImageTier2()` runs `checkGateUrlPatterns()` after placeholder check and `checkGateTechnical()` after dimension extraction
+- **`generate-widget` edge function** — category aesthetic context injected into AI prompts:
+  - Imports `buildCategoryPrompt()` from visual-standards.ts
+  - Injects category mood, palette, textures, lighting, compositions, and anti-patterns into prompt alongside brand and design system constraints
+
+---
+
+## [2026-02-14] - Boards UX Audit: Accessibility, Security & Mobile Fixes
+
+### Security
+- **XSS fix in widget suggestions** — All AI-provided URLs are now escaped with `esc()` before injection into href attributes
+- **Sync error handling with retry** — Failed Supabase syncs now show user-facing error toasts and implement automatic retry queue on next sync cycle
+
+### Accessibility
+- **Color contrast fix** — Updated `--muted` from #888 to #999 for WCAG AA compliance
+- **ARIA roles** — Added proper roles to all modals (role=dialog, aria-modal, aria-labelledby), filter bar (role=tablist/tab with aria-selected), and FAB menu
+- **Focus trapping** — Modals now trap focus with Tab/Shift+Tab cycling and restore focus on close
+- **Keyboard navigation** — Card grid supports Enter/Space for select/expand, Arrow keys for movement, Home/End for first/last
+- **Screen reader support** — Toast container has aria-live="polite", all card images have meaningful alt text
+
+### Mobile
+- **Always-visible card overlay** — Touch devices now always show gradient overlay with title and metadata (no hover required)
+- **Dark mode embeds** — Spotify (theme=0) and SoundCloud embeds now respect dark mode
+- **Expanded URL param cleanup** — Now strips fbclid, mc_cid, and other tracking parameters
+- **Logo detection fix** — Resolved false positives via improved path-segment matching
+
+### Added
+- **Notes field** — Expanded cards include auto-saving notes textarea (searchable)
+- **Onboarding system** — First-pin celebration and progressive hints for new users
+- **Listen player metadata** — BPM, key, and genre now displayed in listen category players
+- **GitHub link preview** — Shows stars count and language badge for GitHub repositories
+- **Watch mood tags** — TMDB keywords and genres mapped to mood tags
+- **APP_CONFIG extraction** — Admin emails and config moved out of hardcoded constants
+
+### Changed
+- **Consolidated hamburger menu** — "Refresh Image" + "Rerun Enrichment" merged into single "Refresh" action, "Change Category" + "Change Content Type" merged into new "Organize" modal, "Share Link" renamed to "Share"
+- **Error badge improvements** — Now shows context on tap and triggers refresh/retry
+- **Organize modal** — New unified interface for category and content type changes
+- **Paste deduplication** — Suppresses add prompt for recently added URLs
+- **Widget re-trigger** — Category changes now automatically regenerate relevant widgets
+- **Widget timeout handling** — 10-second timeout with "Tap to retry" fallback for failed widget generation
+- **Enrichment error UI** — Error badge now clickable to trigger retry
+- **Expanded card validation** — Link IDs validated on load to prevent desync from deleted links
+
+### Fixed
+- BUG-027: XSS vulnerability in AI widget suggestions
+- BUG-028: Color contrast fails WCAG AA in muted text
+- BUG-029: No keyboard access to card grid
+- BUG-030: Missing ARIA roles on interactive elements
+- Multiple micro-interaction and mobile UX issues
+
+---
+
 ## [2026-02-13] - Link Capture Improvements: Mobile, PWA, Bookmarklet, Image Scan
 
 ### Added
