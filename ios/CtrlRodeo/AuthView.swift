@@ -20,61 +20,70 @@ struct AuthView: View {
                 Spacer()
 
                 // Logo
-                Text("ctrl.rodeo")
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
+                Text("boards")
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundColor(Theme.foreground)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 8)
 
                 // Tagline
-                VStack(spacing: 4) {
+                VStack(spacing: 2) {
                     Text("Your likes. Your saves.")
-                        .font(.system(size: 15))
-                        .foregroundColor(Theme.muted)
+                        .textCase(.uppercase)
+                        .tracking(1)
                     Text("Your life \u{2014} organized.")
-                        .font(.system(size: 15))
-                        .foregroundColor(Theme.muted)
+                        .textCase(.uppercase)
+                        .tracking(1)
                 }
-                .padding(.bottom, 48)
+                .font(.system(size: 10))
+                .foregroundColor(Theme.muted)
+                .padding(.bottom, 32)
 
                 if didSend {
                     // Success state
-                    VStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         Image(systemName: "envelope.open")
-                            .font(.system(size: 36))
+                            .font(.system(size: 24))
                             .foregroundColor(Theme.foreground)
 
-                        Text("Check your email")
-                            .font(.system(size: 18, weight: .semibold))
+                        Text("CHECK YOUR EMAIL")
+                            .font(.system(size: 10))
+                            .tracking(1)
                             .foregroundColor(Theme.foreground)
 
                         Text("We sent a magic link to\n\(email)")
-                            .font(.system(size: 14))
+                            .font(.system(size: 10))
                             .foregroundColor(Theme.muted)
                             .multilineTextAlignment(.center)
 
-                        Button("Send again") {
-                            didSend = false
+                        Button(action: { didSend = false }) {
+                            Text("SEND AGAIN")
+                                .font(.system(size: 10))
+                                .tracking(0.5)
+                                .foregroundColor(Theme.muted)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Rectangle()
+                                        .stroke(Theme.borderSubtle, lineWidth: 1)
+                                )
                         }
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.muted)
-                        .padding(.top, 8)
+                        .padding(.top, 4)
                     }
                     .padding(.horizontal, 32)
                 } else {
                     // Email input
                     VStack(spacing: 16) {
-                        TextField("", text: $email, prompt: Text("email@example.com").foregroundColor(Color(hex: "#555555")))
+                        TextField("", text: $email, prompt: Text("email@example.com").foregroundColor(Theme.placeholder))
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .foregroundColor(Theme.foreground)
-                            .font(.system(size: 16))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
+                            .font(.system(size: 10))
+                            .padding(12)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color(hex: "#333333"), lineWidth: 1)
+                                Rectangle()
+                                    .stroke(Theme.foreground, lineWidth: 1)
                             )
                             .focused($emailFocused)
 
@@ -83,27 +92,32 @@ struct AuthView: View {
                             Group {
                                 if isSending {
                                     ProgressView()
-                                        .tint(Theme.background)
+                                        .tint(isValidEmail ? Theme.background : Theme.subtle)
                                 } else {
                                     Text("SEND MAGIC LINK")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .tracking(1)
+                                        .font(.system(size: 10))
+                                        .tracking(0.5)
                                 }
                             }
                             .frame(maxWidth: .infinity)
-                            .frame(height: 48)
+                            .padding(.vertical, 8)
                         }
-                        .foregroundColor(Theme.background)
+                        .foregroundColor(isValidEmail ? Theme.background : Theme.subtle)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isValidEmail ? Theme.foreground : Color(hex: "#333333"))
+                            ZStack {
+                                if isValidEmail {
+                                    Rectangle().fill(Theme.foreground)
+                                } else {
+                                    Rectangle().stroke(Theme.borderSubtle, lineWidth: 1)
+                                }
+                            }
                         )
                         .disabled(!isValidEmail || isSending)
 
                         // Error message
                         if let error = errorMessage {
                             Text(error)
-                                .font(.system(size: 13))
+                                .font(.system(size: 10))
                                 .foregroundColor(.red)
                                 .multilineTextAlignment(.center)
                         }
@@ -116,24 +130,25 @@ struct AuthView: View {
                 // Divider
                 HStack(spacing: 12) {
                     Rectangle()
-                        .fill(Color(hex: "#333333"))
+                        .fill(Theme.borderSubtle)
                         .frame(height: 1)
-                    Text("or")
-                        .font(.system(size: 13))
+                    Text("OR")
+                        .font(.system(size: 10))
+                        .tracking(0.5)
                         .foregroundColor(Theme.muted)
                     Rectangle()
-                        .fill(Color(hex: "#333333"))
+                        .fill(Theme.borderSubtle)
                         .frame(height: 1)
                 }
                 .padding(.horizontal, 32)
-                .padding(.bottom, 20)
+                .padding(.bottom, 16)
 
                 // Skip button
                 Button(action: onSkip) {
                     Text("CONTINUE WITHOUT LOGIN")
-                        .font(.system(size: 13, weight: .medium))
-                        .tracking(0.5)
-                        .foregroundColor(Theme.muted)
+                        .font(.system(size: 10))
+                        .tracking(1)
+                        .foregroundColor(Theme.subtle)
                 }
                 .padding(.bottom, 48)
             }
