@@ -756,35 +756,6 @@ body {
   font-size: 12px;
 }
 
-/* Theme toggle in bottom nav */
-.bottom-nav .theme-toggle {
-  width: 32px;
-  height: 18px;
-  background: transparent;
-  border: 1px solid var(--fg);
-  cursor: pointer;
-  padding: 2px;
-  transition: background 0.2s ease;
-  flex-shrink: 0;
-}
-
-.bottom-nav .theme-toggle__knob {
-  width: 12px;
-  height: 12px;
-  background: var(--fg);
-  transition: transform 0.2s ease;
-  transform: translateX(0);
-}
-
-:root.light .bottom-nav .theme-toggle {
-  background: var(--fg);
-}
-
-:root.light .bottom-nav .theme-toggle__knob {
-  background: var(--bg);
-  transform: translateX(14px);
-}
-
 /* Hidden file inputs for uploads */
 .hidden-input {
   display: none;
@@ -3551,7 +3522,7 @@ body {
   position: fixed;
   bottom: calc(var(--safe-bottom) + var(--space-4));
   left: var(--space-4);
-  right: var(--space-4);
+  max-width: 360px;
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -4638,9 +4609,6 @@ body {
   <nav class="bottom-nav" id="bottomNav">
     <div class="bottom-nav__left">
       <button class="bottom-nav__share-btn" id="shareBtn" style="display:none;">Share</button>
-      <button class="float-btn theme-toggle" id="bottomThemeToggle" aria-label="Toggle theme">
-        <div class="theme-toggle__knob"></div>
-      </button>
     </div>
     <div class="bottom-nav__right">
       <div class="fab-menu" id="fabMenu" style="display:none;">
@@ -11152,8 +11120,6 @@ Return JSON:
   const photoInput = $('photoInput');
   const scanInput = $('scanInput');
   const videoInput = $('videoInput');
-  const bottomThemeToggle = $('bottomThemeToggle');
-
   // Scan Modal DOM
   const scanModal = $('scanModal');
   const scanResults = $('scanResults');
@@ -12191,12 +12157,6 @@ Return JSON:
       el.onclick = () => closeModal(scanModal);
     });
   }
-
-  // Bottom theme toggle
-  bottomThemeToggle.onclick = () => {
-    document.documentElement.classList.toggle('light');
-    localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
-  };
 
   addForm.onsubmit = async (e) => {
     e.preventDefault();
