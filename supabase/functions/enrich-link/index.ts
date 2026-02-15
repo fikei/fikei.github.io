@@ -59,19 +59,37 @@ serve(async (req) => {
     const path = new URL(url).pathname
 
     // ========================================
-    // STEP 0: oEmbed title resolution for platforms that block scraping
-    // YouTube returns generic "YouTube" page data to CORS proxies/scrapers.
-    // Use oEmbed to get real video title, author, and thumbnail.
+    // STEP 0: Platform API metadata for sites that block scraping
+    // YouTube blocks CORS proxies — use YouTube Data API v3 for full metadata.
+    // Vimeo uses oEmbed (simple, reliable).
     // ========================================
-    const oembedTitle = await resolveOembedMetadata(url, domain)
+    let youtubeData: YouTubeVideoData | null = null
+    const oembedTitle = await (async () => {
+      // YouTube: use Data API v3 (full metadata) with oEmbed fallback
+      if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+        youtubeData = await lookupYouTube(url)
+        if (youtubeData) {
+          return {
+            title: youtubeData.title,
+            author: youtubeData.channelTitle,
+            thumbnail: youtubeData.thumbnailUrl
+          }
+        }
+      }
+      // Vimeo: oEmbed
+      return await resolveOembedMetadata(url, domain)
+    })()
+
     if (oembedTitle) {
       // Only override if title is missing or generic
       const genericTitles = ['youtube', 'vimeo', 'watch', '']
       if (!title || genericTitles.includes(title.toLowerCase().trim())) {
-        console.log('[enrich-link] oEmbed resolved title:', oembedTitle.title)
+        console.log('[enrich-link] Platform API resolved title:', oembedTitle.title)
         title = oembedTitle.title
       }
-      if (!description && oembedTitle.author) {
+      if ((!description || description.length < 20) && youtubeData?.description) {
+        description = youtubeData.description.slice(0, 500)
+      } else if (!description && oembedTitle.author) {
         description = `By ${oembedTitle.author}`
       }
     }
@@ -259,46 +277,80 @@ serve(async (req) => {
     }
 
     // ========================================
-    // STEP 2.5: Watch Enrichment — TMDB first, AI fills gaps
+    // STEP 2.5: Watch Enrichment — YouTube API / TMDB / AI
     // ========================================
     let videoMeta: Record<string, any> | null = null
     if (enrichWatch || category === 'watch' || contentType === 'video') {
-      console.log('[enrich-link] Step 2.5: Watch enrichment (TMDB → AI)')
+      // YouTube videos: use YouTube Data API directly (skip TMDB — it's for movies/TV)
+      if (youtubeData) {
+        console.log('[enrich-link] Step 2.5: Watch enrichment from YouTube API')
+        const publishYear = youtubeData.publishedAt
+          ? parseInt(youtubeData.publishedAt.split('-')[0], 10)
+          : null
 
-      // 1. Try TMDB first (structured, real-time data)
-      const tmdbResult = await lookupTMDB(title || '', null, null)
-
-      // 2. Only call AI if TMDB left gaps
-      const needsAI = !tmdbResult
-        || !tmdbResult.overview
-        || !tmdbResult.streamingServices?.length
-
-      let aiResult: Record<string, any> | null = null
-      if (needsAI) {
-        console.log('[enrich-link] TMDB incomplete, calling AI for gaps')
-        aiResult = await enrichWatchWithAI(url, title, description)
+        videoMeta = {
+          title: youtubeData.title,
+          summary: truncSummary(youtubeData.description),
+          type: 'video',
+          genre: youtubeData.tags?.[0] || null,
+          year: publishYear,
+          creator: youtubeData.channelTitle || null,
+          rating: null,
+          runtime: youtubeData.duration,
+          voteAverage: null,
+          tmdbId: null,
+          imdbId: null,
+          tmdbUrl: null,
+          posterPath: null,
+          streamingServices: [{ name: 'YouTube', type: 'free', logoPath: null }],
+          // YouTube-specific fields
+          youtubeVideoId: youtubeData.videoId,
+          viewCount: youtubeData.viewCount,
+          likeCount: youtubeData.likeCount,
+          channelTitle: youtubeData.channelTitle,
+          publishedAt: youtubeData.publishedAt,
+          tags: youtubeData.tags?.slice(0, 10) || []
+        }
+        console.log('[enrich-link] YouTube watch enrichment result:', videoMeta)
       } else {
-        console.log('[enrich-link] TMDB complete, skipping AI call')
-      }
+        // Non-YouTube: TMDB first, AI fills gaps
+        console.log('[enrich-link] Step 2.5: Watch enrichment (TMDB → AI)')
 
-      // 3. Merge: TMDB is primary, AI fills gaps
-      videoMeta = {
-        title: tmdbResult?.title || null,  // Clean canonical title from TMDB
-        summary: truncSummary(tmdbResult?.overview || aiResult?.summary || null),
-        type: aiResult?.type || (tmdbResult ? inferTypeFromTMDB(tmdbResult.mediaType) : null),
-        genre: tmdbResult?.genres?.[0] || aiResult?.genre || null,
-        year: tmdbResult?.year || aiResult?.year || null,
-        creator: tmdbResult?.creator || aiResult?.creator || null,
-        rating: aiResult?.rating || null,
-        runtime: tmdbResult?.runtime ? tmdbResult.runtime * 60 : null,
-        voteAverage: tmdbResult?.voteAverage || null,
-        tmdbId: tmdbResult?.tmdbId || null,
-        imdbId: tmdbResult?.imdbId || null,
-        tmdbUrl: tmdbResult?.tmdbUrl || null,
-        posterPath: tmdbResult?.posterPath || null,
-        streamingServices: tmdbResult?.streamingServices?.length
-          ? tmdbResult.streamingServices
-          : aiResult?.streamingServices || [],
+        // 1. Try TMDB first (structured, real-time data)
+        const tmdbResult = await lookupTMDB(title || '', null, null)
+
+        // 2. Only call AI if TMDB left gaps
+        const needsAI = !tmdbResult
+          || !tmdbResult.overview
+          || !tmdbResult.streamingServices?.length
+
+        let aiResult: Record<string, any> | null = null
+        if (needsAI) {
+          console.log('[enrich-link] TMDB incomplete, calling AI for gaps')
+          aiResult = await enrichWatchWithAI(url, title, description)
+        } else {
+          console.log('[enrich-link] TMDB complete, skipping AI call')
+        }
+
+        // 3. Merge: TMDB is primary, AI fills gaps
+        videoMeta = {
+          title: tmdbResult?.title || null,
+          summary: truncSummary(tmdbResult?.overview || aiResult?.summary || null),
+          type: aiResult?.type || (tmdbResult ? inferTypeFromTMDB(tmdbResult.mediaType) : null),
+          genre: tmdbResult?.genres?.[0] || aiResult?.genre || null,
+          year: tmdbResult?.year || aiResult?.year || null,
+          creator: tmdbResult?.creator || aiResult?.creator || null,
+          rating: aiResult?.rating || null,
+          runtime: tmdbResult?.runtime ? tmdbResult.runtime * 60 : null,
+          voteAverage: tmdbResult?.voteAverage || null,
+          tmdbId: tmdbResult?.tmdbId || null,
+          imdbId: tmdbResult?.imdbId || null,
+          tmdbUrl: tmdbResult?.tmdbUrl || null,
+          posterPath: tmdbResult?.posterPath || null,
+          streamingServices: tmdbResult?.streamingServices?.length
+            ? tmdbResult.streamingServices
+            : aiResult?.streamingServices || [],
+        }
       }
 
       console.log('[enrich-link] Watch enrichment result:', videoMeta)
@@ -359,9 +411,12 @@ serve(async (req) => {
         image_source: imageSource,
         image_resolved_at: new Date().toISOString()
       }
-      // Save oEmbed-resolved title to DB (overrides generic "YouTube" etc.)
+      // Save platform-resolved title to DB (overrides generic "YouTube" etc.)
       if (oembedTitle) {
         updatePayload.title = title
+        if (youtubeData?.description) {
+          updatePayload.description = youtubeData.description.slice(0, 500)
+        }
       }
       if (imageScores) {
         updatePayload.image_scores = imageScores
@@ -403,10 +458,11 @@ serve(async (req) => {
       image_resolution_log: imageResolutionLog,
       cached
     }
-    // Include oEmbed-resolved title so client can update its stored data
+    // Include platform-resolved title so client can update its stored data
     if (oembedTitle) {
       response.title = title
       if (oembedTitle.author) response.author = oembedTitle.author
+      if (youtubeData?.description) response.description = youtubeData.description.slice(0, 500)
     }
     if (videoMeta) {
       response.video = videoMeta
@@ -481,6 +537,156 @@ async function resolveOembedMetadata(
   }
 
   return null
+}
+
+// ========================================
+// YouTube Data API v3 — full video metadata
+// ========================================
+interface YouTubeVideoData {
+  videoId: string
+  title: string
+  description: string
+  channelTitle: string
+  publishedAt: string
+  thumbnailUrl: string | null
+  duration: number | null      // seconds
+  tags: string[]
+  categoryId: string | null
+  viewCount: number | null
+  likeCount: number | null
+}
+
+/**
+ * Extract YouTube video ID from various URL formats.
+ */
+function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    // youtube.com/watch?v=ID
+    if (parsed.hostname.includes('youtube.com')) {
+      return parsed.searchParams.get('v')
+    }
+    // youtu.be/ID
+    if (parsed.hostname.includes('youtu.be')) {
+      return parsed.pathname.slice(1).split(/[?#]/)[0] || null
+    }
+  } catch {}
+  return null
+}
+
+/**
+ * Parse ISO 8601 duration (PT1H2M3S) to seconds.
+ */
+function parseISO8601Duration(iso: string): number | null {
+  if (!iso) return null
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+  if (!match) return null
+  const hours = parseInt(match[1] || '0', 10)
+  const minutes = parseInt(match[2] || '0', 10)
+  const seconds = parseInt(match[3] || '0', 10)
+  return hours * 3600 + minutes * 60 + seconds
+}
+
+/**
+ * Look up a YouTube video using the Data API v3.
+ * Returns rich metadata: title, description, channel, duration, tags, thumbnails, stats.
+ * Falls back to oEmbed if no API key.
+ */
+async function lookupYouTube(url: string): Promise<YouTubeVideoData | null> {
+  const videoId = extractYouTubeVideoId(url)
+  if (!videoId) {
+    console.log('[youtube] Could not extract video ID from:', url)
+    return null
+  }
+
+  const apiKey = Deno.env.get('YOUTUBE_API_KEY')
+  if (!apiKey) {
+    console.log('[youtube] No YOUTUBE_API_KEY, falling back to oEmbed')
+    // Fallback: use oEmbed for basic title/author
+    try {
+      const resp = await fetch(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+      )
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.title) {
+          return {
+            videoId,
+            title: data.title,
+            description: '',
+            channelTitle: data.author_name || '',
+            publishedAt: '',
+            thumbnailUrl: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            duration: null,
+            tags: [],
+            categoryId: null,
+            viewCount: null,
+            likeCount: null
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[youtube] oEmbed fallback error:', e)
+    }
+    return null
+  }
+
+  try {
+    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?` +
+      `id=${videoId}` +
+      `&part=snippet,contentDetails,statistics` +
+      `&key=${apiKey}`
+
+    console.log('[youtube] Fetching video data for:', videoId)
+    const resp = await fetch(apiUrl)
+
+    if (!resp.ok) {
+      console.error('[youtube] API error:', resp.status, await resp.text())
+      return null
+    }
+
+    const data = await resp.json()
+    const items = data.items || []
+
+    if (items.length === 0) {
+      console.log('[youtube] Video not found:', videoId)
+      return null
+    }
+
+    const video = items[0]
+    const snippet = video.snippet || {}
+    const contentDetails = video.contentDetails || {}
+    const statistics = video.statistics || {}
+
+    // Pick best thumbnail: maxres > standard > high > medium > default
+    const thumbs = snippet.thumbnails || {}
+    const thumbnailUrl = thumbs.maxres?.url
+      || thumbs.standard?.url
+      || thumbs.high?.url
+      || thumbs.medium?.url
+      || thumbs.default?.url
+      || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+
+    const result: YouTubeVideoData = {
+      videoId,
+      title: snippet.title || '',
+      description: snippet.description || '',
+      channelTitle: snippet.channelTitle || '',
+      publishedAt: snippet.publishedAt || '',
+      thumbnailUrl,
+      duration: parseISO8601Duration(contentDetails.duration),
+      tags: snippet.tags || [],
+      categoryId: snippet.categoryId || null,
+      viewCount: statistics.viewCount ? parseInt(statistics.viewCount, 10) : null,
+      likeCount: statistics.likeCount ? parseInt(statistics.likeCount, 10) : null
+    }
+
+    console.log('[youtube] Video data:', result.title, `(${result.duration}s)`, 'by', result.channelTitle)
+    return result
+  } catch (e) {
+    console.error('[youtube] API lookup error:', e)
+    return null
+  }
 }
 
 // ========================================

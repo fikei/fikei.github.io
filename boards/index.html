@@ -9461,10 +9461,13 @@ Return JSON:
           }
         }
 
-        // Update title from oEmbed if server resolved a better one (e.g. YouTube)
+        // Update title/description from platform API if server resolved better data (e.g. YouTube)
         if (result.title && (!link.title || link.title === extractDomain(link.url))) {
-          console.log('%c[ENRICH] Title updated from oEmbed:', 'color: #27ae60', result.title);
+          console.log('%c[ENRICH] Title updated from platform API:', 'color: #27ae60', result.title);
           link.title = result.title;
+        }
+        if (result.description && (!link.description || link.description.length < 20)) {
+          link.description = result.description;
         }
 
         save(data);
