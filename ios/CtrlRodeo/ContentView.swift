@@ -3,11 +3,57 @@ import WebKit
 
 struct ContentView: View {
     @State private var isRefreshing = false
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
 
     var body: some View {
-        WebView(isRefreshing: $isRefreshing)
+        ZStack {
+            WebView(
+                isRefreshing: $isRefreshing,
+                isLoading: $isLoading,
+                errorMessage: $errorMessage
+            )
             .ignoresSafeArea()
             .background(Theme.background)
+
+            // Loading overlay
+            if isLoading && errorMessage == nil {
+                ZStack {
+                    Theme.background
+                        .ignoresSafeArea()
+
+                    ProgressView()
+                        .tint(Theme.foreground)
+                }
+            }
+
+            // Error overlay
+            if let error = errorMessage {
+                ZStack {
+                    Theme.background
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 20) {
+                        Text(error)
+                            .foregroundColor(Theme.foreground)
+                            .multilineTextAlignment(.center)
+                            .padding()
+
+                        Button("Retry") {
+                            errorMessage = nil
+                            // Will trigger reload via binding in WebView
+                        }
+                        .foregroundColor(Theme.foreground)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Theme.foreground, lineWidth: 1)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -15,8 +61,12 @@ struct ContentView: View {
 
 struct WebView: UIViewRepresentable {
     @Binding var isRefreshing: Bool
+    @Binding var isLoading: Bool
+    @Binding var errorMessage: String?
 
     func makeUIView(context: Context) -> WKWebView {
+        print("[WebView] makeUIView: Creating WKWebView")
+
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
 
@@ -38,6 +88,7 @@ struct WebView: UIViewRepresentable {
 
         // Load the boards URL
         if let url = URL(string: AppConstants.boardsURL) {
+            print("[WebView] makeUIView: Loading URL \(url)")
             webView.load(URLRequest(url: url))
         }
 
@@ -58,10 +109,23 @@ struct WebView: UIViewRepresentable {
             context.coordinator.refreshControl?.endRefreshing()
             isRefreshing = false
         }
+
+        // Reload if error was cleared (retry button tapped)
+        if errorMessage == nil && context.coordinator.shouldRetry {
+            context.coordinator.shouldRetry = false
+            print("[WebView] updateUIView: Retrying load")
+            if let url = URL(string: AppConstants.boardsURL) {
+                webView.load(URLRequest(url: url))
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isRefreshing: $isRefreshing)
+        Coordinator(
+            isRefreshing: $isRefreshing,
+            isLoading: $isLoading,
+            errorMessage: $errorMessage
+        )
     }
 
     // MARK: - Coordinator
@@ -69,18 +133,33 @@ struct WebView: UIViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var webView: WKWebView?
         var refreshControl: UIRefreshControl?
+        var shouldRetry = false
+
         @Binding var isRefreshing: Bool
+        @Binding var isLoading: Bool
+        @Binding var errorMessage: String?
 
         private var hasInjectedAuth = false
         private var hasProcessedQueue = false
 
-        init(isRefreshing: Binding<Bool>) {
+        init(isRefreshing: Binding<Bool>, isLoading: Binding<Bool>, errorMessage: Binding<String?>) {
             _isRefreshing = isRefreshing
+            _isLoading = isLoading
+            _errorMessage = errorMessage
         }
 
         // MARK: - Navigation Delegate
 
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            print("[WebView] didStartProvisionalNavigation: Started loading")
+            isLoading = true
+            errorMessage = nil
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            print("[WebView] didFinish: Page loaded successfully")
+            isLoading = false
+
             injectAuthBridge()
 
             // Inject stored auth into web localStorage (one-time on first load)
@@ -96,6 +175,20 @@ struct WebView: UIViewRepresentable {
             }
 
             refreshControl?.endRefreshing()
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            print("[WebView] didFail: Navigation failed with error: \(error.localizedDescription)")
+            isLoading = false
+            errorMessage = "Failed to load: \(error.localizedDescription)"
+            shouldRetry = true
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            print("[WebView] didFailProvisionalNavigation: Provisional navigation failed with error: \(error.localizedDescription)")
+            isLoading = false
+            errorMessage = "Failed to load: \(error.localizedDescription)"
+            shouldRetry = true
         }
 
         // MARK: - Script Message Handler
@@ -206,4 +299,3 @@ struct WebView: UIViewRepresentable {
         }
     }
 }
-
