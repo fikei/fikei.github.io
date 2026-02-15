@@ -63,15 +63,41 @@ serve(async (req) => {
     // YouTube blocks CORS proxies — use YouTube Data API v3 for full metadata.
     // Vimeo uses oEmbed (simple, reliable).
     // ========================================
+    const isYouTube = domain.includes('youtube.com') || domain.includes('youtu.be')
     let youtubeData: YouTubeVideoData | null = null
     const oembedTitle = await (async () => {
       // YouTube: use Data API v3 (full metadata) with oEmbed fallback
-      if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+      if (isYouTube) {
         youtubeData = await lookupYouTube(url)
         if (youtubeData) {
           return {
             title: youtubeData.title,
             author: youtubeData.channelTitle,
+            thumbnail: youtubeData.thumbnailUrl
+          }
+        }
+        // YouTube API/oEmbed both failed (deleted/private video) —
+        // Still construct a minimal result with the video ID so we have
+        // a thumbnail and correct content_type
+        const videoId = extractYouTubeVideoId(url)
+        if (videoId) {
+          console.log('[enrich-link] YouTube API/oEmbed failed, using fallback for videoId:', videoId)
+          youtubeData = {
+            videoId,
+            title: '',
+            description: '',
+            channelTitle: '',
+            publishedAt: '',
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            duration: null,
+            tags: [],
+            categoryId: null,
+            viewCount: null,
+            likeCount: null
+          }
+          return {
+            title: '',  // empty — won't override existing title
+            author: null,
             thumbnail: youtubeData.thumbnailUrl
           }
         }
@@ -82,10 +108,12 @@ serve(async (req) => {
 
     if (oembedTitle) {
       // Only override if title is missing or generic
-      const genericTitles = ['youtube', 'vimeo', 'watch', '']
+      const genericTitles = ['youtube', 'youtu.be', 'vimeo', 'watch', '']
       if (!title || genericTitles.includes(title.toLowerCase().trim())) {
-        console.log('[enrich-link] Platform API resolved title:', oembedTitle.title)
-        title = oembedTitle.title
+        if (oembedTitle.title) {
+          console.log('[enrich-link] Platform API resolved title:', oembedTitle.title)
+          title = oembedTitle.title
+        }
       }
       if ((!description || description.length < 20) && youtubeData?.description) {
         description = youtubeData.description.slice(0, 500)
@@ -102,6 +130,14 @@ serve(async (req) => {
     let imageScores: Record<string, any> | null = null
     let cached = false
 
+    // Force content_type for known video platforms — no need for AI classification
+    if (isYouTube) {
+      contentType = 'video'
+      typeConfidence = 1.0
+      typeSource = 'rules'
+      console.log('[enrich-link] YouTube URL detected, forcing content_type=video')
+    }
+
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -110,7 +146,7 @@ serve(async (req) => {
     // ========================================
     // STEP 1: Content Type Classification
     // ========================================
-    if (!skipClassification) {
+    if (!skipClassification && contentType === 'unknown') {
       console.log('[enrich-link] Step 1: Classification')
 
       // Check domain profile cache first
@@ -151,9 +187,28 @@ serve(async (req) => {
     if (!shouldSkipImage) {
       console.log('[enrich-link] Step 2: Image resolution for type:', contentType)
 
+      // YouTube shortcut: use thumbnail directly from API/oEmbed/fallback
+      // This avoids the full strategy loop which can fail for YouTube
+      if (isYouTube && youtubeData?.thumbnailUrl) {
+        console.log('[enrich-link] Using YouTube thumbnail directly:', youtubeData.thumbnailUrl)
+        imageUrl = youtubeData.thumbnailUrl
+        imageSource = 'platform'
+        imageScores = {
+          visual_quality: 0.9, distinctiveness: 1.0,
+          evaluated_at: new Date().toISOString(),
+          evaluation_method: 'youtube_thumbnail_direct'
+        }
+        imageLog.push({
+          strategy: 'youtube_direct', result: 'accepted',
+          image_url: imageUrl, duration_ms: 0
+        })
+      }
+
+      // Only run strategy loop if we don't already have an image (e.g. from YouTube shortcut)
       const strategies = IMAGE_STRATEGIES[contentType] || IMAGE_STRATEGIES.unknown
 
       for (const strategy of strategies) {
+        if (imageUrl) break  // Already resolved (e.g. YouTube direct)
         const attemptStart = Date.now()
         console.log('[enrich-link] Trying strategy:', strategy)
 
@@ -488,33 +543,13 @@ serve(async (req) => {
 })
 
 // ========================================
-// oEmbed Metadata Resolution (YouTube, Vimeo)
+// oEmbed Metadata Resolution (Vimeo, etc.)
+// YouTube is handled by lookupYouTube() which uses Data API v3 + oEmbed fallback
 // ========================================
 async function resolveOembedMetadata(
   url: string,
   domain: string
 ): Promise<{ title: string, author: string | null, thumbnail: string | null } | null> {
-  // YouTube oEmbed (server-side, no CORS issues)
-  if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-    try {
-      const resp = await fetch(
-        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
-      )
-      if (resp.ok) {
-        const data = await resp.json()
-        if (data.title) {
-          return {
-            title: data.title,
-            author: data.author_name || null,
-            thumbnail: data.thumbnail_url || null
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[oembed] YouTube oEmbed error:', e)
-    }
-  }
-
   // Vimeo oEmbed
   if (domain.includes('vimeo.com')) {
     try {
