@@ -8447,6 +8447,7 @@ Return JSON:
         link.music.embedType = embedType;
         link.music.embedHeight = embedHeight;
         save(data);
+        syncLinkToSupabase(link);
       }
     }
     const platform = getMusicPlatform(link.domain) || '';
@@ -9004,10 +9005,8 @@ Return JSON:
         }
       }
 
-      // Sync to Supabase if logged in
-      if (currentUser) {
-        await syncToSupabase();
-      }
+      // Sync updated link to Supabase (has its own auth guards)
+      syncLinkToSupabase(link);
     }
   }
 
@@ -9223,6 +9222,7 @@ Return JSON:
       link.enrichment_failed = true;
       link.enrichment_failed_at = new Date().toISOString();
       save(data);
+      syncLinkToSupabase(link);
     }
   }
 
@@ -9441,9 +9441,8 @@ Return JSON:
         save(data);
 
         // Sync enrichment to Supabase (don't await — fire and forget)
-        if (currentUser) {
-          syncLinkToSupabase(link);
-        }
+        // syncLinkToSupabase has its own auth guards internally
+        syncLinkToSupabase(link);
       }
     }
 
@@ -12336,12 +12335,10 @@ Return JSON:
             });
           }
 
-          // Sync to Supabase
-          if (currentUser) {
-            const data = load();
-            const link = data.links.find(l => l.id === id);
-            if (link) await syncLinkToSupabase(link);
-          }
+          // Sync to Supabase (has its own auth guards)
+          const data2 = load();
+          const link2 = data2.links.find(l => l.id === id);
+          if (link2) syncLinkToSupabase(link2);
         } catch (err) {
           console.error('%c[LINK FLOW] ✗ Metadata fetch failed:', 'color: #e74c3c', err.message);
           // Update link to remove loading state, keep placeholder title
@@ -13710,11 +13707,10 @@ Return JSON:
             });
           }
 
-          if (currentUser) {
-            const data = load();
-            const link = data.links.find(l => l.id === id);
-            if (link) await syncLinkToSupabase(link);
-          }
+          // Sync to Supabase (has its own auth guards)
+          const data3 = load();
+          const link3 = data3.links.find(l => l.id === id);
+          if (link3) syncLinkToSupabase(link3);
         } catch (err) {
           updateLink(id, { loading: false });
           renderGrid();
@@ -14440,10 +14436,8 @@ Return JSON:
 
     if (added > 0) {
       toast(`Added ${added} saved link${added > 1 ? 's' : ''} to your board`);
-      // Only sync to Supabase if logged in
-      if (currentUser) {
-        await syncToSupabase();
-      }
+      // Sync to Supabase (has its own auth guards)
+      await syncToSupabase();
       renderFilters();
       renderGrid();
     }
