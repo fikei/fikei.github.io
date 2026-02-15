@@ -9430,7 +9430,11 @@ Return JSON:
         }
 
         // Update title/description from platform API if server resolved better data (e.g. YouTube)
-        if (result.title && (!link.title || link.title === extractDomain(link.url))) {
+        const genericTitles = ['youtube', 'youtu.be', 'vimeo', 'watch', ''];
+        const titleIsGeneric = !link.title
+          || link.title === extractDomain(link.url)
+          || genericTitles.includes(link.title.toLowerCase().trim());
+        if (result.title && titleIsGeneric) {
           console.log('%c[ENRICH] Title updated from platform API:', 'color: #27ae60', result.title);
           link.title = result.title;
         }
@@ -9644,6 +9648,7 @@ Return JSON:
 
     // YouTube/Vimeo: use noembed.com oEmbed (CORS-friendly) instead of CORS proxy
     // YouTube blocks CORS proxies and returns generic "YouTube" page data
+    const isYouTubeUrl = domain.includes('youtube.com') || domain.includes('youtu.be');
     const oembedDomains = ['youtube.com', 'youtu.be', 'vimeo.com'];
     if (oembedDomains.some(d => domain.includes(d))) {
       try {
@@ -9662,7 +9667,19 @@ Return JSON:
           }
         }
       } catch (e) {
-        console.warn('[METADATA] oEmbed failed, falling back to CORS proxy:', e.message);
+        console.warn('[METADATA] oEmbed failed:', e.message);
+      }
+      // YouTube fallback: even if oEmbed fails (deleted/private video),
+      // construct a minimal response with thumbnail — never fall through to CORS proxy
+      // because YouTube blocks all CORS proxies and returns generic "YouTube" page data
+      if (isYouTubeUrl) {
+        const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?#]+)/)?.[1];
+        if (videoId) {
+          console.log('%c[METADATA] YouTube oEmbed failed, using thumbnail fallback for:', 'color: #e67e22', videoId);
+          meta.image = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          // Title stays as-is (URL or whatever the user typed) — server enrichment will try to resolve it
+          return meta;
+        }
       }
     }
 
