@@ -9587,12 +9587,17 @@ Return JSON:
 
   function normalizeUrl(url) {
     if (!url) return null;
-    let n = url.trim().toLowerCase();
-    if (!n.startsWith('http://') && !n.startsWith('https://')) {
+    let n = url.trim();
+    // Case-insensitive protocol check (don't lowercase entire URL -- path is case-sensitive per RFC 3986)
+    if (!/^https?:\/\//i.test(n)) {
       n = 'https://' + n;
     }
     n = n.replace(/\/+$/, '');
-    try { new URL(n); return n; } catch { return null; }
+    try {
+      const u = new URL(n);
+      // URL constructor normalizes scheme+host to lowercase, preserves path/query/fragment case
+      return u.toString().replace(/\/+$/, '');
+    } catch { return null; }
   }
 
   function extractDomain(url) {
@@ -10364,11 +10369,11 @@ Return JSON:
   }
 
   // ============================================
-  // Migration v5: Enrich listen links - server genre/label + client-side BPM/key
+  // Migration v6: Enrich listen links - fix URL case preservation + re-trigger enrichment
   // ============================================
   // Backfills .music property on listen links that were migrated
   // before extractMusicMetadata existed.
-  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v5';
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v6';
 
   async function enrichListenLinks() {
     if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
@@ -10383,12 +10388,12 @@ Return JSON:
       return false;
     });
     if (needsEnrich.length === 0) {
-      console.log('%c[enrich-listen] v5: All listen links up to date', 'color: #1DB954');
+      console.log('%c[enrich-listen] v6: All listen links up to date', 'color: #1DB954');
       localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
       return;
     }
 
-    console.log(`%c[enrich-listen] v5: Enriching ${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
+    console.log(`%c[enrich-listen] v6: Enriching ${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
 
     let enriched = 0;
     for (const link of needsEnrich) {
@@ -10866,8 +10871,9 @@ Return JSON:
   function getCategories() { return load().categories; }
 
   function findByUrl(url) {
-    const n = url.toLowerCase().replace(/\/+$/, '');
-    return getAllLinks().find(l => l.url.toLowerCase().replace(/\/+$/, '') === n);
+    const n = normalizeUrl(url);
+    if (!n) return null;
+    return getAllLinks().find(l => normalizeUrl(l.url) === n);
   }
 
   function addLink(link) {
