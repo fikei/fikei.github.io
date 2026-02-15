@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" id="viewport">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" id="viewport">
   <title>Boards</title>
   <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
@@ -50,6 +50,12 @@
 
   /* Grid */
   --grid-gap: 16px;
+
+  /* iOS Safe Area */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 
   /* Dark mode (default) */
   --bg: #111;
@@ -127,7 +133,7 @@
 /* Progress bar */
 .progress-bar {
   position: fixed;
-  top: 0;
+  top: var(--safe-top);
   left: 0;
   right: 0;
   height: 3px;
@@ -169,8 +175,8 @@
 /* Auth bar */
 .auth-bar {
   position: fixed;
-  top: var(--space-4);
-  right: var(--space-4);
+  top: calc(var(--safe-top) + var(--space-4));
+  right: calc(var(--safe-right) + var(--space-4));
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -198,6 +204,9 @@
   letter-spacing: 0.05em;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .auth-bar__btn:hover {
@@ -278,7 +287,7 @@
   background: var(--fg);
   color: var(--bg);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -596,7 +605,7 @@ body {
    ============================================ */
 .bottom-nav {
   position: fixed;
-  bottom: 0;
+  bottom: var(--safe-bottom);
   left: 0;
   right: 0;
   pointer-events: none;
@@ -673,6 +682,8 @@ body {
 .fab-menu__trigger {
   width: 24px;
   height: 24px;
+  min-width: 44px;
+  min-height: 44px;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   background: var(--fg);
@@ -787,7 +798,7 @@ body {
   flex-wrap: nowrap;
   gap: var(--space-2);
   padding: var(--space-4);
-  padding-top: 48px; /* Space for auth bar above */
+  padding-top: calc(48px + var(--safe-top)); /* Space for auth bar above */
   padding-right: 120px; /* Space for auth bar - clips filters before profile button */
   border-bottom: 1px solid var(--subtle);
   position: sticky;
@@ -810,13 +821,13 @@ body {
 /* Mobile adjustment for filter padding */
 @media (max-width: 600px) {
   .filters {
-    padding-top: 52px; /* More space on mobile for auth bar */
+    padding-top: calc(52px + var(--safe-top)); /* More space on mobile for auth bar */
     padding-right: 80px; /* Tighter on mobile but still clipped */
   }
 
   .auth-bar {
-    top: var(--space-2);
-    right: var(--space-2);
+    top: calc(var(--safe-top) + var(--space-2));
+    right: calc(var(--safe-right) + var(--space-2));
   }
 }
 
@@ -832,6 +843,9 @@ body {
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   flex-shrink: 0; /* Prevent buttons from shrinking */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .filter-token:hover {
@@ -861,7 +875,7 @@ body {
 
 .sub-tag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   padding: var(--space-1) var(--space-2);
@@ -924,7 +938,7 @@ body {
   grid-auto-flow: dense; /* Fill gaps when cards expand */
   gap: var(--grid-gap);
   padding: var(--space-4);
-  padding-bottom: 80px; /* Space for bottom navigation */
+  padding-bottom: calc(80px + var(--safe-bottom)); /* Space for bottom navigation */
 }
 
 @media (min-width: 600px) {
@@ -2098,7 +2112,7 @@ body {
    ============================================ */
 .listen-player {
   position: fixed;
-  bottom: 0;
+  bottom: var(--safe-bottom);
   left: 0;
   right: 0;
   height: 0;
@@ -2153,7 +2167,7 @@ body {
   gap: 1px;
 }
 .listen-player__artist {
-  font-size: 8px;
+  font-size: 10px;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2172,7 +2186,7 @@ body {
 }
 .listen-player__open-btn {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 10px;
@@ -2471,7 +2485,7 @@ body {
   position: relative;
   width: calc(100% - 32px);
   max-width: 480px;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px - var(--safe-top) - var(--safe-bottom));
   background: var(--bg);
   border: 2px solid var(--fg);
   overflow-y: auto;
@@ -3347,7 +3361,7 @@ body {
    ============================================ */
 .toast-container {
   position: fixed;
-  bottom: var(--space-4);
+  bottom: calc(var(--safe-bottom) + var(--space-4));
   left: var(--space-4);
   right: var(--space-4);
   z-index: 200;
@@ -3375,7 +3389,7 @@ body {
 
 .clipboard-prompt {
   position: fixed;
-  bottom: var(--space-4);
+  bottom: calc(var(--safe-bottom) + var(--space-4));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -3582,7 +3596,7 @@ body {
 
   /* Adjust grid bottom padding to not overlap mobile paste bar */
   .grid {
-    padding-bottom: 120px;
+    padding-bottom: calc(120px + var(--safe-bottom));
   }
 }
 
