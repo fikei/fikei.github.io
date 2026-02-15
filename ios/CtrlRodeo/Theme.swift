@@ -6,6 +6,10 @@ enum Theme {
     static let foreground = Color(hex: "#FFFFFF")
     static let surface = Color(hex: "#111111")
     static let muted = Color(hex: "#888888")
+    static let subtle = Color(hex: "#666666")       // --fg-subtle
+    static let elevated = Color(hex: "#222222")      // --bg-elevated
+    static let borderSubtle = Color(hex: "#333333")  // --border-subtle
+    static let placeholder = Color(hex: "#555555")   // input placeholders
 }
 
 // MARK: - Color Hex Extension
