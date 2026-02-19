@@ -9436,7 +9436,9 @@ Return JSON:
         const titleIsGeneric = !link.title
           || link.title === extractDomain(link.url)
           || genericTitles.includes(link.title.toLowerCase().trim());
-        if (result.title && titleIsGeneric) {
+        const serverTitleIsGeneric = !result.title
+          || genericTitles.includes(result.title.toLowerCase().trim());
+        if (result.title && titleIsGeneric && !serverTitleIsGeneric) {
           console.log('%c[ENRICH] Title updated from platform API:', 'color: #27ae60', result.title);
           link.title = result.title;
         }
