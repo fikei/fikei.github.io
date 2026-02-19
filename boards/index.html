@@ -9354,6 +9354,7 @@ Return JSON:
           link.video = {
             ...existing,
             // Server-enriched fields (TMDB + AI) — overwrite with better data
+            server_enriched_at: new Date().toISOString(),
             summary: result.video.summary || existing.summary || null,
             streamingServices: result.video.streamingServices?.length ? result.video.streamingServices : existing.streamingServices || [],
             voteAverage: result.video.voteAverage || existing.voteAverage || null,
@@ -9399,6 +9400,7 @@ Return JSON:
           link.book = {
             ...existing,
             // Server-enriched fields — overwrite with better data
+            server_enriched_at: new Date().toISOString(),
             title: result.book.title || existing.title || null,
             author: result.book.author || existing.author || null,
             isbn: result.book.isbn || existing.isbn || null,
@@ -10064,7 +10066,7 @@ Return JSON:
       },
       summaryField: 'summary',
       enrichFlag: 'enrichWatch',
-      backfillCheck: (link) => link.video && !link.video.tmdbId,
+      backfillCheck: (link) => link.video && !link.video.server_enriched_at,
     },
     read: {
       category: 'read',
@@ -10101,7 +10103,7 @@ Return JSON:
       },
       summaryField: 'summary',
       enrichFlag: 'enrichBook',
-      backfillCheck: (link) => link.book && !link.book.openLibraryKey,
+      backfillCheck: (link) => link.book && !link.book.server_enriched_at,
     },
   };
 
