@@ -467,8 +467,14 @@ serve(async (req) => {
         image_resolved_at: new Date().toISOString()
       }
       // Save platform-resolved title to DB (overrides generic "YouTube" etc.)
+      // Only save if we actually resolved a meaningful title
       if (oembedTitle) {
-        updatePayload.title = title
+        const genericTitleValues = ['youtube', 'youtu.be', 'vimeo', 'watch', '']
+        const titleIsGeneric = !title || genericTitleValues.includes(title.toLowerCase().trim())
+          || title.toLowerCase().trim() === domain
+        if (!titleIsGeneric) {
+          updatePayload.title = title
+        }
         if (youtubeData?.description) {
           updatePayload.description = youtubeData.description.slice(0, 500)
         }
@@ -514,8 +520,14 @@ serve(async (req) => {
       cached
     }
     // Include platform-resolved title so client can update its stored data
+    // Only include if we actually resolved a meaningful title (not empty or generic domain names)
     if (oembedTitle) {
-      response.title = title
+      const genericTitleValues = ['youtube', 'youtu.be', 'vimeo', 'watch', '']
+      const titleIsGeneric = !title || genericTitleValues.includes(title.toLowerCase().trim())
+        || title.toLowerCase().trim() === domain
+      if (!titleIsGeneric) {
+        response.title = title
+      }
       if (oembedTitle.author) response.author = oembedTitle.author
       if (youtubeData?.description) response.description = youtubeData.description.slice(0, 500)
     }
