@@ -9722,11 +9722,34 @@ Return JSON:
     }
 
     try {
-      // Title
+      // Title — priority: JSON-LD name > og:title > <title>
+      // JSON-LD often has the cleanest title (e.g., PBS puts episode name in JSON-LD
+      // but "FRONTLINE | Episode | Season | PBS" in <title>)
+      let jsonLdTitle = null;
+      const jsonLdBlocks = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+      // JSON-LD @types that carry a meaningful "name" for a pin title
+      const jsonLdTitleTypes = /^(TVEpisode|VideoObject|Movie|TVSeries|Episode|Clip|CreativeWork|Article|NewsArticle|BlogPosting|Review|Product|Book|Recipe|MusicRecording|MusicAlbum|PodcastEpisode|SoftwareApplication|Course|Event|WebPage)$/i;
+      for (const m of jsonLdBlocks) {
+        try {
+          const ld = JSON.parse(m[1]);
+          // Support both top-level and @graph array
+          const candidates = ld['@graph'] ? ld['@graph'] : [ld];
+          for (const item of candidates) {
+            if (item?.name && jsonLdTitleTypes.test(item['@type'])) {
+              // Skip generic site-level WebPage names that just repeat the domain
+              if (item['@type'] === 'WebPage' && item.name.length < 10) continue;
+              jsonLdTitle = item.name;
+              break;
+            }
+          }
+          if (jsonLdTitle) break;
+        } catch (e) { /* JSON parse error, continue */ }
+      }
       const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i) ||
                       html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:title["']/i);
       const title = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-      if (ogTitle) meta.title = decodeEntities(ogTitle[1]);
+      if (jsonLdTitle) meta.title = jsonLdTitle;
+      else if (ogTitle) meta.title = decodeEntities(ogTitle[1]);
       else if (title) meta.title = decodeEntities(title[1]);
 
       // Description

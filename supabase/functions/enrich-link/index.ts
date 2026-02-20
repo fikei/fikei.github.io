@@ -122,6 +122,21 @@ serve(async (req) => {
       }
     }
 
+    // ========================================
+    // STEP 0.5: JSON-LD title resolution for non-platform URLs
+    // When the client title looks like a raw <title> tag (has | or – separators),
+    // try to get a cleaner title from the page's JSON-LD structured data.
+    // This handles PBS, BBC, news sites, etc. without hardcoding network names.
+    // ========================================
+    if (title && !isYouTube && /[\|–—]/.test(title)) {
+      console.log('[enrich-link] Title has separators, trying JSON-LD resolution:', title)
+      const jsonLdTitle = await resolveJsonLdTitle(url)
+      if (jsonLdTitle && jsonLdTitle !== title) {
+        console.log('[enrich-link] JSON-LD resolved better title:', jsonLdTitle)
+        title = jsonLdTitle
+      }
+    }
+
     let contentType = 'unknown'
     let typeConfidence = 0
     let typeSource: 'cache' | 'rules' | 'ai' = 'rules'
@@ -587,6 +602,54 @@ async function resolveOembedMetadata(
 }
 
 // ========================================
+// JSON-LD Title Resolution — extract clean titles from structured data
+// Pages often have messy <title> tags ("SHOW | Episode | Season | Network")
+// but clean names in JSON-LD structured data. This is a generalized approach
+// that works across content types (videos, articles, products, recipes, etc.)
+// ========================================
+const JSON_LD_TITLE_TYPES = new Set([
+  'TVEpisode', 'VideoObject', 'Movie', 'TVSeries', 'Episode', 'Clip',
+  'Article', 'NewsArticle', 'BlogPosting', 'Review',
+  'Product', 'Book', 'Recipe',
+  'MusicRecording', 'MusicAlbum', 'PodcastEpisode',
+  'SoftwareApplication', 'Course', 'Event', 'CreativeWork'
+])
+
+async function resolveJsonLdTitle(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      }
+    })
+    if (!response.ok) return null
+
+    const html = await response.text()
+    const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+
+    for (const match of jsonLdMatches) {
+      try {
+        const ld = JSON.parse(match[1])
+        const candidates = ld['@graph'] ? ld['@graph'] : [ld]
+        for (const item of candidates) {
+          if (item?.name && JSON_LD_TITLE_TYPES.has(item['@type'])) {
+            // Skip very short names (likely just a site name)
+            if (item.name.length < 5) continue
+            console.log('[json-ld] Resolved title:', item.name, 'from @type:', item['@type'])
+            return item.name
+          }
+        }
+      } catch (_e) { /* JSON parse error, continue */ }
+    }
+  } catch (e) {
+    console.log('[json-ld] Fetch failed:', e.message)
+  }
+  return null
+}
+
+// ========================================
 // YouTube Data API v3 — full video metadata
 // ========================================
 interface YouTubeVideoData {
@@ -836,9 +899,9 @@ async function lookupTMDB(rawTitle: string, type: string | null, year: number | 
     return null
   }
 
-  // Clean title: strip common suffixes
+  // Clean title: strip platform/network suffixes after separators
   const cleanTitle = rawTitle
-    .replace(/\s*[\|\-–—]\s*(Netflix|YouTube|Hulu|Disney\+?|HBO|Max|Prime Video|Apple TV\+?|Vimeo|IMDb|Letterboxd|Rotten Tomatoes|Watch|Stream|Official|Wikipedia|Wiki|Fandom).*$/i, '')
+    .replace(/\s*[\|\-–—]\s*(Netflix|YouTube|Hulu|Disney\+?|HBO|Max|Prime Video|Apple TV\+?|Vimeo|IMDb|Letterboxd|Rotten Tomatoes|Watch|Stream|Official|Wikipedia|Wiki|Fandom|PBS|BBC|CBC|ABC|NBC|CBS|CNN|FOX|ITV|NHK|Season\s+\d|Episode\s+\d).*$/i, '')
     .replace(/\s*\(\d{4}\)\s*$/, '')  // strip trailing (2024)
     .replace(/\s*-\s*(IMDb|Wikipedia)\s*$/i, '')
     .replace(/\s*\(TV series\)\s*$/i, '')  // strip "(TV series)" from Wikipedia titles
