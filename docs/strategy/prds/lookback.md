@@ -161,6 +161,37 @@ lookback_score = (
 - At least 1 pin with an external signal (when available)
 - Never more than 1 "dead link" pin per day (negative signals are draining)
 
+### Surface Activation Thresholds
+
+Each Lookback surface and signal activates independently based on minimum collection requirements. This prevents the feature from feeling empty or repetitive on new/small collections.
+
+**Progressive unlock model:**
+
+| Surface / Signal | Min Pins | Min Age | Rationale |
+|-----------------|----------|---------|-----------|
+| **Anniversary signal** | 1 | 365 days | Lowest bar — if any pin is a year old, this fires |
+| **Time Machine** (manual browse) | 10 | 14 days | Light utility that works even with small collections |
+| **Lookback Card** (main board) | 20 | 30 days | Needs enough pins for meaningful daily rotation |
+| **Lookback View** (full page) | 20 | 30 days | Same threshold as Lookback Card |
+| **Seasonal match signal** | 10 | 180 days | Needs at least a half-year of saves for seasonal patterns |
+| **Burst detection signal** | 15 | 60 days | Needs enough saves to form detectable clusters |
+| **Weekly Digest** (email) | 30 | 60 days | Higher bar — email is intrusive; needs strong signal quality |
+| **Monthly Review** | 20 | 30 days | Needs a month of data to summarize meaningfully |
+| **Re-engagement Nudge** (push) | 20 | 30 days | Same as Lookback Card — nudge references specific pins |
+
+**Why not a single threshold?** Different surfaces have different quality requirements. Time Machine works fine with 10 pins — it's just a filtered browse. But a weekly email with 10 pins would resurface the same ones every week. The progressive model lets users discover Lookback gradually as their collection grows.
+
+**Daily budget constraints:**
+
+| Constraint | Value | Rationale |
+|------------|-------|-----------|
+| Total pins per day | 3-5 | Enough to be interesting, not overwhelming |
+| Minimum categories | 2 | Reflects "one place, whole life" — prevents single-category monotony |
+| Max dead link pins | 1 | Negative signals are draining — limit exposure |
+| Max consumption gap pins | 1 | Prevents guilt pile-up ("you never watched these 5 videos") |
+| Max external signal pins | 2 | External signals are noisy — keep them minority |
+| Recency decay half-life | 14 days | Pin surfaced today is dampened for 2 weeks before re-eligible |
+
 ---
 
 ## Surfaces
@@ -537,7 +568,7 @@ This section maps how Lookback specifically drives retention for each segment �
 
 ## Open Questions
 
-1. **Signal cold start** — Lookback needs history to work. What's the minimum collection size/age before Lookback activates? 20 pins? 30 days? Should there be a "preview" mode that shows what Lookback will do once you have enough data?
+1. ~~**Signal cold start**~~ **Resolved** — Using progressive unlock model with per-surface minimums. Lookback Card requires 20 pins + 30 days. Time Machine is lighter at 10 pins + 14 days. Digest requires 30 pins + 60 days. No preview mode — the feature simply doesn't appear until thresholds are met, consistent with "expand with the user" principle. See Surface Activation Thresholds section above.
 2. **Negative signals** — Should Lookback ever surface a pin the user explicitly dismissed? Current design says no (14-day decay). But what about pins dismissed 6 months ago? Relevance can change.
 3. **Emotional tone** — "On this day" features can surface painful memories (a restaurant from a past relationship, a trip that got cancelled). Should there be a "hide this memory" option that permanently suppresses a pin from Lookback?
 4. **Scoring transparency** — Should users see WHY a pin was surfaced ("Because you never opened it" / "Because it's trending")? Current design shows context labels. But should the composite score be visible to power users?

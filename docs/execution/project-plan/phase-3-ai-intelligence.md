@@ -768,3 +768,143 @@ Replace "Refresh Image" button with a full image management interface. Users get
 | **Upload tab**: Drag-and-drop or file picker for custom image | Pending |
 | Image history: show previous images for this pin, one-click revert | Pending |
 | Keyboard shortcut: `i` on selected pin opens image editor | Pending |
+
+---
+
+## Epic 3.6: Categorization Cleanup (Pending)
+
+> **Vision**: A persistent utility queue that surfaces pins with low-confidence AI categorization or missing metadata, lets users fast-correct them, and feeds corrections back into the classification system. Not a widget — a drain-to-zero task queue with a badge count.
+>
+> **Reference**: [PRD: Categorization Cleanup](/docs/strategy/prds/categorization-cleanup.md)
+>
+> **Prerequisite**: Requires `confidence` and `type_confidence` fields from Epic 3.1. Requires `image_scores` from Phase 10.
+
+### Story 1: Schema Migration
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Schema: user_reviewed_at** | | Pending |
+| | Write migration `016_categorization_cleanup.sql`: add `user_reviewed_at TIMESTAMPTZ DEFAULT NULL` to `links` table | Pending |
+| | Add index `idx_links_user_reviewed` on `(user_id, user_reviewed_at)` for queue query performance | Pending |
+| | Run migration against Boards Supabase project | Blocked |
+| | Update `database-schema.md` to document new column | Pending |
+
+### Story 2: Cleanup Queue — Client-Side Computation
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Adaptive threshold computation** | | Pending |
+| | Implement `computeAdaptiveThreshold(links)`: 25th percentile of confidence distribution, floor 0.50, ceiling 0.80 | Pending |
+| | Cache threshold per session (recompute on page load, not per render) | Pending |
+| **getCleanupQueue() function** | | Pending |
+| | Implement `getCleanupQueue(links)` — filter by: confidence < adaptive threshold, uncategorized, type_confidence < 0.50, missing image (null or composite < 0.15), enrichment_failed, missing structured metadata (watch w/o video, listen w/o music, read w/o book) | Pending |
+| | Exclude pins where `user_reviewed_at` is set | Pending |
+| | Priority sort: uncategorized (0), confidence < threshold (1), type_confidence < 0.50 (2), everything else (3) | Pending |
+| | Secondary sort: `created_at` descending within each priority tier | Pending |
+| | Cap queue at 25 items | Pending |
+| | Feature activation gate: return empty queue if user has fewer than 10 pins total | Pending |
+| **Queue badge count** | | Pending |
+| | Compute badge count from `getCleanupQueue()` result length | Pending |
+| | Render badge on cleanup nav item (count, max display "25+") | Pending |
+| | Refresh badge on page load and after each review action | Pending |
+
+### Story 3: Cleanup View — Navigation Entry Point
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Cleanup nav item** | | Pending |
+| | Add cleanup entry to `renderFilters()` after existing category pills | Pending |
+| | Show only if queue has 3+ items | Pending |
+| | Active state styling consistent with other filter pills | Pending |
+| | Tapping nav item activates cleanup view (replaces grid with cleanup UI) | Pending |
+| **Cleanup view shell** | | Pending |
+| | Empty state: "All clear" messaging with return-to-board CTA | Pending |
+| | Header: "Review (N)" with count decrementing as items are resolved | Pending |
+| | Exit cleanup: back button or tapping any category nav returns to board grid | Pending |
+
+### Story 4: Review Card UI
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Review card layout** | | Pending |
+| | Full-width hero image (or placeholder with "No image" label if missing) | Pending |
+| | Inline-editable title field (tap to edit, tap away to save) | Pending |
+| | Inline-editable description field (collapsed to 2 lines, expandable) | Pending |
+| | Domain label below title | Pending |
+| | "AI says: [category] (N%)" context line | Pending |
+| | 9 category chips (horizontally scrollable) with AI suggestion pre-selected | Pending |
+| | Three action buttons: Confirm (primary), Skip (secondary), Delete (destructive) | Pending |
+| **Review card behavior** | | Pending |
+| | Confirm: apply current state, set `user_reviewed_at`, slide card out, show next | Pending |
+| | Skip: move pin to end of queue, excluded from current session | Pending |
+| | Delete: remove pin with undo toast (3-second window) | Pending |
+| | Progress indicator: "3 of 12" counter | Pending |
+| | Keyboard shortcuts: `c` confirm, `s` skip, `d` delete (desktop) | Pending |
+| **Re-fetch image action** | | Pending |
+| | Show "Re-fetch image" button on cards with missing/poor image | Pending |
+| | Calls existing image resolution pipeline, updates card inline | Pending |
+
+### Story 5: Inline Queue Banner
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Banner component** | | Pending |
+| | Render banner at top of board grid when cleanup queue has 3+ items | Pending |
+| | Content: "[flag icon] N pins need review" with "Review now" CTA | Pending |
+| | Tapping CTA activates cleanup view | Pending |
+| | Dismiss button hides banner for current session | Pending |
+| **Banner suppression logic** | | Pending |
+| | Track `cleanup_banner_dismissed_at` in localStorage | Pending |
+| | Suppress if dismissed within 24 hours AND no new queue items since dismissal | Pending |
+| | Re-show if new pins added and queue grew after dismissal | Pending |
+
+### Story 6: Batch Actions
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Multi-select mode** | | Pending |
+| | Long-press on review card enters multi-select mode | Pending |
+| | Checkbox on each card, tap to toggle selection | Pending |
+| | Selection count in floating action bar | Pending |
+| | "Done" button exits multi-select | Pending |
+| **Batch operations** | | Pending |
+| | "Move to category" — category picker, applies to all selected | Pending |
+| | "Delete" — confirmation dialog with count, bulk delete with undo | Pending |
+| | "Re-enrich" — re-trigger server enrichment for selected pins | Pending |
+| | After batch: deselect all, update queue and badge count | Pending |
+
+### Story 7: Feedback Loop
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **On confirm / re-categorize** | | Pending |
+| | Update pin `category`, set `confidence` to 1.0 (user-confirmed) | Pending |
+| | Set `user_reviewed_at` to current timestamp | Pending |
+| | Write `classification_log` entry: `user_override = true`, original + corrected category, original confidence | Pending |
+| | Sync changes to Supabase | Pending |
+| **Domain profile boosting** | | Pending |
+| | On correction: call `updateDomainProfile(domain, correctedCategory)` | Pending |
+| | Increment corrected-category count in `domain_profiles` | Pending |
+| | At 3+ overrides to same category for a domain: boost cached confidence | Pending |
+| **On title / description edit** | | Pending |
+| | Update `title`/`description` in localStorage and sync to Supabase | Pending |
+| | If content type derived from title keywords, re-evaluate `content_type` client-side | Pending |
+
+### Story 8: Testing & Polish
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Functional testing** | | Pending |
+| | Test queue computation: various confidence levels, verify sorting and cap | Pending |
+| | Test adaptive threshold: verify percentile computation, floor, ceiling | Pending |
+| | Test review card: confirm, skip, delete flows with localStorage and Supabase sync | Pending |
+| | Test batch operations: multi-select, category move, bulk delete | Pending |
+| | Test feedback loop: verify `classification_log` entries and `domain_profiles` updates | Pending |
+| | Test banner: appearance at 3+ items, dismissal, 24-hour suppression | Pending |
+| **Edge cases** | | Pending |
+| | Queue with 0 items: no nav badge, no banner, empty state in cleanup view | Pending |
+| | Queue with 1-2 items: no banner, nav badge appears, cleanup view works | Pending |
+| | User reviews all items: badge disappears, "All clear" state shown | Pending |
+| | Offline: queue computed from localStorage, sync queued for reconnection | Pending |
+| | Undo delete: 3-second toast, pin restored to queue on undo | Pending |
+| | Feature gate: verify no UI appears below 10 pins | Pending |

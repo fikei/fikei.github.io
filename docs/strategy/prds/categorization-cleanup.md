@@ -76,7 +76,7 @@ This is not a widget. Widgets are ephemeral AI-generated recommendations — the
 
 | Signal | Threshold | Priority |
 |--------|-----------|----------|
-| Category confidence | < 0.65 | High |
+| Category confidence | Below adaptive threshold (see Threshold Framework below) | High |
 | Content in `uncategorized` | Any | High |
 | Content type confidence | < 0.50 | Medium |
 | Missing image (no image or composite score < 0.15) | Any | Medium |
@@ -86,7 +86,40 @@ This is not a widget. Widgets are ephemeral AI-generated recommendations — the
 
 **Sorting:** High priority first, then by `created_at` descending (newest uncertain pins first — they're freshest in memory).
 
-**Badge count:** Total pins in the queue. Displayed on the cleanup nav item. Refreshed on page load and after each action.
+**Badge count:** Total pins in the queue (capped at 25). Displayed on the cleanup nav item. Refreshed on page load and after each action.
+
+### Threshold Framework
+
+The cleanup queue uses an adaptive threshold model rather than a fixed cutoff. This ensures the queue is useful for both users whose AI performs well (most confidence scores > 0.80) and users whose AI struggles (scores clustered around 0.50-0.60).
+
+**Category confidence threshold:**
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| Method | 25th percentile of user's confidence distribution | Adapts to each user's AI accuracy |
+| Floor | 0.50 | Below 0.50 the AI is essentially guessing — always flag |
+| Ceiling | 0.80 | Above 0.80 the AI is confident — never flag |
+
+Computed on each queue refresh: `threshold = max(0.50, min(0.80, percentile(user_confidences, 0.25)))`. If a user's 25th percentile is 0.72, only pins below 0.72 are flagged. If it's 0.45, the floor kicks in at 0.50.
+
+**Activation gates:**
+
+| Gate | Condition | Behavior |
+|------|-----------|----------|
+| Feature activation | User has < 10 pins total | Cleanup queue returns empty; no badge, no banner, no nav item |
+| Dedicated view | Queue has < 3 items | Nav badge hidden; banner hidden; cleanup view accessible only via direct URL |
+| Badge + banner | Queue has 3+ items | Nav badge visible with count; inline banner appears on board |
+| Queue cap | Queue exceeds 25 items | Show only the top 25 by priority; remaining items are deferred |
+
+**Sub-signal thresholds** (unchanged from qualification table above):
+
+| Signal | Threshold | Notes |
+|--------|-----------|-------|
+| Content type confidence | < 0.50 | Fixed — type classification has different accuracy profile |
+| Image composite score | < 0.15 | Fixed — below this threshold, image is unusable |
+| Enrichment failure | `enrichment_failed = true` | Binary — no threshold |
+| Missing structured metadata | Category-specific null check | Binary — no threshold |
+| Uncategorized | `category = 'uncategorized'` | Binary — always flagged |
 
 ---
 
@@ -188,11 +221,12 @@ The cleanup queue is **computed, not stored**. Qualification is derived from exi
 
 ```sql
 -- Cleanup queue query
+-- Note: :adaptive_threshold is computed client-side as max(0.50, percentile(user_confidences, 0.25))
 SELECT * FROM links
 WHERE user_id = :user_id
   AND user_reviewed_at IS NULL
   AND (
-    confidence < 0.65
+    confidence < :adaptive_threshold
     OR category = 'uncategorized'
     OR type_confidence < 0.50
     OR image IS NULL
@@ -205,11 +239,12 @@ WHERE user_id = :user_id
 ORDER BY
   CASE
     WHEN category = 'uncategorized' THEN 0
-    WHEN confidence < 0.65 THEN 1
+    WHEN confidence < :adaptive_threshold THEN 1
     WHEN type_confidence < 0.50 THEN 2
     ELSE 3
   END,
-  created_at DESC;
+  created_at DESC
+LIMIT 25; -- Queue cap
 ```
 
 ### Schema Changes
@@ -243,9 +278,16 @@ For the local-first architecture, the cleanup queue is also computed client-side
 
 ```javascript
 function getCleanupQueue(links) {
+  if (links.length < 10) return []; // Feature activation gate
+
+  // Adaptive threshold: 25th percentile of confidence distribution, floored at 0.50, capped at 0.80
+  const confidences = links.map(l => l.confidence || 0).filter(c => c > 0).sort((a, b) => a - b);
+  const p25Index = Math.floor(confidences.length * 0.25);
+  const adaptiveThreshold = Math.max(0.50, Math.min(0.80, confidences[p25Index] || 0.50));
+
   return links.filter(link =>
     !link.user_reviewed_at && (
-      (link.confidence || 0) < 0.65 ||
+      (link.confidence || 0) < adaptiveThreshold ||
       link.category === 'uncategorized' ||
       (link.type_confidence || 0) < 0.50 ||
       !link.image ||
@@ -257,7 +299,7 @@ function getCleanupQueue(links) {
     const priorityB = getPriority(b);
     if (priorityA !== priorityB) return priorityA - priorityB;
     return new Date(b.addedAt) - new Date(a.addedAt);
-  });
+  }).slice(0, 25); // Queue cap
 }
 ```
 
@@ -347,7 +389,7 @@ Widgets are the wrong abstraction for cleanup because:
 
 ## Open Questions
 
-1. **Threshold tuning** — Is 0.65 the right category confidence cutoff for flagging? Should it be configurable per user or learn from their correction rate?
+1. ~~**Threshold tuning**~~ **Resolved** — Using adaptive percentile-based threshold (25th percentile of user's confidence distribution, floored at 0.50, capped at 0.80). See Threshold Framework section above. The system adapts per-user automatically; no manual configuration needed.
 2. **Re-flagging** — If the enrichment system re-processes a pin and lowers its confidence after the user reviewed it, should it re-enter the queue? Currently `user_reviewed_at` prevents this permanently.
 3. **Gamification** — Should there be any reward for emptying the queue (streak counter, "all clear" animation)? Risk of making it feel like a chore vs. a satisfying micro-task.
 4. **Image review** — Should "bad image" pins get a different review card with image selection options (choose from alternatives, upload, or accept template)?
