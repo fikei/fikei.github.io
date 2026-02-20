@@ -13931,9 +13931,10 @@ Return JSON:
       return;
     }
 
-    // Require username before first share
+    // Require username before first share — track intent so we auto-share after
     if (!currentUsername) {
-      toast('Set a username before sharing', true);
+      pendingShareAfterUsername = category === null ? '__all__' : category;
+      toast('Set a username before sharing');
       openAccountModal();
       return;
     }
@@ -14090,6 +14091,7 @@ Return JSON:
         link_order: linkOrderForShare,
         hide_widgets: hideWidgets,
         owner_email: currentUser.email,
+        owner_username: currentUsername || null,
         updated_at: new Date().toISOString()
       };
 
@@ -14502,7 +14504,15 @@ Return JSON:
     if (currentUser && wasLoggedOut) {
       // Just logged in - close modal and sync
       authModal.classList.remove('auth-modal--visible');
-      toast('Logged in as ' + currentUser.email);
+
+      // Load username from Supabase user_metadata (persists across devices)
+      const metaUsername = currentUser.user_metadata?.username;
+      if (metaUsername) {
+        currentUsername = metaUsername;
+        localStorage.setItem(USERNAME_KEY, metaUsername);
+      }
+      updateAuthUI();
+      toast('Logged in as ' + (currentUsername ? '@' + currentUsername : currentUser.email));
 
       // Check for local data to migrate
       const localData = load();
@@ -14585,9 +14595,10 @@ Return JSON:
   });
 
   // Account modal handlers
-  // Username storage
+  // Username storage — persisted in Supabase user_metadata, cached in localStorage
   const USERNAME_KEY = 'boards-username';
   let currentUsername = localStorage.getItem(USERNAME_KEY) || '';
+  let pendingShareAfterUsername = null; // Track share intent when username not yet set
 
   function getDeviceInfo() {
     const ua = navigator.userAgent;
@@ -14630,16 +14641,26 @@ Return JSON:
     accountCreatedAt.textContent = createdAt;
     accountDevice.textContent = getDeviceInfo();
 
-    // Load username
+    // Load username — lock if already set (permanent)
     accountUsername.value = currentUsername;
-    usernameStatus.textContent = '';
-    usernameStatus.className = 'username-status';
+    if (currentUsername) {
+      accountUsername.readOnly = true;
+      accountUsername.style.opacity = '0.6';
+      usernameStatus.textContent = 'Username is permanent';
+      usernameStatus.className = 'username-status';
+    } else {
+      accountUsername.readOnly = false;
+      accountUsername.style.opacity = '';
+      usernameStatus.textContent = '';
+      usernameStatus.className = 'username-status';
+    }
     usernameSaveBtn.style.display = 'none';
 
     openModal(accountModal);
   }
 
-  // Username input handling
+  // Username input handling with debounced uniqueness check
+  let usernameCheckTimer = null;
   accountUsername.oninput = () => {
     const raw = accountUsername.value;
     const username = raw.toLowerCase().replace(/[^a-z0-9_]/g, '');
@@ -14651,15 +14672,52 @@ Return JSON:
       usernameStatus.className = 'username-status username-status--error';
       usernameSaveBtn.style.display = 'none';
     } else if (username && username !== currentUsername) {
-      usernameStatus.textContent = 'Username available';
-      usernameStatus.className = 'username-status username-status--success';
-      usernameSaveBtn.style.display = '';
+      usernameStatus.textContent = 'Checking...';
+      usernameStatus.className = 'username-status';
+      usernameSaveBtn.style.display = 'none';
+      // Debounced uniqueness check
+      clearTimeout(usernameCheckTimer);
+      usernameCheckTimer = setTimeout(() => checkUsernameAvailable(username), 400);
     } else {
-      usernameStatus.textContent = '';
+      usernameStatus.textContent = currentUsername ? '' : '';
       usernameStatus.className = 'username-status';
       usernameSaveBtn.style.display = 'none';
     }
   };
+
+  async function checkUsernameAvailable(username) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/shared_boards?owner_username=eq.${encodeURIComponent(username)}&select=user_id&limit=1`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${getAccessToken()}`
+          }
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        // Available if no results, or only result is current user
+        const taken = data.length > 0 && data[0].user_id !== currentUser?.id;
+        if (accountUsername.value.toLowerCase() !== username) return; // Input changed
+        if (taken) {
+          usernameStatus.textContent = 'Username taken';
+          usernameStatus.className = 'username-status username-status--error';
+          usernameSaveBtn.style.display = 'none';
+        } else {
+          usernameStatus.textContent = 'Username available';
+          usernameStatus.className = 'username-status username-status--success';
+          usernameSaveBtn.style.display = '';
+        }
+      }
+    } catch (e) {
+      // On error, still allow saving (server will catch conflicts)
+      usernameStatus.textContent = 'Username available';
+      usernameStatus.className = 'username-status username-status--success';
+      usernameSaveBtn.style.display = '';
+    }
+  }
 
   usernameSaveBtn.onclick = async () => {
     const username = accountUsername.value.toLowerCase();
@@ -14670,15 +14728,33 @@ Return JSON:
     usernameSaveBtn.textContent = 'Saving...';
 
     try {
-      // Save to localStorage (and could sync to Supabase profiles table)
+      // Persist username to Supabase auth user_metadata (syncs across devices)
+      const { error } = await supabase.auth.updateUser({
+        data: { username: username }
+      });
+      if (error) throw error;
+
       currentUsername = username;
       localStorage.setItem(USERNAME_KEY, username);
       usernameStatus.textContent = 'Username saved!';
       usernameStatus.className = 'username-status username-status--success';
       usernameSaveBtn.style.display = 'none';
-      updateAuthUI(); // Update user menu
+      // Lock the input — username is permanent
+      accountUsername.readOnly = true;
+      accountUsername.style.opacity = '0.6';
+      updateAuthUI();
       toast('Username saved');
+
+      // If user was trying to share, auto-open share modal
+      if (pendingShareAfterUsername !== undefined && pendingShareAfterUsername !== null) {
+        const cat = pendingShareAfterUsername;
+        pendingShareAfterUsername = null;
+        closeModal(accountModal);
+        // Small delay for modal transition
+        setTimeout(() => openShareModal(cat === '__all__' ? null : cat), 300);
+      }
     } catch (e) {
+      console.error('[username] Save failed:', e);
       usernameStatus.textContent = 'Failed to save';
       usernameStatus.className = 'username-status username-status--error';
     } finally {
@@ -14786,6 +14862,12 @@ Return JSON:
 
     if (session) {
       currentUser = session.user;
+      // Load username from Supabase user_metadata (persists across devices)
+      const metaUsername = currentUser.user_metadata?.username;
+      if (metaUsername) {
+        currentUsername = metaUsername;
+        localStorage.setItem(USERNAME_KEY, metaUsername);
+      }
       updateAuthUI();
       loadAllShares(); // Load user's shared boards
 

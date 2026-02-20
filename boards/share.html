@@ -850,11 +850,11 @@ body {
     // Initialize expanded cards (from localStorage or board default)
     initExpandedCards();
 
-    // Set title with owner email
+    // Set title with owner username (preferred) or email
     const categoryName = board.name || (board.category ? cap(board.category) : 'All Links');
-    const ownerEmail = board.owner_email || 'Anonymous';
-    boardTitle.textContent = `${ownerEmail} / ${categoryName}`;
-    document.title = `${categoryName} - ${ownerEmail}`;
+    const ownerDisplay = board.owner_username ? '@' + board.owner_username : (board.owner_email || 'Anonymous');
+    boardTitle.textContent = `${ownerDisplay} / ${categoryName}`;
+    document.title = `${categoryName} - ${ownerDisplay}`;
 
     // Set meta
     boardMeta.textContent = `${links.length} link${links.length !== 1 ? 's' : ''}`;
