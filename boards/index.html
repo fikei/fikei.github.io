@@ -11697,7 +11697,7 @@ Return JSON:
 
   // Get cleanup queue - pins that need human attention
   function getCleanupQueue(links) {
-    if (links.length < 10) return []; // Feature activation gate
+    if (links.length < 3) return []; // Feature activation gate (lowered from 10)
 
     const adaptiveThreshold = computeAdaptiveThreshold(links);
 
@@ -12456,7 +12456,7 @@ Return JSON:
 
     // Add cleanup pill if queue has 3+ items
     cleanupQueueCache = getCleanupQueue(links);
-    if (cleanupQueueCache.length >= 3) {
+    if (cleanupQueueCache.length >= 1) {
       const cleanupActive = cleanupViewActive;
       const activeClass = cleanupActive ? 'filter-token--active' : '';
       const count = cleanupQueueCache.length > 25 ? '25+' : cleanupQueueCache.length;
@@ -16994,8 +16994,8 @@ Return JSON:
 
   // Get daily lookback pins
   function getDailyLookback(links, today) {
-    // Activation gate: need at least 20 pins AND collection at least 30 days old
-    if (links.length < 20) return [];
+    // Activation gate: need at least 5 pins AND collection at least 7 days old
+    if (links.length < 5) return [];
 
     const oldestPin = links.reduce((oldest, pin) => {
       const pinDate = new Date(pin.addedAt || pin.created_at);
@@ -17005,7 +17005,7 @@ Return JSON:
     if (!oldestPin) return [];
 
     const collectionAge = (today - oldestPin) / (24 * 60 * 60 * 1000);
-    if (collectionAge < 30) return [];
+    if (collectionAge < 7) return [];
 
     // Load surfaced history for recency decay
     let surfaced = {};
@@ -17144,8 +17144,8 @@ Return JSON:
       });
     }
 
-    // Need at least 3 pins to show card
-    if (lookbackPins.length < 3) return '';
+    // Need at least 1 pin to show card
+    if (lookbackPins.length < 1) return '';
 
     // Render 3 mini-cards
     const miniCards = lookbackPins.slice(0, 3).map(pin => {
