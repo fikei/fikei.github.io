@@ -10868,7 +10868,7 @@ Return JSON:
 
   let currentSubTag = null; // Current sub-tag filter (legacy single-dimension categories)
   let currentFilters = {}; // Multi-dimension filter state: { format: 'movies', genre: 'action' }
-  let showSubTagsBar = false; // Beta feature - enable via: window.enableSubTagsBar()
+  let showSubTagsBar = true; // Sub-tag filters visible by default
 
   // Detect sub-tag from link title/description (legacy single-dimension categories)
   function detectSubTag(link) {
