@@ -1,0 +1,78 @@
+---
+layout: none
+permalink: /404.html
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ctrl.rodeo</title>
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: "Space Grotesk", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .msg {
+      text-align: center;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .msg a {
+      color: #fff;
+      text-decoration: underline;
+    }
+  </style>
+  <script>
+    (function() {
+      var path = window.location.pathname;
+      var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+      var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+
+      // Board short link: /b/{slug} -> /boards/share.html?id={slug}
+      var boardMatch = path.match(/^\/b\/([a-zA-Z0-9_-]+)\/?$/);
+      if (boardMatch) {
+        window.location.replace('/boards/share.html?id=' + boardMatch[1]);
+        return;
+      }
+
+      // Pin short link: /p/{short_code} -> fetch pin URL from Supabase, redirect
+      var pinMatch = path.match(/^\/p\/([a-zA-Z0-9]{6,12})\/?$/);
+      if (pinMatch) {
+        var code = pinMatch[1];
+        var msg = document.getElementById('msg');
+        if (msg) msg.innerHTML = '<p>Redirecting...</p>';
+
+        fetch(SUPABASE_URL + '/rest/v1/links?short_code=eq.' + code + '&select=url', {
+          headers: { 'apikey': SUPABASE_ANON_KEY }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.length > 0 && data[0].url) {
+            window.location.replace(data[0].url);
+          } else {
+            if (msg) msg.innerHTML = '<p>Pin not found</p><p><a href="/">ctrl.rodeo</a></p>';
+          }
+        })
+        .catch(function() {
+          if (msg) msg.innerHTML = '<p>Something went wrong</p><p><a href="/">ctrl.rodeo</a></p>';
+        });
+        return;
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="msg" id="msg">
+    <p>Page not found</p>
+    <p><a href="/">ctrl.rodeo</a></p>
+  </div>
+</body>
+</html>

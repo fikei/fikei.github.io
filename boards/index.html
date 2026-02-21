@@ -9612,6 +9612,11 @@ Return JSON:
     return crypto.randomUUID();
   }
 
+  // Generate 8-char alphanumeric short code for pin share links
+  function generateShortCode() {
+    return Math.random().toString(36).substring(2, 10);
+  }
+
   // ============================================
   // Metadata Fetcher
   // ============================================
@@ -12572,8 +12577,27 @@ Return JSON:
         const link = getAllLinks().find(l => l.id === id);
         if (link) {
           try {
-            await navigator.clipboard.writeText(link.url);
-            toast('Link copied to clipboard');
+            let code = link.short_code;
+            if (!code) {
+              code = generateShortCode();
+              const accessToken = getAccessToken();
+              if (accessToken) {
+                await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${link.id}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Prefer': 'return=minimal'
+                  },
+                  body: JSON.stringify({ short_code: code })
+                });
+                link.short_code = code;
+              }
+            }
+            const shareUrl = `${window.location.origin}/p/${code}`;
+            await navigator.clipboard.writeText(shareUrl);
+            toast('Share link copied');
           } catch (err) {
             toast('Failed to copy link', true);
           }
@@ -13998,7 +14022,7 @@ Return JSON:
     $('shareHideWidgets').checked = !!share.hide_widgets;
 
     // Show link
-    const shareUrl = `${window.location.origin}/boards/share.html?id=${share.slug}`;
+    const shareUrl = `${window.location.origin}/b/${share.slug}`;
     shareLinkInput.value = shareUrl;
     shareLinkSection.style.display = 'block';
 
