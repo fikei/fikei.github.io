@@ -1414,10 +1414,6 @@ body {
 .merge-sources__item a:hover {
   text-decoration: underline;
 }
-.merge-sources__primary {
-  color: var(--fg);
-  font-size: 10px;
-}
 .merge-sources__unmerge {
   margin-top: var(--space-3);
   font-family: var(--font-mono);
@@ -1491,27 +1487,6 @@ body {
 .merge-preview__field input[type="text"]:focus {
   outline: none;
   border-color: var(--fg);
-}
-.merge-preview__radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.merge-preview__radio {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 6px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-}
-.merge-preview__radio:hover {
-  background: rgba(255,255,255,0.05);
-}
-.merge-preview__radio input[type="radio"] {
-  accent-color: var(--fg);
 }
 .merge-preview__actions {
   display: flex;
@@ -5758,10 +5733,6 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <div class="merge-preview__field">
           <label for="mergeTitleInput">Title</label>
           <input type="text" id="mergeTitleInput" placeholder="Merged pin title">
-        </div>
-        <div class="merge-preview__field">
-          <label>Primary link</label>
-          <div class="merge-preview__radio-group" id="mergePrimaryGroup"></div>
         </div>
         <div class="merge-preview__field">
           <label>Image</label>
@@ -12177,23 +12148,22 @@ Return JSON:
     }
 
     const resolved = mergeFieldsFallback(flatSources);
-    const primaryIdx = overrides.primaryIndex || 0;
-    const primarySource = flatSources[primaryIdx] || flatSources[0];
+    const firstSource = flatSources[0];
     const earliest = flatSources.reduce((a, b) => new Date(a.addedAt) < new Date(b.addedAt) ? a : b);
 
     const merged = {
       id: crypto.randomUUID(),
-      url: primarySource.url,
+      url: firstSource.url,
       title: overrides.title || resolved.title,
       description: overrides.description || resolved.description,
       image: overrides.image || resolved.image,
       image_source: resolved.image_source,
       image_scores: resolved.image_scores,
-      domain: primarySource.domain,
-      category: primarySource.category,
-      confidence: primarySource.confidence,
+      domain: firstSource.domain,
+      category: firstSource.category,
+      confidence: firstSource.confidence,
       content_type: resolved.content_type,
-      type_confidence: primarySource.type_confidence,
+      type_confidence: firstSource.type_confidence,
       music: resolved.music,
       video: resolved.video,
       book: resolved.book,
@@ -12914,7 +12884,6 @@ Return JSON:
           <div class="merge-sources">
             <div class="merge-sources__label">${l.sources.length} sources</div>
             ${l.sources.map(s => `<div class="merge-sources__item">
-              ${s.url === l.url ? '<span class="merge-sources__primary">★</span>' : '<span style="width:12px"></span>'}
               <a href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.title || s.url)}">${esc(s.domain)}/${esc(truncateStr(s.url.replace(/^https?:\/\/[^/]+\/?/, ''), 30))}</a>
             </div>`).join('')}
             <button class="merge-sources__unmerge" data-action="unmerge">Unmerge</button>
@@ -14923,15 +14892,6 @@ Return JSON:
     }).join('');
     $('mergePreviewThumbs').innerHTML = thumbsHtml;
 
-    // Primary link radio buttons
-    const radioHtml = sources.map((s, i) => {
-      return `<label class="merge-preview__radio">
-        <input type="radio" name="mergePrimary" value="${i}" ${i === 0 ? 'checked' : ''}>
-        ${esc(s.domain)} — ${esc(truncateStr(s.title || s.url, 40))}
-      </label>`;
-    }).join('');
-    $('mergePrimaryGroup').innerHTML = radioHtml;
-
     // Image picker: show only sources with images
     const imagesWithIdx = sources
       .map((s, i) => ({ image: s.image, scores: s.image_scores, idx: i }))
@@ -14978,12 +14938,8 @@ Return JSON:
     if (mergeSources.length < 2) return;
 
     const titleInput = $('mergeTitleInput').value.trim();
-    const primaryRadio = mergeModal.querySelector('input[name="mergePrimary"]:checked');
-    const primaryIdx = primaryRadio ? parseInt(primaryRadio.value, 10) : 0;
 
-    const overrides = {
-      primaryIndex: primaryIdx,
-    };
+    const overrides = {};
     if (titleInput) overrides.title = titleInput;
     if (mergeSelectedImage) overrides.image = mergeSelectedImage;
 
