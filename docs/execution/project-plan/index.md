@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-14 (Events: RA GraphQL, Gary's Guide, Bonobo sources + multi-source tags)
+> **Last Updated**: 2026-02-19 (Categorization Cleanup + Lookback PRDs → project plan entries)
 
 ---
 
@@ -20,7 +20,7 @@
 |-------|--------|----------|
 | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 24/24 |
 | [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 15/15 |
-| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 151/413 |
+| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 151/502 |
 | [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 11/140 |
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/60 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/15 |
@@ -29,7 +29,8 @@
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/132 |
 | [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 68/126 |
 | [Phase 11: Instagram Import](./phase-11-instagram-import.md) | Pending | 0/73 |
-| [Backlog](./backlog.md) | Future | 1/110 |
+| [Phase 12: Lookback](./phase-12-lookback.md) | Pending | 0/236 |
+| [Backlog](./backlog.md) | Future | 1/102 |
 
 ---
 
@@ -115,7 +116,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 24 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 15 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 151 | 4 | 257 | 0 |
+| Phase 3: AI Intelligence | 151 | 4 | 345 | 1 |
 | Phase 4: Sharing & Collaboration | 11 | 1 | 128 | 0 |
 | Phase 5: UX Polish | 3 | 0 | 57 | 0 |
 | Phase 6: Performance | 1 | 0 | 14 | 0 |
@@ -124,8 +125,9 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 9: Bulk Import | 0 | 0 | 132 | 0 |
 | Phase 10: Image Validation | 68 | 0 | 58 | 0 |
 | Phase 11: Instagram Import | 0 | 0 | 73 | 0 |
-| Backlog | 1 | 0 | 108 | 0 |
-| **TOTAL** | **295** | **5** | **898** | **0** |
+| Phase 12: Lookback | 0 | 0 | 231 | 5 |
+| Backlog | 1 | 0 | 100 | 0 |
+| **TOTAL** | **295** | **5** | **1217** | **6** |
 
 ---
 
@@ -148,6 +150,10 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Item | Blocker | Owner |
 |------|---------|-------|
 | Push notifications | FCM/APNs setup required | Human |
+| Run migration `016_categorization_cleanup.sql` (Phase 3, Epic 3.6) | Supabase Dashboard → SQL Editor | Human |
+| Run migration `017_lookback_prerequisites.sql` (Phase 12) | Supabase Dashboard → SQL Editor | Human |
+| Run migration `018_lookback_external.sql` (Phase 12, Epic 12.2) | Supabase Dashboard → SQL Editor | Human |
+| Add `RESEND_API_KEY` for digest emails (Phase 12, Epic 12.2) | Supabase Dashboard → Edge Functions → Secrets | Human |
 | Run migration `007_image_validation.sql` against Supabase (Phase 10) | Supabase Dashboard → SQL Editor | Human |
 | Deploy `enrich-link` edge function with Tier 2 validation (Phase 10) | `supabase functions deploy enrich-link` | Human |
 | Deploy new `validate-image` edge function for Tier 3 (Phase 10) | `supabase functions deploy validate-image` | Human |

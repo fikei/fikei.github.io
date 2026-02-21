@@ -8,18 +8,9 @@
 
 ## Taste & Pattern Intelligence
 
-Surfaces connections and patterns in what users collect. Directly supports brand principle #1: **Input shapes output.**
+→ Moved to [Phase 12: Lookback](./phase-12-lookback.md).
 
-> Personas: Visual Collector, Sound & Scene Curator, DJ, Researcher, Cultural Omnivore
-
-| Story | Status |
-|-------|--------|
-| **Taste profile** — Auto-generated summary of what a user collects most (domains, categories, content types) | Pending |
-| **"You save a lot of X" insights** — Surface collection patterns via widget or dashboard card | Pending |
-| **Trend detection** — Identify emerging themes across recent saves (e.g. "3 brutalist architecture links this week") | Pending |
-| **Cross-category connections** — Surface related pins across categories ("these pins share a theme") | Pending |
-| **Collection timeline** — Visual timeline of saves over time, filterable by category | Pending |
-| **Monthly digest widget** — Auto-generated summary of that month's curation activity | Pending |
+Items absorbed: taste profile (Epic 12.3), "you save a lot of X" insights (Epic 12.3), trend detection (Epic 12.3), cross-category connections (Epic 12.3), collection timeline (Epic 12.2), monthly digest (Epic 12.2).
 
 ---
 
@@ -471,10 +462,10 @@ Deepening engagement through install prompts and discovery features.
 | **PWA install prompt** (#68) — Show install prompt after repeated visits with "Add to Home Screen" flow | Pending |
 | **Keyboard shortcuts reference** (#69) — Press `?` to show keyboard shortcuts overlay | Pending |
 | **Unread / Read Later tracking** (#44) — Track read/unread state on article pins, filter by unread | Pending |
-| **Recently viewed tracking** (#57) — Track which pins were recently opened/visited, show as a filter or view | Pending |
+| ~~**Recently viewed tracking** (#57)~~ → Moved to [Phase 12: Lookback](./phase-12-lookback.md) Prerequisites (interaction tracking) | Moved |
 | **Widget preference granularity** (#45) — Per-category or per-widget-type enable/disable instead of all-or-nothing | Pending |
 | **Smart auto-boards** (#46) — Rule-based auto-organization (e.g. "all Nike links → Sneakers board") | Pending |
-| **Streaming availability notifications** (#61) — Notify when a Watch pin becomes available on a subscribed streaming service | Pending |
+| ~~**Streaming availability notifications** (#61)~~ → Moved to [Phase 12: Lookback](./phase-12-lookback.md) Epic 12.2 (release calendar) | Moved |
 | **Widget suggestion preview on hover** (#77) — Preview widget content on hover before committing to view | Pending |
 
 ---
