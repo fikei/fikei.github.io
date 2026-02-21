@@ -925,6 +925,134 @@ body {
 }
 
 /* ============================================
+   Lookback Card
+   ============================================ */
+.lookback-card {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border: 1px solid var(--fg);
+  padding: var(--space-4);
+  margin-bottom: var(--grid-gap);
+}
+
+.lookback-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.lookback-card__label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.lookback-card__dismiss {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.lookback-card__dismiss:hover {
+  color: var(--fg);
+}
+
+.lookback-card__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.lookback-card__item {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.lookback-card__item:hover {
+  opacity: 0.7;
+}
+
+.lookback-card__img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  background: var(--subtle);
+  border: 1px solid var(--subtle);
+  margin-bottom: var(--space-2);
+}
+
+.lookback-card__placeholder {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: var(--subtle);
+  border: 1px solid var(--subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-2xl);
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+
+.lookback-card__title {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  margin-bottom: var(--space-1);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--fg);
+}
+
+.lookback-card__context {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.lookback-card__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lookback-card__see-all {
+  background: transparent;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lookback-card__see-all:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+@media (max-width: 640px) {
+  .lookback-card__items {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
    Grid Item
    ============================================ */
 .grid-item {
@@ -10870,6 +10998,98 @@ Return JSON:
   function getAllLinks() { return load().links; }
   function getCategories() { return load().categories; }
 
+  // ============================================
+  // Categorization Cleanup (Epic 3.6)
+  // ============================================
+
+  // Compute adaptive threshold: 25th percentile of confidence distribution, floored at 0.50, capped at 0.80
+  function computeAdaptiveThreshold(links) {
+    const confidences = links
+      .map(l => l.confidence || 0)
+      .filter(c => c > 0)
+      .sort((a, b) => a - b);
+
+    if (confidences.length === 0) return 0.50;
+
+    const p25Index = Math.floor(confidences.length * 0.25);
+    const percentile = confidences[p25Index] || 0.50;
+
+    return Math.max(0.50, Math.min(0.80, percentile));
+  }
+
+  // Get cleanup queue - pins that need human attention
+  function getCleanupQueue(links) {
+    if (links.length < 10) return []; // Feature activation gate
+
+    const adaptiveThreshold = computeAdaptiveThreshold(links);
+
+    // Helper to check if image is missing or poor quality
+    function hasPoOrMissingImage(link) {
+      if (!link.image) return true;
+      if (link.image_scores && typeof link.image_scores === 'object') {
+        const composite = parseFloat(link.image_scores.composite);
+        if (!isNaN(composite) && composite < 0.15) return true;
+      }
+      return false;
+    }
+
+    // Helper to check for missing structured metadata based on category
+    function hasMissingStructuredMetadata(link) {
+      if (link.category === 'watch' && !link.video) return true;
+      if (link.category === 'listen' && !link.music) return true;
+      if (link.category === 'read' && !link.book) return true;
+      return false;
+    }
+
+    // Helper to determine priority tier
+    function getPriority(link) {
+      if (link.category === 'uncategorized') return 0; // High
+      if ((link.confidence || 0) < adaptiveThreshold) return 1; // High
+      if ((link.type_confidence || 0) < 0.50) return 2; // Medium
+      if (hasPoOrMissingImage(link)) return 2; // Medium
+      if (!link.title || link.title === link.domain || link.title === '') return 2; // Medium
+      if (link.enrichment_failed) return 3; // Low
+      if (hasMissingStructuredMetadata(link)) return 3; // Low
+      return 4; // Everything else
+    }
+
+    // Filter pins that qualify for cleanup (7 criteria)
+    const queue = links.filter(link => {
+      // Exclude if already reviewed by user
+      if (link.user_reviewed_at) return false;
+
+      // Qualification criteria (ANY of these):
+      return (
+        (link.confidence || 0) < adaptiveThreshold ||                    // 1. Low category confidence
+        link.category === 'uncategorized' ||                             // 2. Uncategorized
+        (link.type_confidence || 0) < 0.50 ||                           // 3. Low content type confidence
+        hasPoOrMissingImage(link) ||                                     // 4. Missing/poor image
+        !link.title || link.title === link.domain || link.title === '' || // 5. Missing title
+        link.enrichment_failed ||                                        // 6. Enrichment failure
+        hasMissingStructuredMetadata(link)                               // 7. Missing structured metadata
+      );
+    });
+
+    // Sort by priority, then recency
+    queue.sort((a, b) => {
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      // Secondary sort: newest first (created_at or addedAt)
+      const dateA = new Date(a.addedAt || a.created_at || 0);
+      const dateB = new Date(b.addedAt || b.created_at || 0);
+      return dateB - dateA;
+    });
+
+    // Cap at 25 items
+    return queue.slice(0, 25);
+  }
+
+  // Cleanup view state
+  let cleanupViewActive = false;
+  let cleanupQueueCache = [];
+  let currentCleanupIndex = 0;
+
   function findByUrl(url) {
     const n = normalizeUrl(url);
     if (!n) return null;
@@ -11199,6 +11419,15 @@ Return JSON:
       html += `<button class="filter-token ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${cap(name)}${badge}</button>`;
     }
 
+    // Add cleanup pill if queue has 3+ items
+    cleanupQueueCache = getCleanupQueue(links);
+    if (cleanupQueueCache.length >= 3) {
+      const cleanupActive = cleanupViewActive;
+      const activeClass = cleanupActive ? 'filter-token--active' : '';
+      const count = cleanupQueueCache.length > 25 ? '25+' : cleanupQueueCache.length;
+      html += `<button class="filter-token filter-token--cleanup ${activeClass}" data-category="cleanup" role="tab" aria-selected="${cleanupActive}">⚑ Review (${count})</button>`;
+    }
+
     filters.innerHTML = html;
 
     // --- Design Constraints: annotate filter components ---
@@ -11421,6 +11650,9 @@ Return JSON:
 
     let html = '';
     let cardCount = 0;
+
+    // Inject Lookback card at top of grid (before any pins)
+    html += renderLookbackCard(allLinks);
 
     // Build a map of widget positions for injection
     const widgetsByPosition = {};
@@ -12391,7 +12623,23 @@ Return JSON:
   filters.onclick = (e) => {
     const t = e.target.closest('.filter-token');
     if (t) {
-      currentFilter = t.dataset.category;
+      const category = t.dataset.category;
+
+      // Handle cleanup view
+      if (category === 'cleanup') {
+        cleanupViewActive = true;
+        currentCleanupIndex = 0;
+        renderFilters();
+        renderCleanupView();
+        return;
+      }
+
+      // Exit cleanup view if active
+      if (cleanupViewActive) {
+        cleanupViewActive = false;
+      }
+
+      currentFilter = category;
       currentSubTag = null; // Reset sub-tag when changing category
       if (currentPlayer.linkId && currentFilter !== 'listen') closePlayer();
       localStorage.setItem(FILTER_KEY, currentFilter);
@@ -12496,6 +12744,38 @@ Return JSON:
   });
 
   grid.onclick = async (e) => {
+    // Handle Lookback card interactions
+    const lookbackItem = e.target.closest('.lookback-card__item');
+    if (lookbackItem) {
+      e.preventDefault();
+      const linkId = lookbackItem.dataset.linkId;
+      if (linkId) {
+        const link = getAllLinks().find(l => l.id === linkId);
+        if (link) {
+          trackPinInteraction(linkId, 'lookback_view');
+          window.open(link.url, '_blank');
+        }
+      }
+      return;
+    }
+
+    const dismissBtn = e.target.closest('[data-action="dismiss-lookback"]');
+    if (dismissBtn) {
+      e.preventDefault();
+      localStorage.setItem(LOOKBACK_DISMISSED_KEY, new Date().toISOString());
+      renderGrid();
+      return;
+    }
+
+    const seeAllBtn = e.target.closest('[data-action="see-all-lookback"]');
+    if (seeAllBtn) {
+      e.preventDefault();
+      // For MVP, just scroll to show all lookback pins in grid
+      // Full Lookback View is post-MVP
+      toast('Full Lookback view coming soon!');
+      return;
+    }
+
     // Handle listen row click → open player
     const lr = e.target.closest('.listen-row');
     if (lr) { e.preventDefault(); const id = lr.dataset.id; if (id) openPlayer(id); return; }
@@ -12528,6 +12808,8 @@ Return JSON:
       if (openMenu) openMenu.classList.remove('grid-item__menu--visible');
 
       if (actionType === 'visit') {
+        // Track interaction when visiting a pin
+        trackPinInteraction(id, 'click');
         // Let the link handle itself
         return;
       } else if (actionType === 'resize') {
@@ -15021,6 +15303,267 @@ Return JSON:
   };
 
   init();
+
+  // ============================================
+  // Lookback Feature - Phase 1 MVP
+  // ============================================
+
+  const LOOKBACK_CACHE_KEY = 'ctrl-rodeo-lookback-cache';
+  const LOOKBACK_DISMISSED_KEY = 'ctrl-rodeo-lookback-dismissed';
+  const LOOKBACK_SURFACED_KEY = 'ctrl-rodeo-lookback-surfaced';
+
+  // Get season from date
+  function getSeason(date) {
+    const month = date.getMonth();
+    if (month >= 2 && month <= 4) return 'spring';
+    if (month >= 5 && month <= 7) return 'summer';
+    if (month >= 8 && month <= 10) return 'fall';
+    return 'winter';
+  }
+
+  // Compute lookback score for a pin
+  function computeLookbackScore(pin, now) {
+    let score = 0;
+    const signals = [];
+    const createdAt = new Date(pin.addedAt || pin.created_at);
+    const age = now - createdAt;
+    const daysSinceSave = age / (24 * 60 * 60 * 1000);
+
+    // Anniversary (within 3-day window, pin must be 300+ days old)
+    if (daysSinceSave > 300) {
+      const savedMD = `${createdAt.getMonth()}-${createdAt.getDate()}`;
+      for (let offset = -1; offset <= 1; offset++) {
+        const checkDate = new Date(now.getTime() + offset * 86400000);
+        const checkMD = `${checkDate.getMonth()}-${checkDate.getDate()}`;
+        if (savedMD === checkMD) {
+          score += 0.9;
+          const yearsAgo = Math.round(daysSinceSave / 365);
+          signals.push({ type: 'anniversary', label: `Saved ${yearsAgo} year${yearsAgo > 1 ? 's' : ''} ago` });
+          break;
+        }
+      }
+    }
+
+    // Seasonal match (pin 180+ days old, same season)
+    if (daysSinceSave > 180 && getSeason(createdAt) === getSeason(now)) {
+      score += 0.5;
+      const season = getSeason(createdAt);
+      signals.push({ type: 'seasonal', label: `From last ${season}` });
+    }
+
+    // Never clicked (7+ days old, no interaction)
+    if (!pin.last_interacted_at && daysSinceSave > 7) {
+      score += 0.7;
+      signals.push({ type: 'never_clicked', label: 'Never opened' });
+    }
+
+    // Consumption gap
+    if (pin.category === 'watch' && !pin.watched) {
+      score += 0.6;
+      signals.push({ type: 'unwatched', label: 'Still unwatched' });
+    }
+    if (pin.category === 'read' && !pin.read) {
+      score += 0.6;
+      signals.push({ type: 'unread', label: 'Still unread' });
+    }
+
+    // Staleness bonus (90+ days, no interaction)
+    if (daysSinceSave > 90 && !pin.last_interacted_at) {
+      score += Math.min(0.3, daysSinceSave / 1000);
+      signals.push({ type: 'stale', label: 'Forgotten save' });
+    }
+
+    return { score, signals };
+  }
+
+  // Get daily lookback pins
+  function getDailyLookback(links, today) {
+    // Activation gate: need at least 20 pins AND collection at least 30 days old
+    if (links.length < 20) return [];
+
+    const oldestPin = links.reduce((oldest, pin) => {
+      const pinDate = new Date(pin.addedAt || pin.created_at);
+      return !oldest || pinDate < oldest ? pinDate : oldest;
+    }, null);
+
+    if (!oldestPin) return [];
+
+    const collectionAge = (today - oldestPin) / (24 * 60 * 60 * 1000);
+    if (collectionAge < 30) return [];
+
+    // Load surfaced history for recency decay
+    let surfaced = {};
+    try {
+      surfaced = JSON.parse(localStorage.getItem(LOOKBACK_SURFACED_KEY) || '{}');
+    } catch {}
+
+    const now = new Date(today);
+    const scored = [];
+
+    for (const pin of links) {
+      const result = computeLookbackScore(pin, now);
+      if (result.score > 0) {
+        // Apply recency decay
+        let finalScore = result.score;
+        const lastSurfaced = surfaced[pin.id];
+        if (lastSurfaced) {
+          const daysSinceSurfaced = (today - new Date(lastSurfaced)) / (24 * 60 * 60 * 1000);
+          if (daysSinceSurfaced < 14) {
+            // Exponential decay with 14-day half-life
+            const decayFactor = Math.pow(0.5, (14 - daysSinceSurfaced) / 14);
+            finalScore *= decayFactor;
+          }
+        }
+
+        scored.push({ ...pin, lookbackScore: finalScore, lookbackSignals: result.signals });
+      }
+    }
+
+    // Sort by score descending
+    scored.sort((a, b) => b.lookbackScore - a.lookbackScore);
+
+    // Apply daily budget constraints
+    let selected = [];
+    let consumptionGapCount = 0;
+    const categories = new Set();
+
+    for (const pin of scored) {
+      if (selected.length >= 5) break;
+
+      // Max 1 consumption gap pin per day
+      const hasConsumptionGap = pin.lookbackSignals.some(s => s.type === 'unwatched' || s.type === 'unread');
+      if (hasConsumptionGap) {
+        if (consumptionGapCount >= 1) continue;
+        consumptionGapCount++;
+      }
+
+      selected.push(pin);
+      categories.add(pin.category);
+    }
+
+    // Category diversity bonus: if top results are all one category, boost others
+    if (selected.length >= 3 && categories.size === 1) {
+      // Find pins from different categories in the scored list
+      const otherCategories = scored.filter(p =>
+        p.category !== selected[0].category &&
+        !selected.find(s => s.id === p.id)
+      );
+
+      if (otherCategories.length > 0) {
+        // Replace last item with top different-category pin
+        selected[selected.length - 1] = otherCategories[0];
+      }
+    }
+
+    return selected.slice(0, 5); // Return 3-5 pins
+  }
+
+  // Track interaction with a pin
+  function trackPinInteraction(linkId, interactionType) {
+    const link = getAllLinks().find(l => l.id === linkId);
+    if (!link) return;
+
+    // Update last_interacted_at in localStorage
+    const now = new Date().toISOString();
+    updateLink(linkId, { last_interacted_at: now });
+
+    // TODO: Async insert into pin_interactions via Supabase (non-blocking)
+    // For MVP, just localStorage is sufficient
+  }
+
+  // Render lookback card at top of grid
+  function renderLookbackCard(links) {
+    // Only show when viewing all categories
+    if (currentFilter !== 'all') return '';
+
+    // Check if dismissed
+    try {
+      const dismissed = localStorage.getItem(LOOKBACK_DISMISSED_KEY);
+      if (dismissed) {
+        const dismissedDate = new Date(dismissed);
+        const now = new Date();
+        const hoursSinceDismiss = (now - dismissedDate) / (1000 * 60 * 60);
+        if (hoursSinceDismiss < 24) return '';
+      }
+    } catch {}
+
+    // Get today's lookback pins
+    const today = new Date();
+    const todayKey = today.toISOString().split('T')[0];
+
+    // Check cache
+    let cached = null;
+    try {
+      const cacheData = JSON.parse(localStorage.getItem(LOOKBACK_CACHE_KEY) || '{}');
+      if (cacheData.date === todayKey) {
+        cached = cacheData.pins;
+      }
+    } catch {}
+
+    let lookbackPins = cached;
+    if (!cached) {
+      lookbackPins = getDailyLookback(links, today);
+
+      // Cache for the day
+      try {
+        localStorage.setItem(LOOKBACK_CACHE_KEY, JSON.stringify({
+          date: todayKey,
+          pins: lookbackPins.map(p => p.id) // Store only IDs
+        }));
+
+        // Update surfaced history
+        const surfaced = JSON.parse(localStorage.getItem(LOOKBACK_SURFACED_KEY) || '{}');
+        for (const pin of lookbackPins) {
+          surfaced[pin.id] = today.toISOString();
+        }
+        localStorage.setItem(LOOKBACK_SURFACED_KEY, JSON.stringify(surfaced));
+      } catch {}
+    } else {
+      // Reconstruct pins from cached IDs
+      lookbackPins = cached.map(id => links.find(l => l.id === id)).filter(Boolean);
+      // Re-score to get signals
+      lookbackPins = lookbackPins.map(pin => {
+        const result = computeLookbackScore(pin, today);
+        return { ...pin, lookbackScore: result.score, lookbackSignals: result.signals };
+      });
+    }
+
+    // Need at least 3 pins to show card
+    if (lookbackPins.length < 3) return '';
+
+    // Render 3 mini-cards
+    const miniCards = lookbackPins.slice(0, 3).map(pin => {
+      const hasImg = pin.image && pin.image.length > 0;
+      const initial = pin.title ? pin.title.charAt(0).toUpperCase() : '?';
+      const contextLabel = pin.lookbackSignals[0]?.label || 'Worth revisiting';
+
+      return `
+        <div class="lookback-card__item" data-link-id="${pin.id}">
+          ${hasImg
+            ? `<img src="${esc(pin.image)}" alt="" class="lookback-card__img">`
+            : `<div class="lookback-card__placeholder">${initial}</div>`
+          }
+          <div class="lookback-card__title">${esc(pin.title || pin.url)}</div>
+          <div class="lookback-card__context">${esc(contextLabel)}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="lookback-card">
+        <div class="lookback-card__header">
+          <div class="lookback-card__label">LOOKBACK</div>
+          <button class="lookback-card__dismiss" data-action="dismiss-lookback">×</button>
+        </div>
+        <div class="lookback-card__items">
+          ${miniCards}
+        </div>
+        <div class="lookback-card__footer">
+          <button class="lookback-card__see-all" data-action="see-all-lookback">See all →</button>
+        </div>
+      </div>
+    `;
+  }
 
   // ============================================
   // Mobile Paste Button
