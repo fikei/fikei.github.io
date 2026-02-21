@@ -8871,7 +8871,6 @@ Return JSON:
 
   window.disableSubTagsBar = function() {
     showSubTagsBar = false;
-    currentSubTag = null;
     currentFilters = {};
     renderSubTags();
     renderGrid();
@@ -10683,52 +10682,67 @@ Return JSON:
   }
 
   // Sub-tags for each category - shown when filtering by category
-  // Categories with `dimensions` array support multi-dimensional filtering
-  // Categories with `tags`/`keywords` use legacy single-dimension filtering
+  // All categories use `dimensions` array for consistent rendering
   const SUB_TAGS = {
     wear: {
-      tags: ['tops', 'bottoms', 'outerwear', 'footwear', 'accessories', 'bags'],
-      keywords: {
-        tops: ['shirt', 'tee', 't-shirt', 'polo', 'sweater', 'hoodie', 'sweatshirt', 'jersey', 'tank', 'blouse', 'top', 'knit', 'cardigan', 'vest'],
-        bottoms: ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'joggers', 'chinos', 'cargo', 'denim', 'leggings'],
-        outerwear: ['jacket', 'coat', 'blazer', 'parka', 'bomber', 'windbreaker', 'anorak', 'fleece', 'puffer', 'down', 'overcoat', 'raincoat'],
-        footwear: ['shoe', 'sneaker', 'boot', 'sandal', 'loafer', 'oxford', 'trainer', 'runner', 'slipper', 'heel', 'flat', 'mule', 'clog'],
-        accessories: ['hat', 'cap', 'beanie', 'scarf', 'glove', 'belt', 'watch', 'sunglasses', 'glasses', 'jewelry', 'ring', 'necklace', 'bracelet', 'earring', 'tie', 'sock', 'wallet'],
-        bags: ['bag', 'backpack', 'tote', 'messenger', 'duffel', 'crossbody', 'clutch', 'purse', 'satchel', 'briefcase']
-      }
+      dimensions: [{
+        id: 'type',
+        label: 'Type',
+        tags: ['tops', 'bottoms', 'outerwear', 'footwear', 'accessories', 'bags'],
+        keywords: {
+          tops: ['shirt', 'tee', 't-shirt', 'polo', 'sweater', 'hoodie', 'sweatshirt', 'jersey', 'tank', 'blouse', 'top', 'knit', 'cardigan', 'vest'],
+          bottoms: ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'joggers', 'chinos', 'cargo', 'denim', 'leggings'],
+          outerwear: ['jacket', 'coat', 'blazer', 'parka', 'bomber', 'windbreaker', 'anorak', 'fleece', 'puffer', 'down', 'overcoat', 'raincoat'],
+          footwear: ['shoe', 'sneaker', 'boot', 'sandal', 'loafer', 'oxford', 'trainer', 'runner', 'slipper', 'heel', 'flat', 'mule', 'clog'],
+          accessories: ['hat', 'cap', 'beanie', 'scarf', 'glove', 'belt', 'watch', 'sunglasses', 'glasses', 'jewelry', 'ring', 'necklace', 'bracelet', 'earring', 'tie', 'sock', 'wallet'],
+          bags: ['bag', 'backpack', 'tote', 'messenger', 'duffel', 'crossbody', 'clutch', 'purse', 'satchel', 'briefcase']
+        }
+      }]
     },
     home: {
-      tags: ['furniture', 'lighting', 'decor', 'kitchen', 'bedding', 'storage'],
-      keywords: {
-        furniture: ['chair', 'sofa', 'couch', 'table', 'desk', 'bed', 'shelf', 'cabinet', 'dresser', 'bench', 'stool', 'ottoman'],
-        lighting: ['lamp', 'light', 'chandelier', 'sconce', 'pendant', 'lantern', 'candle'],
-        decor: ['art', 'print', 'poster', 'rug', 'carpet', 'mirror', 'vase', 'plant', 'frame', 'pillow', 'cushion', 'throw'],
-        kitchen: ['cookware', 'pan', 'pot', 'knife', 'utensil', 'appliance', 'blender', 'mixer', 'dish', 'plate', 'bowl', 'mug', 'glass'],
-        bedding: ['sheet', 'duvet', 'comforter', 'blanket', 'mattress', 'pillow'],
-        storage: ['basket', 'bin', 'box', 'organizer', 'rack', 'hook', 'hanger']
-      }
+      dimensions: [{
+        id: 'type',
+        label: 'Type',
+        tags: ['furniture', 'lighting', 'decor', 'kitchen', 'bedding', 'storage'],
+        keywords: {
+          furniture: ['chair', 'sofa', 'couch', 'table', 'desk', 'bed', 'shelf', 'cabinet', 'dresser', 'bench', 'stool', 'ottoman'],
+          lighting: ['lamp', 'light', 'chandelier', 'sconce', 'pendant', 'lantern', 'candle'],
+          decor: ['art', 'print', 'poster', 'rug', 'carpet', 'mirror', 'vase', 'plant', 'frame', 'pillow', 'cushion', 'throw'],
+          kitchen: ['cookware', 'pan', 'pot', 'knife', 'utensil', 'appliance', 'blender', 'mixer', 'dish', 'plate', 'bowl', 'mug', 'glass'],
+          bedding: ['sheet', 'duvet', 'comforter', 'blanket', 'mattress', 'pillow'],
+          storage: ['basket', 'bin', 'box', 'organizer', 'rack', 'hook', 'hanger']
+        }
+      }]
     },
     use: {
-      tags: ['tech', 'tools', 'fitness', 'outdoor', 'office', 'travel'],
-      keywords: {
-        tech: ['phone', 'laptop', 'tablet', 'headphone', 'speaker', 'camera', 'charger', 'cable', 'keyboard', 'mouse', 'monitor', 'gadget'],
-        tools: ['tool', 'drill', 'hammer', 'screwdriver', 'wrench', 'saw', 'knife', 'multi-tool'],
-        fitness: ['weight', 'dumbbell', 'yoga', 'mat', 'band', 'roller', 'gym', 'workout', 'exercise'],
-        outdoor: ['tent', 'camping', 'hiking', 'bike', 'bicycle', 'kayak', 'ski', 'snowboard', 'fishing'],
-        office: ['pen', 'notebook', 'planner', 'stapler', 'organizer', 'desk', 'stationery'],
-        travel: ['luggage', 'suitcase', 'carry-on', 'passport', 'adapter', 'toiletry', 'packing']
-      }
+      dimensions: [{
+        id: 'type',
+        label: 'Type',
+        tags: ['tech', 'tools', 'fitness', 'outdoor', 'office', 'travel'],
+        keywords: {
+          tech: ['phone', 'laptop', 'tablet', 'headphone', 'speaker', 'camera', 'charger', 'cable', 'keyboard', 'mouse', 'monitor', 'gadget'],
+          tools: ['tool', 'drill', 'hammer', 'screwdriver', 'wrench', 'saw', 'knife', 'multi-tool'],
+          fitness: ['weight', 'dumbbell', 'yoga', 'mat', 'band', 'roller', 'gym', 'workout', 'exercise'],
+          outdoor: ['tent', 'camping', 'hiking', 'bike', 'bicycle', 'kayak', 'ski', 'snowboard', 'fishing'],
+          office: ['pen', 'notebook', 'planner', 'stapler', 'organizer', 'desk', 'stationery'],
+          travel: ['luggage', 'suitcase', 'carry-on', 'passport', 'adapter', 'toiletry', 'packing']
+        }
+      }]
     },
     listen: {
-      tags: ['albums', 'tracks', 'playlists', 'podcasts', 'artists', 'mixes'],
-      keywords: {
-        albums: ['album', 'lp', 'ep', 'deluxe', 'record', 'vinyl', 'release', 'reissue'],
-        tracks: ['song', 'track', 'single', 'remix', 'beat', 'instrumental', 'feat'],
-        playlists: ['playlist', 'compilation', 'curated', 'collection', 'best of'],
-        podcasts: ['podcast', 'episode', 'pod', 'interview', 'talk', 'hosted by'],
-        artists: ['artist', 'band', 'singer', 'rapper', 'producer', 'dj', 'musician', 'composer'],
-        mixes: ['mix', 'set', 'live', 'session', 'boiler room', 'essential mix', 'radio']
-      }
+      dimensions: [{
+        id: 'type',
+        label: 'Type',
+        tags: ['albums', 'tracks', 'playlists', 'podcasts', 'artists', 'mixes'],
+        keywords: {
+          albums: ['album', 'lp', 'ep', 'deluxe', 'record', 'vinyl', 'release', 'reissue'],
+          tracks: ['song', 'track', 'single', 'remix', 'beat', 'instrumental', 'feat'],
+          playlists: ['playlist', 'compilation', 'curated', 'collection', 'best of'],
+          podcasts: ['podcast', 'episode', 'pod', 'interview', 'talk', 'hosted by'],
+          artists: ['artist', 'band', 'singer', 'rapper', 'producer', 'dj', 'musician', 'composer'],
+          mixes: ['mix', 'set', 'live', 'session', 'boiler room', 'essential mix', 'radio']
+        }
+      }]
     },
     watch: {
       dimensions: [
@@ -10755,7 +10769,6 @@ Return JSON:
         {
           id: 'genre',
           label: 'Genre',
-          hideOther: true, // No "Other" bucket for genres — unmatched items just don't filter
           tags: ['action', 'comedy', 'drama', 'horror', 'sci-fi', 'thriller', 'romance', 'animation', 'fantasy', 'mystery', 'crime'],
           detect(link) {
             return resolveGenre(link);
@@ -10855,7 +10868,7 @@ Return JSON:
       },
       summaryField: 'summary',
       enrichFlag: 'enrichWatch',
-      backfillCheck: (link) => link.video && !link.video.server_enriched_at,
+      backfillCheck: (link) => link.video && (!link.video.server_enriched_at || !link.video.genres?.length),
     },
     read: {
       category: 'read',
@@ -10896,37 +10909,10 @@ Return JSON:
     },
   };
 
-  let currentSubTag = null; // Current sub-tag filter (legacy single-dimension categories)
   let currentFilters = {}; // Multi-dimension filter state: { format: 'movies', genre: 'action' }
   let showSubTagsBar = true; // Sub-tag filters visible by default
 
-  // Detect sub-tag from link title/description (legacy single-dimension categories)
-  function detectSubTag(link) {
-    const category = link.category;
-    const config = SUB_TAGS[category];
-    if (!config || config.dimensions) return null; // Skip multi-dimension categories
-
-    const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
-    const { keywords } = config;
-
-    for (const [tag, words] of Object.entries(keywords)) {
-      for (const word of words) {
-        if (text.includes(word)) {
-          return tag;
-        }
-      }
-    }
-    return null;
-  }
-
-  // Get sub-tag for a link — legacy single-dimension (cached on link object)
-  function getSubTag(link) {
-    if (link.subTag !== undefined) return link.subTag;
-    link.subTag = detectSubTag(link);
-    return link.subTag;
-  }
-
-  // Detect tags across all dimensions for multi-dimension categories
+  // Detect tags across all dimensions for a link
   function detectTags(link) {
     const category = link.category;
     const config = SUB_TAGS[category];
@@ -10946,11 +10932,20 @@ Return JSON:
     return tags;
   }
 
-  // Get multi-dimension tags for a link (cached on link object)
+  // Get tags for a link (cached on link object)
   function getTags(link) {
     if (link._tags !== undefined) return link._tags;
     link._tags = detectTags(link);
     return link._tags;
+  }
+
+  // Get first dimension tag for display purposes (card overlay label)
+  function getSubTag(link) {
+    const tags = getTags(link);
+    if (!tags) return null;
+    const config = SUB_TAGS[link.category];
+    if (!config || !config.dimensions) return null;
+    return tags[config.dimensions[0].id] || null;
   }
 
   // Load domain->category cache from localStorage
@@ -12508,129 +12503,78 @@ Return JSON:
     const subTagsEl = $('subTags');
     if (!subTagsEl) return;
 
-    // Beta feature - hide bar unless explicitly enabled
-    // Enable via console: window.enableSubTagsBar()
     if (!showSubTagsBar) {
       subTagsEl.classList.remove('sub-tags--visible');
       return;
     }
 
     // Hide if "all" or no sub-tags for this category
-    if (currentFilter === 'all' || !SUB_TAGS[currentFilter]) {
+    const categoryConfig = SUB_TAGS[currentFilter];
+    if (currentFilter === 'all' || !categoryConfig?.dimensions) {
       subTagsEl.classList.remove('sub-tags--visible');
-      currentSubTag = null;
       currentFilters = {};
       return;
     }
 
-    const categoryConfig = SUB_TAGS[currentFilter];
     const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
+    let html = '';
+    let anyDimensionHasItems = false;
 
-    // Multi-dimension categories (e.g., watch with format + genre)
-    if (categoryConfig.dimensions) {
-      let html = '';
-      let anyDimensionHasItems = false;
-
-      for (const dim of categoryConfig.dimensions) {
-        // Pre-filter links by other active dimensions (AND logic for counts)
-        let linksForCounting = allCategoryLinks;
-        for (const otherDim of categoryConfig.dimensions) {
-          if (otherDim.id === dim.id) continue;
-          const otherFilter = currentFilters[otherDim.id];
-          if (!otherFilter) continue;
-          linksForCounting = linksForCounting.filter(l => {
-            const tags = getTags(l) || {};
-            if (otherFilter === 'other') return !tags[otherDim.id];
-            return tags[otherDim.id] === otherFilter;
-          });
-        }
-
-        // Count items per tag in this dimension
-        const counts = {};
-        let untaggedCount = 0;
-        for (const link of linksForCounting) {
-          const tags = getTags(link) || {};
-          const tag = tags[dim.id];
-          if (tag) {
-            counts[tag] = (counts[tag] || 0) + 1;
-          } else {
-            untaggedCount++;
-          }
-        }
-
-        const hasTaggedItems = Object.keys(counts).length > 0;
-        if (!hasTaggedItems && untaggedCount === 0) continue;
-        anyDimensionHasItems = true;
-
-        const activeFilter = currentFilters[dim.id];
-
-        let buttonsHtml = `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${dim.id}" data-subtag="">All<span class="sub-tag__count">${linksForCounting.length}</span></button>`;
-
-        for (const tag of dim.tags) {
-          const count = counts[tag] || 0;
-          if (count > 0) {
-            const active = activeFilter === tag ? 'sub-tag--active' : '';
-            buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
-          }
-        }
-
-        if (untaggedCount > 0 && !dim.hideOther) {
-          const active = activeFilter === 'other' ? 'sub-tag--active' : '';
-          buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
-        }
-
-        html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label">${dim.label}</span><div class="sub-tags__buttons">${buttonsHtml}</div></div>`;
+    for (const dim of categoryConfig.dimensions) {
+      // Pre-filter links by other active dimensions (AND logic for counts)
+      let linksForCounting = allCategoryLinks;
+      for (const otherDim of categoryConfig.dimensions) {
+        if (otherDim.id === dim.id) continue;
+        const otherFilter = currentFilters[otherDim.id];
+        if (!otherFilter) continue;
+        linksForCounting = linksForCounting.filter(l => {
+          const tags = getTags(l) || {};
+          if (otherFilter === 'other') return !tags[otherDim.id];
+          return tags[otherDim.id] === otherFilter;
+        });
       }
 
-      if (!anyDimensionHasItems) {
-        subTagsEl.classList.remove('sub-tags--visible');
-        currentFilters = {};
-        return;
+      // Count items per tag in this dimension
+      const counts = {};
+      let untaggedCount = 0;
+      for (const link of linksForCounting) {
+        const tags = getTags(link) || {};
+        const tag = tags[dim.id];
+        if (tag) {
+          counts[tag] = (counts[tag] || 0) + 1;
+        } else {
+          untaggedCount++;
+        }
       }
 
-      subTagsEl.innerHTML = html;
-      subTagsEl.classList.add('sub-tags--visible');
-      return;
+      const hasTaggedItems = Object.keys(counts).length > 0;
+      if (!hasTaggedItems && untaggedCount === 0) continue;
+      anyDimensionHasItems = true;
+
+      const activeFilter = currentFilters[dim.id];
+
+      let buttonsHtml = `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${dim.id}" data-subtag="">All<span class="sub-tag__count">${linksForCounting.length}</span></button>`;
+
+      for (const tag of dim.tags) {
+        const count = counts[tag] || 0;
+        if (count > 0) {
+          const active = activeFilter === tag ? 'sub-tag--active' : '';
+          buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
+        }
+      }
+
+      if (untaggedCount > 0) {
+        const active = activeFilter === 'other' ? 'sub-tag--active' : '';
+        buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
+      }
+
+      html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label">${dim.label}</span><div class="sub-tags__buttons">${buttonsHtml}</div></div>`;
     }
 
-    // Legacy single-dimension categories (wear, home, use, listen)
-    const links = allCategoryLinks;
-
-    // Count items per sub-tag
-    const counts = {};
-    let untaggedCount = 0;
-    for (const link of links) {
-      const tag = getSubTag(link);
-      if (tag) {
-        counts[tag] = (counts[tag] || 0) + 1;
-      } else {
-        untaggedCount++;
-      }
-    }
-
-    // Only show sub-tags bar if we have tagged items
-    const hasTaggedItems = Object.keys(counts).length > 0;
-    if (!hasTaggedItems) {
+    if (!anyDimensionHasItems) {
       subTagsEl.classList.remove('sub-tags--visible');
-      currentSubTag = null;
+      currentFilters = {};
       return;
-    }
-
-    // Build sub-tags HTML
-    let html = `<button class="sub-tag ${!currentSubTag ? 'sub-tag--active' : ''}" data-subtag="">All<span class="sub-tag__count">${links.length}</span></button>`;
-
-    for (const tag of categoryConfig.tags) {
-      const count = counts[tag] || 0;
-      if (count > 0) {
-        const active = currentSubTag === tag ? 'sub-tag--active' : '';
-        html += `<button class="sub-tag ${active}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
-      }
-    }
-
-    // Add "Other" for untagged items
-    if (untaggedCount > 0) {
-      const active = currentSubTag === 'other' ? 'sub-tag--active' : '';
-      html += `<button class="sub-tag ${active}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
     }
 
     subTagsEl.innerHTML = html;
@@ -12679,10 +12623,8 @@ Return JSON:
       ? allLinks
       : allLinks.filter(l => l.category === currentFilter || l.loading);
 
-    // Apply sub-tag filter (multi-dimension or legacy)
-    const filterConfig = SUB_TAGS[currentFilter];
-    if (filterConfig?.dimensions && currentFilter !== 'all') {
-      // Multi-dimension filtering (AND logic across dimensions)
+    // Apply sub-tag filter (AND logic across dimensions)
+    if (SUB_TAGS[currentFilter]?.dimensions && currentFilter !== 'all') {
       const activeFilters = Object.entries(currentFilters).filter(([, v]) => v);
       if (activeFilters.length > 0) {
         links = links.filter(l => {
@@ -12698,16 +12640,6 @@ Return JSON:
           return true;
         });
       }
-    } else if (currentSubTag && currentFilter !== 'all') {
-      // Legacy single-dimension filtering
-      links = links.filter(l => {
-        if (l.loading) return true;
-        const tag = getSubTag(l);
-        if (currentSubTag === 'other') {
-          return tag === null;
-        }
-        return tag === currentSubTag;
-      });
     }
 
     // Apply search filter
@@ -13800,8 +13732,7 @@ Return JSON:
       }
 
       currentFilter = category;
-      currentSubTag = null; // Reset sub-tag when changing category
-      currentFilters = {}; // Reset multi-dimension filters
+      currentFilters = {}; // Reset dimension filters
       if (currentPlayer.linkId && currentFilter !== 'listen') closePlayer();
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
@@ -13813,21 +13744,16 @@ Return JSON:
     }
   };
 
-  // Sub-tag filter click handler (multi-dimension + legacy)
+  // Sub-tag filter click handler
   const subTagsEl = $('subTags');
   if (subTagsEl) {
     subTagsEl.onclick = (e) => {
       const t = e.target.closest('.sub-tag');
       if (!t) return;
-      const tag = t.dataset.subtag;
       const dimension = t.dataset.dimension;
-
+      const tag = t.dataset.subtag;
       if (dimension) {
-        // Multi-dimension category
         currentFilters[dimension] = tag === '' ? null : tag;
-      } else {
-        // Legacy single-dimension category
-        currentSubTag = tag === '' ? null : tag;
       }
       renderSubTags();
       renderGrid();
