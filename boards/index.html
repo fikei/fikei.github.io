@@ -832,16 +832,40 @@ body {
 /* Sub-tag filter bar */
 .sub-tags {
   display: none;
+  flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--subtle);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .sub-tags--visible {
   display: flex;
+}
+
+/* Multi-dimension row */
+.sub-tags__dimension {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.sub-tags__label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-width: 44px;
+}
+
+.sub-tags__buttons {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
 }
 
 .sub-tag {
@@ -8222,6 +8246,7 @@ Return JSON:
   window.disableSubTagsBar = function() {
     showSubTagsBar = false;
     currentSubTag = null;
+    currentFilters = {};
     renderSubTags();
     renderGrid();
     console.log('[beta] Sub-tags bar disabled');
@@ -9365,6 +9390,7 @@ Return JSON:
             // Augment metadata — server fills gaps from client-side extraction
             type: existing.type || result.video.type || null,
             genre: existing.genre || result.video.genre || null,
+            genres: result.video.genres?.length ? result.video.genres : existing.genres || [],
             year: existing.year || result.video.year || null,
             creator: existing.creator || result.video.creator || null,
             rating: existing.rating || result.video.rating || null,
@@ -9377,6 +9403,10 @@ Return JSON:
             seriesInfo: existing.seriesInfo || null
           };
           console.log('%c[ENRICH] Video metadata merged:', 'color: #E50914', link.video);
+
+          // Invalidate cached tags so genre/format detection re-runs with new data
+          delete link._tags;
+          delete link.subTag;
 
           // Update top-level link title with clean TMDB title (removes "- Wikipedia" etc.)
           if (link.video.title) {
@@ -9960,7 +9990,26 @@ Return JSON:
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
   const CATEGORIES = ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read'];
 
+  // Genre normalization — maps TMDB/AI genre names to our tag IDs
+  const GENRE_NORMALIZE = {
+    'action': 'action', 'adventure': 'action', 'action & adventure': 'action',
+    'comedy': 'comedy', 'drama': 'drama', 'horror': 'horror',
+    'science fiction': 'sci-fi', 'sci-fi': 'sci-fi', 'sci-fi & fantasy': 'sci-fi',
+    'thriller': 'thriller', 'romance': 'romance',
+    'animation': 'animation', 'fantasy': 'fantasy',
+    'mystery': 'mystery', 'crime': 'crime',
+    'war': 'action', 'war & politics': 'drama',
+    'western': 'action', 'family': 'comedy', 'history': 'drama'
+  };
+
+  function normalizeGenre(raw) {
+    if (!raw) return null;
+    return GENRE_NORMALIZE[raw.toLowerCase().trim()] || null;
+  }
+
   // Sub-tags for each category - shown when filtering by category
+  // Categories with `dimensions` array support multi-dimensional filtering
+  // Categories with `tags`/`keywords` use legacy single-dimension filtering
   const SUB_TAGS = {
     wear: {
       tags: ['tops', 'bottoms', 'outerwear', 'footwear', 'accessories', 'bags'],
@@ -10007,15 +10056,50 @@ Return JSON:
       }
     },
     watch: {
-      tags: ['movies', 'tv-shows', 'documentaries', 'shorts', 'anime', 'videos'],
-      keywords: {
-        movies: ['movie', 'film', 'cinema', 'feature', 'theatrical', 'blockbuster'],
-        'tv-shows': ['series', 'show', 'season', 'episode', 'tv', 'sitcom', 'drama series', 'miniseries'],
-        documentaries: ['documentary', 'docu', 'docuseries', 'true story'],
-        shorts: ['short', 'short film'],
-        anime: ['anime', 'manga', 'crunchyroll', 'funimation', 'isekai', 'shonen'],
-        videos: ['video', 'clip', 'vlog', 'tutorial', 'review', 'trailer', 'teaser']
-      }
+      dimensions: [
+        {
+          id: 'format',
+          label: 'Type',
+          tags: ['movies', 'tv-shows', 'documentaries', 'shorts', 'anime', 'videos'],
+          detect(link) {
+            if (link.video?.type) {
+              const map = { 'movie': 'movies', 'tv-show': 'tv-shows', 'documentary': 'documentaries', 'short': 'shorts', 'anime': 'anime', 'video': 'videos', 'trailer': 'videos' };
+              return map[link.video.type] || null;
+            }
+            return null;
+          },
+          keywords: {
+            movies: ['movie', 'film', 'cinema', 'feature', 'theatrical', 'blockbuster'],
+            'tv-shows': ['series', 'show', 'season', 'episode', 'tv', 'sitcom', 'drama series', 'miniseries'],
+            documentaries: ['documentary', 'docu', 'docuseries', 'true story'],
+            shorts: ['short', 'short film'],
+            anime: ['anime', 'manga', 'crunchyroll', 'funimation', 'isekai', 'shonen'],
+            videos: ['video', 'clip', 'vlog', 'tutorial', 'review', 'trailer', 'teaser']
+          }
+        },
+        {
+          id: 'genre',
+          label: 'Genre',
+          tags: ['action', 'comedy', 'drama', 'horror', 'sci-fi', 'thriller', 'romance', 'animation', 'fantasy', 'mystery', 'crime'],
+          detect(link) {
+            const raw = link.video?.genres?.[0] || link.video?.genre;
+            return normalizeGenre(raw);
+          },
+          keywords: {
+            action: ['action', 'fight', 'combat', 'adventure'],
+            comedy: ['comedy', 'funny', 'humor', 'sitcom'],
+            drama: ['drama', 'dramatic'],
+            horror: ['horror', 'scary', 'terror'],
+            'sci-fi': ['sci-fi', 'science fiction', 'space', 'alien'],
+            thriller: ['thriller', 'suspense'],
+            romance: ['romance', 'romantic', 'love story'],
+            animation: ['animation', 'animated', 'cartoon', 'pixar'],
+            fantasy: ['fantasy', 'magic', 'wizard'],
+            mystery: ['mystery', 'detective', 'whodunit'],
+            crime: ['crime', 'heist', 'gangster', 'mafia']
+          }
+        }
+      ]
     }
   };
 
@@ -10137,26 +10221,18 @@ Return JSON:
     },
   };
 
-  let currentSubTag = null; // Current sub-tag filter
+  let currentSubTag = null; // Current sub-tag filter (legacy single-dimension categories)
+  let currentFilters = {}; // Multi-dimension filter state: { format: 'movies', genre: 'action' }
   let showSubTagsBar = false; // Beta feature - enable via: window.enableSubTagsBar()
 
-  // Detect sub-tag from link title/description
+  // Detect sub-tag from link title/description (legacy single-dimension categories)
   function detectSubTag(link) {
     const category = link.category;
-    if (!SUB_TAGS[category]) return null;
-
-    // Prefer structured metadata type for watch items
-    if (category === 'watch' && link.video?.type) {
-      const typeToTag = {
-        'movie': 'movies', 'tv-show': 'tv-shows', 'documentary': 'documentaries',
-        'short': 'shorts', 'anime': 'anime', 'video': 'videos', 'trailer': 'videos'
-      };
-      const mapped = typeToTag[link.video.type];
-      if (mapped && SUB_TAGS.watch.tags.includes(mapped)) return mapped;
-    }
+    const config = SUB_TAGS[category];
+    if (!config || config.dimensions) return null; // Skip multi-dimension categories
 
     const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
-    const { keywords } = SUB_TAGS[category];
+    const { keywords } = config;
 
     for (const [tag, words] of Object.entries(keywords)) {
       for (const word of words) {
@@ -10168,11 +10244,38 @@ Return JSON:
     return null;
   }
 
-  // Get sub-tag for a link (cached on link object)
+  // Get sub-tag for a link — legacy single-dimension (cached on link object)
   function getSubTag(link) {
     if (link.subTag !== undefined) return link.subTag;
     link.subTag = detectSubTag(link);
     return link.subTag;
+  }
+
+  // Detect tags across all dimensions for multi-dimension categories
+  function detectTags(link) {
+    const category = link.category;
+    const config = SUB_TAGS[category];
+    if (!config || !config.dimensions) return null;
+
+    const tags = {};
+    for (const dim of config.dimensions) {
+      let detected = dim.detect ? dim.detect(link) : null;
+      if (!detected && dim.keywords) {
+        const text = `${link.title || ''} ${link.description || ''}`.toLowerCase();
+        for (const [tag, words] of Object.entries(dim.keywords)) {
+          if (words.some(w => text.includes(w))) { detected = tag; break; }
+        }
+      }
+      if (detected) tags[dim.id] = detected;
+    }
+    return tags;
+  }
+
+  // Get multi-dimension tags for a link (cached on link object)
+  function getTags(link) {
+    if (link._tags !== undefined) return link._tags;
+    link._tags = detectTags(link);
+    return link._tags;
   }
 
   // Load domain->category cache from localStorage
@@ -11279,11 +11382,82 @@ Return JSON:
     if (currentFilter === 'all' || !SUB_TAGS[currentFilter]) {
       subTagsEl.classList.remove('sub-tags--visible');
       currentSubTag = null;
+      currentFilters = {};
       return;
     }
 
     const categoryConfig = SUB_TAGS[currentFilter];
-    const links = getAllLinks().filter(l => l.category === currentFilter);
+    const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
+
+    // Multi-dimension categories (e.g., watch with format + genre)
+    if (categoryConfig.dimensions) {
+      let html = '';
+      let anyDimensionHasItems = false;
+
+      for (const dim of categoryConfig.dimensions) {
+        // Pre-filter links by other active dimensions (AND logic for counts)
+        let linksForCounting = allCategoryLinks;
+        for (const otherDim of categoryConfig.dimensions) {
+          if (otherDim.id === dim.id) continue;
+          const otherFilter = currentFilters[otherDim.id];
+          if (!otherFilter) continue;
+          linksForCounting = linksForCounting.filter(l => {
+            const tags = getTags(l) || {};
+            if (otherFilter === 'other') return !tags[otherDim.id];
+            return tags[otherDim.id] === otherFilter;
+          });
+        }
+
+        // Count items per tag in this dimension
+        const counts = {};
+        let untaggedCount = 0;
+        for (const link of linksForCounting) {
+          const tags = getTags(link) || {};
+          const tag = tags[dim.id];
+          if (tag) {
+            counts[tag] = (counts[tag] || 0) + 1;
+          } else {
+            untaggedCount++;
+          }
+        }
+
+        const hasTaggedItems = Object.keys(counts).length > 0;
+        if (!hasTaggedItems && untaggedCount === 0) continue;
+        anyDimensionHasItems = true;
+
+        const activeFilter = currentFilters[dim.id];
+
+        let buttonsHtml = `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${dim.id}" data-subtag="">All<span class="sub-tag__count">${linksForCounting.length}</span></button>`;
+
+        for (const tag of dim.tags) {
+          const count = counts[tag] || 0;
+          if (count > 0) {
+            const active = activeFilter === tag ? 'sub-tag--active' : '';
+            buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
+          }
+        }
+
+        if (untaggedCount > 0) {
+          const active = activeFilter === 'other' ? 'sub-tag--active' : '';
+          buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
+        }
+
+        html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label">${dim.label}</span><div class="sub-tags__buttons">${buttonsHtml}</div></div>`;
+      }
+
+      if (!anyDimensionHasItems) {
+        subTagsEl.classList.remove('sub-tags--visible');
+        currentFilters = {};
+        return;
+      }
+
+      subTagsEl.innerHTML = html;
+      subTagsEl.classList.add('sub-tags--visible');
+      return;
+    }
+
+    // Legacy single-dimension categories (wear, home, use, listen)
+    const links = allCategoryLinks;
 
     // Count items per sub-tag
     const counts = {};
@@ -11362,8 +11536,27 @@ Return JSON:
       ? allLinks
       : allLinks.filter(l => l.category === currentFilter || l.loading);
 
-    // Apply sub-tag filter
-    if (currentSubTag && currentFilter !== 'all') {
+    // Apply sub-tag filter (multi-dimension or legacy)
+    const filterConfig = SUB_TAGS[currentFilter];
+    if (filterConfig?.dimensions && currentFilter !== 'all') {
+      // Multi-dimension filtering (AND logic across dimensions)
+      const activeFilters = Object.entries(currentFilters).filter(([, v]) => v);
+      if (activeFilters.length > 0) {
+        links = links.filter(l => {
+          if (l.loading) return true;
+          const tags = getTags(l) || {};
+          for (const [dimId, filterVal] of activeFilters) {
+            if (filterVal === 'other') {
+              if (tags[dimId]) return false;
+            } else {
+              if (tags[dimId] !== filterVal) return false;
+            }
+          }
+          return true;
+        });
+      }
+    } else if (currentSubTag && currentFilter !== 'all') {
+      // Legacy single-dimension filtering
       links = links.filter(l => {
         if (l.loading) return true;
         const tag = getSubTag(l);
@@ -12425,6 +12618,7 @@ Return JSON:
     if (t) {
       currentFilter = t.dataset.category;
       currentSubTag = null; // Reset sub-tag when changing category
+      currentFilters = {}; // Reset multi-dimension filters
       if (currentPlayer.linkId && currentFilter !== 'listen') closePlayer();
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
@@ -12436,17 +12630,24 @@ Return JSON:
     }
   };
 
-  // Sub-tag filter click handler
+  // Sub-tag filter click handler (multi-dimension + legacy)
   const subTagsEl = $('subTags');
   if (subTagsEl) {
     subTagsEl.onclick = (e) => {
       const t = e.target.closest('.sub-tag');
-      if (t) {
-        const tag = t.dataset.subtag;
+      if (!t) return;
+      const tag = t.dataset.subtag;
+      const dimension = t.dataset.dimension;
+
+      if (dimension) {
+        // Multi-dimension category
+        currentFilters[dimension] = tag === '' ? null : tag;
+      } else {
+        // Legacy single-dimension category
         currentSubTag = tag === '' ? null : tag;
-        renderSubTags();
-        renderGrid();
       }
+      renderSubTags();
+      renderGrid();
     };
   }
 
