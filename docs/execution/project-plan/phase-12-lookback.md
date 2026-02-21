@@ -16,22 +16,22 @@ These tasks must be complete before Epic 12.1 can begin.
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Interaction Tracking Schema** | | Pending |
-| | Write migration `017_lookback_prerequisites.sql` | Pending |
-| | Add `last_interacted_at TIMESTAMPTZ DEFAULT NULL` to `links` table | Pending |
-| | Add index `idx_links_last_interacted` on `(user_id, last_interacted_at)` | Pending |
-| | Create `pin_interactions` table: `id UUID PK`, `user_id UUID`, `link_id UUID`, `interaction_type TEXT`, `created_at TIMESTAMPTZ` | Pending |
-| | Add index `idx_pin_interactions_link` on `(link_id)` | Pending |
-| | Add index `idx_pin_interactions_user_date` on `(user_id, created_at DESC)` | Pending |
-| | Enable RLS on `pin_interactions`; policy: `FOR ALL USING (auth.uid() = user_id)` | Pending |
+| **Interaction Tracking Schema** | | Complete |
+| | Write migration `017_lookback_prerequisites.sql` | Complete |
+| | Add `last_interacted_at TIMESTAMPTZ DEFAULT NULL` to `links` table | Complete |
+| | Add index `idx_links_last_interacted` on `(user_id, last_interacted_at)` | Complete |
+| | Create `pin_interactions` table: `id UUID PK`, `user_id UUID`, `link_id UUID`, `interaction_type TEXT`, `created_at TIMESTAMPTZ` | Complete |
+| | Add index `idx_pin_interactions_link` on `(link_id)` | Complete |
+| | Add index `idx_pin_interactions_user_date` on `(user_id, created_at DESC)` | Complete |
+| | Enable RLS on `pin_interactions`; policy: `FOR ALL USING (auth.uid() = user_id)` | Complete |
 | | Run migration against Boards Supabase project | Blocked |
 | | Update `database-schema.md` via `/arch` | Pending |
-| **Client-Side Interaction Tracking** | | Pending |
-| | Instrument `click` event: fires when user opens a pin URL (new tab) | Pending |
-| | Instrument `expand` event: fires when user expands a pin card | Pending |
-| | Instrument `share` event: fires when user shares a pin or board | Pending |
-| | On each interaction: update `links[id].last_interacted_at = now` in localStorage | Pending |
-| | On each interaction: async insert into `pin_interactions` via Supabase (non-blocking) | Pending |
+| **Client-Side Interaction Tracking** | | Complete |
+| | Instrument `click` event: fires when user opens a pin URL (new tab) | Complete |
+| | Instrument `expand` event: fires when user expands a pin card | Complete |
+| | Instrument `share` event: fires when user shares a pin or board | Complete |
+| | On each interaction: update `links[id].last_interacted_at = now` in localStorage | Complete |
+| | On each interaction: async insert into `pin_interactions` via Supabase (non-blocking) | Complete |
 | | Verify tracking overhead < 10ms per event | Pending |
 | | Note: `lookback_view` and `lookback_dismiss` types added in Epic 12.1 | Pending |
 
@@ -46,47 +46,51 @@ These tasks must be complete before Epic 12.1 can begin.
 
 ### Story 1: Client-Side Lookback Scoring Engine
 
+<!-- Shipped: computeLookbackScore() with 6 signals (anniversary, seasonal, never-clicked, consumption gap, staleness, recency decay) in boards/index.html -->
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **computeLookbackScore() function** | | Pending |
-| | Implement `computeLookbackScore(pin, now)` — returns `{ score, signals }` | Pending |
-| | Anniversary signal: match month-day within 3-day window, pin 300+ days old, score += 0.9 | Pending |
-| | Seasonal match: compare saved season to current season, pin 180+ days old, score += 0.5 | Pending |
-| | Never clicked: `last_interacted_at IS NULL` and pin 7+ days old, score += 0.7 | Pending |
-| | Consumption gap — watch: `category === 'watch' && !pin.watched`, score += 0.6 | Pending |
-| | Consumption gap — read: `category === 'read' && !pin.read`, score += 0.6 | Pending |
-| | Staleness bonus: pin > 90 days old with no interaction, score += min(0.3, age_days/1000) | Pending |
-| | `getSeason(date)` helper: returns 'winter', 'spring', 'summer', 'fall' from month | Pending |
-| **Lookback selection algorithm** | | Pending |
-| | `getDailyLookback(links, today)` — scores all pins, selects qualifying set | Pending |
-| | Activation gate: return empty if user has < 20 pins OR collection < 30 days old | Pending |
-| | Recency decay: pins surfaced in last 14 days get score * 0.5^(days_ago/14) | Pending |
-| | Category diversity bonus: if top 5 are all same category, boost underrepresented categories | Pending |
-| | Select top 3-5 pins by composite score | Pending |
-| | Daily budget: max 1 consumption gap pin per day | Pending |
-| | Cache daily set in localStorage with `lookback_date` key (avoid recomputation on re-render) | Pending |
-| | Invalidate cache if user adds new pin or calendar day changes | Pending |
+| **computeLookbackScore() function** | | Complete |
+| | Implement `computeLookbackScore(pin, now)` — returns `{ score, signals }` | Complete |
+| | Anniversary signal: match month-day within 3-day window, pin 300+ days old, score += 0.9 | Complete |
+| | Seasonal match: compare saved season to current season, pin 180+ days old, score += 0.5 | Complete |
+| | Never clicked: `last_interacted_at IS NULL` and pin 7+ days old, score += 0.7 | Complete |
+| | Consumption gap — watch: `category === 'watch' && !pin.watched`, score += 0.6 | Complete |
+| | Consumption gap — read: `category === 'read' && !pin.read`, score += 0.6 | Complete |
+| | Staleness bonus: pin > 90 days old with no interaction, score += min(0.3, age_days/1000) | Complete |
+| | `getSeason(date)` helper: returns 'winter', 'spring', 'summer', 'fall' from month | Complete |
+| **Lookback selection algorithm** | | Complete |
+| | `getDailyLookback(links, today)` — scores all pins, selects qualifying set | Complete |
+| | Activation gate: return empty if user has < 20 pins OR collection < 30 days old | Complete |
+| | Recency decay: pins surfaced in last 14 days get score * 0.5^(days_ago/14) | Complete |
+| | Category diversity bonus: if top 5 are all same category, boost underrepresented categories | Complete |
+| | Select top 3-5 pins by composite score | Complete |
+| | Daily budget: max 1 consumption gap pin per day | Complete |
+| | Cache daily set in localStorage with `lookback_date` key (avoid recomputation on re-render) | Complete |
+| | Invalidate cache if user adds new pin or calendar day changes | Complete |
 | **Lookback interaction events** | | Pending |
 | | Instrument `lookback_view` event: user views a surfaced pin via Lookback | Pending |
 | | Instrument `lookback_dismiss` event: user dismisses the Lookback card | Pending |
 
 ### Story 2: Lookback Card Component (Main Board)
 
+<!-- Shipped: renderLookbackCard(), daily cache, 24h dismiss, mini-cards in boards/index.html -->
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Lookback card layout** | | Pending |
-| | Render at top of board grid, above pins, below filter bar | Pending |
-| | "LOOKBACK" label (small caps, muted) | Pending |
-| | 3 mini-cards: image, title (truncated 2 lines), context label | Pending |
-| | Context labels per signal: "Saved 1 year ago", "Never opened", "Still unwatched", etc. | Pending |
-| | "See all" link — opens Lookback view | Pending |
-| | "Dismiss" button (X) — hides for 24 hours | Pending |
-| **Lookback card behavior** | | Pending |
-| | Only render if `getDailyLookback()` returns 3+ pins | Pending |
-| | Tapping mini-card: open pin URL or expand card | Pending |
-| | Dismissal: set `lookback_dismissed_at` in localStorage, suppress 24 hours | Pending |
-| | New set each day: cache resets at midnight (user local time) | Pending |
-| | Only show when `currentFilter === 'all'` (not in category-filtered views) | Pending |
+| **Lookback card layout** | | Complete |
+| | Render at top of board grid, above pins, below filter bar | Complete |
+| | "LOOKBACK" label (small caps, muted) | Complete |
+| | 3 mini-cards: image, title (truncated 2 lines), context label | Complete |
+| | Context labels per signal: "Saved 1 year ago", "Never opened", "Still unwatched", etc. | Complete |
+| | "See all" link — opens Lookback view | Complete |
+| | "Dismiss" button (X) — hides for 24 hours | Complete |
+| **Lookback card behavior** | | Complete |
+| | Only render if `getDailyLookback()` returns 3+ pins | Complete |
+| | Tapping mini-card: open pin URL or expand card | Complete |
+| | Dismissal: set `lookback_dismissed_at` in localStorage, suppress 24 hours | Complete |
+| | New set each day: cache resets at midnight (user local time) | Complete |
+| | Only show when `currentFilter === 'all'` (not in category-filtered views) | Complete |
 
 ### Story 3: Time Machine View
 

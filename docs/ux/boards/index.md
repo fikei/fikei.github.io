@@ -146,6 +146,8 @@ A board is a container for pins with:
 | **Flexible Tagging** | ⚠️ Partial | Categories, sub-tags, content types; freeform tags planned | [Flexible Tagging](../pins/tagging.md) |
 | **Visual Grid Browsing** | ✅ Shipped | Responsive grid, card expansion, dense flow | [Grid Layout & Display](./grid-layout.md) |
 | **Search & Retrieval** | ✅ Shipped | Live search, category filter, sub-tag filter, notes search | [Search & Retrieval](./search.md) |
+| **Categorization Cleanup** | ✅ Shipped | Review and correct AI categorization mistakes | [Cleanup](./cleanup.md) |
+| **Lookback** | ✅ Shipped | Rediscover valuable past pins (Phase 1 MVP) | [Lookback](./lookback.md) |
 | **Collection Sharing** | ⚠️ Partial | Export shipped; public boards planned | [Sharing & Collaboration](./sharing.md) |
 | **Cross-Category Connections** | ⚠️ Partial | Sub-tags + widget suggestions; explicit connections planned | [Cross-Category](./cross-category.md) |
 | **Events Integration** | ❌ Planned | Event/venue pins, calendar view | [Events](./events.md) |
