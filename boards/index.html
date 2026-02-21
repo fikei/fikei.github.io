@@ -1053,6 +1053,229 @@ body {
 }
 
 /* ============================================
+   Cleanup View — Review Card
+   ============================================ */
+.cleanup-view {
+  grid-column: 1 / -1;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-4) 0;
+}
+
+.cleanup-view__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.cleanup-view__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.05em;
+  color: var(--fg);
+}
+
+.cleanup-view__progress {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.cleanup-view__back {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  padding: 0;
+}
+
+.cleanup-view__back:hover {
+  color: var(--fg);
+}
+
+.review-card {
+  border: 1px solid var(--fg);
+  background: var(--surface);
+}
+
+.review-card__image-wrap {
+  width: 100%;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  background: var(--subtle);
+  position: relative;
+}
+
+.review-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.review-card__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  color: var(--muted);
+}
+
+.review-card__body {
+  padding: var(--space-4);
+}
+
+.review-card__domain {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+
+.review-card__title-input,
+.review-card__desc-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  padding: var(--space-2);
+  border-radius: 0;
+  transition: border-color 0.15s;
+}
+
+.review-card__title-input {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.review-card__desc-input {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-3);
+  resize: vertical;
+  min-height: 48px;
+}
+
+.review-card__title-input:focus,
+.review-card__desc-input:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+
+.review-card__ai-context {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+}
+
+.review-card__ai-context strong {
+  color: var(--fg);
+}
+
+.review-card__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.review-card__cat-chip {
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.review-card__cat-chip:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.review-card__cat-chip--active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.review-card__cat-chip--active:hover {
+  opacity: 0.85;
+}
+
+.review-card__actions {
+  display: flex;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--subtle);
+}
+
+.review-card__btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--fg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.review-card__btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.review-card__btn--confirm {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.review-card__btn--confirm:hover {
+  opacity: 0.85;
+}
+
+.review-card__btn--delete {
+  border-color: #c00;
+  color: #c00;
+  flex: 0.5;
+}
+
+.review-card__btn--delete:hover {
+  background: #c00;
+  color: var(--bg);
+}
+
+.cleanup-view__empty {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 640px) {
+  .cleanup-view {
+    padding: var(--space-2) 0;
+  }
+  .review-card__actions {
+    flex-wrap: wrap;
+  }
+  .review-card__btn--delete {
+    flex: 1;
+  }
+}
+
+/* ============================================
    Grid Item
    ============================================ */
 .grid-item {
@@ -11089,6 +11312,184 @@ Return JSON:
   let cleanupViewActive = false;
   let cleanupQueueCache = [];
   let currentCleanupIndex = 0;
+  let selectedCleanupCategory = null;
+
+  // Render the cleanup review view — replaces the grid when active
+  function renderCleanupView() {
+    if (!cleanupViewActive) return;
+
+    // Refresh queue
+    cleanupQueueCache = getCleanupQueue(getAllLinks());
+
+    if (cleanupQueueCache.length === 0) {
+      grid.innerHTML = `
+        <div class="cleanup-view">
+          <div class="cleanup-view__header">
+            <button class="cleanup-view__back" onclick="exitCleanupView()">← Back</button>
+          </div>
+          <div class="cleanup-view__empty">All caught up — no pins need review right now.</div>
+        </div>`;
+      return;
+    }
+
+    // Clamp index
+    if (currentCleanupIndex >= cleanupQueueCache.length) {
+      currentCleanupIndex = 0;
+    }
+
+    const pin = cleanupQueueCache[currentCleanupIndex];
+    const hasImg = pin.image && pin.image.length > 0;
+    const initial = pin.title ? pin.title.charAt(0).toUpperCase() : '?';
+    const confPct = pin.confidence ? Math.round(pin.confidence * 100) : 0;
+
+    // Pre-select current category
+    selectedCleanupCategory = pin.category || 'uncategorized';
+
+    const catChips = CATEGORIES.map(cat => {
+      const active = cat === selectedCleanupCategory ? ' review-card__cat-chip--active' : '';
+      return `<button class="review-card__cat-chip${active}" data-cleanup-cat="${cat}">${cap(cat)}</button>`;
+    }).join('');
+
+    grid.innerHTML = `
+      <div class="cleanup-view">
+        <div class="cleanup-view__header">
+          <button class="cleanup-view__back" onclick="exitCleanupView()">← Back</button>
+          <span class="cleanup-view__title">Review</span>
+          <span class="cleanup-view__progress">${currentCleanupIndex + 1} of ${cleanupQueueCache.length}</span>
+        </div>
+        <div class="review-card" data-cleanup-pin-id="${pin.id}">
+          <div class="review-card__image-wrap">
+            ${hasImg
+              ? `<img src="${esc(pin.image)}" alt="" class="review-card__image">`
+              : `<div class="review-card__placeholder">${initial}</div>`
+            }
+          </div>
+          <div class="review-card__body">
+            <div class="review-card__domain">${esc(pin.domain || '')}</div>
+            <input class="review-card__title-input" value="${esc(pin.title || '')}" placeholder="Title" data-cleanup-field="title">
+            <textarea class="review-card__desc-input" placeholder="Description" data-cleanup-field="description">${esc(pin.description || '')}</textarea>
+            <div class="review-card__ai-context">AI says: <strong>${esc(cap(pin.category || 'uncategorized'))}</strong> (${confPct}%)</div>
+            <div class="review-card__categories">${catChips}</div>
+            <div class="review-card__actions">
+              <button class="review-card__btn review-card__btn--confirm" data-cleanup-action="confirm">Confirm</button>
+              <button class="review-card__btn" data-cleanup-action="skip">Skip</button>
+              <button class="review-card__btn review-card__btn--delete" data-cleanup-action="delete">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    // Attach event listeners for category chips and action buttons
+    attachCleanupHandlers();
+  }
+
+  function attachCleanupHandlers() {
+    // Category chip selection
+    const chips = grid.querySelectorAll('[data-cleanup-cat]');
+    chips.forEach(chip => {
+      chip.onclick = () => {
+        chips.forEach(c => c.classList.remove('review-card__cat-chip--active'));
+        chip.classList.add('review-card__cat-chip--active');
+        selectedCleanupCategory = chip.dataset.cleanupCat;
+      };
+    });
+
+    // Action buttons
+    const actions = grid.querySelectorAll('[data-cleanup-action]');
+    actions.forEach(btn => {
+      btn.onclick = () => handleCleanupAction(btn.dataset.cleanupAction);
+    });
+  }
+
+  function handleCleanupAction(action) {
+    const pin = cleanupQueueCache[currentCleanupIndex];
+    if (!pin) return;
+
+    if (action === 'confirm') {
+      // Read inline edits
+      const titleInput = grid.querySelector('[data-cleanup-field="title"]');
+      const descInput = grid.querySelector('[data-cleanup-field="description"]');
+
+      const updates = {
+        user_reviewed_at: new Date().toISOString(),
+        confidence: 1.0,
+        category: selectedCleanupCategory
+      };
+
+      if (titleInput && titleInput.value !== pin.title) {
+        updates.title = titleInput.value;
+      }
+      if (descInput && descInput.value !== pin.description) {
+        updates.description = descInput.value;
+      }
+
+      updateLink(pin.id, updates);
+      toast(`Confirmed as ${cap(selectedCleanupCategory)}`);
+
+      // Remove from queue and advance
+      cleanupQueueCache.splice(currentCleanupIndex, 1);
+      if (currentCleanupIndex >= cleanupQueueCache.length) currentCleanupIndex = 0;
+
+      if (cleanupQueueCache.length === 0) {
+        exitCleanupView();
+        toast('All done — queue cleared!');
+        return;
+      }
+      renderCleanupView();
+
+    } else if (action === 'skip') {
+      // Move current to end of queue
+      const skipped = cleanupQueueCache.splice(currentCleanupIndex, 1)[0];
+      cleanupQueueCache.push(skipped);
+      if (currentCleanupIndex >= cleanupQueueCache.length) currentCleanupIndex = 0;
+      renderCleanupView();
+
+    } else if (action === 'delete') {
+      const deletedPin = { ...pin };
+      deleteLink(pin.id);
+      cleanupQueueCache.splice(currentCleanupIndex, 1);
+      if (currentCleanupIndex >= cleanupQueueCache.length) currentCleanupIndex = 0;
+
+      // Show undo toast
+      const toastEl = document.createElement('div');
+      toastEl.className = 'toast toast--success';
+      toastEl.innerHTML = `Deleted "${esc(deletedPin.title || deletedPin.url)}" <button style="margin-left:8px;background:transparent;border:1px solid var(--fg);color:var(--fg);cursor:pointer;padding:2px 8px;font-family:var(--font-mono);font-size:12px" id="undoDelete">Undo</button>`;
+      const container = document.querySelector('.toasts') || document.body;
+      container.appendChild(toastEl);
+      setTimeout(() => toastEl.remove(), 6000);
+
+      toastEl.querySelector('#undoDelete').onclick = () => {
+        // Re-add the pin
+        const data = load();
+        data.links.push(deletedPin);
+        save(data);
+        syncLinkToSupabase(deletedPin);
+        toastEl.remove();
+        toast('Restored');
+        renderCleanupView();
+        renderFilters();
+      };
+
+      if (cleanupQueueCache.length === 0) {
+        exitCleanupView();
+        return;
+      }
+      renderCleanupView();
+    }
+
+    // Update the badge count in filters
+    renderFilters();
+  }
+
+  // Exit cleanup view and return to normal grid
+  window.exitCleanupView = function() {
+    cleanupViewActive = false;
+    currentCleanupIndex = 0;
+    currentFilter = 'all';
+    localStorage.setItem(FILTER_KEY, currentFilter);
+    renderFilters();
+    renderGrid();
+  };
 
   function findByUrl(url) {
     const n = normalizeUrl(url);
@@ -11542,6 +11943,12 @@ Return JSON:
   }
 
   function renderGrid(newIds = []) {
+    // If cleanup view is active, render that instead
+    if (cleanupViewActive) {
+      renderCleanupView();
+      return;
+    }
+
     // Toggle listen grid/list override
     const isListenList = currentFilter === 'listen' && listenView === 'list';
     grid.classList.toggle('grid--listen', currentFilter === 'listen' && listenView === 'grid');
