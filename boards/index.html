@@ -10636,20 +10636,42 @@ Return JSON:
   const CATEGORIES = ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read'];
 
   // Genre normalization — maps TMDB/AI genre names to our tag IDs
+  // Maps every TMDB movie + TV genre name to our normalized tag IDs
   const GENRE_NORMALIZE = {
-    'action': 'action', 'adventure': 'action', 'action & adventure': 'action',
+    // Movie genres (TMDB)
+    'action': 'action', 'adventure': 'action',
     'comedy': 'comedy', 'drama': 'drama', 'horror': 'horror',
-    'science fiction': 'sci-fi', 'sci-fi': 'sci-fi', 'sci-fi & fantasy': 'sci-fi',
+    'science fiction': 'sci-fi', 'sci-fi': 'sci-fi',
     'thriller': 'thriller', 'romance': 'romance',
     'animation': 'animation', 'fantasy': 'fantasy',
     'mystery': 'mystery', 'crime': 'crime',
-    'war': 'action', 'war & politics': 'drama',
-    'western': 'action', 'family': 'comedy', 'history': 'drama'
+    'war': 'action', 'western': 'action',
+    'family': 'comedy', 'history': 'drama',
+    'music': 'drama', 'tv movie': 'drama',
+    // TV genres (TMDB)
+    'action & adventure': 'action', 'sci-fi & fantasy': 'sci-fi',
+    'war & politics': 'drama', 'kids': 'animation',
+    'reality': 'drama', 'soap': 'drama', 'talk': 'drama', 'news': 'drama',
+    // AI enrichment variants
+    'romantic': 'romance', 'animated': 'animation',
+    'suspense': 'thriller', 'detective': 'mystery'
   };
 
   function normalizeGenre(raw) {
     if (!raw) return null;
     return GENRE_NORMALIZE[raw.toLowerCase().trim()] || null;
+  }
+
+  // Try all genres in array until one normalizes, fallback to singular genre field
+  function resolveGenre(link) {
+    const genres = link.video?.genres;
+    if (Array.isArray(genres)) {
+      for (const g of genres) {
+        const n = normalizeGenre(g);
+        if (n) return n;
+      }
+    }
+    return normalizeGenre(link.video?.genre);
   }
 
   // Sub-tags for each category - shown when filtering by category
@@ -10725,10 +10747,10 @@ Return JSON:
         {
           id: 'genre',
           label: 'Genre',
+          hideOther: true, // No "Other" bucket for genres — unmatched items just don't filter
           tags: ['action', 'comedy', 'drama', 'horror', 'sci-fi', 'thriller', 'romance', 'animation', 'fantasy', 'mystery', 'crime'],
           detect(link) {
-            const raw = link.video?.genres?.[0] || link.video?.genre;
-            return normalizeGenre(raw);
+            return resolveGenre(link);
           },
           keywords: {
             action: ['action', 'fight', 'combat', 'adventure'],
@@ -12544,7 +12566,7 @@ Return JSON:
           }
         }
 
-        if (untaggedCount > 0) {
+        if (untaggedCount > 0 && !dim.hideOther) {
           const active = activeFilter === 'other' ? 'sub-tag--active' : '';
           buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
         }
