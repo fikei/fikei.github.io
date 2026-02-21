@@ -986,6 +986,202 @@ body {
   box-shadow: 4px 0 0 0 var(--fg);
 }
 
+/* Merge target visual feedback */
+.grid-item--merge-target {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 2px var(--fg), 0 0 16px rgba(255,255,255,0.15);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 2;
+}
+
+/* Merge pick-target mode: highlight selectable cards */
+.grid-item--merge-selectable {
+  cursor: crosshair;
+}
+.grid-item--merge-selectable:hover {
+  box-shadow: 0 0 0 2px var(--fg);
+}
+
+/* Merged pin badge (stacked indicator) */
+.grid-item__merge-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  gap: -4px;
+  align-items: center;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #fff;
+  pointer-events: none;
+}
+
+/* Merged pin sources list in expanded view */
+.merge-sources {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.merge-sources__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+.merge-sources__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+.merge-sources__item a {
+  color: var(--fg);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.merge-sources__item a:hover {
+  text-decoration: underline;
+}
+.merge-sources__primary {
+  color: var(--fg);
+  font-size: 10px;
+}
+.merge-sources__unmerge {
+  margin-top: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  background: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+.merge-sources__unmerge:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+/* Merge preview modal */
+.merge-preview__thumbs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+}
+.merge-preview__thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+}
+.merge-preview__thumb--selected {
+  border-color: var(--fg);
+}
+.merge-preview__thumb--placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: var(--muted);
+}
+.merge-preview__field {
+  margin-bottom: var(--space-3);
+}
+.merge-preview__field label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
+}
+.merge-preview__field input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: var(--fg);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-base);
+}
+.merge-preview__field input[type="text"]:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+.merge-preview__radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.merge-preview__radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+.merge-preview__radio:hover {
+  background: rgba(255,255,255,0.05);
+}
+.merge-preview__radio input[type="radio"] {
+  accent-color: var(--fg);
+}
+.merge-preview__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.merge-preview__actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: none;
+  color: var(--fg);
+}
+.merge-preview__actions button:hover {
+  border-color: var(--fg);
+}
+.merge-preview__actions .merge-preview__confirm {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+.merge-preview__actions .merge-preview__confirm:hover {
+  opacity: 0.9;
+}
+
 /* New item animation */
 @keyframes slideIn {
   from {
@@ -5170,6 +5366,36 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       </div>
       <div style="padding: var(--space-4);" id="widgetPrdContent">
         <!-- Populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Merge Preview Modal -->
+  <div class="modal" id="mergeModal" role="dialog" aria-modal="true" aria-labelledby="mergeModalTitle">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2 class="modal__title" id="mergeModalTitle">Merge pins</h2>
+        <button class="modal__close" data-close>&times;</button>
+      </div>
+      <div style="padding: var(--space-4);">
+        <div class="merge-preview__thumbs" id="mergePreviewThumbs"></div>
+        <div class="merge-preview__field">
+          <label for="mergeTitleInput">Title</label>
+          <input type="text" id="mergeTitleInput" placeholder="Merged pin title">
+        </div>
+        <div class="merge-preview__field">
+          <label>Primary link</label>
+          <div class="merge-preview__radio-group" id="mergePrimaryGroup"></div>
+        </div>
+        <div class="merge-preview__field">
+          <label>Image</label>
+          <div class="merge-preview__thumbs" id="mergeImagePicker"></div>
+        </div>
+        <div class="merge-preview__actions">
+          <button id="mergeCancelBtn">Cancel</button>
+          <button class="merge-preview__confirm" id="mergeConfirmBtn">Merge</button>
+        </div>
       </div>
     </div>
   </div>
@@ -10785,7 +11011,11 @@ Return JSON:
         music: link.music || null,
         book: link.book || null,
         watched: link.watched || false,
-        read: link.read || false
+        read: link.read || false,
+        // Merge fields
+        is_merged: link.is_merged || false,
+        sources: link.sources || null,
+        merged_at: link.merged_at || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -11182,6 +11412,185 @@ Return JSON:
     }
     if (!data.categories[category]) data.categories[category] = { pinned: false };
     save(data);
+  }
+
+  // ============================================
+  // Pin Merging
+  // ============================================
+  const MAX_MERGE_SOURCES = 10;
+
+  function mergeFieldsFallback(sources) {
+    const primary = sources[0];
+    const bestImage = sources
+      .filter(s => s.image && s.image_scores?.composite)
+      .sort((a, b) => (b.image_scores?.composite || 0) - (a.image_scores?.composite || 0))[0];
+    return {
+      title: primary.title,
+      description: primary.description,
+      image: bestImage?.image || primary.image,
+      image_source: bestImage?.image_source || primary.image_source,
+      image_scores: bestImage?.image_scores || primary.image_scores,
+      content_type: primary.content_type,
+      music: sources.find(s => s.music)?.music || null,
+      video: sources.find(s => s.video)?.video || null,
+      book: sources.find(s => s.book)?.book || null,
+    };
+  }
+
+  function createMergedPin(sources, overrides = {}) {
+    // Flatten: if any source is already merged, pull its sources in
+    const flatSources = [];
+    for (const s of sources) {
+      if (s.is_merged && s.sources) {
+        flatSources.push(...s.sources);
+      } else {
+        // Snapshot the full pin for unmerge
+        const snapshot = { ...s };
+        delete snapshot.is_merged;
+        delete snapshot.sources;
+        delete snapshot.merged_at;
+        flatSources.push(snapshot);
+      }
+    }
+    if (flatSources.length > MAX_MERGE_SOURCES) {
+      toast('Cannot merge more than ' + MAX_MERGE_SOURCES + ' links', true);
+      return null;
+    }
+
+    const resolved = mergeFieldsFallback(flatSources);
+    const primaryIdx = overrides.primaryIndex || 0;
+    const primarySource = flatSources[primaryIdx] || flatSources[0];
+    const earliest = flatSources.reduce((a, b) => new Date(a.addedAt) < new Date(b.addedAt) ? a : b);
+
+    const merged = {
+      id: crypto.randomUUID(),
+      url: primarySource.url,
+      title: overrides.title || resolved.title,
+      description: overrides.description || resolved.description,
+      image: overrides.image || resolved.image,
+      image_source: resolved.image_source,
+      image_scores: resolved.image_scores,
+      domain: primarySource.domain,
+      category: primarySource.category,
+      confidence: primarySource.confidence,
+      content_type: resolved.content_type,
+      type_confidence: primarySource.type_confidence,
+      music: resolved.music,
+      video: resolved.video,
+      book: resolved.book,
+      addedAt: earliest.addedAt,
+      updatedAt: new Date().toISOString(),
+      is_merged: true,
+      sources: flatSources,
+      merged_at: new Date().toISOString(),
+    };
+
+    // Persist: remove source pins, insert merged pin
+    const data = load();
+    const sourceIds = new Set(sources.map(s => s.id));
+
+    // Find earliest position in linkOrder for insertion
+    if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
+    let insertIdx = data.linkOrder.length;
+    for (let i = 0; i < data.linkOrder.length; i++) {
+      if (sourceIds.has(data.linkOrder[i])) {
+        insertIdx = Math.min(insertIdx, i);
+        break;
+      }
+    }
+
+    // Remove source pins
+    data.links = data.links.filter(l => !sourceIds.has(l.id));
+    data.linkOrder = data.linkOrder.filter(id => !sourceIds.has(id));
+
+    // Insert merged pin
+    data.links.push(merged);
+    data.linkOrder.splice(insertIdx, 0, merged.id);
+
+    save(data);
+
+    // Sync: delete sources, upload merged
+    for (const id of sourceIds) {
+      deleteLinkFromSupabase(id);
+    }
+    syncLinkToSupabase(merged);
+    syncOrderToSupabase(data.linkOrder);
+
+    return merged;
+  }
+
+  function unmergePin(mergedPinId) {
+    const data = load();
+    const idx = data.links.findIndex(l => l.id === mergedPinId);
+    if (idx === -1) return [];
+    const merged = data.links[idx];
+    if (!merged.is_merged || !merged.sources) return [];
+
+    const restored = merged.sources.map(s => ({
+      ...s,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    // Find position in linkOrder
+    if (!data.linkOrder) data.linkOrder = data.links.map(l => l.id);
+    const orderIdx = data.linkOrder.indexOf(mergedPinId);
+
+    // Remove merged pin
+    data.links.splice(idx, 1);
+    data.linkOrder = data.linkOrder.filter(id => id !== mergedPinId);
+
+    // Insert restored pins at same position
+    data.links.push(...restored);
+    const restoredIds = restored.map(r => r.id);
+    if (orderIdx !== -1) {
+      data.linkOrder.splice(orderIdx, 0, ...restoredIds);
+    } else {
+      data.linkOrder.push(...restoredIds);
+    }
+
+    save(data);
+
+    // Sync
+    deleteLinkFromSupabase(mergedPinId);
+    for (const pin of restored) {
+      syncLinkToSupabase(pin);
+    }
+    syncOrderToSupabase(data.linkOrder);
+
+    // Clean up expanded card state for the merged pin
+    delete expandedCards[mergedPinId];
+    saveExpandedCards(expandedCards);
+
+    return restored;
+  }
+
+  function addSourceToMergedPin(mergedPinId, newPin) {
+    const data = load();
+    const merged = data.links.find(l => l.id === mergedPinId);
+    if (!merged || !merged.is_merged) return null;
+    if (merged.sources.length >= MAX_MERGE_SOURCES) {
+      toast('Cannot merge more than ' + MAX_MERGE_SOURCES + ' links', true);
+      return null;
+    }
+
+    // Snapshot the new pin
+    const snapshot = { ...newPin };
+    delete snapshot.is_merged;
+    delete snapshot.sources;
+    delete snapshot.merged_at;
+    merged.sources.push(snapshot);
+    merged.updatedAt = new Date().toISOString();
+
+    // Remove the new pin from links
+    data.links = data.links.filter(l => l.id !== newPin.id);
+    if (data.linkOrder) data.linkOrder = data.linkOrder.filter(id => id !== newPin.id);
+
+    save(data);
+    deleteLinkFromSupabase(newPin.id);
+    syncLinkToSupabase(merged);
+    syncOrderToSupabase(data.linkOrder);
+
+    return merged;
   }
 
   // ============================================
@@ -11742,6 +12151,7 @@ Return JSON:
             <button class="grid-item__menu-item" data-action="share">Share</button>
             <button class="grid-item__menu-item" data-action="refresh">Refresh</button>
             <button class="grid-item__menu-item" data-action="organize">Organize</button>
+            <button class="grid-item__menu-item" data-action="merge-with">Merge with…</button>
             <div class="grid-item__menu-divider"></div>
             <button class="grid-item__menu-item" data-action="delete" style="color: #c00;">Delete</button>
           </div>
@@ -11763,6 +12173,15 @@ Return JSON:
             </div>
           `}
           <textarea class="pin-notes" placeholder="Add a note..." rows="2" data-link-id="${l.id}">${esc(l.notes || '')}</textarea>
+          ${l.is_merged && l.sources ? `
+          <div class="merge-sources">
+            <div class="merge-sources__label">${l.sources.length} sources</div>
+            ${l.sources.map(s => `<div class="merge-sources__item">
+              ${s.url === l.url ? '<span class="merge-sources__primary">★</span>' : '<span style="width:12px"></span>'}
+              <a href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.title || s.url)}">${esc(s.domain)}/${esc(truncateStr(s.url.replace(/^https?:\/\/[^/]+\/?/, ''), 30))}</a>
+            </div>`).join('')}
+            <button class="merge-sources__unmerge" data-action="unmerge">Unmerge</button>
+          </div>` : ''}
           <div class="grid-item__actions">
             <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
             ${richActionsHtml}
@@ -11770,6 +12189,12 @@ Return JSON:
           </div>
         </div>
         <div class="grid-item__resize" data-action="resize"></div>`;
+
+      // Merged pin badge and class
+      const mergedClass = l.is_merged ? ' grid-item--merged' : '';
+      const mergeBadgeHtml = l.is_merged && l.sources
+        ? `<span class="grid-item__merge-badge">${l.sources.length} links</span>`
+        : '';
 
       // Determine if this is a listen (music) card
       const isListen = l.category === 'listen';
@@ -11908,13 +12333,17 @@ Return JSON:
           const oMeta = richMeta[cfg.metaField] || cfg.metaFallback?.(richMeta) || l.domain;
           overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__${cfg.titleClass}">${esc(oTitle)}</span><span class="grid-item__${cfg.metaClass}">${esc(oMeta)}</span></div>`;
         } else {
-          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>`;
+          const domainDisplay = l.is_merged && l.sources
+            ? `${l.sources.length} links · ${esc(l.sources.map(s => s.domain).filter((d, i, a) => a.indexOf(d) === i).slice(0, 3).join(', '))}${l.sources.length > 3 ? ' +' + (l.sources.length - 3) : ''}`
+            : esc(l.domain);
+          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${domainDisplay}</p></div>`;
         }
 
         const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item${categoryClass}${doneClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
+        html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
+          ${mergeBadgeHtml}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy">
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
@@ -11927,8 +12356,9 @@ Return JSON:
           : l.category;
         const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
+        html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${mergedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
+          ${mergeBadgeHtml}
           ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
@@ -12872,6 +13302,20 @@ Return JSON:
           processEnrichmentQueue();
         }
         return;
+      } else if (actionType === 'merge-with') {
+        // Enter pick-target mode: next card clicked becomes merge target
+        const link = getAllLinks().find(l => l.id === id);
+        if (link) {
+          mergePickTargetId = id;
+          grid.classList.add('grid--merge-picking');
+          grid.querySelectorAll('.grid-item').forEach(el => {
+            if (el.dataset.id !== id) {
+              el.classList.add('grid-item--merge-selectable');
+            }
+          });
+          toast('Tap a pin to merge with');
+        }
+        return;
       } else if (actionType === 'organize') {
         // Consolidated: show organize modal with category + content type
         organizeTargetId = id;
@@ -12905,8 +13349,25 @@ Return JSON:
       } else if (actionType === 'content-type') {
         selectedLink = getAllLinks().find(l => l.id === id);
         openContentTypeSelect();
+      } else if (actionType === 'unmerge') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link && link.is_merged && link.sources) {
+          const count = link.sources.length;
+          const confirmed = await showConfirm(`Split into ${count} pins?`, 'Unmerge');
+          if (confirmed) {
+            const restored = unmergePin(id);
+            renderFilters();
+            renderGrid();
+            toast(`Split into ${restored.length} pins`);
+          }
+        }
+        return;
       } else if (actionType === 'delete') {
-        const confirmed = await showConfirm('Delete this link?', 'Delete');
+        const link = getAllLinks().find(l => l.id === id);
+        const deleteMsg = link?.is_merged && link.sources
+          ? `Delete this merged pin and all ${link.sources.length} sources?`
+          : 'Delete this link?';
+        const confirmed = await showConfirm(deleteMsg, 'Delete');
         if (confirmed) {
           deleteLink(id);
           delete expandedCards[id];
@@ -12922,7 +13383,10 @@ Return JSON:
     // Toggle expansion (collapsed ↔ medium)
     const item = e.target.closest('.grid-item');
     if (!item) {
-      // Click was outside any grid-item (e.g., on a widget or empty space)
+      // Click was outside any grid-item — cancel merge pick mode if active
+      if (mergePickTargetId) {
+        cancelMergePick();
+      }
       console.log('[click] No .grid-item found. Target:', e.target.className);
       return;
     }
@@ -12931,6 +13395,23 @@ Return JSON:
       return;
     }
     const id = item.dataset.id;
+
+    // Handle merge pick-target mode
+    if (mergePickTargetId && id !== mergePickTargetId) {
+      e.stopPropagation();
+      const allLinks = getAllLinks();
+      const sourcePin = allLinks.find(l => l.id === mergePickTargetId);
+      const targetPin = allLinks.find(l => l.id === id);
+      cancelMergePick();
+      if (sourcePin && targetPin) {
+        openMergePreview([sourcePin, targetPin]);
+      }
+      return;
+    } else if (mergePickTargetId && id === mergePickTargetId) {
+      // Clicked the source pin itself — cancel pick mode
+      cancelMergePick();
+      return;
+    }
     console.log('[click] Toggle expansion:', id, expandedCards[id] ? 'collapse' : 'expand');
 
     // On touch devices, toggle tapped state for label visibility
@@ -12972,8 +13453,8 @@ Return JSON:
   let dropPosition = null; // 'before' or 'after'
 
   function clearDragClasses() {
-    grid.querySelectorAll('.drag-before, .drag-after').forEach(el => {
-      el.classList.remove('drag-before', 'drag-after');
+    grid.querySelectorAll('.drag-before, .drag-after, .grid-item--merge-target').forEach(el => {
+      el.classList.remove('drag-before', 'drag-after', 'grid-item--merge-target');
     });
   }
 
@@ -13026,19 +13507,27 @@ Return JSON:
     const item = e.target.closest('.grid-item');
     if (item && item.dataset.id !== draggedId) {
       const rect = item.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      const isBefore = e.clientX < midX;
+      const relX = (e.clientX - rect.left) / rect.width; // 0..1
 
       clearDragClasses();
-      item.classList.add(isBefore ? 'drag-before' : 'drag-after');
-      dropPosition = isBefore ? 'before' : 'after';
+
+      // Center 40% = merge zone, outer 30% each = reorder zone
+      if (draggedId && relX > 0.3 && relX < 0.7) {
+        // Merge zone
+        item.classList.add('grid-item--merge-target');
+        dropPosition = 'merge';
+      } else {
+        const isBefore = e.clientX < rect.left + rect.width / 2;
+        item.classList.add(isBefore ? 'drag-before' : 'drag-after');
+        dropPosition = isBefore ? 'before' : 'after';
+      }
     }
   };
 
   grid.ondragleave = (e) => {
     const item = e.target.closest('.grid-item');
     if (item) {
-      item.classList.remove('drag-before', 'drag-after');
+      item.classList.remove('drag-before', 'drag-after', 'grid-item--merge-target');
     }
   };
 
@@ -13059,12 +13548,27 @@ Return JSON:
       return;
     }
 
-    // Link card being reordered
+    // Link card being dropped
     if (draggedId) {
       const targetId = targetItem.dataset.id;
       if (draggedId !== targetId) {
-        reorderLinks(draggedId, targetId, dropPosition);
-        renderGrid();
+        if (dropPosition === 'merge') {
+          // Merge: open preview modal with both pins
+          const allLinks = getAllLinks();
+          const sourcePin = allLinks.find(l => l.id === draggedId);
+          const targetPin = allLinks.find(l => l.id === targetId);
+          if (sourcePin && targetPin && !sourcePin.loading && !targetPin.loading) {
+            // If target is already merged, add source to it
+            if (targetPin.is_merged) {
+              openMergePreview([targetPin, sourcePin]);
+            } else {
+              openMergePreview([targetPin, sourcePin]);
+            }
+          }
+        } else {
+          reorderLinks(draggedId, targetId, dropPosition);
+          renderGrid();
+        }
       }
     }
   };
@@ -13579,6 +14083,115 @@ Return JSON:
   });
 
   // ============================================
+  // Merge Preview Modal
+  // ============================================
+  const mergeModal = $('mergeModal');
+  let mergeSources = []; // pins being merged
+  let mergeSelectedImage = null;
+  let mergePickTargetId = null; // for "Merge with..." menu action
+
+  function openMergePreview(sources) {
+    mergeSources = sources;
+
+    // Title defaults to primary source title
+    $('mergeTitleInput').value = sources[0].title || '';
+
+    // Thumbnails
+    const thumbsHtml = sources.map((s, i) => {
+      if (s.image) {
+        return `<img class="merge-preview__thumb" src="${secureImg(s.image)}" alt="${esc(s.title || '')}" data-idx="${i}">`;
+      }
+      const initial = s.title ? s.title.charAt(0).toUpperCase() : '?';
+      return `<div class="merge-preview__thumb--placeholder" data-idx="${i}">${initial}</div>`;
+    }).join('');
+    $('mergePreviewThumbs').innerHTML = thumbsHtml;
+
+    // Primary link radio buttons
+    const radioHtml = sources.map((s, i) => {
+      return `<label class="merge-preview__radio">
+        <input type="radio" name="mergePrimary" value="${i}" ${i === 0 ? 'checked' : ''}>
+        ${esc(s.domain)} — ${esc(truncateStr(s.title || s.url, 40))}
+      </label>`;
+    }).join('');
+    $('mergePrimaryGroup').innerHTML = radioHtml;
+
+    // Image picker: show only sources with images
+    const imagesWithIdx = sources
+      .map((s, i) => ({ image: s.image, scores: s.image_scores, idx: i }))
+      .filter(s => s.image);
+    // Auto-select best image
+    const bestImg = imagesWithIdx.length > 0
+      ? imagesWithIdx.reduce((a, b) => (b.scores?.composite || 0) > (a.scores?.composite || 0) ? b : a)
+      : null;
+    mergeSelectedImage = bestImg ? bestImg.image : (sources[0]?.image || null);
+
+    const imagePickerHtml = imagesWithIdx.map(s => {
+      const selected = s.image === mergeSelectedImage ? ' merge-preview__thumb--selected' : '';
+      return `<img class="merge-preview__thumb${selected}" src="${secureImg(s.image)}" alt="" data-merge-image="${esc(s.image)}">`;
+    }).join('');
+    $('mergeImagePicker').innerHTML = imagePickerHtml || '<span style="color: var(--muted); font-family: var(--font-mono); font-size: 12px;">No images</span>';
+
+    // Update count in title
+    $('mergeModalTitle').textContent = `Merge ${sources.length} pins`;
+
+    openModal(mergeModal);
+  }
+
+  function truncateStr(str, max) {
+    if (!str || str.length <= max) return str || '';
+    return str.substring(0, max) + '…';
+  }
+
+  // Image picker click
+  $('mergeImagePicker').addEventListener('click', (e) => {
+    const img = e.target.closest('[data-merge-image]');
+    if (!img) return;
+    mergeSelectedImage = img.dataset.mergeImage;
+    $('mergeImagePicker').querySelectorAll('.merge-preview__thumb').forEach(el => {
+      el.classList.toggle('merge-preview__thumb--selected', el.dataset.mergeImage === mergeSelectedImage);
+    });
+  });
+
+  $('mergeCancelBtn').onclick = () => {
+    closeModal(mergeModal);
+    mergeSources = [];
+  };
+
+  $('mergeConfirmBtn').onclick = () => {
+    if (mergeSources.length < 2) return;
+
+    const titleInput = $('mergeTitleInput').value.trim();
+    const primaryRadio = mergeModal.querySelector('input[name="mergePrimary"]:checked');
+    const primaryIdx = primaryRadio ? parseInt(primaryRadio.value, 10) : 0;
+
+    const overrides = {
+      primaryIndex: primaryIdx,
+    };
+    if (titleInput) overrides.title = titleInput;
+    if (mergeSelectedImage) overrides.image = mergeSelectedImage;
+
+    const merged = createMergedPin(mergeSources, overrides);
+    if (merged) {
+      closeModal(mergeModal);
+      mergeSources = [];
+      renderFilters();
+      renderGrid();
+      toast(`Merged ${merged.sources.length} pins`);
+    }
+  };
+
+  mergeModal.querySelector('.modal__backdrop').onclick = () => { closeModal(mergeModal); mergeSources = []; };
+  mergeModal.querySelector('.modal__close').onclick = () => { closeModal(mergeModal); mergeSources = []; };
+
+  function cancelMergePick() {
+    mergePickTargetId = null;
+    grid.classList.remove('grid--merge-picking');
+    grid.querySelectorAll('.grid-item--merge-selectable').forEach(el => {
+      el.classList.remove('grid-item--merge-selectable');
+    });
+  }
+
+  // ============================================
   // Helpers
   // ============================================
   function openModal(m) {
@@ -13603,7 +14216,7 @@ Return JSON:
     if (m._trapHandler) { m.removeEventListener('keydown', m._trapHandler); m._trapHandler = null; }
     if (m._previousFocus) { m._previousFocus.focus(); m._previousFocus = null; }
   }
-  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -13641,7 +14254,9 @@ Return JSON:
     $('overlayImage').src = secureImg(l.image) || '';
     $('overlayImage').style.display = l.image ? 'block' : 'none';
     $('overlayTitle').textContent = l.title;
-    $('overlayDomain').textContent = l.domain;
+    $('overlayDomain').textContent = l.is_merged && l.sources
+      ? `${l.sources.length} links · ${l.sources.map(s => s.domain).filter((d, i, a) => a.indexOf(d) === i).slice(0, 3).join(', ')}`
+      : l.domain;
     $('overlayDescription').textContent = l.description || '';
     $('overlayCategory').textContent = cap(l.category);
     $('overlayDate').textContent = new Date(l.addedAt).toLocaleDateString();
