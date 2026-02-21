@@ -4731,6 +4731,22 @@ body {
     height: 80px;
   }
 }
+
+  /* Instagram Review Modal */
+  .ig-entity { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--subtle); margin-bottom: var(--space-2); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .ig-entity:hover { border-color: var(--muted); background: var(--surface); }
+  .ig-entity--selected { border-color: var(--fg); background: var(--surface); }
+  .ig-entity--review { border-color: #f39c12; }
+  .ig-entity input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; accent-color: var(--fg); }
+  .ig-entity__info { flex: 1; min-width: 0; }
+  .ig-entity__name { font-family: var(--font-serif); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .ig-entity__meta { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted); margin-bottom: var(--space-1); }
+  .ig-entity__url { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--fg); opacity: 0.6; word-break: break-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ig-conf { display: inline-block; padding: 1px 5px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid currentColor; }
+  .ig-conf--high { color: #2ecc71; }
+  .ig-conf--mid { color: #f39c12; }
+  .ig-conf--low { color: var(--muted); }
+  #igEntities { max-height: 50vh; overflow-y: auto; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/image-validation.js"></script>
@@ -5417,6 +5433,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
+  <!-- Instagram Review Modal -->
+  <div class="modal" id="igReviewModal" role="dialog" aria-modal="true" aria-labelledby="igReviewTitle">
+    <div class="modal__backdrop"></div>
+    <div class="modal__content" style="max-width: 560px;">
+      <div class="modal__header">
+        <h2 class="modal__title" id="igReviewTitle">Entities from Reel</h2>
+        <button class="modal__close" id="igReviewClose">&times;</button>
+      </div>
+      <div style="padding: var(--space-4);">
+        <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-serif); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
+        <p id="igStats" style="margin-bottom: var(--space-4); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
+        <div id="igEntities"></div>
+        <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+          <button class="overlay__action" id="igCancel" style="flex: 1;">Skip</button>
+          <button class="overlay__action" id="igConfirm" style="flex: 1; background: var(--fg); color: var(--bg);">Add Selected (<span id="igCount">0</span>)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
 // ============================================
 // Boards - Single File App with Supabase
@@ -5504,6 +5540,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     try {
       localStorage.setItem(DOMAIN_CACHE_KEY, JSON.stringify(domainProfileCache));
     } catch {}
+  }
+
+  // Instagram reel/post detection
+  function isInstagramContent(url) {
+    return /instagram\.com\/(reel|p)\//i.test(url || '');
   }
 
   // Classify content type using rules (fast, free)
@@ -9394,6 +9435,25 @@ Return JSON:
   }
 
   // ============================================
+  // Instagram Import
+  // ============================================
+  async function importInstagramContent(url) {
+    const { data, error } = await supabase.functions.invoke('instagram-import', {
+      body: { url }
+    });
+    if (error) throw new Error(error.message || 'Instagram import failed');
+    return data;
+  }
+
+  function normalizeImportedPin(pin) {
+    return {
+      ...pin,
+      id: crypto.randomUUID(),
+      addedAt: new Date().toISOString()
+    };
+  }
+
+  // ============================================
   // Server-Side Enrichment Queue
   // ============================================
   const enrichmentQueue = [];
@@ -13237,6 +13297,36 @@ Return JSON:
       } else if (actionType === 'refresh' || actionType === 'rerun-enrichment') {
         // Consolidated: re-enrich metadata + refresh image
         const link = getAllLinks().find(l => l.id === id);
+        if (link && isInstagramContent(link.url)) {
+          // Instagram reel/post — use import pipeline
+          toast('Importing Instagram content...', { level: 'info', id: 'refresh-' + id });
+          try {
+            const result = await importInstagramContent(link.url);
+            // Update source pin with enriched metadata
+            const src = result.source_pin || {};
+            updateLink(id, {
+              title: src.title || link.title,
+              description: src.description || link.description,
+              image: src.image || link.image,
+              instagram: src.instagram || {},
+              content_type: src.content_type || link.content_type,
+              enrichment_failed: false
+            });
+            renderFilters();
+            renderGrid();
+            toast('Reel imported', { id: 'refresh-' + id });
+            // Show review modal if entities were found
+            if (result.derived_pins && result.derived_pins.length > 0) {
+              showInstagramReview(result);
+            } else {
+              toast('No entities found in this reel');
+            }
+          } catch (err) {
+            console.error('[instagram-import]', err);
+            toast('Import failed', { level: 'error', id: 'refresh-' + id });
+          }
+          return;
+        }
         if (link) {
           toast('Refreshing...', { level: 'info', id: 'refresh-' + id });
           try {
@@ -14216,7 +14306,7 @@ Return JSON:
     if (m._trapHandler) { m.removeEventListener('keydown', m._trapHandler); m._trapHandler = null; }
     if (m._previousFocus) { m._previousFocus.focus(); m._previousFocus = null; }
   }
-  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal].forEach(closeModal); }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal, igReviewModal].forEach(closeModal); }
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -14241,6 +14331,146 @@ Return JSON:
       confirmCancelBtn.onclick = () => { cleanup(); resolve(false); };
     });
   }
+
+  // ============================================
+  // Instagram Review Modal Logic
+  // ============================================
+  const igReviewModal = $('igReviewModal');
+  const igSummary = $('igSummary');
+  const igStats = $('igStats');
+  const igEntities = $('igEntities');
+  const igCount = $('igCount');
+  const igConfirm = $('igConfirm');
+  const igCancel = $('igCancel');
+  const igClose = $('igReviewClose');
+
+  let igReviewData = null;
+
+  function showInstagramReview(result) {
+    igReviewData = result;
+    const { post_summary, stats, entities, derived_pins } = result;
+
+    igSummary.textContent = post_summary || '';
+    igStats.textContent = `${stats.entities_found} found \u00b7 ${stats.entities_resolved} resolved \u00b7 ${stats.entities_review} need review \u00b7 ${stats.entities_discarded} skipped`;
+
+    igEntities.innerHTML = '';
+
+    if (!derived_pins || derived_pins.length === 0) {
+      igEntities.innerHTML = '<p style="text-align:center;padding:var(--space-6);color:var(--muted);font-family:var(--font-serif);">No entities to add.</p>';
+      igConfirm.disabled = true;
+      openModal(igReviewModal);
+      return;
+    }
+
+    igConfirm.disabled = false;
+
+    derived_pins.forEach((pin, i) => {
+      const entity = (entities || []).find(e => e.name === pin.title);
+      const confidence = entity?.confidence || pin.type_confidence || 0;
+      const status = entity?.status || (confidence >= 0.7 ? 'auto' : 'review');
+      const entityType = entity?.type || pin.content_type || '';
+      const autoChecked = status === 'auto';
+      const confClass = confidence >= 0.7 ? 'high' : confidence >= 0.5 ? 'mid' : 'low';
+      const existing = findByUrl(pin.url);
+
+      const card = document.createElement('div');
+      card.className = 'ig-entity' + (autoChecked ? ' ig-entity--selected' : '') + (status === 'review' ? ' ig-entity--review' : '');
+
+      card.innerHTML =
+        '<input type="checkbox" data-idx="' + i + '"' + (autoChecked ? ' checked' : '') + (existing ? ' disabled' : '') + '>' +
+        '<div class="ig-entity__info">' +
+          '<div class="ig-entity__name">' + escHtml(pin.title) +
+            ' <span class="ig-conf ig-conf--' + confClass + '">' + Math.round(confidence * 100) + '%</span>' +
+            (existing ? ' <span style="font-size:var(--font-size-xs);color:var(--muted);font-family:var(--font-mono);">already saved</span>' : '') +
+          '</div>' +
+          '<div class="ig-entity__meta">' + escHtml(pin.category) + ' \u00b7 ' + escHtml(entityType) + (status === 'review' ? ' \u00b7 needs review' : '') + '</div>' +
+          '<div class="ig-entity__url">' + escHtml(pin.domain || pin.url) + '</div>' +
+        '</div>';
+
+      card.addEventListener('click', (e) => {
+        if (e.target.type === 'checkbox' || e.target.disabled) return;
+        const cb = card.querySelector('input[type="checkbox"]');
+        if (cb.disabled) return;
+        cb.checked = !cb.checked;
+        card.classList.toggle('ig-entity--selected', cb.checked);
+        updateIgCount();
+      });
+
+      const cb = card.querySelector('input[type="checkbox"]');
+      cb.addEventListener('change', () => {
+        card.classList.toggle('ig-entity--selected', cb.checked);
+        updateIgCount();
+      });
+
+      igEntities.appendChild(card);
+    });
+
+    updateIgCount();
+    openModal(igReviewModal);
+  }
+
+  function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  function updateIgCount() {
+    const boxes = igEntities.querySelectorAll('input[type="checkbox"]:not(:disabled)');
+    const n = Array.from(boxes).filter(cb => cb.checked).length;
+    igCount.textContent = n;
+    igConfirm.disabled = n === 0;
+  }
+
+  function closeIgReview() {
+    closeModal(igReviewModal);
+    igReviewData = null;
+  }
+
+  function confirmIgReview() {
+    if (!igReviewData) return;
+
+    const boxes = igEntities.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)');
+    const indices = Array.from(boxes).map(cb => parseInt(cb.dataset.idx));
+    const selected = indices.map(i => igReviewData.derived_pins[i]);
+
+    closeIgReview();
+
+    if (selected.length === 0) {
+      toast('No entities selected');
+      return;
+    }
+
+    toast('Adding ' + selected.length + ' pins...', { level: 'info', id: 'ig-add' });
+
+    let added = 0, skipped = 0;
+    for (const pin of selected) {
+      const norm = normalizeImportedPin(pin);
+      const res = addLink(norm);
+      if (res.updated) {
+        skipped++;
+      } else {
+        added++;
+        queueServerEnrichment(norm.id, norm.url, norm.title, norm.description, {
+          category: norm.category,
+          skipClassification: true
+        });
+      }
+    }
+
+    processEnrichmentQueue();
+    renderFilters();
+    renderGrid();
+
+    const msg = added > 0
+      ? 'Added ' + added + ' pin' + (added !== 1 ? 's' : '') + (skipped > 0 ? ', ' + skipped + ' already saved' : '')
+      : 'All ' + skipped + ' already saved';
+    toast(msg, { id: 'ig-add' });
+  }
+
+  igConfirm.addEventListener('click', confirmIgReview);
+  igCancel.addEventListener('click', closeIgReview);
+  igClose.addEventListener('click', closeIgReview);
 
   function openDetail(id) {
     console.log('[openDetail] Opening id:', id);
