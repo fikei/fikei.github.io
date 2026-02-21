@@ -6,6 +6,47 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-02-21] - Categorization Cleanup & Lookback MVPs
+
+### Added
+- **Categorization Cleanup MVP (Epic 3.6)** — Adaptive threshold system for identifying pins needing manual review:
+  - Adaptive threshold engine: 25th percentile of confidence scores, floor 0.50, ceiling 0.80
+  - Cleanup queue with 7 qualification criteria: threshold, category conflict, content mismatch, no category, description missing, title missing, enrichment error
+  - Priority sorting by confidence score, daily cap of 25 items
+  - "Review" pill in filter bar (⚑ flag icon) shows cleanup count and activates review mode
+  - Full review card UI: hero image, inline editing (title/description), category reassignment dropdown, confirm/skip/delete actions
+  - Migration `016_categorization_cleanup.sql` with cleanup scoring function
+  - Lowered activation gate from 10 → 5 pins for visibility on smaller collections (PR #124)
+
+- **Lookback Phase 1 MVP (Epic 12.1)** — Daily surfacing of relevant past pins:
+  - Lookback scoring engine with 6 signals: anniversary (days since added), seasonal (month match), never-clicked (no interactions), consumption gap (time since last click), staleness (recency penalty), recency decay (exponential falloff)
+  - `getDailyLookback()` with activation gates (5+ pins, 3+ eligible), category diversity (max 2 per category), daily budget (5 cards)
+  - Lookback Card at top of board grid: mini-cards with hero images, click handler to expand pin, "Skip All" action
+  - Interaction tracking: `lastInteractedAt` timestamp updated on pin clicks
+  - Migration `017_lookback_prerequisites.sql` with interaction tracking column
+  - Lowered activation gates from 50/10 → 5/3 for visibility on smaller collections (PR #124)
+
+### Changed
+- **Threshold adjustments** — Both Categorization Cleanup and Lookback now activate at 5+ pins (down from 10 and 50 respectively) to be visible and useful for smaller collections
+
+### Documentation
+- **PRD updates**:
+  - `docs/strategy/prds/categorization-cleanup.md` — Added threshold framework section documenting adaptive approach
+  - `docs/strategy/prds/lookback.md` — Added threshold framework section with Phase 1 activation gates
+- **Project plan**:
+  - Created `docs/execution/project-plan/phase-12-lookback.md` — 236 items across 3 epics (Phase 1 Daily Lookback, Phase 2 Curated Collections, Phase 3 Intelligence)
+  - Updated `docs/execution/project-plan/phase-3-ai-intelligence.md` — Added Epic 3.6 Categorization Cleanup (89 items)
+  - Updated `docs/execution/project-plan/backlog.md` — Added cross-references to Phase 12 for time-based features
+  - Updated `docs/execution/project-plan/index.md` — Phase 12 added to overview, stats updated (Phase 3: 128/175, Phase 12: 8/228, total: 163/916)
+- **Notion structure**: Added Phase 12 plan file entry to `notion-structure.json`
+
+### PRs
+- #120: Implement Categorization Cleanup MVP — review card UI + cleanup view (Epic 3.6 Stories 3-4)
+- #124: Lower activation gates for Categorization Cleanup & Lookback (5 pins)
+- #121: Implement Lookback Phase 1 MVP (Phase 12 Prerequisites + Epic 12.1 Stories 1-2)
+
+---
+
 ## [2026-02-14] - Events Aggregator: New Sources, RA GraphQL Fix & Multi-Source Tags
 
 ### Added

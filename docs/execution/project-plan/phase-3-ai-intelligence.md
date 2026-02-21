@@ -781,28 +781,32 @@ Replace "Refresh Image" button with a full image management interface. Users get
 
 ### Story 1: Schema Migration
 
+<!-- Shipped: 016_categorization_cleanup.sql adds user_reviewed_at column + index -->
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Schema: user_reviewed_at** | | Pending |
-| | Write migration `016_categorization_cleanup.sql`: add `user_reviewed_at TIMESTAMPTZ DEFAULT NULL` to `links` table | Pending |
-| | Add index `idx_links_user_reviewed` on `(user_id, user_reviewed_at)` for queue query performance | Pending |
+| **Schema: user_reviewed_at** | | Complete |
+| | Write migration `016_categorization_cleanup.sql`: add `user_reviewed_at TIMESTAMPTZ DEFAULT NULL` to `links` table | Complete |
+| | Add index `idx_links_user_reviewed` on `(user_id, user_reviewed_at)` for queue query performance | Complete |
 | | Run migration against Boards Supabase project | Blocked |
 | | Update `database-schema.md` to document new column | Pending |
 
 ### Story 2: Cleanup Queue — Client-Side Computation
 
+<!-- Shipped: computeAdaptiveThreshold(), getCleanupQueue() with 7 criteria, priority sort, 25-item cap in boards/index.html -->
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Adaptive threshold computation** | | Pending |
-| | Implement `computeAdaptiveThreshold(links)`: 25th percentile of confidence distribution, floor 0.50, ceiling 0.80 | Pending |
-| | Cache threshold per session (recompute on page load, not per render) | Pending |
-| **getCleanupQueue() function** | | Pending |
-| | Implement `getCleanupQueue(links)` — filter by: confidence < adaptive threshold, uncategorized, type_confidence < 0.50, missing image (null or composite < 0.15), enrichment_failed, missing structured metadata (watch w/o video, listen w/o music, read w/o book) | Pending |
-| | Exclude pins where `user_reviewed_at` is set | Pending |
-| | Priority sort: uncategorized (0), confidence < threshold (1), type_confidence < 0.50 (2), everything else (3) | Pending |
-| | Secondary sort: `created_at` descending within each priority tier | Pending |
-| | Cap queue at 25 items | Pending |
-| | Feature activation gate: return empty queue if user has fewer than 10 pins total | Pending |
+| **Adaptive threshold computation** | | Complete |
+| | Implement `computeAdaptiveThreshold(links)`: 25th percentile of confidence distribution, floor 0.50, ceiling 0.80 | Complete |
+| | Cache threshold per session (recompute on page load, not per render) | Complete |
+| **getCleanupQueue() function** | | Complete |
+| | Implement `getCleanupQueue(links)` — filter by: confidence < adaptive threshold, uncategorized, type_confidence < 0.50, missing image (null or composite < 0.15), enrichment_failed, missing structured metadata (watch w/o video, listen w/o music, read w/o book) | Complete |
+| | Exclude pins where `user_reviewed_at` is set | Complete |
+| | Priority sort: uncategorized (0), confidence < threshold (1), type_confidence < 0.50 (2), everything else (3) | Complete |
+| | Secondary sort: `created_at` descending within each priority tier | Complete |
+| | Cap queue at 25 items | Complete |
+| | Feature activation gate: return empty queue if user has fewer than 10 pins total | Complete |
 | **Queue badge count** | | Pending |
 | | Compute badge count from `getCleanupQueue()` result length | Pending |
 | | Render badge on cleanup nav item (count, max display "25+") | Pending |
@@ -810,13 +814,15 @@ Replace "Refresh Image" button with a full image management interface. Users get
 
 ### Story 3: Cleanup View — Navigation Entry Point
 
+<!-- Shipped: "⚑ Review (N)" pill in renderFilters(), click handler enters cleanup view in boards/index.html -->
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Cleanup nav item** | | Pending |
-| | Add cleanup entry to `renderFilters()` after existing category pills | Pending |
-| | Show only if queue has 3+ items | Pending |
-| | Active state styling consistent with other filter pills | Pending |
-| | Tapping nav item activates cleanup view (replaces grid with cleanup UI) | Pending |
+| **Cleanup nav item** | | Complete |
+| | Add cleanup entry to `renderFilters()` after existing category pills | Complete |
+| | Show only if queue has 3+ items | Complete |
+| | Active state styling consistent with other filter pills | Complete |
+| | Tapping nav item activates cleanup view (replaces grid with cleanup UI) | Complete |
 | **Cleanup view shell** | | Pending |
 | | Empty state: "All clear" messaging with return-to-board CTA | Pending |
 | | Header: "Review (N)" with count decrementing as items are resolved | Pending |
@@ -824,22 +830,24 @@ Replace "Refresh Image" button with a full image management interface. Users get
 
 ### Story 4: Review Card UI
 
+<!-- Shipped: renderCleanupView() with hero image, inline edit, category chips, confirm/skip/delete, handleCleanupAction() in boards/index.html -->
+
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **Review card layout** | | Pending |
-| | Full-width hero image (or placeholder with "No image" label if missing) | Pending |
-| | Inline-editable title field (tap to edit, tap away to save) | Pending |
-| | Inline-editable description field (collapsed to 2 lines, expandable) | Pending |
-| | Domain label below title | Pending |
-| | "AI says: [category] (N%)" context line | Pending |
-| | 9 category chips (horizontally scrollable) with AI suggestion pre-selected | Pending |
-| | Three action buttons: Confirm (primary), Skip (secondary), Delete (destructive) | Pending |
-| **Review card behavior** | | Pending |
-| | Confirm: apply current state, set `user_reviewed_at`, slide card out, show next | Pending |
-| | Skip: move pin to end of queue, excluded from current session | Pending |
-| | Delete: remove pin with undo toast (3-second window) | Pending |
-| | Progress indicator: "3 of 12" counter | Pending |
-| | Keyboard shortcuts: `c` confirm, `s` skip, `d` delete (desktop) | Pending |
+| **Review card layout** | | Complete |
+| | Full-width hero image (or placeholder with "No image" label if missing) | Complete |
+| | Inline-editable title field (tap to edit, tap away to save) | Complete |
+| | Inline-editable description field (collapsed to 2 lines, expandable) | Complete |
+| | Domain label below title | Complete |
+| | "AI says: [category] (N%)" context line | Complete |
+| | 9 category chips (horizontally scrollable) with AI suggestion pre-selected | Complete |
+| | Three action buttons: Confirm (primary), Skip (secondary), Delete (destructive) | Complete |
+| **Review card behavior** | | Complete |
+| | Confirm: apply current state, set `user_reviewed_at`, slide card out, show next | Complete |
+| | Skip: move pin to end of queue, excluded from current session | Complete |
+| | Delete: remove pin with undo toast (3-second window) | Complete |
+| | Progress indicator: "3 of 12" counter | Complete |
+| | Keyboard shortcuts: `c` confirm, `s` skip, `d` delete (desktop) | Complete |
 | **Re-fetch image action** | | Pending |
 | | Show "Re-fetch image" button on cards with missing/poor image | Pending |
 | | Calls existing image resolution pipeline, updates card inline | Pending |
