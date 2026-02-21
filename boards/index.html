@@ -9789,11 +9789,19 @@ Return JSON:
   // Instagram Import
   // ============================================
   async function importInstagramContent(url) {
-    const { data, error } = await supabase.functions.invoke('instagram-import', {
-      body: { url }
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/instagram-import`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url })
     });
-    if (error) throw new Error(error.message || 'Instagram import failed');
-    return data;
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Import failed (${resp.status}): ${text}`);
+    }
+    return resp.json();
   }
 
   function normalizeImportedPin(pin) {
