@@ -21,16 +21,16 @@ const corsHeaders = {
 const CONTENT_TYPES = ['product', 'article', 'book', 'video', 'music', 'repository', 'social', 'document', 'tool', 'unknown']
 
 const IMAGE_STRATEGIES: Record<string, string[]> = {
-  product: ['scrape', 'favicon', 'template'],
-  article: ['scrape', 'favicon', 'template'],
-  book: ['platform', 'scrape', 'template'],
-  video: ['platform', 'scrape', 'template'],
-  music: ['platform', 'scrape', 'template'],
-  repository: ['platform', 'template'],
-  social: ['platform', 'scrape', 'template'],
-  document: ['template'],
-  tool: ['scrape', 'favicon', 'template'],
-  unknown: ['scrape', 'favicon', 'template']
+  product: ['scrape', 'search', 'favicon', 'template'],
+  article: ['scrape', 'search', 'favicon', 'template'],
+  book: ['platform', 'scrape', 'search', 'template'],
+  video: ['platform', 'scrape', 'template'],              // platform thumbnails are best
+  music: ['platform', 'scrape', 'search', 'template'],
+  repository: ['platform', 'template'],                    // GitHub OG is sufficient
+  social: ['platform', 'scrape', 'template'],              // platform images are best
+  document: ['search', 'template'],
+  tool: ['scrape', 'search', 'favicon', 'template'],
+  unknown: ['scrape', 'search', 'favicon', 'template']
 }
 
 serve(async (req) => {
@@ -145,12 +145,20 @@ serve(async (req) => {
     let imageScores: Record<string, any> | null = null
     let cached = false
 
-    // Force content_type for known video platforms — no need for AI classification
+    // Force content_type for known platforms — no need for AI classification
     if (isYouTube) {
       contentType = 'video'
       typeConfidence = 1.0
       typeSource = 'rules'
       console.log('[enrich-link] YouTube URL detected, forcing content_type=video')
+    }
+
+    const isMusicPlatform = domain.includes('spotify.com') || domain.includes('soundcloud.com') || domain.includes('bandcamp.com')
+    if (isMusicPlatform) {
+      contentType = 'music'
+      typeConfidence = 1.0
+      typeSource = 'rules'
+      console.log('[enrich-link] Music platform detected, forcing content_type=music:', domain)
     }
 
     // Initialize Supabase client
@@ -1363,6 +1371,9 @@ async function executeImageStrategy(
     case 'platform':
       return await resolvePlatformImage(url)
 
+    case 'search':
+      return await searchImageSerpApi(url, title, description)
+
     case 'scrape':
       return await scrapeImage(url)
 
@@ -1417,13 +1428,17 @@ async function resolvePlatformImage(url: string): Promise<{ url: string, source:
   // Spotify (oEmbed API — bypasses bot detection)
   if (domain.includes('spotify.com')) {
     try {
-      const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`)
+      const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`
+      console.log('[platform] Spotify oEmbed request:', oembedUrl)
+      const response = await fetch(oembedUrl)
+      console.log('[platform] Spotify oEmbed response:', response.status)
       if (response.ok) {
         const data = await response.json()
         if (data.thumbnail_url) {
           console.log('[platform] Spotify oEmbed thumbnail:', data.thumbnail_url)
           return { url: data.thumbnail_url, source: 'platform' }
         }
+        console.log('[platform] Spotify oEmbed response missing thumbnail_url:', JSON.stringify(data).slice(0, 200))
       }
     } catch (e) {
       console.error('[platform] Spotify oEmbed error:', e)
@@ -1925,6 +1940,64 @@ async function resolveFavicon(url: string): Promise<{ url: string, source: 'favi
   }
 
   return null
+}
+
+// Search for image using SerpApi Google Images
+async function searchImageSerpApi(
+  url: string,
+  title: string,
+  description: string
+): Promise<{ url: string, source: 'scraped' } | null> {
+  const serpApiKey = Deno.env.get('SERP_API_KEY')
+  if (!serpApiKey) {
+    console.log('[search] SERP_API_KEY not configured, skipping')
+    return null
+  }
+
+  try {
+    // Build search query: prefer title, fall back to domain
+    const query = title && title.length > 3
+      ? title
+      : new URL(url).hostname.replace('www.', '')
+
+    console.log('[search] SerpApi Google Images query:', query)
+
+    const params = new URLSearchParams({
+      api_key: serpApiKey,
+      engine: 'google_images',
+      q: query,
+      num: '5'
+    })
+
+    const response = await fetch(`https://serpapi.com/search?${params}`)
+    if (!response.ok) {
+      console.log('[search] SerpApi returned', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    const results = data.images_results || []
+
+    if (results.length === 0) {
+      console.log('[search] No image results for:', query)
+      return null
+    }
+
+    // Find first result with a full-res original URL
+    for (const result of results) {
+      const imageUrl = result.original
+      if (imageUrl && imageUrl.startsWith('http')) {
+        console.log('[search] Found image via SerpApi:', imageUrl)
+        return { url: imageUrl, source: 'scraped' }
+      }
+    }
+
+    console.log('[search] No usable image URLs in results')
+    return null
+  } catch (e) {
+    console.error('[search] SerpApi error:', e)
+    return null
+  }
 }
 
 // ========================================
