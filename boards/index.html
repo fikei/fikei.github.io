@@ -11420,7 +11420,9 @@ Return JSON:
         // Enrichment fields
         content_type: link.content_type || null,
         type_confidence: link.type_confidence || null,
+        type_signals: link.type_signals || null,
         image_source: link.image_source || null,
+        image_scores: link.image_scores || null,
         // Structured metadata (JSONB columns)
         video: link.video || null,
         music: link.music || null,
@@ -11430,7 +11432,9 @@ Return JSON:
         // Merge fields
         is_merged: link.is_merged || false,
         sources: link.sources || null,
-        merged_at: link.merged_at || null
+        merged_at: link.merged_at || null,
+        // Share & interaction fields
+        short_code: link.short_code || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -11584,13 +11588,21 @@ Return JSON:
         // Enrichment fields from server
         content_type: l.content_type || null,
         type_confidence: l.type_confidence || null,
+        type_signals: l.type_signals || null,
         image_source: l.image_source || null,
+        image_scores: l.image_scores || null,
         // Structured metadata (JSONB)
         video: l.video || null,
         music: l.music || null,
         book: l.book || null,
         watched: l.watched || false,
-        read: l.read || false
+        read: l.read || false,
+        // Merge fields
+        is_merged: l.is_merged || false,
+        sources: l.sources || null,
+        merged_at: l.merged_at || null,
+        // Share fields
+        short_code: l.short_code || null
       }));
 
       const categories = { uncategorized: { pinned: true } };
