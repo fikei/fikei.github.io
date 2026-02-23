@@ -100,6 +100,18 @@
               "icon": "\ud83d\udcf8",
               "file": "docs/strategy/prds/instagram-import.md",
               "source": "ai"
+            },
+            {
+              "title": "Create a Board",
+              "icon": "\u2795",
+              "file": "docs/strategy/prds/create-a-board.md",
+              "source": "ai"
+            },
+            {
+              "title": "Add Subcategories by Prompt",
+              "icon": "\ud83c\udff7\ufe0f",
+              "file": "docs/strategy/prds/add-subcategories-by-prompt.md",
+              "source": "ai"
             }
           ]
         }
