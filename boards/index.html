@@ -4506,6 +4506,13 @@ body {
   }
 }
 
+/* Auth deep link banner: stack above capture promo on mobile */
+@media (max-width: 600px) {
+  #authDeepLinkBanner {
+    bottom: 160px;
+  }
+}
+
 /* Mobile Paste Button — clipboard-aware full-width paste action */
 .mobile-paste {
   display: none;
@@ -5404,6 +5411,19 @@ body {
       </div>
       <button class="capture-promo__cta" id="promoShowTools">Install</button>
       <button class="capture-promo__dismiss" id="promoDismiss" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+
+  <!-- iOS Magic Link Auth Banner -->
+  <div class="capture-promo" id="authDeepLinkBanner" style="display:none;z-index:1001;">
+    <div class="capture-promo__inner">
+      <div class="capture-promo__icon">📱</div>
+      <div class="capture-promo__body">
+        <div class="capture-promo__text">Open in Boards app</div>
+        <div class="capture-promo__subtext">Tap to sign in to the app</div>
+      </div>
+      <button class="capture-promo__cta" id="authBannerOpen">Open App</button>
+      <button class="capture-promo__dismiss" id="authBannerDismiss" aria-label="Dismiss">&times;</button>
     </div>
   </div>
 
@@ -17825,6 +17845,64 @@ Return JSON:
 
 })();
   </script>
+
+  <!-- iOS Magic Link Auth Banner Script -->
+  <script>
+(function() {
+  'use strict';
+
+  // Skip if inside the native WKWebView (authBridge injected by the app)
+  if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.authBridge) return;
+
+  // Only show on iOS (iPhone/iPad in Safari or Chrome)
+  if (!/iPhone|iPad/.test(navigator.userAgent)) return;
+
+  // Only show when there's an auth callback in the URL hash
+  var hash = window.location.hash;
+  if (!hash || hash.indexOf('access_token') === -1) return;
+
+  // Parse tokens from hash fragment
+  var params = {};
+  hash.slice(1).split('&').forEach(function(part) {
+    var kv = part.split('=');
+    if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+  });
+
+  var accessToken = params['access_token'];
+  var refreshToken = params['refresh_token'] || '';
+  var tokenType = params['token_type'] || 'bearer';
+  if (!accessToken) return;
+
+  // Build deep link URL using the custom URL scheme
+  var deepLink = 'ctrlrodeo://auth#access_token=' + encodeURIComponent(accessToken)
+    + '&refresh_token=' + encodeURIComponent(refreshToken)
+    + '&token_type=' + encodeURIComponent(tokenType);
+
+  var banner = document.getElementById('authDeepLinkBanner');
+  var openBtn = document.getElementById('authBannerOpen');
+  var dismissBtn = document.getElementById('authBannerDismiss');
+  if (!banner || !openBtn || !dismissBtn) return;
+
+  function hideBanner() { banner.style.display = 'none'; }
+
+  var autoDismiss = setTimeout(hideBanner, 10000);
+
+  openBtn.addEventListener('click', function() {
+    clearTimeout(autoDismiss);
+    hideBanner();
+    window.location.href = deepLink;
+  });
+
+  dismissBtn.addEventListener('click', function() {
+    clearTimeout(autoDismiss);
+    hideBanner();
+  });
+
+  // Show after 300ms delay to let Supabase SDK start processing the hash
+  setTimeout(function() { banner.style.display = 'block'; }, 300);
+})();
+  </script>
+
   <footer class="attribution" style="position:fixed;bottom:0;left:0;padding:2px 6px;font-size:7px;font-family:var(--font-mono);color:var(--subtle);opacity:0.3;z-index:0;pointer-events:auto;">
     BPM data by <a href="https://getsongbpm.com" target="_blank" rel="noopener" style="color:inherit;">GetSongBPM</a>
   </footer>
