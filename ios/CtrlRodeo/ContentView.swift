@@ -40,14 +40,28 @@ struct ContentView: View {
 
         // Check if this is an auth callback (contains access_token in fragment or query)
         let urlString = url.absoluteString
-        if urlString.contains("access_token") || urlString.contains("token_type") {
-            // Store the URL to pass to WebView for token extraction
-            pendingAuthURL = url
+        guard urlString.contains("access_token") || urlString.contains("token_type") else { return }
 
-            // If we're on the auth screen, skip to the web view so it can process the token
-            if !isAuthenticated && !didSkipAuth {
-                didSkipAuth = true
-            }
+        // If it's a custom scheme URL (ctrlrodeo://), WKWebView can't load it.
+        // Extract the fragment and build a proper HTTPS URL.
+        let loadURL: URL
+        if url.scheme == AppConstants.urlScheme {
+            let fragment = url.fragment ?? ""
+            let httpsURLString = fragment.isEmpty
+                ? AppConstants.boardsURL
+                : AppConstants.boardsURL + "#" + fragment
+            loadURL = URL(string: httpsURLString) ?? url
+            print("[ContentView] handleAuthDeepLink: translated custom scheme to \(loadURL)")
+        } else {
+            loadURL = url
+        }
+
+        // Store the URL to pass to WebView for token extraction
+        pendingAuthURL = loadURL
+
+        // If we're on the auth screen, skip to the web view so it can process the token
+        if !isAuthenticated && !didSkipAuth {
+            didSkipAuth = true
         }
     }
 }
@@ -150,14 +164,6 @@ struct WebView: UIViewRepresentable {
             print("[WebView] makeUIView: Loading URL \(url)")
             webView.load(URLRequest(url: url))
         }
-
-        // Listen for deep links
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.handleDeepLink(_:)),
-            name: NSNotification.Name("DeepLinkReceived"),
-            object: nil
-        )
 
         context.coordinator.webView = webView
         return webView
@@ -364,16 +370,5 @@ struct WebView: UIViewRepresentable {
             webView?.reload()
         }
 
-        // MARK: - Deep Links
-
-        @objc func handleDeepLink(_ notification: Notification) {
-            guard let url = notification.userInfo?["url"] as? URL else { return }
-
-            print("[WebView] handleDeepLink: Loading URL \(url)")
-
-            // Navigate to the deep link URL in the web view
-            // This handles OAuth callbacks from Supabase
-            webView?.load(URLRequest(url: url))
-        }
     }
 }
