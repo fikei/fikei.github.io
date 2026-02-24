@@ -1729,6 +1729,26 @@ body {
   border-style: solid;
   background: var(--bg);
 }
+.filter-token__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  line-height: 1;
+  border-radius: 50%;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}
+.filter-token__delete:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.2);
+}
+.filter-token--active .filter-token__delete:hover {
+  background: rgba(0,0,0,0.2);
+}
 
 /* ============================================
    Board Seed Panel (Library Suggestions)
@@ -12061,6 +12081,30 @@ Return JSON:
       });
       if (!res.ok) {
         const errBody = await res.text();
+        // PostgREST schema cache miss — retry without the unrecognized column
+        if (errBody.includes('schema cache')) {
+          const colMatch = errBody.match(/Could not find the '(\w+)' column/);
+          if (colMatch) {
+            const badCol = colMatch[1];
+            console.warn(`[sync] Schema cache miss for '${badCol}', retrying without it`);
+            delete payload[badCol];
+            const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Prefer': 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify(payload)
+            });
+            if (retry.ok) {
+              console.log('[sync] Uploaded (retry):', link.url);
+              syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
+              return;
+            }
+          }
+        }
         console.error('[sync] Upload failed:', res.status, errBody);
         toast('Sync failed — changes saved locally', true);
         // Queue for retry on next sync
@@ -12748,6 +12792,45 @@ Return JSON:
     saveBoardMetadata(data.categories);
   }
 
+  async function deleteUserBoard(slug) {
+    const data = load();
+    const meta = data.categories[slug];
+    if (!meta || !meta.isUserBoard) return;
+
+    const boardName = meta.displayName || slug;
+    const pinCount = data.links.filter(l => l.category === slug).length;
+    const pinMsg = pinCount > 0 ? `\n${pinCount} pin${pinCount !== 1 ? 's' : ''} will be moved to Uncategorized.` : '';
+    const confirmed = await showConfirm(`Delete board "${boardName}"?${pinMsg}`, 'Delete Board');
+    if (!confirmed) return;
+
+    // Move all pins to uncategorized
+    for (const link of data.links) {
+      if (link.category === slug) {
+        link.category = 'uncategorized';
+        syncLinkToSupabase(link);
+      }
+    }
+
+    // Remove the category
+    delete data.categories[slug];
+    save(data);
+    saveBoardMetadata(data.categories);
+
+    // Clean up prompt-based dimensions localStorage
+    try { localStorage.removeItem(DIMS_KEY_PREFIX + slug); } catch {}
+
+    // Reset filter if we were viewing the deleted board
+    if (currentFilter === slug) {
+      currentFilter = 'all';
+      currentFilters = {};
+      localStorage.setItem(FILTER_KEY, currentFilter);
+    }
+
+    renderFilters();
+    renderGrid();
+    toast(`Board "${boardName}" deleted`);
+  }
+
   // ============================================
   // Prompt-Based Dimensions (AI-generated filter dimensions)
   // ============================================
@@ -13130,7 +13213,8 @@ Return JSON:
       const userClass = meta.isUserBoard ? ' filter-token--user-board' : '';
       const label = meta.isUserBoard ? `✦ ${meta.displayName || cap(name)}` : cap(name);
       const badge = name === 'uncategorized' && c > 0 ? ` (${c})` : '';
-      html += `<button class="filter-token${userClass} ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${label}${badge}</button>`;
+      const deleteBtn = meta.isUserBoard ? `<span class="filter-token__delete" data-delete-board="${name}" aria-label="Delete board" title="Delete board">✕</span>` : '';
+      html += `<button class="filter-token${userClass} ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${label}${badge}${deleteBtn}</button>`;
     }
 
     // Add "New Board" button in filter bar
@@ -14716,6 +14800,14 @@ Return JSON:
   };
 
   filters.onclick = (e) => {
+    // Handle delete board ✕ button
+    const deleteBtn = e.target.closest('[data-delete-board]');
+    if (deleteBtn) {
+      e.stopPropagation();
+      deleteUserBoard(deleteBtn.dataset.deleteBoard);
+      return;
+    }
+
     const t = e.target.closest('.filter-token');
     if (t) {
       const category = t.dataset.category;
@@ -18328,6 +18420,7 @@ Return JSON:
         localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedCards));
         renderFilters();
         renderGrid();
+        renderBoardSeedPanel(currentFilter);
         generateWidgets();
         console.log('[sync] Updated from cloud');
       } else {
@@ -18418,6 +18511,7 @@ Return JSON:
       // Re-render with animation for new items
       renderFilters();
       renderGrid(newIds);
+      renderBoardSeedPanel(currentFilter);
 
       if (newIds.length > 0) {
         toast(`${newIds.length} new link${newIds.length > 1 ? 's' : ''} synced`);
