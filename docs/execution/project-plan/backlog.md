@@ -450,6 +450,8 @@ Animation, haptic, and refinement work. Low priority but improves perceived qual
 | **Duplicate detection URL normalization** (#74) — Normalize URLs (trailing slashes, www prefix, protocol) before duplicate checking | Pending |
 | **Widget dismissal memory** (#58) — Track dismissed widgets and suppress future suggestions of the same type | Pending |
 | **Category pill colors** (#78) — Allow users to customize category pill colors for visual differentiation | Pending |
+| **Cleanup review card design polish** — Refine review card layout, transitions between cards, swipe gestures on mobile, empty-state illustration, and visual feedback on confirm/skip/delete actions | Pending |
+| **Lookback card design polish** — Refine lookback card visual hierarchy, add entry animation, improve mini-card image treatment, context label styling, and "See all" view design | Pending |
 
 ---
 
