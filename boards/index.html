@@ -907,6 +907,134 @@ body {
   font-size: 8px;
 }
 
+/* Prompt-based dimension controls */
+.sub-tags__remove {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 0 var(--space-1);
+  background: transparent;
+  color: var(--fg-subtle);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: var(--space-1);
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+.sub-tags__remove:hover { opacity: 1; }
+
+.sub-tags__dimension--add {
+  padding: var(--space-1) var(--space-4);
+}
+
+.sub-tags__dimension--cta {
+  padding: var(--space-2) var(--space-4);
+}
+
+.sub-tags__label--cta {
+  color: var(--fg-subtle);
+}
+
+.sub-tag--add {
+  border: 1px dashed var(--subtle);
+  color: var(--fg-subtle);
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sub-tag--add:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.sub-tag--suggestion {
+  border: 1px dotted var(--subtle);
+  color: var(--fg-subtle);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 8px;
+  transition: all 0.15s;
+}
+.sub-tag--suggestion:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+/* Inline dimension prompt form */
+.dim-prompt-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  padding: var(--space-1) 0;
+}
+
+.dim-prompt-input {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  padding: 3px var(--space-2);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  flex: 1;
+  min-width: 0;
+  outline: none;
+}
+.dim-prompt-input::placeholder {
+  color: var(--fg-subtle);
+  text-transform: none;
+}
+
+.dim-prompt-submit,
+.dim-prompt-cancel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--fg);
+}
+.dim-prompt-submit {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+.dim-prompt-cancel:hover { border-color: var(--fg); }
+
+/* Dimension context menu */
+.dim-context-menu {
+  position: fixed;
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  z-index: 1000;
+  min-width: 140px;
+}
+.dim-context-menu button {
+  display: block;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  cursor: pointer;
+}
+.dim-context-menu button:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
 /* Search input */
 .search-input {
   font-family: var(--font-mono);
@@ -5356,6 +5484,13 @@ body {
   </nav>
 
   <nav class="sub-tags" id="subTags"></nav>
+
+  <!-- Dimension context menu (long-press on prompt dimension label) -->
+  <div class="dim-context-menu" id="dimContextMenu" style="display:none">
+    <button id="dimCtxReanalyze">Re-analyze</button>
+    <button id="dimCtxEditPrompt">Edit prompt</button>
+    <button id="dimCtxRemove">Remove filter</button>
+  </div>
 
   <!-- Listen view toggle (grid/list) — visible only when listen filter active -->
   <div class="listen-view-toggle" id="listenViewToggle">
@@ -12614,6 +12749,49 @@ Return JSON:
   }
 
   // ============================================
+  // Prompt-Based Dimensions (AI-generated filter dimensions)
+  // ============================================
+  const DIMS_KEY_PREFIX = 'board-dimensions-';
+  const MAX_PROMPT_DIMS = 5;
+  const MAX_AI_DIM_CALLS = 3;
+  let aiDimCallsThisSession = 0;
+  let dimensionPromptOpen = false;
+
+  function loadPromptDimensions(category) {
+    try { return JSON.parse(localStorage.getItem(DIMS_KEY_PREFIX + category) || '[]'); }
+    catch { return []; }
+  }
+
+  function savePromptDimensions(category, dims) {
+    try { localStorage.setItem(DIMS_KEY_PREFIX + category, JSON.stringify(dims)); }
+    catch (e) { console.error('[dimensions] Save failed:', e); }
+  }
+
+  function addPromptDimension(category, dim) {
+    const existing = loadPromptDimensions(category);
+    existing.push(dim);
+    savePromptDimensions(category, existing);
+  }
+
+  function removePromptDimension(category, dimId) {
+    const existing = loadPromptDimensions(category);
+    savePromptDimensions(category, existing.filter(d => d.id !== dimId));
+  }
+
+  function updatePromptDimension(category, dimId, updates) {
+    const existing = loadPromptDimensions(category);
+    const idx = existing.findIndex(d => d.id === dimId);
+    if (idx !== -1) {
+      existing[idx] = { ...existing[idx], ...updates };
+      savePromptDimensions(category, existing);
+    }
+  }
+
+  function genDimensionId() {
+    return 'dim-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+  }
+
+  // ============================================
   // Pin Merging
   // ============================================
   const MAX_MERGE_SOURCES = 10;
@@ -13000,6 +13178,258 @@ Return JSON:
     }
   }
 
+  // ============================================
+  // Prompt Dimension UI — inline prompt input + AI call
+  // ============================================
+
+  function showDimensionPromptInput(prefill) {
+    dimensionPromptOpen = true;
+    const addRow = document.querySelector('.sub-tags__dimension--add') || document.querySelector('.sub-tags__dimension--cta');
+    if (!addRow) return;
+
+    addRow.innerHTML = `
+      <form class="dim-prompt-form" id="dimPromptForm">
+        <input type="text" class="dim-prompt-input" id="dimPromptInput"
+          placeholder="e.g. organize by brand tier..." autocomplete="off" maxlength="120"
+          value="${esc(prefill || '')}" />
+        <button type="submit" class="dim-prompt-submit">Analyze</button>
+        <button type="button" class="dim-prompt-cancel" id="dimPromptCancel">Cancel</button>
+      </form>
+    `;
+
+    const form = $('dimPromptForm');
+    const input = $('dimPromptInput');
+
+    input.focus();
+    if (prefill) input.setSelectionRange(prefill.length, prefill.length);
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const promptText = input.value.trim();
+      if (!promptText) return;
+      await runDimensionPrompt(promptText);
+    };
+
+    $('dimPromptCancel').onclick = () => {
+      dimensionPromptOpen = false;
+      renderSubTags();
+    };
+  }
+
+  async function runDimensionPrompt(promptText) {
+    if (aiDimCallsThisSession >= MAX_AI_DIM_CALLS) {
+      toast('AI filter limit reached for this session');
+      dimensionPromptOpen = false;
+      renderSubTags();
+      return;
+    }
+
+    const existing = loadPromptDimensions(currentFilter);
+    if (existing.length >= MAX_PROMPT_DIMS) {
+      toast('Maximum filters reached for this board');
+      dimensionPromptOpen = false;
+      renderSubTags();
+      return;
+    }
+
+    // Show loading state
+    const addRow = document.querySelector('.sub-tags__dimension--add') || document.querySelector('.sub-tags__dimension--cta');
+    if (addRow) {
+      addRow.innerHTML = `<span class="sub-tags__label">Analyzing pins...</span>`;
+    }
+
+    const pins = getAllLinks()
+      .filter(l => l.category === currentFilter && !l.loading)
+      .slice(0, 200)
+      .map(l => ({
+        id: l.id,
+        title: l.title || l.domain || l.url,
+        description: l.description || '',
+        domain: l.domain || '',
+        url: l.url,
+      }));
+
+    if (pins.length < 3) {
+      toast('Add more pins to enable filtering (minimum 3)');
+      dimensionPromptOpen = false;
+      renderSubTags();
+      return;
+    }
+
+    aiDimCallsThisSession++;
+
+    try {
+      const accessToken = getAccessToken();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ prompt: promptText, category: currentFilter, pins })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        toast(data.error);
+        dimensionPromptOpen = false;
+        renderSubTags();
+        return;
+      }
+
+      const newDim = {
+        id: genDimensionId(),
+        label: data.dimensionLabel || promptText,
+        tags: data.tags || [],
+        source: 'prompt',
+        prompt: promptText,
+        assignments: data.assignments || {},
+        createdAt: Date.now(),
+        analyzedAt: Date.now(),
+      };
+
+      addPromptDimension(currentFilter, newDim);
+      dimensionPromptOpen = false;
+      renderSubTags();
+      renderGrid();
+      toast(`Filter "${newDim.label}" added`);
+    } catch (err) {
+      console.error('[dimensions] AI call failed:', err);
+      toast('Failed to create filter. Try again.');
+      dimensionPromptOpen = false;
+      renderSubTags();
+    }
+  }
+
+  async function reanalyzeDimension(category, dimId) {
+    const dims = loadPromptDimensions(category);
+    const dim = dims.find(d => d.id === dimId);
+    if (!dim || !dim.prompt) return;
+
+    if (aiDimCallsThisSession >= MAX_AI_DIM_CALLS) {
+      toast('AI filter limit reached for this session');
+      return;
+    }
+
+    // Show loading state on the dimension row
+    const label = document.querySelector(`[data-dim-label="${dimId}"]`);
+    if (label) label.textContent = 'Analyzing...';
+
+    const pins = getAllLinks()
+      .filter(l => l.category === category && !l.loading)
+      .slice(0, 200)
+      .map(l => ({ id: l.id, title: l.title || l.domain, description: l.description || '', domain: l.domain || '', url: l.url }));
+
+    aiDimCallsThisSession++;
+
+    try {
+      const accessToken = getAccessToken();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ prompt: dim.prompt, category, pins })
+      });
+
+      const data = await res.json();
+      if (data.error) { toast('Re-analyze failed: ' + data.error); renderSubTags(); return; }
+
+      updatePromptDimension(category, dimId, {
+        label: data.dimensionLabel || dim.label,
+        tags: data.tags || dim.tags,
+        assignments: data.assignments || dim.assignments,
+        analyzedAt: Date.now(),
+      });
+
+      renderSubTags();
+      renderGrid();
+      toast('Filter re-analyzed');
+    } catch (err) {
+      console.error('[dimensions] Re-analyze failed:', err);
+      toast('Re-analyze failed. Try again.');
+      renderSubTags();
+    }
+  }
+
+  function editDimensionPrompt(category, dimId) {
+    const dims = loadPromptDimensions(category);
+    const dim = dims.find(d => d.id === dimId);
+    if (!dim) return;
+
+    const row = document.querySelector(`[data-dimension="${dimId}"]`);
+    if (!row) return;
+
+    row.innerHTML = `
+      <form class="dim-prompt-form" id="dimEditForm">
+        <input type="text" class="dim-prompt-input" id="dimEditInput"
+          value="${esc(dim.prompt || '')}" autocomplete="off" maxlength="120" />
+        <button type="submit" class="dim-prompt-submit">Re-analyze</button>
+        <button type="button" class="dim-prompt-cancel" id="dimEditCancel">Cancel</button>
+      </form>
+    `;
+
+    const input = $('dimEditInput');
+    input.focus();
+    input.select();
+
+    $('dimEditForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const newPrompt = input.value.trim();
+      if (!newPrompt) return;
+      updatePromptDimension(category, dimId, { prompt: newPrompt });
+      await reanalyzeDimension(category, dimId);
+    };
+
+    $('dimEditCancel').onclick = () => renderSubTags();
+  }
+
+  // Auto-assign new pin to existing prompt-based dimensions
+  async function autoAssignNewPin(link) {
+    const category = link.category;
+    if (!category || category === 'all' || category === 'uncategorized') return;
+
+    const dims = loadPromptDimensions(category);
+    if (dims.length === 0) return;
+
+    for (const dim of dims) {
+      if (dim.assignments?.[link.id]) continue; // Already assigned
+
+      try {
+        const accessToken = getAccessToken();
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            prompt: dim.prompt,
+            category,
+            pins: [{ id: link.id, title: link.title || link.domain, description: link.description || '', domain: link.domain || '', url: link.url }],
+            existingTags: dim.tags,
+          })
+        });
+
+        const data = await res.json();
+        if (data.assignments && data.assignments[link.id]) {
+          updatePromptDimension(category, dim.id, {
+            assignments: { ...dim.assignments, [link.id]: data.assignments[link.id] }
+          });
+        }
+      } catch (err) {
+        console.warn('[dimensions] Auto-assign failed for', link.id, err);
+      }
+    }
+
+    if (currentFilter === category) renderSubTags();
+  }
+
   function renderSubTags() {
     const subTagsEl = $('subTags');
     if (!subTagsEl) return;
@@ -13009,29 +13439,66 @@ Return JSON:
       return;
     }
 
-    // Hide if "all" or no sub-tags for this category
-    const categoryConfig = SUB_TAGS[currentFilter];
-    if (currentFilter === 'all' || !categoryConfig?.dimensions) {
+    if (currentFilter === 'all') {
       subTagsEl.classList.remove('sub-tags--visible');
       currentFilters = {};
       return;
     }
 
+    const categoryConfig = SUB_TAGS[currentFilter];
+    const builtinDims = categoryConfig?.dimensions || [];
+    const promptDims = loadPromptDimensions(currentFilter);
+    const allDims = [
+      ...builtinDims.map(d => ({ ...d, source: 'builtin' })),
+      ...promptDims.map(d => ({ ...d, source: 'prompt' }))
+    ];
+
     const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
+
+    // Phase 4: "No filters yet" CTA for user-created boards with enough pins
+    const isUserBoard = !categoryConfig?.dimensions;
+    if (isUserBoard && promptDims.length === 0 && allCategoryLinks.length >= 5) {
+      let html = `<div class="sub-tags__dimension sub-tags__dimension--cta">`;
+      html += `<span class="sub-tags__label sub-tags__label--cta">No filters yet</span>`;
+      html += `<div class="sub-tags__buttons">`;
+      const suggestions = ['organize by type', 'organize by priority', 'organize by status'];
+      for (const s of suggestions) {
+        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s)}">${esc(s)}</button>`;
+      }
+      html += `<button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button>`;
+      html += `</div></div>`;
+      subTagsEl.innerHTML = html;
+      subTagsEl.classList.add('sub-tags--visible');
+      return;
+    }
+
+    // Hide if no dimensions at all and not enough pins for CTA
+    if (allDims.length === 0) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      currentFilters = {};
+      return;
+    }
+
     let html = '';
     let anyDimensionHasItems = false;
 
-    for (const dim of categoryConfig.dimensions) {
+    for (const dim of allDims) {
       // Pre-filter links by other active dimensions (AND logic for counts)
       let linksForCounting = allCategoryLinks;
-      for (const otherDim of categoryConfig.dimensions) {
+      for (const otherDim of allDims) {
         if (otherDim.id === dim.id) continue;
         const otherFilter = currentFilters[otherDim.id];
         if (!otherFilter) continue;
         linksForCounting = linksForCounting.filter(l => {
-          const tags = getTags(l) || {};
-          if (otherFilter === 'other') return !tags[otherDim.id];
-          return tags[otherDim.id] === otherFilter;
+          if (otherDim.source === 'builtin') {
+            const tags = getTags(l) || {};
+            if (otherFilter === 'other') return !tags[otherDim.id];
+            return tags[otherDim.id] === otherFilter;
+          } else {
+            const assigned = otherDim.assignments?.[l.id];
+            if (otherFilter === 'other') return !assigned;
+            return assigned === otherFilter;
+          }
         });
       }
 
@@ -13039,8 +13506,13 @@ Return JSON:
       const counts = {};
       let untaggedCount = 0;
       for (const link of linksForCounting) {
-        const tags = getTags(link) || {};
-        const tag = tags[dim.id];
+        let tag;
+        if (dim.source === 'builtin') {
+          const tags = getTags(link) || {};
+          tag = tags[dim.id];
+        } else {
+          tag = dim.assignments?.[link.id] || null;
+        }
         if (tag) {
           counts[tag] = (counts[tag] || 0) + 1;
         } else {
@@ -13053,6 +13525,9 @@ Return JSON:
       anyDimensionHasItems = true;
 
       const activeFilter = currentFilters[dim.id];
+      const removeBtn = dim.source === 'prompt'
+        ? `<button class="sub-tags__remove" data-dim-remove="${dim.id}" title="Remove filter">\u00d7</button>`
+        : '';
 
       let buttonsHtml = `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${dim.id}" data-subtag="">All<span class="sub-tag__count">${linksForCounting.length}</span></button>`;
 
@@ -13069,10 +13544,15 @@ Return JSON:
         buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
       }
 
-      html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label">${dim.label}</span><div class="sub-tags__buttons">${buttonsHtml}</div></div>`;
+      html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label" data-dim-label="${dim.id}">${esc(dim.label)}</span><div class="sub-tags__buttons">${buttonsHtml}</div>${removeBtn}</div>`;
     }
 
-    if (!anyDimensionHasItems) {
+    // [+ Filter] button (if under the limit)
+    if (promptDims.length < MAX_PROMPT_DIMS) {
+      html += `<div class="sub-tags__dimension sub-tags__dimension--add"><button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button></div>`;
+    }
+
+    if (!anyDimensionHasItems && promptDims.length === 0) {
       subTagsEl.classList.remove('sub-tags--visible');
       currentFilters = {};
       return;
@@ -13124,18 +13604,28 @@ Return JSON:
       ? allLinks
       : allLinks.filter(l => l.category === currentFilter || l.loading);
 
-    // Apply sub-tag filter (AND logic across dimensions)
-    if (SUB_TAGS[currentFilter]?.dimensions && currentFilter !== 'all') {
+    // Apply sub-tag filter (AND logic across built-in + prompt dimensions)
+    if (currentFilter !== 'all') {
       const activeFilters = Object.entries(currentFilters).filter(([, v]) => v);
       if (activeFilters.length > 0) {
+        const promptDims = loadPromptDimensions(currentFilter);
+        const promptDimMap = {};
+        for (const pd of promptDims) promptDimMap[pd.id] = pd;
+
         links = links.filter(l => {
           if (l.loading) return true;
-          const tags = getTags(l) || {};
+          const builtinTags = getTags(l) || {};
           for (const [dimId, filterVal] of activeFilters) {
-            if (filterVal === 'other') {
-              if (tags[dimId]) return false;
+            const promptDim = promptDimMap[dimId];
+            if (promptDim) {
+              // Prompt-based dimension: check assignments map
+              const assigned = promptDim.assignments?.[l.id];
+              if (filterVal === 'other') { if (assigned) return false; }
+              else { if (assigned !== filterVal) return false; }
             } else {
-              if (tags[dimId] !== filterVal) return false;
+              // Built-in dimension: check keyword-detected tags
+              if (filterVal === 'other') { if (builtinTags[dimId]) return false; }
+              else { if (builtinTags[dimId] !== filterVal) return false; }
             }
           }
           return true;
@@ -14148,6 +14638,10 @@ Return JSON:
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
 
+          // Auto-assign to prompt-based dimensions (fire-and-forget)
+          autoAssignNewPin({ id, url, title: meta.title, description: meta.description, domain: meta.domain || domain, category: cat.category })
+            .catch(err => console.warn('[dimensions] autoAssign error:', err));
+
           // Try fast platform resolution if no image from CORS proxy
           if (!meta.image) {
             const platformResult = await resolvePlatformImage(url);
@@ -14265,6 +14759,31 @@ Return JSON:
   const subTagsEl = $('subTags');
   if (subTagsEl) {
     subTagsEl.onclick = (e) => {
+      // [+ Filter] button
+      if (e.target.closest('#dimensionAddBtn')) {
+        showDimensionPromptInput();
+        return;
+      }
+
+      // Suggestion chip (user-created board CTA)
+      const suggestion = e.target.closest('[data-suggestion]');
+      if (suggestion) {
+        showDimensionPromptInput(suggestion.dataset.suggestion);
+        return;
+      }
+
+      // [x] remove dimension button
+      const removeBtn = e.target.closest('[data-dim-remove]');
+      if (removeBtn) {
+        const dimId = removeBtn.dataset.dimRemove;
+        removePromptDimension(currentFilter, dimId);
+        delete currentFilters[dimId];
+        renderSubTags();
+        renderGrid();
+        return;
+      }
+
+      // Tag button click (filter within a dimension)
       const t = e.target.closest('.sub-tag');
       if (!t) return;
       const dimension = t.dataset.dimension;
@@ -14275,7 +14794,71 @@ Return JSON:
       renderSubTags();
       renderGrid();
     };
+
+    // Long-press context menu for prompt-based dimensions
+    let longPressTimer = null;
+    subTagsEl.addEventListener('pointerdown', (e) => {
+      const label = e.target.closest('[data-dim-label]');
+      if (!label) return;
+      const dimId = label.dataset.dimLabel;
+      // Only prompt-based dimensions get context menu
+      const dims = loadPromptDimensions(currentFilter);
+      if (!dims.find(d => d.id === dimId)) return;
+
+      longPressTimer = setTimeout(() => {
+        showDimContextMenu(e, dimId);
+      }, 600);
+    });
+    subTagsEl.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+    subTagsEl.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
+    subTagsEl.addEventListener('pointermove', () => clearTimeout(longPressTimer));
   }
+
+  // Dimension context menu
+  let dimContextTarget = null;
+
+  function showDimContextMenu(e, dimId) {
+    dimContextTarget = { dimId, category: currentFilter };
+    const menu = $('dimContextMenu');
+    if (!menu) return;
+    menu.style.display = 'block';
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px';
+    menu.style.top = Math.min(e.clientY, window.innerHeight - 130) + 'px';
+  }
+
+  function hideDimContextMenu() {
+    const menu = $('dimContextMenu');
+    if (menu) menu.style.display = 'none';
+    dimContextTarget = null;
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#dimContextMenu')) hideDimContextMenu();
+  });
+
+  $('dimCtxReanalyze')?.addEventListener('click', async () => {
+    if (!dimContextTarget) return;
+    const { dimId, category } = dimContextTarget;
+    hideDimContextMenu();
+    await reanalyzeDimension(category, dimId);
+  });
+
+  $('dimCtxEditPrompt')?.addEventListener('click', () => {
+    if (!dimContextTarget) return;
+    const { dimId, category } = dimContextTarget;
+    hideDimContextMenu();
+    editDimensionPrompt(category, dimId);
+  });
+
+  $('dimCtxRemove')?.addEventListener('click', () => {
+    if (!dimContextTarget) return;
+    const { dimId, category } = dimContextTarget;
+    hideDimContextMenu();
+    removePromptDimension(category, dimId);
+    delete currentFilters[dimId];
+    renderSubTags();
+    renderGrid();
+  });
 
   // Listen view toggle handler
   if (listenViewToggle) {
@@ -16513,6 +17096,10 @@ Return JSON:
 
           renderFilters();
           renderGrid();
+
+          // Auto-assign to prompt-based dimensions (fire-and-forget)
+          autoAssignNewPin({ id, url, title: meta.title, description: meta.description, domain: meta.domain || (new URL(url)).hostname.replace('www.', ''), category: cat.category })
+            .catch(err => console.warn('[dimensions] autoAssign error:', err));
 
           // Try fast platform resolution if no image from CORS proxy
           if (!meta.image) {
