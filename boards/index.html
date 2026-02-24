@@ -9934,6 +9934,27 @@ Return JSON:
       const data = load();
       const link = data.links.find(l => l.id === item.linkId);
       if (link) {
+        // Merged pin source enrichment: write into sources[i] and re-select best image
+        if (item.sourceIndex !== undefined && link.is_merged && link.sources?.[item.sourceIndex]) {
+          const src = link.sources[item.sourceIndex];
+          if (result.image_url && result.image_source !== 'preserved') {
+            src.image = result.image_url;
+            src.image_source = result.image_source;
+          }
+          if (result.image_scores) {
+            src.image_scores = result.image_scores;
+          }
+          delete link.enrichment_failed;
+          delete link.enrichment_failed_at;
+          const best = mergeFieldsFallback(link.sources);
+          link.image = best.image || link.image;
+          link.image_source = best.image_source || link.image_source;
+          link.image_scores = best.image_scores || link.image_scores;
+          save(data);
+          syncLinkToSupabase(link);
+          continue;
+        }
+
         // Clear any previous failure state
         delete link.enrichment_failed;
         delete link.enrichment_failed_at;
@@ -14026,53 +14047,115 @@ Return JSON:
         if (link) {
           toast('Refreshing...', { level: 'info', id: 'refresh-' + id });
           try {
-            const meta = await fetchMetadata(link.url);
-            const cat = await smartCategorize(meta);
-            const contentType = classifyByRules(link.url, meta.title, meta.description);
-            let music = null;
-            if (cat.category === 'listen' || contentType.type === 'music') {
-              music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
-            }
-            let video = null;
-            if (cat.category === 'watch' || contentType.type === 'video') {
-              video = await extractVideoMetadata(link.url, meta.title, meta.description, meta.videoTags);
-            }
-            let book = null;
-            if (cat.category === 'read' || contentType.type === 'book') {
-              book = extractBookMetadata(link.url, meta.title, meta.description);
-            }
-            const linkUpdate = {
-              title: meta.title || link.title,
-              description: meta.description || link.description,
-              image: meta.image || link.image,
-              category: cat.category,
-              confidence: cat.confidence,
-              content_type: contentType.type,
-              type_confidence: contentType.confidence,
-              type_signals: contentType.signals,
-              enrichment_failed: false
-            };
-            if (music) linkUpdate.music = music;
-            if (video) linkUpdate.video = video;
-            if (book) linkUpdate.book = book;
-            updateLink(id, linkUpdate);
-            // Also force refresh image via server
-            enrichmentQueue.push({ linkId: link.id, url: link.url, title: meta.title || link.title, description: meta.description || link.description, forceRefresh: true });
-            processEnrichmentQueue();
-            renderFilters();
-            renderGrid();
+            if (link.is_merged && link.sources?.length) {
+              // ---- MERGED PIN REFRESH: re-enrich all sources ----
+              const sourceCount = link.sources.length;
+              toast(`Refreshing ${sourceCount} source${sourceCount > 1 ? 's' : ''}...`, { level: 'info', id: 'refresh-' + id });
 
-            // Queue watch/book items for AI enrichment
-            const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
-            const isBookRerun = cat.category === 'read' || contentType.type === 'book';
-            if (isWatchRerun || isBookRerun) {
-              queueServerEnrichment(id, link.url, meta.title, meta.description, {
-                category: cat.category,
-                enrichWatch: isWatchRerun,
-                enrichBook: isBookRerun
+              const metaResults = await Promise.allSettled(
+                link.sources.map(src => fetchMetadata(src.url))
+              );
+
+              let successCount = 0;
+              const updatedSources = link.sources.map((src, i) => {
+                const result = metaResults[i];
+                if (result.status === 'fulfilled') {
+                  const meta = result.value;
+                  successCount++;
+                  return { ...src, title: meta.title || src.title, description: meta.description || src.description, image: meta.image || src.image, enrichment_failed: false };
+                }
+                console.warn('[refresh-merged] Source fetch failed:', src.url, result.reason);
+                return src;
               });
+
+              const resolved = mergeFieldsFallback(updatedSources);
+
+              // Re-categorize from first source (matches createMergedPin contract)
+              const firstMeta = metaResults[0].status === 'fulfilled' ? metaResults[0].value : null;
+              let cat = { category: link.category, confidence: link.confidence };
+              let contentType = { type: link.content_type, confidence: link.type_confidence, signals: link.type_signals };
+              if (firstMeta) {
+                cat = await smartCategorize(firstMeta);
+                contentType = classifyByRules(link.sources[0].url, firstMeta.title, firstMeta.description);
+              }
+
+              updateLink(id, {
+                title: resolved.title || link.title,
+                description: resolved.description || link.description,
+                image: resolved.image || link.image,
+                image_source: resolved.image_source || link.image_source,
+                image_scores: resolved.image_scores || link.image_scores,
+                category: cat.category,
+                confidence: cat.confidence,
+                content_type: contentType.type,
+                type_confidence: contentType.confidence,
+                type_signals: contentType.signals,
+                sources: updatedSources,
+                enrichment_failed: false
+              });
+              renderFilters();
+              renderGrid();
+
+              // Queue server enrichment for each source (sourceIndex triggers per-source write-back)
+              updatedSources.forEach((src, i) => {
+                if (metaResults[i].status === 'fulfilled') {
+                  const meta = metaResults[i].value;
+                  enrichmentQueue.push({ linkId: id, url: src.url, title: meta.title || src.title, description: meta.description || src.description, forceRefresh: true, sourceIndex: i });
+                }
+              });
+              processEnrichmentQueue();
+
+              const failedCount = sourceCount - successCount;
+              toast(failedCount > 0 ? `Refreshed — ${successCount} of ${sourceCount} sources updated` : 'Refreshed', { id: 'refresh-' + id });
+
+            } else {
+              // ---- SINGLE PIN REFRESH ----
+              const meta = await fetchMetadata(link.url);
+              const cat = await smartCategorize(meta);
+              const contentType = classifyByRules(link.url, meta.title, meta.description);
+              let music = null;
+              if (cat.category === 'listen' || contentType.type === 'music') {
+                music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
+              }
+              let video = null;
+              if (cat.category === 'watch' || contentType.type === 'video') {
+                video = await extractVideoMetadata(link.url, meta.title, meta.description, meta.videoTags);
+              }
+              let book = null;
+              if (cat.category === 'read' || contentType.type === 'book') {
+                book = extractBookMetadata(link.url, meta.title, meta.description);
+              }
+              const linkUpdate = {
+                title: meta.title || link.title,
+                description: meta.description || link.description,
+                image: meta.image || link.image,
+                category: cat.category,
+                confidence: cat.confidence,
+                content_type: contentType.type,
+                type_confidence: contentType.confidence,
+                type_signals: contentType.signals,
+                enrichment_failed: false
+              };
+              if (music) linkUpdate.music = music;
+              if (video) linkUpdate.video = video;
+              if (book) linkUpdate.book = book;
+              updateLink(id, linkUpdate);
+              enrichmentQueue.push({ linkId: link.id, url: link.url, title: meta.title || link.title, description: meta.description || link.description, forceRefresh: true });
+              processEnrichmentQueue();
+              renderFilters();
+              renderGrid();
+
+              const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
+              const isBookRerun = cat.category === 'read' || contentType.type === 'book';
+              if (isWatchRerun || isBookRerun) {
+                queueServerEnrichment(id, link.url, meta.title, meta.description, {
+                  category: cat.category,
+                  enrichWatch: isWatchRerun,
+                  enrichBook: isBookRerun
+                });
+              }
+              toast('Refreshed', { id: 'refresh-' + id });
             }
-            toast('Refreshed', { id: 'refresh-' + id });
           } catch (err) {
             console.error('[refresh]', err);
             toast('Refresh failed', { level: 'error', id: 'refresh-' + id });
