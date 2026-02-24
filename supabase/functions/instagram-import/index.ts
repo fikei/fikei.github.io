@@ -53,7 +53,13 @@ interface Entity {
   search_query: string
   resolved_url: string | null
   resolved_via: string | null
+  match_quality: number
   status: 'auto' | 'review' | 'discarded'
+}
+
+interface SearchResult {
+  url: string
+  title: string
 }
 
 interface ExtractionResult {
@@ -322,7 +328,16 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
 // 4. Entity Resolution (DuckDuckGo search)
 // ---------------------------------------------------------------------------
 
-async function searchDuckDuckGo(query: string): Promise<string | null> {
+function unwrapDdgUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl)
+    const uddg = parsed.searchParams.get('uddg')
+    if (uddg) return uddg
+  } catch { /* not a redirect URL */ }
+  return rawUrl
+}
+
+async function searchDuckDuckGo(query: string, maxResults = 5): Promise<SearchResult[]> {
   const encoded = encodeURIComponent(query)
   const url = `https://html.duckduckgo.com/html/?q=${encoded}`
 
@@ -334,64 +349,160 @@ async function searchDuckDuckGo(query: string): Promise<string | null> {
     })
 
     const html = await resp.text()
-    const match = html.match(/class="result__a"[^>]*href="([^"]+)"/)
-    if (match) {
-      const resultUrl = match[1]
-      // DuckDuckGo wraps URLs in a redirect
-      try {
-        const parsed = new URL(resultUrl)
-        const uddg = parsed.searchParams.get('uddg')
-        if (uddg) return uddg
-      } catch { /* not a redirect URL */ }
-      return resultUrl
+    const results: SearchResult[] = []
+    const pattern = /class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]*)</g
+    let match
+    while ((match = pattern.exec(html)) !== null && results.length < maxResults) {
+      const resolvedUrl = unwrapDdgUrl(match[1])
+      if (resolvedUrl) {
+        results.push({
+          url: resolvedUrl,
+          title: match[2].trim().replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
+        })
+      }
     }
+    return results
   } catch {
-    // Search failed — return null
+    return []
   }
-
-  return null
 }
 
-async function resolveEntity(entity: Entity): Promise<Entity> {
-  const searchQuery = entity.search_query || (() => {
-    switch (entity.type) {
-      case 'place': return `${entity.name} ${entity.location_hint || ''} Google Maps`.trim()
-      case 'song': return `${entity.name} Spotify`
-      case 'brand': return `${entity.name} official site`
-      case 'product': return `${entity.name} buy`
-      case 'person': return `${entity.name} Instagram`
-      default: return entity.name
-    }
-  })()
+function buildSearchQuery(entity: Entity): string {
+  if (entity.search_query) return entity.search_query
+  switch (entity.type) {
+    case 'place': return `${entity.name} ${entity.location_hint || ''} Google Maps`.trim()
+    case 'food': return `${entity.name} ${entity.location_hint || ''} Google Maps`.trim()
+    case 'song': return `${entity.name} Spotify`
+    case 'brand': return `${entity.name} official site`
+    case 'product': return `${entity.name} buy`
+    case 'person': return `${entity.name} Instagram`
+    default: return entity.name
+  }
+}
 
-  const url = await searchDuckDuckGo(searchQuery)
-  entity.resolved_url = url
-  entity.resolved_via = url ? 'duckduckgo-search' : null
-  return entity
+const URL_SELECTION_PROMPT = `You are selecting the best primary-source URL for each entity from web search results.
+
+Pick the URL that is the OFFICIAL or CANONICAL source for this entity. Prefer:
+- place/food/eat: Google Maps link > official restaurant/venue website > Yelp
+- song/listen: Spotify > Apple Music > YouTube Music > SoundCloud
+- brand: official brand website (not aggregators or review sites)
+- product: brand's own product page > major retailer (Amazon, etc.)
+- person/follow: Instagram profile > personal website > LinkedIn
+
+If none of the URLs match the entity well, set selected_url to null.
+
+Return ONLY a valid JSON array, no markdown fences:
+[{"entity_index": 0, "selected_url": "https://...", "match_quality": 0.95}]`
+
+async function selectBestUrls(
+  entities: { index: number; name: string; type: string; category: string; location_hint: string | null; results: SearchResult[] }[]
+): Promise<Map<number, { url: string | null; quality: number }>> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) return new Map()
+
+  const input = entities.map(e => ({
+    entity_index: e.index,
+    entity_name: e.name,
+    entity_type: e.type,
+    entity_category: e.category,
+    location_hint: e.location_hint,
+    search_results: e.results.map(r => ({ url: r.url, title: r.title })),
+  }))
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [
+          { role: 'user', content: `${URL_SELECTION_PROMPT}\n\nEntities:\n${JSON.stringify(input, null, 2)}` }
+        ],
+      }),
+    })
+
+    if (!resp.ok) throw new Error(`Claude API ${resp.status}`)
+
+    const result = await resp.json()
+    let text = result.content[0].text.trim()
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+    }
+
+    const selections: { entity_index: number; selected_url: string | null; match_quality: number }[] = JSON.parse(text)
+    const map = new Map<number, { url: string | null; quality: number }>()
+    for (const s of selections) {
+      map.set(s.entity_index, { url: s.selected_url, quality: s.match_quality || 0 })
+    }
+    console.log(`[instagram-import] Claude selected URLs for ${map.size} entities`)
+    return map
+  } catch (err) {
+    console.error('[instagram-import] URL selection failed, falling back to first results:', err)
+    return new Map()
+  }
 }
 
 async function resolveAllEntities(entities: Entity[]): Promise<Entity[]> {
-  const results: Entity[] = []
-
+  // Phase 1: Classify entities
+  const toResolve: Entity[] = []
   for (const entity of entities) {
     if (entity.confidence < 0.5) {
       entity.resolved_url = null
+      entity.resolved_via = null
+      entity.match_quality = 0
       entity.status = 'discarded'
-      results.push(entity)
-      continue
+    } else {
+      entity.status = entity.confidence >= 0.7 ? 'auto' : 'review'
+      toResolve.push(entity)
     }
-
-    entity.status = entity.confidence >= 0.7 ? 'auto' : 'review'
-    const resolved = await resolveEntity(entity)
-    results.push(resolved)
-
-    console.log(`[instagram-import] Resolved: ${entity.name} -> ${resolved.resolved_url || 'NOT FOUND'}`)
-
-    // Rate limit: 500ms between searches
-    await new Promise(r => setTimeout(r, 500))
   }
 
-  return results
+  // Phase 2: Search DDG for each entity (serial, rate-limited)
+  const searchResults = new Map<number, SearchResult[]>()
+  for (let i = 0; i < toResolve.length; i++) {
+    const query = buildSearchQuery(toResolve[i])
+    const results = await searchDuckDuckGo(query)
+    searchResults.set(i, results)
+    console.log(`[instagram-import] DDG: ${toResolve[i].name} -> ${results.length} results`)
+    if (i < toResolve.length - 1) await new Promise(r => setTimeout(r, 500))
+  }
+
+  // Phase 3: Batch Claude call to pick best URL per entity
+  const forSelection = toResolve
+    .map((entity, i) => ({ index: i, name: entity.name, type: entity.type, category: entity.category, location_hint: entity.location_hint, results: searchResults.get(i) || [] }))
+    .filter(e => e.results.length > 0)
+
+  const selections = forSelection.length > 0 ? await selectBestUrls(forSelection) : new Map()
+
+  // Phase 4: Apply selections, fall back to first DDG result
+  for (let i = 0; i < toResolve.length; i++) {
+    const entity = toResolve[i]
+    const results = searchResults.get(i) || []
+    const selection = selections.get(i)
+
+    if (selection?.url) {
+      entity.resolved_url = selection.url
+      entity.resolved_via = 'duckduckgo+claude'
+      entity.match_quality = selection.quality
+    } else if (results.length > 0) {
+      entity.resolved_url = results[0].url
+      entity.resolved_via = 'duckduckgo-first'
+      entity.match_quality = 0
+    } else {
+      entity.resolved_url = null
+      entity.resolved_via = null
+      entity.match_quality = 0
+    }
+
+    console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via})`)
+  }
+
+  return entities
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +573,8 @@ function createPins(
           source_shortcode: reel.shortcode,
           confidence: entity.confidence,
           entity_type: entity.type,
+          entity_source: entity.source,
+          match_quality: entity.match_quality || 0,
           resolved_via: entity.resolved_via,
         },
         addedAt: now,

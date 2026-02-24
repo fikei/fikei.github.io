@@ -5306,6 +5306,8 @@ body {
   .ig-entity:hover { border-color: var(--muted); background: var(--surface); }
   .ig-entity--selected { border-color: var(--fg); background: var(--surface); }
   .ig-entity--review { border-color: #f39c12; }
+  .ig-entity--audio { border-left: 3px solid var(--muted); }
+  .ig-entity__audio-tag { display: inline-block; padding: 1px 5px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid var(--muted); color: var(--muted); }
   .ig-entity input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; accent-color: var(--fg); }
   .ig-entity__info { flex: 1; min-width: 0; }
   .ig-entity__name { font-family: var(--font-serif); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -15631,18 +15633,20 @@ Return JSON:
       const confidence = entity?.confidence || pin.type_confidence || 0;
       const status = entity?.status || (confidence >= 0.7 ? 'auto' : 'review');
       const entityType = entity?.type || pin.content_type || '';
-      const autoChecked = status === 'auto';
+      const isAudio = entity?.source === 'audio_track';
+      const autoChecked = !isAudio && status === 'auto';
       const confClass = confidence >= 0.7 ? 'high' : confidence >= 0.5 ? 'mid' : 'low';
       const existing = findByUrl(pin.url);
 
       const card = document.createElement('div');
-      card.className = 'ig-entity' + (autoChecked ? ' ig-entity--selected' : '') + (status === 'review' ? ' ig-entity--review' : '');
+      card.className = 'ig-entity' + (autoChecked ? ' ig-entity--selected' : '') + (status === 'review' ? ' ig-entity--review' : '') + (isAudio ? ' ig-entity--audio' : '');
 
       card.innerHTML =
         '<input type="checkbox" data-idx="' + i + '"' + (autoChecked ? ' checked' : '') + (existing ? ' disabled' : '') + '>' +
         '<div class="ig-entity__info">' +
           '<div class="ig-entity__name">' + escHtml(pin.title) +
             ' <span class="ig-conf ig-conf--' + confClass + '">' + Math.round(confidence * 100) + '%</span>' +
+            (isAudio ? ' <span class="ig-entity__audio-tag">audio</span>' : '') +
             (existing ? ' <span style="font-size:var(--font-size-xs);color:var(--muted);font-family:var(--font-mono);">already saved</span>' : '') +
           '</div>' +
           '<div class="ig-entity__meta">' + escHtml(pin.category) + ' \u00b7 ' + escHtml(entityType) + (status === 'review' ? ' \u00b7 needs review' : '') + '</div>' +
