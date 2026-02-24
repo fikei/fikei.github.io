@@ -10324,6 +10324,8 @@ Return JSON:
           // Invalidate cached tags so genre/format detection re-runs with new data
           delete link._tags;
           delete link.subTag;
+          // Recompute unified tags with new enrichment data
+          link.tags = computeLinkTags(link);
 
           // Update top-level link title with clean TMDB title (removes "- Wikipedia" etc.)
           if (link.video.title) {
@@ -10361,6 +10363,9 @@ Return JSON:
             format: existing.format || result.book.format || 'book'
           };
           console.log('%c[ENRICH] Book metadata merged:', 'color: #553b08', link.book);
+          // Recompute unified tags with new book data
+          delete link._tags;
+          link.tags = computeLinkTags(link);
 
           // Update top-level link title with canonical title
           if (link.book.title) {
@@ -10907,9 +10912,10 @@ Return JSON:
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
   const CATEGORIES = ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read'];
 
-  // Genre normalization — maps TMDB/AI genre names to our tag IDs
-  // Maps every TMDB movie + TV genre name to our normalized tag IDs
+  // Genre normalization — maps variant spellings to canonical tag IDs
+  // Used by TF-IDF ranker, detectTags, and computeLinkTags
   const GENRE_NORMALIZE = {
+    // === VIDEO GENRES ===
     // Movie genres (TMDB)
     'action': 'action', 'adventure': 'action',
     'comedy': 'comedy', 'drama': 'drama', 'horror': 'horror',
@@ -10917,21 +10923,66 @@ Return JSON:
     'thriller': 'thriller', 'romance': 'romance',
     'animation': 'animation', 'fantasy': 'fantasy',
     'mystery': 'mystery', 'crime': 'crime',
-    'war': 'action', 'western': 'action',
-    'family': 'comedy', 'history': 'drama',
-    'music': 'drama', 'tv movie': 'drama',
+    'war': 'war', 'western': 'western',
+    'family': 'family', 'history': 'history',
+    'music': 'music', 'tv movie': 'drama',
     // TV genres (TMDB)
     'action & adventure': 'action', 'sci-fi & fantasy': 'sci-fi',
-    'war & politics': 'drama', 'kids': 'animation',
-    'reality': 'drama', 'soap': 'drama', 'talk': 'drama', 'news': 'drama',
+    'war & politics': 'political', 'kids': 'animation',
+    'reality': 'reality', 'soap': 'soap', 'talk': 'talk', 'news': 'news',
     // AI enrichment variants
     'romantic': 'romance', 'animated': 'animation',
-    'suspense': 'thriller', 'detective': 'mystery'
+    'suspense': 'thriller', 'detective': 'mystery',
+    // Expanded video genre synonyms
+    'documentary': 'documentary', 'biographical': 'documentary',
+    'noir': 'noir', 'neo-noir': 'noir', 'film-noir': 'noir',
+    'musical': 'musical',
+    'superhero': 'superhero', 'comic-book': 'superhero',
+    'historical': 'period-drama', 'period': 'period-drama', 'costume': 'period-drama',
+    'sports': 'sports', 'boxing': 'sports', 'racing': 'sports',
+    'psychological': 'psychological',
+    'disaster': 'apocalyptic', 'apocalyptic': 'apocalyptic', 'post-apocalyptic': 'apocalyptic',
+    'anthology': 'anthology', 'episodic': 'anthology',
+    'mockumentary': 'mockumentary', 'found-footage': 'mockumentary',
+    'arthouse': 'arthouse', 'art-house': 'arthouse', 'experimental': 'arthouse', 'avant-garde': 'arthouse', 'indie': 'arthouse',
+    'martial-arts': 'martial-arts', 'kung-fu': 'martial-arts', 'wuxia': 'martial-arts',
+    'satire': 'dark-comedy', 'dark-comedy': 'dark-comedy', 'black-comedy': 'dark-comedy',
+    'coming-of-age': 'coming-of-age', 'teen': 'coming-of-age',
+    'espionage': 'spy', 'spy': 'spy',
+    'survival': 'survival', 'wilderness': 'survival',
+    'legal': 'legal', 'courtroom': 'legal',
+    'political': 'political',
+    'slice-of-life': 'slice-of-life',
+
+    // === MUSIC GENRES (synonym-only normalization, sub-genres stay granular) ===
+    'hip hop': 'hip-hop', 'hip-hop': 'hip-hop',
+    'r&b': 'r-and-b', 'rnb': 'r-and-b', 'rhythm and blues': 'r-and-b',
+    'drum and bass': 'dnb', 'drum-and-bass': 'dnb', 'd&b': 'dnb', "d'n'b": 'dnb',
+    'lo-fi': 'lofi', 'lofi': 'lofi', 'lo fi': 'lofi',
+    'synth-pop': 'synthpop', 'synthpop': 'synthpop',
+    'deep house': 'deep-house', 'deep-house': 'deep-house',
+    'tech house': 'tech-house', 'tech-house': 'tech-house',
+    'indie rock': 'indie-rock', 'indie-rock': 'indie-rock',
+    'alt rock': 'alt-rock', 'alt-rock': 'alt-rock', 'alternative rock': 'alt-rock',
+    'post punk': 'post-punk', 'post-punk': 'post-punk',
+    'neo soul': 'neo-soul', 'neo-soul': 'neo-soul',
+    'psych rock': 'psych-rock', 'psych-rock': 'psych-rock', 'psychedelic rock': 'psych-rock',
+    'prog rock': 'prog-rock', 'prog-rock': 'prog-rock', 'progressive rock': 'prog-rock',
+    'death metal': 'death-metal', 'death-metal': 'death-metal',
+    'black metal': 'black-metal', 'black-metal': 'black-metal',
+    'math rock': 'math-rock', 'math-rock': 'math-rock',
+    'afro beat': 'afrobeat', 'afrobeat': 'afrobeat',
+    'bossa nova': 'bossa-nova', 'bossa-nova': 'bossa-nova',
+    'k-pop': 'k-pop', 'kpop': 'k-pop',
+    'j-pop': 'j-pop', 'jpop': 'j-pop',
+    'singer songwriter': 'singer-songwriter', 'singer-songwriter': 'singer-songwriter',
+    'garage rock': 'garage-rock', 'garage-rock': 'garage-rock',
   };
 
   function normalizeGenre(raw) {
     if (!raw) return null;
-    return GENRE_NORMALIZE[raw.toLowerCase().trim()] || null;
+    const key = raw.toLowerCase().trim();
+    return GENRE_NORMALIZE[key] || key; // Return lowercase original if no mapping
   }
 
   // Try all genres in array until one normalizes, fallback to singular genre field
@@ -11211,6 +11262,66 @@ Return JSON:
     const config = SUB_TAGS[link.category];
     if (!config || !config.dimensions) return null;
     return tags[config.dimensions[0].id] || null;
+  }
+
+  // Compute unified tags array — aggregates all tag-like data from scattered fields
+  // Persisted to the `tags TEXT[]` column for TF-IDF ranking and future server-side search
+  function computeLinkTags(link) {
+    const tags = new Set();
+
+    // Content type
+    if (link.content_type) tags.add(link.content_type);
+
+    // SUB_TAGS sub-category (previously runtime-only, now persisted)
+    const subTags = detectTags(link);
+    if (subTags) {
+      for (const val of Object.values(subTags)) {
+        if (val) tags.add(val);
+      }
+    }
+
+    // Video: genres + type + YouTube tags
+    if (link.video) {
+      if (link.video.type) tags.add(link.video.type);
+      if (link.video.genres) {
+        for (const g of link.video.genres) {
+          const n = normalizeGenre(g);
+          if (n) tags.add(n);
+        }
+      }
+      if (link.video.genre) {
+        const n = normalizeGenre(link.video.genre);
+        if (n) tags.add(n);
+      }
+      if (link.video.tags) {
+        for (const t of link.video.tags.slice(0, 10)) {
+          if (t && t.length >= 3) tags.add(t.toLowerCase());
+        }
+      }
+    }
+
+    // Music: genre + genreTags + contentFormat
+    if (link.music) {
+      if (link.music.genre) {
+        const n = normalizeGenre(link.music.genre);
+        if (n) tags.add(n);
+      }
+      if (link.music.genreTags) {
+        for (const g of link.music.genreTags) {
+          const n = normalizeGenre(g);
+          if (n) tags.add(n);
+        }
+      }
+      if (link.music.contentFormat) tags.add(link.music.contentFormat);
+    }
+
+    // Book: genre + format
+    if (link.book) {
+      if (link.book.genre) tags.add(link.book.genre.toLowerCase());
+      if (link.book.format) tags.add(link.book.format);
+    }
+
+    return [...tags].filter(Boolean);
   }
 
   // Load domain->category cache from localStorage
@@ -11640,6 +11751,50 @@ Return JSON:
     }
   }
 
+  // Persist board metadata (user-created boards) to Supabase
+  // Extracts only user-board-relevant fields to keep payload small
+  function saveBoardMetadata(categories) {
+    if (!categories) return;
+
+    // Build metadata object: only include boards with metadata worth preserving
+    const metadata = {};
+    for (const [slug, meta] of Object.entries(categories)) {
+      if (meta.isUserBoard || meta.displayName || meta.prompt) {
+        metadata[slug] = {
+          isUserBoard: meta.isUserBoard || false,
+          displayName: meta.displayName || null,
+          prompt: meta.prompt || null,
+          createdAt: meta.createdAt || null,
+          pinned: meta.pinned || false
+        };
+      }
+    }
+
+    // Fire-and-forget upsert to Supabase
+    if (currentUser) {
+      const accessToken = getAccessToken();
+      if (accessToken) {
+        fetch(`${SUPABASE_URL}/rest/v1/board_metadata`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            user_id: currentUser.id,
+            metadata: metadata,
+            updated_at: new Date().toISOString()
+          })
+        }).then(res => {
+          if (!res.ok) console.error('[sync] Board metadata save failed:', res.status);
+          else console.log('[sync] Board metadata saved');
+        }).catch(e => console.error('[sync] Board metadata error:', e));
+      }
+    }
+  }
+
   // Local storage functions (sync, fast)
   function load() {
     try {
@@ -11655,6 +11810,10 @@ Return JSON:
 
   function save(data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    // Invalidate TF-IDF cache when corpus changes (lazy recompute on next query)
+    if (typeof PinRanker !== 'undefined' && PinRanker.invalidateCache) {
+      PinRanker.invalidateCache();
+    }
   }
 
   // Auth helpers - read from localStorage (Supabase client hangs)
@@ -11728,7 +11887,9 @@ Return JSON:
         sources: link.sources || null,
         merged_at: link.merged_at || null,
         // Share & interaction fields
-        short_code: link.short_code || null
+        short_code: link.short_code || null,
+        // Unified tags (computed from scattered genre/sub-category/content-type fields)
+        tags: link.tags || computeLinkTags(link)
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -11852,21 +12013,24 @@ Return JSON:
       };
 
       // Fetch all data in parallel using raw fetch
-      const [linksRes, orderRes, expandedRes] = await Promise.all([
+      const [linksRes, orderRes, expandedRes, boardMetaRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/links?user_id=eq.${currentUser.id}&select=*`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/link_order?user_id=eq.${currentUser.id}&select=order_ids&limit=1`, { headers }),
-        fetch(`${SUPABASE_URL}/rest/v1/expanded_cards?user_id=eq.${currentUser.id}&select=cards&limit=1`, { headers })
+        fetch(`${SUPABASE_URL}/rest/v1/expanded_cards?user_id=eq.${currentUser.id}&select=cards&limit=1`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/board_metadata?user_id=eq.${currentUser.id}&select=metadata&limit=1`, { headers })
       ]);
 
-      const [linksData, orderData, expandedData] = await Promise.all([
+      const [linksData, orderData, expandedData, boardMetaData] = await Promise.all([
         linksRes.json(),
         orderRes.json(),
-        expandedRes.json()
+        expandedRes.json(),
+        boardMetaRes.json()
       ]);
 
       console.log(`[perf] Supabase queries: ${(performance.now() - t0).toFixed(0)}ms`);
       console.log('[supabase] links:', linksData?.length || 0);
       console.log('[supabase] order:', orderData?.[0] ? 'found' : 'none');
+      console.log('[supabase] board_metadata:', boardMetaData?.[0] ? 'found' : 'none');
 
       const links = (linksData || []).map(l => ({
         id: l.id,
@@ -11896,7 +12060,9 @@ Return JSON:
         sources: l.sources || null,
         merged_at: l.merged_at || null,
         // Share fields
-        short_code: l.short_code || null
+        short_code: l.short_code || null,
+        // Unified tags
+        tags: l.tags || []
       }));
 
       const categories = { uncategorized: { pinned: true } };
@@ -11905,6 +12071,13 @@ Return JSON:
           categories[l.category] = { pinned: false };
         }
       });
+
+      // Merge saved board metadata on top of reconstructed categories
+      // This restores isUserBoard, displayName, prompt, createdAt, pinned
+      const savedMeta = boardMetaData?.[0]?.metadata || {};
+      for (const [slug, meta] of Object.entries(savedMeta)) {
+        categories[slug] = { ...(categories[slug] || { pinned: false }), ...meta };
+      }
 
       const linkOrder = orderData?.[0]?.order_ids || links.map(l => l.id);
       const expanded = expandedData?.[0]?.cards || {};
@@ -12356,6 +12529,9 @@ Return JSON:
     if (updates.category && !data.categories[updates.category]) {
       data.categories[updates.category] = { pinned: false };
     }
+    // Recompute unified tags when link data changes
+    delete data.links[i]._tags;
+    data.links[i].tags = computeLinkTags(data.links[i]);
     save(data);
     syncLinkToSupabase(data.links[i]); // Background sync
   }
@@ -12396,6 +12572,7 @@ Return JSON:
       createdAt: new Date().toISOString()
     };
     save(data);
+    saveBoardMetadata(data.categories);
     return n;
   }
 
@@ -12410,6 +12587,7 @@ Return JSON:
     }
     if (!data.categories[category]) data.categories[category] = { pinned: false };
     save(data);
+    saveBoardMetadata(data.categories);
   }
 
   // ============================================
@@ -15353,6 +15531,278 @@ Return JSON:
   }
 
   // ============================================
+  // TF-IDF Pin Ranker — vector-space model for board suggestions
+  // Categories are vectors, not static labels. Each category's meaning
+  // emerges from the aggregate text of its pins.
+  // ============================================
+  const PinRanker = (() => {
+    // Stopwords: reuse EVENTS_STOPWORDS + board-specific noise
+    const BOARD_STOPWORDS = new Set([
+      ...EVENTS_STOPWORDS,
+      'the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'has',
+      'are', 'was', 'were', 'been', 'will', 'would', 'could', 'should',
+      'may', 'might', 'can', 'not', 'but', 'its', 'our', 'your', 'his',
+      'her', 'their', 'which', 'what', 'when', 'where', 'how', 'who',
+      'out', 'up', 'down', 'off', 'on', 'in', 'to', 'at', 'by', 'of',
+      'an', 'a', 'is', 'it', 'be', 'as', 'or', 'if', 'no', 'do', 'so',
+      'we', 'he', 'she', 'me', 'my', 'us', 'am', 'did', 'get', 'got',
+      'let', 'say', 'see', 'use', 'way', 'day', 'set', 'put', 'run',
+      'go', 'come', 'make', 'take', 'know', 'think', 'look', 'want',
+      'give', 'well', 'also', 'back', 'much', 'even', 'here', 'there',
+      'than', 'now', 'still', 'just', 'like', 'made', 'own', 'most',
+      'need', 'find', 'keep', 'work', 'part', 'must', 'does',
+      // Web noise
+      'http', 'https', 'www', 'com', 'org', 'net', 'html', 'php',
+      'page', 'site', 'click', 'link', 'share', 'view', 'login',
+      'sign', 'newsletter', 'subscribe', 'cookie', 'privacy', 'terms',
+      'official', 'free', 'best', 'top', 'new', 'buy', 'shop', 'sale',
+      'order', 'cart', 'add', 'home', 'product', 'item', 'price',
+    ]);
+
+    // Tokenizer: lowercase, strip URLs/punctuation, filter stopwords
+    function tokenize(text) {
+      if (!text) return [];
+      return text
+        .toLowerCase()
+        .replace(/https?:\/\/[^\s]+/g, '') // Strip URLs
+        .replace(/[^a-z0-9\-]/g, ' ')      // Keep hyphens (for genre tokens like "hip-hop")
+        .split(/\s+/)
+        .filter(t => t.length >= 3 && !BOARD_STOPWORDS.has(t) && !/^\d+$/.test(t));
+    }
+
+    // Domain cleaner: "www.example.com" → "example"
+    function cleanDomain(domain) {
+      if (!domain) return '';
+      return domain.replace(/^www\./, '').replace(/\.(com|org|net|io|co|me|tv|fm|uk|de|fr|ca|au|us)(\.\w+)?$/, '');
+    }
+
+    // Build a weighted text document from all pin fields
+    // Field weighting via repetition: repeating a token N times = Nx TF weight
+    function buildPinDocument(pin) {
+      const parts = [];
+      const repeat = (text, n) => { for (let i = 0; i < n; i++) parts.push(text); };
+
+      // Title 3x (highest signal)
+      if (pin.title) repeat(pin.title, 3);
+
+      // Domain 2x (brand signal)
+      const dom = cleanDomain(pin.domain);
+      if (dom) repeat(dom, 2);
+
+      // Category 2x
+      if (pin.category && pin.category !== 'uncategorized') repeat(pin.category.replace(/-/g, ' '), 2);
+
+      // Content type 1x
+      if (pin.content_type) parts.push(pin.content_type);
+
+      // Description 1x
+      if (pin.description) parts.push(pin.description);
+
+      // Tags (unified) 2x — includes genres, sub-categories, content types
+      if (pin.tags && Array.isArray(pin.tags)) {
+        repeat(pin.tags.join(' '), 2);
+      }
+
+      // Video metadata
+      if (pin.video) {
+        if (pin.video.genres) repeat(pin.video.genres.map(g => normalizeGenre(g)).filter(Boolean).join(' '), 2);
+        if (pin.video.creator) repeat(pin.video.creator, 2);
+        if (pin.video.keywords) repeat(pin.video.keywords.join(' '), 2);
+        if (pin.video.tags) repeat(pin.video.tags.slice(0, 10).join(' '), 1);
+        if (pin.video.summary) parts.push(pin.video.summary);
+        if (pin.video.type) parts.push(pin.video.type);
+      }
+
+      // Book metadata
+      if (pin.book) {
+        if (pin.book.author) repeat(pin.book.author, 2);
+        if (pin.book.genre) repeat(normalizeGenre(pin.book.genre) || pin.book.genre, 2);
+        if (pin.book.summary) parts.push(pin.book.summary);
+      }
+
+      // Music metadata
+      if (pin.music) {
+        if (pin.music.artist) repeat(pin.music.artist, 3);
+        if (pin.music.genre) repeat(normalizeGenre(pin.music.genre) || pin.music.genre, 2);
+        if (pin.music.genreTags) repeat(pin.music.genreTags.map(g => normalizeGenre(g)).filter(Boolean).join(' '), 2);
+        if (pin.music.albumTitle) parts.push(pin.music.albumTitle);
+        if (pin.music.trackTitle) parts.push(pin.music.trackTitle);
+      }
+
+      return parts.join(' ');
+    }
+
+    // --- IDF cache ---
+    let idfCache = null;       // Map<token, idfScore>
+    let idfCorpusSize = 0;     // Invalidated when corpus size changes
+    let pinDocCache = new Map(); // pinId → tokenized tokens[]
+    let pinVectorCache = new Map(); // pinId → Map<token, tfidf>
+
+    function invalidateCache() {
+      idfCache = null;
+      idfCorpusSize = 0;
+      pinDocCache.clear();
+      pinVectorCache.clear();
+      try { localStorage.removeItem('boards-idf-v1'); } catch {}
+    }
+
+    // Compute IDF for entire corpus
+    function computeIDF(pins) {
+      if (idfCache && idfCorpusSize === pins.length) return idfCache;
+
+      const t0 = performance.now();
+      const N = pins.length;
+      const df = new Map(); // document frequency: how many docs contain each token
+
+      // Build per-pin token sets and count DF
+      for (const pin of pins) {
+        const doc = buildPinDocument(pin);
+        const tokens = tokenize(doc);
+        const uniqueTokens = new Set(tokens);
+        pinDocCache.set(pin.id, tokens);
+
+        for (const t of uniqueTokens) {
+          df.set(t, (df.get(t) || 0) + 1);
+        }
+      }
+
+      // Compute IDF with smoothing, prune corpus-wide stopwords
+      const idf = new Map();
+      const maxDf = N * 0.6; // Prune tokens in >60% of docs
+      for (const [token, count] of df) {
+        if (count > maxDf || count < 2) continue; // Too common or too rare
+        idf.set(token, Math.log((N + 1) / (count + 1)) + 1);
+      }
+
+      idfCache = idf;
+      idfCorpusSize = N;
+      console.log(`[ranker] IDF computed: ${idf.size} terms from ${N} pins in ${(performance.now() - t0).toFixed(0)}ms`);
+
+      return idf;
+    }
+
+    // Build TF-IDF vector for a set of tokens
+    function tfidfVector(tokens, idf) {
+      const tf = new Map();
+      for (const t of tokens) {
+        tf.set(t, (tf.get(t) || 0) + 1);
+      }
+
+      const vec = new Map();
+      for (const [term, count] of tf) {
+        const idfScore = idf.get(term);
+        if (idfScore) {
+          vec.set(term, count * idfScore);
+        }
+      }
+      return vec;
+    }
+
+    // Cosine similarity between two TF-IDF vectors
+    function cosineSimilarity(vecA, vecB) {
+      let dot = 0, magA = 0, magB = 0;
+
+      for (const [term, weightA] of vecA) {
+        magA += weightA * weightA;
+        const weightB = vecB.get(term);
+        if (weightB) dot += weightA * weightB;
+      }
+
+      for (const [, weightB] of vecB) {
+        magB += weightB * weightB;
+      }
+
+      if (magA === 0 || magB === 0) return 0;
+      return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+    }
+
+    // Get or build TF-IDF vector for a pin
+    function getPinVector(pin, idf) {
+      if (pinVectorCache.has(pin.id)) return pinVectorCache.get(pin.id);
+
+      const tokens = pinDocCache.get(pin.id) || tokenize(buildPinDocument(pin));
+      const vec = tfidfVector(tokens, idf);
+      pinVectorCache.set(pin.id, vec);
+      return vec;
+    }
+
+    // --- Public API ---
+
+    // Rank pins for a board (main entry point)
+    function rankPinsForBoard(boardSlug, allLinks, categories, limit = 12) {
+      const meta = categories[boardSlug];
+      if (!meta) return [];
+
+      const boardName = meta.displayName || boardSlug.replace(/-/g, ' ');
+      const prompt = meta.prompt || '';
+
+      // Build query: board name (3x weight) + prompt (1x)
+      const queryParts = [];
+      for (let i = 0; i < 3; i++) queryParts.push(boardName);
+      if (prompt) queryParts.push(prompt);
+      const queryText = queryParts.join(' ');
+      const queryTokens = tokenize(queryText);
+
+      if (queryTokens.length === 0) return [];
+
+      // Get pins not already on this board
+      const boardPinIds = new Set(allLinks.filter(l => l.category === boardSlug).map(l => l.id));
+      const candidates = allLinks.filter(l =>
+        !boardPinIds.has(l.id) && !l.loading && l.category !== 'uncategorized'
+      );
+
+      if (candidates.length === 0) return [];
+
+      const t0 = performance.now();
+
+      // Compute IDF from all pins (cached)
+      const idf = computeIDF(allLinks);
+      const queryVec = tfidfVector(queryTokens, idf);
+
+      if (queryVec.size === 0) return [];
+
+      // Score each candidate
+      const now = Date.now();
+      const scored = candidates.map(pin => {
+        const pinVec = getPinVector(pin, idf);
+        let score = cosineSimilarity(queryVec, pinVec);
+
+        // Recency boost: 10% weight, exponential decay over 90 days
+        if (pin.addedAt) {
+          const ageMs = now - new Date(pin.addedAt).getTime();
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          const recencyBoost = Math.exp(-ageDays / 90);
+          score = 0.9 * score + 0.1 * recencyBoost;
+        }
+
+        return { link: pin, score };
+      });
+
+      // Sort and return top results
+      scored.sort((a, b) => b.score - a.score);
+      const results = scored.slice(0, limit).filter(r => r.score > 0.01);
+
+      console.log(`[ranker] Board "${boardSlug}": ${candidates.length} candidates scored in ${(performance.now() - t0).toFixed(0)}ms, top=${results[0]?.score.toFixed(3) || 'n/a'}`);
+
+      return results.map(r => r.link);
+    }
+
+    // Warm cache in idle time
+    function warmCache(allLinks) {
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(() => {
+          if (allLinks.length >= 10) {
+            computeIDF(allLinks);
+            console.log('[ranker] Cache warmed');
+          }
+        });
+      }
+    }
+
+    return { rankPinsForBoard, warmCache, invalidateCache, tokenize, buildPinDocument };
+  })();
+
+  // ============================================
   // Board Seed Panel — Library Suggestions
   // ============================================
   const BOARD_SEED_THRESHOLD = 5;
@@ -15363,7 +15813,8 @@ Return JSON:
   const boardSeedDismiss = $('boardSeedDismiss');
   const boardSeedAddAll = $('boardSeedAddAll');
 
-  function getLibrarySuggestions(boardSlug, limit = 12) {
+  // Legacy substring matcher — fallback for small corpora (<10 pins)
+  function getLibrarySuggestionsLegacy(boardSlug, limit = 12) {
     const data = load();
     const meta = data.categories[boardSlug];
     if (!meta) return [];
@@ -15392,15 +15843,28 @@ Return JSON:
           if (domainLower.includes(token)) score += 1;
         }
 
-        // Image quality bonus
         if (link.image) score += 1;
-
         return { link, score };
       })
       .filter(r => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
       .map(r => r.link);
+  }
+
+  // TF-IDF ranker with graceful fallback
+  function getLibrarySuggestions(boardSlug, limit = 12) {
+    const data = load();
+    try {
+      // Fall back to legacy for very small corpora
+      if (data.links.length < 10) {
+        return getLibrarySuggestionsLegacy(boardSlug, limit);
+      }
+      return PinRanker.rankPinsForBoard(boardSlug, data.links, data.categories, limit);
+    } catch (e) {
+      console.error('[ranker] TF-IDF failed, falling back to legacy:', e);
+      return getLibrarySuggestionsLegacy(boardSlug, limit);
+    }
   }
 
   function renderBoardSeedPanel(slug) {
@@ -17076,6 +17540,8 @@ Return JSON:
     renderFilters();
     renderGrid();
     renderBoardSeedPanel(currentFilter);
+    // Warm TF-IDF cache in idle time for fast board suggestions
+    PinRanker.warmCache(load().links);
     initWidgetSystem();
     generateWidgets();
     console.log(`[perf] init: ${(performance.now() - initStart).toFixed(0)}ms`);
@@ -17162,6 +17628,16 @@ Return JSON:
         if (updatedCount > 0) {
           console.log('[sync] Pushed', updatedCount, 'locally-updated pins to cloud');
         }
+
+        // Merge local board metadata into cloud categories (local may have boards not yet in cloud)
+        const localCats = localData.categories || {};
+        for (const [slug, meta] of Object.entries(localCats)) {
+          if ((meta.isUserBoard || meta.displayName || meta.prompt) && !cloudData.categories[slug]?.isUserBoard) {
+            cloudData.categories[slug] = { ...(cloudData.categories[slug] || { pinned: false }), ...meta };
+          }
+        }
+        // Push merged board metadata to cloud
+        saveBoardMetadata(cloudData.categories);
 
         // Update from merged cloud data (source of truth)
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
