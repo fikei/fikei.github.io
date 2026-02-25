@@ -89,52 +89,24 @@ enum DSButtonSize {
     case large    // 12/24 padding, 10pt font — web .btn--lg
 }
 
-struct DSButton: View {
-    let title: String
-    let action: () -> Void
-    var variant: DSButtonVariant = .outlined
-    var size: DSButtonSize = .regular
-    var fullWidth: Bool = false
-    var disabled: Bool = false
-    var loading: Bool = false
+/// Custom ButtonStyle that drives press-state visuals via `configuration.isPressed`.
+/// This replaces the DragGesture approach which interfered with tap delivery.
+struct DSButtonStyle: ButtonStyle {
+    let variant: DSButtonVariant
+    let size: DSButtonSize
+    let fullWidth: Bool
 
-    @State private var isPressed = false
+    func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
 
-    var body: some View {
-        Button(action: {
-            if !disabled && !loading { action() }
-        }) {
-            Group {
-                if loading {
-                    ProgressView()
-                        .tint(textColor)
-                } else {
-                    Text(title.uppercased())
-                        .font(.system(size: fontSize, weight: .bold))
-                        .tracking(Theme.trackingWide)
-                }
-            }
+        configuration.label
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .padding(.vertical, verticalPadding)
             .padding(.horizontal, horizontalPadding)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .foregroundColor(textColor)
-        .background(backgroundColor)
-        .overlay(borderOverlay)
-        .opacity(disabled ? 0.5 : 1.0)
-        .disabled(disabled || loading)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in withAnimation(.easeInOut(duration: Theme.durationFast)) { isPressed = true } }
-                .onEnded { _ in withAnimation(.easeInOut(duration: Theme.durationFast)) { isPressed = false } }
-        )
-    }
-
-    // MARK: - Sizing
-
-    private var fontSize: CGFloat {
-        size == .small ? Theme.text2XS : Theme.textXS
+            .foregroundColor(textColor(pressed: pressed))
+            .background(backgroundColor(pressed: pressed))
+            .overlay(borderOverlay)
+            .animation(.easeInOut(duration: Theme.durationFast), value: pressed)
     }
 
     private var verticalPadding: CGFloat {
@@ -153,27 +125,19 @@ struct DSButton: View {
         }
     }
 
-    // MARK: - Colors
-
-    private var backgroundColor: Color {
+    private func backgroundColor(pressed: Bool) -> Color {
         switch variant {
-        case .outlined:
-            return isPressed ? Theme.foreground : .clear
-        case .filled:
-            return isPressed ? .clear : Theme.foreground
-        case .ghost:
-            return .clear
+        case .outlined: return pressed ? Theme.foreground : .clear
+        case .filled:   return pressed ? .clear : Theme.foreground
+        case .ghost:    return .clear
         }
     }
 
-    private var textColor: Color {
+    private func textColor(pressed: Bool) -> Color {
         switch variant {
-        case .outlined:
-            return isPressed ? Theme.surface : Theme.foreground
-        case .filled:
-            return isPressed ? Theme.foreground : Theme.surface
-        case .ghost:
-            return Theme.foreground
+        case .outlined: return pressed ? Theme.surface : Theme.foreground
+        case .filled:   return pressed ? Theme.foreground : Theme.surface
+        case .ghost:    return Theme.foreground
         }
     }
 
@@ -184,6 +148,47 @@ struct DSButton: View {
             Rectangle().stroke(Theme.foreground, lineWidth: 1)
         case .ghost:
             EmptyView()
+        }
+    }
+}
+
+struct DSButton: View {
+    let title: String
+    let action: () -> Void
+    var variant: DSButtonVariant = .outlined
+    var size: DSButtonSize = .regular
+    var fullWidth: Bool = false
+    var disabled: Bool = false
+    var loading: Bool = false
+
+    var body: some View {
+        Button(action: {
+            if !disabled && !loading { action() }
+        }) {
+            Group {
+                if loading {
+                    ProgressView()
+                        .tint(labelColor)
+                } else {
+                    Text(title.uppercased())
+                        .font(.system(size: fontSize, weight: .bold))
+                        .tracking(Theme.trackingWide)
+                }
+            }
+        }
+        .buttonStyle(DSButtonStyle(variant: variant, size: size, fullWidth: fullWidth))
+        .opacity(disabled ? 0.5 : 1.0)
+        .disabled(disabled || loading)
+    }
+
+    private var fontSize: CGFloat {
+        size == .small ? Theme.text2XS : Theme.textXS
+    }
+
+    private var labelColor: Color {
+        switch variant {
+        case .outlined, .ghost: return Theme.foreground
+        case .filled: return Theme.surface
         }
     }
 }

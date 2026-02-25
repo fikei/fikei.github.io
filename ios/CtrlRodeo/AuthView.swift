@@ -117,6 +117,12 @@ struct AuthView: View {
     private func sendMagicLink() {
         guard isValidEmail else { return }
 
+        // Dismiss keyboard immediately
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil, from: nil, for: nil
+        )
+
         isSending = true
         errorMessage = nil
 
