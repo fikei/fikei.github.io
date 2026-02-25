@@ -675,19 +675,19 @@
     <div class="section-label">Impact at a Glance</div>
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-big stat-big--blue">21 of 35</div>
-        <div class="stat-label">Fields Pre-Loaded for Confirmation</div>
-        <div class="stat-sub">60% of fields ready to confirm — not type from scratch</div>
+        <div class="stat-big stat-big--blue">60%</div>
+        <div class="stat-label">Fields Sourced</div>
+        <div class="stat-sub">21 of 35 fields ready to confirm — not type from scratch</div>
       </div>
       <div class="stat-card">
-        <div class="stat-big stat-big--green">4 Steps</div>
-        <div class="stat-label">Steps Skipped</div>
-        <div class="stat-sub">Coverage + Coaching handled server-side or moved to on-device setup</div>
+        <div class="stat-big stat-big--green">44%</div>
+        <div class="stat-label">Fewer Steps</div>
+        <div class="stat-sub">5 steps vs. 9 — coverage + coaching handled elsewhere</div>
       </div>
       <div class="stat-card">
-        <div class="stat-big" style="color: var(--yellow);">~5 min</div>
-        <div class="stat-label">Estimated Time Saved</div>
-        <div class="stat-sub">From an average 8-minute flow to ~3 minutes</div>
+        <div class="stat-big" style="color: var(--yellow);">63%</div>
+        <div class="stat-label">Faster Completion</div>
+        <div class="stat-sub">~3 minutes vs. ~8 minutes average</div>
       </div>
     </div>
   </div>
@@ -792,7 +792,7 @@
             <span class="badge badge--green">5 Steps</span>
             <span class="badge badge--savings">−4 Steps</span>
           </div>
-          <div class="flow-card-desc">Employer, health records, and carrier data pre-load 21 of 35 fields for confirmation. Coverage verified server-side; coaching moved to on-device setup.</div>
+          <div class="flow-card-desc">Employer, health records, and carrier data source 21 of 35 fields for confirmation. Coverage verified server-side; coaching moved to on-device setup.</div>
         </div>
         <div class="flow-card-body">
           <ol class="step-list">
@@ -918,7 +918,7 @@
       <div class="insight-card" style="border-top: 3px solid var(--blue);">
         <div class="insight-icon" style="background: var(--blue-light); font-size: 1.25rem;">🔍</div>
         <div class="insight-title">User Lookup</div>
-        <div class="insight-body" style="margin-bottom: 12px;">Takes a UUID or basic identifiers (first name, last name, DOB, zip code) and resolves to a unique member record. This is the entry point — before any data can be pre-loaded, the system must know who the user is.</div>
+        <div class="insight-body" style="margin-bottom: 12px;">Takes a UUID or basic identifiers (first name, last name, DOB, zip code) and resolves to a unique member record. This is the entry point — before any data can be sourced, the system must know who the user is.</div>
         <div style="font-size: 0.75rem; color: var(--gray-500); border-top: 1px solid var(--gray-200); padding-top: 10px; margin-top: auto;">
           <strong>Inputs:</strong> UUID <em>or</em> First + Last + DOB + Zip<br>
           <strong>Output:</strong> Canonical member ID
@@ -938,7 +938,7 @@
       <div class="insight-card" style="border-top: 3px solid var(--purple);">
         <div class="insight-icon" style="background: var(--purple-light); font-size: 1.25rem;">🧠</div>
         <div class="insight-title">Question Engine</div>
-        <div class="insight-body" style="margin-bottom: 12px;">For each question in the registration flow, provides a confidence score and a suggested answer based on available data. High-confidence fields are pre-loaded for confirmation; low-confidence fields are left for the user to fill in.</div>
+        <div class="insight-body" style="margin-bottom: 12px;">For each question in the registration flow, provides a confidence score and a suggested answer based on available data. High-confidence fields are sourced for confirmation; low-confidence fields are left for the user to fill in.</div>
         <div style="font-size: 0.75rem; color: var(--gray-500); border-top: 1px solid var(--gray-200); padding-top: 10px; margin-top: auto;">
           <strong>Input:</strong> Question ID + Member Profile<br>
           <strong>Output:</strong> Answer + Confidence Score
@@ -958,7 +958,7 @@
         <span style="color: var(--gray-400); font-size: 1.25rem;">→</span>
         <div style="background: var(--purple-light); color: #6A1B9A; border: 1px solid #E1BEE7; padding: 10px 16px; border-radius: var(--radius); font-weight: 600; white-space: nowrap;">🧠 Question Engine</div>
         <span style="color: var(--gray-400); font-size: 1.25rem;">→</span>
-        <div style="background: var(--green-light); color: #2E7D32; border: 1px solid var(--green-mid); padding: 10px 16px; border-radius: var(--radius); font-weight: 600; white-space: nowrap;">✅ Pre-Loaded Form</div>
+        <div style="background: var(--green-light); color: #2E7D32; border: 1px solid var(--green-mid); padding: 10px 16px; border-radius: var(--radius); font-weight: 600; white-space: nowrap;">✅ Sourced Form</div>
       </div>
     </div>
   </div>
