@@ -460,6 +460,17 @@
       border: 1px solid #f0d060;
     }
 
+    .source-pill--deferred {
+      background: #f3e8ff;
+      color: #6b21a8;
+      border: 1px solid #d8b4fe;
+    }
+
+    .status-chip--purple {
+      background: #f3e8ff;
+      color: #6b21a8;
+    }
+
     /* ── FIELD TABLE ── */
     .table-section {
       background: var(--white);
@@ -967,25 +978,9 @@
   <!-- ── FIELD TABLE ── -->
   <div class="section">
     <div class="section-label">Detailed Field Analysis</div>
-    <div class="section-title">All Fields &amp; Their Optimized Status</div>
+    <div class="section-title">Breakdown by Field</div>
     <div class="section-desc">Every field across the full onboarding flow, mapped to its optimized treatment and data source.</div>
 
-    <!-- Source legend -->
-    <div class="source-legend">
-      <span class="source-legend-label">Sources:</span>
-      <span class="source-pill source-pill--employer">🏢 Employer HR</span>
-      <span class="source-pill source-pill--health">🏥 Health Records</span>
-      <span class="source-pill source-pill--user">✏️ User Enters</span>
-      <span class="source-pill source-pill--eliminated">⚠ Skipped</span>
-    </div>
-
-    <!-- Status legend -->
-    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
-      <span class="status-chip status-chip--green">🟢 Confirm</span>
-      <span class="status-chip status-chip--yellow">🟡 Partial</span>
-      <span class="status-chip status-chip--red">🔴 User enters</span>
-      <span class="status-chip status-chip--black">⚠ Skipped</span>
-    </div>
 
     <!-- Filter bar -->
     <div class="filter-bar" id="filterBar">
@@ -1077,28 +1072,28 @@
               <td class="field-name">Coverage Search</td>
               <td class="field-standard">Manual search</td>
               <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
               <td class="field-notes">Employer sponsorship — verified server-side</td>
             </tr>
             <tr data-status="skipped">
               <td class="field-name">Insurance Provider</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
             <tr data-status="skipped">
               <td class="field-name">Member ID</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
             <tr data-status="skipped">
               <td class="field-name">Group ID</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
 
@@ -1163,15 +1158,15 @@
             <tr data-status="skipped">
               <td class="field-name">Coaching Thresholds</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td><span class="status-chip status-chip--purple">↗ Moved</span></td>
+              <td class="field-source"><span class="source-pill source-pill--deferred">⏳ Deferred</span></td>
               <td class="field-notes">Moved to on-device onboarding</td>
             </tr>
             <tr data-status="skipped">
               <td class="field-name">Contact Method</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td><span class="status-chip status-chip--purple">↗ Moved</span></td>
+              <td class="field-source"><span class="source-pill source-pill--deferred">⏳ Deferred</span></td>
               <td class="field-notes">Moved to on-device onboarding</td>
             </tr>
 
