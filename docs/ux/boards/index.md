@@ -7,6 +7,7 @@ Boards are the primary workspace for organizing and viewing saved pins. Each boa
 ## User Goals
 
 - **Organize content visually** in a way that makes sense to me
+- **Create my own named collections** around personal themes and projects
 - **Find what I need quickly** through filters and search
 - **Customize my view** to match how I think about my content
 - **Share collections** with others when I want to collaborate
@@ -19,6 +20,7 @@ Boards are the primary workspace for organizing and viewing saved pins. Each boa
 | When I... | I want to... | So I can... |
 |-----------|-------------|-------------|
 | Start a new project | Create a themed board | Keep related content together |
+| Start a new board | See AI-ranked suggestions from my library | Seed it without browsing manually |
 | Browse my collection | See an organized grid | Find pins visually |
 | Look for something specific | Filter by category/type | Narrow down results |
 | Collaborate on ideas | Share a board | Work with others |
@@ -34,7 +36,13 @@ Boards are the primary workspace for organizing and viewing saved pins. Each boa
 
 ### What is a Board?
 
-A board is a container for pins with:
+A board is a container for pins. There are two kinds:
+
+**AI-generated boards** (categories): Auto-created by content type inference (e.g., "Clothing", "Tech"). Hidden when empty.
+
+**User-created boards**: Named by the user with an optional context prompt. Visible even at 0 pins. Marked with a ✦ prefix in the filter bar. Persisted to Supabase so they survive reload and appear on all devices.
+
+All boards have:
 - **Name and description**: What this collection is about
 - **Layout options**: Grid, list, or masonry view
 - **Filter state**: Current category/type selections
@@ -116,25 +124,17 @@ A board is a container for pins with:
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Board Selector
+### Filter Bar with User Boards
 
 ```
-┌───────────────────────────────────────┐
-│  Your Boards                    [+]   │
-├───────────────────────────────────────┤
-│                                       │
-│  🛍️ Shopping          12 pins         │
-│  📚 Reading List       8 pins         │
-│  🎨 Design Inspo      45 pins    ●    │  ← Active
-│  🏠 Home Ideas        23 pins         │
-│  🎁 Gift Ideas         6 pins         │
-│                                       │
-│  ─────────────────────────────────    │
-│  👥 Shared with me                    │
-│                                       │
-│  🤝 Team Mood Board    34 pins        │
-│                                       │
-└───────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  [Search...]  [All]  [Clothing]  [Tech]  [✦ Running]  [+ Board]    │
+└────────────────────────────────────────────────────────────────────┘
+                                    ↑
+                         User-created board — ✦ prefix,
+                         visible even at 0 pins
+
+Sort order:  Pinned AI → User boards (✦) → Unpinned AI → [+ Board]
 ```
 
 ---
@@ -143,6 +143,7 @@ A board is a container for pins with:
 
 | Component | Status | Description | See Details |
 |-----------|--------|-------------|-------------|
+| **Create a Board** | ✅ Shipped | User-created boards with name + prompt, library seed panel, TF-IDF ranking, Supabase persistence | [Create a Board](./create-board.md) |
 | **Flexible Tagging** | ⚠️ Partial | Categories, sub-tags, content types; freeform tags planned | [Flexible Tagging](../pins/tagging.md) |
 | **Visual Grid Browsing** | ✅ Shipped | Responsive grid, card expansion, dense flow | [Grid Layout & Display](./grid-layout.md) |
 | **Search & Retrieval** | ✅ Shipped | Live search, category filter, sub-tag filter, notes search | [Search & Retrieval](./search.md) |
@@ -222,3 +223,8 @@ A board is a container for pins with:
 - Onboarding state stored in localStorage (`boards_onboarding`)
 - ARIA roles: `role="dialog"`, `role="tablist"`, `aria-live="polite"` for toasts
 - WCAG AA compliant color contrast (--muted: #999)
+- User-created board metadata persisted to `board_metadata` Supabase table (JSONB per user, `supabase/migrations/019_board_metadata.sql`)
+- `saveBoardMetadata()` upserts on every board create/update; `fetchFromSupabase()` merges metadata at load time (`boards/index.html:11756`, `12020`)
+- ✦ prefix applied in filter bar for `isUserBoard === true` categories (`boards/index.html:12930`)
+- Filter sort order: pinned AI → user boards → unpinned AI by pin count (`boards/index.html:12911`)
+- TF-IDF cosine similarity ranker (`PinRanker` module, `boards/index.html:15636`) used for library seed suggestions

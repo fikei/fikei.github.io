@@ -394,9 +394,12 @@
 
 | Story | Tasks | Status |
 |-------|-------|--------|
-| **AI Category Assignment** | | Pending |
+| **AI Category Assignment** | | In Progress |
 | | Extend `enrich-link` to return `{ category, tags[] }` instead of `{ category }` | Pending |
-| | Add `tags` column (text array) to items table | Pending |
+| | Add `tags` column (text array) to links table | Complete |
+| | `computeLinkTags(link)` — client-side tag computation from existing metadata (genres, categories, domains) | Complete |
+| | GIN index `idx_links_tags` on `links.tags` for fast tag queries | Complete |
+| | Run migration `020_link_tags.sql` against Boards Supabase project | Blocked |
 | | AI assigns primary category + secondary tags on link save | Pending |
 | | Fallback: user confirms/overrides if AI confidence < threshold | Pending |
 | **Dynamic Filter Bar** | | Pending |
@@ -916,3 +919,104 @@ Replace "Refresh Image" button with a full image management interface. Users get
 | | Offline: queue computed from localStorage, sync queued for reconnection | Pending |
 | | Undo delete: 3-second toast, pin restored to queue on undo | Pending |
 | | Feature gate: verify no UI appears below 10 pins | Pending |
+
+---
+
+## Epic 3.7: Create a Board MVP (In Progress)
+
+> **Vision**: User-initiated board creation with AI-powered library suggestions. Users declare intent ("I want a board for X") and the system surfaces matching pins from their library and the internet.
+>
+> **Reference**: [PRD: Create a Board](/docs/strategy/prds/create-a-board.md)
+
+### Story 1: Infrastructure — Tags + Board Metadata
+
+<!-- Shipped: 019_board_metadata.sql, 020_link_tags.sql, computeLinkTags(), saveBoardMetadata(), expanded GENRE_NORMALIZE in boards/index.html (PR #143) -->
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Unified tags column on links** | | In Progress |
+| | Write migration `020_link_tags.sql`: add `tags TEXT[] DEFAULT '{}'` to `links` table | Complete |
+| | Add GIN index `idx_links_tags` on `(user_id, tags)` for fast tag-based queries | Complete |
+| | Implement `computeLinkTags(link)` — derives tags from genre, category, domain, content type metadata | Complete |
+| | Populate `tags` on link load from localStorage (`loadLinks()`) | Complete |
+| | Run migration `020_link_tags.sql` against Boards Supabase project | Blocked |
+| | Persist computed tags to Supabase on link save (sync layer) | Pending |
+| **Board metadata persistence** | | In Progress |
+| | Write migration `019_board_metadata.sql`: `board_metadata` table (`user_id`, `slug`, `display_name`, `prompt`, `user_created`, `created_at`) | Complete |
+| | RLS policies: `FOR ALL USING (auth.uid() = user_id)` | Complete |
+| | Implement `saveBoardMetadata(slug, metadata)` — upserts to Supabase | Complete |
+| | Run migration `019_board_metadata.sql` against Boards Supabase project | Blocked |
+| | Load board metadata from Supabase on auth (`loadBoardMetadata()`) | Pending |
+| **GENRE_NORMALIZE expansion** | | Complete |
+| | Expand video genre synonyms: 19 entries (anime, documentary, sitcom, etc.) | Complete |
+| | Expand music genre synonyms: 22 entries (house, techno, ambient, jazz, etc.) | Complete |
+
+### Story 2: Board Creation Flow
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **`[+]` button in category navigation** | | Pending |
+| | Add `[+]` token after last category pill in `renderFilters()` | Pending |
+| | Tapping opens "Create Board" modal | Pending |
+| **Create Board modal** | | Pending |
+| | Name field (required, 1–50 chars, uniqueness check) | Pending |
+| | Prompt field (optional, up to 200 chars) | Pending |
+| | Name collision detection with existing AI categories | Pending |
+| | On submit: derive slug (lowercase, hyphens, strip special chars), create board in categories object | Pending |
+| | `user_created`, `display_name`, `prompt`, `created_at` fields on category metadata | Pending |
+| | Save to Supabase via `saveBoardMetadata()` | Pending |
+| **`✦` creator indicator in filter bar** | | Pending |
+| | Render `✦` prefix on `filter-token--user-created` tokens | Pending |
+| | User-created boards sorted after AI categories, ordered by created_at | Pending |
+| | Empty user-created boards remain visible in nav (unlike AI categories) | Pending |
+
+### Story 3: Library Suggestions (TF-IDF Ranking)
+
+<!-- Shipped: PinRanker module (TF-IDF vector-space ranking, corpus IDF from all links, per-link TF, cosine similarity) in boards/index.html (PR #143) -->
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **PinRanker module (TF-IDF vector-space)** | | Complete |
+| | `PinRanker` class: `buildCorpus(links)` computes IDF weights across full link collection | Complete |
+| | `scoreLink(link, queryTerms)` — TF × IDF cosine similarity, title/description/tag field weighting | Complete |
+| | `rank(links, boardName, boardPrompt)` — returns links sorted by relevance score, threshold 0.1 | Complete |
+| | Domain match bonus: exact domain mention in board name/prompt | Complete |
+| | Category affinity bonus: board prompt references category keyword | Complete |
+| | Recency boost: pins added in last 30 days +0.1 | Complete |
+| | Replace broken substring matching (`suggestFromLibrary` v1) with `PinRanker` | Complete |
+| **Library suggestion UI** | | Pending |
+| | "From your library" section renders below empty board grid | Pending |
+| | Horizontal scrollable row or responsive grid, up to 20 suggestions | Pending |
+| | Pin card with image, title, domain, and `[Add]` button | Pending |
+| | `[Add]` moves pin to board (updates category field), removes from suggestion row | Pending |
+| | `[Add All (N)]` bulk move with confirmation dialog | Pending |
+| | Hide section once board has 5+ pins (seeded threshold) | Pending |
+| | "No matching pins in your library yet." empty state | Pending |
+
+### Story 4: Internet Suggestions (AI-Powered)
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **`suggest-for-board` edge function** | | Pending |
+| | Create new edge function (or extend `generate-widget`) | Pending |
+| | Accept `{ board_name, prompt, exclude_domains[], count }` | Pending |
+| | Claude Haiku generates 6–12 relevant URLs with title, description, image | Pending |
+| | Return structured suggestions array | Pending |
+| **Internet suggestion UI** | | Pending |
+| | "From the internet" section below library suggestions | Pending |
+| | Same pin card layout with `[Add]` button | Pending |
+| | `[Add]` creates new pin via enrichment pipeline (`enrich-link`) | Pending |
+| | `[Add All]` bulk add with enrichment, confirmation dialog | Pending |
+| | `[Refresh]` button, rate-limited to 3 refreshes per board per session | Pending |
+| | Session cache (`sessionStorage`) 1-hour TTL per board | Pending |
+| | "Add a description to get smarter suggestions." fallback when no prompt | Pending |
+| | Duplicate check against user's full library before showing suggestions | Pending |
+
+### Story 5: Sharing Integration
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Hide suggestions on shared boards** | | Pending |
+| | Library and internet suggestion sections invisible to shared board viewers | Pending |
+| | `✦` creator indicator visible on shared boards (shows board origin, not a tool) | Pending |
+| | Collaborative board views also hide suggestions | Pending |

@@ -78,6 +78,7 @@ Link {
   type_confidence: number // Content type confidence (0-1)
   type_source: string     // cache | rules | ai
   image_source: string    // scraped | platform | searched | generated | template
+  tags: string[]          // Unified tags: normalized genres, sub-categories, content types (migration 020)
   addedAt: ISO8601
   updatedAt: ISO8601
 }
@@ -500,11 +501,12 @@ This creates a positive feedback loop: better enrichment leads to better widgets
 ### Shared Infrastructure
 
 All three systems share:
-- **Supabase PostgreSQL** for persistence (links, domain_profiles, strategy_performance tables)
+- **Supabase PostgreSQL** for persistence (links, domain_profiles, strategy_performance, board_metadata tables)
 - **Claude 3 Haiku** for AI operations (categorization, content type classification, widget generation)
 - **Claude Sonnet 4** for vision tasks (image scanning with `scan-image`)
 - **Domain profile cache** used by both enrichment (to skip AI classification) and widgets (brand resolution)
 - **localStorage** as the primary client-side data store
+- **`tags[]` column** on the `links` table used by PinRanker for board-scoped relevance scoring and available for future server-side search
 
 ### Key Architectural Decisions
 
@@ -517,6 +519,9 @@ All three systems share:
 | Brand registry constraint | Prevents AI hallucination; ensures real product URLs |
 | Multi-strategy image fallback | Shopify API is fast and reliable; SERP and scraping cover the rest |
 | Fire-and-forget Supabase sync | Local state is truth; server sync is eventual and non-blocking |
+| Client-side TF-IDF ranking | Board suggestions need sub-100ms scoring with no server round-trip; corpus rarely exceeds a few hundred pins |
+| JSONB blob for board metadata | Same pattern as expanded_cards; avoids per-board rows and simplifies upsert |
+| Unified tags column with GIN index | Denormalizes scattered genre/sub-category signals into one queryable array; reduces per-render computation |
 
 ---
 
@@ -529,12 +534,18 @@ All three systems share:
 | Pin Creation | `boards/index.html` (~L5935) | `smartCategorize()` — AI/rules category assignment |
 | Pin Enrichment | `boards/index.html` (~L5645) | `fetchMetadata()` — client-side CORS proxy scraping |
 | Pin Enrichment | `boards/index.html` (~L5358) | Enrichment queue with retry logic |
+| Pin Enrichment | `boards/index.html` (~L11269) | `computeLinkTags()` — unified tags aggregator |
 | Pin Enrichment | `supabase/functions/enrich-link/index.ts` | Server-side AI classification + image resolution (for links) |
 | Pin Enrichment | `supabase/functions/scan-image/index.ts` | Vision AI for image pins (extract products, URLs, categories) |
+| Board Ranking | `boards/index.html` (~L10916) | `GENRE_NORMALIZE`, `normalizeGenre()` — canonical genre tokens |
+| Board Ranking | `boards/index.html` (~L15538) | `PinRanker` IIFE — TF-IDF cosine similarity ranking |
+| Board Ranking | `boards/index.html` (~L11756) | `saveBoardMetadata()` — board properties persistence |
 | Widgets | `supabase/functions/generate-widget/index.ts` | Main edge function (AI call, validation, enrichment) |
 | Widgets | `supabase/functions/generate-widget/config/schema.ts` | Widget definition types |
 | Widgets | `supabase/functions/generate-widget/config/registry.ts` | Widget loader, eligibility evaluator, prompt builder |
 | Widgets | `supabase/functions/generate-widget/config/widgets/` | Individual widget configs |
+| Migrations | `supabase/migrations/019_board_metadata.sql` | board_metadata table |
+| Migrations | `supabase/migrations/020_link_tags.sql` | links.tags TEXT[] + GIN index |
 
 ---
 
@@ -548,4 +559,4 @@ All three systems share:
 
 ---
 
-*Last updated: 2026-02-13*
+*Last updated: 2026-02-23*
