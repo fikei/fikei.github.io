@@ -12066,6 +12066,8 @@ Return JSON:
         merged_at: link.merged_at || null,
         // Share & interaction fields
         short_code: link.short_code || null,
+        // User-generated content
+        notes: link.notes || null,
         // Unified tags (computed from scattered genre/sub-category/content-type fields)
         tags: link.tags || computeLinkTags(link)
       };
@@ -12263,6 +12265,8 @@ Return JSON:
         merged_at: l.merged_at || null,
         // Share fields
         short_code: l.short_code || null,
+        // User-generated content
+        notes: l.notes || null,
         // Unified tags
         tags: l.tags || []
       }));
@@ -17999,9 +18003,43 @@ Return JSON:
         await migrateLocalToSupabase();
       }
 
-      // Fetch from Supabase and update local cache
+      // Fetch from Supabase and merge with local (same logic as init)
       const cloudData = await fetchFromSupabase();
       if (cloudData) {
+        const freshLocal = load();
+
+        // Push local-only pins to cloud before overwriting
+        const cloudIds = new Set(cloudData.links.map(l => l.id));
+        const localOnly = freshLocal.links.filter(l => !cloudIds.has(l.id));
+        if (localOnly.length > 0) {
+          console.log('[auth] Pushing', localOnly.length, 'local-only pins to cloud');
+          for (const link of localOnly) {
+            await syncLinkToSupabase(link);
+          }
+          cloudData.links.push(...localOnly);
+          const localOnlyIds = localOnly.map(l => l.id);
+          cloudData.linkOrder = [...localOnlyIds, ...cloudData.linkOrder];
+          await syncOrderToSupabase(cloudData.linkOrder);
+        }
+
+        // Push locally-updated pins to cloud
+        const cloudMap = new Map(cloudData.links.map(l => [l.id, l]));
+        for (const local of freshLocal.links) {
+          const cloud = cloudMap.get(local.id);
+          if (cloud && local.updatedAt && (!cloud.updatedAt || new Date(local.updatedAt) > new Date(cloud.updatedAt))) {
+            await syncLinkToSupabase(local);
+            Object.assign(cloud, local);
+          }
+        }
+
+        // Preserve local-only fields (notes, etc.)
+        for (const local of freshLocal.links) {
+          const cloud = cloudMap.get(local.id);
+          if (cloud) {
+            if (local.notes && !cloud.notes) cloud.notes = local.notes;
+          }
+        }
+
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
         // Validate expanded cards - remove orphaned entries
         const validLinkIds = new Set(cloudData.links.map(l => l.id));
@@ -18395,6 +18433,14 @@ Return JSON:
           console.log('[sync] Pushed', updatedCount, 'locally-updated pins to cloud');
         }
 
+        // Preserve local-only fields (notes, etc.) not yet in cloud schema
+        for (const local of localData.links) {
+          const cloud = cloudMap.get(local.id);
+          if (cloud) {
+            if (local.notes && !cloud.notes) cloud.notes = local.notes;
+          }
+        }
+
         // Merge local board metadata into cloud categories (local may have boards not yet in cloud)
         const localCats = localData.categories || {};
         for (const [slug, meta] of Object.entries(localCats)) {
@@ -18477,24 +18523,52 @@ Return JSON:
     const localIds = new Set(localData.links.map(l => l.id));
     const cloudIds = new Set(cloudData.links.map(l => l.id));
 
-    // Find new items from cloud
+    // Protect local-only pins: push them to cloud before overwriting
+    // (mirrors the same merge logic used in init())
+    const localOnly = localData.links.filter(l => !cloudIds.has(l.id));
+    if (localOnly.length > 0) {
+      console.log('[poll] Found', localOnly.length, 'local-only pins — pushing to cloud before merge');
+      for (const link of localOnly) {
+        await syncLinkToSupabase(link);
+      }
+      // Preserve local-only links in the merged result
+      cloudData.links.push(...localOnly);
+      const localOnlyIds = localOnly.map(l => l.id);
+      cloudData.linkOrder = [...localOnlyIds, ...cloudData.linkOrder];
+      await syncOrderToSupabase(cloudData.linkOrder);
+    }
+
+    // Protect locally-updated pins: push newer data to cloud
+    const cloudMap = new Map(cloudData.links.map(l => [l.id, l]));
+    for (const local of localData.links) {
+      const cloud = cloudMap.get(local.id);
+      if (cloud && local.updatedAt && (!cloud.updatedAt || new Date(local.updatedAt) > new Date(cloud.updatedAt))) {
+        await syncLinkToSupabase(local);
+        Object.assign(cloud, local);
+      }
+    }
+
+    // Preserve local-only fields (notes, etc.) that aren't in the cloud schema
+    for (const local of localData.links) {
+      const cloud = cloudMap.get(local.id);
+      if (cloud) {
+        if (local.notes && !cloud.notes) cloud.notes = local.notes;
+      }
+    }
+
+    // Find new items from cloud (excluding the local-only we just merged)
     const newIds = cloudData.links
       .filter(l => !localIds.has(l.id))
       .map(l => l.id);
 
-    // Find deleted items (in local but not cloud)
-    const deletedIds = localData.links
-      .filter(l => !cloudIds.has(l.id))
-      .map(l => l.id);
-
-    // Check for any changes
-    const hasChanges = newIds.length > 0 || deletedIds.length > 0 ||
+    // Check for any changes (compare against original local state)
+    const hasChanges = newIds.length > 0 || localOnly.length > 0 ||
       cloudData.links.length !== localData.links.length;
 
     if (hasChanges) {
-      console.log(`[poll] Changes detected: +${newIds.length} new, -${deletedIds.length} deleted`);
+      console.log(`[poll] Changes detected: +${newIds.length} new from cloud, ${localOnly.length} local preserved`);
 
-      // Save the new data
+      // Save the merged data
       save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
       // Validate expanded cards - remove orphaned entries
       const validLinkIds = new Set(cloudData.links.map(l => l.id));
