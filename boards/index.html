@@ -5441,6 +5441,7 @@ body {
   .ig-entity--review { border-color: #f39c12; }
   .ig-entity--audio { border-left: 3px solid var(--muted); }
   .ig-entity__audio-tag { display: inline-block; padding: 1px 5px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid var(--muted); color: var(--muted); }
+  .ig-entity__desc { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted); margin-bottom: var(--space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ig-entity input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; accent-color: var(--fg); }
   .ig-entity__info { flex: 1; min-width: 0; }
   .ig-entity__name { font-family: var(--font-serif); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -16814,15 +16815,23 @@ Return JSON:
 
     igConfirm.disabled = false;
 
+    const SOURCE_LABELS = { caption: 'caption', transcript: 'spoken', audio_track: 'audio', tagged_location: 'tagged', tagged_account: 'tagged' };
+
     derived_pins.forEach((pin, i) => {
       const entity = (entities || []).find(e => e.name === pin.title);
       const confidence = entity?.confidence || pin.type_confidence || 0;
       const status = entity?.status || (confidence >= 0.7 ? 'auto' : 'review');
       const entityType = entity?.type || pin.content_type || '';
-      const isAudio = entity?.source === 'audio_track';
+      const entitySource = entity?.source || null;
+      const isAudio = entitySource === 'audio_track';
+      const sourceLabel = entitySource ? (SOURCE_LABELS[entitySource] || entitySource) : null;
+      const locationHint = entity?.location_hint || null;
       const autoChecked = !isAudio && status === 'auto';
       const confClass = confidence >= 0.7 ? 'high' : confidence >= 0.5 ? 'mid' : 'low';
       const existing = findByUrl(pin.url);
+      const rawDesc = pin.description || '';
+      const descText = rawDesc.length > 80 ? rawDesc.slice(0, 78) + '\u2026' : rawDesc;
+      const showDesc = descText.length > 0;
 
       const card = document.createElement('div');
       card.className = 'ig-entity' + (autoChecked ? ' ig-entity--selected' : '') + (status === 'review' ? ' ig-entity--review' : '') + (isAudio ? ' ig-entity--audio' : '');
@@ -16832,11 +16841,15 @@ Return JSON:
         '<div class="ig-entity__info">' +
           '<div class="ig-entity__name">' + escHtml(pin.title) +
             ' <span class="ig-conf ig-conf--' + confClass + '">' + Math.round(confidence * 100) + '%</span>' +
-            (isAudio ? ' <span class="ig-entity__audio-tag">audio</span>' : '') +
+            (sourceLabel ? ' <span class="ig-entity__audio-tag">' + escHtml(sourceLabel) + '</span>' : '') +
             (existing ? ' <span style="font-size:var(--font-size-xs);color:var(--muted);font-family:var(--font-mono);">already saved</span>' : '') +
           '</div>' +
-          '<div class="ig-entity__meta">' + escHtml(pin.category) + ' \u00b7 ' + escHtml(entityType) + (status === 'review' ? ' \u00b7 needs review' : '') + '</div>' +
-          '<div class="ig-entity__url">' + escHtml(pin.domain || pin.url) + '</div>' +
+          '<div class="ig-entity__meta">' + escHtml(pin.category) + ' \u00b7 ' + escHtml(entityType) +
+            (locationHint ? ' \u00b7 ' + escHtml(locationHint) : '') +
+            (status === 'review' ? ' \u00b7 needs review' : '') +
+          '</div>' +
+          (showDesc ? '<div class="ig-entity__desc">' + escHtml(descText) + '</div>' : '') +
+          '<div class="ig-entity__url">' + escHtml(pin.url) + '</div>' +
         '</div>';
 
       card.addEventListener('click', (e) => {
