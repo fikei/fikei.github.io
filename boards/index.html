@@ -12078,7 +12078,8 @@ Return JSON:
         type_confidence: link.type_confidence || null,
         type_signals: link.type_signals || null,
         image_source: link.image_source || null,
-        image_scores: link.image_scores || null,
+        // image_scores intentionally omitted — client-only field, DB column exists but
+        // PostgREST schema cache may be stale. Scores live in localStorage and are recomputed.
         // Structured metadata (JSONB columns)
         video: link.video || null,
         music: link.music || null,
@@ -12135,7 +12136,12 @@ Return JSON:
           errBody = await retry.text();
         }
         console.error('[sync] Upload failed:', res.status, errBody);
-        toast('Sync failed — changes saved locally', true);
+        // Throttle toast — show at most once per 30s
+        const now = Date.now();
+        if (!syncLinkToSupabase._lastToast || now - syncLinkToSupabase._lastToast > 30000) {
+          syncLinkToSupabase._lastToast = now;
+          toast('Sync failed — changes saved locally', true);
+        }
         // Queue for retry on next sync
         if (!syncRetryQueue.find(l => l.id === link.id)) {
           syncRetryQueue.push(link);
@@ -12147,7 +12153,11 @@ Return JSON:
       }
     } catch (e) {
       console.error('[sync] Error:', e);
-      toast('Sync failed — changes saved locally', true);
+      const now = Date.now();
+      if (!syncLinkToSupabase._lastToast || now - syncLinkToSupabase._lastToast > 30000) {
+        syncLinkToSupabase._lastToast = now;
+        toast('Sync failed — changes saved locally', true);
+      }
       // Queue for retry on next sync
       if (!syncRetryQueue.find(l => l.id === link.id)) {
         syncRetryQueue.push(link);
