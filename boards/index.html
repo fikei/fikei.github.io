@@ -1511,8 +1511,10 @@ body {
 /* Merge pick-target mode: highlight selectable cards */
 .grid-item--merge-selectable {
   cursor: crosshair;
+  outline: 1px dashed var(--muted);
 }
 .grid-item--merge-selectable:hover {
+  outline: none;
   box-shadow: 0 0 0 2px var(--fg);
 }
 
@@ -13072,6 +13074,13 @@ Return JSON:
     delete snapshot.sources;
     delete snapshot.merged_at;
     merged.sources.push(snapshot);
+
+    // Re-select best image now that sources list has grown
+    const best = mergeFieldsFallback(merged.sources);
+    merged.image = best.image || merged.image;
+    merged.image_source = best.image_source || merged.image_source;
+    merged.image_scores = best.image_scores || merged.image_scores;
+
     merged.updatedAt = new Date().toISOString();
 
     // Remove the new pin from links
@@ -13687,14 +13696,23 @@ Return JSON:
   function matchesSearch(link) {
     if (!searchQuery) return true;
     const q = searchQuery;
-    return (
+    if (
       (link.title && link.title.toLowerCase().includes(q)) ||
       (link.domain && link.domain.toLowerCase().includes(q)) ||
       (link.description && link.description.toLowerCase().includes(q)) ||
       (link.category && link.category.toLowerCase().includes(q)) ||
       (link.url && link.url.toLowerCase().includes(q)) ||
       (link.notes && link.notes.toLowerCase().includes(q))
-    );
+    ) return true;
+    // Also search inside merged pin sources
+    if (link.is_merged && Array.isArray(link.sources)) {
+      return link.sources.some(s =>
+        (s.title && s.title.toLowerCase().includes(q)) ||
+        (s.domain && s.domain.toLowerCase().includes(q)) ||
+        (s.url && s.url.toLowerCase().includes(q))
+      );
+    }
+    return false;
   }
 
   function renderGrid(newIds = []) {
@@ -15641,9 +15659,14 @@ Return JSON:
           const sourcePin = allLinks.find(l => l.id === draggedId);
           const targetPin = allLinks.find(l => l.id === targetId);
           if (sourcePin && targetPin && !sourcePin.loading && !targetPin.loading) {
-            // If target is already merged, add source to it
+            // If target is already merged, add source directly (no preview needed)
             if (targetPin.is_merged) {
-              openMergePreview([targetPin, sourcePin]);
+              const result = addSourceToMergedPin(targetPin.id, sourcePin);
+              if (result) {
+                renderFilters();
+                renderGrid();
+                toast(`Added to merged pin (${result.sources.length} pins)`);
+              }
             } else {
               openMergePreview([targetPin, sourcePin]);
             }
