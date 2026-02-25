@@ -10278,8 +10278,17 @@ Return JSON:
           await sleep(delay);
         }
 
-        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
-          body: {
+        // Use raw fetch with anon key (matches generate-widget pattern).
+        // supabase.functions.invoke() sent the user JWT which expires and
+        // returns a generic "non-2xx status code" error that hid the real
+        // HTTP status, causing 401s to be retried pointlessly.
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
             url: item.url,
             title: item.title,
             description: item.description,
@@ -10291,25 +10300,35 @@ Return JSON:
             category: item.category || null,
             enrichWatch: item.enrichWatch || false,
             enrichBook: item.enrichBook || false
-          }
+          })
         });
 
-        if (error) {
-          // Check if it's a retryable error (network, 5xx)
-          const isRetryable = !error.message?.includes('400') && !error.message?.includes('401');
-          if (isRetryable && attempt < ENRICHMENT_MAX_RETRIES) {
-            lastError = error;
+        if (!response.ok) {
+          const status = response.status;
+          // 400/401/403/404 are not retryable — stop immediately
+          if (status >= 400 && status < 500) {
+            throw new Error(`enrich-link returned ${status}`);
+          }
+          // 5xx are retryable
+          if (attempt < ENRICHMENT_MAX_RETRIES) {
+            lastError = new Error(`enrich-link returned ${status}`);
             continue;
           }
-          throw new Error(error.message || 'Server error');
+          throw new Error(`enrich-link returned ${status}`);
         }
 
+        const result = await response.json();
         return { success: true, result };
       } catch (e) {
         lastError = e;
-        // Network errors are retryable
-        if (attempt < ENRICHMENT_MAX_RETRIES) {
+        // Non-retryable client errors already threw above.
+        // Network errors (TypeError: Failed to fetch) are retryable.
+        if (e.name === 'TypeError' && attempt < ENRICHMENT_MAX_RETRIES) {
           continue;
+        }
+        // If we threw a 4xx error above, don't retry
+        if (attempt >= ENRICHMENT_MAX_RETRIES || e.message?.match(/returned [45]\d\d/)) {
+          break;
         }
       }
     }
@@ -10641,8 +10660,10 @@ Return JSON:
       // Find items that need enrichment:
       // 1. Items in this category with no metadata field at all (new feature, never enriched)
       // 2. Items in this category that fail the backfillCheck (partial enrichment)
+      // Skip items that already failed enrichment — they'll retry via the error badge tap
       const needsEnrichment = links.filter(l =>
         l.category === category &&
+        !l.enrichment_failed &&
         (!l[config.metaField] || config.backfillCheck(l))
       );
 
@@ -12086,30 +12107,32 @@ Return JSON:
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        const errBody = await res.text();
-        // PostgREST schema cache miss — retry without the unrecognized column
-        if (errBody.includes('schema cache')) {
+        let errBody = await res.text();
+        // PostgREST schema cache miss — strip unrecognized columns and retry (up to 5)
+        let schemaRetries = 0;
+        while (errBody.includes('schema cache') && schemaRetries < 5) {
           const colMatch = errBody.match(/Could not find the '(\w+)' column/);
-          if (colMatch) {
-            const badCol = colMatch[1];
-            console.warn(`[sync] Schema cache miss for '${badCol}', retrying without it`);
-            delete payload[badCol];
-            const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify(payload)
-            });
-            if (retry.ok) {
-              console.log('[sync] Uploaded (retry):', link.url);
-              syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
-              return;
-            }
+          if (!colMatch) break;
+          const badCol = colMatch[1];
+          console.warn(`[sync] Column '${badCol}' not in DB, removing from payload`);
+          delete payload[badCol];
+          schemaRetries++;
+          const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(payload)
+          });
+          if (retry.ok) {
+            console.log('[sync] Uploaded (after dropping', schemaRetries, 'columns):', link.url);
+            syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
+            return;
           }
+          errBody = await retry.text();
         }
         console.error('[sync] Upload failed:', res.status, errBody);
         toast('Sync failed — changes saved locally', true);
