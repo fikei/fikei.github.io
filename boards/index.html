@@ -1034,6 +1034,12 @@ body {
   background: var(--fg);
   color: var(--bg);
 }
+.dim-context-menu__item--danger {
+  opacity: 0.6;
+}
+.dim-context-menu__item--danger:hover {
+  opacity: 1;
+}
 
 /* Search input */
 .search-input {
@@ -1729,27 +1735,6 @@ body {
   border-style: solid;
   background: var(--bg);
 }
-.filter-token__delete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 6px;
-  width: 16px;
-  height: 16px;
-  font-size: 10px;
-  line-height: 1;
-  border-radius: 50%;
-  opacity: 0.4;
-  transition: opacity 0.15s, background 0.15s;
-}
-.filter-token__delete:hover {
-  opacity: 1;
-  background: rgba(255,255,255,0.2);
-}
-.filter-token--active .filter-token__delete:hover {
-  background: rgba(0,0,0,0.2);
-}
-
 /* ============================================
    Board Seed Panel (Library Suggestions)
    ============================================ */
@@ -5510,6 +5495,12 @@ body {
     <button id="dimCtxReanalyze">Re-analyze</button>
     <button id="dimCtxEditPrompt">Edit prompt</button>
     <button id="dimCtxRemove">Remove filter</button>
+  </div>
+
+  <!-- Board context menu (right-click / long-press on user board token) -->
+  <div class="dim-context-menu" id="boardContextMenu" style="display:none" role="menu">
+    <button id="boardCtxRename">Rename board</button>
+    <button id="boardCtxDelete" class="dim-context-menu__item--danger">Delete board</button>
   </div>
 
   <!-- Listen view toggle (grid/list) — visible only when listen filter active -->
@@ -13213,8 +13204,7 @@ Return JSON:
       const userClass = meta.isUserBoard ? ' filter-token--user-board' : '';
       const label = meta.isUserBoard ? `✦ ${meta.displayName || cap(name)}` : cap(name);
       const badge = name === 'uncategorized' && c > 0 ? ` (${c})` : '';
-      const deleteBtn = meta.isUserBoard ? `<span class="filter-token__delete" data-delete-board="${name}" aria-label="Delete board" title="Delete board">✕</span>` : '';
-      html += `<button class="filter-token${userClass} ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${label}${badge}${deleteBtn}</button>`;
+      html += `<button class="filter-token${userClass} ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${label}${badge}</button>`;
     }
 
     // Add "New Board" button in filter bar
@@ -14800,14 +14790,6 @@ Return JSON:
   };
 
   filters.onclick = (e) => {
-    // Handle delete board ✕ button
-    const deleteBtn = e.target.closest('[data-delete-board]');
-    if (deleteBtn) {
-      e.stopPropagation();
-      deleteUserBoard(deleteBtn.dataset.deleteBoard);
-      return;
-    }
-
     const t = e.target.closest('.filter-token');
     if (t) {
       const category = t.dataset.category;
@@ -14910,6 +14892,7 @@ Return JSON:
   let dimContextTarget = null;
 
   function showDimContextMenu(e, dimId) {
+    hideBoardContextMenu();
     dimContextTarget = { dimId, category: currentFilter };
     const menu = $('dimContextMenu');
     if (!menu) return;
@@ -14950,6 +14933,66 @@ Return JSON:
     delete currentFilters[dimId];
     renderSubTags();
     renderGrid();
+  });
+
+  // =============================================================================
+  // Board context menu (right-click + long-press on user board tokens)
+  // =============================================================================
+  let boardContextTarget = null;
+
+  function showBoardContextMenu(e, slug) {
+    hideDimContextMenu();
+    boardContextTarget = slug;
+    const menu = $('boardContextMenu');
+    if (!menu) return;
+    menu.style.display = 'block';
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px';
+    menu.style.top = Math.min(e.clientY, window.innerHeight - 100) + 'px';
+  }
+
+  function hideBoardContextMenu() {
+    const menu = $('boardContextMenu');
+    if (menu) menu.style.display = 'none';
+    boardContextTarget = null;
+  }
+
+  // Dismiss on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#boardContextMenu')) hideBoardContextMenu();
+  });
+
+  // Right-click (desktop)
+  document.addEventListener('contextmenu', (e) => {
+    const token = e.target.closest('.filter-token--user-board');
+    if (!token) return;
+    e.preventDefault();
+    showBoardContextMenu(e, token.dataset.category);
+  });
+
+  // Long-press (mobile) — mirrors dimension label pattern
+  let boardLongPressTimer = null;
+  filters.addEventListener('pointerdown', (e) => {
+    const token = e.target.closest('.filter-token--user-board');
+    if (!token) return;
+    boardLongPressTimer = setTimeout(() => {
+      showBoardContextMenu(e, token.dataset.category);
+    }, 600);
+  });
+  filters.addEventListener('pointerup', () => clearTimeout(boardLongPressTimer));
+  filters.addEventListener('pointercancel', () => clearTimeout(boardLongPressTimer));
+  filters.addEventListener('pointermove', () => clearTimeout(boardLongPressTimer));
+
+  // Menu actions
+  $('boardCtxDelete')?.addEventListener('click', () => {
+    const slug = boardContextTarget;
+    hideBoardContextMenu();
+    if (slug) deleteUserBoard(slug);
+  });
+
+  $('boardCtxRename')?.addEventListener('click', () => {
+    const slug = boardContextTarget;
+    hideBoardContextMenu();
+    if (slug) toast('Rename coming soon');
   });
 
   // Listen view toggle handler
@@ -16272,6 +16315,10 @@ Return JSON:
         updateShareButton();
         renderBoardSeedPanel(slug);
         toast(`Board "${name}" created`);
+        if (!localStorage.getItem('board-ctx-hint-shown')) {
+          localStorage.setItem('board-ctx-hint-shown', '1');
+          setTimeout(() => toast('Tip: right-click or long-press a board for options'), 2000);
+        }
       } catch (e) {
         if (e.message === 'Category exists') {
           createBoardError.textContent = `A board named "${name}" already exists.`;
