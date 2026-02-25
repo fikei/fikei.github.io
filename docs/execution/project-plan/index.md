@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-19 (Categorization Cleanup + Lookback PRDs → project plan entries)
+> **Last Updated**: 2026-02-23 (PR #143: TF-IDF board suggestions, board_metadata, link tags, GENRE_NORMALIZE expansion)
 
 ---
 
@@ -20,7 +20,7 @@
 |-------|--------|----------|
 | [Phase 1: Foundation](./phase-1-foundation.md) | SHIPPED | 24/24 |
 | [Phase 2: Core Experience](./phase-2-core-experience.md) | SHIPPED | 15/15 |
-| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 178/502 |
+| [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md) | IN PROGRESS | 192/560 |
 | [Phase 4: Sharing & Collaboration](./phase-4-sharing-collaboration.md) | IN PROGRESS | 11/140 |
 | [Phase 5: UX Polish](./phase-5-ux-polish.md) | Pending | 3/60 |
 | [Phase 6: Performance & Scale](./phase-6-performance.md) | Pending | 1/15 |
@@ -35,6 +35,15 @@
 ---
 
 ## Recent Milestones
+
+### Create a Board — Infrastructure Sprint ⚡
+**Completed: 2026-02-23** — PR #143
+
+- **TF-IDF `PinRanker` module** — vector-space ranking replaces broken substring matching for library suggestions; corpus IDF from all links, cosine similarity per pin, domain + category affinity bonuses
+- **`board_metadata` table** — Supabase persistence for user-created board metadata (`019_board_metadata.sql`); `saveBoardMetadata()` client function; RLS-protected
+- **Unified `tags TEXT[]` column** on `links` table — `computeLinkTags(link)` derives tags from genre/category/domain metadata; GIN index for fast queries (`020_link_tags.sql`)
+- **Expanded `GENRE_NORMALIZE` map** — 19 video genre synonyms + 22 music genre synonyms for richer tag computation
+- Migrations `019` and `020` still need to be run against Boards Supabase project (see Blocked Items)
 
 ### Visual Standards System ✅
 **Completed: 2026-02-14**
@@ -116,7 +125,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 |----------|----------|-------------|---------|---------|
 | Phase 1: Foundation | 24 | 0 | 0 | 0 |
 | Phase 2: Core Experience | 15 | 0 | 0 | 0 |
-| Phase 3: AI Intelligence | 178 | 4 | 318 | 1 |
+| Phase 3: AI Intelligence | 192 | 4 | 360 | 4 |
 | Phase 4: Sharing & Collaboration | 11 | 1 | 128 | 0 |
 | Phase 5: UX Polish | 3 | 0 | 57 | 0 |
 | Phase 6: Performance | 1 | 0 | 14 | 0 |
@@ -127,7 +136,7 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 11: Instagram Import | 0 | 0 | 73 | 0 |
 | Phase 12: Lookback | 34 | 0 | 197 | 5 |
 | Backlog | 1 | 0 | 100 | 0 |
-| **TOTAL** | **329** | **5** | **1183** | **6** |
+| **TOTAL** | **343** | **5** | **1225** | **9** |
 
 ---
 
@@ -150,6 +159,8 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Item | Blocker | Owner |
 |------|---------|-------|
 | Push notifications | FCM/APNs setup required | Human |
+| Run migration `019_board_metadata.sql` (Phase 3, Epic 3.7) | Supabase Dashboard → SQL Editor | Human |
+| Run migration `020_link_tags.sql` (Phase 3, Epic 3.7) | Supabase Dashboard → SQL Editor | Human |
 | Run migration `016_categorization_cleanup.sql` (Phase 3, Epic 3.6) | Supabase Dashboard → SQL Editor | Human |
 | Run migration `017_lookback_prerequisites.sql` (Phase 12) | Supabase Dashboard → SQL Editor | Human |
 | Run migration `018_lookback_external.sql` (Phase 12, Epic 12.2) | Supabase Dashboard → SQL Editor | Human |

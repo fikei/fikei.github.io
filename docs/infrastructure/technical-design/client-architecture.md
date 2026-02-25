@@ -25,6 +25,10 @@ The Boards app is a single-file monolith at `boards/index.html` (~9,100 lines). 
 | URL Processing | 5581-5640 | `extractUrls()`, `normalizeUrl()`, `extractDomain()`, `generateId()` |
 | Metadata Scraping | 5645-5772 | `fetchMetadata()`, CORS proxy logic |
 | Category Patterns | 5774-5960 | PATTERNS object, `categorize()`, `smartCategorize()` |
+| Genre Normalization | ~10916-10986 | `GENRE_NORMALIZE` map, `normalizeGenre()`, `resolveGenre()` |
+| Sub-Tag System | ~11002-11268 | `SUB_TAGS` config, `detectTags()`, `renderSubTags()` |
+| Tag Aggregation | ~11269-11325 | `computeLinkTags()` — unified `tags[]` builder |
+| Board Metadata | ~11756-11796 | `saveBoardMetadata()` — fire-and-forget Supabase upsert |
 | Storage Layer | 6110-6170 | `load()`, `save()`, `getAllLinks()`, `getCategories()`, auth token helpers |
 | Supabase Sync | 6173-6390 | `syncLinkToSupabase()`, `fetchFromSupabase()`, `migrateLocalToSupabase()` |
 | Link CRUD | 6393-6580 | `addLink()`, `updateLink()`, `deleteLink()`, `findByUrl()` |
@@ -34,7 +38,9 @@ The Boards app is a single-file monolith at `boards/index.html` (~9,100 lines). 
 | Auth System | 8562-8735 | `handleLogin()`, `handleLogout()`, `onAuthStateChange()` |
 | Boot Sequence | 8860-8959 | `init()` function |
 | Event Listeners | 8960-9089 | Clipboard, paste, visibility, click handlers |
-| **IIFE End** | **9091** | `})()` |
+| **PinRanker Module** | **~15538-15803** | TF-IDF vector-space ranking IIFE |
+| Board Seed Panel | ~15806+ | Library suggestions panel, `getLibrarySuggestions()` |
+| **IIFE End** | **~17600** | `})()` |
 
 ---
 
@@ -63,6 +69,9 @@ User action → handler() → mutate state → save(data) → render*() → sync
 | `widgetRefreshCounters` | Object | Memory only | Per-widget variation counter |
 | `widgetEventBuffer` | Array | localStorage | Instrumentation events |
 | `syncInProgress` | boolean | Memory only | Prevents concurrent syncs |
+| `PinRanker.idfCache` | Map | Memory only | IDF scores for current corpus |
+| `PinRanker.pinDocCache` | Map | Memory only | pinId → tokenized token arrays |
+| `PinRanker.pinVectorCache` | Map | Memory only | pinId → TF-IDF weight vectors |
 
 ### localStorage Keys
 
@@ -80,6 +89,7 @@ User action → handler() → mutate state → save(data) → render*() → sync
 | `widget_feedback` | User widget feedback |
 | `widget_events` | Instrumentation event buffer |
 | `pending_saves` | Offline queue for anonymous users |
+| `boards-seed-dismissed` | Set of board slugs where seed panel was dismissed |
 
 ---
 
@@ -243,6 +253,200 @@ exportWidgetFeedback()
 
 ---
 
+## PinRanker Module
+
+The `PinRanker` module (`boards/index.html` ~L15538) is a self-contained IIFE that provides TF-IDF vector-space ranking for the "Create a Board" library suggestion feature. It scores pins from across the user's entire library against a board's name and prompt to surface the most relevant candidates.
+
+### Architecture
+
+```
+Board name + prompt
+    │
+    ▼
+tokenize() → queryTokens[]
+    │
+    ▼
+tfidfVector(queryTokens, idf) → queryVec (Map<token, weight>)
+    │                                   ▲
+    │                                   │
+    ├── For each candidate pin:          computeIDF(allPins) ← IDF cache (memory)
+    │       buildPinDocument(pin)        └── df per token across corpus
+    │       tokenize(doc) → tokens[]         IDF = log((N+1)/(df+1)) + 1
+    │       tfidfVector(tokens, idf)         Prune: >60% docs OR <2 docs
+    │       → pinVec
+    │
+    ▼
+cosineSimilarity(queryVec, pinVec)
+    │   dot(A,B) / (|A| × |B|)
+    │
+    └── + recency boost (10% weight, e^(-days/90) decay)
+    │
+    ▼
+ranked pins[] sorted by score, filtered > 0.01
+```
+
+### Functions
+
+#### `tokenize(text)`
+
+Converts raw text to a normalized token array. Strips URLs (`https?://...`), collapses punctuation (hyphens preserved for genre tokens like `hip-hop`), filters:
+- Tokens shorter than 3 characters
+- Tokens in `BOARD_STOPWORDS` (union of web noise + common English words)
+- Pure numbers
+
+#### `buildPinDocument(pin)`
+
+Constructs a weighted text representation of a pin for TF-IDF indexing. Field weights are implemented via text repetition (repeating a field N times gives its tokens N× the TF score):
+
+| Field | Weight | Notes |
+|-------|--------|-------|
+| `title` | 3x | Highest signal |
+| `domain` (cleaned) | 2x | Brand signal; strips TLD |
+| `category` | 2x | |
+| `tags[]` | 2x | Unified tags: genres, sub-categories, content types |
+| `video.genres`, `video.creator`, `video.keywords` | 2x | |
+| `music.artist` | 3x | |
+| `music.genre`, `music.genreTags` | 2x | |
+| `book.author`, `book.genre` | 2x | |
+| `content_type` | 1x | |
+| `description`, `video.summary`, `book.summary` | 1x | |
+| `video.tags` (top 10), `video.type` | 1x | |
+
+#### `computeIDF(pins)`
+
+Computes corpus-wide Inverse Document Frequency scores with in-memory caching. Invalidated when the corpus size changes (new pin added or deleted).
+
+- **Formula**: `IDF(t) = log((N + 1) / (df(t) + 1)) + 1` (smoothed)
+- **Pruning rules**:
+  - Tokens appearing in > 60% of documents: too common, pruned
+  - Tokens appearing in < 2 documents: too rare, pruned
+- **Cache invalidation**: `idfCorpusSize` is compared on each call; mismatch triggers full recompute. Also invalidated explicitly by `save()` when the link list changes.
+
+#### `cosineSimilarity(vecA, vecB)`
+
+Standard dot-product cosine: `A · B / (|A| × |B|)`. Returns 0 for zero-magnitude vectors.
+
+#### `rankPinsForBoard(boardSlug, allLinks, categories, limit = 12)`
+
+Main entry point. Builds the query vector from the board's `displayName` (3x) + `prompt` (1x), then scores all pins not already on the target board. Pins in `loading` state or `uncategorized` are excluded from candidates.
+
+**Recency boost**: 10% of final score is a recency signal — exponential decay `e^(-ageDays / 90)` — so pins added in the last 90 days rank slightly higher at equal cosine scores.
+
+**Fallback**: For corpora with fewer than 10 pins, the legacy substring matcher (`getLibrarySuggestionsLegacy()`) is used instead.
+
+#### `warmCache(allLinks)`
+
+Schedules a background IDF precompute via `requestIdleCallback` so the first user-initiated ranking call returns instantly. Only runs if corpus has 10+ pins. Called once during `init()`.
+
+#### `invalidateCache()`
+
+Clears all three in-memory caches (`idfCache`, `pinDocCache`, `pinVectorCache`) and removes any persisted IDF data from localStorage. Called automatically by `save()` when the link corpus changes.
+
+### Public API
+
+```javascript
+PinRanker.rankPinsForBoard(boardSlug, allLinks, categories, limit)  // → Link[]
+PinRanker.warmCache(allLinks)                                        // → void
+PinRanker.invalidateCache()                                          // → void
+PinRanker.tokenize(text)                                             // → string[] (for testing)
+PinRanker.buildPinDocument(pin)                                      // → string (for testing)
+```
+
+---
+
+## Genre Normalization
+
+The `GENRE_NORMALIZE` map (`boards/index.html` ~L10917) is a shared lookup table used by PinRanker, `detectTags()`, and `computeLinkTags()` to normalize raw genre strings from AI enrichment into consistent tokens.
+
+### Design Principles
+
+- **Video genres**: Many-to-one normalization — synonyms and TMDB genre names roll up to canonical tokens (e.g., `"science fiction"` → `"sci-fi"`, `"biographical"` → `"documentary"`). Coverage: 19 expanded genre mappings added in PR #143.
+- **Music genres**: Synonym-only normalization — only normalizes spelling variants and spacing to a canonical hyphenated form (e.g., `"hip hop"` → `"hip-hop"`, `"drum and bass"` → `"dnb"`). Sub-genres are **not** rolled up to parent genres — `"death-metal"` stays `"death-metal"`, not `"metal"`. This preserves ranking precision. Coverage: 22 music genre synonym mappings added in PR #143.
+
+### `normalizeGenre(raw)`
+
+Lowercases and trims the input, then looks it up in `GENRE_NORMALIZE`. Returns the canonical form if found, or the lowercased original if no mapping exists — unknown genres are preserved rather than discarded.
+
+```javascript
+normalizeGenre('Science Fiction')  // → 'sci-fi'
+normalizeGenre('drum and bass')    // → 'dnb'
+normalizeGenre('hyperpop')         // → 'hyperpop'  (no mapping, kept as-is)
+normalizeGenre(null)               // → null
+```
+
+### `resolveGenre(link)`
+
+Tries each entry in `link.video.genres[]` in order, returning the first non-null normalized result. Falls back to `link.video.genre` (singular). Used for display in sub-tag filters.
+
+---
+
+## Unified Tags System
+
+`computeLinkTags(link)` (`boards/index.html` ~L11269) aggregates all genre, sub-category, and content-type signals from a pin into a single flat `TEXT[]` array. This array is:
+
+1. **Persisted** to the `links.tags` column in Supabase (via `syncLinkToSupabase()`, `updateLink()`, and enrichment merge)
+2. **Indexed** with a GIN index for server-side array queries (`tags @> ARRAY['thriller']`)
+3. **Used by PinRanker** as a 2x-weighted field in `buildPinDocument()`
+
+### Sources Aggregated
+
+| Source | Fields |
+|--------|--------|
+| Content type | `link.content_type` |
+| SUB_TAGS sub-category | `detectTags(link)` → all dimension values |
+| Video genres | `link.video.genres[]`, `link.video.genre` (normalized) |
+| Video type | `link.video.type` |
+| YouTube tags | `link.video.tags[]` (first 10, min 3 chars) |
+| Music genre | `link.music.genre` (normalized) |
+| Music genre tags | `link.music.genreTags[]` (normalized) |
+| Music content format | `link.music.contentFormat` |
+| Book genre | `link.book.genre` (lowercased) |
+| Book format | `link.book.format` |
+
+### When Computed
+
+- **Enrichment merge** (`processEnrichmentQueue` result handler, ~L10328): when AI enrichment data arrives for a pin
+- **`updateLink()`** (~L10368): on any manual pin update
+- **`syncLinkToSupabase()`** (~L11892): included in every cloud sync payload
+- **Full fetch merge** (`fetchFromSupabase()`, ~L12534): backfills tags for existing pins on full cloud sync
+
+---
+
+## Board Metadata Persistence
+
+`saveBoardMetadata(categories)` (`boards/index.html` ~L11756) persists user-created board properties to the `board_metadata` Supabase table so boards survive page reload and sync across devices.
+
+### Pattern
+
+Follows the same fire-and-forget upsert pattern as `saveExpandedCards()`:
+
+```javascript
+saveBoardMetadata(categories)
+  └── filter categories → only boards with { isUserBoard, displayName, or prompt }
+  └── POST board_metadata with Prefer: resolution=merge-duplicates
+  └── fire-and-forget (errors logged, not surfaced to user)
+```
+
+### Persisted Fields Per Board
+
+```json
+{
+  "my-board-slug": {
+    "isUserBoard": true,
+    "displayName": "Street Photography",
+    "prompt": "urban, candid, black and white",
+    "createdAt": "2026-02-20T...",
+    "pinned": false
+  }
+}
+```
+
+### Read Path
+
+`fetchFromSupabase()` fetches `board_metadata` in parallel with links. On merge, saved metadata is applied onto reconstructed category objects, restoring `isUserBoard`, `displayName`, `prompt`, and `pinned` state. Empty boards (no pins yet) survive reload because their metadata is preserved independently of the pin list.
+
+---
+
 ## PWA Infrastructure
 
 Boards is a Progressive Web App with offline support, installability, and native share sheet integration.
@@ -320,4 +524,4 @@ All three produce the same result: the add modal opens with the URL pre-filled a
 
 ---
 
-*Last updated: 2026-02-13*
+*Last updated: 2026-02-23*

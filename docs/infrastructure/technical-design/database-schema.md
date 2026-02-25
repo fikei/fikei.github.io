@@ -10,7 +10,7 @@ The database spans two Supabase projects and six migrations. All tables use UUID
 
 | Project | Ref ID | Tables |
 |---------|--------|--------|
-| **Boards** | `yfhudwakpgzswiylhfbh` | links, link_order, expanded_cards, shared_boards, board_views, board_invites, content_types, domain_profiles, classification_log, image_strategies, strategy_performance |
+| **Boards** | `yfhudwakpgzswiylhfbh` | links, link_order, expanded_cards, shared_boards, board_views, board_invites, content_types, domain_profiles, classification_log, image_strategies, strategy_performance, board_metadata |
 | **Ops** | `ycilriwjnmcelkspmfmg` | sync_state, block_state, sync_log, structure_state |
 | **Systemic** | `atdqdfpdeytfuvvpsasz` | audit_jobs, design_systems, design_tokens, design_components, crawl_pages, ghost_components, component_relationships |
 
@@ -41,10 +41,13 @@ Primary pin storage. One row per saved URL per user.
 | `image_source` | text | `'scraped'` | scraped, platform, searched, generated, template (migration 004) |
 | `image_method` | text | | Resolution method used (migration 004) |
 | `image_resolved_at` | timestamptz | | When image was resolved (migration 004) |
+| `tags` | text[] | `'{}'` | Unified tags: normalized genres, sub-categories, content types (migration 020) |
 
 **RLS**: Owner-only access (`auth.uid() = user_id`)
 
-**Source**: `boards/index.html` ~L6202, `supabase/migrations/003_content_type_system.sql`, `supabase/migrations/004_image_resolution_system.sql`
+**Indexes**: GIN index `idx_links_tags` on `tags` column for array containment queries
+
+**Source**: `boards/index.html` ~L6202, `supabase/migrations/003_content_type_system.sql`, `supabase/migrations/004_image_resolution_system.sql`, `supabase/migrations/020_link_tags.sql`
 
 ### link_order
 
@@ -71,6 +74,33 @@ Persists which cards are expanded/collapsed per user. One row per user.
 **RLS**: Owner-only access
 
 **Source**: `boards/index.html` ~L6121
+
+### board_metadata
+
+Persists user-created board properties so boards survive page reload and sync across devices. One row per user — all board metadata is stored as a single JSONB blob (same pattern as `expanded_cards`).
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `user_id` | uuid | PK | FK → auth.users(id) ON DELETE CASCADE |
+| `metadata` | jsonb | `'{}'` | Map of board slug → board properties |
+| `updated_at` | timestamptz | now() | |
+
+**JSONB structure**:
+```json
+{
+  "my-board-slug": {
+    "isUserBoard": true,
+    "displayName": "Street Photography",
+    "prompt": "urban, candid, black and white",
+    "createdAt": "2026-02-20T...",
+    "pinned": false
+  }
+}
+```
+
+**RLS**: Owner-only access (`auth.uid() = user_id`)
+
+**Source**: `boards/index.html` ~L11756, `supabase/migrations/019_board_metadata.sql`
 
 ---
 
@@ -388,6 +418,8 @@ auth.users
     │
     ├──< expanded_cards (user_id)
     │
+    ├──< board_metadata (user_id)
+    │
     └──< shared_boards (user_id)
             │
             ├──< board_views (board_id)
@@ -435,7 +467,9 @@ sync_state
 | 004 | `supabase/migrations/004_image_resolution_system.sql` | image_strategies, strategy_performance |
 | 005 | `supabase/migrations/005_systemic_ai.sql` | audit_jobs, design_systems, design_tokens, design_components, crawl_pages, ghost_components, component_relationships |
 | 006 | `supabase/migrations/006_notion_sync_state.sql` | sync_state, block_state, sync_log, structure_state |
+| 019 | `supabase/migrations/019_board_metadata.sql` | board_metadata |
+| 020 | `supabase/migrations/020_link_tags.sql` | links.tags column + GIN index |
 
 ---
 
-*Last updated: 2026-02-05*
+*Last updated: 2026-02-23*
