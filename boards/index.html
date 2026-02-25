@@ -12723,6 +12723,13 @@ Return JSON:
     const data = load();
     const i = data.links.findIndex(l => l.id === id);
     if (i === -1) throw new Error('Not found');
+    // Remember previous category when moving to a user board
+    if (updates.category && updates.category !== data.links[i].category) {
+      const targetMeta = data.categories[updates.category];
+      if (targetMeta?.isUserBoard) {
+        updates.previousCategory = data.links[i].category;
+      }
+    }
     data.links[i] = { ...data.links[i], ...updates, updatedAt: new Date().toISOString() };
     if (updates.category && !data.categories[updates.category]) {
       data.categories[updates.category] = { pinned: false };
@@ -12776,9 +12783,14 @@ Return JSON:
 
   function bulkMove(ids, category) {
     const data = load();
+    const targetMeta = data.categories[category];
+    const isUserBoard = targetMeta?.isUserBoard;
     for (const id of ids) {
       const i = data.links.findIndex(l => l.id === id);
       if (i !== -1) {
+        if (isUserBoard && data.links[i].category !== category) {
+          data.links[i].previousCategory = data.links[i].category;
+        }
         data.links[i].category = category;
         syncLinkToSupabase(data.links[i]); // Background sync
       }
@@ -12794,15 +12806,29 @@ Return JSON:
     if (!meta || !meta.isUserBoard) return;
 
     const boardName = meta.displayName || slug;
-    const pinCount = data.links.filter(l => l.category === slug).length;
-    const pinMsg = pinCount > 0 ? `\n${pinCount} pin${pinCount !== 1 ? 's' : ''} will be moved to Uncategorized.` : '';
+    const boardPins = data.links.filter(l => l.category === slug);
+    const pinCount = boardPins.length;
+    const restorable = boardPins.filter(l => l.previousCategory && l.previousCategory !== slug).length;
+    let pinMsg = '';
+    if (pinCount > 0) {
+      if (restorable === pinCount) {
+        pinMsg = `\n${pinCount} pin${pinCount !== 1 ? 's' : ''} will return to ${pinCount === 1 ? 'its' : 'their'} original board${pinCount !== 1 ? 's' : ''}.`;
+      } else if (restorable > 0) {
+        pinMsg = `\n${restorable} pin${restorable !== 1 ? 's' : ''} will return to original boards. ${pinCount - restorable} will move to Uncategorized.`;
+      } else {
+        pinMsg = `\n${pinCount} pin${pinCount !== 1 ? 's' : ''} will be moved to Uncategorized.`;
+      }
+    }
     const confirmed = await showConfirm(`Delete board "${boardName}"?${pinMsg}`, 'Delete Board');
     if (!confirmed) return;
 
-    // Move all pins to uncategorized
+    // Restore pins to their previous category, or uncategorized if unknown
     for (const link of data.links) {
       if (link.category === slug) {
-        link.category = 'uncategorized';
+        const restoreTo = link.previousCategory && link.previousCategory !== slug
+          ? link.previousCategory : 'uncategorized';
+        link.category = restoreTo;
+        delete link.previousCategory;
         syncLinkToSupabase(link);
       }
     }
