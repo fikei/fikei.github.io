@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registration Flow Comparison — Livongo</title>
+  <title>Onboarding Flow Comparison — Livongo</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -51,7 +51,7 @@
 
     /* ── HEADER ── */
     .site-header {
-      background: linear-gradient(135deg, #1976D2 0%, #1565C0 60%, #0D47A1 100%);
+      background: #ffffff;
       border-bottom: none;
       padding: 20px 32px;
       display: flex;
@@ -60,7 +60,7 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 12px rgba(21,101,192,0.3);
+      box-shadow: 0 1px 0 0 #e0e0e0;
     }
 
     .logo-mark {
@@ -76,7 +76,7 @@
     .header-divider {
       width: 1px;
       height: 36px;
-      background: rgba(255,255,255,0.3);
+      background: var(--gray-300);
       flex-shrink: 0;
     }
 
@@ -85,13 +85,13 @@
     .header-title {
       font-size: 1.125rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--gray-900);
       line-height: 1.2;
     }
 
     .header-subtitle {
       font-size: 0.8125rem;
-      color: rgba(255,255,255,0.75);
+      color: var(--gray-500);
       margin-top: 2px;
     }
 
@@ -242,6 +242,7 @@
     .step-num--blue { background: var(--blue); color: var(--white); }
     .step-num--green { background: var(--green); color: var(--white); }
     .step-num--red { background: var(--red-light); color: var(--red); border: 1.5px solid var(--red); }
+    .step-num--yellow { background: var(--yellow-light); color: #856000; border: 1.5px solid var(--yellow); }
 
     .step-content { flex: 1; min-width: 0; }
 
@@ -453,9 +454,9 @@
     }
 
     .source-pill--eliminated {
-      background: var(--gray-800);
-      color: var(--white);
-      border: 1px solid var(--gray-700);
+      background: var(--yellow-light);
+      color: #856000;
+      border: 1px solid #f0d060;
     }
 
     /* ── FIELD TABLE ── */
@@ -549,7 +550,7 @@
     .status-chip--green { background: var(--green-light); color: #2E7D32; }
     .status-chip--yellow { background: var(--yellow-light); color: #E65100; }
     .status-chip--red { background: var(--red-light); color: var(--red); }
-    .status-chip--black { background: var(--gray-800); color: var(--white); }
+    .status-chip--black { background: var(--yellow-light); color: #856000; }
 
     /* group row separators */
     .table-group-row td {
@@ -615,6 +616,40 @@
       color: var(--gray-700);
     }
 
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .filter-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--gray-300);
+      background: var(--white);
+      color: var(--gray-700);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .filter-pill:hover { background: var(--gray-200); }
+    .filter-pill.active {
+      background: var(--blue);
+      color: var(--white);
+      border-color: var(--blue);
+    }
+    .filter-pill .count {
+      font-size: 0.6875rem;
+      opacity: 0.7;
+    }
+    tbody tr.hidden-by-filter { display: none; }
+    .table-group-row.hidden-by-filter { display: none; }
+
     /* ── SECTION SPACING ── */
     .section + .section { margin-top: 4px; }
   </style>
@@ -630,29 +665,51 @@
       <path d="M10 20 C10 14 14 10 22 10 C22 18 18 22 10 22 Z" fill="white" opacity="0.9"/>
       <path d="M16 22 L16 16" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
       <!-- Wordmark -->
-      <text x="36" y="21" font-family="Roboto, sans-serif" font-size="14" font-weight="700" fill="white">Livongo</text>
+      <text x="36" y="21" font-family="Roboto, sans-serif" font-size="14" font-weight="700" fill="#333">Livongo</text>
     </svg>
   </a>
   <div class="header-divider"></div>
   <div class="header-text">
-    <div class="header-title">Registration Flow Comparison</div>
-    <div class="header-subtitle">Standard vs. Pre-Registration: Reducing friction through upstream data</div>
+    <div class="header-title">Onboarding Flow Comparison</div>
+    <div class="header-subtitle">Original Flow vs. Optimized Flow: Reducing friction through upstream data</div>
   </div>
 </header>
 
 <!-- ────────────────────────────────────────── MAIN -->
 <main class="main">
 
+  <!-- ── IMPACT AT A GLANCE ── -->
+  <div class="section">
+    <div class="section-label">Impact at a Glance</div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-big stat-big--blue">21 of 35</div>
+        <div class="stat-label">Fields Pre-Loaded for Confirmation</div>
+        <div class="stat-sub">60% of fields ready to confirm — not type from scratch</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big stat-big--green">4 Steps</div>
+        <div class="stat-label">Steps Skipped</div>
+        <div class="stat-sub">Coverage + Coaching handled server-side or moved to on-device setup</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" style="color: var(--yellow);">~5 min</div>
+        <div class="stat-label">Estimated Time Saved</div>
+        <div class="stat-sub">From an average 8-minute flow to ~3 minutes</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── FLOW COMPARISON ── -->
   <div class="section">
     <div class="section-label">Side-by-Side Comparison</div>
     <div class="section-title">Two Paths, One Goal</div>
-    <div class="section-desc">Pre-registration moves data collection upstream — from employer HR, health plan records, and carrier APIs — so the user arrives already known to the system.</div>
+    <div class="section-desc">The optimized flow moves data collection upstream — from employer HR, health plan records, and carrier APIs — so the user arrives already known to the system.</div>
 
     <!-- View buttons above the grid -->
     <div class="flow-buttons-row">
-      <a href="standard.html" target="_blank" class="btn btn--blue">View Standard Flow →</a>
-      <a href="prereg.html" target="_blank" class="btn btn--green">View Pre-Reg Flow →</a>
+      <a href="standard.html" target="_blank" class="btn btn--blue">View Original Flow →</a>
+      <a href="prereg.html" target="_blank" class="btn btn--green">View Optimized Flow →</a>
     </div>
 
     <div class="flow-grid">
@@ -661,7 +718,7 @@
       <div class="flow-card flow-card--standard">
         <div class="flow-card-header">
           <div class="flow-card-title-row">
-            <span class="flow-card-title">Standard Flow</span>
+            <span class="flow-card-title">Original Flow</span>
             <span class="badge badge--blue">9 Steps</span>
           </div>
           <div class="flow-card-desc">User enters all information manually from scratch. Every field requires input.</div>
@@ -735,15 +792,15 @@
         </div>
       </div>
 
-      <!-- Pre-Registration Flow -->
+      <!-- Optimized Flow -->
       <div class="flow-card flow-card--prereg">
         <div class="flow-card-header">
           <div class="flow-card-title-row">
-            <span class="flow-card-title">Pre-Registration Flow</span>
-            <span class="badge badge--green">6 Steps</span>
-            <span class="badge badge--savings">−3 Steps</span>
+            <span class="flow-card-title">Optimized Flow</span>
+            <span class="badge badge--green">5 Steps</span>
+            <span class="badge badge--savings">−4 Steps</span>
           </div>
-          <div class="flow-card-desc">Employer, health records, and carrier data load 24 of 36 fields for confirmation. Coverage verified server-side before the user starts.</div>
+          <div class="flow-card-desc">Employer, health records, and carrier data pre-load 21 of 35 fields for confirmation. Coverage verified server-side; coaching moved to on-device setup.</div>
         </div>
         <div class="flow-card-body">
           <ol class="step-list">
@@ -751,84 +808,67 @@
               <span class="step-num step-num--green">1</span>
               <div class="step-content">
                 <div class="step-title">
-                  <a href="prereg.html#step-1" target="_blank">Personal Information</a>
+                  <a href="prereg.html#step-1" target="_blank">Confirm Identity</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
-                <div class="step-subtitle">Name, email, DOB, address from employer — user confirms</div>
+                <div class="step-subtitle">Enter name &amp; DOB to verify identity, confirm email from employer</div>
               </div>
             </li>
             <li class="step-item">
               <span class="step-num step-num--green">2</span>
               <div class="step-content">
                 <div class="step-title">
-                  <a href="prereg.html#step-2" target="_blank">Shipping &amp; Supplies</a>
-                  <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
-                </div>
-                <div class="step-subtitle">Address from employer records — user confirms</div>
-              </div>
-            </li>
-            <li class="step-item">
-              <span class="step-num step-num--red">3</span>
-              <div class="step-content">
-                <div class="step-title step-title--eliminated">
-                  Coverage Search
-                  <span class="badge badge--red" style="font-size:0.6rem; padding:2px 6px;">Skipped</span>
-                </div>
-                <div class="step-subtitle step-subtitle--eliminated">Skipped — employer sponsorship verified server-side</div>
-              </div>
-            </li>
-            <li class="step-item">
-              <span class="step-num step-num--red">4</span>
-              <div class="step-content">
-                <div class="step-title step-title--eliminated">
-                  Coverage Verification
-                  <span class="badge badge--red" style="font-size:0.6rem; padding:2px 6px;">Skipped</span>
-                </div>
-                <div class="step-subtitle step-subtitle--eliminated">Skipped — eligibility confirmed before user starts</div>
-              </div>
-            </li>
-            <li class="step-item">
-              <span class="step-num step-num--red">5</span>
-              <div class="step-content">
-                <div class="step-title step-title--eliminated">
-                  Coverage Insurance
-                  <span class="badge badge--red" style="font-size:0.6rem; padding:2px 6px;">Skipped</span>
-                </div>
-                <div class="step-subtitle step-subtitle--eliminated">Skipped — insurance details from employer benefits</div>
-              </div>
-            </li>
-            <li class="step-item">
-              <span class="step-num step-num--green">6</span>
-              <div class="step-content">
-                <div class="step-title">
-                  <a href="prereg.html#step-6" target="_blank">Care Plan</a>
+                  <a href="prereg.html#step-2" target="_blank">Care Plan</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
                 <div class="step-subtitle">Diabetes type, A1C, meds from health records — user confirms</div>
               </div>
             </li>
             <li class="step-item">
-              <span class="step-num step-num--green">7</span>
-              <div class="step-content">
-                <div class="step-title"><a href="prereg.html#step-7" target="_blank">Coaching &amp; Alerts</a></div>
-                <div class="step-subtitle">Same as standard flow — personal thresholds</div>
-              </div>
-            </li>
-            <li class="step-item">
-              <span class="step-num step-num--green">8</span>
+              <span class="step-num step-num--green">3</span>
               <div class="step-content">
                 <div class="step-title">
-                  <a href="prereg.html#step-8" target="_blank">Health Profile</a>
+                  <a href="prereg.html#step-3" target="_blank">Health Profile</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
                 <div class="step-subtitle">Height, weight, conditions, smoking from health records — user confirms</div>
               </div>
             </li>
             <li class="step-item">
-              <span class="step-num step-num--green">9</span>
+              <span class="step-num step-num--green">4</span>
               <div class="step-content">
-                <div class="step-title"><a href="prereg.html#step-9" target="_blank">Welcome</a></div>
-                <div class="step-subtitle">Completion screen</div>
+                <div class="step-title">
+                  <a href="prereg.html#step-4" target="_blank">Shipping &amp; Supplies</a>
+                  <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
+                </div>
+                <div class="step-subtitle">Address from employer records — user confirms</div>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num step-num--green">5</span>
+              <div class="step-content">
+                <div class="step-title"><a href="prereg.html#step-5" target="_blank">Welcome</a></div>
+                <div class="step-subtitle">Next steps: app, coach, and kit setup</div>
+              </div>
+            </li>
+            <li class="step-item" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--gray-300);">
+              <span class="step-num step-num--yellow">–</span>
+              <div class="step-content">
+                <div class="step-title step-title--eliminated">
+                  Coverage Search / Verification / Insurance
+                  <span class="badge badge--yellow" style="font-size:0.6rem; padding:2px 6px;">Skipped</span>
+                </div>
+                <div class="step-subtitle step-subtitle--eliminated">Skipped — employer sponsorship verified server-side</div>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num step-num--yellow">–</span>
+              <div class="step-content">
+                <div class="step-title step-title--eliminated">
+                  Coaching &amp; Alerts
+                  <span class="badge badge--yellow" style="font-size:0.6rem; padding:2px 6px;">Skipped</span>
+                </div>
+                <div class="step-subtitle step-subtitle--eliminated">Moved to on-device setup — better cost-to-value moment</div>
               </div>
             </li>
           </ol>
@@ -844,30 +884,10 @@
   </div><!-- /section -->
 
 
-  <!-- ── STATS ROW ── -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-big stat-big--blue">24 of 36</div>
-      <div class="stat-label">Fields Pre-Loaded for Confirmation</div>
-      <div class="stat-sub">67% of fields ready to confirm — not type from scratch</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-big stat-big--green">3 Steps</div>
-      <div class="stat-label">Steps Skipped</div>
-      <div class="stat-sub">Coverage section handled server-side — employer sponsorship pre-verified</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-big" style="color: var(--yellow);">~5 min</div>
-      <div class="stat-label">Estimated Time Saved</div>
-      <div class="stat-sub">From an average 8-minute flow to ~3 minutes</div>
-    </div>
-  </div>
-
-
   <!-- ── INSIGHTS ── -->
   <div class="section">
     <div class="section-label">Design Rationale</div>
-    <div class="section-title">What Pre-Registration Changes</div>
+    <div class="section-title">What the Redesign Changes</div>
     <div class="section-desc">Four key shifts in the user experience when upstream data is available.</div>
 
     <div class="insights-grid">
@@ -898,8 +918,8 @@
   <!-- ── ARCHITECTURE ── -->
   <div class="section">
     <div class="section-label">System Architecture</div>
-    <div class="section-title">How Pre-Registration Works</div>
-    <div class="section-desc">Three backend services power the pre-registration experience — each responsible for a different layer of data resolution.</div>
+    <div class="section-title">How the Optimized Flow Works</div>
+    <div class="section-desc">Three backend services power the optimized experience — each responsible for a different layer of data resolution.</div>
 
     <div class="insights-grid" style="grid-template-columns: repeat(3, 1fr);">
 
@@ -955,17 +975,16 @@
   <!-- ── FIELD TABLE ── -->
   <div class="section">
     <div class="section-label">Detailed Field Analysis</div>
-    <div class="section-title">All Fields &amp; Their Pre-Registration Status</div>
-    <div class="section-desc">Every field across the full registration flow, mapped to its pre-registration treatment and data source.</div>
+    <div class="section-title">All Fields &amp; Their Optimized Status</div>
+    <div class="section-desc">Every field across the full onboarding flow, mapped to its optimized treatment and data source.</div>
 
     <!-- Source legend -->
     <div class="source-legend">
       <span class="source-legend-label">Sources:</span>
       <span class="source-pill source-pill--employer">🏢 Employer HR</span>
       <span class="source-pill source-pill--health">🏥 Health Records</span>
-      <span class="source-pill source-pill--carrier">📞 Carrier API</span>
       <span class="source-pill source-pill--user">✏️ User Enters</span>
-      <span class="source-pill source-pill--eliminated">⚫ Skipped</span>
+      <span class="source-pill source-pill--eliminated">⚠ Skipped</span>
     </div>
 
     <!-- Status legend -->
@@ -973,22 +992,31 @@
       <span class="status-chip status-chip--green">🟢 Confirm</span>
       <span class="status-chip status-chip--yellow">🟡 Partial</span>
       <span class="status-chip status-chip--red">🔴 User enters</span>
-      <span class="status-chip status-chip--black">⚫ Skipped</span>
+      <span class="status-chip status-chip--black">⚠ Skipped</span>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-pill active" data-filter="all">All <span class="count">(35)</span></button>
+      <button class="filter-pill" data-filter="confirm">🟢 Confirm <span class="count">(21)</span></button>
+      <button class="filter-pill" data-filter="user">🔴 User enters <span class="count">(6)</span></button>
+      <button class="filter-pill" data-filter="skipped">⚠ Skipped <span class="count">(6)</span></button>
+      <button class="filter-pill" data-filter="partial">🟡 Partial <span class="count">(2)</span></button>
     </div>
 
     <div class="table-section">
       <div class="table-section-header">
-        <div class="section-label" style="margin-bottom:2px;">36 Fields — 24 Confirm, 8 User-Entered, 4 Skipped</div>
+        <div class="section-label" style="margin-bottom:2px;">35 Fields — 21 Confirm, 6 User-Entered, 6 Skipped, 2 Partial</div>
         <div style="font-size:0.8125rem; color: var(--gray-600);">Scroll horizontally on small screens to see all columns.</div>
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table id="fieldTable">
           <thead>
             <tr>
               <th>Field Name</th>
-              <th>Standard Flow</th>
-              <th>Pre-Reg Flow</th>
+              <th>Original Flow</th>
+              <th>Optimized Flow</th>
               <th>Data Source</th>
               <th>Notes</th>
             </tr>
@@ -996,186 +1024,139 @@
           <tbody>
 
             <!-- Personal Information -->
-            <tr class="table-group-row">
-              <td colspan="5">Step 1 — Personal Information</td>
+            <tr class="table-group-row" data-group="identity">
+              <td colspan="5">Step 1 — Confirm Identity</td>
             </tr>
-            <tr>
+            <tr data-status="user">
               <td class="field-name">Legal First Name</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">User confirms</td>
+              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
+              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
+              <td class="field-notes">Identity confirmation</td>
             </tr>
-            <tr>
+            <tr data-status="user">
               <td class="field-name">Legal Last Name</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">User confirms</td>
+              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
+              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
+              <td class="field-notes">Identity confirmation</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Email Address</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">User confirms</td>
+              <td class="field-notes">Pre-filled after identity confirmed</td>
             </tr>
-            <tr>
+            <tr data-status="user">
               <td class="field-name">Password</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
               <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
               <td class="field-notes">Security requirement</td>
             </tr>
-            <tr>
+            <tr data-status="user">
               <td class="field-name">Mobile Phone</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
               <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
               <td class="field-notes">Personal device</td>
             </tr>
-            <tr>
-              <td class="field-name">Phone Type</td>
-              <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--carrier">📞 Carrier API</span></td>
-              <td class="field-notes">Auto-detected from phone number</td>
-            </tr>
-            <tr>
+            <tr data-status="user">
               <td class="field-name">Date of Birth</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">Identity verification</td>
+              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
+              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
+              <td class="field-notes">Identity confirmation</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Language</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
+              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
-              <td class="field-notes">Personal preference</td>
-            </tr>
-
-            <!-- Shipping -->
-            <tr class="table-group-row">
-              <td colspan="5">Step 2 — Shipping &amp; Supplies</td>
-            </tr>
-            <tr>
-              <td class="field-name">Street Address</td>
-              <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">User confirms</td>
-            </tr>
-            <tr>
-              <td class="field-name">Apt / Suite</td>
-              <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
-              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
-              <td class="field-notes">Often not in records</td>
-            </tr>
-            <tr>
-              <td class="field-name">City</td>
-              <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes"></td>
-            </tr>
-            <tr>
-              <td class="field-name">State</td>
-              <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes"></td>
-            </tr>
-            <tr>
-              <td class="field-name">Zip Code</td>
-              <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes"></td>
+              <td class="field-notes">Footer selection — defaults English</td>
             </tr>
 
             <!-- Coverage -->
-            <tr class="table-group-row">
+            <tr class="table-group-row" data-group="coverage">
               <td colspan="5">Steps 3–5 — Coverage Search, Verification &amp; Insurance</td>
             </tr>
-            <tr>
+            <tr data-status="skipped">
               <td class="field-name">Coverage Search</td>
               <td class="field-standard">Manual search</td>
-              <td><span class="status-chip status-chip--black">⚫ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚫ Skipped</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
               <td class="field-notes">Employer sponsorship — verified server-side</td>
             </tr>
-            <tr>
+            <tr data-status="skipped">
               <td class="field-name">Insurance Provider</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--black">⚫ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚫ Skipped</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
-            <tr>
+            <tr data-status="skipped">
               <td class="field-name">Member ID</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--black">⚫ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚫ Skipped</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
-            <tr>
+            <tr data-status="skipped">
               <td class="field-name">Group ID</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--black">⚫ Skipped</span></td>
-              <td class="field-source"><span class="source-pill source-pill--eliminated">⚫ Skipped</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
 
             <!-- Care Plan -->
-            <tr class="table-group-row">
-              <td colspan="5">Step 6 — Care Plan</td>
+            <tr class="table-group-row" data-group="careplan">
+              <td colspan="5">Step 2 — Care Plan</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Gender</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
               <td class="field-notes">User confirms on Care Plan</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Diabetes Type</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From health plan claims data</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Diagnosis Date</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From health plan claims data</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">A1C Check</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">Most recent lab result</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Medications</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From pharmacy claims data</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">BG Check Frequency</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">Inferred from supply orders</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Doctor BG Recommendation</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
@@ -1184,92 +1165,92 @@
             </tr>
 
             <!-- Coaching -->
-            <tr class="table-group-row">
-              <td colspan="5">Step 7 — Coaching &amp; Alerts</td>
+            <tr class="table-group-row" data-group="coaching">
+              <td colspan="5">Coaching &amp; Alerts — Moved to On-Device Setup</td>
             </tr>
-            <tr>
+            <tr data-status="skipped">
               <td class="field-name">Coaching Thresholds</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
-              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
-              <td class="field-notes">Personal preference</td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td class="field-notes">Moved to on-device onboarding</td>
             </tr>
-            <tr>
+            <tr data-status="skipped">
               <td class="field-name">Contact Method</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
-              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
-              <td class="field-notes">Personal preference</td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
+              <td class="field-source"><span class="source-pill source-pill--eliminated">⚠ Skipped</span></td>
+              <td class="field-notes">Moved to on-device onboarding</td>
             </tr>
 
             <!-- Health Profile -->
-            <tr class="table-group-row">
-              <td colspan="5">Step 8 — Health Profile</td>
+            <tr class="table-group-row" data-group="health">
+              <td colspan="5">Step 3 — Health Profile</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Height</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From most recent clinical record</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Weight</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From most recent clinical record</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Exams History</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">Eye exams, foot exams from claims</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">CGM Usage</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From device/supply claims</td>
             </tr>
-            <tr>
+            <tr data-status="partial">
               <td class="field-name">Conditions</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--yellow">🟡 Partial</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">HBP from records; user adds others</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Smoking Status</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">From clinical notes / ICD codes</td>
             </tr>
-            <tr>
+            <tr data-status="partial">
               <td class="field-name">Vaccines</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--yellow">🟡 Partial</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">Flu from records; pneumonia user-entered</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Activity Level</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
               <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
               <td class="field-notes">Lifestyle — not in records</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Eating Habits</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
               <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
               <td class="field-notes">Lifestyle — not in records</td>
             </tr>
-            <tr>
+            <tr data-status="confirm">
               <td class="field-name">Demographics</td>
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
@@ -1277,11 +1258,90 @@
               <td class="field-notes">Optional self-reported</td>
             </tr>
 
+            <!-- Shipping -->
+            <tr class="table-group-row" data-group="shipping">
+              <td colspan="5">Step 4 — Shipping &amp; Supplies</td>
+            </tr>
+            <tr data-status="confirm">
+              <td class="field-name">Street Address</td>
+              <td class="field-standard">Manual entry</td>
+              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
+              <td class="field-notes">User confirms</td>
+            </tr>
+            <tr data-status="confirm">
+              <td class="field-name">Apt / Suite</td>
+              <td class="field-standard">Manual entry</td>
+              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
+              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
+              <td class="field-notes">Often not in records</td>
+            </tr>
+            <tr data-status="confirm">
+              <td class="field-name">City</td>
+              <td class="field-standard">Manual entry</td>
+              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
+              <td class="field-notes"></td>
+            </tr>
+            <tr data-status="confirm">
+              <td class="field-name">State</td>
+              <td class="field-standard">Manual entry</td>
+              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
+              <td class="field-notes"></td>
+            </tr>
+            <tr data-status="confirm">
+              <td class="field-name">Zip Code</td>
+              <td class="field-standard">Manual entry</td>
+              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
+              <td class="field-notes"></td>
+            </tr>
+
           </tbody>
         </table>
       </div><!-- /table-wrap -->
     </div><!-- /table-section -->
   </div><!-- /section -->
+
+  <!-- Filter table JS -->
+  <script>
+    document.getElementById('filterBar').addEventListener('click', function(e) {
+      var pill = e.target.closest('.filter-pill');
+      if (!pill) return;
+      var filter = pill.dataset.filter;
+
+      // Update active pill
+      this.querySelectorAll('.filter-pill').forEach(function(p) { p.classList.remove('active'); });
+      pill.classList.add('active');
+
+      var rows = document.querySelectorAll('#fieldTable tbody tr');
+      rows.forEach(function(row) {
+        if (row.classList.contains('table-group-row')) {
+          // Show/hide group headers based on whether they have visible children
+          row.classList.remove('hidden-by-filter');
+          return;
+        }
+        var status = row.dataset.status;
+        if (filter === 'all' || status === filter) {
+          row.classList.remove('hidden-by-filter');
+        } else {
+          row.classList.add('hidden-by-filter');
+        }
+      });
+
+      // Hide group headers with no visible children
+      document.querySelectorAll('#fieldTable .table-group-row').forEach(function(groupRow) {
+        var next = groupRow.nextElementSibling;
+        var hasVisible = false;
+        while (next && !next.classList.contains('table-group-row')) {
+          if (!next.classList.contains('hidden-by-filter')) hasVisible = true;
+          next = next.nextElementSibling;
+        }
+        groupRow.classList.toggle('hidden-by-filter', !hasVisible);
+      });
+    });
+  </script>
 
 </main>
 
