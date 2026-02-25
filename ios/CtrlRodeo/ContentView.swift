@@ -56,12 +56,15 @@ struct ContentView: View {
             loadURL = url
         }
 
-        // Store the URL to pass to WebView for token extraction
+        // Store the URL to pass to WebView for token extraction.
+        // Set pendingAuthURL first, then defer the view transition to the next runloop tick.
+        // This ensures the binding value is committed before BoardsWebView's makeUIView reads it.
         pendingAuthURL = loadURL
 
-        // If we're on the auth screen, skip to the web view so it can process the token
         if !isAuthenticated && !didSkipAuth {
-            didSkipAuth = true
+            DispatchQueue.main.async {
+                didSkipAuth = true
+            }
         }
     }
 }
@@ -153,15 +156,10 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.addSubview(refreshControl)
         context.coordinator.refreshControl = refreshControl
 
-        // Load the boards URL (or pending auth URL if we have one)
-        if let authURL = pendingAuthURL {
-            print("[WebView] makeUIView: Loading auth URL \(authURL)")
-            webView.load(URLRequest(url: authURL))
-            DispatchQueue.main.async {
-                pendingAuthURL = nil
-            }
-        } else if let url = URL(string: AppConstants.boardsURL) {
-            print("[WebView] makeUIView: Loading URL \(url)")
+        // Always load the base boards URL here.
+        // If a pendingAuthURL exists, updateUIView will load it immediately after.
+        if let url = URL(string: AppConstants.boardsURL) {
+            print("[WebView] makeUIView: Loading base URL \(url)")
             webView.load(URLRequest(url: url))
         }
 

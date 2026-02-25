@@ -10,6 +10,27 @@
   <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
   <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
 
+  <!-- iOS Auth Token Capture — MUST run before Supabase clears the hash -->
+  <script>
+  (function() {
+    var h = window.location.hash;
+    if (h && h.indexOf('access_token') !== -1) {
+      var p = {};
+      h.slice(1).split('&').forEach(function(s) {
+        var kv = s.split('=');
+        if (kv[0]) p[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+      });
+      if (p['access_token']) {
+        window.__iosAuthCapture = {
+          accessToken: p['access_token'],
+          refreshToken: p['refresh_token'] || '',
+          tokenType: p['token_type'] || 'bearer'
+        };
+      }
+    }
+  })();
+  </script>
+
   <!-- Space Grotesk Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4639,13 +4660,6 @@ body {
   }
 }
 
-/* Auth deep link banner: stack above capture promo on mobile */
-@media (max-width: 600px) {
-  #authDeepLinkBanner {
-    bottom: 160px;
-  }
-}
-
 /* Mobile Paste Button — clipboard-aware full-width paste action */
 .mobile-paste {
   display: none;
@@ -5563,16 +5577,14 @@ body {
     </div>
   </div>
 
-  <!-- iOS Magic Link Auth Banner -->
-  <div class="capture-promo" id="authDeepLinkBanner" style="display:none;z-index:1001;">
-    <div class="capture-promo__inner">
-      <div class="capture-promo__icon">📱</div>
-      <div class="capture-promo__body">
-        <div class="capture-promo__text">Open in Boards app</div>
-        <div class="capture-promo__subtext">Tap to sign in to the app</div>
-      </div>
-      <button class="capture-promo__cta" id="authBannerOpen">Open App</button>
-      <button class="capture-promo__dismiss" id="authBannerDismiss" aria-label="Dismiss">&times;</button>
+  <!-- iOS App Redirect Overlay -->
+  <div id="iosAppOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;color:#fff;font-family:var(--font-mono);flex-direction:column;align-items:center;justify-content:center;padding:var(--space-8);text-align:center;-webkit-font-smoothing:antialiased;">
+    <div style="max-width:320px;width:100%;">
+      <div style="font-family:'Georgia',serif;font-size:40px;margin-bottom:var(--space-8);letter-spacing:-0.02em;">boards</div>
+      <div style="font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:var(--space-3);">Open in the app</div>
+      <div style="font-size:var(--font-size-xs);color:#666;margin-bottom:var(--space-8);line-height:1.6;" id="iosOverlaySubtext">Continue to the full Boards experience</div>
+      <button id="iosOverlayOpen" style="display:block;width:100%;padding:var(--space-3) var(--space-6);background:#fff;color:#000;border:1px solid #fff;font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;cursor:pointer;margin-bottom:var(--space-4);">Open Boards App</button>
+      <button id="iosOverlayDismiss" style="display:block;width:100%;padding:var(--space-3) var(--space-6);background:transparent;color:#666;border:1px solid #333;font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;">Continue in Browser</button>
     </div>
   </div>
 
@@ -19262,7 +19274,7 @@ Return JSON:
 })();
   </script>
 
-  <!-- iOS Magic Link Auth Banner Script -->
+  <!-- iOS App Redirect Overlay Script -->
   <script>
 (function() {
   'use strict';
@@ -19270,52 +19282,54 @@ Return JSON:
   // Skip if inside the native WKWebView (authBridge injected by the app)
   if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.authBridge) return;
 
-  // Only show on iOS (iPhone/iPad in Safari or Chrome)
+  // Only show on iOS
   if (!/iPhone|iPad/.test(navigator.userAgent)) return;
 
-  // Only show when there's an auth callback in the URL hash
-  var hash = window.location.hash;
-  if (!hash || hash.indexOf('access_token') === -1) return;
+  var overlay = document.getElementById('iosAppOverlay');
+  var openBtn = document.getElementById('iosOverlayOpen');
+  var dismissBtn = document.getElementById('iosOverlayDismiss');
+  var subtext = document.getElementById('iosOverlaySubtext');
+  if (!overlay || !openBtn || !dismissBtn) return;
 
-  // Parse tokens from hash fragment
-  var params = {};
-  hash.slice(1).split('&').forEach(function(part) {
-    var kv = part.split('=');
-    if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
-  });
+  // Check for captured auth tokens (from head-level script, before Supabase cleared the hash)
+  var capturedAuth = window.__iosAuthCapture || null;
 
-  var accessToken = params['access_token'];
-  var refreshToken = params['refresh_token'] || '';
-  var tokenType = params['token_type'] || 'bearer';
-  if (!accessToken) return;
+  // Check for existing session in localStorage
+  var hasExistingSession = false;
+  try {
+    var stored = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
+    if (stored) {
+      var parsed = JSON.parse(stored);
+      if (parsed && parsed.access_token) hasExistingSession = true;
+    }
+  } catch (e) {}
 
-  // Build deep link URL using the custom URL scheme
-  var deepLink = 'ctrlrodeo://auth#access_token=' + encodeURIComponent(accessToken)
-    + '&refresh_token=' + encodeURIComponent(refreshToken)
-    + '&token_type=' + encodeURIComponent(tokenType);
+  // Show overlay if we have fresh auth tokens OR an existing session
+  if (!capturedAuth && !hasExistingSession) return;
 
-  var banner = document.getElementById('authDeepLinkBanner');
-  var openBtn = document.getElementById('authBannerOpen');
-  var dismissBtn = document.getElementById('authBannerDismiss');
-  if (!banner || !openBtn || !dismissBtn) return;
+  // Build deep link
+  var deepLink;
+  if (capturedAuth) {
+    deepLink = 'ctrlrodeo://auth#access_token=' + encodeURIComponent(capturedAuth.accessToken)
+      + '&refresh_token=' + encodeURIComponent(capturedAuth.refreshToken)
+      + '&token_type=' + encodeURIComponent(capturedAuth.tokenType);
+    if (subtext) subtext.textContent = 'Tap to sign in to the app';
+  } else {
+    deepLink = 'ctrlrodeo://open';
+    if (subtext) subtext.textContent = 'Continue to the full Boards experience';
+  }
 
-  function hideBanner() { banner.style.display = 'none'; }
-
-  var autoDismiss = setTimeout(hideBanner, 10000);
+  function hideOverlay() { overlay.style.display = 'none'; }
 
   openBtn.addEventListener('click', function() {
-    clearTimeout(autoDismiss);
-    hideBanner();
     window.location.href = deepLink;
+    setTimeout(hideOverlay, 2500);
   });
 
-  dismissBtn.addEventListener('click', function() {
-    clearTimeout(autoDismiss);
-    hideBanner();
-  });
+  dismissBtn.addEventListener('click', hideOverlay);
 
-  // Show after 300ms delay to let Supabase SDK start processing the hash
-  setTimeout(function() { banner.style.display = 'block'; }, 300);
+  // Show overlay immediately
+  overlay.style.display = 'flex';
 })();
   </script>
 
