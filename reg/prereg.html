@@ -80,7 +80,7 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 }
 
 /* Section labels */
-.section-label { font-size: 11px; font-weight: 600; color: #666; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
+.section-label { font-size: 11px; font-weight: 600; color: #666; margin-top: 32px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Source banner — section-level attribution */
 .source-banner {
@@ -170,7 +170,7 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   background: #fff;
   font-family: 'Roboto', sans-serif;
 }
-.records-privacy { font-size: 12px; color: #999; padding-top: 16px; margin-top: 12px; border-top: 1px solid #eee; }
+.records-privacy { font-size: 12px; color: #999; margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee; }
 
 /* Welcome Card + Data Disclosure Card — bordered card matching program-value-card */
 .welcome-card,
@@ -251,6 +251,14 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #43a047; }
 .coverage-verified .cv-text { font-size: 14px; color: #333; line-height: 1.6; }
 .coverage-verified .cv-text strong { font-weight: 700; }
+
+/* Hero variant for Step 6 enrolled card */
+.coverage-verified--hero { padding: 24px; gap: 16px; }
+.coverage-verified--hero .cv-icon { font-size: 28px; }
+.coverage-verified--hero .cv-text strong { font-size: 20px; display: block; margin-bottom: 6px; }
+
+/* Section heading — Step 6 sub-sections */
+.section-heading { font-size: 18px; font-weight: 600; color: #222; margin-bottom: 8px; }
 
 /* Step legend */
 .step-legend {
@@ -690,7 +698,7 @@ input.error, select.error { border-color: #d32f2f; }
     </label>
   </div>
 
-  <p class="section-label" style="margin-top: 32px;">Checking Blood Glucose</p>
+  <p class="section-label">Checking Blood Glucose</p>
 
   <div class="question-group">
     <div class="question">How often do you check your blood sugar?</div>
@@ -858,7 +866,7 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <p class="section-label" style="margin-top:32px;">Your Health Background</p>
+  <p class="section-label">Your Health Background</p>
 
   <div class="question-group">
     <div class="question">Have you ever been diagnosed with or taken medication for any of the following?</div>
@@ -896,7 +904,7 @@ input.error, select.error { border-color: #d32f2f; }
     </label>
   </div>
 
-  <p class="section-label" style="margin-top:32px;">Activity and Diet</p>
+  <p class="section-label">Activity and Diet</p>
 
   <div class="question-group">
     <div class="question">How active are you?</div>
@@ -928,7 +936,7 @@ input.error, select.error { border-color: #d32f2f; }
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="not"> Not interested</label>
   </div>
 
-  <p class="section-label" style="margin-top:32px;">Demographics</p>
+  <p class="section-label">Demographics</p>
 
   <div class="question-group">
     <div class="question">Do you identify as any of the following?</div>
@@ -1038,16 +1046,16 @@ input.error, select.error { border-color: #d32f2f; }
 
 <!-- ========== STEP 6: You're Enrolled / Next Steps ========== -->
 <div class="step" data-step="6">
-  <div class="coverage-verified" style="padding: 24px; gap: 16px;">
-    <span class="cv-icon" style="font-size: 28px;">🎉</span>
+  <div class="coverage-verified coverage-verified--hero">
+    <span class="cv-icon">🎉</span>
     <div class="cv-text">
-      <strong style="font-size: 20px; display: block; margin-bottom: 6px;">You're in!</strong>
+      <strong>You're in!</strong>
       You're officially part of the Livongo program. Your care team is ready.
     </div>
   </div>
 
-  <h2 style="font-size: 18px; font-weight: 600; color: #222; margin-bottom: 6px;">Start your journey today</h2>
-  <p class="subtitle" style="margin-bottom: 20px;">Here's what to expect over the next few days.</p>
+  <h2 class="section-heading">Start your journey today</h2>
+  <p class="subtitle">Here's what to expect over the next few days.</p>
 
   <div class="next-steps-grid">
     <div class="next-step-card">
@@ -1085,7 +1093,7 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <div style="text-align: center; margin-top: 24px;">
+  <div style="text-align: center;">
     <a class="btn-dashboard" href="#">Go to Dashboard</a>
   </div>
 </div>
