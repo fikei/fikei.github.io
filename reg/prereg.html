@@ -40,7 +40,7 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   transition: color 0.3s;
 }
 .progress-section-label.active { color: #1976D2; }
-.progress-section-label.done { color: #4caf50; }
+.progress-section-label.done { color: #1976D2; }
 .progress-section-bar {
   flex: 1;
   height: 4px;
@@ -57,7 +57,7 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 }
 .progress-section-fill.complete {
   width: 100%;
-  background: #4caf50;
+  background: #1976D2;
 }
 .progress-section-dot {
   width: 6px;
@@ -68,7 +68,7 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   transition: background 0.3s;
 }
 .progress-section-dot.active { background: #1976D2; }
-.progress-section-dot.done { background: #4caf50; }
+.progress-section-dot.done { background: #1976D2; }
 
 /* Step Container */
 .step { display: none; max-width: 640px; margin: 0 auto; padding: 48px 24px 120px; }
@@ -130,6 +130,11 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   border-radius: 50%;
   pointer-events: none;
 }
+/* Increase dot offset for selects to clear native dropdown arrow */
+.field-wrap.prefilled--select::after {
+  right: 36px;
+}
+
 .radio-card.preselected::after,
 .checkbox-card.preselected::after {
   content: "";
@@ -143,14 +148,14 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 
 /* From Your Records — collapsed summary */
 .records-summary { margin-top: 32px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
-.records-summary summary { padding: 14px 18px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fafafa; list-style: none; }
+.records-summary summary { padding: 14px 18px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fff; list-style: none; }
 .records-summary summary::-webkit-details-marker { display: none; }
 .records-summary summary::after { content: "▸"; float: right; transition: transform 0.2s; }
 .records-summary[open] summary::after { transform: rotate(90deg); }
 .records-summary-body { padding: 16px 18px; border-top: 1px solid #e0e0e0; }
 .records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 12px 0 6px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
 .records-source-heading:first-child { margin-top: 0; padding-top: 0; border-top: none; }
-.records-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.records-item { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
 .records-item:last-child { border-bottom: none; }
 .records-label { color: #777; flex: 1; }
 .records-value { font-weight: 500; color: #333; }
@@ -162,11 +167,14 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .welcome-card,
 .data-disclosure-card {
   background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  padding: 24px;
+  border: none;
+  border-radius: 0;
+  padding: 20px 0 24px;
+  margin-top: 16px;
   margin-bottom: 32px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: none;
+  border-top: 1px solid #e8e8e8;
+  border-bottom: 1px solid #e8e8e8;
 }
 .welcome-card .wc-greeting,
 .data-disclosure-card .wc-greeting {
@@ -218,9 +226,9 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 
 /* Coverage verified box */
 .coverage-verified {
-  background: #fff;
-  border: 1px solid #a5d6a7;
-  border-left: 4px solid #4caf50;
+  background: #f0f7ff;
+  border: 1px solid #d0e3f8;
+  border-left: 4px solid #1976D2;
   border-radius: 10px;
   padding: 16px 18px;
   margin-bottom: 24px;
@@ -228,8 +236,8 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   align-items: flex-start;
   gap: 12px;
 }
-.coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #4caf50; }
-.coverage-verified .cv-text { font-size: 14px; color: #2e7d32; line-height: 1.5; }
+.coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #1976D2; }
+.coverage-verified .cv-text { font-size: 14px; color: #1565c0; line-height: 1.5; }
 .coverage-verified .cv-text strong { font-weight: 700; }
 
 /* Step legend */
@@ -301,7 +309,7 @@ input.error, select.error { border-color: #d32f2f; }
 .pw-rules { margin-top: 8px; font-size: 12px; color: #999; display: none; }
 .pw-rules.visible { display: block; }
 .pw-rules .rule { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.pw-rules .rule.pass { color: #4caf50; }
+.pw-rules .rule.pass { color: #1976D2; }
 .pw-rules .rule.pass::before { content: "✓"; font-weight: 700; }
 .pw-rules .rule.fail::before { content: "✕"; color: #d32f2f; font-weight: 700; }
 
@@ -341,7 +349,7 @@ input.error, select.error { border-color: #d32f2f; }
 .supplies-showcase { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 24px 0; padding: 20px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; }
 .supplies-list { list-style: none; }
 .supplies-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
-.supplies-list li .check { color: #4caf50; font-size: 18px; }
+.supplies-list li .check { color: #1976D2; font-size: 18px; }
 
 /* Welcome / What's Next screen */
 .complete-hero { background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%); color: #fff; text-align: center; padding: 48px 24px; border-radius: 12px; margin-bottom: 32px; }
@@ -448,6 +456,85 @@ input.error, select.error { border-color: #d32f2f; }
 }
 .address-section-header .section-label { margin-bottom: 0; }
 
+/* Persistent privacy trust banner — below Next button on all steps */
+.privacy-banner {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #f9fbff;
+  border: 1px solid #e8eef8;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+/* Program value explanation card — Step 3 */
+.program-value-card {
+  background: #f0f7ff;
+  border: 1px solid #d0e3f8;
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 28px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.65;
+}
+.program-value-card .pvc-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1565c0;
+  margin-bottom: 10px;
+}
+.program-value-card .pvc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.program-value-card .pvc-list li {
+  padding: 4px 0;
+  padding-left: 20px;
+  position: relative;
+  color: #555;
+  font-size: 13px;
+}
+.program-value-card .pvc-list li::before {
+  content: "\2192";
+  position: absolute;
+  left: 0;
+  color: #1976D2;
+  font-weight: 700;
+}
+
+/* Context card at top of From Your Records expansion */
+.records-context-card {
+  background: #f0f7ff;
+  border: 1px solid #d0e3f8;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.55;
+}
+
+/* Review badge on From Your Records summary */
+.records-summary summary .review-badge {
+  display: inline-block;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .form-row { flex-direction: column; }
@@ -501,9 +588,6 @@ input.error, select.error { border-color: #d32f2f; }
       <strong>Pilot Trucking LLC</strong> has enrolled you in Livongo to help manage your diabetes.
       We'll confirm your eligibility with the information you provide.
     </div>
-    <div class="wc-privacy">
-      🔒 Your data is encrypted and never shared outside of your care team.
-    </div>
   </div>
 
   <div class="form-row">
@@ -529,6 +613,8 @@ input.error, select.error { border-color: #d32f2f; }
 
   <button class="btn-next" onclick="goTo(2)"><span class="label-bold">Next:</span> Create Account</button>
 
+  <div class="privacy-banner">🔒 Your data is encrypted and never shared outside of your care team.</div>
+
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
     <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
@@ -542,9 +628,9 @@ input.error, select.error { border-color: #d32f2f; }
   <p class="subtitle">Create your email and password so you can access Livongo anytime.</p>
 
   <div class="coverage-verified">
-    <span class="cv-icon">✅</span>
+    <span class="cv-icon">&#10003;</span>
     <div class="cv-text">
-      <strong>No cost to you.</strong> <strong>Pilot Trucking LLC</strong> covers the full cost of Livongo — there's nothing to pay, now or later.
+      <strong>We found you!</strong> Your eligibility through <strong>Pilot Trucking LLC</strong> is confirmed — Livongo is covered at no cost to you, now or later.
     </div>
   </div>
 
@@ -553,6 +639,14 @@ input.error, select.error { border-color: #d32f2f; }
       <label for="email">Email Address <span class="req">*</span></label>
       <input type="email" id="email" placeholder="your@email.com" required>
       <span class="error-msg" id="emailErr">Please enter a valid email address</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="phone">Mobile Phone Number <span class="req">*</span></label>
+      <input type="tel" id="phone" placeholder="(555) 555-5555">
+      <span class="error-msg" id="phoneErr">Please enter a valid phone number</span>
     </div>
   </div>
 
@@ -573,20 +667,14 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <div class="form-row single">
-    <div class="form-group">
-      <label for="phone">Mobile Phone Number <span class="req">*</span></label>
-      <input type="tel" id="phone" placeholder="(555) 555-5555">
-      <span class="error-msg" id="phoneErr">Please enter a valid phone number</span>
-    </div>
-  </div>
-
   <div class="checkbox-row">
     <input type="checkbox" id="tos">
     <label for="tos">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
   </div>
 
-  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Supporting Your Diabetes</button>
+  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Your Diabetes Program</button>
+
+  <div class="privacy-banner">🔒 Your data is encrypted and never shared outside of your care team.</div>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -594,18 +682,29 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 3: Supporting Your Diabetes ========== -->
+<!-- ========== STEP 3: Set Up Your Diabetes Program ========== -->
 <div class="step" data-step="3">
 
-  <h1>Supporting Your Diabetes</h1>
-  <p class="subtitle">Answer a few questions about how you manage your blood sugar. We've already confirmed the rest from your records.</p>
+  <h1>Set Up Your Diabetes Program</h1>
+  <p class="subtitle">Tell us about your current monitoring routine. This helps us personalize your program from day one.</p>
+
+  <div class="program-value-card">
+    <div class="pvc-heading">What's included in your Livongo program</div>
+    <ul class="pvc-list">
+      <li>A connected glucose meter with unlimited strip refills</li>
+      <li>A dedicated certified health coach</li>
+      <li>Personalized insights after every reading</li>
+      <li>Your answers here help us tailor your coaching from the start</li>
+    </ul>
+  </div>
 
   <div class="question-group">
     <div class="question">Do you use a Continuous Glucose Monitor (CGM) to help monitor your blood glucose?</div>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="cgm" value="yes"> Yes</label>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="cgm" value="no" checked>
-      No    </label>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="cgm" value="no">
+      No
+    </label>
   </div>
 
   <p class="section-label" style="margin-top: 32px;">Checking Blood Glucose</p>
@@ -614,7 +713,7 @@ input.error, select.error { border-color: #d32f2f; }
     <div class="question">How often do you check your blood sugar?</div>
     <div class="form-row">
       <div class="form-group">
-        <div class="field-wrap prefilled">
+        <div class="field-wrap prefilled prefilled--select">
           <select id="checkFreq" aria-label="How often you check your blood sugar">
             <option value="">Checks per day</option>
             <option>Less than once a day</option>
@@ -632,7 +731,7 @@ input.error, select.error { border-color: #d32f2f; }
     <div class="question">How often does your doctor recommend you check your blood sugar?</div>
     <div class="form-row">
       <div class="form-group">
-        <div class="field-wrap prefilled">
+        <div class="field-wrap prefilled prefilled--select">
           <select id="docRecFreq" aria-label="Doctor recommended blood sugar check frequency">
             <option value="">Checks per day</option>
             <option>Less than once a day</option>
@@ -647,8 +746,12 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 
   <details class="records-summary">
-    <summary>From Your Records</summary>
+    <summary>From Your Records <span class="review-badge">Review</span></summary>
     <div class="records-summary-body">
+      <div class="records-context-card">
+        We pulled these details from your employer and health records to save you time. Review the information below and edit anything that's changed.
+      </div>
+
       <div class="records-source-heading">🏢 Employer</div>
       <div class="records-item">
         <span class="records-label">Gender</span>
@@ -694,6 +797,8 @@ input.error, select.error { border-color: #d32f2f; }
 
   <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health History</button>
 
+  <div class="privacy-banner">🔒 Your data is encrypted and never shared outside of your care team.</div>
+
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
     <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
@@ -706,12 +811,9 @@ input.error, select.error { border-color: #d32f2f; }
   <p class="subtitle">These answers help your coach personalize your experience. Answer what you can — you can always update later.</p>
 
   <div class="data-disclosure-card">
-    <div class="wc-greeting">ℹ️ How We Use This Information</div>
+    <div class="wc-greeting">A little about your health</div>
     <div class="wc-body">
-      Your answers help us match you with the right coach, set meaningful goals, and personalize your Livongo experience. Nothing here is required — answer what you're comfortable with, and update anytime.
-    </div>
-    <div class="wc-privacy">
-      🔒 Your health information is private and protected. Only your care team can see it.
+      The more your coach knows, the better they can support you. Nothing here is required — share what feels right, skip what doesn't, and come back to update anytime.
     </div>
   </div>
 
@@ -725,7 +827,7 @@ input.error, select.error { border-color: #d32f2f; }
     <div class="form-row">
       <div class="form-group">
         <label for="heightFt">Feet </label>
-        <div class="field-wrap prefilled">
+        <div class="field-wrap prefilled prefilled--select">
           <select id="heightFt">
             <option value="">Feet</option>
             <option>4</option><option selected>5</option><option>6</option><option>7</option>
@@ -734,7 +836,7 @@ input.error, select.error { border-color: #d32f2f; }
       </div>
       <div class="form-group">
         <label for="heightIn">Inches </label>
-        <div class="field-wrap prefilled">
+        <div class="field-wrap prefilled prefilled--select">
           <select id="heightIn">
             <option value="">Inches</option>
             <option>0</option><option>1</option><option>2</option><option>3</option>
@@ -751,44 +853,47 @@ input.error, select.error { border-color: #d32f2f; }
     <div class="form-row">
       <div class="form-group">
         <label for="weight">Pounds </label>
-        <div class="field-wrap prefilled">
-          <input type="number" id="weight" value="218" min="50" max="600">
+        <div class="field-wrap">
+          <input type="number" id="weight" placeholder="e.g. 185" min="50" max="600">
         </div>
       </div>
     </div>
   </div>
 
-  <p class="section-label" style="margin-top:32px;">Other Conditions</p>
+  <p class="section-label" style="margin-top:32px;">Your Health Background</p>
 
   <div class="question-group">
     <div class="question">Have you ever been diagnosed with or taken medication for any of the following?</div>
     <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="cholesterol"> High Cholesterol</label>
     <label class="checkbox-card preselected selected" onclick="toggleCheckCard(this)">
       <input type="checkbox" value="hbp" checked>
-      High Blood Pressure (Hypertension)    </label>
+      High Blood Pressure (Hypertension)
+    </label>
   </div>
 
   <div class="question-group">
     <div class="question">Do you smoke?</div>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="smoke" value="yes"> Yes</label>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="smoke" value="no" checked>
-      No    </label>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="smoke" value="no">
+      No
+    </label>
   </div>
 
   <div class="question-group">
     <div class="question">Have you had a flu vaccine within the last year? <span class="info-icon">ⓘ</span></div>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="flu" value="yes" checked>
-      Yes    </label>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="flu" value="yes">
+      Yes
+    </label>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="flu" value="no"> No</label>
   </div>
 
   <div class="question-group">
     <div class="question">Have you ever had the pneumonia vaccine? <span class="info-icon">ⓘ</span></div>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="pneumonia" value="yes"> Yes</label>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="pneumonia" value="no" checked>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="pneumonia" value="no">
       No
     </label>
   </div>
@@ -838,7 +943,9 @@ input.error, select.error { border-color: #d32f2f; }
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="other"> Other</label>
   </div>
 
-  <button class="btn-next" onclick="goTo(5)"><span class="label-bold">Next:</span> Your Welcome Kit</button>
+  <button class="btn-next" onclick="goTo(5)"><span class="label-bold">Next:</span> Receiving Your Device</button>
+
+  <div class="privacy-banner">🔒 Your health information is private and protected. Only your care team can see it.</div>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -846,16 +953,20 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 5: Your Welcome Kit ========== -->
+<!-- ========== STEP 5: Receiving Your Device ========== -->
 <div class="step" data-step="5">
-  <h1>Your Welcome Kit</h1>
-  <p class="subtitle">We'll send you everything you need to get started — at no cost to you.</p>
+  <h1>Receiving Your Device</h1>
+  <p class="subtitle">Your meter, strips, and supplies ship free — fully covered by <strong>Pilot Trucking LLC</strong>. Confirm your shipping address below.</p>
+
+  <div style="background: #f5f8fc; border-radius: 10px; height: 160px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 13px; margin-bottom: 20px; border: 1px dashed #ddd;">
+    [Product photo placeholder]
+  </div>
 
   <div class="supplies-showcase">
     <ul class="supplies-list">
-      <li><span class="check">✅</span> An advanced glucose meter ($200 value)</li>
-      <li><span class="check">✅</span> 150 strips (with unlimited refills)</li>
-      <li><span class="check">✅</span> Lancing device, lancets, and carrying case</li>
+      <li><span class="check">&#10003;</span> An advanced glucose meter ($200 value)</li>
+      <li><span class="check">&#10003;</span> 150 strips (with unlimited refills)</li>
+      <li><span class="check">&#10003;</span> Lancing device, lancets, and carrying case</li>
     </ul>
   </div>
 
@@ -889,7 +1000,7 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
     <div class="form-group" style="max-width:100px;">
       <label for="state">State <span class="req">*</span> </label>
-      <div class="field-wrap prefilled">
+      <div class="field-wrap prefilled prefilled--select">
         <select id="state">
           <option value="">State</option>
           <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
@@ -918,10 +1029,12 @@ input.error, select.error { border-color: #d32f2f; }
 
   <div class="source-banner source-banner--employer">
     <span class="sb-icon">🏢</span>
-    <span>Address provided by your employer.</span>
+    <span>This is the address we have on file from your employer. Update any field if needed before continuing.</span>
   </div>
 
   <button class="btn-next" onclick="goTo(6)">Finish Setup</button>
+
+  <div class="privacy-banner">🔒 Your address is used only for shipping your Livongo kit. It is never sold or shared.</div>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -929,12 +1042,18 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 6: Welcome / What's Next ========== -->
+<!-- ========== STEP 6: You're Enrolled / Next Steps ========== -->
 <div class="step" data-step="6">
   <div class="complete-hero">
-    <div class="check-circle">✓</div>
-    <h1>You're All Set!</h1>
-    <p>Your Welcome Kit is on its way — expect it in 5–7 business days.</p>
+    <div class="check-circle">&#10003;</div>
+    <h1>You're enrolled!</h1>
+    <p>Here's what happens next — your Welcome Kit ships within 1–2 business days.</p>
+  </div>
+
+  <p style="font-size: 15px; color: #444; margin-bottom: 16px; line-height: 1.6;">You're officially part of the Livongo program. Your care team is ready. Here's what to expect over the next few days.</p>
+
+  <div style="background: #f5f8fc; border-radius: 10px; height: 120px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 13px; margin-bottom: 20px; border: 1px dashed #ddd;">
+    [Celebration / product photo placeholder]
   </div>
 
   <div class="next-steps-grid">
