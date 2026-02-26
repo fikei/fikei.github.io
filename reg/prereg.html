@@ -263,7 +263,8 @@ input.error, select.error { border-color: #d32f2f; }
 .toggle-pw { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; font-size: 18px; }
 
 /* Password strength */
-.pw-rules { margin-top: 8px; font-size: 12px; color: #999; }
+.pw-rules { margin-top: 8px; font-size: 12px; color: #999; display: none; }
+.pw-rules.visible { display: block; }
 .pw-rules .rule { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .pw-rules .rule.pass { color: #4caf50; }
 .pw-rules .rule.pass::before { content: "✓"; font-weight: 700; }
@@ -464,6 +465,9 @@ input.error, select.error { border-color: #d32f2f; }
 <!-- ========== STEP 1: Confirm Identity ========== -->
 <div class="step active" data-step="1">
 
+  <h1>Let's Get Started</h1>
+  <p class="subtitle">We just need your name and date of birth to confirm your enrollment.</p>
+
   <div class="welcome-card">
     <div class="wc-greeting">👋 Welcome to Livongo</div>
     <div class="wc-body">
@@ -474,9 +478,6 @@ input.error, select.error { border-color: #d32f2f; }
       🔒 Your data is encrypted and never shared outside of your care team.
     </div>
   </div>
-
-  <h1>Let's Confirm Your Identity</h1>
-  <p class="subtitle">Enter your name and date of birth so we can verify your enrollment.</p>
 
   <div class="form-row">
     <div class="form-group">
@@ -510,8 +511,15 @@ input.error, select.error { border-color: #d32f2f; }
 <!-- ========== STEP 2: Create Account ========== -->
 <div class="step" data-step="2">
 
-  <h1>Create Your Account</h1>
-  <p class="subtitle">Set up your login credentials to access Livongo.</p>
+  <h1>Set Up Your Account</h1>
+  <p class="subtitle">Create your email and password so you can access Livongo anytime.</p>
+
+  <div class="coverage-verified">
+    <span class="cv-icon">✅</span>
+    <div class="cv-text">
+      <strong>No cost to you.</strong> <strong>Pilot Trucking LLC</strong> covers the full cost of Livongo — there's nothing to pay, now or later.
+    </div>
+  </div>
 
   <div class="form-row single">
     <div class="form-group">
@@ -551,7 +559,7 @@ input.error, select.error { border-color: #d32f2f; }
     <label for="tos">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
   </div>
 
-  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Care Plan</button>
+  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Supporting Your Diabetes</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -559,8 +567,11 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 3: Personalize Your Care Plan ========== -->
+<!-- ========== STEP 3: Supporting Your Diabetes ========== -->
 <div class="step" data-step="3">
+
+  <h1>Supporting Your Diabetes</h1>
+  <p class="subtitle">Review your diabetes history so we can support you from day one.</p>
 
   <div class="data-disclosure-card">
     <div class="wc-greeting">📋 Where Your Information Comes From</div>
@@ -586,16 +597,6 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
     <div class="wc-privacy">
       🔒 Your data is encrypted and never shared outside of your care team.
-    </div>
-  </div>
-
-  <h1>Personalize Your Care Plan</h1>
-  <p class="subtitle">Information you provide will be used to craft a personalized care plan.</p>
-
-  <div class="coverage-verified">
-    <span class="cv-icon">✅</span>
-    <div class="cv-text">
-      <strong>Coverage verified.</strong> Your coverage through <strong>Pilot Trucking LLC</strong> has been confirmed. No additional insurance information needed.
     </div>
   </div>
 
@@ -681,99 +682,7 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <p class="section-label" style="margin-top: 32px;">Checking Blood Glucose</p>
-
-  <div class="question-group">
-    <div class="question">How often do you check your blood sugar?</div>
-    <div class="form-row">
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="checkFreq" aria-label="How often you check your blood sugar">
-            <option value="">Checks per day</option>
-            <option>Less than once a day</option>
-            <option>1 time per day</option>
-            <option selected>2 times per day</option>
-            <option>3 times per day</option>
-            <option>4+ times per day</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="question-group">
-    <div class="question">How often does your doctor recommend you check your blood sugar?</div>
-    <div class="form-row">
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="docRecFreq" aria-label="Doctor recommended blood sugar check frequency">
-            <option value="">Checks per day</option>
-            <option>Less than once a day</option>
-            <option>1 time per day</option>
-            <option>2 times per day</option>
-            <option selected>3 times per day</option>
-            <option>4+ times per day</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health Profile</button>
-
-  <div class="footer">
-    <span>&copy; Livongo Health, All Rights Reserved.</span>
-    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
-  </div>
-</div>
-
-<!-- ========== STEP 4: Complete Your Health Profile ========== -->
-<div class="step" data-step="4">
-  <h1>Complete Your Health Profile</h1>
-  <p class="subtitle">Let's get some basic information about you and your health.</p>
-
-  <div class="source-banner source-banner--records">
-    <span class="sb-icon">🏥</span>
-    <span>Your clinical data was sourced from health records. Update anything that may have changed.</span>
-  </div>
-
-  <div class="question-group">
-    <div class="question">Height</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="heightFt">Feet <span class="source-icon">🏥</span></label>
-        <div class="field-wrap prefilled">
-          <select id="heightFt">
-            <option value="">Feet</option>
-            <option>4</option><option selected>5</option><option>6</option><option>7</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="heightIn">Inches <span class="source-icon">🏥</span></label>
-        <div class="field-wrap prefilled">
-          <select id="heightIn">
-            <option value="">Inches</option>
-            <option>0</option><option>1</option><option>2</option><option>3</option>
-            <option>4</option><option>5</option><option>6</option><option>7</option>
-            <option>8</option><option>9</option><option selected>10</option><option>11</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="question-group">
-    <div class="question">Weight</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="weight">Pounds <span class="source-icon">🏥</span></label>
-        <div class="field-wrap prefilled">
-          <input type="number" id="weight" value="218" min="50" max="600">
-        </div>
-      </div>
-    </div>
-  </div>
+  <p class="section-label" style="margin-top: 32px;">Exams &amp; Monitoring</p>
 
   <div class="question-group">
     <div class="question">Have you had any of the following exams?</div>
@@ -846,6 +755,110 @@ input.error, select.error { border-color: #d32f2f; }
       <input type="radio" name="cgm" value="no" checked>
       No <span class="source-icon">🏥</span>
     </label>
+  </div>
+
+  <p class="section-label" style="margin-top: 32px;">Checking Blood Glucose</p>
+
+  <div class="question-group">
+    <div class="question">How often do you check your blood sugar?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="field-wrap prefilled">
+          <select id="checkFreq" aria-label="How often you check your blood sugar">
+            <option value="">Checks per day</option>
+            <option>Less than once a day</option>
+            <option>1 time per day</option>
+            <option selected>2 times per day</option>
+            <option>3 times per day</option>
+            <option>4+ times per day</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How often does your doctor recommend you check your blood sugar?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="field-wrap prefilled">
+          <select id="docRecFreq" aria-label="Doctor recommended blood sugar check frequency">
+            <option value="">Checks per day</option>
+            <option>Less than once a day</option>
+            <option>1 time per day</option>
+            <option>2 times per day</option>
+            <option selected>3 times per day</option>
+            <option>4+ times per day</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health Profile</button>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 4: A Little More About You ========== -->
+<div class="step" data-step="4">
+  <h1>A Little More About You</h1>
+  <p class="subtitle">These answers help your coach personalize your experience. Answer what you can — you can always update later.</p>
+
+  <div class="data-disclosure-card">
+    <div class="wc-greeting">ℹ️ How We Use This Information</div>
+    <div class="wc-body">
+      Your answers help us match you with the right coach, set meaningful goals, and personalize your Livongo experience. Nothing here is required — answer what you're comfortable with, and update anytime.
+    </div>
+    <div class="wc-privacy">
+      🔒 Your health information is private and protected. Only your care team can see it.
+    </div>
+  </div>
+
+  <div class="source-banner source-banner--records">
+    <span class="sb-icon">🏥</span>
+    <span>Some answers are filled in from your health records. Update anything that's changed.</span>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Height</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="heightFt">Feet <span class="source-icon">🏥</span></label>
+        <div class="field-wrap prefilled">
+          <select id="heightFt">
+            <option value="">Feet</option>
+            <option>4</option><option selected>5</option><option>6</option><option>7</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="heightIn">Inches <span class="source-icon">🏥</span></label>
+        <div class="field-wrap prefilled">
+          <select id="heightIn">
+            <option value="">Inches</option>
+            <option>0</option><option>1</option><option>2</option><option>3</option>
+            <option>4</option><option>5</option><option>6</option><option>7</option>
+            <option>8</option><option>9</option><option selected>10</option><option>11</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Weight</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="weight">Pounds <span class="source-icon">🏥</span></label>
+        <div class="field-wrap prefilled">
+          <input type="number" id="weight" value="218" min="50" max="600">
+        </div>
+      </div>
+    </div>
   </div>
 
   <p class="section-label" style="margin-top:32px;">Other Conditions</p>
@@ -931,7 +944,7 @@ input.error, select.error { border-color: #d32f2f; }
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="other"> Other</label>
   </div>
 
-  <button class="btn-next" onclick="goTo(5)"><span class="label-bold">Next:</span> Shipping &amp; Supplies</button>
+  <button class="btn-next" onclick="goTo(5)"><span class="label-bold">Next:</span> Your Welcome Kit</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -939,9 +952,9 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 5: Shipping & Supplies ========== -->
+<!-- ========== STEP 5: Your Welcome Kit ========== -->
 <div class="step" data-step="5">
-  <h1>Shipping &amp; Supplies</h1>
+  <h1>Your Welcome Kit</h1>
   <p class="subtitle">We'll send you everything you need to get started — at no cost to you.</p>
 
   <div class="source-banner source-banner--employer">
@@ -1167,6 +1180,11 @@ function togglePassword() {
   var pw = document.getElementById('password');
   pw.type = pw.type === 'password' ? 'text' : 'password';
 }
+
+// Show password rules on focus
+document.getElementById('password').addEventListener('focus', function() {
+  document.getElementById('pwRules').classList.add('visible');
+});
 
 // Password validation
 document.getElementById('password').addEventListener('input', function() {
