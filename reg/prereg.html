@@ -74,7 +74,7 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .step { display: none; max-width: 640px; margin: 0 auto; padding: 48px 24px 120px; }
 .step.active { display: block; animation: stepFadeIn 0.3s ease; }
 .step h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #222; }
-.step .subtitle { font-size: 15px; color: #666; margin-bottom: 32px; line-height: 1.5; }
+.step .subtitle { font-size: 15px; color: #666; margin-bottom: 24px; line-height: 1.6; }
 
 /* Step fade animation */
 @keyframes stepFadeIn {
@@ -96,13 +96,13 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .source-banner {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   font-size: 14px;
   color: #444;
   line-height: 1.6;
-  padding: 14px 18px;
+  padding: 16px;
   border-radius: 10px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 .source-banner--employer {
   background: #f0f7ff;
@@ -148,11 +148,11 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 
 /* From Your Records — collapsed summary */
 .records-summary { margin-top: 32px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
-.records-summary summary { padding: 14px 18px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fff; list-style: none; display: flex; align-items: center; }
+.records-summary summary { padding: 16px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fff; list-style: none; display: flex; align-items: center; }
 .records-summary summary::-webkit-details-marker { display: none; }
 .records-summary summary::after { content: "▸"; padding-left: 12px; transition: transform 0.2s; font-size: 14px; color: #999; flex-shrink: 0; }
 .records-summary[open] summary::after { transform: rotate(90deg); }
-.records-summary-body { padding: 16px 18px; border-top: 1px solid #e0e0e0; }
+.records-summary-body { padding: 16px; border-top: 1px solid #e0e0e0; }
 .records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 12px 0 6px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
 .records-source-heading:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 .records-item { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
@@ -169,25 +169,25 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   background: #fff;
   border: none;
   border-radius: 0;
-  padding: 20px 0 24px;
+  padding: 24px 0;
   margin-top: 16px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
   box-shadow: none;
   border-top: 1px solid #e8e8e8;
   border-bottom: 1px solid #e8e8e8;
 }
 .welcome-card .wc-greeting,
 .data-disclosure-card .wc-greeting {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   color: #222;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .welcome-card .wc-body,
 .data-disclosure-card .wc-body {
   font-size: 14px;
   color: #555;
-  line-height: 1.65;
+  line-height: 1.6;
   margin-bottom: 20px;
 }
 .welcome-card .wc-sources,
@@ -195,8 +195,8 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 18px;
-  padding: 14px 16px;
+  margin-bottom: 16px;
+  padding: 16px;
   background: #f9fbff;
   border-radius: 8px;
   border: 1px solid #e8eef8;
@@ -219,8 +219,8 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   color: #888;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-top: 14px;
+  gap: 8px;
+  padding-top: 16px;
   border-top: 1px solid #eee;
 }
 
@@ -230,14 +230,14 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   border: 1px solid #d0e3f8;
   border-left: 4px solid #1976D2;
   border-radius: 10px;
-  padding: 16px 18px;
+  padding: 16px;
   margin-bottom: 24px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
 .coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #1976D2; }
-.coverage-verified .cv-text { font-size: 14px; color: #1565c0; line-height: 1.5; }
+.coverage-verified .cv-text { font-size: 14px; color: #1565c0; line-height: 1.6; }
 .coverage-verified .cv-text strong { font-weight: 700; }
 
 /* Step legend */
@@ -307,8 +307,8 @@ input.error, select.error { border-color: #d32f2f; }
   color: #666;
   margin-top: 8px;
   margin-bottom: 16px;
-  line-height: 1.5;
-  padding: 10px 14px;
+  line-height: 1.6;
+  padding: 12px 16px;
   background: #fafafa;
   border-radius: 8px;
   border: 1px solid #eee;
@@ -360,7 +360,7 @@ input.error, select.error { border-color: #d32f2f; }
 .btn-next .label-bold { font-weight: 700; }
 
 /* Supplies showcase */
-.supplies-showcase { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 24px 0; padding: 20px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; }
+.supplies-showcase { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 24px 0; padding: 24px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; }
 .supplies-list { list-style: none; }
 .supplies-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
 .supplies-list li .check { color: #1976D2; font-size: 18px; }
@@ -369,7 +369,7 @@ input.error, select.error { border-color: #d32f2f; }
 .complete-hero { background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%); color: #fff; text-align: center; padding: 48px 24px; border-radius: 12px; margin-bottom: 32px; }
 .complete-hero .check-circle { width: 64px; height: 64px; border: 3px solid rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; background: rgba(255,255,255,0.1); }
 .complete-hero h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
-.complete-hero p { font-size: 14px; opacity: 0.9; line-height: 1.5; }
+.complete-hero p { font-size: 14px; opacity: 0.9; line-height: 1.6; }
 
 .next-steps-grid {
   display: grid;
@@ -381,21 +381,21 @@ input.error, select.error { border-color: #d32f2f; }
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 12px;
-  padding: 24px 20px;
+  padding: 24px;
   text-align: center;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .next-step-card .ns-icon { font-size: 32px; margin-bottom: 12px; }
-.next-step-card .ns-title { font-size: 15px; font-weight: 700; color: #222; margin-bottom: 8px; }
+.next-step-card .ns-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 8px; }
 .next-step-card .ns-body { font-size: 13px; color: #555; line-height: 1.6; }
-.next-step-card .ns-tag { font-size: 11px; color: #888; margin-top: 10px; font-weight: 500; }
+.next-step-card .ns-tag { font-size: 11px; color: #888; margin-top: 12px; font-weight: 500; }
 
 .impact-stats {
   display: flex;
   justify-content: center;
   gap: 40px;
   margin: 24px 0;
-  padding: 20px;
+  padding: 24px;
   background: #f5f8fc;
   border-radius: 10px;
 }
@@ -407,7 +407,7 @@ input.error, select.error { border-color: #d32f2f; }
 .btn-dashboard:hover { background: #e3f2fd; }
 
 /* Question groups */
-.question-group { margin-bottom: 28px; }
+.question-group { margin-bottom: 24px; }
 .question-group .question { font-size: 15px; font-weight: 500; margin-bottom: 12px; color: #333; }
 .question-group .question .info-icon { color: #1976D2; cursor: help; font-size: 16px; margin-left: 4px; }
 
@@ -430,7 +430,7 @@ input.error, select.error { border-color: #d32f2f; }
 .lang-modal {
   background: #fff;
   border-radius: 12px;
-  padding: 28px 32px;
+  padding: 24px 32px;
   width: 320px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.15);
   text-align: center;
@@ -456,10 +456,10 @@ input.error, select.error { border-color: #d32f2f; }
 .loader-area { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; margin-bottom: 24px; }
 
 /* Help box */
-.help-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 18px; margin-bottom: 24px; }
+.help-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
 
 /* Nav hint */
-.nav-hint { position: fixed; bottom: 16px; right: 16px; background: #333; color: #fff; padding: 8px 14px; border-radius: 10px; font-size: 12px; opacity: 0.7; z-index: 200; }
+.nav-hint { position: fixed; bottom: 16px; right: 16px; background: #333; color: #fff; padding: 8px 12px; border-radius: 10px; font-size: 12px; opacity: 0.7; z-index: 200; }
 
 /* Address section */
 .address-section-header {
@@ -482,7 +482,7 @@ input.error, select.error { border-color: #d32f2f; }
   display: flex;
   align-items: center;
   gap: 8px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 /* Program value card — Step 3, card treatment matching original welcome-card style */
@@ -492,19 +492,19 @@ input.error, select.error { border-color: #d32f2f; }
   border-radius: 10px;
   padding: 24px;
   margin-top: 16px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .program-value-card .wc-greeting {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   color: #222;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .program-value-card .wc-body {
   font-size: 14px;
   color: #555;
-  line-height: 1.65;
+  line-height: 1.6;
   margin-bottom: 0;
 }
 
@@ -513,11 +513,11 @@ input.error, select.error { border-color: #d32f2f; }
   background: #f0f7ff;
   border: 1px solid #d0e3f8;
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   margin-bottom: 16px;
   font-size: 13px;
   color: #555;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 /* Review badge on From Your Records summary — pushed to the right */
@@ -529,7 +529,7 @@ input.error, select.error { border-color: #d32f2f; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 10px;
   margin-left: auto;
   flex-shrink: 0;
