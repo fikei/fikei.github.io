@@ -686,14 +686,14 @@
     <div class="section-label">Impact at a Glance</div>
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-big stat-big--blue">60%</div>
+        <div class="stat-big stat-big--blue">57%</div>
         <div class="stat-label">Fields Sourced</div>
-        <div class="stat-sub">21 of 35 fields ready to confirm — not type from scratch</div>
+        <div class="stat-sub">20 of 35 fields ready to confirm — not type from scratch</div>
       </div>
       <div class="stat-card">
-        <div class="stat-big stat-big--green">44%</div>
+        <div class="stat-big stat-big--green">33%</div>
         <div class="stat-label">Fewer Steps</div>
-        <div class="stat-sub">5 steps vs. 9 — coverage + coaching handled elsewhere</div>
+        <div class="stat-sub">6 steps vs. 9 — coverage + coaching handled elsewhere</div>
       </div>
       <div class="stat-card">
         <div class="stat-big" style="color: var(--yellow);">~5 min</div>
@@ -795,10 +795,10 @@
         <div class="flow-card-header">
           <div class="flow-card-title-row">
             <span class="flow-card-title">Optimized Flow</span>
-            <span class="badge badge--green">5 Steps</span>
-            <span class="badge badge--savings">−4 Steps</span>
+            <span class="badge badge--green">6 Steps</span>
+            <span class="badge badge--savings">−3 Steps</span>
           </div>
-          <div class="flow-card-desc">Employer, health records, and carrier data source 21 of 35 fields for confirmation. Coverage verified server-side; coaching moved to on-device setup.</div>
+          <div class="flow-card-desc">Employer, health records, and carrier data source 20 of 35 fields for confirmation. Coverage verified server-side; coaching moved to on-device setup.</div>
         </div>
         <div class="flow-card-body">
           <ol class="step-list">
@@ -809,43 +809,53 @@
                   <a href="prereg.html#step-1" target="_blank">Confirm Identity</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
-                <div class="step-subtitle">Enter name &amp; DOB to verify identity, confirm email from employer</div>
+                <div class="step-subtitle">Enter name &amp; DOB to verify enrollment</div>
               </div>
             </li>
             <li class="step-item">
               <span class="step-num step-num--green">2</span>
               <div class="step-content">
                 <div class="step-title">
-                  <a href="prereg.html#step-2" target="_blank">Care Plan</a>
-                  <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
+                  <a href="prereg.html#step-2" target="_blank">Create Account</a>
+                  <span class="badge badge--red" style="font-size:0.6rem; padding:2px 6px;">User enters</span>
                 </div>
-                <div class="step-subtitle">Diabetes type, A1C, meds from health records — user confirms</div>
+                <div class="step-subtitle">Email, password, and phone to set up access</div>
               </div>
             </li>
             <li class="step-item">
               <span class="step-num step-num--green">3</span>
               <div class="step-content">
                 <div class="step-title">
-                  <a href="prereg.html#step-3" target="_blank">Health Profile</a>
+                  <a href="prereg.html#step-3" target="_blank">Care Plan</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
-                <div class="step-subtitle">Height, weight, conditions, smoking from health records — user confirms</div>
+                <div class="step-subtitle">Diabetes type, A1C, meds from health records — user confirms</div>
               </div>
             </li>
             <li class="step-item">
               <span class="step-num step-num--green">4</span>
               <div class="step-content">
                 <div class="step-title">
-                  <a href="prereg.html#step-4" target="_blank">Shipping &amp; Supplies</a>
+                  <a href="prereg.html#step-4" target="_blank">Health Profile</a>
+                  <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
+                </div>
+                <div class="step-subtitle">Height, weight, conditions, smoking from health records — user confirms</div>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num step-num--green">5</span>
+              <div class="step-content">
+                <div class="step-title">
+                  <a href="prereg.html#step-5" target="_blank">Shipping &amp; Supplies</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
                 <div class="step-subtitle">Address from employer records — user confirms</div>
               </div>
             </li>
             <li class="step-item">
-              <span class="step-num step-num--green">5</span>
+              <span class="step-num step-num--green">6</span>
               <div class="step-content">
-                <div class="step-title"><a href="prereg.html#step-5" target="_blank">Welcome</a></div>
+                <div class="step-title"><a href="prereg.html#step-6" target="_blank">Welcome</a></div>
                 <div class="step-subtitle">Next steps: app, coach, and kit setup</div>
               </div>
             </li>
@@ -981,15 +991,15 @@
     <!-- Filter bar -->
     <div class="filter-bar" id="filterBar">
       <button class="filter-pill active" data-filter="all">All <span class="count">(35)</span></button>
-      <button class="filter-pill" data-filter="confirm">🟢 Confirm <span class="count">(21)</span></button>
-      <button class="filter-pill" data-filter="user">🔴 User enters <span class="count">(6)</span></button>
+      <button class="filter-pill" data-filter="confirm">🟢 Confirm <span class="count">(20)</span></button>
+      <button class="filter-pill" data-filter="user">🔴 User enters <span class="count">(7)</span></button>
       <button class="filter-pill" data-filter="skipped">⚠ Skipped <span class="count">(6)</span></button>
       <button class="filter-pill" data-filter="partial">🟡 Partial <span class="count">(2)</span></button>
     </div>
 
     <div class="table-section">
       <div class="table-section-header">
-        <div class="section-label" style="margin-bottom:2px;">35 Fields — 21 Confirm, 6 User-Entered, 6 Skipped, 2 Partial</div>
+        <div class="section-label" style="margin-bottom:2px;">35 Fields — 20 Confirm, 7 User-Entered, 6 Skipped, 2 Partial</div>
         <div style="font-size:0.8125rem; color: var(--gray-600);">Scroll horizontally on small screens to see all columns.</div>
       </div>
 
@@ -1008,7 +1018,7 @@
 
             <!-- Personal Information -->
             <tr class="table-group-row" data-group="identity">
-              <td colspan="5">Step 1 — Confirm Identity</td>
+              <td colspan="5">Steps 1–2 — Confirm Identity &amp; Create Account</td>
             </tr>
             <tr data-status="user">
               <td class="field-name">Legal First Name</td>
@@ -1024,12 +1034,12 @@
               <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
               <td class="field-notes">Identity confirmation</td>
             </tr>
-            <tr data-status="confirm">
+            <tr data-status="user">
               <td class="field-name">Email Address</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
-              <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">Pre-filled after identity confirmed</td>
+              <td><span class="status-chip status-chip--red">🔴 User enters</span></td>
+              <td class="field-source"><span class="source-pill source-pill--user">✏️ User Enters</span></td>
+              <td class="field-notes">Member enters on account creation step</td>
             </tr>
             <tr data-status="user">
               <td class="field-name">Password</td>
@@ -1095,7 +1105,7 @@
 
             <!-- Care Plan -->
             <tr class="table-group-row" data-group="careplan">
-              <td colspan="5">Step 2 — Care Plan</td>
+              <td colspan="5">Step 3 — Care Plan</td>
             </tr>
             <tr data-status="confirm">
               <td class="field-name">Gender</td>
@@ -1168,7 +1178,7 @@
 
             <!-- Health Profile -->
             <tr class="table-group-row" data-group="health">
-              <td colspan="5">Step 3 — Health Profile</td>
+              <td colspan="5">Step 4 — Health Profile</td>
             </tr>
             <tr data-status="confirm">
               <td class="field-name">Height</td>
@@ -1243,7 +1253,7 @@
 
             <!-- Shipping -->
             <tr class="table-group-row" data-group="shipping">
-              <td colspan="5">Step 4 — Shipping &amp; Supplies</td>
+              <td colspan="5">Step 5 — Shipping &amp; Supplies</td>
             </tr>
             <tr data-status="confirm">
               <td class="field-name">Street Address</td>
