@@ -116,8 +116,42 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 }
 .source-banner .sb-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 
-/* Source icons — field-level compact indicators */
-.source-icon { font-size: 12px; opacity: 0.6; margin-left: 4px; }
+/* Prefilled indicator — polished dot on right side */
+.field-wrap.prefilled { position: relative; }
+.field-wrap.prefilled::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #1976D2;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.radio-card.preselected::after,
+.checkbox-card.preselected::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: #1976D2;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* From Your Records — collapsed summary */
+.records-summary { margin-top: 32px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+.records-summary summary { padding: 14px 18px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fafafa; list-style: none; }
+.records-summary summary::-webkit-details-marker { display: none; }
+.records-summary summary::after { content: "▸"; float: right; transition: transform 0.2s; }
+.records-summary[open] summary::after { transform: rotate(90deg); }
+.records-summary-body { padding: 16px 18px; border-top: 1px solid #e0e0e0; }
+.records-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.records-item:last-child { border-bottom: none; }
+.records-label { color: #777; }
+.records-value { font-weight: 500; color: #333; }
 
 /* Welcome Card + Data Disclosure Card */
 .welcome-card,
@@ -233,15 +267,11 @@ input.error, select.error { border-color: #d32f2f; }
 .field-wrap { position: relative; }
 .field-wrap.prefilled input,
 .field-wrap.prefilled select {
-  background: #f9fbff;
-  border-color: #b3d4f5;
-  border-left: 3px solid #1976D2;
-  color: #1a237e;
+  padding-right: 28px;
 }
 .field-wrap.prefilled input:focus,
 .field-wrap.prefilled select:focus {
   border-color: #1976D2;
-  background: #fff;
 }
 
 /* Identity hint */
@@ -283,11 +313,6 @@ input.error, select.error { border-color: #d32f2f; }
 .radio-card .info-icon { margin-left: auto; color: #1976D2; cursor: help; font-size: 18px; }
 
 /* Pre-selected radio card */
-.radio-card.preselected {
-  border-color: #90caf9;
-  background: #f0f7ff;
-  border-left: 3px solid #1976D2;
-}
 .radio-card.preselected.selected {
   border-color: #1976D2;
   background: #e3f2fd;
@@ -300,10 +325,7 @@ input.error, select.error { border-color: #d32f2f; }
 .checkbox-card input { accent-color: #1976D2; width: 18px; height: 18px; }
 .checkbox-card .info-icon { margin-left: auto; color: #1976D2; cursor: help; font-size: 18px; }
 
-/* Pre-selected checkbox card */
-.checkbox-card.preselected {
-  border-left: 3px solid #1976D2;
-}
+/* Pre-selected checkbox card — dot indicator added via ::after in prefilled section */
 
 /* Buttons */
 .btn-next { display: block; width: 100%; padding: 18px; background: #1976D2; color: #fff; border: none; border-radius: 10px; font-size: 17px; font-weight: 500; cursor: pointer; transition: background 0.2s; font-family: 'Roboto', sans-serif; margin-top: 24px; box-shadow: 0 2px 8px rgba(25,118,210,0.25); min-height: 56px; }
@@ -495,7 +517,7 @@ input.error, select.error { border-color: #d32f2f; }
   <div class="form-row single">
     <div class="form-group">
       <label for="dob">Date of Birth <span class="req">*</span></label>
-      <input type="date" id="dob" required>
+      <input type="text" id="dob" placeholder="MM / DD / YYYY" maxlength="14" required inputmode="numeric">
       <span class="error-msg" id="dobErr">Date of birth is required</span>
     </div>
   </div>
@@ -605,61 +627,22 @@ input.error, select.error { border-color: #d32f2f; }
     <span>Your diabetes history was sourced from health plan records. Review each item and correct anything that's changed.</span>
   </div>
 
-  <p class="section-label">History</p>
-
   <div class="question-group">
     <div class="question">What is your gender?</div>
     <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
       <input type="radio" name="gender" value="male" checked>
-      Male <span class="source-icon">🏢</span>
-    </label>
+      Male    </label>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="female"> Female</label>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="other"> Prefer to self-describe</label>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="nodisclose"> Prefer not to disclose</label>
   </div>
 
-  <div class="question-group">
-    <div class="question">What type of diabetes do you have?</div>
-    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="diabetesType" value="type1"> Type 1 <span class="info-icon" title="Type 1 diabetes is an autoimmune condition">ⓘ</span></label>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="diabetesType" value="type2" checked>
-      Type 2 <span class="info-icon" title="Type 2 diabetes affects how your body processes blood sugar">ⓘ</span>
-      <span class="source-icon">🏥</span>
-    </label>
-  </div>
-
-  <div class="question-group">
-    <div class="question">When were you diagnosed with diabetes?</div>
-    <div class="form-row">
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="diagYear" aria-label="Diagnosis year">
-            <option value="">Year</option>
-            <option>2024</option><option>2023</option><option>2022</option><option>2021</option>
-            <option>2020</option><option selected>2019</option><option>2018</option><option>2017</option>
-            <option>2016</option><option>2015</option><option>2010-2014</option>
-            <option>2005-2009</option><option>Before 2005</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <select id="diagMonth" aria-label="Diagnosis month (optional)">
-          <option value="">Month (Optional)</option>
-          <option>January</option><option>February</option><option>March</option>
-          <option>April</option><option>May</option><option>June</option>
-          <option>July</option><option>August</option><option>September</option>
-          <option>October</option><option>November</option><option>December</option>
-        </select>
-      </div>
-    </div>
-  </div>
 
   <div class="question-group">
     <div class="question">Have you ever had an A1C check? <span class="info-icon" title="A1C measures your average blood sugar over 2-3 months">ⓘ</span></div>
     <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
       <input type="radio" name="a1c" value="yes" checked>
-      Yes <span class="source-icon">🏥</span>
-    </label>
+      Yes    </label>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="a1c" value="no"> No</label>
     <div class="checkbox-row" style="margin-top: 8px;">
       <input type="checkbox" id="a1cUnsure">
@@ -667,94 +650,13 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <div class="question-group">
-    <div class="question">Check all of the following you use to help manage diabetes.</div>
-    <label class="checkbox-card preselected selected" onclick="toggleCheckCard(this)">
-      <input type="checkbox" name="meds" value="oral" checked>
-      Oral Medications <span class="info-icon">ⓘ</span>
-      <span class="source-icon">🏥</span>
-    </label>
-    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" name="meds" value="injection"> Insulin Injections <span class="info-icon">ⓘ</span></label>
-    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" name="meds" value="pump"> Insulin Pump <span class="info-icon">ⓘ</span></label>
-    <div class="checkbox-row" style="margin-top: 8px;">
-      <input type="checkbox" id="noMeds">
-      <label for="noMeds">I don't use medications to manage diabetes.</label>
-    </div>
-  </div>
-
-  <p class="section-label" style="margin-top: 32px;">Exams &amp; Monitoring</p>
-
-  <div class="question-group">
-    <div class="question">Have you had any of the following exams?</div>
-    <label class="checkbox-card preselected selected" onclick="toggleCheckCard(this)">
-      <input type="checkbox" value="eye" checked>
-      Diabetes eye exam <span class="source-icon">🏥</span>
-    </label>
-    <label class="checkbox-card preselected selected" onclick="toggleCheckCard(this)">
-      <input type="checkbox" value="foot" checked>
-      Foot exam by a doctor or medical professional <span class="source-icon">🏥</span>
-    </label>
-  </div>
-
-  <div class="question-group">
-    <div class="question">When was your last diabetes eye exam?</div>
-    <div class="form-row">
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="eyeExamMonth" aria-label="Eye exam month (optional)">
-            <option value="">Month (Optional)</option>
-            <option>January</option><option>February</option><option selected>March</option>
-            <option>April</option><option>May</option><option>June</option>
-            <option>July</option><option>August</option><option>September</option>
-            <option>October</option><option>November</option><option>December</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="eyeExamYear" aria-label="Eye exam year">
-            <option value="">Year</option>
-            <option>2025</option><option selected>2024</option><option>2023</option>
-            <option>2022</option><option>2021</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="question-group">
-    <div class="question">When was your last foot exam?</div>
-    <div class="form-row">
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="footExamMonth" aria-label="Foot exam month (optional)">
-            <option value="">Month (Optional)</option>
-            <option>January</option><option>February</option><option>March</option>
-            <option>April</option><option>May</option><option>June</option>
-            <option>July</option><option>August</option><option>September</option>
-            <option>October</option><option selected>November</option><option>December</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="field-wrap prefilled">
-          <select id="footExamYear" aria-label="Foot exam year">
-            <option value="">Year</option>
-            <option>2025</option><option selected>2024</option><option>2023</option>
-            <option>2022</option><option>2021</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div class="question-group">
     <div class="question">Do you use a Continuous Glucose Monitor (CGM) to help monitor your blood glucose?</div>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="cgm" value="yes"> Yes</label>
     <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
       <input type="radio" name="cgm" value="no" checked>
-      No <span class="source-icon">🏥</span>
-    </label>
+      No    </label>
   </div>
 
   <p class="section-label" style="margin-top: 32px;">Checking Blood Glucose</p>
@@ -795,7 +697,33 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health Profile</button>
+  <details class="records-summary">
+    <summary>From Your Records</summary>
+    <div class="records-summary-body">
+      <div class="records-item">
+        <span class="records-label">Diabetes Type</span>
+        <span class="records-value">Type 2</span>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Diagnosed</span>
+        <span class="records-value">2019</span>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Medications</span>
+        <span class="records-value">Oral Medications</span>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Diabetes Eye Exam</span>
+        <span class="records-value">March 2024</span>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Foot Exam</span>
+        <span class="records-value">November 2024</span>
+      </div>
+    </div>
+  </details>
+
+  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> A Little More About You</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -827,7 +755,7 @@ input.error, select.error { border-color: #d32f2f; }
     <div class="question">Height</div>
     <div class="form-row">
       <div class="form-group">
-        <label for="heightFt">Feet <span class="source-icon">🏥</span></label>
+        <label for="heightFt">Feet </label>
         <div class="field-wrap prefilled">
           <select id="heightFt">
             <option value="">Feet</option>
@@ -836,7 +764,7 @@ input.error, select.error { border-color: #d32f2f; }
         </div>
       </div>
       <div class="form-group">
-        <label for="heightIn">Inches <span class="source-icon">🏥</span></label>
+        <label for="heightIn">Inches </label>
         <div class="field-wrap prefilled">
           <select id="heightIn">
             <option value="">Inches</option>
@@ -853,7 +781,7 @@ input.error, select.error { border-color: #d32f2f; }
     <div class="question">Weight</div>
     <div class="form-row">
       <div class="form-group">
-        <label for="weight">Pounds <span class="source-icon">🏥</span></label>
+        <label for="weight">Pounds </label>
         <div class="field-wrap prefilled">
           <input type="number" id="weight" value="218" min="50" max="600">
         </div>
@@ -868,8 +796,7 @@ input.error, select.error { border-color: #d32f2f; }
     <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="cholesterol"> High Cholesterol</label>
     <label class="checkbox-card preselected selected" onclick="toggleCheckCard(this)">
       <input type="checkbox" value="hbp" checked>
-      High Blood Pressure (Hypertension) <span class="source-icon">🏥</span>
-    </label>
+      High Blood Pressure (Hypertension)    </label>
   </div>
 
   <div class="question-group">
@@ -877,16 +804,14 @@ input.error, select.error { border-color: #d32f2f; }
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="smoke" value="yes"> Yes</label>
     <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
       <input type="radio" name="smoke" value="no" checked>
-      No <span class="source-icon">🏥</span>
-    </label>
+      No    </label>
   </div>
 
   <div class="question-group">
     <div class="question">Have you had a flu vaccine within the last year? <span class="info-icon">ⓘ</span></div>
     <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
       <input type="radio" name="flu" value="yes" checked>
-      Yes <span class="source-icon">🏥</span>
-    </label>
+      Yes    </label>
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="flu" value="no"> No</label>
   </div>
 
@@ -957,11 +882,6 @@ input.error, select.error { border-color: #d32f2f; }
   <h1>Your Welcome Kit</h1>
   <p class="subtitle">We'll send you everything you need to get started — at no cost to you.</p>
 
-  <div class="source-banner source-banner--employer">
-    <span class="sb-icon">🏢</span>
-    <span>Your address was sourced from employer records. Confirm or update for kit delivery.</span>
-  </div>
-
   <div class="supplies-showcase">
     <ul class="supplies-list">
       <li><span class="check">✅</span> An advanced glucose meter ($200 value)</li>
@@ -976,7 +896,7 @@ input.error, select.error { border-color: #d32f2f; }
 
   <div class="form-row single">
     <div class="form-group">
-      <label for="street">Street Address <span class="req">*</span> <span class="source-icon">🏢</span></label>
+      <label for="street">Street Address <span class="req">*</span> </label>
       <div class="field-wrap prefilled">
         <input type="text" id="street" value="1847 Oak Ridge Drive" required>
       </div>
@@ -993,13 +913,13 @@ input.error, select.error { border-color: #d32f2f; }
 
   <div class="form-row">
     <div class="form-group">
-      <label for="city">City <span class="req">*</span> <span class="source-icon">🏢</span></label>
+      <label for="city">City <span class="req">*</span> </label>
       <div class="field-wrap prefilled">
         <input type="text" id="city" value="Fort Worth" required>
       </div>
     </div>
     <div class="form-group" style="max-width:100px;">
-      <label for="state">State <span class="req">*</span> <span class="source-icon">🏢</span></label>
+      <label for="state">State <span class="req">*</span> </label>
       <div class="field-wrap prefilled">
         <select id="state">
           <option value="">State</option>
@@ -1020,11 +940,16 @@ input.error, select.error { border-color: #d32f2f; }
       </div>
     </div>
     <div class="form-group" style="max-width:120px;">
-      <label for="zip">Zip Code <span class="req">*</span> <span class="source-icon">🏢</span></label>
+      <label for="zip">Zip Code <span class="req">*</span> </label>
       <div class="field-wrap prefilled">
         <input type="text" id="zip" value="76102" maxlength="10">
       </div>
     </div>
+  </div>
+
+  <div class="source-banner source-banner--employer">
+    <span class="sb-icon">🏢</span>
+    <span>Address provided by your employer.</span>
   </div>
 
   <button class="btn-next" onclick="goTo(6)">Finish Setup</button>
@@ -1102,7 +1027,7 @@ const totalSteps = 6;
 
 // Progress bar section mapping
 // Steps 1-2 = Sign Up section (Confirm Identity + Create Account)
-// Steps 3-5 = About You section (Care Plan, Health Profile, Shipping)
+// Steps 3-5 = About You section (Diabetes Care Plan, Health Profile, Shipping)
 // Step 6 = Welcome section
 const stepSections = {
   1: { section: 'signup', progress: 50 },
@@ -1269,6 +1194,19 @@ if (location.hash) {
   var step = parseInt(location.hash.replace('#step-', ''));
   if (!isNaN(step) && step >= 1 && step <= totalSteps) goTo(step);
 }
+
+// DOB auto-format: MM / DD / YYYY
+document.getElementById('dob').addEventListener('input', function() {
+  var val = this.value.replace(/\D/g, '');
+  if (val.length > 8) val = val.slice(0, 8);
+  if (val.length >= 5) {
+    this.value = val.slice(0,2) + ' / ' + val.slice(2,4) + ' / ' + val.slice(4);
+  } else if (val.length >= 3) {
+    this.value = val.slice(0,2) + ' / ' + val.slice(2);
+  } else {
+    this.value = val;
+  }
+});
 
 // Initial state
 updateProgress();

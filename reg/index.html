@@ -760,7 +760,7 @@
             <li class="step-item">
               <span class="step-num step-num--blue">6</span>
               <div class="step-content">
-                <div class="step-title"><a href="standard.html#step-6" target="_blank">Care Plan</a></div>
+                <div class="step-title"><a href="standard.html#step-6" target="_blank">Diabetes Care Plan</a></div>
                 <div class="step-subtitle">Health questions — diabetes type, diagnosis, meds</div>
               </div>
             </li>
@@ -829,7 +829,7 @@
                   <a href="prereg.html#step-3" target="_blank">Supporting Your Diabetes</a>
                   <span class="badge badge--green" style="font-size:0.6rem; padding:2px 6px;">Confirm</span>
                 </div>
-                <div class="step-subtitle">Diabetes history, exams, and monitoring from records — user confirms</div>
+                <div class="step-subtitle">Gender, A1C, CGM, blood glucose — skippable fields auto-confirmed</div>
               </div>
             </li>
             <li class="step-item">
@@ -991,15 +991,15 @@
     <!-- Filter bar -->
     <div class="filter-bar" id="filterBar">
       <button class="filter-pill active" data-filter="all">All <span class="count">(35)</span></button>
-      <button class="filter-pill" data-filter="confirm">🟢 Confirm <span class="count">(20)</span></button>
+      <button class="filter-pill" data-filter="confirm">🟢 Confirm <span class="count">(16)</span></button>
       <button class="filter-pill" data-filter="user">🔴 User enters <span class="count">(7)</span></button>
-      <button class="filter-pill" data-filter="skipped">⚠ Skipped <span class="count">(6)</span></button>
+      <button class="filter-pill" data-filter="skipped">⚠ Skipped <span class="count">(10)</span></button>
       <button class="filter-pill" data-filter="partial">🟡 Partial <span class="count">(2)</span></button>
     </div>
 
     <div class="table-section">
       <div class="table-section-header">
-        <div class="section-label" style="margin-bottom:2px;">35 Fields — 20 Confirm, 7 User-Entered, 6 Skipped, 2 Partial</div>
+        <div class="section-label" style="margin-bottom:2px;">35 Fields — 16 Confirm, 7 User-Entered, 10 Skipped, 2 Partial</div>
         <div style="font-size:0.8125rem; color: var(--gray-600);">Scroll horizontally on small screens to see all columns.</div>
       </div>
 
@@ -1103,7 +1103,7 @@
               <td class="field-notes">Employer benefits — verified server-side</td>
             </tr>
 
-            <!-- Care Plan -->
+            <!-- Diabetes Care Plan -->
             <tr class="table-group-row" data-group="careplan">
               <td colspan="5">Step 3 — Supporting Your Diabetes</td>
             </tr>
@@ -1112,21 +1112,21 @@
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--employer">🏢 Employer HR</span></td>
-              <td class="field-notes">User confirms on Care Plan</td>
+              <td class="field-notes">User confirms on Diabetes Care Plan</td>
             </tr>
-            <tr data-status="confirm">
+            <tr data-status="skipped">
               <td class="field-name">Diabetes Type</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
-              <td class="field-notes">From health plan claims data</td>
+              <td class="field-notes">Auto-confirmed from health records</td>
             </tr>
-            <tr data-status="confirm">
+            <tr data-status="skipped">
               <td class="field-name">Diagnosis Date</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
-              <td class="field-notes">From health plan claims data</td>
+              <td class="field-notes">Auto-confirmed from health records</td>
             </tr>
             <tr data-status="confirm">
               <td class="field-name">A1C Check</td>
@@ -1135,12 +1135,12 @@
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
               <td class="field-notes">Most recent lab result</td>
             </tr>
-            <tr data-status="confirm">
+            <tr data-status="skipped">
               <td class="field-name">Medications</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
-              <td class="field-notes">From pharmacy claims data</td>
+              <td class="field-notes">Auto-confirmed from pharmacy claims data</td>
             </tr>
             <tr data-status="confirm">
               <td class="field-name">BG Check Frequency</td>
@@ -1154,14 +1154,14 @@
               <td class="field-standard">Manual entry</td>
               <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
-              <td class="field-notes">From care plan notes</td>
+              <td class="field-notes">From diabetes care plan notes</td>
             </tr>
-            <tr data-status="confirm">
+            <tr data-status="skipped">
               <td class="field-name">Exams History</td>
               <td class="field-standard">Manual entry</td>
-              <td><span class="status-chip status-chip--green">🟢 Confirm</span></td>
+              <td><span class="status-chip status-chip--black">⚠ Skipped</span></td>
               <td class="field-source"><span class="source-pill source-pill--health">🏥 Health Records</span></td>
-              <td class="field-notes">Eye exam, foot exam — moved to diabetes step for continuity</td>
+              <td class="field-notes">Auto-confirmed — exams within last year from claims data</td>
             </tr>
             <tr data-status="confirm">
               <td class="field-name">CGM Usage</td>
