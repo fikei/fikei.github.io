@@ -1199,6 +1199,7 @@ function selectRadioCard(el) {
   var name = el.querySelector('input').name;
   document.querySelectorAll('input[name="' + name + '"]').forEach(function(i) {
     i.closest('.radio-card').classList.remove('selected');
+    i.closest('.radio-card').classList.remove('preselected');
   });
   el.classList.add('selected');
   el.querySelector('input').checked = true;
@@ -1208,7 +1209,20 @@ function selectRadioCard(el) {
 function toggleCheckCard(el) {
   var cb = el.querySelector('input');
   el.classList.toggle('selected', cb.checked);
+  if (!cb.checked) el.classList.remove('preselected');
 }
+
+// Remove prefilled dot when user edits a prefilled text input or select
+document.querySelectorAll('.field-wrap.prefilled input, .field-wrap.prefilled select').forEach(function(field) {
+  field.addEventListener('input', function() {
+    var wrap = this.closest('.field-wrap');
+    if (wrap) wrap.classList.remove('prefilled', 'prefilled--select');
+  });
+  field.addEventListener('change', function() {
+    var wrap = this.closest('.field-wrap');
+    if (wrap) wrap.classList.remove('prefilled', 'prefilled--select');
+  });
+});
 
 // Language modal
 function openLangModal() {
