@@ -137,16 +137,40 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .records-summary summary::-webkit-details-marker { display: none; }
 .records-summary summary::after { content: "▸"; padding-left: 12px; transition: transform 0.2s; font-size: 14px; color: #999; flex-shrink: 0; }
 .records-summary[open] summary::after { transform: rotate(90deg); }
-.records-summary-body { padding: 16px; border-top: 1px solid #e0e0e0; }
-.records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 12px 0 6px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
-.records-source-heading:first-child { margin-top: 0; padding-top: 0; border-top: none; }
-.records-item { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.records-summary-body { padding: 20px; border-top: 1px solid #e0e0e0; }
+.records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 20px 0 8px; }
+.records-source-heading:first-child { margin-top: 0; }
+.records-item { display: flex; align-items: center; padding: 16px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
 .records-item:last-child { border-bottom: none; }
-.records-label { color: #777; flex: 1; }
-.records-value { font-weight: 500; color: #333; }
-.records-edit { font-size: 12px; color: #1976D2; cursor: pointer; margin-left: 12px; text-decoration: none; }
-.records-edit:hover { text-decoration: underline; }
-.records-privacy { font-size: 12px; color: #999; padding-top: 12px; margin-top: 8px; border-top: 1px solid #eee; }
+.records-label { color: #777; width: 140px; flex-shrink: 0; }
+.records-value { flex: 1; font-weight: 500; color: #333; }
+.records-edit {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1976D2;
+  cursor: pointer;
+  margin-left: 12px;
+  text-decoration: none;
+  padding: 4px 12px;
+  border: 1px solid #d0e3f8;
+  border-radius: 6px;
+  background: #f5f9ff;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.records-edit:hover { background: #e3f2fd; border-color: #1976D2; }
+.records-input {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  padding: 6px 10px;
+  border: 1px solid #1976D2;
+  border-radius: 6px;
+  background: #fff;
+  font-family: 'Roboto', sans-serif;
+}
+.records-privacy { font-size: 12px; color: #999; padding-top: 16px; margin-top: 12px; border-top: 1px solid #eee; }
 
 /* Welcome Card + Data Disclosure Card — bordered card matching program-value-card */
 .welcome-card,
@@ -726,39 +750,54 @@ input.error, select.error { border-color: #d32f2f; }
       <div class="records-item">
         <span class="records-label">Gender</span>
         <span class="records-value">Male</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <select class="records-input" style="display:none">
+          <option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
 
       <div class="records-source-heading">🏥 Health Records</div>
       <div class="records-item">
         <span class="records-label">Diabetes Type</span>
         <span class="records-value">Type 2</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <select class="records-input" style="display:none">
+          <option>Type 1</option><option>Type 2</option><option>Gestational</option><option>Pre-diabetes</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Diagnosed</span>
         <span class="records-value">2019</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <input type="number" class="records-input" min="1950" max="2026" style="display:none">
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">A1C Check</span>
         <span class="records-value">Yes</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <select class="records-input" style="display:none">
+          <option>Yes</option><option>No</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Medications</span>
         <span class="records-value">Oral Medications</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <select class="records-input" style="display:none">
+          <option>None</option><option>Oral Medications</option><option>Insulin</option><option>Both</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Diabetes Eye Exam</span>
         <span class="records-value">March 2024</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <input type="text" class="records-input" placeholder="e.g. March 2024" style="display:none">
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Foot Exam</span>
         <span class="records-value">November 2024</span>
-        <a class="records-edit" onclick="return false">Edit</a>
+        <input type="text" class="records-input" placeholder="e.g. November 2024" style="display:none">
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
       </div>
 
       <div class="records-privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
@@ -1223,6 +1262,42 @@ document.querySelectorAll('.field-wrap.prefilled input, .field-wrap.prefilled se
     if (wrap) wrap.classList.remove('prefilled', 'prefilled--select');
   });
 });
+
+// Inline edit toggle for From Your Records rows
+function toggleRecordEdit(el) {
+  var row = el.closest('.records-item');
+  var valueEl = row.querySelector('.records-value');
+  var inputEl = row.querySelector('.records-input');
+  var isEditing = inputEl.style.display !== 'none';
+
+  if (isEditing) {
+    // Save: update value from input, switch back to read mode
+    if (inputEl.tagName === 'SELECT') {
+      valueEl.textContent = inputEl.options[inputEl.selectedIndex].text;
+    } else {
+      valueEl.textContent = inputEl.value;
+    }
+    valueEl.style.display = '';
+    inputEl.style.display = 'none';
+    el.textContent = 'Edit';
+  } else {
+    // Edit: show input with current value, hide value text
+    if (inputEl.tagName === 'SELECT') {
+      for (var i = 0; i < inputEl.options.length; i++) {
+        if (inputEl.options[i].text === valueEl.textContent.trim()) {
+          inputEl.selectedIndex = i;
+          break;
+        }
+      }
+    } else {
+      inputEl.value = valueEl.textContent.trim();
+    }
+    valueEl.style.display = 'none';
+    inputEl.style.display = '';
+    inputEl.focus();
+    el.textContent = 'Done';
+  }
+}
 
 // Language modal
 function openLangModal() {
