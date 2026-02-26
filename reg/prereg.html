@@ -59,16 +59,6 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   width: 100%;
   background: #1976D2;
 }
-.progress-section-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #e0e0e0;
-  flex-shrink: 0;
-  transition: background 0.3s;
-}
-.progress-section-dot.active { background: #1976D2; }
-.progress-section-dot.done { background: #1976D2; }
 
 /* Step Container */
 .step { display: none; max-width: 640px; margin: 0 auto; padding: 48px 24px 120px; }
@@ -542,12 +532,10 @@ input.error, select.error { border-color: #d32f2f; }
       <div class="progress-section">
         <span class="progress-section-label active" data-section="signup">Sign Up</span>
         <div class="progress-section-bar"><div class="progress-section-fill" data-section="signup"></div></div>
-        <span class="progress-section-dot active" data-section="signup"></span>
       </div>
       <div class="progress-section">
         <span class="progress-section-label" data-section="about">About You</span>
         <div class="progress-section-bar"><div class="progress-section-fill" data-section="about"></div></div>
-        <span class="progress-section-dot" data-section="about"></span>
       </div>
       <div class="progress-section">
         <span class="progress-section-label" data-section="welcome">Welcome</span>
@@ -1144,8 +1132,6 @@ function updateProgress() {
   sectionOrder.forEach(function(sec, idx) {
     var labels = document.querySelectorAll('.progress-section-label[data-section="' + sec + '"]');
     var fills = document.querySelectorAll('.progress-section-fill[data-section="' + sec + '"]');
-    var dots = document.querySelectorAll('.progress-section-dot[data-section="' + sec + '"]');
-
     labels.forEach(function(el) {
       el.classList.remove('active', 'done');
       if (idx < currentIdx) el.classList.add('done');
@@ -1164,11 +1150,6 @@ function updateProgress() {
       }
     });
 
-    dots.forEach(function(el) {
-      el.classList.remove('active', 'done');
-      if (idx < currentIdx) el.classList.add('done');
-      else if (idx === currentIdx) el.classList.add('active');
-    });
   });
 }
 
