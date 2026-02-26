@@ -163,32 +163,36 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .records-edit:hover { text-decoration: underline; }
 .records-privacy { font-size: 12px; color: #999; padding-top: 12px; margin-top: 8px; border-top: 1px solid #eee; }
 
-/* Welcome Card + Data Disclosure Card */
+/* Welcome Card + Data Disclosure Card — bordered card matching program-value-card */
 .welcome-card,
 .data-disclosure-card {
-  background: #fff;
-  border: none;
-  border-radius: 0;
-  padding: 24px 0;
+  background: #faf8f5;
+  border: 1px solid #ede8e1;
+  border-radius: 10px;
+  padding: 24px;
   margin-top: 16px;
   margin-bottom: 24px;
-  box-shadow: none;
-  border-top: 1px solid #e8e8e8;
-  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .welcome-card .wc-greeting,
-.data-disclosure-card .wc-greeting {
+.data-disclosure-card .wc-greeting,
+.program-value-card .wc-greeting {
   font-size: 17px;
   font-weight: 600;
   color: #222;
   margin-bottom: 8px;
 }
 .welcome-card .wc-body,
-.data-disclosure-card .wc-body {
+.data-disclosure-card .wc-body,
+.program-value-card .wc-body {
   font-size: 14px;
   color: #555;
   line-height: 1.6;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+.welcome-card .wc-body + .wc-sources,
+.data-disclosure-card .wc-body + .wc-sources {
+  margin-top: 16px;
 }
 .welcome-card .wc-sources,
 .data-disclosure-card .wc-sources {
@@ -224,11 +228,11 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   border-top: 1px solid #eee;
 }
 
-/* Coverage verified box */
+/* Coverage verified box — sage confirmation */
 .coverage-verified {
-  background: #f0f7ff;
-  border: 1px solid #d0e3f8;
-  border-left: 4px solid #1976D2;
+  background: #f5f9f5;
+  border: 1px solid #dde8dd;
+  border-left: 4px solid #4caf50;
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 24px;
@@ -236,8 +240,8 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   align-items: flex-start;
   gap: 12px;
 }
-.coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #1976D2; }
-.coverage-verified .cv-text { font-size: 14px; color: #1565c0; line-height: 1.6; }
+.coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #43a047; }
+.coverage-verified .cv-text { font-size: 14px; color: #2e7d32; line-height: 1.6; }
 .coverage-verified .cv-text strong { font-weight: 700; }
 
 /* Step legend */
@@ -495,19 +499,6 @@ input.error, select.error { border-color: #d32f2f; }
   margin-bottom: 24px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.program-value-card .wc-greeting {
-  font-size: 17px;
-  font-weight: 600;
-  color: #222;
-  margin-bottom: 8px;
-}
-.program-value-card .wc-body {
-  font-size: 14px;
-  color: #555;
-  line-height: 1.6;
-  margin-bottom: 0;
-}
-
 /* Context card at top of From Your Records expansion */
 .records-context-card {
   background: #f0f7ff;
@@ -808,7 +799,7 @@ input.error, select.error { border-color: #d32f2f; }
   <p class="subtitle">These answers help your coach personalize your experience. Answer what you can — you can always update later.</p>
 
   <div class="data-disclosure-card">
-    <div class="wc-greeting">💚 A little about your health</div>
+    <div class="wc-greeting">💚 We want to get to know you!</div>
     <div class="wc-body">
       The more your coach knows, the better they can support you. Nothing here is required — share what feels right, skip what doesn't, and come back to update anytime.
     </div>
