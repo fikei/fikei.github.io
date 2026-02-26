@@ -148,10 +148,15 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 .records-summary summary::after { content: "▸"; float: right; transition: transform 0.2s; }
 .records-summary[open] summary::after { transform: rotate(90deg); }
 .records-summary-body { padding: 16px 18px; border-top: 1px solid #e0e0e0; }
-.records-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 12px 0 6px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+.records-source-heading:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.records-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
 .records-item:last-child { border-bottom: none; }
-.records-label { color: #777; }
+.records-label { color: #777; flex: 1; }
 .records-value { font-weight: 500; color: #333; }
+.records-edit { font-size: 12px; color: #1976D2; cursor: pointer; margin-left: 12px; text-decoration: none; }
+.records-edit:hover { text-decoration: underline; }
+.records-privacy { font-size: 12px; color: #999; padding-top: 12px; margin-top: 8px; border-top: 1px solid #eee; }
 
 /* Welcome Card + Data Disclosure Card */
 .welcome-card,
@@ -593,63 +598,7 @@ input.error, select.error { border-color: #d32f2f; }
 <div class="step" data-step="3">
 
   <h1>Supporting Your Diabetes</h1>
-  <p class="subtitle">Review your diabetes history so we can support you from day one.</p>
-
-  <div class="data-disclosure-card">
-    <div class="wc-greeting">📋 Where Your Information Comes From</div>
-    <div class="wc-body">
-      To save you time, we've combined information from a few sources. Review what we have and correct anything that's changed.
-    </div>
-    <div class="wc-sources">
-      <div class="wc-source-row">
-        <span class="wc-icon">🏢</span>
-        <strong>Employer</strong>
-        <span class="wc-fields">Address</span>
-      </div>
-      <div class="wc-source-row">
-        <span class="wc-icon">🏥</span>
-        <strong>Health Records</strong>
-        <span class="wc-fields">Diabetes history, Clinical data</span>
-      </div>
-      <div class="wc-source-row">
-        <span class="wc-icon">✏️</span>
-        <strong>You provided</strong>
-        <span class="wc-fields">Name, DOB, Email, Phone</span>
-      </div>
-    </div>
-    <div class="wc-privacy">
-      🔒 Your data is encrypted and never shared outside of your care team.
-    </div>
-  </div>
-
-  <div class="source-banner source-banner--records">
-    <span class="sb-icon">🏥</span>
-    <span>Your diabetes history was sourced from health plan records. Review each item and correct anything that's changed.</span>
-  </div>
-
-  <div class="question-group">
-    <div class="question">What is your gender?</div>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="gender" value="male" checked>
-      Male    </label>
-    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="female"> Female</label>
-    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="other"> Prefer to self-describe</label>
-    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="nodisclose"> Prefer not to disclose</label>
-  </div>
-
-
-  <div class="question-group">
-    <div class="question">Have you ever had an A1C check? <span class="info-icon" title="A1C measures your average blood sugar over 2-3 months">ⓘ</span></div>
-    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
-      <input type="radio" name="a1c" value="yes" checked>
-      Yes    </label>
-    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="a1c" value="no"> No</label>
-    <div class="checkbox-row" style="margin-top: 8px;">
-      <input type="checkbox" id="a1cUnsure">
-      <label for="a1cUnsure">I don't know if I have had an A1C check.</label>
-    </div>
-  </div>
-
+  <p class="subtitle">Answer a few questions about how you manage your blood sugar. We've already confirmed the rest from your records.</p>
 
   <div class="question-group">
     <div class="question">Do you use a Continuous Glucose Monitor (CGM) to help monitor your blood glucose?</div>
@@ -700,30 +649,50 @@ input.error, select.error { border-color: #d32f2f; }
   <details class="records-summary">
     <summary>From Your Records</summary>
     <div class="records-summary-body">
+      <div class="records-source-heading">🏢 Employer</div>
+      <div class="records-item">
+        <span class="records-label">Gender</span>
+        <span class="records-value">Male</span>
+        <a class="records-edit" onclick="return false">Edit</a>
+      </div>
+
+      <div class="records-source-heading">🏥 Health Records</div>
       <div class="records-item">
         <span class="records-label">Diabetes Type</span>
         <span class="records-value">Type 2</span>
+        <a class="records-edit" onclick="return false">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Diagnosed</span>
         <span class="records-value">2019</span>
+        <a class="records-edit" onclick="return false">Edit</a>
+      </div>
+      <div class="records-item">
+        <span class="records-label">A1C Check</span>
+        <span class="records-value">Yes</span>
+        <a class="records-edit" onclick="return false">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Medications</span>
         <span class="records-value">Oral Medications</span>
+        <a class="records-edit" onclick="return false">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Diabetes Eye Exam</span>
         <span class="records-value">March 2024</span>
+        <a class="records-edit" onclick="return false">Edit</a>
       </div>
       <div class="records-item">
         <span class="records-label">Foot Exam</span>
         <span class="records-value">November 2024</span>
+        <a class="records-edit" onclick="return false">Edit</a>
       </div>
+
+      <div class="records-privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
     </div>
   </details>
 
-  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> A Little More About You</button>
+  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health History</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -731,9 +700,9 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 4: A Little More About You ========== -->
+<!-- ========== STEP 4: Health History ========== -->
 <div class="step" data-step="4">
-  <h1>A Little More About You</h1>
+  <h1>Health History</h1>
   <p class="subtitle">These answers help your coach personalize your experience. Answer what you can — you can always update later.</p>
 
   <div class="data-disclosure-card">
@@ -1027,7 +996,7 @@ const totalSteps = 6;
 
 // Progress bar section mapping
 // Steps 1-2 = Sign Up section (Confirm Identity + Create Account)
-// Steps 3-5 = About You section (Diabetes Care Plan, Health Profile, Shipping)
+// Steps 3-5 = About You section (Diabetes Care Plan, Health History, Shipping)
 // Step 6 = Welcome section
 const stepSections = {
   1: { section: 'signup', progress: 50 },
