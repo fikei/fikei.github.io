@@ -130,9 +130,9 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   border-radius: 50%;
   pointer-events: none;
 }
-/* Increase dot offset for selects to clear native dropdown arrow */
+/* Increase dot offset for selects to clear custom dropdown caret */
 .field-wrap.prefilled--select::after {
-  right: 36px;
+  right: 38px;
 }
 
 .radio-card.preselected::after,
@@ -148,9 +148,9 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 
 /* From Your Records — collapsed summary */
 .records-summary { margin-top: 32px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
-.records-summary summary { padding: 14px 18px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fff; list-style: none; }
+.records-summary summary { padding: 14px 18px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fff; list-style: none; display: flex; align-items: center; }
 .records-summary summary::-webkit-details-marker { display: none; }
-.records-summary summary::after { content: "▸"; float: right; transition: transform 0.2s; }
+.records-summary summary::after { content: "▸"; padding-left: 12px; transition: transform 0.2s; font-size: 14px; color: #999; flex-shrink: 0; }
 .records-summary[open] summary::after { transform: rotate(90deg); }
 .records-summary-body { padding: 16px 18px; border-top: 1px solid #e0e0e0; }
 .records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 12px 0 6px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
@@ -267,6 +267,18 @@ input[type="text"], input[type="email"], input[type="password"], input[type="tel
   font-family: 'Roboto', sans-serif; background: #fff; color: #333; transition: border-color 0.2s, box-shadow 0.2s;
   min-height: 48px;
 }
+/* Custom dropdown caret — consistent ▾ triangle matching From Your Records ▸ style */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4.5L9 1' fill='none' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 10px;
+  cursor: pointer;
+}
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: #1976D2;
@@ -278,9 +290,11 @@ input.error, select.error { border-color: #d32f2f; }
 
 /* Pre-filled field styling */
 .field-wrap { position: relative; }
-.field-wrap.prefilled input,
-.field-wrap.prefilled select {
+.field-wrap.prefilled input {
   padding-right: 28px;
+}
+.field-wrap.prefilled select {
+  padding-right: 52px;
 }
 .field-wrap.prefilled input:focus,
 .field-wrap.prefilled select:focus {
@@ -506,7 +520,7 @@ input.error, select.error { border-color: #d32f2f; }
   line-height: 1.55;
 }
 
-/* Review badge on From Your Records summary */
+/* Review badge on From Your Records summary — pushed to the right */
 .records-summary summary .review-badge {
   display: inline-block;
   background: #fff3e0;
@@ -517,8 +531,8 @@ input.error, select.error { border-color: #d32f2f; }
   letter-spacing: 0.04em;
   padding: 2px 7px;
   border-radius: 10px;
-  margin-left: 8px;
-  vertical-align: middle;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Responsive */
