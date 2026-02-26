@@ -507,17 +507,6 @@ input.error, select.error { border-color: #d32f2f; }
   margin-bottom: 24px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-/* Context card at top of From Your Records expansion */
-.records-context-card {
-  background: #f0f7ff;
-  border: 1px solid #d0e3f8;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: #555;
-  line-height: 1.6;
-}
 
 /* Count badge on From Your Records summary — pushed to the right */
 .records-summary summary .review-badge {
@@ -742,9 +731,7 @@ input.error, select.error { border-color: #d32f2f; }
   <details class="records-summary">
     <summary>From Your Records <span class="review-badge">7 Found</span></summary>
     <div class="records-summary-body">
-      <div class="records-context-card">
-        We pulled these details from your employer and health records to save you time. Review the information below and edit anything that's changed.
-      </div>
+      <p style="font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 16px;">We pulled these details from your employer and health records to save you time. Review the information below and edit anything that's changed.</p>
 
       <div class="records-source-heading">🏢 Employer</div>
       <div class="records-item">
@@ -822,7 +809,7 @@ input.error, select.error { border-color: #d32f2f; }
   <div class="data-disclosure-card">
     <div class="wc-greeting">🤝 Personal from day one.</div>
     <div class="wc-body">
-      Every answer here helps your coach understand what matters to you — so your plan reflects your life, not a one-size-fits-all checklist.
+      Every answer here helps your coach your unique heath with your h — so your plan reflects your needs, not a one-size-fits-all checklist.
     </div>
   </div>
 
@@ -969,10 +956,6 @@ input.error, select.error { border-color: #d32f2f; }
   <h1>Receiving Your Device</h1>
   <p class="subtitle">Your meter, strips, and supplies ship free — fully covered by <strong>Pilot Trucking LLC</strong>. Confirm your shipping address below.</p>
 
-  <div style="background: #f5f8fc; border-radius: 10px; height: 160px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 13px; margin-bottom: 20px; border: 1px dashed #ddd;">
-    [Product photo placeholder]
-  </div>
-
   <div class="supplies-showcase">
     <ul class="supplies-list">
       <li><span class="check">&#10003;</span> An advanced glucose meter ($200 value)</li>
@@ -1055,17 +1038,16 @@ input.error, select.error { border-color: #d32f2f; }
 
 <!-- ========== STEP 6: You're Enrolled / Next Steps ========== -->
 <div class="step" data-step="6">
-  <div class="complete-hero">
-    <div class="check-circle">&#10003;</div>
-    <h1>You're enrolled!</h1>
-    <p>Here's what happens next — your Welcome Kit ships within 1–2 business days.</p>
+  <div class="coverage-verified" style="padding: 24px; gap: 16px;">
+    <span class="cv-icon" style="font-size: 28px;">🎉</span>
+    <div class="cv-text">
+      <strong style="font-size: 20px; display: block; margin-bottom: 6px;">You're in!</strong>
+      You're officially part of the Livongo program. Your care team is ready.
+    </div>
   </div>
 
-  <p style="font-size: 15px; color: #444; margin-bottom: 16px; line-height: 1.6;">You're officially part of the Livongo program. Your care team is ready. Here's what to expect over the next few days.</p>
-
-  <div style="background: #f5f8fc; border-radius: 10px; height: 120px; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 13px; margin-bottom: 20px; border: 1px dashed #ddd;">
-    [Celebration / product photo placeholder]
-  </div>
+  <h2 style="font-size: 18px; font-weight: 600; color: #222; margin-bottom: 6px;">Start your journey today</h2>
+  <p class="subtitle" style="margin-bottom: 20px;">Here's what to expect over the next few days.</p>
 
   <div class="next-steps-grid">
     <div class="next-step-card">
