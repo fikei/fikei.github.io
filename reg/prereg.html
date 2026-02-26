@@ -471,17 +471,27 @@ input.error, select.error { border-color: #d32f2f; }
   line-height: 1.5;
 }
 
-/* Program value card — Step 3, matches welcome-card divider treatment */
+/* Program value card — Step 3, card treatment matching original welcome-card style */
 .program-value-card {
   background: #fff;
-  border: none;
-  border-radius: 0;
-  padding: 20px 0 24px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 24px;
   margin-top: 16px;
-  margin-bottom: 32px;
-  box-shadow: none;
-  border-top: 1px solid #e8e8e8;
-  border-bottom: 1px solid #e8e8e8;
+  margin-bottom: 28px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.program-value-card .wc-greeting {
+  font-size: 18px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 10px;
+}
+.program-value-card .wc-body {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.65;
+  margin-bottom: 0;
 }
 
 /* Context card at top of From Your Records expansion */
