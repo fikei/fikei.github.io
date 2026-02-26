@@ -119,8 +119,9 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
 /* Source icons — field-level compact indicators */
 .source-icon { font-size: 12px; opacity: 0.6; margin-left: 4px; }
 
-/* Welcome Card */
-.welcome-card {
+/* Welcome Card + Data Disclosure Card */
+.welcome-card,
+.data-disclosure-card {
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 10px;
@@ -128,19 +129,22 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   margin-bottom: 32px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.welcome-card .wc-greeting {
+.welcome-card .wc-greeting,
+.data-disclosure-card .wc-greeting {
   font-size: 18px;
   font-weight: 600;
   color: #222;
   margin-bottom: 10px;
 }
-.welcome-card .wc-body {
+.welcome-card .wc-body,
+.data-disclosure-card .wc-body {
   font-size: 14px;
   color: #555;
   line-height: 1.65;
   margin-bottom: 20px;
 }
-.welcome-card .wc-sources {
+.welcome-card .wc-sources,
+.data-disclosure-card .wc-sources {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -150,16 +154,20 @@ body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-hei
   border-radius: 8px;
   border: 1px solid #e8eef8;
 }
-.welcome-card .wc-source-row {
+.welcome-card .wc-source-row,
+.data-disclosure-card .wc-source-row {
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 13px;
   color: #444;
 }
-.welcome-card .wc-source-row .wc-icon { font-size: 16px; flex-shrink: 0; }
-.welcome-card .wc-source-row .wc-fields { color: #777; font-size: 12px; }
-.welcome-card .wc-privacy {
+.welcome-card .wc-source-row .wc-icon,
+.data-disclosure-card .wc-source-row .wc-icon { font-size: 16px; flex-shrink: 0; }
+.welcome-card .wc-source-row .wc-fields,
+.data-disclosure-card .wc-source-row .wc-fields { color: #777; font-size: 12px; }
+.welcome-card .wc-privacy,
+.data-disclosure-card .wc-privacy {
   font-size: 12px;
   color: #888;
   display: flex;
@@ -459,24 +467,8 @@ input.error, select.error { border-color: #d32f2f; }
   <div class="welcome-card">
     <div class="wc-greeting">👋 Welcome to Livongo</div>
     <div class="wc-body">
-      <strong>Pilot Trucking LLC</strong> enrolled you in Livongo to help manage your diabetes. We've pulled some details from your employer and health records to save you time.
-    </div>
-    <div class="wc-sources">
-      <div class="wc-source-row">
-        <span class="wc-icon">🏢</span>
-        <strong>Employer</strong>
-        <span class="wc-fields">Email, Address</span>
-      </div>
-      <div class="wc-source-row">
-        <span class="wc-icon">🏥</span>
-        <strong>Health Records</strong>
-        <span class="wc-fields">Diabetes history, Clinical data</span>
-      </div>
-      <div class="wc-source-row">
-        <span class="wc-icon">🔐</span>
-        <strong>You create</strong>
-        <span class="wc-fields">Name, DOB, Password, Phone</span>
-      </div>
+      <strong>Pilot Trucking LLC</strong> has enrolled you in Livongo to help manage your diabetes.
+      We'll confirm your eligibility with the information you provide.
     </div>
     <div class="wc-privacy">
       🔒 Your data is encrypted and never shared outside of your care team.
@@ -485,11 +477,6 @@ input.error, select.error { border-color: #d32f2f; }
 
   <h1>Let's Confirm Your Identity</h1>
   <p class="subtitle">Enter your name and date of birth so we can verify your enrollment.</p>
-
-  <div class="source-banner source-banner--employer">
-    <span class="sb-icon">🏢</span>
-    <span>Your email was sourced from <strong>Pilot Trucking LLC</strong>. Enter your name and date of birth to confirm your identity.</span>
-  </div>
 
   <div class="form-row">
     <div class="form-group">
@@ -512,14 +499,24 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <div class="identity-hint">We ask you to enter your name and date of birth to confirm your identity before showing your sourced information.</div>
+  <button class="btn-next" onclick="goTo(2)"><span class="label-bold">Next:</span> Create Account</button>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 2: Create Account ========== -->
+<div class="step" data-step="2">
+
+  <h1>Create Your Account</h1>
+  <p class="subtitle">Set up your login credentials to access Livongo.</p>
 
   <div class="form-row single">
     <div class="form-group">
-      <label for="email">Email Address <span class="req">*</span> <span class="source-icon">🏢</span></label>
-      <div class="field-wrap prefilled">
-        <input type="email" id="email" value="steve.mariano@pilottrucking.com" required>
-      </div>
+      <label for="email">Email Address <span class="req">*</span></label>
+      <input type="email" id="email" placeholder="your@email.com" required>
       <span class="error-msg" id="emailErr">Please enter a valid email address</span>
     </div>
   </div>
@@ -553,12 +550,8 @@ input.error, select.error { border-color: #d32f2f; }
     <input type="checkbox" id="tos">
     <label for="tos">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
   </div>
-  <div class="checkbox-row">
-    <input type="checkbox" id="sms">
-    <label for="sms">I agree to receive <a href="#">Livongo Member Messaging</a> via text message</label>
-  </div>
 
-  <button class="btn-next" onclick="goTo(2)"><span class="label-bold">Next:</span> Care Plan</button>
+  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Care Plan</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -566,8 +559,36 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 2: Personalize Your Care Plan ========== -->
-<div class="step" data-step="2">
+<!-- ========== STEP 3: Personalize Your Care Plan ========== -->
+<div class="step" data-step="3">
+
+  <div class="data-disclosure-card">
+    <div class="wc-greeting">📋 Where Your Information Comes From</div>
+    <div class="wc-body">
+      To save you time, we've combined information from a few sources. Review what we have and correct anything that's changed.
+    </div>
+    <div class="wc-sources">
+      <div class="wc-source-row">
+        <span class="wc-icon">🏢</span>
+        <strong>Employer</strong>
+        <span class="wc-fields">Address</span>
+      </div>
+      <div class="wc-source-row">
+        <span class="wc-icon">🏥</span>
+        <strong>Health Records</strong>
+        <span class="wc-fields">Diabetes history, Clinical data</span>
+      </div>
+      <div class="wc-source-row">
+        <span class="wc-icon">✏️</span>
+        <strong>You provided</strong>
+        <span class="wc-fields">Name, DOB, Email, Phone</span>
+      </div>
+    </div>
+    <div class="wc-privacy">
+      🔒 Your data is encrypted and never shared outside of your care team.
+    </div>
+  </div>
+
   <h1>Personalize Your Care Plan</h1>
   <p class="subtitle">Information you provide will be used to craft a personalized care plan.</p>
 
@@ -698,7 +719,7 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Health Profile</button>
+  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health Profile</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -706,8 +727,8 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 3: Complete Your Health Profile ========== -->
-<div class="step" data-step="3">
+<!-- ========== STEP 4: Complete Your Health Profile ========== -->
+<div class="step" data-step="4">
   <h1>Complete Your Health Profile</h1>
   <p class="subtitle">Let's get some basic information about you and your health.</p>
 
@@ -910,7 +931,7 @@ input.error, select.error { border-color: #d32f2f; }
     <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="other"> Other</label>
   </div>
 
-  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Shipping &amp; Supplies</button>
+  <button class="btn-next" onclick="goTo(5)"><span class="label-bold">Next:</span> Shipping &amp; Supplies</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -918,8 +939,8 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 4: Shipping & Supplies ========== -->
-<div class="step" data-step="4">
+<!-- ========== STEP 5: Shipping & Supplies ========== -->
+<div class="step" data-step="5">
   <h1>Shipping &amp; Supplies</h1>
   <p class="subtitle">We'll send you everything you need to get started — at no cost to you.</p>
 
@@ -993,7 +1014,7 @@ input.error, select.error { border-color: #d32f2f; }
     </div>
   </div>
 
-  <button class="btn-next" onclick="goTo(5)">Finish Setup</button>
+  <button class="btn-next" onclick="goTo(6)">Finish Setup</button>
 
   <div class="footer">
     <span>&copy; Livongo Health, All Rights Reserved.</span>
@@ -1001,8 +1022,8 @@ input.error, select.error { border-color: #d32f2f; }
   </div>
 </div>
 
-<!-- ========== STEP 5: Welcome / What's Next ========== -->
-<div class="step" data-step="5">
+<!-- ========== STEP 6: Welcome / What's Next ========== -->
+<div class="step" data-step="6">
   <div class="complete-hero">
     <div class="check-circle">✓</div>
     <h1>You're All Set!</h1>
@@ -1060,23 +1081,23 @@ input.error, select.error { border-color: #d32f2f; }
 </div>
 
 <!-- Step indicator -->
-<div class="nav-hint" id="navHint">Step <span id="stepNum">1</span> of 5 &nbsp;|&nbsp; &larr; &rarr; to navigate</div>
+<div class="nav-hint" id="navHint">Step <span id="stepNum">1</span> of 6 &nbsp;|&nbsp; &larr; &rarr; to navigate</div>
 
 <script>
 let currentStep = 1;
-const totalSteps = 5;
+const totalSteps = 6;
 
 // Progress bar section mapping
-// Step 1 = Sign Up section
-// Steps 2-3 = About You section
-// Step 4 = About You section (shipping is still "about you" data)
-// Step 5 = Welcome section
+// Steps 1-2 = Sign Up section (Confirm Identity + Create Account)
+// Steps 3-5 = About You section (Care Plan, Health Profile, Shipping)
+// Step 6 = Welcome section
 const stepSections = {
-  1: { section: 'signup', progress: 100 },
-  2: { section: 'about', progress: 33 },
-  3: { section: 'about', progress: 66 },
-  4: { section: 'about', progress: 100 },
-  5: { section: 'welcome', progress: 100 }
+  1: { section: 'signup', progress: 50 },
+  2: { section: 'signup', progress: 100 },
+  3: { section: 'about', progress: 33 },
+  4: { section: 'about', progress: 66 },
+  5: { section: 'about', progress: 100 },
+  6: { section: 'welcome', progress: 100 }
 };
 
 function goTo(step) {
