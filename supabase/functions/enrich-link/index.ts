@@ -509,21 +509,108 @@ serve(async (req) => {
       else if (/\/artist[\/s]/.test(path)) musicResult.contentFormat = 'artist'
       else if (/\/sets?[\/]/.test(path) && domain.includes('soundcloud.com')) musicResult.contentFormat = 'mix'
 
-      // 2. Spotify oEmbed (no CORS issues server-side)
+      // 2. Spotify: scrape page meta tags + oEmbed
+      // Spotify's oEmbed doesn't return author_name, but the HTML page has rich meta tags:
+      //   music:musician_description → artist name
+      //   music:duration → seconds
+      //   music:release_date → YYYY-MM-DD
+      //   og:description → "Artist · Track · Type · Year"
+      //   <title> → "Track - song and lyrics by Artist | Spotify"
+      //   og:image → album art
       if (domain.includes('spotify.com')) {
+        // 2a. Fetch page HTML for meta tags
+        try {
+          const pageResp = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo/1.0)' },
+            redirect: 'follow',
+          })
+          if (pageResp.ok) {
+            const html = await pageResp.text()
+
+            // music:musician_description → direct artist name (most reliable)
+            const artistMeta = html.match(/<meta\s+name="music:musician_description"\s+content="([^"]+)"/i)
+            if (artistMeta) {
+              musicResult.artist = artistMeta[1].trim()
+              console.log('[enrich-link] Spotify meta artist:', musicResult.artist)
+            }
+
+            // music:duration → seconds
+            const durMeta = html.match(/<meta\s+name="music:duration"\s+content="(\d+)"/i)
+            if (durMeta) {
+              musicResult.duration = parseInt(durMeta[1], 10)
+            }
+
+            // music:release_date → YYYY-MM-DD
+            const releaseMeta = html.match(/<meta\s+name="music:release_date"\s+content="([^"]+)"/i)
+            if (releaseMeta) {
+              musicResult.releaseDate = releaseMeta[1].trim()
+            }
+
+            // og:title → track title
+            const ogTitle = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i)
+            if (ogTitle) {
+              musicResult.trackTitle = ogTitle[1].trim()
+            }
+
+            // og:image → album art (we'll pass this through separately)
+            const ogImage = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i)
+            if (ogImage) {
+              musicResult.imageUrl = ogImage[1].trim()
+            }
+
+            // <title> fallback: "Track - song and lyrics by Artist | Spotify"
+            if (!musicResult.artist) {
+              const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)
+              if (titleTag) {
+                const spTitle = titleTag[1].match(/^(.+?)\s*-\s*(?:song and lyrics by|Song by|Album by)\s+(.+?)\s*\|/i)
+                if (spTitle) {
+                  musicResult.trackTitle = musicResult.trackTitle || spTitle[1].trim()
+                  musicResult.artist = spTitle[2].trim()
+                }
+              }
+            }
+
+            // og:description fallback: "Artist · Track · Type · Year" or "Type · Artist · Year"
+            if (!musicResult.artist) {
+              const ogDesc = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i)
+              if (ogDesc) {
+                const desc = ogDesc[1]
+                // Format: "Artist · Track · Song · 2026"
+                const parts = desc.split(/\s*[·]\s*/)
+                if (parts.length >= 3) {
+                  // Check if a part is a type keyword
+                  const typeIdx = parts.findIndex(p => /^(Song|Album|Playlist|EP|Single|Podcast)$/i.test(p.trim()))
+                  if (typeIdx === 0 && parts.length >= 2) {
+                    // "Song · Artist · Year"
+                    musicResult.artist = parts[1].trim()
+                  } else if (typeIdx >= 2) {
+                    // "Artist · Track · Song · Year"
+                    musicResult.artist = parts[0].trim()
+                  }
+                }
+              }
+            }
+
+            console.log('[enrich-link] Spotify page scrape:', {
+              artist: musicResult.artist, track: musicResult.trackTitle,
+              duration: musicResult.duration, releaseDate: musicResult.releaseDate
+            })
+          }
+        } catch (e) { console.warn('[enrich-link] Spotify page scrape failed:', (e as Error).message) }
+
+        // 2b. Spotify oEmbed for embed URL (lightweight, always works)
         try {
           const oembedResp = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`)
           if (oembedResp.ok) {
             const oe = await oembedResp.json()
-            musicResult.trackTitle = oe.title || null
-            if (oe.provider_name === 'Spotify' && oe.author_name) {
+            musicResult.trackTitle = musicResult.trackTitle || oe.title || null
+            if (!musicResult.artist && oe.author_name) {
               musicResult.artist = oe.author_name
             }
             if (oe.html) {
               const m = oe.html.match(/src=["']([^"']+)["']/)
               if (m) { musicResult.embedUrl = m[1]; musicResult.embedType = 'iframe'; musicResult.embedHeight = oe.height || 152 }
             }
-            console.log('[enrich-link] Spotify oEmbed:', oe.title, '-', oe.author_name)
           }
         } catch (e) { console.warn('[enrich-link] Spotify oEmbed failed:', (e as Error).message) }
       }
@@ -544,7 +631,7 @@ serve(async (req) => {
         } catch (e) { console.warn('[enrich-link] SoundCloud oEmbed failed:', (e as Error).message) }
       }
 
-      // 4. Title-based fallback for artist/track
+      // 4. Title-based fallback for artist/track (from client-provided title)
       if (!musicResult.artist && title) {
         // "Track - song and lyrics by Artist | Spotify"
         const spTitle = title.match(/^(.+?)\s*-\s*(?:song and lyrics by|Song by|Album by)\s+(.+?)\s*\|/i)
@@ -562,12 +649,24 @@ serve(async (req) => {
         }
       }
 
-      // 5. Description-based fallback (Spotify: "Listen to Track on Spotify. Type · Artist · Year")
+      // 5. Description-based fallback
       if (!musicResult.artist && description) {
-        const spDesc = description.match(/(?:Song|Album|Playlist|EP)\s*[·]\s*(.+?)\s*[·]\s*(\d{4})/i)
+        // "Listen to Track on Spotify. Song · Artist · Year"
+        const spDesc = description.match(/(?:Song|Album|Playlist|EP)\s*[·•]\s*(.+?)\s*[·•]\s*(\d{4})/i)
         if (spDesc) {
           musicResult.artist = spDesc[1].trim()
           musicResult.releaseDate = musicResult.releaseDate || spDesc[2]
+        }
+        // "Artist · Track · Song · Year" (og:description format)
+        if (!musicResult.artist) {
+          const parts = description.split(/\s*[·•]\s*/)
+          if (parts.length >= 3) {
+            const typeIdx = parts.findIndex(p => /^(Song|Album|Playlist|EP|Single)$/i.test(p.trim()))
+            if (typeIdx >= 2) {
+              musicResult.artist = parts[0].trim()
+              musicResult.releaseDate = musicResult.releaseDate || (parts[parts.length - 1].match(/\d{4}/) || [])[0] || null
+            }
+          }
         }
       }
 
@@ -592,6 +691,7 @@ serve(async (req) => {
           if (enrichResp.ok) {
             const enrichData = await enrichResp.json()
             if (enrichData.genre) musicResult.genre = enrichData.genre
+            if (enrichData.genreTags) musicResult.genreTags = enrichData.genreTags
             if (enrichData.label) musicResult.label = enrichData.label
             if (enrichData.album) musicResult.albumTitle = musicResult.albumTitle || enrichData.album
             if (enrichData.releaseDate) musicResult.releaseDate = musicResult.releaseDate || enrichData.releaseDate
@@ -605,6 +705,16 @@ serve(async (req) => {
       if (hasData) {
         musicMeta = musicResult
       }
+
+      // Use Spotify og:image as fallback if no image was resolved
+      if (musicMeta?.imageUrl && !imageUrl) {
+        imageUrl = musicMeta.imageUrl
+        imageSource = 'platform'
+        imageLog.push({ strategy: 'music_page_scrape', result: 'accepted', url: imageUrl })
+        console.log('[enrich-link] Using Spotify og:image as fallback:', imageUrl)
+      }
+      // Remove imageUrl from musicMeta (it's handled by the image pipeline)
+      if (musicMeta?.imageUrl) delete musicMeta.imageUrl
 
       console.log('[enrich-link] Music enrichment result:', musicMeta)
     }
