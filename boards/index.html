@@ -10454,6 +10454,7 @@ Return JSON:
     let processedCount = 0;
     let successCount = 0;
     let failCount = 0;
+    const enrichedIds = [];
 
     console.log('%c[ENRICH] Starting server enrichment, items:', 'color: #e74c3c; font-weight: bold', totalItems);
 
@@ -10497,6 +10498,7 @@ Return JSON:
 
       console.log('%c[ENRICH] Server result:', 'color: #27ae60; font-weight: bold', result);
       successCount++;
+      enrichedIds.push(item.linkId);
 
       // Update local state
       const data = load();
@@ -10705,6 +10707,9 @@ Return JSON:
     // Single re-render after all items processed (avoids flash per item)
     if (successCount > 0) {
       renderGrid();
+      // Re-classify "Other" pins now that enrichment filled in metadata
+      backfillOtherPins(enrichedIds).catch(err =>
+        console.warn('[dimensions] backfill error:', err));
     }
 
     isProcessingEnrichment = false;
@@ -13532,7 +13537,7 @@ Return JSON:
     }
 
     const pins = getAllLinks()
-      .filter(l => l.category === currentFilter && !l.loading)
+      .filter(l => l.category === currentFilter)
       .slice(0, 200)
       .map(l => ({
         id: l.id,
@@ -13681,46 +13686,94 @@ Return JSON:
     $('dimEditCancel').onclick = () => renderSubTags();
   }
 
-  // Auto-assign new pin to existing prompt-based dimensions
-  async function autoAssignNewPin(link) {
-    const category = link.category;
-    if (!category || category === 'all' || category === 'uncategorized') return;
+  // Batch re-classify "Other" pins after enrichment fills in metadata
+  async function backfillOtherPins(enrichedLinkIds) {
+    const allLinks = getAllLinks();
+    const enrichedById = {};
+    for (const link of allLinks) {
+      if (enrichedLinkIds.includes(link.id)) enrichedById[link.id] = link;
+    }
 
-    const dims = loadPromptDimensions(category);
-    if (dims.length === 0) return;
+    const categoriesProcessed = new Set();
+    for (const link of Object.values(enrichedById)) {
+      const cat = link.category;
+      if (!cat || cat === 'all' || cat === 'uncategorized') continue;
+      if (categoriesProcessed.has(cat)) continue;
+      categoriesProcessed.add(cat);
 
-    for (const dim of dims) {
-      if (dim.assignments?.[link.id]) continue; // Already assigned
+      const dims = loadPromptDimensions(cat);
+      if (dims.length === 0) continue;
 
-      try {
-        const accessToken = getAccessToken();
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            prompt: dim.prompt,
-            category,
-            pins: [{ id: link.id, title: link.title || link.domain, description: link.description || '', domain: link.domain || '', url: link.url }],
-            existingTags: dim.tags,
-          })
-        });
-
-        const data = await res.json();
-        if (data.assignments && data.assignments[link.id]) {
-          updatePromptDimension(category, dim.id, {
-            assignments: { ...dim.assignments, [link.id]: data.assignments[link.id] }
-          });
+      for (const dim of dims) {
+        // Collect enriched pins that are unassigned ("Other") for this dimension
+        const otherPins = [];
+        for (const id of enrichedLinkIds) {
+          const l = enrichedById[id];
+          if (!l || l.category !== cat) continue;
+          const assigned = dim.assignments?.[l.id];
+          if (!assigned) {
+            otherPins.push({
+              id: l.id,
+              title: l.title || l.domain || l.url,
+              description: l.description || '',
+              domain: l.domain || '',
+              url: l.url,
+            });
+          }
         }
-      } catch (err) {
-        console.warn('[dimensions] Auto-assign failed for', link.id, err);
+        if (otherPins.length === 0) continue;
+
+        // Batch classify into existing tags (single API call per dimension)
+        try {
+          const accessToken = getAccessToken();
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              prompt: dim.prompt,
+              category: cat,
+              pins: otherPins,
+              existingTags: dim.tags,
+            })
+          });
+          const data = await res.json();
+          if (data.assignments) {
+            const updated = { ...dim.assignments };
+            for (const [pinId, tag] of Object.entries(data.assignments)) {
+              if (tag) updated[pinId] = tag;
+            }
+            updatePromptDimension(cat, dim.id, { assignments: updated });
+          }
+        } catch (err) {
+          console.warn('[dimensions] Backfill failed for dim', dim.id, err);
+        }
       }
     }
 
-    if (currentFilter === category) renderSubTags();
+    if (categoriesProcessed.has(currentFilter)) {
+      renderSubTags();
+      renderGrid();
+    }
+  }
+
+  // Debounced auto-assign: accumulate newly enriched pins, batch-classify after 2s
+  let pendingAutoAssign = [];
+  let autoAssignTimer = null;
+
+  function queueAutoAssign(link) {
+    pendingAutoAssign.push(link);
+    clearTimeout(autoAssignTimer);
+    autoAssignTimer = setTimeout(flushAutoAssign, 2000);
+  }
+
+  async function flushAutoAssign() {
+    const batch = pendingAutoAssign.splice(0);
+    if (batch.length === 0) return;
+    await backfillOtherPins(batch.map(l => l.id));
   }
 
   function renderSubTags() {
@@ -14945,9 +14998,8 @@ Return JSON:
             showNewBoardChip(id, cat.suggestedBoard);
           }
 
-          // Auto-assign to prompt-based dimensions (fire-and-forget)
-          autoAssignNewPin({ id, url, title: meta.title, description: meta.description, domain: meta.domain || domain, category: cat.category })
-            .catch(err => console.warn('[dimensions] autoAssign error:', err));
+          // Queue for batch auto-assign to prompt-based dimensions
+          queueAutoAssign({ id, url, title: meta.title, description: meta.description, domain: meta.domain || domain, category: cat.category });
 
           // Try fast platform resolution if no image from CORS proxy
           if (!meta.image) {
@@ -17542,9 +17594,8 @@ Return JSON:
           renderFilters();
           renderGrid();
 
-          // Auto-assign to prompt-based dimensions (fire-and-forget)
-          autoAssignNewPin({ id, url, title: meta.title, description: meta.description, domain: meta.domain || (new URL(url)).hostname.replace('www.', ''), category: cat.category })
-            .catch(err => console.warn('[dimensions] autoAssign error:', err));
+          // Queue for batch auto-assign to prompt-based dimensions
+          queueAutoAssign({ id, url, title: meta.title, description: meta.description, domain: meta.domain || (new URL(url)).hostname.replace('www.', ''), category: cat.category });
 
           // Try fast platform resolution if no image from CORS proxy
           if (!meta.image) {
