@@ -19475,14 +19475,31 @@ Return JSON:
   // Check for captured auth tokens (from head-level script, before Supabase cleared the hash)
   var capturedAuth = window.__iosAuthCapture || null;
 
-  // Only show overlay on fresh login (auth tokens in URL), not on every page refresh
-  if (!capturedAuth) return;
+  // Check for existing session in localStorage
+  var hasExistingSession = false;
+  try {
+    var stored = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
+    if (stored) {
+      var parsed = JSON.parse(stored);
+      if (parsed && parsed.access_token) hasExistingSession = true;
+    }
+  } catch (e) {}
 
-  // Build deep link with auth tokens
-  var deepLink = 'ctrlrodeo://auth#access_token=' + encodeURIComponent(capturedAuth.accessToken)
-    + '&refresh_token=' + encodeURIComponent(capturedAuth.refreshToken)
-    + '&token_type=' + encodeURIComponent(capturedAuth.tokenType);
-  if (subtext) subtext.textContent = 'Tap to sign in to the app';
+  // Show overlay if we have fresh auth tokens OR an existing session
+  if (!capturedAuth && !hasExistingSession) return;
+
+  // Build deep link
+  var deepLink;
+  if (capturedAuth) {
+    deepLink = 'ctrlrodeo://auth#access_token=' + capturedAuth.accessToken
+      + '&refresh_token=' + capturedAuth.refreshToken
+      + '&token_type=' + capturedAuth.tokenType;
+    if (subtext) subtext.textContent = 'Tap to sign in to the app';
+  } else {
+    deepLink = 'ctrlrodeo://open';
+    if (subtext) subtext.textContent = 'Continue to the full Boards experience';
+  }
+
 
   function hideOverlay() { overlay.style.display = 'none'; }
 

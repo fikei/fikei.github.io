@@ -134,6 +134,27 @@ struct WebView: UIViewRepresentable {
     @Binding var isAuthenticated: Bool
     @Binding var pendingAuthURL: URL?
 
+    /// Auth bridge JS injected at document start to intercept localStorage writes.
+    /// Must run BEFORE any page JS (including Supabase) to patch setItem in time.
+    private static let authBridgeJS: String = """
+    (function() {
+        var authKey = '\(AppConstants.webAuthStorageKey)';
+        var originalSetItem = localStorage.setItem;
+
+        localStorage.setItem = function(key, value) {
+            originalSetItem.apply(this, arguments);
+            if (key === authKey) {
+                try {
+                    var auth = JSON.parse(value);
+                    window.webkit.messageHandlers.authBridge.postMessage(auth);
+                } catch (e) {
+                    console.error('[authBridge] Failed to parse auth:', e);
+                }
+            }
+        };
+    })();
+    """
+
     func makeUIView(context: Context) -> WKWebView {
         print("[WebView] makeUIView: Creating WKWebView")
 
@@ -142,6 +163,15 @@ struct WebView: UIViewRepresentable {
 
         // Set up message handler for auth bridge
         config.userContentController.add(context.coordinator, name: "authBridge")
+
+        // Inject auth bridge at document start so it patches localStorage.setItem
+        // BEFORE Supabase or any other page JS can write to it.
+        let bridgeScript = WKUserScript(
+            source: Self.authBridgeJS,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(bridgeScript)
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -156,11 +186,12 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.addSubview(refreshControl)
         context.coordinator.refreshControl = refreshControl
 
-        // Always load the base boards URL here.
-        // If a pendingAuthURL exists, updateUIView will load it immediately after.
-        if let url = URL(string: AppConstants.boardsURL) {
+        // Only load the base URL if there's no pending auth URL.
+        // If pendingAuthURL is set, updateUIView will load it on the next SwiftUI pass.
+        if pendingAuthURL == nil, let url = URL(string: AppConstants.boardsURL) {
             print("[WebView] makeUIView: Loading base URL \(url)")
             webView.load(URLRequest(url: url))
+            context.coordinator.hasLoadedInitially = true
         }
 
         context.coordinator.webView = webView
@@ -182,9 +213,20 @@ struct WebView: UIViewRepresentable {
             }
         }
 
+        // If makeUIView skipped loading (because pendingAuthURL was set), load base URL
+        // now if no auth URL is pending (e.g., the auth URL was already consumed).
+        if !context.coordinator.hasLoadedInitially && pendingAuthURL == nil {
+            context.coordinator.hasLoadedInitially = true
+            if let url = URL(string: AppConstants.boardsURL) {
+                print("[WebView] updateUIView: Deferred base URL load \(url)")
+                webView.load(URLRequest(url: url))
+            }
+        }
+
         // Load pending auth URL if one arrived
         if let authURL = pendingAuthURL {
             print("[WebView] updateUIView: Loading pending auth URL \(authURL)")
+            context.coordinator.hasLoadedInitially = true
             webView.load(URLRequest(url: authURL))
             DispatchQueue.main.async {
                 pendingAuthURL = nil
@@ -207,6 +249,7 @@ struct WebView: UIViewRepresentable {
         var webView: WKWebView?
         var refreshControl: UIRefreshControl?
         var shouldRetry = false
+        var hasLoadedInitially = false
 
         @Binding var isRefreshing: Bool
         @Binding var isLoading: Bool
@@ -235,7 +278,10 @@ struct WebView: UIViewRepresentable {
             print("[WebView] didFinish: Page loaded successfully")
             isLoading = false
 
-            injectAuthBridge()
+            // Check if auth already exists in localStorage and send it to Swift.
+            // The setItem bridge is already injected via WKUserScript at document start,
+            // so this only needs to check for pre-existing auth (e.g., page reload).
+            checkExistingAuth()
 
             // Inject stored auth into web localStorage (one-time on first load)
             if !hasInjectedAuth {
@@ -260,6 +306,14 @@ struct WebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            // Ignore cancelled navigations — these happen when updateUIView starts a new load
+            // (e.g., auth URL) while a previous load (base URL) is still in progress.
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+                print("[WebView] didFailProvisionalNavigation: Ignoring cancelled navigation")
+                return
+            }
+
             print("[WebView] didFailProvisionalNavigation: Provisional navigation failed with error: \(error.localizedDescription)")
             isLoading = false
             errorMessage = "Failed to load: \(error.localizedDescription)"
@@ -288,33 +342,20 @@ struct WebView: UIViewRepresentable {
 
         // MARK: - Auth Bridge
 
-        private func injectAuthBridge() {
+        /// Check if auth already exists in localStorage and post it to Swift.
+        /// The localStorage.setItem patch is injected via WKUserScript at document start,
+        /// so this only handles the case where auth was already in localStorage before the page loaded.
+        private func checkExistingAuth() {
             let script = """
             (function() {
-                // Monitor localStorage changes to auth token
-                const authKey = '\(AppConstants.webAuthStorageKey)';
-                const originalSetItem = localStorage.setItem;
-
-                localStorage.setItem = function(key, value) {
-                    originalSetItem.apply(this, arguments);
-                    if (key === authKey) {
-                        try {
-                            const auth = JSON.parse(value);
-                            window.webkit.messageHandlers.authBridge.postMessage(auth);
-                        } catch (e) {
-                            console.error('Failed to parse auth:', e);
-                        }
-                    }
-                };
-
-                // Also send current auth if it exists
-                const currentAuth = localStorage.getItem(authKey);
+                var authKey = '\(AppConstants.webAuthStorageKey)';
+                var currentAuth = localStorage.getItem(authKey);
                 if (currentAuth) {
                     try {
-                        const auth = JSON.parse(currentAuth);
+                        var auth = JSON.parse(currentAuth);
                         window.webkit.messageHandlers.authBridge.postMessage(auth);
                     } catch (e) {
-                        console.error('Failed to parse existing auth:', e);
+                        console.error('[authBridge] Failed to parse existing auth:', e);
                     }
                 }
             })();
