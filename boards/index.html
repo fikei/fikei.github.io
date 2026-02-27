@@ -1114,12 +1114,17 @@ body {
 /* ============================================
    Lookback Card
    ============================================ */
+@keyframes lookbackSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .lookback-card {
   grid-column: 1 / -1;
   background: var(--surface);
   border: 1px solid var(--fg);
   padding: var(--space-4);
-  margin-bottom: var(--grid-gap);
+  animation: lookbackSlideUp 0.4s ease-out forwards;
 }
 
 .lookback-card__header {
@@ -1157,20 +1162,48 @@ body {
   color: var(--fg);
 }
 
+/* Hero + secondary 2-column layout */
 .lookback-card__items {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: 2fr 1fr;
   gap: var(--space-4);
-  margin-bottom: var(--space-4);
+}
+
+.lookback-card__secondary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .lookback-card__item {
+  position: relative;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 
 .lookback-card__item:hover {
   opacity: 0.7;
+}
+
+/* Visited state (session-only, applied via JS) */
+.lookback-card__item--visited {
+  opacity: 0.4;
+}
+.lookback-card__item--visited .lookback-card__title {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted);
+}
+
+/* Hero image: taller ratio */
+.lookback-card__item--hero .lookback-card__img,
+.lookback-card__item--hero .lookback-card__placeholder {
+  aspect-ratio: 4/3;
+}
+
+/* Secondary images: compact */
+.lookback-card__item--secondary .lookback-card__img,
+.lookback-card__item--secondary .lookback-card__placeholder {
+  aspect-ratio: 16/9;
 }
 
 .lookback-card__img {
@@ -1188,11 +1221,38 @@ body {
   background: var(--subtle);
   border: 1px solid var(--subtle);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-2xl);
+  gap: var(--space-1);
+  font-size: var(--font-size-xl);
   color: var(--muted);
   margin-bottom: var(--space-2);
+}
+
+.lookback-card__placeholder-sub {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* Category badge — always visible, top-left of thumbnail */
+.lookback-card__badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 5px;
+  background: var(--bg);
+  border-right: 1px solid var(--fg);
+  border-bottom: 1px solid var(--fg);
+  color: var(--fg);
+  line-height: 1;
 }
 
 .lookback-card__title {
@@ -1206,36 +1266,53 @@ body {
   color: var(--fg);
 }
 
+/* Signal context label with type border */
 .lookback-card__context {
   font-size: var(--font-size-xs);
   color: var(--muted);
   font-family: var(--font-mono);
+  border-left: 2px solid var(--subtle);
+  padding-left: var(--space-2);
+  margin-top: var(--space-1);
+}
+.lookback-card__context--temporal {
+  border-left-color: var(--fg);
+}
+.lookback-card__context--action {
+  border-left-color: var(--muted);
 }
 
-.lookback-card__footer {
-  display: flex;
-  justify-content: flex-end;
+/* Single-pin layout: hero spans full width */
+.lookback-card__items--single {
+  grid-template-columns: 1fr;
 }
 
-.lookback-card__see-all {
-  background: transparent;
-  border: 1px solid var(--fg);
-  color: var(--fg);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  padding: var(--space-2) var(--space-4);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.lookback-card__see-all:hover {
-  background: var(--fg);
-  color: var(--bg);
-}
-
+/* Mobile: horizontal scroll carousel */
 @media (max-width: 640px) {
   .lookback-card__items {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: var(--space-4);
+    padding-bottom: var(--space-2);
+  }
+  .lookback-card__items::-webkit-scrollbar { display: none; }
+  .lookback-card__secondary {
+    display: contents;
+  }
+  .lookback-card__item--hero {
+    flex: 0 0 72vw;
+    max-width: 280px;
+  }
+  .lookback-card__item--secondary {
+    flex: 0 0 55vw;
+    max-width: 200px;
+  }
+  .lookback-card__item--hero .lookback-card__img,
+  .lookback-card__item--hero .lookback-card__placeholder {
+    aspect-ratio: 16/9;
   }
 }
 
@@ -13938,9 +14015,6 @@ Return JSON:
     let html = '';
     let cardCount = 0;
 
-    // Inject Lookback card at top of grid (before any pins)
-    html += renderLookbackCard(allLinks);
-
     // Build a map of widget positions for injection
     const widgetsByPosition = {};
     if (inlineWidgets.length > 0) {
@@ -14251,6 +14325,9 @@ Return JSON:
         </article>`;
       }
     }
+
+    // Inject Lookback card at bottom of feed (after all pins)
+    html += renderLookbackCard(allLinks);
 
     // Add remaining inline widgets at end if not yet inserted
     while (widgetPosIdx < widgetPositionKeys.length) {
@@ -15238,6 +15315,7 @@ Return JSON:
         const link = getAllLinks().find(l => l.id === linkId);
         if (link) {
           trackPinInteraction(linkId, 'lookback_view');
+          lookbackItem.classList.add('lookback-card__item--visited');
           window.open(link.url, '_blank');
         }
       }
@@ -15252,14 +15330,6 @@ Return JSON:
       return;
     }
 
-    const seeAllBtn = e.target.closest('[data-action="see-all-lookback"]');
-    if (seeAllBtn) {
-      e.preventDefault();
-      // For MVP, just scroll to show all lookback pins in grid
-      // Full Lookback View is post-MVP
-      toast('Full Lookback view coming soon!');
-      return;
-    }
 
     // Handle listen row click → open player
     const lr = e.target.closest('.listen-row');
@@ -18995,13 +19065,85 @@ Return JSON:
     return 'winter';
   }
 
+  // Stopwords for title keyword extraction
+  const LOOKBACK_STOPWORDS = new Set([
+    'the','a','an','and','or','is','in','on','at','to','for','of','with','by',
+    'from','this','that','it','be','as','are','was','were','has','have','been',
+    'will','not','but','so','how','what','why','who','when','where','your','my',
+    'i','you','we','they','he','she','its','our','their','do','does','did','can',
+    'could','would','should','just','more','most','very','all','any','no','new'
+  ]);
+
+  // Extract meaningful keywords from a title
+  function extractTitleWords(title) {
+    if (!title) return [];
+    return title.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !LOOKBACK_STOPWORDS.has(w));
+  }
+
+  // Simple string hash for deterministic daily jitter
+  function lookbackHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
+  }
+
+  // Build recency-weighted context from recent saves
+  function buildRecentContext(links, now) {
+    const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+    const recentPins = links
+      .filter(p => {
+        const saved = new Date(p.addedAt || p.created_at);
+        const age = now - saved;
+        return age > 0 && age < fourteenDaysMs;
+      })
+      .sort((a, b) => new Date(b.addedAt || b.created_at) - new Date(a.addedAt || a.created_at));
+
+    const wordWeights = {};
+    const categoryWeights = {};
+    const domainWeights = {};
+
+    for (const pin of recentPins) {
+      const saved = new Date(pin.addedAt || pin.created_at);
+      const daysSinceSave = (now - saved) / (24 * 60 * 60 * 1000);
+      const weight = 1.0 / (1 + daysSinceSave);
+
+      // Title words
+      for (const word of extractTitleWords(pin.title)) {
+        wordWeights[word] = (wordWeights[word] || 0) + weight;
+      }
+
+      // Category
+      if (pin.category) {
+        categoryWeights[pin.category] = (categoryWeights[pin.category] || 0) + weight;
+      }
+
+      // Domain
+      if (pin.domain) {
+        const dom = pin.domain.replace(/^www\./, '');
+        domainWeights[dom] = (domainWeights[dom] || 0) + weight;
+      }
+    }
+
+    return { wordWeights, categoryWeights, domainWeights, hasPins: recentPins.length > 0 };
+  }
+
   // Compute lookback score for a pin
-  function computeLookbackScore(pin, now) {
+  function computeLookbackScore(pin, now, recentContext) {
     let score = 0;
     const signals = [];
     const createdAt = new Date(pin.addedAt || pin.created_at);
     const age = now - createdAt;
     const daysSinceSave = age / (24 * 60 * 60 * 1000);
+
+    // Skip very recent pins (< 14 days) — they're not lookback material
+    if (daysSinceSave < 14) return { score: 0, signals: [] };
+
+    // --- Temporal signals ---
 
     // Anniversary (within 3-day window, pin must be 300+ days old)
     if (daysSinceSave > 300) {
@@ -19025,9 +19167,16 @@ Return JSON:
       signals.push({ type: 'seasonal', label: `From last ${season}` });
     }
 
-    // Never clicked (7+ days old, no interaction)
-    if (!pin.last_interacted_at && daysSinceSave > 7) {
-      score += 0.7;
+    // --- Interaction signals ---
+
+    // Never clicked — age-scaled weight (higher for older forgotten pins)
+    if (!pin.last_interacted_at && daysSinceSave > 14) {
+      let neverClickedWeight;
+      if (daysSinceSave <= 30) neverClickedWeight = 0.2;
+      else if (daysSinceSave <= 90) neverClickedWeight = 0.45;
+      else if (daysSinceSave <= 180) neverClickedWeight = 0.65;
+      else neverClickedWeight = 0.8;
+      score += neverClickedWeight;
       signals.push({ type: 'never_clicked', label: 'Never opened' });
     }
 
@@ -19041,11 +19190,58 @@ Return JSON:
       signals.push({ type: 'unread', label: 'Still unread' });
     }
 
-    // Staleness bonus (90+ days, no interaction)
-    if (daysSinceSave > 90 && !pin.last_interacted_at) {
-      score += Math.min(0.3, daysSinceSave / 1000);
-      signals.push({ type: 'stale', label: 'Forgotten save' });
+    // Staleness: previously interacted but then abandoned (90+ days since last interaction)
+    if (pin.last_interacted_at) {
+      const daysSinceInteraction = (now - new Date(pin.last_interacted_at)) / (24 * 60 * 60 * 1000);
+      if (daysSinceInteraction > 90) {
+        score += Math.min(0.25, daysSinceInteraction / 1000);
+        signals.push({ type: 'stale', label: 'Revisit this' });
+      }
     }
+
+    // --- Recent context signal (train of thought) ---
+    if (recentContext && recentContext.hasPins) {
+      let relevance = 0;
+      let matchType = '';
+
+      // Title word overlap (weighted)
+      const pinWords = extractTitleWords(pin.title);
+      let wordScore = 0;
+      for (const word of pinWords) {
+        if (recentContext.wordWeights[word]) {
+          wordScore += recentContext.wordWeights[word];
+        }
+      }
+      relevance += wordScore;
+      if (wordScore > 0.3) matchType = 'word';
+
+      // Category match
+      if (pin.category && recentContext.categoryWeights[pin.category]) {
+        relevance += recentContext.categoryWeights[pin.category] * 0.3;
+        if (!matchType) matchType = 'category';
+      }
+
+      // Domain match
+      if (pin.domain) {
+        const dom = pin.domain.replace(/^www\./, '');
+        if (recentContext.domainWeights[dom]) {
+          relevance += recentContext.domainWeights[dom] * 0.3;
+          if (!matchType) matchType = 'domain';
+        }
+      }
+
+      if (relevance > 0.1) {
+        const contextScore = Math.min(0.7, relevance * 0.7);
+        score += contextScore;
+        const label = matchType === 'word' ? 'Similar to recent saves'
+          : matchType === 'category' ? `You're saving ${pin.category} lately`
+          : 'From a site you\'re browsing';
+        signals.push({ type: 'recent_context', label });
+      }
+    }
+
+    // Normalize to 0-1 range
+    score = Math.min(score / 2.5, 1.0);
 
     return { score, signals };
   }
@@ -19071,11 +19267,29 @@ Return JSON:
       surfaced = JSON.parse(localStorage.getItem(LOOKBACK_SURFACED_KEY) || '{}');
     } catch {}
 
+    // Prune surfaced entries older than 30 days
+    const thirtyDaysAgo = today - 30 * 24 * 60 * 60 * 1000;
+    let pruned = false;
+    for (const id of Object.keys(surfaced)) {
+      if (new Date(surfaced[id]).getTime() < thirtyDaysAgo) {
+        delete surfaced[id];
+        pruned = true;
+      }
+    }
+    if (pruned) {
+      try { localStorage.setItem(LOOKBACK_SURFACED_KEY, JSON.stringify(surfaced)); } catch {}
+    }
+
     const now = new Date(today);
+    const todayKey = today.toISOString ? today.toISOString().split('T')[0] : new Date(today).toISOString().split('T')[0];
+
+    // Build recent context for train-of-thought signal
+    const recentContext = buildRecentContext(links, now);
+
     const scored = [];
 
     for (const pin of links) {
-      const result = computeLookbackScore(pin, now);
+      const result = computeLookbackScore(pin, now, recentContext);
       if (result.score > 0) {
         // Apply recency decay
         let finalScore = result.score;
@@ -19083,53 +19297,59 @@ Return JSON:
         if (lastSurfaced) {
           const daysSinceSurfaced = (today - new Date(lastSurfaced)) / (24 * 60 * 60 * 1000);
           if (daysSinceSurfaced < 14) {
-            // Exponential decay with 14-day half-life
             const decayFactor = Math.pow(0.5, (14 - daysSinceSurfaced) / 14);
             finalScore *= decayFactor;
           }
         }
 
+        // Add deterministic daily jitter (seeded by date + pin ID)
+        const jitter = (lookbackHash(todayKey + pin.id) % 100) / 833; // 0–0.12 range
+        finalScore += jitter;
+
         scored.push({ ...pin, lookbackScore: finalScore, lookbackSignals: result.signals });
       }
     }
 
-    // Sort by score descending
-    scored.sort((a, b) => b.lookbackScore - a.lookbackScore);
-
-    // Apply daily budget constraints
-    let selected = [];
+    // Greedy diversity-aware selection (replaces sort + linear scan)
+    const selected = [];
+    const categoryCount = {};
+    const selectedIds = new Set();
     let consumptionGapCount = 0;
-    const categories = new Set();
 
-    for (const pin of scored) {
-      if (selected.length >= 5) break;
+    while (selected.length < 3) {
+      let bestPin = null;
+      let bestEffective = -1;
 
-      // Max 1 consumption gap pin per day
-      const hasConsumptionGap = pin.lookbackSignals.some(s => s.type === 'unwatched' || s.type === 'unread');
-      if (hasConsumptionGap) {
-        if (consumptionGapCount >= 1) continue;
-        consumptionGapCount++;
+      for (const pin of scored) {
+        if (selectedIds.has(pin.id)) continue;
+
+        // Max 1 consumption gap pin
+        const hasConsumptionGap = pin.lookbackSignals.some(s => s.type === 'unwatched' || s.type === 'unread');
+        if (hasConsumptionGap && consumptionGapCount >= 1) continue;
+
+        // Category diversity penalty
+        const catCount = categoryCount[pin.category] || 0;
+        let diversityMultiplier = 1.0;
+        if (catCount === 1) diversityMultiplier = 0.6;
+        else if (catCount >= 2) diversityMultiplier = 0.3;
+
+        const effectiveScore = pin.lookbackScore * diversityMultiplier;
+        if (effectiveScore > bestEffective) {
+          bestEffective = effectiveScore;
+          bestPin = pin;
+        }
       }
 
-      selected.push(pin);
-      categories.add(pin.category);
+      if (!bestPin) break;
+
+      selected.push(bestPin);
+      selectedIds.add(bestPin.id);
+      categoryCount[bestPin.category] = (categoryCount[bestPin.category] || 0) + 1;
+      const hasGap = bestPin.lookbackSignals.some(s => s.type === 'unwatched' || s.type === 'unread');
+      if (hasGap) consumptionGapCount++;
     }
 
-    // Category diversity bonus: if top results are all one category, boost others
-    if (selected.length >= 3 && categories.size === 1) {
-      // Find pins from different categories in the scored list
-      const otherCategories = scored.filter(p =>
-        p.category !== selected[0].category &&
-        !selected.find(s => s.id === p.id)
-      );
-
-      if (otherCategories.length > 0) {
-        // Replace last item with top different-category pin
-        selected[selected.length - 1] = otherCategories[0];
-      }
-    }
-
-    return selected.slice(0, 5); // Return 3-5 pins
+    return selected;
   }
 
   // Track interaction with a pin
@@ -19145,10 +19365,8 @@ Return JSON:
     // For MVP, just localStorage is sufficient
   }
 
-  // Render lookback card at top of grid
+  // Render lookback card at bottom of feed
   function renderLookbackCard(links) {
-    // Only show when viewing all categories
-    if (currentFilter !== 'all') return '';
 
     // Check if dismissed
     try {
@@ -19195,9 +19413,10 @@ Return JSON:
     } else {
       // Reconstruct pins from cached IDs
       lookbackPins = cached.map(id => links.find(l => l.id === id)).filter(Boolean);
-      // Re-score to get signals
+      // Re-score to get signals (with recent context for label generation)
+      const recentCtx = buildRecentContext(links, today);
       lookbackPins = lookbackPins.map(pin => {
-        const result = computeLookbackScore(pin, today);
+        const result = computeLookbackScore(pin, today, recentCtx);
         return { ...pin, lookbackScore: result.score, lookbackSignals: result.signals };
       });
     }
@@ -19205,23 +19424,45 @@ Return JSON:
     // Need at least 1 pin to show card
     if (lookbackPins.length < 1) return '';
 
-    // Render 3 mini-cards
-    const miniCards = lookbackPins.slice(0, 3).map(pin => {
+    // Helper: render a single mini-card
+    function renderLookbackMiniCard(pin, isHero) {
       const hasImg = pin.image && pin.image.length > 0;
       const initial = pin.title ? pin.title.charAt(0).toUpperCase() : '?';
       const contextLabel = pin.lookbackSignals[0]?.label || 'Worth revisiting';
+      const signalType = pin.lookbackSignals[0]?.type || '';
+      const isTemporalSignal = signalType === 'anniversary' || signalType === 'seasonal' || signalType === 'recent_context';
+      const contextClass = isTemporalSignal
+        ? 'lookback-card__context--temporal'
+        : 'lookback-card__context--action';
+      const itemClass = isHero
+        ? 'lookback-card__item lookback-card__item--hero'
+        : 'lookback-card__item lookback-card__item--secondary';
+      const thumbnailHtml = hasImg
+        ? `<img src="${esc(pin.image)}" alt="" class="lookback-card__img">`
+        : `<div class="lookback-card__placeholder">
+             <span>${initial}</span>
+             <span class="lookback-card__placeholder-sub">${esc(pin.category || 'link')}</span>
+           </div>`;
 
       return `
-        <div class="lookback-card__item" data-link-id="${pin.id}">
-          ${hasImg
-            ? `<img src="${esc(pin.image)}" alt="" class="lookback-card__img">`
-            : `<div class="lookback-card__placeholder">${initial}</div>`
-          }
+        <div class="${itemClass}" data-link-id="${esc(pin.id)}">
+          ${thumbnailHtml}
+          <span class="lookback-card__badge">${esc(pin.category || 'link')}</span>
           <div class="lookback-card__title">${esc(pin.title || pin.url)}</div>
-          <div class="lookback-card__context">${esc(contextLabel)}</div>
+          <div class="lookback-card__context ${contextClass}">${esc(contextLabel)}</div>
         </div>
       `;
-    }).join('');
+    }
+
+    const displayPins = lookbackPins.slice(0, 3);
+    const heroHtml = renderLookbackMiniCard(displayPins[0], true);
+    const sidebarPins = displayPins.slice(1);
+    const sidebarHtml = sidebarPins.length > 0
+      ? `<div class="lookback-card__secondary">${sidebarPins.map(p => renderLookbackMiniCard(p, false)).join('')}</div>`
+      : '';
+    const itemsClass = displayPins.length === 1
+      ? 'lookback-card__items lookback-card__items--single'
+      : 'lookback-card__items';
 
     return `
       <div class="lookback-card">
@@ -19229,11 +19470,9 @@ Return JSON:
           <div class="lookback-card__label">LOOKBACK</div>
           <button class="lookback-card__dismiss" data-action="dismiss-lookback">×</button>
         </div>
-        <div class="lookback-card__items">
-          ${miniCards}
-        </div>
-        <div class="lookback-card__footer">
-          <button class="lookback-card__see-all" data-action="see-all-lookback">See all →</button>
+        <div class="${itemsClass}">
+          ${heroHtml}
+          ${sidebarHtml}
         </div>
       </div>
     `;
