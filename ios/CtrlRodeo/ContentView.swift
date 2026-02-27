@@ -6,14 +6,12 @@ import WebKit
 struct ContentView: View {
     @State private var isAuthenticated = SupabaseClient.shared.isAuthenticated
     @State private var didSkipAuth = false
-    @State private var pendingAuthURL: URL? = nil
 
     var body: some View {
         Group {
             if isAuthenticated || didSkipAuth {
                 BoardsWebView(
-                    isAuthenticated: $isAuthenticated,
-                    pendingAuthURL: $pendingAuthURL
+                    isAuthenticated: $isAuthenticated
                 )
             } else {
                 AuthView(
@@ -38,30 +36,40 @@ struct ContentView: View {
     private func handleAuthDeepLink(_ url: URL) {
         print("[ContentView] handleAuthDeepLink: \(url)")
 
-        // Check if this is an auth callback (contains access_token in fragment or query)
+        // Check if this is an auth callback (contains access_token in fragment)
         let urlString = url.absoluteString
-        guard urlString.contains("access_token") || urlString.contains("token_type") else { return }
+        guard urlString.contains("access_token") else { return }
 
-        // If it's a custom scheme URL (ctrlrodeo://), WKWebView can't load it.
-        // Extract the fragment and build a proper HTTPS URL.
-        let loadURL: URL
-        if url.scheme == AppConstants.urlScheme {
-            let fragment = url.fragment ?? ""
-            let httpsURLString = fragment.isEmpty
-                ? AppConstants.boardsURL
-                : AppConstants.boardsURL + "#" + fragment
-            loadURL = URL(string: httpsURLString) ?? url
-            print("[ContentView] handleAuthDeepLink: translated custom scheme to \(loadURL)")
-        } else {
-            loadURL = url
+        // Parse tokens directly from the URL fragment — no WKWebView round-trip needed.
+        // The fragment contains: "access_token=JWT&refresh_token=REFRESH&token_type=bearer"
+        let fragment = url.fragment ?? ""
+        var params: [String: String] = [:]
+        fragment.split(separator: "&").forEach { pair in
+            let kv = pair.split(separator: "=", maxSplits: 1)
+            if kv.count == 2 {
+                params[String(kv[0])] = String(kv[1])
+            }
         }
 
-        // Store the URL to pass to WebView for token extraction.
-        // Set pendingAuthURL first, then defer the view transition to the next runloop tick.
-        // This ensures the binding value is committed before BoardsWebView's makeUIView reads it.
-        pendingAuthURL = loadURL
+        guard let accessToken = params["access_token"], !accessToken.isEmpty else {
+            print("[ContentView] handleAuthDeepLink: No access_token in fragment")
+            return
+        }
 
-        if !isAuthenticated && !didSkipAuth {
+        let refreshToken = params["refresh_token"]
+        print("[ContentView] handleAuthDeepLink: Parsed tokens directly, storing auth")
+
+        // Store auth immediately — eliminates the fragile WKWebView token round-trip
+        let auth = StoredAuth(accessToken: accessToken, refreshToken: refreshToken, user: nil)
+        SupabaseClient.shared.storeAuth(auth)
+        isAuthenticated = true
+
+        // Notify other views (including WebView coordinator) that auth state changed
+        NotificationCenter.default.post(name: NSNotification.Name("AuthStateChanged"), object: nil)
+
+        // Transition to BoardsWebView if not already showing.
+        // WebView loads the base URL normally; injectStoredAuth() pushes tokens to web localStorage.
+        if !didSkipAuth {
             DispatchQueue.main.async {
                 didSkipAuth = true
             }
@@ -73,7 +81,6 @@ struct ContentView: View {
 
 struct BoardsWebView: View {
     @Binding var isAuthenticated: Bool
-    @Binding var pendingAuthURL: URL?
 
     @State private var isRefreshing = false
     @State private var isLoading = true
@@ -85,8 +92,7 @@ struct BoardsWebView: View {
                 isRefreshing: $isRefreshing,
                 isLoading: $isLoading,
                 errorMessage: $errorMessage,
-                isAuthenticated: $isAuthenticated,
-                pendingAuthURL: $pendingAuthURL
+                isAuthenticated: $isAuthenticated
             )
             .ignoresSafeArea()
             .background(Theme.background)
@@ -132,7 +138,6 @@ struct WebView: UIViewRepresentable {
     @Binding var isLoading: Bool
     @Binding var errorMessage: String?
     @Binding var isAuthenticated: Bool
-    @Binding var pendingAuthURL: URL?
 
     /// Auth bridge JS injected at document start to intercept localStorage writes.
     /// Must run BEFORE any page JS (including Supabase) to patch setItem in time.
@@ -186,12 +191,11 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.addSubview(refreshControl)
         context.coordinator.refreshControl = refreshControl
 
-        // Only load the base URL if there's no pending auth URL.
-        // If pendingAuthURL is set, updateUIView will load it on the next SwiftUI pass.
-        if pendingAuthURL == nil, let url = URL(string: AppConstants.boardsURL) {
+        // Always load the base boards URL. Auth tokens are stored directly in Swift
+        // (not passed through the URL), and injectStoredAuth() pushes them to web localStorage.
+        if let url = URL(string: AppConstants.boardsURL) {
             print("[WebView] makeUIView: Loading base URL \(url)")
             webView.load(URLRequest(url: url))
-            context.coordinator.hasLoadedInitially = true
         }
 
         context.coordinator.webView = webView
@@ -212,26 +216,6 @@ struct WebView: UIViewRepresentable {
                 webView.load(URLRequest(url: url))
             }
         }
-
-        // If makeUIView skipped loading (because pendingAuthURL was set), load base URL
-        // now if no auth URL is pending (e.g., the auth URL was already consumed).
-        if !context.coordinator.hasLoadedInitially && pendingAuthURL == nil {
-            context.coordinator.hasLoadedInitially = true
-            if let url = URL(string: AppConstants.boardsURL) {
-                print("[WebView] updateUIView: Deferred base URL load \(url)")
-                webView.load(URLRequest(url: url))
-            }
-        }
-
-        // Load pending auth URL if one arrived
-        if let authURL = pendingAuthURL {
-            print("[WebView] updateUIView: Loading pending auth URL \(authURL)")
-            context.coordinator.hasLoadedInitially = true
-            webView.load(URLRequest(url: authURL))
-            DispatchQueue.main.async {
-                pendingAuthURL = nil
-            }
-        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -249,21 +233,37 @@ struct WebView: UIViewRepresentable {
         var webView: WKWebView?
         var refreshControl: UIRefreshControl?
         var shouldRetry = false
-        var hasLoadedInitially = false
 
         @Binding var isRefreshing: Bool
         @Binding var isLoading: Bool
         @Binding var errorMessage: String?
         @Binding var isAuthenticated: Bool
 
-        private var hasInjectedAuth = false
         private var hasProcessedQueue = false
+
+        private var authChangedObserver: NSObjectProtocol?
 
         init(isRefreshing: Binding<Bool>, isLoading: Binding<Bool>, errorMessage: Binding<String?>, isAuthenticated: Binding<Bool>) {
             _isRefreshing = isRefreshing
             _isLoading = isLoading
             _errorMessage = errorMessage
             _isAuthenticated = isAuthenticated
+            super.init()
+
+            // When auth state changes (e.g., deep link parsed new tokens), re-inject into web
+            authChangedObserver = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("AuthStateChanged"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.injectStoredAuth()
+            }
+        }
+
+        deinit {
+            if let observer = authChangedObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
 
         // MARK: - Navigation Delegate
@@ -283,11 +283,9 @@ struct WebView: UIViewRepresentable {
             // so this only needs to check for pre-existing auth (e.g., page reload).
             checkExistingAuth()
 
-            // Inject stored auth into web localStorage (one-time on first load)
-            if !hasInjectedAuth {
-                injectStoredAuth()
-                hasInjectedAuth = true
-            }
+            // Inject stored auth into web localStorage on every page load.
+            // This is idempotent and ensures auth is available after deep link arrivals.
+            injectStoredAuth()
 
             // Process queued URLs (one-time on first load)
             if !hasProcessedQueue {
@@ -329,14 +327,14 @@ struct WebView: UIViewRepresentable {
                 return
             }
 
-            // Parse auth token from web and store in App Group
+            // Parse auth token from web and store in App Group.
+            // Do NOT post AuthStateChanged here — it would trigger injectStoredAuth() which
+            // writes to localStorage, which triggers this handler again → infinite loop.
+            // The isAuthenticated binding propagates the state change directly.
             if let auth = try? JSONDecoder().decode(StoredAuth.self, from: authData) {
                 print("[WebView] authBridge: Received auth token, storing...")
                 SupabaseClient.shared.storeAuth(auth)
                 isAuthenticated = true
-
-                // Notify other views that auth state changed
-                NotificationCenter.default.post(name: NSNotification.Name("AuthStateChanged"), object: nil)
             }
         }
 
