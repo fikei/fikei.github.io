@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Livongo — Optimized Onboarding Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-height: 100vh; }
+
+/* Header */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; background: #fff; z-index: 100; }
+.logo { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; color: #333; text-decoration: none; }
+.header-center { flex: 1; max-width: 400px; margin: 0 40px; }
+.header-right { display: flex; align-items: center; gap: 16px; font-size: 14px; color: #666; }
+.live-chat { color: #1976D2; font-weight: 500; cursor: pointer; }
+
+/* Sectioned Progress Bar */
+.progress-sections {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.progress-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  position: relative;
+}
+.progress-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #bbb;
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+.progress-section-label.active { color: #1976D2; }
+.progress-section-label.done { color: #1976D2; }
+.progress-section-bar {
+  flex: 1;
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-section-fill {
+  height: 100%;
+  background: #1976D2;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0;
+}
+.progress-section-fill.complete {
+  width: 100%;
+  background: #1976D2;
+}
+
+/* Step Container */
+.step { display: none; max-width: 640px; margin: 0 auto; padding: 48px 24px 120px; }
+.step.active { display: block; animation: stepFadeIn 0.3s ease; }
+.step h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #222; }
+.step .subtitle { font-size: 15px; color: #666; margin-bottom: 24px; line-height: 1.6; }
+
+/* Step fade animation */
+@keyframes stepFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.step.fading-out {
+  animation: stepFadeOut 0.15s ease forwards;
+}
+@keyframes stepFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+/* Section labels */
+.section-label { font-size: 11px; font-weight: 600; color: #666; margin-top: 32px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Source banner — section-level attribution */
+.source-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.6;
+  padding: 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+}
+.source-banner--employer {
+  background: #f0f7ff;
+  border: 1px solid #d0e3f8;
+  border-left: 3px solid #1976D2;
+}
+.source-banner .sb-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* Prefilled indicator — polished dot on right side */
+.field-wrap.prefilled { position: relative; }
+.field-wrap.prefilled::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #1976D2;
+  border-radius: 50%;
+  pointer-events: none;
+}
+/* Increase dot offset for selects to clear custom dropdown caret */
+.field-wrap.prefilled--select::after {
+  right: 38px;
+}
+
+.radio-card.preselected::after,
+.checkbox-card.preselected::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: #1976D2;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* From Your Records — collapsed summary */
+.records-summary { margin-top: 32px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+.records-summary summary { padding: 16px; font-size: 14px; font-weight: 600; color: #555; cursor: pointer; background: #fff; list-style: none; display: flex; align-items: center; }
+.records-summary summary::-webkit-details-marker { display: none; }
+.records-summary summary::after { content: "▸"; padding-left: 12px; transition: transform 0.2s; font-size: 14px; color: #999; flex-shrink: 0; }
+.records-summary[open] summary::after { transform: rotate(90deg); }
+.records-summary-body { padding: 20px; border-top: 1px solid #e0e0e0; }
+.records-source-heading { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 20px 0 8px; }
+.records-source-heading:first-child { margin-top: 0; }
+.records-item { display: flex; align-items: center; padding: 16px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.records-item:last-child { border-bottom: none; }
+.records-label { color: #777; width: 140px; flex-shrink: 0; }
+.records-value { flex: 1; font-weight: 500; color: #333; }
+.records-edit {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1976D2;
+  cursor: pointer;
+  margin-left: 12px;
+  text-decoration: none;
+  padding: 4px 12px;
+  border: 1px solid #d0e3f8;
+  border-radius: 6px;
+  background: #f5f9ff;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.records-edit:hover { background: #e3f2fd; border-color: #1976D2; }
+.records-input {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  padding: 6px 10px;
+  border: 1px solid #1976D2;
+  border-radius: 6px;
+  background: #fff;
+  font-family: 'Roboto', sans-serif;
+}
+.records-privacy { font-size: 12px; color: #999; margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee; }
+
+/* Welcome Card + Data Disclosure Card — bordered card matching program-value-card */
+.welcome-card,
+.data-disclosure-card {
+  background: #faf8f5;
+  border: 1px solid #ede8e1;
+  border-radius: 10px;
+  padding: 16px 24px 24px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.welcome-card .wc-greeting,
+.data-disclosure-card .wc-greeting,
+.program-value-card .wc-greeting {
+  font-size: 17px;
+  font-weight: 600;
+  color: #2d2a26;
+  margin-bottom: 12px;
+}
+.welcome-card .wc-body,
+.data-disclosure-card .wc-body,
+.program-value-card .wc-body {
+  font-size: 14px;
+  color: #4a4540;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+.welcome-card .wc-body + .wc-sources,
+.data-disclosure-card .wc-body + .wc-sources {
+  margin-top: 16px;
+}
+.welcome-card .wc-sources,
+.data-disclosure-card .wc-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #f9fbff;
+  border-radius: 8px;
+  border: 1px solid #e8eef8;
+}
+.welcome-card .wc-source-row,
+.data-disclosure-card .wc-source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #444;
+}
+.welcome-card .wc-source-row .wc-icon,
+.data-disclosure-card .wc-source-row .wc-icon { font-size: 16px; flex-shrink: 0; }
+.welcome-card .wc-source-row .wc-fields,
+.data-disclosure-card .wc-source-row .wc-fields { color: #777; font-size: 12px; }
+.welcome-card .wc-privacy,
+.data-disclosure-card .wc-privacy {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+/* Confirmation / attribution card — blue-sage, dark text */
+.coverage-verified {
+  background: #f5f9f9;
+  border: 1px solid #d3d9d9;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.coverage-verified .cv-icon { font-size: 20px; flex-shrink: 0; color: #43a047; }
+.coverage-verified .cv-text { font-size: 14px; color: #333; line-height: 1.6; }
+.coverage-verified .cv-text strong { font-weight: 700; }
+
+/* Hero variant for Step 6 enrolled card */
+.coverage-verified--hero { padding: 24px; gap: 16px; }
+.coverage-verified--hero .cv-icon { font-size: 28px; }
+.coverage-verified--hero .cv-text strong { font-size: 20px; display: block; margin-bottom: 6px; }
+
+/* Section heading — Step 6 sub-sections */
+.section-heading { font-size: 18px; font-weight: 600; color: #222; margin-bottom: 8px; }
+
+/* Step legend */
+.step-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 20px;
+  background: #e0f2f1;
+  color: #00695c;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* Form Elements */
+.form-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.form-row.single { flex-direction: column; }
+.form-group { flex: 1; display: flex; flex-direction: column; position: relative; }
+.form-group label { font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.form-group label .req { color: #d32f2f; }
+
+input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="date"], input[type="number"], select, textarea {
+  width: 100%; padding: 14px 16px; border: 1px solid #ccc; border-radius: 10px; font-size: 15px;
+  font-family: 'Roboto', sans-serif; background: #fff; color: #333; transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 48px;
+}
+/* Custom dropdown caret — consistent ▾ triangle matching From Your Records ▸ style */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4.5L9 1' fill='none' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 10px;
+  cursor: pointer;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #1976D2;
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+input.error, select.error { border-color: #d32f2f; }
+.error-msg { font-size: 12px; color: #d32f2f; margin-top: 4px; display: none; }
+.error-msg.visible { display: block; }
+
+/* Pre-filled field styling */
+.field-wrap { position: relative; }
+.field-wrap.prefilled input {
+  padding-right: 28px;
+}
+.field-wrap.prefilled select {
+  padding-right: 52px;
+}
+.field-wrap.prefilled input:focus,
+.field-wrap.prefilled select:focus {
+  border-color: #1976D2;
+}
+
+/* Identity hint */
+.identity-hint {
+  font-size: 13px;
+  color: #666;
+  margin-top: 8px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+/* Password field */
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 44px; }
+.toggle-pw { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; font-size: 18px; }
+
+/* Password strength */
+.pw-rules { margin-top: 8px; font-size: 12px; color: #999; display: none; }
+.pw-rules.visible { display: block; }
+.pw-rules .rule { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.pw-rules .rule.pass { color: #1976D2; }
+.pw-rules .rule.pass::before { content: "✓"; font-weight: 700; }
+.pw-rules .rule.fail::before { content: "✕"; color: #d32f2f; font-weight: 700; }
+
+/* Checkboxes & Radios */
+.checkbox-row, .radio-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
+.checkbox-row input, .radio-row input { margin-top: 2px; accent-color: #1976D2; width: 18px; height: 18px; cursor: pointer; }
+.checkbox-row a, .radio-row a { color: #1976D2; text-decoration: none; }
+
+/* Radio Cards */
+.radio-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); min-height: 48px; }
+.radio-card:hover { border-color: #1976D2; background: #f5f9ff; }
+.radio-card.selected { border-color: #1976D2; background: #e3f2fd; }
+.radio-card input { accent-color: #1976D2; width: 18px; height: 18px; }
+.radio-card .info-icon { margin-left: auto; color: #1976D2; cursor: help; font-size: 18px; }
+
+/* Pre-selected radio card */
+.radio-card.preselected.selected {
+  border-color: #1976D2;
+  background: #e3f2fd;
+}
+
+/* Checkbox Cards */
+.checkbox-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); min-height: 48px; }
+.checkbox-card:hover { border-color: #1976D2; background: #f5f9ff; }
+.checkbox-card.selected { border-color: #1976D2; background: #e3f2fd; }
+.checkbox-card input { accent-color: #1976D2; width: 18px; height: 18px; }
+.checkbox-card .info-icon { margin-left: auto; color: #1976D2; cursor: help; font-size: 18px; }
+
+/* Pre-selected checkbox card — dot indicator added via ::after in prefilled section */
+
+/* Buttons */
+.btn-next { display: block; width: 100%; padding: 18px; background: #1976D2; color: #fff; border: none; border-radius: 10px; font-size: 17px; font-weight: 500; cursor: pointer; transition: background 0.2s; font-family: 'Roboto', sans-serif; margin-top: 24px; box-shadow: 0 2px 8px rgba(25,118,210,0.25); min-height: 56px; }
+.btn-next:hover { background: #1565c0; }
+.btn-next .label-bold { font-weight: 600; }
+
+/* Supplies showcase */
+.supplies-showcase { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 24px 0; padding: 24px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; }
+.supplies-list { list-style: none; }
+.supplies-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+.supplies-list li .check { color: #1976D2; font-size: 18px; }
+
+/* Welcome / What's Next screen */
+.complete-hero { background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%); color: #fff; text-align: center; padding: 48px 24px; border-radius: 12px; margin-bottom: 32px; }
+.complete-hero .check-circle { width: 64px; height: 64px; border: 3px solid rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; background: rgba(255,255,255,0.1); }
+.complete-hero h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+.complete-hero p { font-size: 14px; opacity: 0.9; line-height: 1.6; }
+
+.next-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 32px 0;
+}
+.next-step-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.next-step-card .ns-icon { font-size: 32px; margin-bottom: 12px; }
+.next-step-card .ns-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 8px; }
+.next-step-card .ns-body { font-size: 13px; color: #555; line-height: 1.6; }
+.next-step-card .ns-tag { font-size: 11px; color: #888; margin-top: 12px; font-weight: 500; }
+
+.impact-stats {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin: 24px 0;
+  padding: 24px;
+  background: #f5f8fc;
+  border-radius: 10px;
+}
+.impact-stat { text-align: center; }
+.impact-stat .is-big { font-size: 24px; font-weight: 700; color: #1976D2; }
+.impact-stat .is-label { font-size: 12px; color: #666; margin-top: 4px; }
+
+.btn-dashboard { display: inline-block; margin-top: 16px; padding: 12px 32px; background: #fff; color: #1976D2; border: 2px solid #1976D2; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none; transition: background 0.2s; }
+.btn-dashboard:hover { background: #e3f2fd; }
+
+/* Question groups */
+.question-group { margin-bottom: 24px; }
+.question-group .question { font-size: 15px; font-weight: 500; margin-bottom: 12px; color: #333; }
+.question-group .question .info-icon { color: #1976D2; cursor: help; font-size: 16px; margin-left: 4px; }
+
+/* Footer with language */
+.footer { max-width: 640px; margin: 0 auto; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #999; border-top: 1px solid #eee; }
+.footer a { color: #1976D2; text-decoration: none; }
+.lang-toggle { cursor: pointer; color: #1976D2; font-weight: 500; }
+
+/* Language modal */
+.lang-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 500;
+  justify-content: center;
+  align-items: center;
+}
+.lang-modal-overlay.visible { display: flex; }
+.lang-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px 32px;
+  width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  text-align: center;
+}
+.lang-modal h3 { font-size: 18px; margin-bottom: 16px; color: #222; }
+.lang-option {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-family: 'Roboto', sans-serif;
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.lang-option:hover { background: #f5f9ff; border-color: #1976D2; }
+.lang-option.selected { background: #e3f2fd; border-color: #1976D2; font-weight: 600; }
+
+/* Loader area */
+.loader-area { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+
+/* Help box */
+.help-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
+
+/* Nav hint */
+.nav-hint { position: fixed; bottom: 16px; right: 16px; background: #333; color: #fff; padding: 8px 12px; border-radius: 10px; font-size: 12px; opacity: 0.7; z-index: 200; }
+
+/* Address section */
+.address-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.address-section-header .section-label { margin-bottom: 0; }
+
+/* Persistent privacy trust banner — below Next button on all steps */
+.privacy-banner {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #f9fbff;
+  border: 1px solid #e8eef8;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+/* Program value card — Step 3, card treatment matching original welcome-card style */
+.program-value-card {
+  background: #faf8f5;
+  border: 1px solid #ede8e1;
+  border-radius: 10px;
+  padding: 16px 24px 24px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Count badge on From Your Records summary — pushed to the right */
+.records-summary summary .review-badge {
+  display: inline-block;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; }
+  .header { padding: 12px 16px; }
+  .step { padding: 32px 16px 100px; }
+  .header-center { max-width: 200px; margin: 0 12px; }
+  .next-steps-grid { grid-template-columns: 1fr; }
+  .impact-stats { flex-direction: column; gap: 16px; }
+  .progress-section-label { font-size: 9px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <a class="logo" href="#">Livongo</a>
+  <div class="header-center">
+    <div class="progress-sections" id="progressSections">
+      <div class="progress-section">
+        <span class="progress-section-label active" data-section="signup">Sign Up</span>
+        <div class="progress-section-bar"><div class="progress-section-fill" data-section="signup"></div></div>
+      </div>
+      <div class="progress-section">
+        <span class="progress-section-label" data-section="about">About You</span>
+        <div class="progress-section-bar"><div class="progress-section-fill" data-section="about"></div></div>
+      </div>
+      <div class="progress-section">
+        <span class="progress-section-label" data-section="welcome">Welcome</span>
+        <div class="progress-section-bar"><div class="progress-section-fill" data-section="welcome" style="width:0"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span>(800) 945-4355</span>
+    <span class="live-chat">LIVE CHAT</span>
+  </div>
+</div>
+
+<!-- ========== STEP 1: Confirm Identity ========== -->
+<div class="step active" data-step="1">
+
+  <h1>Let's Get Started</h1>
+  <p class="subtitle">We just need your name and date of birth to confirm your enrollment.</p>
+
+  <div class="welcome-card">
+    <div class="wc-greeting">👋 Welcome to Livongo</div>
+    <div class="wc-body">
+      <strong>Pilot Trucking LLC</strong> has enrolled you in Livongo to help manage your diabetes.
+      We'll confirm your eligibility with the information you provide.
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="firstName">Legal First Name <span class="req">*</span></label>
+      <input type="text" id="firstName" placeholder="First name" required>
+      <span class="error-msg" id="firstNameErr">First name is required</span>
+    </div>
+    <div class="form-group">
+      <label for="lastName">Legal Last Name <span class="req">*</span></label>
+      <input type="text" id="lastName" placeholder="Last name" required>
+      <span class="error-msg" id="lastNameErr">Last name is required</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="dob">Date of Birth <span class="req">*</span></label>
+      <input type="text" id="dob" placeholder="MM / DD / YYYY" maxlength="14" required inputmode="numeric">
+      <span class="error-msg" id="dobErr">Date of birth is required</span>
+    </div>
+  </div>
+
+  <button class="btn-next" onclick="goTo(2)"><span class="label-bold">Next:</span> Create Account</button>
+
+  <div class="privacy-banner">🔒 Your data is encrypted and never shared outside of your care team.</div>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 2: Create Account ========== -->
+<div class="step" data-step="2">
+
+  <h1>Create Your Account</h1>
+  <p class="subtitle">Create your email and password so you can access Livongo anytime.</p>
+
+  <div class="coverage-verified">
+    <span class="cv-icon">🔍</span>
+    <div class="cv-text">
+      <strong>We found you!</strong> Your eligibility through <strong>Pilot Trucking LLC</strong> is confirmed — Livongo is covered at no cost to you, now or later.
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="email">Email Address <span class="req">*</span></label>
+      <input type="email" id="email" name="email" placeholder="your@email.com" autocomplete="email" required>
+      <span class="error-msg" id="emailErr">Please enter a valid email address</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="phone">Mobile Phone Number <span class="req">*</span></label>
+      <input type="tel" id="phone" placeholder="(555) 555-5555">
+      <span class="error-msg" id="phoneErr">Please enter a valid phone number</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="password">Password <span class="req">*</span></label>
+      <div class="password-wrap">
+        <input type="password" id="password" name="password" placeholder="Create a password" autocomplete="new-password" required>
+        <button type="button" class="toggle-pw" onclick="togglePassword()">👁</button>
+      </div>
+      <div class="pw-rules" id="pwRules">
+        <div class="rule fail" data-rule="length">At least 8 characters</div>
+        <div class="rule fail" data-rule="upper">At least one uppercase letter</div>
+        <div class="rule fail" data-rule="lower">At least one lowercase letter</div>
+        <div class="rule fail" data-rule="number">At least one number</div>
+        <div class="rule fail" data-rule="special">At least one special character</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="tos">
+    <label for="tos">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
+  </div>
+
+  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Your Diabetes Program</button>
+
+  <div class="privacy-banner">🔒 Your data is encrypted and never shared outside of your care team.</div>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 3: Set Up Your Diabetes Program ========== -->
+<div class="step" data-step="3">
+
+  <h1>Set Up Your Diabetes Program</h1>
+  <p class="subtitle">Tell us about your current monitoring routine. This helps us personalize your program from day one.</p>
+
+  <div class="program-value-card">
+    <div class="wc-greeting">✨ A program made for you.</div>
+    <div class="wc-body">
+      Your coach will use these answers to create a plan that fits your schedule, your goals, and your routine — backed by a connected meter and unlimited strips.
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Do you use a Continuous Glucose Monitor (CGM) to help monitor your blood glucose?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="cgm" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="cgm" value="no">
+      No
+    </label>
+  </div>
+
+  <p class="section-label">Checking Blood Glucose</p>
+
+  <div class="question-group">
+    <div class="question">How often do you check your blood sugar?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="field-wrap prefilled prefilled--select">
+          <select id="checkFreq" aria-label="How often you check your blood sugar">
+            <option value="">Checks per day</option>
+            <option>Less than once a day</option>
+            <option>1 time per day</option>
+            <option selected>2 times per day</option>
+            <option>3 times per day</option>
+            <option>4+ times per day</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How often does your doctor recommend you check your blood sugar?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="field-wrap prefilled prefilled--select">
+          <select id="docRecFreq" aria-label="Doctor recommended blood sugar check frequency">
+            <option value="">Checks per day</option>
+            <option>Less than once a day</option>
+            <option>1 time per day</option>
+            <option>2 times per day</option>
+            <option selected>3 times per day</option>
+            <option>4+ times per day</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <details class="records-summary">
+    <summary>From Your Records <span class="review-badge">7 Found</span></summary>
+    <div class="records-summary-body">
+      <p style="font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 16px;">We pulled these details from your employer and health records to save you time. Review the information below and edit anything that's changed.</p>
+
+      <div class="records-source-heading">🏢 Employer</div>
+      <div class="records-item">
+        <span class="records-label">Gender</span>
+        <span class="records-value">Male</span>
+        <select class="records-input" style="display:none">
+          <option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+
+      <div class="records-source-heading">🏥 Health Records</div>
+      <div class="records-item">
+        <span class="records-label">Diabetes Type</span>
+        <span class="records-value">Type 2</span>
+        <select class="records-input" style="display:none">
+          <option>Type 1</option><option>Type 2</option><option>Gestational</option><option>Pre-diabetes</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Diagnosed</span>
+        <span class="records-value">2019</span>
+        <input type="number" class="records-input" min="1950" max="2026" style="display:none">
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+      <div class="records-item">
+        <span class="records-label">A1C Check</span>
+        <span class="records-value">Yes</span>
+        <select class="records-input" style="display:none">
+          <option>Yes</option><option>No</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Medications</span>
+        <span class="records-value">Oral Medications</span>
+        <select class="records-input" style="display:none">
+          <option>None</option><option>Oral Medications</option><option>Insulin</option><option>Both</option>
+        </select>
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Diabetes Eye Exam</span>
+        <span class="records-value">March 2024</span>
+        <input type="text" class="records-input" placeholder="e.g. March 2024" style="display:none">
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+      <div class="records-item">
+        <span class="records-label">Foot Exam</span>
+        <span class="records-value">November 2024</span>
+        <input type="text" class="records-input" placeholder="e.g. November 2024" style="display:none">
+        <a class="records-edit" onclick="toggleRecordEdit(this)">Edit</a>
+      </div>
+
+      <div class="records-privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
+    </div>
+  </details>
+
+  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health History</button>
+
+  <div class="privacy-banner">🔒 Your data is encrypted and never shared outside of your care team.</div>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 4: Health History ========== -->
+<div class="step" data-step="4">
+  <h1>Health History</h1>
+  <p class="subtitle">These answers help your coach personalize your experience. Answer what you can — you can always update later.</p>
+
+  <div class="data-disclosure-card">
+    <div class="wc-greeting">🤝 Personal from day one.</div>
+    <div class="wc-body">
+      Every answer here helps your coach your unique heath with your h — so your plan reflects your needs, not a one-size-fits-all checklist.
+    </div>
+  </div>
+
+  <div class="coverage-verified">
+    <span class="cv-icon">🏥</span>
+    <div class="cv-text">
+      <strong>Filled in from your records.</strong> Some answers below come from your health records to save you time. Review and update anything that's changed.
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Height</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="heightFt">Feet </label>
+        <div class="field-wrap prefilled prefilled--select">
+          <select id="heightFt">
+            <option value="">Feet</option>
+            <option>4</option><option selected>5</option><option>6</option><option>7</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="heightIn">Inches </label>
+        <div class="field-wrap prefilled prefilled--select">
+          <select id="heightIn">
+            <option value="">Inches</option>
+            <option>0</option><option>1</option><option>2</option><option>3</option>
+            <option>4</option><option>5</option><option>6</option><option>7</option>
+            <option>8</option><option>9</option><option selected>10</option><option>11</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Weight</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="weight">Pounds </label>
+        <div class="field-wrap">
+          <input type="number" id="weight" placeholder="e.g. 185" min="50" max="600">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-label">Your Health Background</p>
+
+  <div class="question-group">
+    <div class="question">Have you ever been diagnosed with or taken medication for any of the following?</div>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="cholesterol"> High Cholesterol</label>
+    <label class="checkbox-card preselected selected" onclick="toggleCheckCard(this)">
+      <input type="checkbox" value="hbp" checked>
+      High Blood Pressure (Hypertension)
+    </label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Do you smoke?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="smoke" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="smoke" value="no">
+      No
+    </label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you had a flu vaccine within the last year? <span class="info-icon">ⓘ</span></div>
+    <label class="radio-card preselected selected" onclick="selectRadioCard(this)">
+      <input type="radio" name="flu" value="yes" checked>
+      Yes
+    </label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="flu" value="no"> No</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you ever had the pneumonia vaccine? <span class="info-icon">ⓘ</span></div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="pneumonia" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)">
+      <input type="radio" name="pneumonia" value="no">
+      No
+    </label>
+  </div>
+
+  <p class="section-label">Activity and Diet</p>
+
+  <div class="question-group">
+    <div class="question">How active are you?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="activity" value="regular"> Regularly Active</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="activity" value="somewhat"> Somewhat Active</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="activity" value="not"> Not Active</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How interested are you in increasing your activity level?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="very"> Very Interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="unable"> Interested but physically unable</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="somewhat"> Somewhat interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="notint"> Not interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="notPhys"> Not interested and physically unable</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How satisfied are you with your current eating habits over the past week?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatSat" value="very"> Very satisfied</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatSat" value="mod"> Moderately satisfied</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatSat" value="un"> Unsatisfied</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How interested are you in learning more about healthy eating?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="very"> Very interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="mod"> Moderately interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="not"> Not interested</label>
+  </div>
+
+  <p class="section-label">Demographics</p>
+
+  <div class="question-group">
+    <div class="question">Do you identify as any of the following?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="white"> White / Caucasian</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="black"> Black / African American</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="asian"> Asian</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="native"> Native American or Alaskan Native</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="pacific"> Native Hawaiian or Pacific Islander</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="hispanic"> Spanish, Hispanic or Latino</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="other"> Other</label>
+  </div>
+
+  <button class="btn-next" onclick="goTo(5)"><span class="label-bold">Next:</span> Receiving Your Device</button>
+
+  <div class="privacy-banner">🔒 Your health information is private and protected. Only your care team can see it.</div>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 5: Receiving Your Device ========== -->
+<div class="step" data-step="5">
+  <h1>Receiving Your Device</h1>
+  <p class="subtitle">Your meter, strips, and supplies ship free — fully covered by <strong>Pilot Trucking LLC</strong>. Confirm your shipping address below.</p>
+
+  <div class="supplies-showcase">
+    <ul class="supplies-list">
+      <li><span class="check">&#10003;</span> An advanced glucose meter ($200 value)</li>
+      <li><span class="check">&#10003;</span> 150 strips (with unlimited refills)</li>
+      <li><span class="check">&#10003;</span> Lancing device, lancets, and carrying case</li>
+    </ul>
+  </div>
+
+  <div class="address-section-header">
+    <p class="section-label">Shipping Address</p>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="street">Street Address <span class="req">*</span> </label>
+      <div class="field-wrap prefilled">
+        <input type="text" id="street" value="1847 Oak Ridge Drive" required>
+      </div>
+      <span class="error-msg" id="streetErr">Street address is required</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label for="apt">Apt / Suite / Floor</label>
+      <input type="text" id="apt" placeholder="Apt / Suite / Floor (optional)">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="city">City <span class="req">*</span> </label>
+      <div class="field-wrap prefilled">
+        <input type="text" id="city" value="Fort Worth" required>
+      </div>
+    </div>
+    <div class="form-group" style="max-width:100px;">
+      <label for="state">State <span class="req">*</span> </label>
+      <div class="field-wrap prefilled prefilled--select">
+        <select id="state">
+          <option value="">State</option>
+          <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+          <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
+          <option>FL</option><option>GA</option><option>HI</option><option>ID</option>
+          <option>IL</option><option>IN</option><option>IA</option><option>KS</option>
+          <option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+          <option>MA</option><option>MI</option><option>MN</option><option>MS</option>
+          <option>MO</option><option>MT</option><option>NE</option><option>NV</option>
+          <option>NH</option><option>NJ</option><option>NM</option><option>NY</option>
+          <option>NC</option><option>ND</option><option>OH</option><option>OK</option>
+          <option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+          <option>SD</option><option>TN</option><option selected>TX</option><option>UT</option>
+          <option>VT</option><option>VA</option><option>WA</option><option>WV</option>
+          <option>WI</option><option>WY</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="max-width:120px;">
+      <label for="zip">Zip Code <span class="req">*</span> </label>
+      <div class="field-wrap prefilled">
+        <input type="text" id="zip" value="76102" maxlength="10">
+      </div>
+    </div>
+  </div>
+
+  <div class="source-banner source-banner--employer">
+    <span class="sb-icon">🏢</span>
+    <span>This is the address we have on file from your employer. Update any field if needed before continuing.</span>
+  </div>
+
+  <button class="btn-next" onclick="goTo(6)">Finish Setup</button>
+
+  <div class="privacy-banner">🔒 Your address is used only for shipping your Livongo kit. It is never sold or shared.</div>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><span class="lang-toggle" onclick="openLangModal()">🌐 English</span> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- ========== STEP 6: You're Enrolled / Next Steps ========== -->
+<div class="step" data-step="6">
+  <div class="coverage-verified coverage-verified--hero">
+    <span class="cv-icon">🎉</span>
+    <div class="cv-text">
+      <strong>You're in!</strong>
+      You're officially part of the Livongo program. Your care team is ready.
+    </div>
+  </div>
+
+  <h2 class="section-heading">Start your journey today</h2>
+  <p class="subtitle">Here's what to expect over the next few days.</p>
+
+  <div class="next-steps-grid">
+    <div class="next-step-card">
+      <div class="ns-icon">📱</div>
+      <div class="ns-title">Download the App</div>
+      <div class="ns-body">Track readings, set goals, and get personalized tips. Your health data syncs automatically from your meter.</div>
+      <div class="ns-tag">Available on iOS &amp; Android</div>
+    </div>
+    <div class="next-step-card">
+      <div class="ns-icon">👤</div>
+      <div class="ns-title">Meet Your Coach</div>
+      <div class="ns-body">A dedicated certified health coach will reach out within 48 hours. They'll help with diet, exercise, medication, motivation, and mental health.</div>
+      <div class="ns-tag">Available in English and Spanish</div>
+    </div>
+    <div class="next-step-card">
+      <div class="ns-icon">📦</div>
+      <div class="ns-title">Set Up Your Kit</div>
+      <div class="ns-body">When your Welcome Kit arrives: unbox your meter, download the app, and take your first reading. Your coach will help you get started.</div>
+      <div class="ns-tag">Arrives in 5–7 business days</div>
+    </div>
+  </div>
+
+  <div class="impact-stats">
+    <div class="impact-stat">
+      <div class="is-big">48%</div>
+      <div class="is-label">Reduced diabetes incidence</div>
+    </div>
+    <div class="impact-stat">
+      <div class="is-big">15 mmHg</div>
+      <div class="is-label">Blood pressure reduction</div>
+    </div>
+    <div class="impact-stat">
+      <div class="is-big">0.8%</div>
+      <div class="is-label">Average A1C improvement</div>
+    </div>
+  </div>
+
+  <div style="text-align: center;">
+    <a class="btn-dashboard" href="#">Go to Dashboard</a>
+  </div>
+</div>
+
+<!-- Language Modal -->
+<div class="lang-modal-overlay" id="langModal">
+  <div class="lang-modal">
+    <h3>Choose Language</h3>
+    <button class="lang-option selected" onclick="selectLang('English')">🌐 English</button>
+    <button class="lang-option" onclick="selectLang('Español')">🌐 Español</button>
+  </div>
+</div>
+
+<!-- Step indicator -->
+<div class="nav-hint" id="navHint">Step <span id="stepNum">1</span> of 6 &nbsp;|&nbsp; &larr; &rarr; to navigate</div>
+
+<script>
+let currentStep = 1;
+const totalSteps = 6;
+
+// Progress bar section mapping
+// Steps 1-2 = Sign Up section (Confirm Identity + Create Account)
+// Steps 3-5 = About You section (Diabetes Care Plan, Health History, Shipping)
+// Step 6 = Welcome section
+const stepSections = {
+  1: { section: 'signup', progress: 50 },
+  2: { section: 'signup', progress: 100 },
+  3: { section: 'about', progress: 33 },
+  4: { section: 'about', progress: 66 },
+  5: { section: 'about', progress: 100 },
+  6: { section: 'welcome', progress: 100 }
+};
+
+function goTo(step) {
+  if (step < 1 || step > totalSteps) return;
+
+  // Fade out current step
+  var currentEl = document.querySelector('.step.active');
+  if (currentEl && step !== currentStep) {
+    currentEl.classList.add('fading-out');
+    setTimeout(function() {
+      currentEl.classList.remove('active', 'fading-out');
+      showStep(step);
+    }, 150);
+  } else {
+    showStep(step);
+  }
+}
+
+function showStep(step) {
+  document.querySelectorAll('.step').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelector('[data-step="' + step + '"]').classList.add('active');
+  currentStep = step;
+  updateProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateProgress() {
+  document.getElementById('stepNum').textContent = currentStep;
+
+  var info = stepSections[currentStep];
+  var sectionOrder = ['signup', 'about', 'welcome'];
+  var currentIdx = sectionOrder.indexOf(info.section);
+
+  sectionOrder.forEach(function(sec, idx) {
+    var labels = document.querySelectorAll('.progress-section-label[data-section="' + sec + '"]');
+    var fills = document.querySelectorAll('.progress-section-fill[data-section="' + sec + '"]');
+    labels.forEach(function(el) {
+      el.classList.remove('active', 'done');
+      if (idx < currentIdx) el.classList.add('done');
+      else if (idx === currentIdx) el.classList.add('active');
+    });
+
+    fills.forEach(function(el) {
+      el.classList.remove('complete');
+      if (idx < currentIdx) {
+        el.style.width = '100%';
+        el.classList.add('complete');
+      } else if (idx === currentIdx) {
+        el.style.width = info.progress + '%';
+      } else {
+        el.style.width = '0';
+      }
+    });
+
+  });
+}
+
+// Password toggle
+function togglePassword() {
+  var pw = document.getElementById('password');
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+}
+
+// Show password rules on focus
+document.getElementById('password').addEventListener('focus', function() {
+  document.getElementById('pwRules').classList.add('visible');
+});
+
+// Password validation
+document.getElementById('password').addEventListener('input', function() {
+  var val = this.value;
+  var rules = {
+    length:  val.length >= 8,
+    upper:   /[A-Z]/.test(val),
+    lower:   /[a-z]/.test(val),
+    number:  /[0-9]/.test(val),
+    special: /[^A-Za-z0-9]/.test(val)
+  };
+  document.querySelectorAll('#pwRules .rule').forEach(function(r) {
+    var rule = r.dataset.rule;
+    r.classList.toggle('pass', rules[rule]);
+    r.classList.toggle('fail', !rules[rule]);
+  });
+});
+
+// Phone number auto-formatting
+document.getElementById('phone').addEventListener('input', function() {
+  var val = this.value.replace(/\D/g, '');
+  if (val.length > 10) val = val.slice(0, 10);
+  if (val.length >= 7) {
+    this.value = '(' + val.slice(0,3) + ') ' + val.slice(3,6) + '-' + val.slice(6);
+  } else if (val.length >= 4) {
+    this.value = '(' + val.slice(0,3) + ') ' + val.slice(3);
+  } else if (val.length > 0) {
+    this.value = '(' + val;
+  }
+});
+
+// Radio card selection
+function selectRadioCard(el) {
+  var name = el.querySelector('input').name;
+  document.querySelectorAll('input[name="' + name + '"]').forEach(function(i) {
+    i.closest('.radio-card').classList.remove('selected');
+    i.closest('.radio-card').classList.remove('preselected');
+  });
+  el.classList.add('selected');
+  el.querySelector('input').checked = true;
+}
+
+// Checkbox card toggle
+function toggleCheckCard(el) {
+  var cb = el.querySelector('input');
+  el.classList.toggle('selected', cb.checked);
+  if (!cb.checked) el.classList.remove('preselected');
+}
+
+// Remove prefilled dot when user edits a prefilled text input or select
+document.querySelectorAll('.field-wrap.prefilled input, .field-wrap.prefilled select').forEach(function(field) {
+  field.addEventListener('input', function() {
+    var wrap = this.closest('.field-wrap');
+    if (wrap) wrap.classList.remove('prefilled', 'prefilled--select');
+  });
+  field.addEventListener('change', function() {
+    var wrap = this.closest('.field-wrap');
+    if (wrap) wrap.classList.remove('prefilled', 'prefilled--select');
+  });
+});
+
+// Inline edit toggle for From Your Records rows
+function toggleRecordEdit(el) {
+  var row = el.closest('.records-item');
+  var valueEl = row.querySelector('.records-value');
+  var inputEl = row.querySelector('.records-input');
+  var isEditing = inputEl.style.display !== 'none';
+
+  if (isEditing) {
+    // Save: update value from input, switch back to read mode
+    if (inputEl.tagName === 'SELECT') {
+      valueEl.textContent = inputEl.options[inputEl.selectedIndex].text;
+    } else {
+      valueEl.textContent = inputEl.value;
+    }
+    valueEl.style.display = '';
+    inputEl.style.display = 'none';
+    el.textContent = 'Edit';
+  } else {
+    // Edit: show input with current value, hide value text
+    if (inputEl.tagName === 'SELECT') {
+      for (var i = 0; i < inputEl.options.length; i++) {
+        if (inputEl.options[i].text === valueEl.textContent.trim()) {
+          inputEl.selectedIndex = i;
+          break;
+        }
+      }
+    } else {
+      inputEl.value = valueEl.textContent.trim();
+    }
+    valueEl.style.display = 'none';
+    inputEl.style.display = '';
+    inputEl.focus();
+    el.textContent = 'Done';
+  }
+}
+
+// Language modal
+function openLangModal() {
+  document.getElementById('langModal').classList.add('visible');
+}
+
+function selectLang(lang) {
+  document.querySelectorAll('.lang-option').forEach(function(opt) { opt.classList.remove('selected'); });
+  event.target.classList.add('selected');
+  document.querySelectorAll('.lang-toggle').forEach(function(el) { el.textContent = '🌐 ' + lang; });
+  setTimeout(function() { document.getElementById('langModal').classList.remove('visible'); }, 200);
+}
+
+// Close modal on overlay click
+document.getElementById('langModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('visible');
+});
+
+// Arrow key navigation between steps
+document.addEventListener('keydown', function(e) {
+  var tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (currentStep < totalSteps) goTo(currentStep + 1);
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (currentStep > 1) goTo(currentStep - 1);
+  }
+});
+
+// Deep-link hash support
+if (location.hash) {
+  var step = parseInt(location.hash.replace('#step-', ''));
+  if (!isNaN(step) && step >= 1 && step <= totalSteps) goTo(step);
+}
+
+// DOB auto-format: MM / DD / YYYY
+document.getElementById('dob').addEventListener('input', function() {
+  var val = this.value.replace(/\D/g, '');
+  if (val.length > 8) val = val.slice(0, 8);
+  if (val.length >= 5) {
+    this.value = val.slice(0,2) + ' / ' + val.slice(2,4) + ' / ' + val.slice(4);
+  } else if (val.length >= 3) {
+    this.value = val.slice(0,2) + ' / ' + val.slice(2);
+  } else {
+    this.value = val;
+  }
+});
+
+// Initial state
+updateProgress();
+</script>
+</body>
+</html>

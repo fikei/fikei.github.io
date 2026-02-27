@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Livongo — Original Onboarding Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-height: 100vh; }
+
+/* Header */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; background: #fff; z-index: 100; }
+.logo { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; color: #333; text-decoration: none; }
+.header-right { display: flex; align-items: center; gap: 16px; font-size: 14px; color: #666; }
+.live-chat { color: #1976D2; font-weight: 500; cursor: pointer; }
+
+/* Progress Bar */
+.progress-wrap { padding: 0 32px; }
+.progress-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0; }
+.progress-fill { height: 100%; background: #1976D2; border-radius: 2px; transition: width 0.4s ease; }
+
+/* Step Container */
+.step { display: none; max-width: 640px; margin: 0 auto; padding: 48px 24px 120px; }
+.step.active { display: block; }
+.step h1 { font-size: 28px; font-weight: 400; margin-bottom: 8px; color: #222; }
+.step .subtitle { font-size: 15px; color: #666; margin-bottom: 32px; line-height: 1.5; }
+.section-label { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Form Elements */
+.form-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.form-row.single { flex-direction: column; }
+.form-group { flex: 1; display: flex; flex-direction: column; }
+.form-group label { font-size: 12px; font-weight: 500; color: #666; margin-bottom: 4px; }
+.form-group label .req { color: #d32f2f; }
+
+input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="date"], input[type="number"], select, textarea {
+  width: 100%; padding: 14px 16px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px;
+  font-family: 'Roboto', sans-serif; background: #fff; color: #333; transition: border-color 0.2s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: #1976D2; box-shadow: 0 0 0 2px rgba(25,118,210,0.1); }
+input.error, select.error { border-color: #d32f2f; }
+.error-msg { font-size: 12px; color: #d32f2f; margin-top: 4px; display: none; }
+.error-msg.visible { display: block; }
+
+/* Password field */
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 44px; }
+.toggle-pw { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; font-size: 18px; }
+
+/* Password strength */
+.pw-rules { margin-top: 8px; font-size: 12px; color: #999; }
+.pw-rules .rule { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.pw-rules .rule.pass { color: #4caf50; }
+.pw-rules .rule.pass::before { content: "✓"; font-weight: 700; }
+.pw-rules .rule.fail::before { content: "✕"; color: #d32f2f; font-weight: 700; }
+
+/* Checkboxes & Radios */
+.checkbox-row, .radio-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
+.checkbox-row input, .radio-row input { margin-top: 2px; accent-color: #1976D2; width: 18px; height: 18px; cursor: pointer; }
+.checkbox-row a, .radio-row a { color: #1976D2; text-decoration: none; }
+
+/* Radio Cards */
+.radio-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.radio-card:hover { border-color: #1976D2; background: #f5f9ff; }
+.radio-card.selected { border-color: #1976D2; background: #e3f2fd; }
+.radio-card input { accent-color: #1976D2; width: 18px; height: 18px; }
+.radio-card .info-icon { margin-left: auto; color: #1976D2; cursor: help; font-size: 18px; }
+
+/* Checkbox Cards */
+.checkbox-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.checkbox-card:hover { border-color: #1976D2; background: #f5f9ff; }
+.checkbox-card.selected { border-color: #1976D2; background: #e3f2fd; }
+.checkbox-card input { accent-color: #1976D2; width: 18px; height: 18px; }
+.checkbox-card .info-icon { margin-left: auto; color: #1976D2; cursor: help; font-size: 18px; }
+
+/* Buttons */
+.btn-next { display: block; width: 100%; padding: 16px; background: #90b4e0; color: #fff; border: none; border-radius: 6px; font-size: 16px; font-weight: 500; cursor: pointer; transition: background 0.2s; font-family: 'Roboto', sans-serif; margin-top: 24px; }
+.btn-next:hover { background: #7aa3d4; }
+.btn-next.ready { background: #1976D2; }
+.btn-next.ready:hover { background: #1565c0; }
+.btn-next .label-bold { font-weight: 700; }
+
+/* Search box */
+.search-box { position: relative; margin-bottom: 16px; }
+.search-box input { padding-left: 44px; }
+.search-box .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #999; font-size: 18px; }
+.search-results { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; display: none; }
+.search-results.visible { display: block; }
+.search-result { padding: 14px 16px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.15s; }
+.search-result:last-child { border-bottom: none; }
+.search-result:hover, .search-result.highlighted { background: #e3f2fd; }
+.search-result .name { font-size: 15px; color: #333; }
+.search-result .code { font-size: 12px; color: #999; text-transform: uppercase; }
+
+/* Sponsor badge */
+.sponsor-badge { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border: 2px solid #1976D2; border-radius: 6px; margin-bottom: 24px; }
+.sponsor-badge .sponsor-name { color: #1976D2; font-weight: 500; font-size: 16px; }
+.sponsor-badge .change-link { color: #1976D2; font-size: 14px; cursor: pointer; }
+
+/* Loader */
+.loader-area { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 0; background: #f5f8fc; border-radius: 8px; margin: 24px 0; }
+.spinner { width: 48px; height: 48px; border: 4px solid #e0e0e0; border-top-color: #1976D2; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { margin-top: 16px; color: #666; font-size: 14px; }
+
+/* Help box */
+.help-box { background: #f5f5f5; border-radius: 8px; padding: 20px; margin-top: 16px; }
+.help-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+.help-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #555; }
+.help-item .check { color: #1976D2; font-size: 18px; flex-shrink: 0; }
+.help-item a { color: #1976D2; text-decoration: none; }
+
+/* Supplies showcase */
+.supplies-showcase { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 24px 0; padding: 20px; background: #f5f8fc; border-radius: 8px; }
+.supplies-list { list-style: none; }
+.supplies-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+.supplies-list li .check { color: #4caf50; font-size: 18px; }
+
+/* Sliders */
+.slider-group { margin-bottom: 24px; }
+.slider-group label { font-size: 14px; font-weight: 500; color: #333; display: block; margin-bottom: 8px; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-val { min-width: 80px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; text-align: center; font-family: 'Roboto', sans-serif; }
+.slider-row input[type="range"] { flex: 1; accent-color: #1976D2; }
+.slider-row .range-label { font-size: 13px; color: #999; min-width: 30px; }
+
+/* Welcome Banner */
+.welcome-banner { background: #1976D2; color: #fff; text-align: center; padding: 10px 16px; font-size: 14px; border-radius: 6px; margin-bottom: 24px; }
+
+/* Completion screen */
+.complete-hero { background: #4caf50; color: #fff; text-align: center; padding: 64px 24px; border-radius: 12px; margin-bottom: 32px; }
+.complete-hero .check-circle { width: 64px; height: 64px; border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; }
+.complete-hero h1 { font-size: 24px; font-weight: 400; margin-bottom: 8px; }
+.complete-hero p { font-size: 14px; opacity: 0.9; }
+.btn-dashboard { display: inline-block; margin-top: 16px; padding: 12px 32px; background: rgba(255,255,255,0.2); color: #fff; border: 2px solid #fff; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none; }
+
+/* Webinar list */
+.webinar-list { margin-top: 32px; }
+.webinar-list h2 { font-size: 22px; font-weight: 400; margin-bottom: 8px; }
+.webinar-list .sub { font-size: 15px; color: #666; margin-bottom: 16px; }
+.webinar-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
+.webinar-item .name { font-weight: 500; }
+.webinar-item .date { font-size: 13px; color: #999; }
+.btn-signup { padding: 8px 20px; background: #1976D2; color: #fff; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-family: 'Roboto', sans-serif; }
+
+/* Nav hint */
+.nav-hint { position: fixed; bottom: 16px; right: 16px; background: #333; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 12px; opacity: 0.7; z-index: 200; }
+
+/* Question groups */
+.question-group { margin-bottom: 28px; }
+.question-group .question { font-size: 15px; font-weight: 500; margin-bottom: 12px; color: #333; }
+.question-group .question .info-icon { color: #1976D2; cursor: help; font-size: 16px; margin-left: 4px; }
+
+/* Footer */
+.footer { max-width: 640px; margin: 0 auto; padding: 16px 24px; display: flex; justify-content: space-between; font-size: 12px; color: #999; border-top: 1px solid #eee; }
+.footer a { color: #1976D2; text-decoration: none; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; }
+  .header { padding: 12px 16px; }
+  .step { padding: 32px 16px 100px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <a class="logo" href="#">Livongo</a>
+  <div class="progress-wrap" style="flex:1; max-width: 400px; margin: 0 40px;">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:10%"></div></div>
+  </div>
+  <div class="header-right">
+    <span>(800) 945-4355</span>
+    <span class="live-chat">LIVE CHAT</span>
+  </div>
+</div>
+
+<!-- STEP 1: Personal Information -->
+<div class="step active" data-step="1">
+  <h1>Let's Start with the Basics</h1>
+  <p class="subtitle">To join, let's first create a Livongo account. Enter information for the person who will be using Livongo. We keep your data secure and protect it like its our own.</p>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Legal First Name <span class="req">*</span></label>
+      <input type="text" id="firstName" placeholder="Legal First Name" required>
+      <span class="error-msg" id="firstNameErr">First name is required</span>
+    </div>
+    <div class="form-group">
+      <label>Legal Last Name <span class="req">*</span></label>
+      <input type="text" id="lastName" placeholder="Legal Last Name" required>
+      <span class="error-msg" id="lastNameErr">Last name is required</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Email Address <span class="req">*</span></label>
+      <input type="email" id="email" placeholder="Email Address" required>
+      <span class="error-msg" id="emailErr">Please enter a valid email address</span>
+    </div>
+  </div>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Password <span class="req">*</span></label>
+      <div class="password-wrap">
+        <input type="password" id="password" placeholder="Password" required>
+        <button type="button" class="toggle-pw" onclick="togglePassword()">👁</button>
+      </div>
+      <div class="pw-rules" id="pwRules">
+        <div class="rule fail" data-rule="length">At least 8 characters</div>
+        <div class="rule fail" data-rule="upper">At least one uppercase letter</div>
+        <div class="rule fail" data-rule="lower">At least one lowercase letter</div>
+        <div class="rule fail" data-rule="number">At least one number</div>
+        <div class="rule fail" data-rule="special">At least one special character</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Mobile Phone Number <span class="req">*</span></label>
+      <input type="tel" id="phone" placeholder="(555) 555-5555">
+      <span class="error-msg" id="phoneErr">Please enter a valid phone number</span>
+    </div>
+    <div class="form-group">
+      <label>Phone Type</label>
+      <select id="phoneType">
+        <option value="">Phone Type</option>
+        <option value="mobile">Mobile</option>
+        <option value="home">Home</option>
+        <option value="work">Work</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Date of Birth <span class="req">*</span></label>
+      <input type="date" id="dob">
+      <span class="error-msg" id="dobErr">Date of birth is required</span>
+    </div>
+    <div class="form-group">
+      <label>Language</label>
+      <select id="language">
+        <option value="en">🌐 English</option>
+        <option value="es">🌐 Español</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="tos">
+    <label for="tos">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></label>
+  </div>
+  <div class="checkbox-row">
+    <input type="checkbox" id="sms">
+    <label for="sms">I agree to receive <a href="#">Livongo Member Messaging</a> via text message</label>
+  </div>
+
+  <button class="btn-next" onclick="goTo(2)"><span class="label-bold">Next:</span> Shipping and Supplies</button>
+</div>
+
+<!-- STEP 2: Shipping & Supplies -->
+<div class="step" data-step="2">
+  <h1>Shipping & Supplies</h1>
+  <p class="subtitle">Enter your address, so we can ship you the following:</p>
+
+  <div class="supplies-showcase">
+    <ul class="supplies-list">
+      <li><span class="check">✅</span> An advanced glucose meter ($200 value)</li>
+      <li><span class="check">✅</span> 150 strips (with unlimited refills)</li>
+      <li><span class="check">✅</span> Lancing device, lancets, and carrying case</li>
+    </ul>
+  </div>
+
+  <p class="section-label">Shipping Address</p>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Street Address <span class="req">*</span></label>
+      <input type="text" id="street" placeholder="Street Address" required>
+      <span class="error-msg" id="streetErr">Street address is required</span>
+    </div>
+  </div>
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Apt / Suite / Floor</label>
+      <input type="text" id="apt" placeholder="Apt / Suite / Floor">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>City <span class="req">*</span></label>
+      <input type="text" id="city" placeholder="City" required>
+    </div>
+    <div class="form-group" style="max-width:100px;">
+      <label>State <span class="req">*</span></label>
+      <select id="state"><option value="">State</option><option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option><option>SD</option><option>TN</option><option selected>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option></select>
+    </div>
+    <div class="form-group" style="max-width:120px;">
+      <label>Zip Code <span class="req">*</span></label>
+      <input type="text" id="zip" placeholder="Zip Code" maxlength="10">
+    </div>
+  </div>
+
+  <button class="btn-next" onclick="goTo(3)"><span class="label-bold">Next:</span> Coverage</button>
+
+  <div class="footer">
+    <span>&copy; Livongo Health, All Rights Reserved.</span>
+    <span><a href="#">Español</a> &bull; PL000000</span>
+  </div>
+</div>
+
+<!-- STEP 3: Coverage Search -->
+<div class="step" data-step="3">
+  <h1>Who has you covered?</h1>
+  <p class="subtitle">Enter or search for your registration code, employer, or health plan.</p>
+
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="coverageSearch" placeholder="Search Registration Code or Sponsor" oninput="handleCoverageSearch(this.value)">
+  </div>
+
+  <div class="search-results" id="coverageResults">
+    <div class="search-result" onclick="selectSponsor('Pilot Trucking LLC', 'PILOT-TRUCKING')">
+      <div class="name">Pilot Trucking LLC</div>
+      <div class="code">PILOT-TRUCKING</div>
+    </div>
+    <div class="search-result" onclick="selectSponsor('Pilot Flying J', 'PILOT-FJ')">
+      <div class="name">Pilot Flying J</div>
+      <div class="code">PILOT-FJ</div>
+    </div>
+    <div class="search-result" onclick="selectSponsor('Pioneer Natural Resources', 'PIONEER-NR')">
+      <div class="name">Pioneer Natural Resources</div>
+      <div class="code">PIONEER-NR</div>
+    </div>
+  </div>
+
+  <div class="help-box">
+    <h3>Searching for your sponsor didn't work?</h3>
+    <div class="help-item"><span class="check">🔵</span> Try entering your employer name.</div>
+    <div class="help-item"><span class="check">🔵</span> Call Member Support at (800) 945-4355 or <a href="#">chat with us</a>.</div>
+    <div class="help-item"><span class="check">🔵</span> Look for your code in the email or mailer you received about Livongo</div>
+  </div>
+
+  <button class="btn-next" onclick="goTo(4)"><span class="label-bold">Next:</span> Health</button>
+</div>
+
+<!-- STEP 4: Coverage Results (loader) -->
+<div class="step" data-step="4">
+  <h1>Who has you covered?</h1>
+  <p class="subtitle">Search for your registration code, employer, or health plan.</p>
+
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="coverageSearchLoading" value="Pilot Trucking" readonly style="background: #f9f9f9;">
+  </div>
+
+  <div class="loader-area" id="coverageLoader">
+    <div class="spinner"></div>
+    <div class="loader-text">Verifying coverage...</div>
+  </div>
+
+  <button class="btn-next" onclick="goTo(5)" style="display:none" id="coverageLoaderNext"><span class="label-bold">Next:</span> Health</button>
+</div>
+
+<!-- STEP 5: Coverage - Insurance Details -->
+<div class="step" data-step="5">
+  <h1>Who has you covered?</h1>
+  <p class="subtitle">Your sponsor is:</p>
+
+  <div class="sponsor-badge">
+    <span class="sponsor-name">Pilot Trucking LLC</span>
+    <span class="change-link" onclick="goTo(3)">Change...</span>
+  </div>
+
+  <p style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">It looks like we need more information to confirm your coverage.</p>
+  <p class="subtitle">We use this information to confirm your coverage only. You are not charged for joining Livongo. <a href="#" style="color:#1976D2;">I am covered as a spouse or dependent.</a></p>
+
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Insurance Provider <span class="req">*</span></label>
+      <select id="insuranceProvider">
+        <option value="">Insurance Provider</option>
+        <option>Blue Cross Blue Shield of Texas</option>
+        <option>Aetna</option>
+        <option>UnitedHealthcare</option>
+        <option>Cigna</option>
+        <option>Humana</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Member ID <span class="req">*</span></label>
+      <input type="text" id="memberId" placeholder="Member ID">
+    </div>
+  </div>
+  <div class="form-row single">
+    <div class="form-group">
+      <label>Group ID</label>
+      <input type="text" id="groupId" placeholder="Group ID">
+    </div>
+  </div>
+
+  <p style="font-size: 13px; color: #666; margin-top: 12px;">Joining as a spouse or dependent? <a href="#" style="color:#1976D2;">Add Primary Policy Holder.</a></p>
+
+  <button class="btn-next" onclick="goTo(6)"><span class="label-bold">Next:</span> Health</button>
+</div>
+
+<!-- STEP 6: Personalize Your Care Plan -->
+<div class="step" data-step="6">
+  <h1>Personalize Your Care Plan</h1>
+  <p class="subtitle">Information you provide will be used to craft a personalized care plan.</p>
+
+  <p class="section-label">History</p>
+
+  <div class="question-group">
+    <div class="question">What is your gender?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="female"> Female</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="gender" value="male"> Male</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">What type of diabetes do you have?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="diabetesType" value="type1"> Type 1 <span class="info-icon" title="Type 1 diabetes is an autoimmune condition">ⓘ</span></label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="diabetesType" value="type2"> Type 2 <span class="info-icon" title="Type 2 diabetes affects how your body processes blood sugar">ⓘ</span></label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">When were you diagnosed with diabetes?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <select id="diagYear"><option value="">Year</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option><option>2020</option><option>2019</option><option>2018</option><option>2017</option><option>2016</option><option>2015</option><option>2010-2014</option><option>2005-2009</option><option>Before 2005</option></select>
+      </div>
+      <div class="form-group">
+        <select id="diagMonth"><option value="">Month (Optional)</option><option>January</option><option>February</option><option>March</option><option>April</option><option>May</option><option>June</option><option>July</option><option>August</option><option>September</option><option>October</option><option>November</option><option>December</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you ever had an A1C check? <span class="info-icon" title="A1C measures your average blood sugar over 2-3 months">ⓘ</span></div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="a1c" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="a1c" value="no"> No</label>
+    <div class="checkbox-row" style="margin-top: 8px;">
+      <input type="checkbox" id="a1cUnsure">
+      <label for="a1cUnsure">I don't know if I have had an A1C check.</label>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Check all of the following to help manage diabetes.</div>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" name="meds" value="oral"> Oral Medications <span class="info-icon">ⓘ</span></label>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" name="meds" value="injection"> Insulin Injections <span class="info-icon">ⓘ</span></label>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" name="meds" value="pump"> Insulin Pump <span class="info-icon">ⓘ</span></label>
+    <div class="checkbox-row" style="margin-top: 8px;">
+      <input type="checkbox" id="noMeds">
+      <label for="noMeds">I don't use medications to manage diabetes.</label>
+    </div>
+  </div>
+
+  <p class="section-label" style="margin-top: 32px;">Checking Blood Glucose</p>
+
+  <div class="question-group">
+    <div class="question">How often do you check your blood sugar?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <select id="checkFreq">
+          <option value="">Checks per day</option>
+          <option>Less than once a day</option>
+          <option>1 time per day</option>
+          <option>2 times per day</option>
+          <option>3 times per day</option>
+          <option>4+ times per day</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How often does your doctor recommend you check your blood sugar?</div>
+    <div class="form-row">
+      <div class="form-group">
+        <select id="docRecFreq">
+          <option value="">Checks per day</option>
+          <option>Less than once a day</option>
+          <option>1 time per day</option>
+          <option>2 times per day</option>
+          <option>3 times per day</option>
+          <option>4+ times per day</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-next" onclick="goTo(7)"><span class="label-bold">Complete</span> and Finish Setup</button>
+</div>
+
+<!-- STEP 7: Setup Coaching and Alerts -->
+<div class="step" data-step="7">
+  <div class="welcome-banner">Welcome to the Livongo Program! Let's finish your profile.</div>
+
+  <h1>Setup Coaching and Alerts</h1>
+  <p class="subtitle" style="margin-bottom: 24px;">
+    <strong>Coach Notifications</strong><br>
+    A Livongo Coach can contact you when your blood glucose readings are out of target range to provide you with the support you need to help you return to a safe level.
+  </p>
+
+  <div class="slider-group">
+    <label><strong>Low Blood Glucose</strong></label>
+    <p style="font-size: 13px; color: #666; margin-bottom: 8px;">A coach will contact me when my blood glucose is equal to or lower than</p>
+    <div class="slider-row">
+      <input type="text" class="slider-val" id="lowVal" value="50 mg/dL" readonly>
+      <span class="range-label" id="lowLabel">40</span>
+      <input type="range" min="40" max="120" value="50" id="lowSlider" oninput="updateSlider('low')">
+      <span class="range-label">120</span>
+    </div>
+  </div>
+
+  <div class="slider-group">
+    <label><strong>High Blood Glucose</strong></label>
+    <p style="font-size: 13px; color: #666; margin-bottom: 8px;">A coach will contact me when my blood glucose is equal to or higher than</p>
+    <div class="slider-row">
+      <input type="text" class="slider-val" id="highVal" value="400 mg/dL" readonly>
+      <span class="range-label" id="highLabel">120</span>
+      <input type="range" min="120" max="600" value="400" id="highSlider" oninput="updateSlider('high')">
+      <span class="range-label">600</span>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How would you like a coach to contact you?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="contactMethod" value="phone"> Phone Call</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="contactMethod" value="text"> Text Message</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="contactMethod" value="either"> Either Phone Call or Text Message</label>
+  </div>
+
+  <p style="font-size: 13px; color: #666; margin: 12px 0;">A coach will only contact you for to a high or low blood glucose reading between 11PM and 7AM after you respond to a message on your meter. <a href="#" style="color:#1976D2;">Customize</a></p>
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="noCoaching">
+    <label for="noCoaching">I don't want coaching notifications</label>
+  </div>
+
+  <button class="btn-next" onclick="goTo(8)"><span class="label-bold">Next:</span> Health Profile</button>
+</div>
+
+<!-- STEP 8: Complete Your Health Profile -->
+<div class="step" data-step="8">
+  <h1>Complete Your Health Profile</h1>
+  <p class="subtitle">Let's get some basic information about you and your health.</p>
+
+  <div class="question-group">
+    <div class="question">Height</div>
+    <div class="form-row">
+      <div class="form-group"><label>Feet</label><select id="heightFt"><option value="">Feet</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+      <div class="form-group"><label>Inches</label><select id="heightIn"><option value="">Inches</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option></select></div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Weight</div>
+    <div class="form-row">
+      <div class="form-group"><label>Pounds</label><input type="number" id="weight" placeholder="Weight (lbs)" min="50" max="600"></div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you had any of the following exams?</div>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="diabetes"> Diabetes eye exam</label>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="foot"> Foot exam by a doctor or medical professional</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">When was your last diabetes eye exam?</div>
+    <div class="form-row">
+      <div class="form-group"><select><option value="">Month (Optional)</option><option>January</option><option>February</option><option>March</option><option>April</option><option>May</option><option>June</option><option>July</option><option>August</option><option>September</option><option>October</option><option>November</option><option>December</option></select></div>
+      <div class="form-group"><select><option value="">Year</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option></select></div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">When was your last foot exam?</div>
+    <div class="form-row">
+      <div class="form-group"><select><option value="">Month (Optional)</option><option>January</option><option>February</option><option>March</option><option>April</option><option>May</option><option>June</option><option>July</option><option>August</option><option>September</option><option>October</option><option>November</option><option>December</option></select></div>
+      <div class="form-group"><select><option value="">Year</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option></select></div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Do you use a Continuous Glucose Monitor (CGM) to help monitor your blood glucose?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="cgm" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="cgm" value="no"> No</label>
+  </div>
+
+  <p class="section-label" style="margin-top:32px;">Other Conditions</p>
+
+  <div class="question-group">
+    <div class="question">Have you ever been diagnosed with or taken medication for any of the following?</div>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="cholesterol"> High Cholesterol</label>
+    <label class="checkbox-card" onclick="toggleCheckCard(this)"><input type="checkbox" value="hbp"> High Blood Pressure (Hypertension)</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Do you smoke?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="smoke" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="smoke" value="no"> No</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you had a flu vaccine within the last year? <span class="info-icon">ⓘ</span></div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="flu" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="flu" value="no"> No</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you ever had the pneumonia vaccine? <span class="info-icon">ⓘ</span></div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="pneumonia" value="yes"> Yes</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="pneumonia" value="no"> No</label>
+  </div>
+
+  <p class="section-label" style="margin-top:32px;">Activity and Diet</p>
+
+  <div class="question-group">
+    <div class="question">How active are you?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="activity" value="regular"> Regularly Active</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="activity" value="somewhat"> Somewhat Active</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="activity" value="not"> Not Active</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How interested are you in increasing your activity level?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="very"> Very Interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="interested"> Interested by physically unable</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="somewhat"> Somewhat interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="not"> Not interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="actInterest" value="notPhys"> Not interested and physically unable</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How satisfied are you with your current eating habits over the past week?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatSat" value="very"> Very satisfied</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatSat" value="mod"> Moderately satisfied</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatSat" value="un"> Unsatisfied</label>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How interested are you in learning more about healthy eating?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="very"> Very interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="mod"> Moderately interested</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="eatInterest" value="not"> Not interested</label>
+  </div>
+
+  <p class="section-label" style="margin-top:32px;">Demographics</p>
+
+  <div class="question-group">
+    <div class="question">Do you identify as any of the following?</div>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="white"> White / Caucasian</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="black"> Black / African American</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="asian"> Asian</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="native"> Native American or Alaskan Native</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="pacific"> Native Hawaiian or Pacific Islander</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="hispanic"> Spanish, Hispanic or Latino</label>
+    <label class="radio-card" onclick="selectRadioCard(this)"><input type="radio" name="ethnicity" value="other"> Other</label>
+  </div>
+
+  <button class="btn-next ready" onclick="goTo(9)">Finish</button>
+</div>
+
+<!-- STEP 9: Dashboard / Welcome -->
+<div class="step" data-step="9">
+  <div class="complete-hero">
+    <div class="check-circle">✓</div>
+    <h1>Welcome to the Livongo Program!</h1>
+    <p>Once approved, your Welcome Kit should arrive in 5-7 days.</p>
+    <a class="btn-dashboard" href="#">Go to Dashboard</a>
+  </div>
+
+  <div class="webinar-list">
+    <h2>Still have questions?</h2>
+    <p class="sub">Sign up for a webinar with one of our Livongo coaches!</p>
+    <div class="webinar-item"><div><div class="name">Getting Started with Livongo</div><div class="date">March 15, 2 p.m. ET</div></div><button class="btn-signup" onclick="signUpWebinar(this, 'Getting Started with Livongo')">Sign Up</button></div>
+    <div class="webinar-item"><div><div class="name">Understanding Your Glucose Readings</div><div class="date">March 22, 2 p.m. ET</div></div><button class="btn-signup" onclick="signUpWebinar(this, 'Understanding Your Glucose Readings')">Sign Up</button></div>
+    <div class="webinar-item"><div><div class="name">Nutrition and Blood Sugar Control</div><div class="date">March 29, 2 p.m. ET</div></div><button class="btn-signup" onclick="signUpWebinar(this, 'Nutrition and Blood Sugar Control')">Sign Up</button></div>
+    <div class="webinar-item"><div><div class="name">Exercise Tips for Diabetes Management</div><div class="date">April 5, 2 p.m. ET</div></div><button class="btn-signup" onclick="signUpWebinar(this, 'Exercise Tips for Diabetes Management')">Sign Up</button></div>
+  </div>
+</div>
+
+<!-- Step indicator -->
+<div class="nav-hint" id="navHint">Step <span id="stepNum">1</span> of 9 &nbsp;|&nbsp; ← → to navigate</div>
+
+<script>
+let currentStep = 1;
+const totalSteps = 9;
+
+function goTo(step) {
+  if (step < 1 || step > totalSteps) return;
+
+  // Auto-advance from loader step
+  if (step === 4) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.querySelector('[data-step="4"]').classList.add('active');
+    currentStep = 4;
+    updateProgress();
+    window.scrollTo(0, 0);
+    // Auto-advance after 2 seconds
+    setTimeout(() => goTo(5), 2000);
+    return;
+  }
+
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelector(`[data-step="${step}"]`).classList.add('active');
+  currentStep = step;
+  updateProgress();
+  window.scrollTo(0, 0);
+}
+
+function updateProgress() {
+  const pct = (currentStep / totalSteps) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('stepNum').textContent = currentStep;
+}
+
+// Password toggle
+function togglePassword() {
+  const pw = document.getElementById('password');
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+}
+
+// Password validation
+document.getElementById('password')?.addEventListener('input', function() {
+  const val = this.value;
+  const rules = {
+    length: val.length >= 8,
+    upper: /[A-Z]/.test(val),
+    lower: /[a-z]/.test(val),
+    number: /[0-9]/.test(val),
+    special: /[^A-Za-z0-9]/.test(val)
+  };
+  document.querySelectorAll('#pwRules .rule').forEach(r => {
+    const rule = r.dataset.rule;
+    r.classList.toggle('pass', rules[rule]);
+    r.classList.toggle('fail', !rules[rule]);
+  });
+});
+
+// Phone formatting
+document.getElementById('phone')?.addEventListener('input', function() {
+  let val = this.value.replace(/\D/g, '');
+  if (val.length > 10) val = val.slice(0, 10);
+  if (val.length >= 7) {
+    this.value = `(${val.slice(0,3)}) ${val.slice(3,6)}-${val.slice(6)}`;
+  } else if (val.length >= 4) {
+    this.value = `(${val.slice(0,3)}) ${val.slice(3)}`;
+  } else if (val.length > 0) {
+    this.value = `(${val}`;
+  }
+});
+
+// Coverage search
+function handleCoverageSearch(val) {
+  const results = document.getElementById('coverageResults');
+  if (val.length >= 2) {
+    results.classList.add('visible');
+    // Filter results
+    results.querySelectorAll('.search-result').forEach(r => {
+      const name = r.querySelector('.name').textContent.toLowerCase();
+      r.style.display = name.includes(val.toLowerCase()) ? 'block' : 'none';
+    });
+  } else {
+    results.classList.remove('visible');
+  }
+}
+
+function selectSponsor(name, code) {
+  document.getElementById('coverageResults').classList.remove('visible');
+  document.getElementById('coverageSearch').value = name;
+  // Go to loader then insurance
+  goTo(4);
+}
+
+// Sliders
+function updateSlider(type) {
+  if (type === 'low') {
+    const val = document.getElementById('lowSlider').value;
+    document.getElementById('lowVal').value = val + ' mg/dL';
+    document.getElementById('lowLabel').textContent = val;
+  } else {
+    const val = document.getElementById('highSlider').value;
+    document.getElementById('highVal').value = val + ' mg/dL';
+    document.getElementById('highLabel').textContent = val;
+  }
+}
+
+// Radio card selection
+function selectRadioCard(el) {
+  const name = el.querySelector('input').name;
+  document.querySelectorAll(`input[name="${name}"]`).forEach(i => {
+    i.closest('.radio-card').classList.remove('selected');
+  });
+  el.classList.add('selected');
+  el.querySelector('input').checked = true;
+}
+
+// Checkbox card toggle
+// NOTE: onclick fires before the label's native checkbox toggle, so cb.checked
+// still holds the PRE-click value here. The native toggle will flip it after
+// this handler returns. We therefore read the future state as !cb.checked and
+// do NOT manually set cb.checked (the label's native behavior handles that).
+function toggleCheckCard(el) {
+  const cb = el.querySelector('input');
+  const nextChecked = !cb.checked; // what native label click will leave it at
+  el.classList.toggle('selected', nextChecked);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (currentStep < totalSteps) goTo(currentStep + 1);
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (currentStep > 1) goTo(currentStep - 1);
+  }
+});
+
+// Webinar sign-up (step 9)
+function signUpWebinar(btn, title) {
+  btn.textContent = 'Registered!';
+  btn.disabled = true;
+  btn.style.background = '#4caf50';
+}
+
+// Initial state
+updateProgress();
+</script>
+</body>
+</html>

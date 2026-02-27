@@ -1511,8 +1511,10 @@ body {
 /* Merge pick-target mode: highlight selectable cards */
 .grid-item--merge-selectable {
   cursor: crosshair;
+  outline: 1px dashed var(--muted);
 }
 .grid-item--merge-selectable:hover {
+  outline: none;
   box-shadow: 0 0 0 2px var(--fg);
 }
 
@@ -1755,6 +1757,22 @@ body {
   border-color: var(--fg);
   border-style: solid;
   background: var(--bg);
+}
+.filter-token--board-suggest {
+  color: #10b981;
+  border-color: rgba(16,185,129,0.4);
+  border-style: dashed;
+  animation: board-suggest-pulse 2s ease-in-out 1;
+}
+.filter-token--board-suggest:hover {
+  color: #fff;
+  border-color: #10b981;
+  border-style: solid;
+  background: rgba(16,185,129,0.15);
+}
+@keyframes board-suggest-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 /* ============================================
    Board Seed Panel (Library Suggestions)
@@ -10278,8 +10296,17 @@ Return JSON:
           await sleep(delay);
         }
 
-        const { data: result, error } = await supabase.functions.invoke('enrich-link', {
-          body: {
+        // Use raw fetch with anon key (matches generate-widget pattern).
+        // supabase.functions.invoke() sent the user JWT which expires and
+        // returns a generic "non-2xx status code" error that hid the real
+        // HTTP status, causing 401s to be retried pointlessly.
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
             url: item.url,
             title: item.title,
             description: item.description,
@@ -10291,25 +10318,35 @@ Return JSON:
             category: item.category || null,
             enrichWatch: item.enrichWatch || false,
             enrichBook: item.enrichBook || false
-          }
+          })
         });
 
-        if (error) {
-          // Check if it's a retryable error (network, 5xx)
-          const isRetryable = !error.message?.includes('400') && !error.message?.includes('401');
-          if (isRetryable && attempt < ENRICHMENT_MAX_RETRIES) {
-            lastError = error;
+        if (!response.ok) {
+          const status = response.status;
+          // 400/401/403/404 are not retryable — stop immediately
+          if (status >= 400 && status < 500) {
+            throw new Error(`enrich-link returned ${status}`);
+          }
+          // 5xx are retryable
+          if (attempt < ENRICHMENT_MAX_RETRIES) {
+            lastError = new Error(`enrich-link returned ${status}`);
             continue;
           }
-          throw new Error(error.message || 'Server error');
+          throw new Error(`enrich-link returned ${status}`);
         }
 
+        const result = await response.json();
         return { success: true, result };
       } catch (e) {
         lastError = e;
-        // Network errors are retryable
-        if (attempt < ENRICHMENT_MAX_RETRIES) {
+        // Non-retryable client errors already threw above.
+        // Network errors (TypeError: Failed to fetch) are retryable.
+        if (e.name === 'TypeError' && attempt < ENRICHMENT_MAX_RETRIES) {
           continue;
+        }
+        // If we threw a 4xx error above, don't retry
+        if (attempt >= ENRICHMENT_MAX_RETRIES || e.message?.match(/returned [45]\d\d/)) {
+          break;
         }
       }
     }
@@ -10641,8 +10678,10 @@ Return JSON:
       // Find items that need enrichment:
       // 1. Items in this category with no metadata field at all (new feature, never enriched)
       // 2. Items in this category that fail the backfillCheck (partial enrichment)
+      // Skip items that already failed enrichment — they'll retry via the error badge tap
       const needsEnrichment = links.filter(l =>
         l.category === category &&
+        !l.enrichment_failed &&
         (!l[config.metaField] || config.backfillCheck(l))
       );
 
@@ -11093,6 +11132,29 @@ Return JSON:
   const AI_CATEGORIZE_ENDPOINT = `${SUPABASE_URL}/functions/v1/categorize`;
   const CATEGORY_CACHE_KEY = 'boards-category-cache';
   const CATEGORIES = ['home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read'];
+
+  // Get user-created boards formatted for the categorize API
+  function getUserBoardsForCategorizer() {
+    try {
+      const cats = load().categories;
+      const boards = [];
+      for (const [slug, meta] of Object.entries(cats)) {
+        if (meta.isUserBoard) {
+          boards.push({
+            slug,
+            name: meta.displayName || slug.replace(/-/g, ' '),
+            prompt: meta.prompt || undefined
+          });
+        }
+      }
+      // Cap at 15, most recent first
+      return boards.sort((a, b) => {
+        const ca = cats[a.slug]?.createdAt || '';
+        const cb = cats[b.slug]?.createdAt || '';
+        return cb.localeCompare(ca);
+      }).slice(0, 15);
+    } catch { return []; }
+  }
 
   // Genre normalization — maps variant spellings to canonical tag IDs
   // Used by TF-IDF ranker, detectTags, and computeLinkTags
@@ -11558,7 +11620,8 @@ Return JSON:
           title: link.title || '',
           description: link.description || '',
           domain: domain,
-          categories: CATEGORIES
+          categories: CATEGORIES,
+          userBoards: getUserBoardsForCategorizer()
         })
       });
 
@@ -11575,13 +11638,14 @@ Return JSON:
         `\n  💭 ${data.reason || data.error || 'no reason'}`,
         `\n  ⏱ ${ms}ms`);
 
-      // Cache the result by domain (skip multi-topic domains)
-      if (data.category && data.category !== 'uncategorized' && !isMultiTopicDomain(domain)) {
+      // Cache the result by domain (skip multi-topic domains and user board results)
+      const isUserBoardResult = data.category && !CATEGORIES.includes(data.category) && data.category !== 'uncategorized';
+      if (data.category && data.category !== 'uncategorized' && !isMultiTopicDomain(domain) && !isUserBoardResult) {
         categoryCache[domain] = data.category;
         saveCategoryCache(categoryCache);
       }
 
-      return { category: data.category, confidence: data.confidence ?? 0.9, cached: false, source: 'ai', reason: data.reason };
+      return { category: data.category, confidence: data.confidence ?? 0.9, cached: false, source: 'ai', reason: data.reason, suggestedBoard: data.suggestedBoard || null };
     } catch (e) {
       console.warn('[categorize] AI failed:', e.message);
       return null; // Fall back to rule-based
@@ -11887,6 +11951,22 @@ Return JSON:
       if (score > maxScore) { maxScore = score; best = cat; }
     }
 
+    // Score against user-created boards (name + prompt keywords)
+    try {
+      const cats = getCategories();
+      for (const [slug, meta] of Object.entries(cats)) {
+        if (!meta.isUserBoard) continue;
+        const boardText = `${meta.displayName || ''} ${meta.prompt || ''}`.toLowerCase();
+        const boardTokens = boardText.split(/\s+/).filter(t => t.length > 3);
+        let score = 0;
+        for (const token of boardTokens) {
+          if (text.includes(token)) score += 0.2;
+        }
+        score = Math.min(score, 0.7); // Cap below strong built-in matches
+        if (score > maxScore) { maxScore = score; best = slug; }
+      }
+    } catch { /* getCategories may fail before data is loaded */ }
+
     // Lower threshold to 0.15 (single keyword match is enough)
     return { category: maxScore >= 0.15 ? best : 'uncategorized', confidence: maxScore };
   }
@@ -12057,7 +12137,8 @@ Return JSON:
         type_confidence: link.type_confidence || null,
         type_signals: link.type_signals || null,
         image_source: link.image_source || null,
-        image_scores: link.image_scores || null,
+        // image_scores intentionally omitted — client-only field, DB column exists but
+        // PostgREST schema cache may be stale. Scores live in localStorage and are recomputed.
         // Structured metadata (JSONB columns)
         video: link.video || null,
         music: link.music || null,
@@ -12086,33 +12167,40 @@ Return JSON:
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        const errBody = await res.text();
-        // PostgREST schema cache miss — retry without the unrecognized column
-        if (errBody.includes('schema cache')) {
+        let errBody = await res.text();
+        // PostgREST schema cache miss — strip unrecognized columns and retry (up to 5)
+        let schemaRetries = 0;
+        while (errBody.includes('schema cache') && schemaRetries < 5) {
           const colMatch = errBody.match(/Could not find the '(\w+)' column/);
-          if (colMatch) {
-            const badCol = colMatch[1];
-            console.warn(`[sync] Schema cache miss for '${badCol}', retrying without it`);
-            delete payload[badCol];
-            const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify(payload)
-            });
-            if (retry.ok) {
-              console.log('[sync] Uploaded (retry):', link.url);
-              syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
-              return;
-            }
+          if (!colMatch) break;
+          const badCol = colMatch[1];
+          console.warn(`[sync] Column '${badCol}' not in DB, removing from payload`);
+          delete payload[badCol];
+          schemaRetries++;
+          const retry = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(payload)
+          });
+          if (retry.ok) {
+            console.log('[sync] Uploaded (after dropping', schemaRetries, 'columns):', link.url);
+            syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
+            return;
           }
+          errBody = await retry.text();
         }
         console.error('[sync] Upload failed:', res.status, errBody);
-        toast('Sync failed — changes saved locally', true);
+        // Throttle toast — show at most once per 30s
+        const now = Date.now();
+        if (!syncLinkToSupabase._lastToast || now - syncLinkToSupabase._lastToast > 30000) {
+          syncLinkToSupabase._lastToast = now;
+          toast('Sync failed — changes saved locally', true);
+        }
         // Queue for retry on next sync
         if (!syncRetryQueue.find(l => l.id === link.id)) {
           syncRetryQueue.push(link);
@@ -12124,7 +12212,11 @@ Return JSON:
       }
     } catch (e) {
       console.error('[sync] Error:', e);
-      toast('Sync failed — changes saved locally', true);
+      const now = Date.now();
+      if (!syncLinkToSupabase._lastToast || now - syncLinkToSupabase._lastToast > 30000) {
+        syncLinkToSupabase._lastToast = now;
+        toast('Sync failed — changes saved locally', true);
+      }
       // Queue for retry on next sync
       if (!syncRetryQueue.find(l => l.id === link.id)) {
         syncRetryQueue.push(link);
@@ -13072,6 +13164,13 @@ Return JSON:
     delete snapshot.sources;
     delete snapshot.merged_at;
     merged.sources.push(snapshot);
+
+    // Re-select best image now that sources list has grown
+    const best = mergeFieldsFallback(merged.sources);
+    merged.image = best.image || merged.image;
+    merged.image_source = best.image_source || merged.image_source;
+    merged.image_scores = best.image_scores || merged.image_scores;
+
     merged.updatedAt = new Date().toISOString();
 
     // Remove the new pin from links
@@ -13687,14 +13786,23 @@ Return JSON:
   function matchesSearch(link) {
     if (!searchQuery) return true;
     const q = searchQuery;
-    return (
+    if (
       (link.title && link.title.toLowerCase().includes(q)) ||
       (link.domain && link.domain.toLowerCase().includes(q)) ||
       (link.description && link.description.toLowerCase().includes(q)) ||
       (link.category && link.category.toLowerCase().includes(q)) ||
       (link.url && link.url.toLowerCase().includes(q)) ||
       (link.notes && link.notes.toLowerCase().includes(q))
-    );
+    ) return true;
+    // Also search inside merged pin sources
+    if (link.is_merged && Array.isArray(link.sources)) {
+      return link.sources.some(s =>
+        (s.title && s.title.toLowerCase().includes(q)) ||
+        (s.domain && s.domain.toLowerCase().includes(q)) ||
+        (s.url && s.url.toLowerCase().includes(q))
+      );
+    }
+    return false;
   }
 
   function renderGrid(newIds = []) {
@@ -14755,6 +14863,11 @@ Return JSON:
           renderGrid();
           console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
 
+          // Suggest new board if AI couldn't categorize but has a suggestion
+          if (cat.category === 'uncategorized' && cat.suggestedBoard) {
+            showNewBoardChip(id, cat.suggestedBoard);
+          }
+
           // Auto-assign to prompt-based dimensions (fire-and-forget)
           autoAssignNewPin({ id, url, title: meta.title, description: meta.description, domain: meta.domain || domain, category: cat.category })
             .catch(err => console.warn('[dimensions] autoAssign error:', err));
@@ -15641,9 +15754,14 @@ Return JSON:
           const sourcePin = allLinks.find(l => l.id === draggedId);
           const targetPin = allLinks.find(l => l.id === targetId);
           if (sourcePin && targetPin && !sourcePin.loading && !targetPin.loading) {
-            // If target is already merged, add source to it
+            // If target is already merged, add source directly (no preview needed)
             if (targetPin.is_merged) {
-              openMergePreview([targetPin, sourcePin]);
+              const result = addSourceToMergedPin(targetPin.id, sourcePin);
+              if (result) {
+                renderFilters();
+                renderGrid();
+                toast(`Added to merged pin (${result.sources.length} pins)`);
+              }
             } else {
               openMergePreview([targetPin, sourcePin]);
             }
@@ -16327,9 +16445,9 @@ Return JSON:
     });
   }
 
-  function openCreateBoardModal() {
+  function openCreateBoardModal(prefillName = '') {
     if (!createBoardModal) return;
-    createBoardNameInput.value = '';
+    createBoardNameInput.value = prefillName;
     createBoardPromptInput.value = '';
     createBoardError.hidden = true;
     createBoardError.textContent = '';
@@ -16358,6 +16476,22 @@ Return JSON:
         updateShareButton();
         renderBoardSeedPanel(slug);
         toast(`Board "${name}" created`);
+        // If a pin triggered this board suggestion, offer to move it
+        if (_pendingBoardSuggestPin) {
+          const pendingId = _pendingBoardSuggestPin;
+          _pendingBoardSuggestPin = null;
+          const pin = getAllLinks().find(l => l.id === pendingId);
+          if (pin) {
+            setTimeout(() => {
+              if (confirm(`Move "${pin.title || pin.domain}" to "${name}"?`)) {
+                updateLink(pendingId, { category: slug, previousCategory: pin.category });
+                renderFilters();
+                renderGrid();
+                toast(`Moved to "${name}"`);
+              }
+            }, 300);
+          }
+        }
         if (!localStorage.getItem('board-ctx-hint-shown')) {
           localStorage.setItem('board-ctx-hint-shown', '1');
           setTimeout(() => toast('Tip: right-click or long-press a board for options'), 2000);
@@ -16378,6 +16512,53 @@ Return JSON:
     createBoardNameInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') createBoardSubmitBtn.click();
     });
+  }
+
+  // ============================================
+  // Suggest New Board — chip UX for uncategorized pins
+  // ============================================
+  let _pendingBoardSuggestPin = null;
+
+  function showNewBoardChip(pinId, suggestedName) {
+    const filtersEl = document.getElementById('filters');
+    if (!filtersEl) return;
+
+    // Only one suggestion at a time
+    const existing = filtersEl.querySelector('.filter-token--board-suggest');
+    if (existing) existing.remove();
+
+    const chip = document.createElement('button');
+    chip.className = 'filter-token filter-token--board-suggest';
+    chip.setAttribute('aria-label', `Create "${suggestedName}" board`);
+
+    const label = document.createElement('span');
+    label.textContent = `+ "${suggestedName}" board?`;
+    chip.appendChild(label);
+
+    const dismiss = document.createElement('span');
+    dismiss.textContent = '\u00d7';
+    dismiss.style.marginLeft = '6px';
+    dismiss.style.cursor = 'pointer';
+    dismiss.onclick = (e) => {
+      e.stopPropagation();
+      _pendingBoardSuggestPin = null;
+      chip.remove();
+    };
+    chip.appendChild(dismiss);
+
+    chip.onclick = () => {
+      _pendingBoardSuggestPin = pinId;
+      chip.remove();
+      openCreateBoardModal(suggestedName);
+    };
+
+    // Insert before the "+ Board" button
+    const createBtn = filtersEl.querySelector('#createBoardBtn');
+    if (createBtn) {
+      filtersEl.insertBefore(chip, createBtn);
+    } else {
+      filtersEl.appendChild(chip);
+    }
   }
 
   // ============================================
@@ -19310,14 +19491,15 @@ Return JSON:
   // Build deep link
   var deepLink;
   if (capturedAuth) {
-    deepLink = 'ctrlrodeo://auth#access_token=' + encodeURIComponent(capturedAuth.accessToken)
-      + '&refresh_token=' + encodeURIComponent(capturedAuth.refreshToken)
-      + '&token_type=' + encodeURIComponent(capturedAuth.tokenType);
+    deepLink = 'ctrlrodeo://auth#access_token=' + capturedAuth.accessToken
+      + '&refresh_token=' + capturedAuth.refreshToken
+      + '&token_type=' + capturedAuth.tokenType;
     if (subtext) subtext.textContent = 'Tap to sign in to the app';
   } else {
     deepLink = 'ctrlrodeo://open';
     if (subtext) subtext.textContent = 'Continue to the full Boards experience';
   }
+
 
   function hideOverlay() { overlay.style.display = 'none'; }
 
