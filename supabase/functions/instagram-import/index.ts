@@ -257,25 +257,38 @@ async function transcribeAudio(reel: ReelData): Promise<string | null> {
 // 3. Entity Extraction (Claude Haiku)
 // ---------------------------------------------------------------------------
 
-const EXTRACTION_PROMPT = `Analyze this Instagram Reel post. Extract every real-world entity mentioned or referenced — places, products, brands, songs, restaurants, events, people, recipes, tools, etc.
+const EXTRACTION_PROMPT = `Analyze this Instagram Reel post. Your job is to find EVERY real-world entity the creator mentions or recommends — places, restaurants, products, brands, songs, events, people, recipes, tools, etc.
 
-For each entity:
+## Step 1: Count expected items
+Before extracting, read the caption and transcript carefully. Does the creator say "my top 8 restaurants", "5 things you need", "these 3 spots", etc.? If so, note that number — you MUST find that many entities. If no explicit count is given, estimate how many distinct things are being recommended based on the content.
+
+## Step 2: Extract all entities
+For each entity extract:
 - type: place | product | brand | song | food | event | person | generic
-- name: canonical name (e.g., "Blue Bottle Coffee" not "this coffee spot")
+- name: the CORRECT canonical spelling of the entity name. The transcript is speech-to-text and may contain misspellings or phonetic errors (e.g. "Bouchon Bistrow" → "Bouchon Bistro", "Nobu Malibu" may be transcribed as "Nobu Maleebu"). Use context clues from the caption, location tags, and surrounding words to determine the correct real-world name. Always output the corrected canonical name.
 - location_hint: any geographic context (e.g., "Valencia St, San Francisco")
-- category: which board category (eat, go, wear, watch, listen, use, follow, read)
-- confidence: 0.0-1.0
+- category: which board category fits best (eat, go, wear, watch, listen, use, follow, read)
+- confidence: 0.0-1.0 (use 0.5+ for anything plausible, not just certain items)
 - source: which input it came from ("caption" | "transcript" | "audio_track" | "tagged_location" | "tagged_account" | "screen_text")
-- search_query: a search query to find this SPECIFIC piece of content — not the creator's channel or homepage, unless the entity IS the creator/channel itself
+- search_query: a search query to find this SPECIFIC entity — use the CORRECTED canonical name, not the misspelled transcript version. For places include city/neighborhood. For products include brand name. For songs include artist.
 
-Be aggressive about extraction. If someone says "this place" while tagged at a location, that's a place entity. If a song is playing, that's a song entity. If they mention a brand, that's a brand entity.
+## Step 3: Cross-check
+Compare your extracted list against the caption AND transcript independently:
+- Did you find everything mentioned in the caption?
+- Did you find everything mentioned in the transcript?
+- If the creator mentioned a count (Step 1), does your list match that count? If not, look again — you may have missed an item or merged two distinct entities into one.
 
-If a thumbnail image is provided, also extract any text visible on screen in the video thumbnail — overlaid text, signs, labels, product names, captions. Use source "screen_text" for these entities.
+## Step 4: Screen text
+If a thumbnail image is provided, extract any text visible on screen — overlaid text, signs, labels, product names. Use source "screen_text". These may reveal items not mentioned in the audio.
 
-Specificity: when someone references a specific piece of content (article, video, recipe, tutorial, podcast episode, product listing, course, etc.), extract the specific content as the entity — not the creator, channel, or website. But if the entity IS the creator/channel itself, that's fine.
+## Key rules
+- Be aggressive: if someone says "this place" while tagged at a location, that's a place entity. Vague references backed by context still count.
+- Specificity: extract the specific piece of content, not the creator's channel/homepage — unless the entity IS the creator.
+- Do NOT discard entities just because the transcript spelling looks odd — correct the spelling and include them with confidence >= 0.5.
 
 Return ONLY valid JSON, no markdown fences:
 {
+  "expected_count": 8,
   "entities": [...],
   "post_category": "eat|go|wear|watch|listen|use|follow|read",
   "post_summary": "one sentence summary"
@@ -477,7 +490,7 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
   // Phase 1: Classify entities
   const toResolve: Entity[] = []
   for (const entity of entities) {
-    if (entity.confidence < 0.5) {
+    if (entity.confidence < 0.35) {
       entity.resolved_url = null
       entity.resolved_via = null
       entity.match_quality = 0
@@ -936,7 +949,11 @@ serve(async (req) => {
 
       // Step 3: Extract entities
       const extraction = await extractEntities(reel, transcript)
-      console.log(`[instagram-import] Found ${extraction.entities.length} entities`)
+      const expectedCount = (extraction as Record<string, unknown>).expected_count as number | undefined
+      if (expectedCount && extraction.entities.length < expectedCount) {
+        console.warn(`[instagram-import] Extraction gap: expected ${expectedCount}, found ${extraction.entities.length} entities`)
+      }
+      console.log(`[instagram-import] Found ${extraction.entities.length} entities (expected: ${expectedCount ?? 'unknown'})`)
 
       // Step 4: Resolve entities
       extraction.entities = await resolveAllEntities(extraction.entities, reel)

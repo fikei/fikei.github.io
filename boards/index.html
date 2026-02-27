@@ -6460,7 +6460,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   // Instagram reel/post detection
   function isInstagramContent(url) {
-    return /instagram\.com\/(reel|p)\//i.test(url || '');
+    return /instagram\.com\/(reels?|p|tv)\//i.test(url || '');
   }
 
   // Classify content type using rules (fast, free)
@@ -14991,203 +14991,8 @@ Return JSON:
     closeModal(addModal);
     showStatus('');
 
-    let added = 0, updated = 0;
-    const total = urls.length;
-
-    // STEP 1: Create placeholder cards immediately for all URLs
-    const placeholders = [];
-    for (const url of urls) {
-      const domain = extractDomain(url);
-      const id = generateId(url);
-
-      // Check if already exists
-      if (findByUrl(url)) {
-        console.log('%c[LINK FLOW] URL already exists, skipping placeholder:', 'color: #f39c12', url);
-        updated++;
-        continue;
-      }
-
-      // Create skeleton link with minimal data
-      const skeleton = {
-        id,
-        url,
-        title: generateTitleFromUrl(url),
-        description: '',
-        image: null,
-        domain,
-        category: 'uncategorized',
-        confidence: 0,
-        content_type: null,
-        type_confidence: 0,
-        loading: true // Mark as loading
-      };
-
-      console.log('%c[LINK FLOW] Creating placeholder card:', 'color: #1abc9c; font-weight: bold', domain);
-      const result = addLink(skeleton);
-      if (result.success && !result.updated) {
-        placeholders.push({ id, url, domain });
-        added++;
-      }
-    }
-
-    // Render placeholders immediately
-    if (placeholders.length > 0) {
-      renderFilters();
-      renderGrid();
-      toast(`Adding ${placeholders.length} link${placeholders.length > 1 ? 's' : ''}...`, { level: 'info', id: 'add-links' });
-    }
-
-    // STEP 2: Fetch metadata and update cards progressively (in background)
-    for (let i = 0; i < placeholders.length; i++) {
-      const { id, url, domain } = placeholders[i];
-
-      // Process each link asynchronously but with a small delay to not overwhelm
-      (async () => {
-        try {
-          console.log(`%c[LINK FLOW] (${i+1}/${placeholders.length}) Fetching metadata:`, 'color: #1abc9c', url);
-          const meta = await fetchMetadata(url);
-          console.log('%c[LINK FLOW] Metadata received:', 'color: #1abc9c', {
-            title: meta.title,
-            image: meta.image ? 'YES' : 'NO'
-          });
-
-          // Categorize
-          const cat = await smartCategorize(meta);
-          console.log('%c[LINK FLOW] Category:', 'color: #1abc9c', cat.category);
-
-          // Content type classification
-          const contentType = classifyByRules(url, meta.title, meta.description);
-          console.log('%c[LINK FLOW] Content type:', 'color: #1abc9c', contentType.type);
-
-          // Extract music metadata if categorized as listen or content_type is music
-          let music = null;
-          if (cat.category === 'listen' || contentType.type === 'music') {
-            music = await extractMusicMetadata(url, meta.title, meta.description, meta.musicTags);
-          }
-
-          // Extract video metadata if categorized as watch or content_type is video
-          let video = null;
-          if (cat.category === 'watch' || contentType.type === 'video') {
-            video = await extractVideoMetadata(url, meta.title, meta.description, meta.videoTags);
-          }
-
-          // Extract book metadata if categorized as read or content_type is book
-          let book = null;
-          if (cat.category === 'read' || contentType.type === 'book') {
-            book = extractBookMetadata(url, meta.title, meta.description);
-          }
-
-          // Initialize image resolution log
-          const clientLog = [{
-            strategy: 'client_cors_proxy',
-            result: meta.image ? 'found_og_image' : 'no_image',
-            reason: meta.image ? 'og:image extracted from HTML' : 'No og:image found or CORS proxy failed',
-            image_url: meta.image || null
-          }];
-
-          // Update the link with full data
-          const linkUpdate = {
-            title: meta.title,
-            description: meta.description,
-            image: meta.image,
-            category: cat.category,
-            confidence: cat.confidence,
-            content_type: contentType.type,
-            type_confidence: contentType.confidence,
-            type_signals: contentType.signals,
-            image_resolution_log: { attempts: clientLog, retry_count: 0 },
-            loading: false // Mark as loaded
-          };
-          if (music) linkUpdate.music = music;
-          if (video) linkUpdate.video = video;
-          if (book) linkUpdate.book = book;
-          updateLink(id, linkUpdate);
-
-          renderFilters();
-          renderGrid();
-          console.log('%c[LINK FLOW] ✓ Card updated:', 'color: #27ae60; font-weight: bold', meta.title);
-
-          // Suggest new board if AI couldn't categorize but has a suggestion
-          if (cat.category === 'uncategorized' && cat.suggestedBoard) {
-            showNewBoardChip(id, cat.suggestedBoard);
-          }
-
-          // Queue for batch auto-assign to prompt-based dimensions
-          queueAutoAssign({ id, url, title: meta.title, description: meta.description, domain: meta.domain || domain, category: cat.category });
-
-          // Try fast platform resolution if no image from CORS proxy
-          if (!meta.image) {
-            const platformResult = await resolvePlatformImage(url);
-            if (platformResult?.imageUrl) {
-              let accepted = false;
-              if (typeof ImageValidation !== 'undefined') {
-                const v = ImageValidation.tier1(platformResult.imageUrl, { title: meta.title, domain: meta.domain });
-                if (v.pass) {
-                  meta.image = platformResult.imageUrl;
-                  meta.image_source = platformResult.source;
-                  meta.image_scores = v.scores;
-                  accepted = true;
-                }
-              } else {
-                meta.image = platformResult.imageUrl;
-                meta.image_source = platformResult.source;
-                accepted = true;
-              }
-              if (accepted) {
-                clientLog.push({ strategy: 'client_platform', result: 'accepted', source: platformResult.source, image_url: meta.image });
-                updateLink(id, { image: meta.image, image_source: meta.image_source, image_scores: meta.image_scores,
-                  image_resolution_log: { attempts: clientLog, retry_count: 0 } });
-                renderGrid();
-              } else {
-                clientLog.push({ strategy: 'client_platform', result: 'rejected', reason: 'Tier 1 validation failed' });
-              }
-            } else {
-              clientLog.push({ strategy: 'client_platform', result: 'skipped', reason: 'Not a known platform domain' });
-            }
-          }
-
-          // Queue for server enrichment if needed (server handles scrape + Tier 2 + Tier 3 quality gate)
-          const isWatchItem = cat.category === 'watch' || contentType.type === 'video';
-          const isBookItem = cat.category === 'read' || contentType.type === 'book';
-          const isListenItem = cat.category === 'listen' || contentType.type === 'music';
-          const needsEnrichment = contentType.confidence < 0.7 || !meta.image || isWatchItem || isBookItem || isListenItem;
-          if (needsEnrichment) {
-            queueServerEnrichment(id, url, meta.title, meta.description, {
-              category: cat.category,
-              enrichWatch: isWatchItem,
-              enrichBook: isBookItem,
-              enrichListen: isListenItem
-            });
-          }
-
-          // Sync to Supabase (has its own auth guards)
-          const data2 = load();
-          const link2 = data2.links.find(l => l.id === id);
-          if (link2) syncLinkToSupabase(link2);
-        } catch (err) {
-          console.error('%c[LINK FLOW] ✗ Metadata fetch failed:', 'color: #e74c3c', err.message);
-          // Update link to remove loading state, keep placeholder title
-          updateLink(id, { loading: false });
-          renderGrid();
-        }
-      })();
-
-      // Small delay between starting each fetch to avoid overwhelming proxies
-      if (i < placeholders.length - 1) {
-        await new Promise(r => setTimeout(r, 200));
-      }
-    }
-
-    // Show summary
-    const parts = [];
-    if (added > 0) parts.push(`Added ${added}`);
-    if (updated > 0) parts.push(`${updated} already existed`);
-    if (parts.length > 0 && added > 0) {
-      // Toast already shown above
-    }
-
-    checkClusters();
-    // Image queue removed — server handles image resolution via queueServerEnrichment
+    // Delegate to processLinks — same path as paste, clipboard, deep link
+    processLinks(text);
   };
 
   filters.onclick = (e) => {
@@ -17943,6 +17748,11 @@ Return JSON:
           renderFilters();
           renderGrid();
 
+          // Suggest new board if AI couldn't categorize but has a suggestion
+          if (cat.category === 'uncategorized' && cat.suggestedBoard) {
+            showNewBoardChip(id, cat.suggestedBoard);
+          }
+
           // Queue for batch auto-assign to prompt-based dimensions
           queueAutoAssign({ id, url, title: meta.title, description: meta.description, domain: meta.domain || (new URL(url)).hostname.replace('www.', ''), category: cat.category });
 
@@ -17980,12 +17790,14 @@ Return JSON:
           // Queue for server enrichment if needed (server handles scrape + Tier 2 + Tier 3 quality gate)
           const isWatchItem2 = cat.category === 'watch' || contentType.type === 'video';
           const isBookItem2 = cat.category === 'read' || contentType.type === 'book';
-          const needsEnrichment2 = contentType.confidence < 0.7 || !meta.image || isWatchItem2 || isBookItem2;
+          const isListenItem2 = cat.category === 'listen' || contentType.type === 'music';
+          const needsEnrichment2 = contentType.confidence < 0.7 || !meta.image || isWatchItem2 || isBookItem2 || isListenItem2;
           if (needsEnrichment2) {
             queueServerEnrichment(id, url, meta.title, meta.description, {
               category: cat.category,
               enrichWatch: isWatchItem2,
-              enrichBook: isBookItem2
+              enrichBook: isBookItem2,
+              enrichListen: isListenItem2
             });
           }
 
