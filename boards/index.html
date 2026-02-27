@@ -2678,6 +2678,8 @@ body {
   --color-tidal: #00FFFF;
   --color-youtube-music: #FF0000;
   --color-beatport: #94D500;
+  --color-deezer: #A238FF;
+  --color-audiomack: #FFA200;
 }
 
 /* Listen variant — no grayscale on album art */
@@ -2770,6 +2772,8 @@ body {
 .grid-item__platform-icon--tidal { background: var(--color-tidal); }
 .grid-item__platform-icon--youtube-music { background: var(--color-youtube-music); }
 .grid-item__platform-icon--beatport { background: var(--color-beatport); }
+.grid-item__platform-icon--deezer { background: var(--color-deezer); }
+.grid-item__platform-icon--audiomack { background: var(--color-audiomack); }
 
 /* Expanded listen cards — show artist/track in details */
 .grid-item--listen.grid-item--expanded-medium .grid-item__overlay,
@@ -6421,7 +6425,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   const BUILTIN_TYPES = [
     { name: 'product', keywords: ['buy', 'price', 'cart', 'shop', 'store'], domains: ['amazon.com', 'ebay.com', 'etsy.com'] },
     { name: 'article', keywords: ['read', 'blog', 'post', 'article', 'story'], domains: ['medium.com', 'substack.com'], patterns: ['/blog/', '/post/', '/article/'] },
-    { name: 'music', keywords: ['listen', 'track', 'album', 'playlist', 'song', 'artist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'music.youtube.com', 'audiomack.com'] },
+    { name: 'music', keywords: ['listen', 'track', 'album', 'playlist', 'song', 'artist'], domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'beatport.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'music.youtube.com', 'audiomack.com'] },
     { name: 'video', keywords: ['watch', 'video', 'stream'], domains: ['youtube.com', 'youtu.be', 'vimeo.com', 'tiktok.com'] },
     { name: 'book', keywords: ['book', 'novel', 'author', 'isbn', 'paperback', 'hardcover', 'audiobook'], domains: ['goodreads.com', 'openlibrary.org', 'bookshop.org', 'audible.com', 'librarything.com'], patterns: ['/book/', '/books/', '/dp/'] },
     { name: 'repository', keywords: ['code', 'repo', 'commit', 'fork'], domains: ['github.com', 'gitlab.com', 'bitbucket.org'] },
@@ -9585,6 +9589,8 @@ Return JSON:
     if (d.includes('tidal.com')) return 'tidal';
     if (d.includes('music.youtube.com')) return 'youtube-music';
     if (d.includes('beatport.com')) return 'beatport';
+    if (d.includes('deezer.com')) return 'deezer';
+    if (d.includes('audiomack.com')) return 'audiomack';
     return null;
   }
 
@@ -12091,7 +12097,7 @@ Return JSON:
     },
     listen: {
       kw: ['music', 'album', 'song', 'playlist', 'track', 'artist', 'band', 'concert', 'listen', 'podcast', 'dj', 'remix', 'mix', 'vinyl', 'record', 'ep', 'single', 'lyrics', 'genre', 'beat', 'producer', 'rapper', 'singer', 'songwriter', 'audio'],
-      domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com', 'beatport.com']
+      domains: LISTEN_DOMAINS
     },
     use: {
       kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer', 'utility', 'product'],
