@@ -5467,6 +5467,9 @@ body {
   .ig-conf--high { color: #2ecc71; }
   .ig-conf--mid { color: #f39c12; }
   .ig-conf--low { color: var(--muted); }
+  .ig-entity--unresolved { border-color: var(--subtle); opacity: 0.85; cursor: default; }
+  .ig-entity--unresolved:hover { border-color: var(--muted); background: none; }
+  .ig-entity--unresolved-resolved { border-color: var(--fg) !important; opacity: 1; }
   #igEntities { max-height: 50vh; overflow-y: auto; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -6230,7 +6233,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       </div>
       <div style="padding: var(--space-4);">
         <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-serif); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
-        <p id="igStats" style="margin-bottom: var(--space-4); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
+        <p id="igStats" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
+        <div id="igKeepSourceRow" style="display:none;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid var(--subtle);">
+          <input type="checkbox" id="igKeepSource" checked style="width:16px;height:16px;accent-color:var(--fg);cursor:pointer;">
+          <label for="igKeepSource" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);cursor:pointer;user-select:none;">Keep original Instagram post as a pin</label>
+        </div>
         <div id="igEntities"></div>
         <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
           <button class="overlay__action" id="igCancel" style="flex: 1;">Skip</button>
@@ -15298,8 +15305,9 @@ Return JSON:
             renderGrid();
             toast('Reel imported', { id: 'refresh-' + id });
             // Show review modal if entities were found
-            if (result.derived_pins && result.derived_pins.length > 0) {
-              showInstagramReview(result);
+            if ((result.derived_pins && result.derived_pins.length > 0) ||
+                (result.unresolved_entities && result.unresolved_entities.length > 0)) {
+              showInstagramReview(result, id);
             } else {
               toast('No entities found in this reel');
             }
@@ -16894,13 +16902,45 @@ Return JSON:
   const igClose = $('igReviewClose');
 
   let igReviewData = null;
+  let igReviewSourceId = null;
 
-  function showInstagramReview(result) {
+  // Modal queue for sequential display when multiple Instagram URLs are pasted
+  const igReviewQueue = [];
+  let igReviewBusy = false;
+
+  function queueIgReview(result, sourceId) {
+    igReviewQueue.push({ result, sourceId });
+    drainIgReviewQueue();
+  }
+
+  function drainIgReviewQueue() {
+    if (igReviewBusy || igReviewQueue.length === 0) return;
+    igReviewBusy = true;
+    const { result, sourceId } = igReviewQueue.shift();
+    if (igReviewQueue.length > 0) {
+      toast(`${igReviewQueue.length} more reel${igReviewQueue.length > 1 ? 's' : ''} to review`, { level: 'info', id: 'ig-queue' });
+    }
+    showInstagramReview(result, sourceId);
+  }
+
+  function showInstagramReview(result, sourceId) {
     igReviewData = result;
+    igReviewSourceId = sourceId || null;
     const { post_summary, stats, entities, derived_pins } = result;
 
+    // Show/hide the keep-source toggle
+    const keepRow = $('igKeepSourceRow');
+    if (keepRow) {
+      keepRow.style.display = sourceId ? 'flex' : 'none';
+      const keepCb = $('igKeepSource');
+      if (keepCb) keepCb.checked = true;
+    }
+
     igSummary.textContent = post_summary || '';
-    igStats.textContent = `${stats.entities_found} found \u00b7 ${stats.entities_resolved} resolved \u00b7 ${stats.entities_review} need review \u00b7 ${stats.entities_discarded} skipped`;
+    const unresolvedCount = (result.unresolved_entities || []).length;
+    igStats.textContent = `${stats.entities_found} found \u00b7 ${stats.entities_resolved} resolved`
+      + (unresolvedCount > 0 ? ` \u00b7 ${unresolvedCount} not found` : '')
+      + ` \u00b7 ${stats.entities_review} need review \u00b7 ${stats.entities_discarded} skipped`;
 
     igEntities.innerHTML = '';
 
@@ -16913,7 +16953,7 @@ Return JSON:
 
     igConfirm.disabled = false;
 
-    const SOURCE_LABELS = { caption: 'caption', transcript: 'spoken', audio_track: 'audio', tagged_location: 'tagged', tagged_account: 'tagged' };
+    const SOURCE_LABELS = { caption: 'caption', transcript: 'spoken', audio_track: 'audio', tagged_location: 'tagged', tagged_account: 'tagged', screen_text: 'on screen' };
 
     derived_pins.forEach((pin, i) => {
       const entity = (entities || []).find(e => e.name === pin.title);
@@ -16968,8 +17008,117 @@ Return JSON:
       igEntities.appendChild(card);
     });
 
+    // --- "Mentioned but not found" section ---
+    const unresolvedEntities = result.unresolved_entities || [];
+    if (unresolvedEntities.length > 0) {
+      const header = document.createElement('div');
+      header.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);margin:var(--space-3) 0 var(--space-2);text-transform:uppercase;letter-spacing:0.05em;';
+      header.textContent = 'Mentioned but not found';
+      igEntities.appendChild(header);
+
+      unresolvedEntities.forEach((entity, ui) => {
+        const uConfidence = entity.confidence || 0;
+        const uConfClass = uConfidence >= 0.7 ? 'high' : uConfidence >= 0.5 ? 'mid' : 'low';
+        const uSource = entity.source || null;
+        const uSourceLabel = uSource ? (SOURCE_LABELS[uSource] || uSource) : null;
+        const uLocationHint = entity.location_hint || null;
+        const searchQ = entity.search_query || entity.name;
+        const ddgUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(searchQ);
+
+        const card = document.createElement('div');
+        card.className = 'ig-entity ig-entity--unresolved';
+        card.dataset.unresolvedIdx = String(ui);
+
+        card.innerHTML =
+          '<div class="ig-entity__info" style="width:100%;">' +
+            '<div class="ig-entity__name">' + escHtml(entity.name) +
+              ' <span class="ig-conf ig-conf--' + uConfClass + '">' + Math.round(uConfidence * 100) + '%</span>' +
+              (uSourceLabel ? ' <span class="ig-entity__audio-tag">' + escHtml(uSourceLabel) + '</span>' : '') +
+            '</div>' +
+            '<div class="ig-entity__meta">' + escHtml(entity.category || '') +
+              (entity.type ? ' \u00b7 ' + escHtml(entity.type) : '') +
+              (uLocationHint ? ' \u00b7 ' + escHtml(uLocationHint) : '') +
+            '</div>' +
+            '<div class="ig-entity__unresolved-actions" style="display:flex;gap:var(--space-2);margin-top:var(--space-2);align-items:center;">' +
+              '<a href="' + escHtml(ddgUrl) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);padding:2px 8px;text-decoration:none;white-space:nowrap;">Search \u2197</a>' +
+              '<input type="text" class="ig-manual-url" placeholder="Paste URL to add\u2026" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">' +
+            '</div>' +
+          '</div>';
+
+        const urlInput = card.querySelector('.ig-manual-url');
+        urlInput.addEventListener('change', () => {
+          handleUnresolvedUrlInput(card, entity, urlInput.value.trim(), ui, SOURCE_LABELS);
+        });
+
+        igEntities.appendChild(card);
+      });
+    }
+
     updateIgCount();
     openModal(igReviewModal);
+  }
+
+  function handleUnresolvedUrlInput(card, entity, pastedUrl, unresolvedIdx, SOURCE_LABELS) {
+    // Remove any previous resolved state
+    const prevCb = card.querySelector('input[type="checkbox"]');
+    if (prevCb) prevCb.remove();
+    card.classList.remove('ig-entity--selected', 'ig-entity--unresolved-resolved');
+
+    if (!pastedUrl || !pastedUrl.startsWith('http')) return;
+    try { new URL(pastedUrl); } catch { return; }
+
+    let domain = '';
+    try { domain = new URL(pastedUrl).hostname.replace('www.', ''); } catch {}
+
+    const resolvedPin = {
+      id: 'ig_manual_' + Date.now() + '_' + unresolvedIdx,
+      url: pastedUrl,
+      title: entity.name,
+      description: '',
+      image: null,
+      domain,
+      category: entity.category || 'uncategorized',
+      content_type: entity.type || 'generic',
+      type_confidence: entity.confidence,
+      source: 'social',
+      source_url: igReviewData?.source_pin?.url || '',
+      extraction: {
+        method: 'manual',
+        source_platform: 'instagram',
+        entity_type: entity.type,
+        entity_source: entity.source,
+        confidence: entity.confidence,
+      },
+      addedAt: Math.floor(Date.now() / 1000),
+      _manual: true,
+      _unresolvedIdx: unresolvedIdx,
+    };
+
+    if (!igReviewData._manualPins) igReviewData._manualPins = [];
+    igReviewData._manualPins = igReviewData._manualPins.filter(p => p._unresolvedIdx !== unresolvedIdx);
+    igReviewData._manualPins.push(resolvedPin);
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.dataset.manualIdx = String(unresolvedIdx);
+    cb.style.cssText = 'width:18px;height:18px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:var(--fg);';
+    card.insertBefore(cb, card.firstChild);
+
+    card.classList.add('ig-entity--selected', 'ig-entity--unresolved-resolved');
+
+    cb.addEventListener('change', () => {
+      card.classList.toggle('ig-entity--selected', cb.checked);
+      updateIgCount();
+    });
+
+    // Replace the actions area with confirmed URL display
+    const actionsDiv = card.querySelector('.ig-entity__unresolved-actions');
+    actionsDiv.innerHTML =
+      '<span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--fg);opacity:0.6;word-break:break-all;">' +
+      escHtml(pastedUrl) + '</span>';
+
+    updateIgCount();
   }
 
   function escHtml(s) {
@@ -16988,26 +17137,48 @@ Return JSON:
   function closeIgReview() {
     closeModal(igReviewModal);
     igReviewData = null;
+    igReviewSourceId = null;
+    igReviewBusy = false;
+    drainIgReviewQueue();
   }
 
   function confirmIgReview() {
     if (!igReviewData) return;
 
-    const boxes = igEntities.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)');
+    // Capture all data BEFORE closing (closeIgReview nulls igReviewData)
+    const boxes = igEntities.querySelectorAll('input[type="checkbox"][data-idx]:checked:not(:disabled)');
     const indices = Array.from(boxes).map(cb => parseInt(cb.dataset.idx));
     const selected = indices.map(i => igReviewData.derived_pins[i]);
 
+    // Collect manually-resolved pins
+    const manualBoxes = igEntities.querySelectorAll('input[type="checkbox"][data-manual-idx]:checked');
+    const manualIndices = Array.from(manualBoxes).map(cb => parseInt(cb.dataset.manualIdx));
+    const manualPins = (igReviewData._manualPins || []).filter(p => manualIndices.includes(p._unresolvedIdx));
+
+    const allSelected = [...selected, ...manualPins];
+
+    // Keep/remove original source pin
+    const keepSource = $('igKeepSource')?.checked !== false;
+    const sourceId = igReviewSourceId;
+
     closeIgReview();
 
-    if (selected.length === 0) {
-      toast('No entities selected');
+    // Remove original if unchecked
+    if (!keepSource && sourceId) {
+      deleteLink(sourceId);
+    }
+
+    if (allSelected.length === 0) {
+      toast(keepSource ? 'No entities selected' : 'Original removed');
+      renderFilters();
+      renderGrid();
       return;
     }
 
-    toast('Adding ' + selected.length + ' pins...', { level: 'info', id: 'ig-add' });
+    toast('Adding ' + allSelected.length + ' pins...', { level: 'info', id: 'ig-add' });
 
     let added = 0, skipped = 0;
-    for (const pin of selected) {
+    for (const pin of allSelected) {
       const norm = normalizeImportedPin(pin);
       const res = addLink(norm);
       if (res.updated) {
@@ -17297,6 +17468,49 @@ Return JSON:
 
       (async () => {
         try {
+          // Instagram path: use the full import pipeline instead of generic metadata fetch
+          if (isInstagramContent(url)) {
+            toast('Importing Instagram content...', { level: 'info', id: 'ig-import-' + id });
+            try {
+              const result = await importInstagramContent(url);
+              const src = result.source_pin || {};
+              updateLink(id, {
+                title: src.title || generateTitleFromUrl(url),
+                description: src.description || '',
+                image: src.image || null,
+                instagram: src.instagram || {},
+                content_type: src.content_type || 'social',
+                type_confidence: 1.0,
+                category: src.category || 'follow',
+                domain: 'instagram.com',
+                loading: false,
+                enrichment_failed: false,
+              });
+              renderFilters();
+              renderGrid();
+              toast('Reel imported', { id: 'ig-import-' + id });
+
+              if ((result.derived_pins && result.derived_pins.length > 0) ||
+                  (result.unresolved_entities && result.unresolved_entities.length > 0)) {
+                queueIgReview(result, id);
+              } else {
+                toast('No entities found in this reel');
+              }
+
+              // Sync to Supabase
+              const data3 = load();
+              const link3 = data3.links.find(l => l.id === id);
+              if (link3) syncLinkToSupabase(link3);
+            } catch (err) {
+              console.error('[instagram-import] Auto-import failed:', err);
+              updateLink(id, { loading: false, enrichment_failed: true });
+              renderGrid();
+              toast('Instagram import failed — try refresh', { level: 'error', id: 'ig-import-' + id });
+            }
+            return;
+          }
+
+          // Generic path: unchanged
           const meta = await fetchMetadata(url);
           const cat = await smartCategorize(meta);
           const contentType = classifyByRules(url, meta.title, meta.description);
