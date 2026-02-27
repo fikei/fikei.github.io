@@ -19992,6 +19992,9 @@ Return JSON:
   // Show overlay if we have fresh auth tokens OR an existing session
   if (!capturedAuth && !hasExistingSession) return;
 
+  // If user already dismissed this session, don't show again (unless fresh auth redirect)
+  if (!capturedAuth && sessionStorage.getItem('iosOverlayDismissed')) return;
+
   // Build deep link
   var deepLink;
   if (capturedAuth) {
@@ -20004,8 +20007,10 @@ Return JSON:
     if (subtext) subtext.textContent = 'Continue to the full Boards experience';
   }
 
-
-  function hideOverlay() { overlay.style.display = 'none'; }
+  function hideOverlay() {
+    overlay.style.display = 'none';
+    sessionStorage.setItem('iosOverlayDismissed', '1');
+  }
 
   openBtn.addEventListener('click', function() {
     window.location.href = deepLink;
