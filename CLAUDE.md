@@ -229,6 +229,7 @@ Claude Code is authorized to perform the following operations **without asking f
 - **Assign all PRs to `fikei`** so they appear in the GitHub mobile app for quick merge
 - **Create and push branches** for feature work
 - **Close stale branches** after successful merges
+- **Bump the boards version on every push** — increment `const VERSION` in `boards/index.html` (line ~6354) and update the console.log description on the next line. Use semver: patch (Z) for fixes/small changes, minor (Y) for new features or behavioral changes, major (X) for breaking/structural changes. Include the version bump in the same commit as your changes
 
 ### Supabase Deployment
 - **Always deploy any updated Supabase edge functions after merge** — if any files in `supabase/functions/` changed, run `supabase functions deploy <function-name>` immediately after merging without asking
