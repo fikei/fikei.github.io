@@ -3205,7 +3205,7 @@ body {
 
 .listen-row {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
+  grid-template-columns: 40px 1fr auto auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-2) 0;
@@ -3214,6 +3214,7 @@ body {
   transition: background 0.1s;
   text-decoration: none;
   color: var(--fg);
+  position: relative;
 }
 
 .listen-row:hover {
@@ -3530,11 +3531,64 @@ body {
   background: var(--subtle);
 }
 
+/* Listen Row Menu */
+.listen-row__menu-container {
+  position: relative;
+  z-index: 10;
+}
+.listen-row__menu-btn {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.listen-row:hover .listen-row__menu-btn,
+.listen-row__menu-container:focus-within .listen-row__menu-btn {
+  opacity: 1;
+}
+.listen-row__menu-btn:hover {
+  background: var(--subtle);
+}
+.listen-row__menu-btn::before {
+  content: '\u2022\u2022\u2022';
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.listen-row__menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-1);
+  background: var(--bg);
+  border: 1px solid var(--subtle);
+  border-radius: 4px;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+}
+.listen-row__menu--visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
 @media (max-width: 768px) {
   .listen-player--active { height: 60px; }
   .listen-player--tall { height: 152px; }
   .listen-row__meta-secondary { opacity: 1; }
   .grid--player-active { padding-bottom: 160px; }
+  .listen-row__menu-btn { opacity: 0.6; }
 }
 
 /* ============================================
@@ -13303,7 +13357,7 @@ Return JSON:
     }
   })();
   const LISTEN_VIEW_KEY = 'boards-listen-view';
-  let listenView = localStorage.getItem(LISTEN_VIEW_KEY) || 'list'; // 'grid' | 'list'
+  let listenView = 'list'; // always list view
   const WATCH_VIEW_KEY = 'boards-watch-view';
   let watchView = localStorage.getItem(WATCH_VIEW_KEY) || 'grid'; // 'grid' | 'list'
 
@@ -13476,9 +13530,9 @@ Return JSON:
     // Render sub-tags if applicable
     renderSubTags();
 
-    // Show/hide listen view toggle
+    // Listen view toggle hidden — always list view
     if (listenViewToggle) {
-      listenViewToggle.classList.toggle('listen-view-toggle--visible', currentFilter === 'listen');
+      listenViewToggle.classList.remove('listen-view-toggle--visible');
     }
     // Show/hide watch view toggle
     if (watchViewToggle) {
@@ -14293,6 +14347,17 @@ Return JSON:
             ${hasSecondary ? `<div class="listen-row__meta-secondary">
               ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}${explicitBadge}${albumMeta}${genreMeta}${yearMeta}${labelMeta}
             </div>` : ''}
+          </div>
+          <div class="listen-row__menu-container">
+            <button class="listen-row__menu-btn" data-action="listen-menu" aria-label="More options"></button>
+            <div class="listen-row__menu" data-menu-id="${l.id}">
+              <button class="grid-item__menu-item" data-action="share">Share</button>
+              <button class="grid-item__menu-item" data-action="refresh">Refresh</button>
+              <button class="grid-item__menu-item" data-action="organize">Organize</button>
+              <button class="grid-item__menu-item" data-action="merge-with">Merge with…</button>
+              <div class="grid-item__menu-divider"></div>
+              <button class="grid-item__menu-item" data-action="delete" style="color: #c00;">Delete</button>
+            </div>
           </div>
         </div>`;
         continue;
@@ -15290,26 +15355,7 @@ Return JSON:
     if (slug) toast('Rename coming soon');
   });
 
-  // Listen view toggle handler
-  if (listenViewToggle) {
-    listenViewToggle.onclick = (e) => {
-      const btn = e.target.closest('.listen-view-toggle__btn');
-      if (btn) {
-        listenView = btn.dataset.view;
-        if (listenView !== 'list' && currentPlayer.linkId) closePlayer();
-        localStorage.setItem(LISTEN_VIEW_KEY, listenView);
-        listenViewToggle.querySelectorAll('.listen-view-toggle__btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderGrid();
-      }
-    };
-    // Restore saved toggle state
-    const activeBtn = listenViewToggle.querySelector(`[data-view="${listenView}"]`);
-    if (activeBtn) {
-      listenViewToggle.querySelectorAll('.listen-view-toggle__btn').forEach(b => b.classList.remove('active'));
-      activeBtn.classList.add('active');
-    }
-  }
+  // Listen view toggle disabled — always list view
 
   // Watch view toggle handler
   if (watchViewToggle) {
@@ -15336,6 +15382,11 @@ Return JSON:
     if (!e.target.closest('.grid-item__menu-container')) {
       document.querySelectorAll('.grid-item__menu--visible').forEach(menu => {
         menu.classList.remove('grid-item__menu--visible');
+      });
+    }
+    if (!e.target.closest('.listen-row__menu-container')) {
+      document.querySelectorAll('.listen-row__menu--visible').forEach(menu => {
+        menu.classList.remove('listen-row__menu--visible');
       });
     }
   });
@@ -15393,15 +15444,46 @@ Return JSON:
     }
 
 
-    // Handle listen row click → open player
+    // Handle listen row: menu toggle and player open
     const lr = e.target.closest('.listen-row');
-    if (lr) { e.preventDefault(); const id = lr.dataset.id; if (id) openPlayer(id); return; }
+    if (lr) {
+      const lrAction = e.target.closest('[data-action]');
+      if (lrAction) {
+        const actionType = lrAction.dataset.action;
 
-    // Handle action buttons in expanded card
+        // Handle listen-row menu toggle
+        if (actionType === 'listen-menu') {
+          e.stopPropagation();
+          e.preventDefault();
+          const menu = lr.querySelector('.listen-row__menu');
+          if (menu) {
+            document.querySelectorAll('.listen-row__menu--visible').forEach(m => {
+              if (m !== menu) m.classList.remove('listen-row__menu--visible');
+            });
+            document.querySelectorAll('.grid-item__menu--visible').forEach(m => m.classList.remove('grid-item__menu--visible'));
+            menu.classList.toggle('listen-row__menu--visible');
+          }
+          return;
+        }
+
+        // Close listen-row menu after action, then fall through to general action handler
+        const openLrMenu = lr.querySelector('.listen-row__menu--visible');
+        if (openLrMenu) openLrMenu.classList.remove('listen-row__menu--visible');
+        // Fall through — the general [data-action] handler below will process it
+      } else {
+        // No action button clicked — open player
+        e.preventDefault();
+        const id = lr.dataset.id;
+        if (id) openPlayer(id);
+        return;
+      }
+    }
+
+    // Handle action buttons in expanded card or listen row
     const action = e.target.closest('[data-action]');
     if (action) {
       e.stopPropagation();
-      const item = e.target.closest('.grid-item');
+      const item = e.target.closest('.grid-item') || e.target.closest('.listen-row');
       const id = item?.dataset.id;
       if (!id) return;
 
