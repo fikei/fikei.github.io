@@ -260,10 +260,14 @@ For each entity:
 - location_hint: any geographic context (e.g., "Valencia St, San Francisco")
 - category: which board category (eat, go, wear, watch, listen, use, follow, read)
 - confidence: 0.0-1.0
-- source: which input it came from ("caption" | "transcript" | "audio_track" | "tagged_location" | "tagged_account")
-- search_query: a search query to find this entity's primary website or listing
+- source: which input it came from ("caption" | "transcript" | "audio_track" | "tagged_location" | "tagged_account" | "screen_text")
+- search_query: a search query to find this SPECIFIC piece of content — not the creator's channel or homepage, unless the entity IS the creator/channel itself
 
 Be aggressive about extraction. If someone says "this place" while tagged at a location, that's a place entity. If a song is playing, that's a song entity. If they mention a brand, that's a brand entity.
+
+If a thumbnail image is provided, also extract any text visible on screen in the video thumbnail — overlaid text, signs, labels, product names, captions. Use source "screen_text" for these entities.
+
+Specificity: when someone references a specific piece of content (article, video, recipe, tutorial, podcast episode, product listing, course, etc.), extract the specific content as the entity — not the creator, channel, or website. But if the entity IS the creator/channel itself, that's fine.
 
 Return ONLY valid JSON, no markdown fences:
 {
@@ -290,7 +294,20 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
   }
 
   const userMessage = parts.join('\n\n')
-  console.log(`[instagram-import] Entity extraction input: ${userMessage.length} chars`)
+  console.log(`[instagram-import] Entity extraction input: ${userMessage.length} chars, thumbnail: ${reel.thumbnail_url ? 'yes' : 'no'}`)
+
+  // Build multimodal content array — include thumbnail for on-screen text extraction
+  const messageContent: Array<{type: string; [key: string]: unknown}> = []
+  if (reel.thumbnail_url) {
+    messageContent.push({
+      type: 'image',
+      source: { type: 'url', url: reel.thumbnail_url },
+    })
+  }
+  messageContent.push({
+    type: 'text',
+    text: `${EXTRACTION_PROMPT}\n\n---\n\n${userMessage}`,
+  })
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -303,7 +320,7 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       messages: [
-        { role: 'user', content: `${EXTRACTION_PROMPT}\n\n---\n\n${userMessage}` }
+        { role: 'user', content: messageContent }
       ],
     }),
   })
@@ -368,14 +385,16 @@ async function searchDuckDuckGo(query: string, maxResults = 5): Promise<SearchRe
 }
 
 function buildSearchQuery(entity: Entity): string {
+  // Always prefer Claude's specific search_query first
   if (entity.search_query) return entity.search_query
+  // Fallbacks — only used if Claude returned no search_query
   switch (entity.type) {
     case 'place': return `${entity.name} ${entity.location_hint || ''} Google Maps`.trim()
     case 'food': return `${entity.name} ${entity.location_hint || ''} Google Maps`.trim()
     case 'song': return `${entity.name} Spotify`
     case 'brand': return `${entity.name} official site`
-    case 'product': return `${entity.name} buy`
-    case 'person': return `${entity.name} Instagram`
+    case 'product': return `${entity.name} product page`
+    case 'person': return `${entity.name} ${entity.location_hint || ''}`.trim()
     default: return entity.name
   }
 }
@@ -386,8 +405,10 @@ Pick the URL that is the OFFICIAL or CANONICAL source for this entity. Prefer:
 - place/food/eat: Google Maps link > official restaurant/venue website > Yelp
 - song/listen: Spotify > Apple Music > YouTube Music > SoundCloud
 - brand: official brand website (not aggregators or review sites)
-- product: brand's own product page > major retailer (Amazon, etc.)
-- person/follow: Instagram profile > personal website > LinkedIn
+- product: brand's own product page (not homepage) > specific retailer listing (not retailer homepage)
+- person/follow: if the entity is a specific piece of content by a person, prefer the direct URL for that content; if the entity is the person themselves, prefer Instagram profile > personal website > LinkedIn
+
+Specificity: when the entity refers to a specific piece of content, prefer the direct URL for that content over the creator's profile or channel page. Examples: specific YouTube video over channel, specific article over blog homepage, specific podcast episode over show page, specific product listing over brand homepage, specific recipe page over food blog. If the entity IS the creator/channel/brand itself (not a specific piece of their content), then the profile or homepage is correct.
 
 If none of the URLs match the entity well, set selected_url to null.
 
@@ -632,18 +653,24 @@ serve(async (req) => {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       console.log(`[instagram-import] Done in ${elapsed}s: 1 source + ${derived_pins.length} derived pins`)
 
+      const unresolvedEntities = extraction.entities.filter(
+        e => e.status !== 'discarded' && !e.resolved_url
+      )
+
       return new Response(
         JSON.stringify({
           source_pin,
           derived_pins,
           transcript,
           entities: extraction.entities,
+          unresolved_entities: unresolvedEntities,
           post_category: extraction.post_category,
           post_summary: extraction.post_summary,
           stats: {
             elapsed_seconds: parseFloat(elapsed),
             entities_found: extraction.entities.length,
             entities_resolved: derived_pins.length,
+            entities_unresolved: unresolvedEntities.length,
             entities_review: extraction.entities.filter(e => e.status === 'review').length,
             entities_discarded: extraction.entities.filter(e => e.status === 'discarded').length,
           },
