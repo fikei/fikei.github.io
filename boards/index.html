@@ -10431,7 +10431,8 @@ Return JSON:
             forceRefresh: forceRefresh,
             category: item.category || null,
             enrichWatch: item.enrichWatch || false,
-            enrichBook: item.enrichBook || false
+            enrichBook: item.enrichBook || false,
+            enrichListen: item.enrichListen || false
           })
         });
 
@@ -10715,6 +10716,41 @@ Return JSON:
               link.image = olCover;
               link.image_source = 'openlibrary';
             }
+          }
+        }
+
+        // Merge server-enriched music metadata (MusicBrainz + Last.fm + oEmbed) into existing music field
+        if (result.music) {
+          const existing = link.music || {};
+          link.music = {
+            ...existing,
+            server_enriched_at: new Date().toISOString(),
+            artist: result.music.artist || existing.artist || null,
+            trackTitle: result.music.trackTitle || existing.trackTitle || null,
+            albumTitle: result.music.albumTitle || existing.albumTitle || null,
+            genre: result.music.genre || existing.genre || null,
+            genreTags: result.music.genreTags || existing.genreTags || null,
+            label: result.music.label || existing.label || null,
+            releaseDate: result.music.releaseDate || existing.releaseDate || null,
+            duration: existing.duration || result.music.duration || null,
+            contentFormat: existing.contentFormat || result.music.contentFormat || null,
+            isExplicit: existing.isExplicit ?? result.music.isExplicit ?? null,
+            // Preserve client-side fields (BPM/key from GetSongBPM, embed from URL parsing)
+            bpm: existing.bpm || null,
+            key: existing.key || null,
+            embedUrl: result.music.embedUrl || existing.embedUrl || null,
+            embedType: result.music.embedType || existing.embedType || null,
+            embedHeight: result.music.embedHeight || existing.embedHeight || null,
+            platformId: existing.platformId || null,
+          };
+          console.log('%c[ENRICH] Music metadata merged:', 'color: #1db954', link.music);
+          // Recompute unified tags with new music data
+          delete link._tags;
+          link.tags = computeLinkTags(link);
+
+          // Update top-level title with artist - track if we have both
+          if (link.music.artist && link.music.trackTitle) {
+            link.title = `${link.music.artist} – ${link.music.trackTitle}`;
           }
         }
 
@@ -11585,6 +11621,39 @@ Return JSON:
       summaryField: 'summary',
       enrichFlag: 'enrichBook',
       backfillCheck: (link) => link.book && !link.book.server_enriched_at,
+    },
+    listen: {
+      category: 'listen',
+      metaField: 'music',
+      doneField: 'listened',
+      doneLabel: 'Listened',
+      cssClass: 'listen',
+      doneClass: 'listened',
+      getPlatform: getMusicPlatform,
+      overlay: {
+        titleField: 'trackTitle',
+        metaField: 'artist',
+        metaFallback: (meta) => meta.albumTitle || null,
+        titleClass: 'music-title',
+        metaClass: 'music-meta',
+      },
+      metaLine: [
+        { field: 'genre' },
+        { field: 'label' },
+        { field: 'contentFormat', format: (f) => cap(f.replace('-', ' ')) },
+      ],
+      badge: { typeField: 'contentFormat', durationField: 'duration' },
+      externalLink: (meta) => {
+        if (meta.artist && meta.trackTitle) {
+          const q = encodeURIComponent(`${meta.artist} ${meta.trackTitle}`);
+          return { url: `https://www.last.fm/search?q=${q}`, label: 'Last.fm', cssClass: '' };
+        }
+        return null;
+      },
+      extras: () => '',
+      summaryField: null,
+      enrichFlag: 'enrichListen',
+      backfillCheck: (link) => link.music && !link.music.server_enriched_at,
     },
   };
 
@@ -15067,12 +15136,14 @@ Return JSON:
           // Queue for server enrichment if needed (server handles scrape + Tier 2 + Tier 3 quality gate)
           const isWatchItem = cat.category === 'watch' || contentType.type === 'video';
           const isBookItem = cat.category === 'read' || contentType.type === 'book';
-          const needsEnrichment = contentType.confidence < 0.7 || !meta.image || isWatchItem || isBookItem;
+          const isListenItem = cat.category === 'listen' || contentType.type === 'music';
+          const needsEnrichment = contentType.confidence < 0.7 || !meta.image || isWatchItem || isBookItem || isListenItem;
           if (needsEnrichment) {
             queueServerEnrichment(id, url, meta.title, meta.description, {
               category: cat.category,
               enrichWatch: isWatchItem,
-              enrichBook: isBookItem
+              enrichBook: isBookItem,
+              enrichListen: isListenItem
             });
           }
 

@@ -2,8 +2,8 @@
 // Handles AI classification, image resolution, and watch enrichment for links
 //
 // POST /functions/v1/enrich-link
-// Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, enrichBook?, category? }
-// Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video?, book? }
+// Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, enrichBook?, enrichListen?, category? }
+// Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video?, book?, music? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -41,7 +41,7 @@ serve(async (req) => {
 
   try {
     let { url, title, description, linkId, skipClassification, skipImage,
-            skipIfHasImage, currentImage, forceRefresh, enrichWatch, enrichBook, category } = await req.json()
+            skipIfHasImage, currentImage, forceRefresh, enrichWatch, enrichBook, enrichListen, category } = await req.json()
 
     // Support skipIfHasImage: skip image resolution if client already has a valid image
     const shouldSkipImage = skipImage || (skipIfHasImage && !!currentImage)
@@ -479,6 +479,137 @@ serve(async (req) => {
     }
 
     // ========================================
+    // STEP 2.7: Music Enrichment — oEmbed + URL parsing + MusicBrainz/Last.fm
+    // ========================================
+    let musicMeta: Record<string, any> | null = null
+    if (enrichListen || category === 'listen' || contentType === 'music') {
+      console.log('[enrich-link] Step 2.7: Music enrichment for:', url)
+
+      const musicResult: Record<string, any> = {
+        artist: null,
+        trackTitle: null,
+        albumTitle: null,
+        genre: null,
+        duration: null,
+        contentFormat: null,
+        releaseDate: null,
+        label: null,
+        isExplicit: null,
+        embedUrl: null,
+        embedType: null,
+        embedHeight: null,
+        server_enriched_at: new Date().toISOString(),
+      }
+
+      // 1. Infer contentFormat from URL
+      if (/\/track[\/s]/.test(path)) musicResult.contentFormat = 'track'
+      else if (/\/album[\/s]/.test(path)) musicResult.contentFormat = 'album'
+      else if (/\/playlist[\/s]/.test(path)) musicResult.contentFormat = 'playlist'
+      else if (/\/episode[\/s]/.test(path) || /\/podcast/.test(path)) musicResult.contentFormat = 'podcast-episode'
+      else if (/\/artist[\/s]/.test(path)) musicResult.contentFormat = 'artist'
+      else if (/\/sets?[\/]/.test(path) && domain.includes('soundcloud.com')) musicResult.contentFormat = 'mix'
+
+      // 2. Spotify oEmbed (no CORS issues server-side)
+      if (domain.includes('spotify.com')) {
+        try {
+          const oembedResp = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`)
+          if (oembedResp.ok) {
+            const oe = await oembedResp.json()
+            musicResult.trackTitle = oe.title || null
+            if (oe.provider_name === 'Spotify' && oe.author_name) {
+              musicResult.artist = oe.author_name
+            }
+            if (oe.html) {
+              const m = oe.html.match(/src=["']([^"']+)["']/)
+              if (m) { musicResult.embedUrl = m[1]; musicResult.embedType = 'iframe'; musicResult.embedHeight = oe.height || 152 }
+            }
+            console.log('[enrich-link] Spotify oEmbed:', oe.title, '-', oe.author_name)
+          }
+        } catch (e) { console.warn('[enrich-link] Spotify oEmbed failed:', (e as Error).message) }
+      }
+
+      // 3. SoundCloud oEmbed
+      if (domain.includes('soundcloud.com')) {
+        try {
+          const oembedResp = await fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`)
+          if (oembedResp.ok) {
+            const oe = await oembedResp.json()
+            musicResult.trackTitle = musicResult.trackTitle || oe.title || null
+            musicResult.artist = musicResult.artist || oe.author_name || null
+            if (oe.html) {
+              const m = oe.html.match(/src=["']([^"']+)["']/)
+              if (m) { musicResult.embedUrl = m[1]; musicResult.embedType = 'iframe'; musicResult.embedHeight = oe.height || 166 }
+            }
+          }
+        } catch (e) { console.warn('[enrich-link] SoundCloud oEmbed failed:', (e as Error).message) }
+      }
+
+      // 4. Title-based fallback for artist/track
+      if (!musicResult.artist && title) {
+        // "Track - song and lyrics by Artist | Spotify"
+        const spTitle = title.match(/^(.+?)\s*-\s*(?:song and lyrics by|Song by|Album by)\s+(.+?)\s*\|/i)
+        if (spTitle) {
+          musicResult.trackTitle = musicResult.trackTitle || spTitle[1].trim()
+          musicResult.artist = spTitle[2].trim()
+        }
+        // "Artist - Track" or "Track by Artist"
+        if (!musicResult.artist) {
+          const dashSplit = title.match(/^(.+?)\s*[-–—]\s+(.+?)(?:\s*\|.*)?$/)
+          if (dashSplit) {
+            musicResult.artist = musicResult.artist || dashSplit[1].trim()
+            musicResult.trackTitle = musicResult.trackTitle || dashSplit[2].trim()
+          }
+        }
+      }
+
+      // 5. Description-based fallback (Spotify: "Listen to Track on Spotify. Type · Artist · Year")
+      if (!musicResult.artist && description) {
+        const spDesc = description.match(/(?:Song|Album|Playlist|EP)\s*[·]\s*(.+?)\s*[·]\s*(\d{4})/i)
+        if (spDesc) {
+          musicResult.artist = spDesc[1].trim()
+          musicResult.releaseDate = musicResult.releaseDate || spDesc[2]
+        }
+      }
+
+      // 6. MusicBrainz + Last.fm for genre/label (if we have artist + track)
+      if (musicResult.artist && musicResult.trackTitle) {
+        try {
+          // Call our own enrich-music function internally
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+          const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+          const enrichResp = await fetch(`${supabaseUrl}/functions/v1/enrich-music`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              artist: musicResult.artist,
+              track: musicResult.trackTitle,
+              album: musicResult.albumTitle,
+            }),
+          })
+          if (enrichResp.ok) {
+            const enrichData = await enrichResp.json()
+            if (enrichData.genre) musicResult.genre = enrichData.genre
+            if (enrichData.label) musicResult.label = enrichData.label
+            if (enrichData.album) musicResult.albumTitle = musicResult.albumTitle || enrichData.album
+            if (enrichData.releaseDate) musicResult.releaseDate = musicResult.releaseDate || enrichData.releaseDate
+            console.log('[enrich-link] enrich-music result:', enrichData)
+          }
+        } catch (e) { console.warn('[enrich-link] enrich-music call failed:', (e as Error).message) }
+      }
+
+      // Return if we got anything useful
+      const hasData = musicResult.artist || musicResult.trackTitle || musicResult.contentFormat
+      if (hasData) {
+        musicMeta = musicResult
+      }
+
+      console.log('[enrich-link] Music enrichment result:', musicMeta)
+    }
+
+    // ========================================
     // STEP 3: Update link in database (if linkId provided)
     // ========================================
     if (linkId) {
@@ -512,6 +643,9 @@ serve(async (req) => {
       }
       if (bookMeta) {
         updatePayload.book = bookMeta
+      }
+      if (musicMeta) {
+        updatePayload.music = musicMeta
       }
       await supabase
         .from('links')
@@ -561,6 +695,9 @@ serve(async (req) => {
     }
     if (bookMeta) {
       response.book = bookMeta
+    }
+    if (musicMeta) {
+      response.music = musicMeta
     }
 
     console.log('[enrich-link] Complete:', response)
