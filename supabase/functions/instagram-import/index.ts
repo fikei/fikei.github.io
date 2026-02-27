@@ -86,8 +86,6 @@ interface Pin {
   addedAt: number
 }
 
-// Module-level video buffer cache (populated by Deepgram transcription, reused by AudD)
-let cachedVideoBuffer: ArrayBuffer | null = null
 
 // ---------------------------------------------------------------------------
 // 1. Content Extraction (ScrapeCreators)
@@ -200,8 +198,6 @@ async function transcribeViaDeepgram(videoUrl: string): Promise<string | null> {
     if (!videoResp.ok) return null
 
     const videoBuffer = await videoResp.arrayBuffer()
-    // Cache for reuse by AudD fingerprinting
-    cachedVideoBuffer = videoBuffer
     console.log(`[instagram-import] Downloaded ${(videoBuffer.byteLength / 1024 / 1024).toFixed(1)} MB for transcription`)
 
     // Send to Deepgram
@@ -541,15 +537,25 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
     console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via})`)
   }
 
-  // Phase 5: Enhanced music resolution (Spotify + AudD)
+  // Phase 5: Enhanced music resolution (Spotify + AudD multi-track)
   const musicEntities = toResolve.filter(e => isMusicEntity(e))
   if (musicEntities.length > 0) {
     console.log(`[instagram-import] Phase 5: Enhanced music resolution for ${musicEntities.length} entities`)
 
+    // Tier 2 prep: fingerprint ALL tracks in one call (before entity loop)
+    let fingerprints: FingerprintResult[] = []
+    const streamingRegex = /spotify\.com|music\.apple\.com|soundcloud\.com|beatport\.com|bandcamp\.com|tidal\.com|deezer\.com|audiomack\.com|youtube\.com\/watch|music\.youtube\.com/
+    const anyNeedFingerprint = musicEntities.some(e => {
+      const isStreaming = e.resolved_url && streamingRegex.test(e.resolved_url)
+      return !(isStreaming && e.match_quality >= 0.7)
+    })
+    if (anyNeedFingerprint && reel.video_url) {
+      fingerprints = await fingerprintAllTracks(reel.video_url)
+    }
+
     for (const entity of musicEntities) {
       // Check if Tier 0 already resolved to a streaming service with high quality
-      const isStreamingUrl = entity.resolved_url &&
-        /spotify\.com|music\.apple\.com|soundcloud\.com|beatport\.com|youtube\.com\/watch|music\.youtube\.com/.test(entity.resolved_url)
+      const isStreamingUrl = entity.resolved_url && streamingRegex.test(entity.resolved_url)
       if (isStreamingUrl && entity.match_quality >= 0.7) {
         console.log(`[instagram-import] Tier 0 sufficient for: ${entity.name} (${entity.match_quality})`)
         continue
@@ -569,22 +575,48 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
         }
       }
 
-      // Tier 2: AudD fingerprinting (only if metadata is missing/generic)
-      if (isOriginalAudio(reel) && reel.video_url) {
-        const fingerprint = await fingerprintAudio(reel.video_url)
-        if (fingerprint) {
-          entity.resolved_url = fingerprint.spotifyUrl || entity.resolved_url
+      // Tier 2: match against fingerprints
+      if (fingerprints.length > 0) {
+        const match = matchFingerprintToEntity(entity, fingerprints)
+        if (match) {
+          entity.resolved_url = match.spotifyUrl || entity.resolved_url
           entity.resolved_via = 'audd-fingerprint'
           entity.match_quality = 0.85
-          // Update entity name if we now know the actual track
-          if (fingerprint.track) {
-            entity.name = fingerprint.artist
-              ? `${fingerprint.artist} - ${fingerprint.track}`
-              : fingerprint.track
+          if (match.track) {
+            entity.name = match.artist
+              ? `${match.artist} - ${match.track}`
+              : match.track
           }
-          console.log(`[instagram-import] AudD identified: ${entity.name}`)
+          console.log(`[instagram-import] AudD matched: ${entity.name}`)
+          // If no URL yet, try Spotify search with the now-identified track
+          if (!entity.resolved_url && match.artist && match.track) {
+            const fallback = await searchSpotify(match.artist, match.track)
+            if (fallback) {
+              entity.resolved_url = fallback.url
+              entity.resolved_via = 'audd-fingerprint+spotify'
+            }
+          }
         }
       }
+    }
+
+    // Create entities for unmatched fingerprints (tracks not in caption/transcript)
+    for (const fp of fingerprints) {
+      if (fp._matched) continue
+      console.log(`[instagram-import] AudD new track: ${fp.artist} - ${fp.track} (offset: ${fp.offset}s)`)
+      entities.push({
+        type: 'song',
+        name: `${fp.artist} - ${fp.track}`,
+        category: 'listen',
+        confidence: 0.8,
+        source: 'audio_fingerprint',
+        resolved_url: fp.spotifyUrl || null,
+        resolved_via: 'audd-fingerprint',
+        match_quality: 0.85,
+        status: 'review',
+        location_hint: null,
+        search_query: `${fp.artist} ${fp.track} Spotify`,
+      })
     }
   }
 
@@ -733,68 +765,114 @@ async function searchSpotify(
   }
 }
 
-async function fingerprintAudio(
-  videoUrl: string
-): Promise<{ track: string; artist: string; spotifyUrl?: string } | null> {
+interface FingerprintResult {
+  track: string
+  artist: string
+  offset: number          // seconds into the video
+  spotifyUrl?: string
+  _matched?: boolean      // internal: set when assigned to an entity
+}
+
+async function fingerprintAllTracks(videoUrl: string): Promise<FingerprintResult[]> {
   const apiKey = Deno.env.get('AUDD_API_KEY')
-  if (!apiKey) return null
+  if (!apiKey) return []
 
   try {
-    // Use cached buffer from Deepgram step, or download fresh
-    let buffer = cachedVideoBuffer
-    if (!buffer) {
-      console.log('[instagram-import] AudD: downloading video for fingerprinting')
-      const resp = await fetch(videoUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
-      })
-      if (!resp.ok) return null
-      buffer = await resp.arrayBuffer()
-    }
+    const params = new URLSearchParams({
+      api_token: apiKey,
+      url: videoUrl,          // AudD fetches server-side — no upload needed
+      return: 'spotify',
+      accurate_offsets: 'true',
+    })
 
-    // Convert to base64
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    const audioBase64 = btoa(binary)
+    console.log('[instagram-import] AudD enterprise: scanning video for all tracks')
 
-    console.log(`[instagram-import] AudD: sending ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB for fingerprinting`)
-
-    const formData = new FormData()
-    formData.append('api_token', apiKey)
-    formData.append('audio', `data:audio/mp4;base64,${audioBase64}`)
-    formData.append('return', 'spotify')
-
-    const resp = await fetch('https://api.audd.io/', {
+    const resp = await fetch('https://enterprise.audd.io/', {
       method: 'POST',
-      body: formData,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
     })
 
     if (!resp.ok) {
-      console.error(`[instagram-import] AudD API error: ${resp.status}`)
-      return null
+      console.error(`[instagram-import] AudD enterprise error: ${resp.status}`)
+      return []
     }
 
     const data = await resp.json()
 
-    if (data.status !== 'success' || !data.result) {
-      console.log('[instagram-import] AudD: no match found')
-      return null
+    if (data.status !== 'success' || !data.result || !Array.isArray(data.result)) {
+      console.log('[instagram-import] AudD enterprise: no results')
+      return []
     }
 
-    const result = data.result
-    console.log(`[instagram-import] AudD: identified "${result.artist} - ${result.title}"`)
+    // Enterprise response: { result: [ { offset, songs: [{ artist, title, spotify }] } ] }
+    // Each chunk has an array of song matches — take the best one per chunk
+    const seen = new Map<string, FingerprintResult>()
 
-    return {
-      track: result.title || '',
-      artist: result.artist || '',
-      spotifyUrl: result.spotify?.external_urls?.spotify || undefined,
+    for (const chunk of data.result) {
+      const songs = chunk.songs
+      if (!songs || !Array.isArray(songs) || songs.length === 0) continue
+
+      // Take the first (best) song from each chunk
+      const song = songs[0]
+      if (!song.artist && !song.title) continue
+
+      const key = normalizeForComparison(`${song.artist || ''} ${song.title || ''}`)
+      if (seen.has(key)) continue // deduplicate — keep earliest offset
+
+      seen.set(key, {
+        track: song.title || '',
+        artist: song.artist || '',
+        offset: chunk.offset || 0,
+        spotifyUrl: song.spotify?.external_urls?.spotify || undefined,
+      })
     }
+
+    const results = Array.from(seen.values()).sort((a, b) => a.offset - b.offset)
+    console.log(`[instagram-import] AudD: found ${results.length} tracks`)
+    for (const r of results) {
+      console.log(`  [${r.offset}s] ${r.artist} - ${r.track}${r.spotifyUrl ? ' ✓ Spotify' : ''}`)
+    }
+    return results
   } catch (err) {
     console.error('[instagram-import] AudD fingerprint error:', err)
-    return null
+    return []
   }
+}
+
+function matchFingerprintToEntity(
+  entity: Entity,
+  fingerprints: FingerprintResult[]
+): FingerprintResult | null {
+  const normName = normalizeForComparison(entity.name)
+
+  // First pass: match by normalized name comparison
+  for (const fp of fingerprints) {
+    if (fp._matched) continue
+    const fpName = normalizeForComparison(`${fp.artist} ${fp.track}`)
+    const fpReversed = normalizeForComparison(`${fp.track} ${fp.artist}`)
+    if (normName.includes(fpName) || fpName.includes(normName) ||
+        normName.includes(fpReversed) || fpReversed.includes(normName)) {
+      fp._matched = true
+      return fp
+    }
+    // Also check artist or track individually
+    const normArtist = normalizeForComparison(fp.artist)
+    const normTrack = normalizeForComparison(fp.track)
+    if (normName.includes(normArtist) && normName.includes(normTrack)) {
+      fp._matched = true
+      return fp
+    }
+  }
+
+  // Second pass: assign first unmatched fingerprint (by offset order)
+  for (const fp of fingerprints) {
+    if (fp._matched) continue
+    fp._matched = true
+    return fp
+  }
+
+  return null
 }
 
 function isMusicEntity(entity: Entity): boolean {
@@ -958,9 +1036,6 @@ serve(async (req) => {
       // Step 4: Resolve entities
       extraction.entities = await resolveAllEntities(extraction.entities, reel)
 
-      // Clear cached video buffer
-      cachedVideoBuffer = null
-
       // Step 5: Create pins
       const { source_pin, derived_pins } = createPins(reel, extraction, transcript)
 
@@ -1002,13 +1077,13 @@ serve(async (req) => {
           const transcript = await transcribeAudio(reel)
           const extraction = await extractEntities(reel, transcript)
           extraction.entities = await resolveAllEntities(extraction.entities, reel)
-          cachedVideoBuffer = null
+
           const pins = createPins(reel, extraction, transcript)
           results.push({ url: u, ...pins, entities: extraction.entities, status: 'ok' })
         } catch (err) {
           results.push({ url: u, status: 'error', error: String(err) })
         }
-        cachedVideoBuffer = null
+
         // Rate limit between posts
         await new Promise(r => setTimeout(r, 1000))
       }
@@ -1041,13 +1116,13 @@ serve(async (req) => {
           const transcript = await transcribeAudio(reel)
           const extraction = await extractEntities(reel, transcript)
           extraction.entities = await resolveAllEntities(extraction.entities, reel)
-          cachedVideoBuffer = null
+
           const pins = createPins(reel, extraction, transcript)
           results.push({ url: reel.url, ...pins, entities: extraction.entities, status: 'ok' })
         } catch (err) {
           results.push({ url: post.url || post.shortcode, status: 'error', error: String(err) })
         }
-        cachedVideoBuffer = null
+
         await new Promise(r => setTimeout(r, 1000))
       }
 

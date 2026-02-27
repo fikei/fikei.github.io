@@ -153,7 +153,11 @@ serve(async (req) => {
       console.log('[enrich-link] YouTube URL detected, forcing content_type=video')
     }
 
-    const isMusicPlatform = domain.includes('spotify.com') || domain.includes('soundcloud.com') || domain.includes('bandcamp.com') || domain.includes('beatport.com')
+    const isMusicPlatform = domain.includes('spotify.com') ||
+      domain.includes('soundcloud.com') || domain.includes('bandcamp.com') ||
+      domain.includes('beatport.com') || domain.includes('music.apple.com') ||
+      domain.includes('tidal.com') || domain.includes('deezer.com') ||
+      domain.includes('audiomack.com') || domain.includes('music.youtube.com')
     if (isMusicPlatform) {
       contentType = 'music'
       typeConfidence = 1.0
