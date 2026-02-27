@@ -13557,13 +13557,11 @@ Return JSON:
     aiDimCallsThisSession++;
 
     try {
-      const accessToken = getAccessToken();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({ prompt: promptText, category: currentFilter, pins })
       });
@@ -13623,13 +13621,11 @@ Return JSON:
     aiDimCallsThisSession++;
 
     try {
-      const accessToken = getAccessToken();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({ prompt: dim.prompt, category, pins })
       });
@@ -13725,13 +13721,11 @@ Return JSON:
 
         // Batch classify into existing tags (single API call per dimension)
         try {
-          const accessToken = getAccessToken();
           const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
             },
             body: JSON.stringify({
               prompt: dim.prompt,
