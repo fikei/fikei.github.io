@@ -3434,30 +3434,11 @@ body {
   padding-bottom: 160px;
 }
 
-/* Extended Listen Row Metadata */
+/* Listen Row Metadata */
 .listen-row__meta--extended {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-.listen-row__meta-primary {
-  display: flex;
   align-items: center;
   gap: 6px;
-}
-.listen-row__meta-secondary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  font-size: 8px;
-  font-family: var(--font-mono);
-  color: var(--muted);
-}
-.listen-row:hover .listen-row__meta-secondary {
-  opacity: 1;
 }
 .listen-row__explicit {
   display: inline-flex;
@@ -3479,14 +3460,6 @@ body {
   font-family: var(--font-mono);
   color: var(--fg);
   opacity: 0.7;
-}
-.listen-row__album,
-.listen-row__genre,
-.listen-row__year,
-.listen-row__label {
-  font-size: 8px;
-  font-family: var(--font-mono);
-  color: var(--muted);
 }
 
 /* Play Button Overlay on Album Art */
@@ -3586,7 +3559,6 @@ body {
 @media (max-width: 768px) {
   .listen-player--active { height: 60px; }
   .listen-player--tall { height: 152px; }
-  .listen-row__meta-secondary { opacity: 1; }
   .grid--player-active { padding-bottom: 160px; }
   .listen-row__menu-btn { opacity: 0.6; }
 }
@@ -14322,13 +14294,8 @@ Return JSON:
           : `<div class="listen-row__art listen-row__art--placeholder">${initial}</div>`;
         const isPlaying = currentPlayer.linkId === l.id;
         const explicitBadge = music?.isExplicit ? '<span class="listen-row__explicit">E</span>' : '';
-        const albumMeta = music?.albumTitle ? `<span class="listen-row__album">${esc(music.albumTitle)}</span>` : '';
-        const genreMeta = music?.genre ? `<span class="listen-row__genre">${esc(music.genre)}</span>` : '';
-        const yearMeta = music?.releaseDate ? `<span class="listen-row__year">${esc(music.releaseDate.substring(0,4))}</span>` : '';
         const bpmMeta = music?.bpm ? `<span class="listen-row__bpm">${music.bpm} BPM</span>` : '';
         const keyMeta = music?.key ? `<span class="listen-row__key">${esc(music.key)}</span>` : '';
-        const labelMeta = music?.label ? `<span class="listen-row__label">${esc(music.label)}</span>` : '';
-        const hasSecondary = fmt || music?.isExplicit || music?.albumTitle || music?.genre || music?.releaseDate || music?.label;
 
         html += `<div class="listen-row${isPlaying ? ' listen-row--playing' : ''}" data-id="${l.id}">
           <div class="listen-row__art-wrapper">
@@ -14340,13 +14307,8 @@ Return JSON:
             <span class="listen-row__artist">${platformDot} ${esc(artistName)}</span>
           </div>
           <div class="listen-row__meta listen-row__meta--extended">
-            <div class="listen-row__meta-primary">
-              ${bpmMeta}${keyMeta}
-              ${dur ? `<span class="listen-row__duration">${dur}</span>` : ''}
-            </div>
-            ${hasSecondary ? `<div class="listen-row__meta-secondary">
-              ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}${explicitBadge}${albumMeta}${genreMeta}${yearMeta}${labelMeta}
-            </div>` : ''}
+            ${explicitBadge}${bpmMeta}${keyMeta}
+            ${dur ? `<span class="listen-row__duration">${dur}</span>` : ''}
           </div>
           <div class="listen-row__menu-container">
             <button class="listen-row__menu-btn" data-action="listen-menu" aria-label="More options"></button>
