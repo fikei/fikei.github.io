@@ -2584,6 +2584,7 @@ body {
   --color-bandcamp: #1DA0C3;
   --color-tidal: #00FFFF;
   --color-youtube-music: #FF0000;
+  --color-beatport: #94D500;
 }
 
 /* Listen variant — no grayscale on album art */
@@ -2675,6 +2676,7 @@ body {
 .grid-item__platform-icon--bandcamp { background: var(--color-bandcamp); }
 .grid-item__platform-icon--tidal { background: var(--color-tidal); }
 .grid-item__platform-icon--youtube-music { background: var(--color-youtube-music); }
+.grid-item__platform-icon--beatport { background: var(--color-beatport); }
 
 /* Expanded listen cards — show artist/track in details */
 .grid-item--listen.grid-item--expanded-medium .grid-item__overlay,
@@ -9462,6 +9464,7 @@ Return JSON:
     if (d.includes('bandcamp.com')) return 'bandcamp';
     if (d.includes('tidal.com')) return 'tidal';
     if (d.includes('music.youtube.com')) return 'youtube-music';
+    if (d.includes('beatport.com')) return 'beatport';
     return null;
   }
 
@@ -11708,7 +11711,7 @@ Return JSON:
   // Migration: watch → listen for music links
   // ============================================
   // Domains that should be 'listen' instead of 'watch'
-  const LISTEN_DOMAINS = ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com'];
+  const LISTEN_DOMAINS = ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com', 'beatport.com'];
   const LISTEN_MIGRATION_KEY = 'boards-listen-migration-v1';
 
   function migrateWatchToListen() {
@@ -11869,7 +11872,7 @@ Return JSON:
     },
     listen: {
       kw: ['music', 'album', 'song', 'playlist', 'track', 'artist', 'band', 'concert', 'listen', 'podcast', 'dj', 'remix', 'mix', 'vinyl', 'record', 'ep', 'single', 'lyrics', 'genre', 'beat', 'producer', 'rapper', 'singer', 'songwriter', 'audio'],
-      domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com']
+      domains: ['spotify.com', 'soundcloud.com', 'bandcamp.com', 'music.apple.com', 'tidal.com', 'deezer.com', 'audiomack.com', 'music.youtube.com', 'last.fm', 'genius.com', 'pitchfork.com', 'beatport.com']
     },
     use: {
       kw: ['app', 'software', 'tool', 'github', 'npm', 'library', 'framework', 'api', 'code', 'extension', 'plugin', 'developer', 'visualizer', 'utility', 'product'],
@@ -17189,6 +17192,15 @@ Return JSON:
           category: norm.category,
           skipClassification: true
         });
+        // Immediately extract music metadata for listen-category pins
+        if ((norm.category === 'listen' || norm.content_type === 'music') && norm.url) {
+          extractMusicMetadata(norm.url, norm.title, norm.description).then(music => {
+            if (music) {
+              updateLink(norm.id, { music, content_type: 'music' });
+              renderGrid();
+            }
+          });
+        }
       }
     }
 

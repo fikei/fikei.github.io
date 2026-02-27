@@ -86,6 +86,9 @@ interface Pin {
   addedAt: number
 }
 
+// Module-level video buffer cache (populated by Deepgram transcription, reused by AudD)
+let cachedVideoBuffer: ArrayBuffer | null = null
+
 // ---------------------------------------------------------------------------
 // 1. Content Extraction (ScrapeCreators)
 // ---------------------------------------------------------------------------
@@ -197,6 +200,8 @@ async function transcribeViaDeepgram(videoUrl: string): Promise<string | null> {
     if (!videoResp.ok) return null
 
     const videoBuffer = await videoResp.arrayBuffer()
+    // Cache for reuse by AudD fingerprinting
+    cachedVideoBuffer = videoBuffer
     console.log(`[instagram-import] Downloaded ${(videoBuffer.byteLength / 1024 / 1024).toFixed(1)} MB for transcription`)
 
     // Send to Deepgram
@@ -468,7 +473,7 @@ async function selectBestUrls(
   }
 }
 
-async function resolveAllEntities(entities: Entity[]): Promise<Entity[]> {
+async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<Entity[]> {
   // Phase 1: Classify entities
   const toResolve: Entity[] = []
   for (const entity of entities) {
@@ -523,11 +528,300 @@ async function resolveAllEntities(entities: Entity[]): Promise<Entity[]> {
     console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via})`)
   }
 
+  // Phase 5: Enhanced music resolution (Spotify + AudD)
+  const musicEntities = toResolve.filter(e => isMusicEntity(e))
+  if (musicEntities.length > 0) {
+    console.log(`[instagram-import] Phase 5: Enhanced music resolution for ${musicEntities.length} entities`)
+
+    for (const entity of musicEntities) {
+      // Check if Tier 0 already resolved to a streaming service with high quality
+      const isStreamingUrl = entity.resolved_url &&
+        /spotify\.com|music\.apple\.com|soundcloud\.com|beatport\.com|youtube\.com\/watch|music\.youtube\.com/.test(entity.resolved_url)
+      if (isStreamingUrl && entity.match_quality >= 0.7) {
+        console.log(`[instagram-import] Tier 0 sufficient for: ${entity.name} (${entity.match_quality})`)
+        continue
+      }
+
+      // Parse artist/track from entity name or audio_track metadata
+      const { artist, track } = parseArtistTrack(entity.name, reel.audio_track)
+
+      // Tier 1: Spotify search
+      if (artist || track) {
+        const spotifyResult = await searchSpotify(artist, track)
+        if (spotifyResult && spotifyResult.quality >= 0.6) {
+          entity.resolved_url = spotifyResult.url
+          entity.resolved_via = 'spotify'
+          entity.match_quality = spotifyResult.quality
+          continue
+        }
+      }
+
+      // Tier 2: AudD fingerprinting (only if metadata is missing/generic)
+      if (isOriginalAudio(reel) && reel.video_url) {
+        const fingerprint = await fingerprintAudio(reel.video_url)
+        if (fingerprint) {
+          entity.resolved_url = fingerprint.spotifyUrl || entity.resolved_url
+          entity.resolved_via = 'audd-fingerprint'
+          entity.match_quality = 0.85
+          // Update entity name if we now know the actual track
+          if (fingerprint.track) {
+            entity.name = fingerprint.artist
+              ? `${fingerprint.artist} - ${fingerprint.track}`
+              : fingerprint.track
+          }
+          console.log(`[instagram-import] AudD identified: ${entity.name}`)
+        }
+      }
+    }
+  }
+
   return entities
 }
 
 // ---------------------------------------------------------------------------
-// 5. Pin Creation
+// 5. Enhanced Music Resolution (Spotify + AudD)
+// ---------------------------------------------------------------------------
+
+// Module-level cache for Spotify access token
+let _spotifyToken: string | null = null
+let _spotifyTokenExpiry = 0
+
+async function getSpotifyToken(): Promise<string | null> {
+  const clientId = Deno.env.get('SPOTIFY_CLIENT_ID')
+  const clientSecret = Deno.env.get('SPOTIFY_CLIENT_SECRET')
+  if (!clientId || !clientSecret) return null
+
+  // Return cached token if still valid (with 60s buffer)
+  if (_spotifyToken && Date.now() < _spotifyTokenExpiry - 60_000) {
+    return _spotifyToken
+  }
+
+  try {
+    const resp = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + btoa(`${clientId}:${clientSecret}`),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    })
+
+    if (!resp.ok) {
+      console.error(`[instagram-import] Spotify auth failed: ${resp.status}`)
+      return null
+    }
+
+    const data = await resp.json()
+    _spotifyToken = data.access_token
+    _spotifyTokenExpiry = Date.now() + (data.expires_in * 1000)
+    console.log('[instagram-import] Spotify token obtained')
+    return _spotifyToken
+  } catch (err) {
+    console.error('[instagram-import] Spotify auth error:', err)
+    return null
+  }
+}
+
+function normalizeForComparison(s: string): string {
+  return s.toLowerCase()
+    .replace(/['']/g, "'")
+    .replace(/[^\w\s']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+async function searchSpotify(
+  artist: string,
+  track: string
+): Promise<{ url: string; quality: number } | null> {
+  const token = await getSpotifyToken()
+  if (!token) return null
+
+  // Build query — use field filters when we have both parts
+  let q = ''
+  if (artist && track) {
+    q = `track:${track} artist:${artist}`
+  } else if (track) {
+    q = track
+  } else if (artist) {
+    q = `artist:${artist}`
+  } else {
+    return null
+  }
+
+  try {
+    const params = new URLSearchParams({ type: 'track', q, limit: '5' })
+    const resp = await fetch(`https://api.spotify.com/v1/search?${params}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+
+    if (!resp.ok) {
+      console.error(`[instagram-import] Spotify search failed: ${resp.status}`)
+      return null
+    }
+
+    const data = await resp.json()
+    const items = data.tracks?.items
+    if (!items || items.length === 0) return null
+
+    // Score each result
+    const normTrack = normalizeForComparison(track || '')
+    const normArtist = normalizeForComparison(artist || '')
+
+    let bestUrl = ''
+    let bestScore = 0
+
+    for (const item of items) {
+      const itemTrack = normalizeForComparison(item.name || '')
+      const itemArtists = (item.artists || []).map((a: { name: string }) =>
+        normalizeForComparison(a.name)
+      )
+
+      let score = 0
+
+      // Track name matching
+      if (normTrack) {
+        if (itemTrack === normTrack) {
+          score += 0.5
+        } else if (itemTrack.includes(normTrack) || normTrack.includes(itemTrack)) {
+          score += 0.3
+        }
+      }
+
+      // Artist matching
+      if (normArtist) {
+        if (itemArtists.some((a: string) => a === normArtist)) {
+          score += 0.5
+        } else if (itemArtists.some((a: string) => a.includes(normArtist) || normArtist.includes(a))) {
+          score += 0.3
+        }
+      }
+
+      // If we only had one of artist/track, scale the score
+      if (!normTrack || !normArtist) {
+        score = Math.min(score * 1.5, 0.9)
+      }
+
+      if (score > bestScore) {
+        bestScore = score
+        bestUrl = item.external_urls?.spotify || ''
+      }
+    }
+
+    if (bestUrl && bestScore > 0) {
+      console.log(`[instagram-import] Spotify: "${artist} - ${track}" -> ${bestUrl} (score: ${bestScore})`)
+      return { url: bestUrl, quality: bestScore }
+    }
+
+    return null
+  } catch (err) {
+    console.error('[instagram-import] Spotify search error:', err)
+    return null
+  }
+}
+
+async function fingerprintAudio(
+  videoUrl: string
+): Promise<{ track: string; artist: string; spotifyUrl?: string } | null> {
+  const apiKey = Deno.env.get('AUDD_API_KEY')
+  if (!apiKey) return null
+
+  try {
+    // Use cached buffer from Deepgram step, or download fresh
+    let buffer = cachedVideoBuffer
+    if (!buffer) {
+      console.log('[instagram-import] AudD: downloading video for fingerprinting')
+      const resp = await fetch(videoUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
+      })
+      if (!resp.ok) return null
+      buffer = await resp.arrayBuffer()
+    }
+
+    // Convert to base64
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    const audioBase64 = btoa(binary)
+
+    console.log(`[instagram-import] AudD: sending ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB for fingerprinting`)
+
+    const formData = new FormData()
+    formData.append('api_token', apiKey)
+    formData.append('audio', `data:audio/mp4;base64,${audioBase64}`)
+    formData.append('return', 'spotify')
+
+    const resp = await fetch('https://api.audd.io/', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!resp.ok) {
+      console.error(`[instagram-import] AudD API error: ${resp.status}`)
+      return null
+    }
+
+    const data = await resp.json()
+
+    if (data.status !== 'success' || !data.result) {
+      console.log('[instagram-import] AudD: no match found')
+      return null
+    }
+
+    const result = data.result
+    console.log(`[instagram-import] AudD: identified "${result.artist} - ${result.title}"`)
+
+    return {
+      track: result.title || '',
+      artist: result.artist || '',
+      spotifyUrl: result.spotify?.external_urls?.spotify || undefined,
+    }
+  } catch (err) {
+    console.error('[instagram-import] AudD fingerprint error:', err)
+    return null
+  }
+}
+
+function isMusicEntity(entity: Entity): boolean {
+  return entity.type === 'song' || entity.category === 'listen'
+}
+
+function isOriginalAudio(reel: ReelData): boolean {
+  const track = reel.audio_track
+  if (!track) return true
+  const lower = track.toLowerCase()
+  return lower.includes('original audio') ||
+    lower.includes('original sound') ||
+    lower.startsWith('original audio -')
+}
+
+function parseArtistTrack(
+  entityName: string,
+  audioTrack: string | null
+): { artist: string; track: string } {
+  // Try audio_track first (format: "Artist - Track Name")
+  const source = audioTrack || entityName
+  const separatorMatch = source.match(/^(.+?)\s*[-–—]\s*(.+)$/)
+  if (separatorMatch) {
+    let artist = separatorMatch[1].trim()
+    let track = separatorMatch[2].trim()
+    // Clean up feat./ft. in track name — move to artist
+    const featMatch = track.match(/^(.+?)\s*\(?\s*(?:feat\.?|ft\.?)\s*(.+?)\)?\s*$/i)
+    if (featMatch) {
+      track = featMatch[1].trim()
+      artist = `${artist}, ${featMatch[2].trim()}`
+    }
+    return { artist, track }
+  }
+
+  // No separator found — use full name as track
+  return { artist: '', track: source.trim() }
+}
+
+// ---------------------------------------------------------------------------
+// 6. Pin Creation
 // ---------------------------------------------------------------------------
 
 function generateId(): string {
@@ -584,7 +878,7 @@ function createPins(
         image: null,
         domain,
         category: entity.category || 'uncategorized',
-        content_type: entity.type || 'generic',
+        content_type: isMusicEntity(entity) ? 'music' : (entity.type || 'generic'),
         type_confidence: entity.confidence,
         source: 'social',
         source_url: reel.url,
@@ -645,7 +939,10 @@ serve(async (req) => {
       console.log(`[instagram-import] Found ${extraction.entities.length} entities`)
 
       // Step 4: Resolve entities
-      extraction.entities = await resolveAllEntities(extraction.entities)
+      extraction.entities = await resolveAllEntities(extraction.entities, reel)
+
+      // Clear cached video buffer
+      cachedVideoBuffer = null
 
       // Step 5: Create pins
       const { source_pin, derived_pins } = createPins(reel, extraction, transcript)
@@ -687,12 +984,14 @@ serve(async (req) => {
           const reel = await extractReel(u)
           const transcript = await transcribeAudio(reel)
           const extraction = await extractEntities(reel, transcript)
-          extraction.entities = await resolveAllEntities(extraction.entities)
+          extraction.entities = await resolveAllEntities(extraction.entities, reel)
+          cachedVideoBuffer = null
           const pins = createPins(reel, extraction, transcript)
           results.push({ url: u, ...pins, entities: extraction.entities, status: 'ok' })
         } catch (err) {
           results.push({ url: u, status: 'error', error: String(err) })
         }
+        cachedVideoBuffer = null
         // Rate limit between posts
         await new Promise(r => setTimeout(r, 1000))
       }
@@ -724,12 +1023,14 @@ serve(async (req) => {
 
           const transcript = await transcribeAudio(reel)
           const extraction = await extractEntities(reel, transcript)
-          extraction.entities = await resolveAllEntities(extraction.entities)
+          extraction.entities = await resolveAllEntities(extraction.entities, reel)
+          cachedVideoBuffer = null
           const pins = createPins(reel, extraction, transcript)
           results.push({ url: reel.url, ...pins, entities: extraction.entities, status: 'ok' })
         } catch (err) {
           results.push({ url: post.url || post.shortcode, status: 'error', error: String(err) })
         }
+        cachedVideoBuffer = null
         await new Promise(r => setTimeout(r, 1000))
       }
 
