@@ -19311,8 +19311,6 @@ Return JSON:
     return issues;
   };
 
-  init();
-
   // ============================================
   // Lookback Feature - Phase 1 MVP
   // ============================================
@@ -19742,6 +19740,9 @@ Return JSON:
       </div>
     `;
   }
+
+  // Initialize the app (must be after all const declarations above)
+  init();
 
   // ============================================
   // Mobile Paste Button
