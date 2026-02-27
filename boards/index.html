@@ -14302,7 +14302,7 @@ Return JSON:
             <span class="listen-row__artist">${platformDot} ${esc(artistName)}</span>
           </div>
           <div class="listen-row__meta listen-row__meta--extended">
-            ${explicitBadge}${bpmMeta}${keyMeta}
+            ${fmt ? `<span class="listen-row__format">${esc(fmt)}</span>` : ''}${explicitBadge}${bpmMeta}${keyMeta}
             ${dur ? `<span class="listen-row__duration">${dur}</span>` : ''}
           </div>
           <div class="listen-row__menu-container">
