@@ -13047,6 +13047,7 @@ Return JSON:
   const MAX_AI_DIM_CALLS = 3;
   let aiDimCallsThisSession = 0;
   let dimensionPromptOpen = false;
+  const healedDimIds = new Set();
 
   function loadPromptDimensions(category) {
     try { return JSON.parse(localStorage.getItem(DIMS_KEY_PREFIX + category) || '[]'); }
@@ -13554,8 +13555,6 @@ Return JSON:
       return;
     }
 
-    aiDimCallsThisSession++;
-
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
         method: 'POST',
@@ -13574,6 +13573,8 @@ Return JSON:
         renderSubTags();
         return;
       }
+
+      aiDimCallsThisSession++; // Only count successful calls
 
       const newDim = {
         id: genDimensionId(),
@@ -13618,8 +13619,6 @@ Return JSON:
       .slice(0, 200)
       .map(l => ({ id: l.id, title: l.title || l.domain, description: l.description || '', domain: l.domain || '', url: l.url }));
 
-    aiDimCallsThisSession++;
-
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
         method: 'POST',
@@ -13632,6 +13631,8 @@ Return JSON:
 
       const data = await res.json();
       if (data.error) { toast('Re-analyze failed: ' + data.error); renderSubTags(); return; }
+
+      aiDimCallsThisSession++; // Only count successful calls
 
       updatePromptDimension(category, dimId, {
         label: data.dimensionLabel || dim.label,
@@ -13788,6 +13789,18 @@ Return JSON:
     const categoryConfig = SUB_TAGS[currentFilter];
     const builtinDims = categoryConfig?.dimensions || [];
     const promptDims = loadPromptDimensions(currentFilter);
+
+    // Auto-heal broken prompt dims (created during 401 era — 0 assignments)
+    for (const pd of promptDims) {
+      const assigned = Object.values(pd.assignments || {}).filter(v => v);
+      if (assigned.length === 0 && pd.prompt && !healedDimIds.has(pd.id)) {
+        healedDimIds.add(pd.id);
+        console.log('[dimensions] Auto-healing broken dimension:', pd.label);
+        reanalyzeDimension(currentFilter, pd.id)
+          .catch(err => console.warn('[dimensions] Auto-heal failed:', err));
+      }
+    }
+
     const allDims = [
       ...builtinDims.map(d => ({ ...d, source: 'builtin' })),
       ...promptDims.map(d => ({ ...d, source: 'prompt' }))
