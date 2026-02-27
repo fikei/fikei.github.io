@@ -6351,8 +6351,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.1.1';
-  console.log('[boards] v' + VERSION + ' - Add version bump rule');
+  const VERSION = '2.1.2';
+  console.log('[boards] v' + VERSION + ' - Show full email when no username set');
 
   // ============================================
   // Supabase Setup
@@ -17917,11 +17917,9 @@ Return JSON:
     if (currentUsername) {
       return '@' + currentUsername;
     }
-    // Otherwise show first name from email (capitalized)
+    // Otherwise show full email
     if (currentUser?.email) {
-      const emailPrefix = currentUser.email.split('@')[0];
-      // Capitalize first letter
-      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+      return currentUser.email;
     }
     return 'User';
   }
