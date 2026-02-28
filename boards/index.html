@@ -6408,8 +6408,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.4.0';
-  console.log('[boards] v' + VERSION + ' - Add Taste Map — force-directed concept graph');
+  const VERSION = '2.4.1';
+  console.log('[boards] v' + VERSION + ' - Fix filter bar race conditions, XSS, and stale response handling');
 
   // ============================================
   // Supabase Setup
@@ -13221,6 +13221,7 @@ Return JSON:
   let dimensionPromptPrefill = '';
   const healedDimIds = new Set();
   let activeSuggestionPrompt = null;   // prompt string of currently expanded chip (null = all collapsed)
+  let dimPromptInFlight = null;        // prompt string of in-flight API call (prevents race conditions)
   const PRECOMPUTED_KEY_PREFIX = 'dim-precomputed-';
   const precomputingCategories = new Set(); // track in-flight background pre-computation
 
@@ -13707,6 +13708,11 @@ Return JSON:
     }
 
     // No precomputed data — fall through to API call
+    if (dimPromptInFlight) {
+      console.log('[dimensions] Ignoring — already in flight:', dimPromptInFlight);
+      return; // prevent double-click / concurrent calls
+    }
+
     if (aiDimCallsThisSession >= MAX_AI_DIM_CALLS) {
       toast('AI filter limit reached for this session');
       dimensionPromptOpen = false;
@@ -13715,6 +13721,8 @@ Return JSON:
     }
 
     // Show loading state — mark the chip as loading if it exists
+    const requestCategory = currentFilter; // capture for stale-response check
+    dimPromptInFlight = promptText;
     activeSuggestionPrompt = promptText;
     dimensionPromptOpen = false;
     renderSubTags(); // re-renders with loading indicator on the chip
@@ -13732,6 +13740,7 @@ Return JSON:
 
     if (pins.length < 3) {
       toast('Add more pins to enable filtering (minimum 3)');
+      dimPromptInFlight = null;
       activeSuggestionPrompt = null;
       renderSubTags();
       return;
@@ -13744,10 +13753,17 @@ Return JSON:
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify({ prompt: promptText, category: currentFilter, pins })
+        body: JSON.stringify({ prompt: promptText, category: requestCategory, pins })
       });
 
       const data = await res.json();
+      dimPromptInFlight = null;
+
+      // Stale response check — user may have switched chips or categories
+      if (activeSuggestionPrompt !== promptText || currentFilter !== requestCategory) {
+        console.log('[dimensions] Stale response for', promptText, '— ignoring');
+        return;
+      }
 
       if (data.error) {
         toast(data.error);
@@ -13770,7 +13786,7 @@ Return JSON:
       };
 
       // Also cache in precomputed for future use
-      setPrecomputedDim(currentFilter, promptText, {
+      setPrecomputedDim(requestCategory, promptText, {
         label: newDim.label,
         tags: newDim.tags,
         assignments: newDim.assignments,
@@ -13779,16 +13795,17 @@ Return JSON:
       });
 
       // Replace existing dimensions — one filter at a time
-      const existing = loadPromptDimensions(currentFilter);
-      for (const d of existing) removePromptDimension(currentFilter, d.id);
+      const existing = loadPromptDimensions(requestCategory);
+      for (const d of existing) removePromptDimension(requestCategory, d.id);
       currentFilters = {};
 
-      addPromptDimension(currentFilter, newDim);
+      addPromptDimension(requestCategory, newDim);
       activeSuggestionPrompt = promptText;
       renderSubTags();
       renderGrid();
     } catch (err) {
       console.error('[dimensions] AI call failed:', err);
+      dimPromptInFlight = null;
       toast('Failed to create filter. Try again.');
       activeSuggestionPrompt = null;
       renderSubTags();
@@ -14217,7 +14234,6 @@ Return JSON:
     for (const s of suggestions) {
       const isExpanded = activeSuggestionPrompt === s.prompt;
       const isLoading = isExpanded && !expandedDim;
-      const precomputed = getPrecomputedDim(currentFilter, s.prompt);
 
       if (isExpanded && expandedDim) {
         // ── Expanded chip — show label + tag buttons inline ──
@@ -14243,7 +14259,7 @@ Return JSON:
           const count = counts[tag] || 0;
           if (count > 0) {
             const active = activeFilter === tag ? 'sub-tag--active' : '';
-            html += `<span class="sub-tag ${active}" data-subtag="${esc(tag)}" data-dim-prompt="${esc(s.prompt)}">${cap(tag)}<span class="sub-tag__count">${count}</span></span>`;
+            html += `<span class="sub-tag ${active}" data-subtag="${esc(tag)}" data-dim-prompt="${esc(s.prompt)}">${esc(cap(tag))}<span class="sub-tag__count">${count}</span></span>`;
           }
         }
         if (untaggedCount > 0) {
