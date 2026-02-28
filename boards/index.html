@@ -934,6 +934,46 @@ body {
 }
 .sub-tag--suggestion:hover { border-color: var(--fg); color: var(--fg); }
 
+/* Expanded chip — selected suggestion with inline tag buttons */
+.sub-tag--expanded {
+  background: var(--subtle);
+  color: var(--fg);
+  border: 1px solid var(--fg-subtle);
+  padding: 2px 4px 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Tag buttons inside expanded chip */
+.sub-tag__expanded {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px;
+  align-items: center;
+}
+.sub-tag__expanded .sub-tag {
+  font-size: 8px;
+  padding: 1px 4px;
+  border: none;
+  color: var(--fg-subtle);
+}
+.sub-tag__expanded .sub-tag:hover { color: var(--fg); }
+.sub-tag__expanded .sub-tag--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* Loading state on individual chip */
+.sub-tag--loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Accessibility: better contrast for interactive elements */
+.sub-tag--suggestion { color: var(--fg); }
+.sub-tag--ai { color: var(--fg); }
+
 /* × close button — pinned right */
 .sub-tags__close {
   font-family: var(--font-mono);
@@ -5614,7 +5654,7 @@ body {
     <button class="filter-token filter-token--active" data-category="all" role="tab" aria-selected="true">All</button>
   </nav>
 
-  <nav class="sub-tags" id="subTags"></nav>
+  <nav class="sub-tags" id="subTags" aria-label="Filter dimensions" role="toolbar"></nav>
 
   <!-- Dimension context menu (long-press on prompt dimension label) -->
   <div class="dim-context-menu" id="dimContextMenu" style="display:none">
@@ -6364,8 +6404,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.3.2';
-  console.log('[boards] v' + VERSION + ' - Only show lookback card on all page');
+  const VERSION = '2.4.0';
+  console.log('[boards] v' + VERSION + ' - Inline expand filter bar with eager pre-computation + accessibility');
 
   // ============================================
   // Supabase Setup
@@ -13174,7 +13214,11 @@ Return JSON:
   const MAX_AI_DIM_CALLS = 3;
   let aiDimCallsThisSession = 0;
   let dimensionPromptOpen = false;
+  let dimensionPromptPrefill = '';
   const healedDimIds = new Set();
+  let activeSuggestionPrompt = null;   // prompt string of currently expanded chip (null = all collapsed)
+  const PRECOMPUTED_KEY_PREFIX = 'dim-precomputed-';
+  const precomputingCategories = new Set(); // track in-flight background pre-computation
 
   function loadPromptDimensions(category) {
     try { return JSON.parse(localStorage.getItem(DIMS_KEY_PREFIX + category) || '[]'); }
@@ -13208,6 +13252,24 @@ Return JSON:
 
   function genDimensionId() {
     return 'dim-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+  }
+
+  // Precomputed dimension cache — eager background classification results
+  function loadPrecomputedDims(category) {
+    try { return JSON.parse(localStorage.getItem(PRECOMPUTED_KEY_PREFIX + category) || '{}'); }
+    catch { return {}; }
+  }
+  function getPrecomputedDim(category, prompt) {
+    return loadPrecomputedDims(category)[prompt] || null;
+  }
+  function setPrecomputedDim(category, prompt, dimData) {
+    const all = loadPrecomputedDims(category);
+    all[prompt] = dimData;
+    try { localStorage.setItem(PRECOMPUTED_KEY_PREFIX + category, JSON.stringify(all)); }
+    catch (e) { console.error('[precompute] Save failed:', e); }
+  }
+  function clearPrecomputedDims(category) {
+    localStorage.removeItem(PRECOMPUTED_KEY_PREFIX + category);
   }
 
   // ============================================
@@ -13610,39 +13672,37 @@ Return JSON:
 
   function showDimensionPromptInput(prefill) {
     dimensionPromptOpen = true;
-    const subTagsEl = $('subTags');
-    if (!subTagsEl) return;
-
-    subTagsEl.innerHTML = `
-      <form class="dim-prompt-form" id="dimPromptForm">
-        <input type="text" class="dim-prompt-input" id="dimPromptInput"
-          placeholder="e.g. organize by brand tier..." autocomplete="off" maxlength="120"
-          value="${esc(prefill || '')}" />
-        <button type="submit" class="dim-prompt-submit">Go</button>
-        <button type="button" class="dim-prompt-cancel" id="dimPromptCancel">Cancel</button>
-      </form>
-      <button class="sub-tags__close" id="subTagsClose" title="Cancel">\u00d7</button>
-    `;
-    subTagsEl.classList.add('sub-tags--visible');
-
-    const input = $('dimPromptInput');
-    input.focus();
-    if (prefill) input.setSelectionRange(prefill.length, prefill.length);
-
-    $('dimPromptForm').onsubmit = async (e) => {
-      e.preventDefault();
-      const promptText = input.value.trim();
-      if (!promptText) return;
-      await runDimensionPrompt(promptText);
-    };
-
-    $('dimPromptCancel').onclick = () => {
-      dimensionPromptOpen = false;
-      renderSubTags();
-    };
+    dimensionPromptPrefill = prefill || '';
+    renderSubTags(); // renderSubTags handles the inline form rendering
   }
 
   async function runDimensionPrompt(promptText) {
+    // Check precomputed cache first (instant!)
+    const precomputed = getPrecomputedDim(currentFilter, promptText);
+    if (precomputed) {
+      console.log('[dimensions] Precomputed cache hit for', promptText);
+      const newDim = {
+        id: genDimensionId(),
+        label: precomputed.label,
+        tags: precomputed.tags,
+        source: 'prompt',
+        prompt: promptText,
+        assignments: precomputed.assignments,
+        createdAt: Date.now(),
+        analyzedAt: precomputed.precomputedAt,
+      };
+      const existing = loadPromptDimensions(currentFilter);
+      for (const d of existing) removePromptDimension(currentFilter, d.id);
+      currentFilters = {};
+      addPromptDimension(currentFilter, newDim);
+      activeSuggestionPrompt = promptText;
+      dimensionPromptOpen = false;
+      renderSubTags();
+      renderGrid();
+      return;
+    }
+
+    // No precomputed data — fall through to API call
     if (aiDimCallsThisSession >= MAX_AI_DIM_CALLS) {
       toast('AI filter limit reached for this session');
       dimensionPromptOpen = false;
@@ -13650,12 +13710,10 @@ Return JSON:
       return;
     }
 
-    // Show loading state in the single-row bar
-    const subTagsEl = $('subTags');
-    if (subTagsEl) {
-      subTagsEl.innerHTML = `<span class="sub-tags__label sub-tags__label--loading">Analyzing pins...</span>`;
-      subTagsEl.classList.add('sub-tags--visible');
-    }
+    // Show loading state — mark the chip as loading if it exists
+    activeSuggestionPrompt = promptText;
+    dimensionPromptOpen = false;
+    renderSubTags(); // re-renders with loading indicator on the chip
 
     const pins = getAllLinks()
       .filter(l => l.category === currentFilter)
@@ -13670,7 +13728,7 @@ Return JSON:
 
     if (pins.length < 3) {
       toast('Add more pins to enable filtering (minimum 3)');
-      dimensionPromptOpen = false;
+      activeSuggestionPrompt = null;
       renderSubTags();
       return;
     }
@@ -13689,7 +13747,7 @@ Return JSON:
 
       if (data.error) {
         toast(data.error);
-        dimensionPromptOpen = false;
+        activeSuggestionPrompt = null;
         renderSubTags();
         return;
       }
@@ -13707,20 +13765,28 @@ Return JSON:
         analyzedAt: Date.now(),
       };
 
+      // Also cache in precomputed for future use
+      setPrecomputedDim(currentFilter, promptText, {
+        label: newDim.label,
+        tags: newDim.tags,
+        assignments: newDim.assignments,
+        prompt: promptText,
+        precomputedAt: Date.now()
+      });
+
       // Replace existing dimensions — one filter at a time
       const existing = loadPromptDimensions(currentFilter);
       for (const d of existing) removePromptDimension(currentFilter, d.id);
       currentFilters = {};
 
       addPromptDimension(currentFilter, newDim);
-      dimensionPromptOpen = false;
+      activeSuggestionPrompt = promptText;
       renderSubTags();
       renderGrid();
-      toast(`Filter "${newDim.label}" added`);
     } catch (err) {
       console.error('[dimensions] AI call failed:', err);
       toast('Failed to create filter. Try again.');
-      dimensionPromptOpen = false;
+      activeSuggestionPrompt = null;
       renderSubTags();
     }
   }
@@ -13877,6 +13943,16 @@ Return JSON:
             }
             updatePromptDimension(cat, dim.id, { assignments: updated });
             console.log('[backfill-other] Reclassified', reclassified, 'of', otherPins.length, 'pins for', dim.label);
+
+            // Also update precomputed cache if it exists for this prompt
+            if (dim.prompt) {
+              const pre = getPrecomputedDim(cat, dim.prompt);
+              if (pre) {
+                pre.assignments = { ...pre.assignments, ...data.assignments };
+                setPrecomputedDim(cat, dim.prompt, pre);
+                console.log('[backfill-other] Updated precomputed cache for', dim.label);
+              }
+            }
           }
         } catch (err) {
           console.warn('[backfill-other] Failed for dim', dim.label, err);
@@ -13896,7 +13972,10 @@ Return JSON:
 
   function queueAutoAssign(link) {
     pendingAutoAssign.push(link);
-    if (link.category) clearSuggestionCache(link.category);
+    if (link.category) {
+      clearSuggestionCache(link.category);
+      clearPrecomputedDims(link.category); // re-classify with enriched metadata
+    }
     clearTimeout(autoAssignTimer);
     autoAssignTimer = setTimeout(flushAutoAssign, 2000);
   }
@@ -13981,6 +14060,61 @@ Return JSON:
     localStorage.removeItem(`dim-suggestions-${category}`);
   }
 
+  // Eager background pre-computation — classify all pins for each suggestion
+  async function precomputeDimensions(category, suggestions) {
+    if (precomputingCategories.has(category)) return;
+    precomputingCategories.add(category);
+    console.log('[precompute] Starting for', category, ':', suggestions.length, 'suggestions');
+
+    const pins = getAllLinks()
+      .filter(l => l.category === category && !l.loading)
+      .slice(0, 200)
+      .map(l => ({ id: l.id, title: l.title || l.domain || l.url, description: l.description || '', domain: l.domain || '', url: l.url }));
+
+    if (pins.length < 3) {
+      console.log('[precompute] Not enough pins for', category);
+      precomputingCategories.delete(category);
+      return;
+    }
+
+    const promises = suggestions.map(async (s) => {
+      // Skip if already precomputed
+      if (getPrecomputedDim(category, s.prompt)) {
+        console.log('[precompute] Cache hit, skipping', s.label);
+        return;
+      }
+      try {
+        console.log('[precompute] Classifying', s.label, 'for', pins.length, 'pins');
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ prompt: s.prompt, category, pins })
+        });
+        const data = await res.json();
+        if (!data.error && data.tags) {
+          setPrecomputedDim(category, s.prompt, {
+            label: data.dimensionLabel || s.label,
+            tags: data.tags,
+            assignments: data.assignments || {},
+            prompt: s.prompt,
+            precomputedAt: Date.now()
+          });
+          console.log('[precompute] Done:', s.label, '→', data.tags.length, 'tags');
+          // Re-render if user is still on this category
+          if (currentFilter === category) renderSubTags();
+        } else {
+          console.warn('[precompute] Error for', s.label, ':', data.error || 'no tags');
+        }
+      } catch (err) {
+        console.warn('[precompute] Failed for', s.label, err);
+      }
+    });
+
+    await Promise.allSettled(promises);
+    precomputingCategories.delete(category);
+    console.log('[precompute] All done for', category);
+  }
+
   // Get first prompt dimension tag for card overlay display
   function getPromptSubTag(link) {
     const dims = loadPromptDimensions(link.category);
@@ -13998,11 +14132,17 @@ Return JSON:
       return;
     }
 
-    const promptDims = loadPromptDimensions(currentFilter);
     const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
-    console.log('[filter-bar] render:', currentFilter, '| dims:', promptDims.length, '| pins:', allCategoryLinks.length, '| suggesting:', suggestingCategories.has(currentFilter));
+    console.log('[filter-bar] render:', currentFilter, '| active:', activeSuggestionPrompt, '| prompt:', dimensionPromptOpen, '| pins:', allCategoryLinks.length);
 
-    // Auto-heal broken prompt dims (created during 401 era — 0 assignments)
+    // Not enough pins → hide bar
+    if (allCategoryLinks.length < 5) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      return;
+    }
+
+    // Auto-heal broken persisted dims
+    const promptDims = loadPromptDimensions(currentFilter);
     for (const pd of promptDims) {
       const assigned = Object.values(pd.assignments || {}).filter(v => v);
       if (assigned.length === 0 && pd.prompt && !healedDimIds.has(pd.id)) {
@@ -14011,48 +14151,6 @@ Return JSON:
         reanalyzeDimension(currentFilter, pd.id)
           .catch(err => console.warn('[dimensions] Auto-heal failed:', err));
       }
-    }
-
-    // ── State: Active dimension — show its tags in one row ──
-    const activeDim = promptDims.length > 0 ? promptDims[0] : null;
-    if (activeDim) {
-      console.log('[filter-bar] Active dimension:', activeDim.label, '| tags:', activeDim.tags?.length);
-      const counts = {};
-      let untaggedCount = 0;
-      for (const link of allCategoryLinks) {
-        const tag = activeDim.assignments?.[link.id] || null;
-        if (tag) counts[tag] = (counts[tag] || 0) + 1;
-        else untaggedCount++;
-      }
-
-      const activeFilter = currentFilters[activeDim.id];
-      let html = `<span class="sub-tags__label">${esc(activeDim.label)}</span>`;
-      html += `<div class="sub-tags__buttons">`;
-      html += `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${activeDim.id}" data-subtag="">All<span class="sub-tag__count">${allCategoryLinks.length}</span></button>`;
-
-      for (const tag of activeDim.tags) {
-        const count = counts[tag] || 0;
-        if (count > 0) {
-          const active = activeFilter === tag ? 'sub-tag--active' : '';
-          html += `<button class="sub-tag ${active}" data-dimension="${activeDim.id}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
-        }
-      }
-      if (untaggedCount > 0) {
-        const active = activeFilter === 'other' ? 'sub-tag--active' : '';
-        html += `<button class="sub-tag ${active}" data-dimension="${activeDim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
-      }
-
-      html += `</div>`;
-      html += `<button class="sub-tags__close" id="subTagsClose" title="Clear filter">\u00d7</button>`;
-      subTagsEl.innerHTML = html;
-      subTagsEl.classList.add('sub-tags--visible');
-      return;
-    }
-
-    // ── No active dimension — show suggestions or loading ──
-    if (allCategoryLinks.length < 5) {
-      subTagsEl.classList.remove('sub-tags--visible');
-      return;
     }
 
     // Check suggestion cache
@@ -14068,40 +14166,144 @@ Return JSON:
       } catch { /* ignore */ }
     }
 
-    if (suggestions.length > 0) {
-      // State: Suggestions available — show chips + ✦ + ×
-      console.log('[filter-bar] Showing', suggestions.length, 'suggestion chips for', currentFilter);
-      let html = `<div class="sub-tags__buttons">`;
-      for (const s of suggestions) {
-        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
+    // No suggestions yet — trigger fetch or show loading
+    if (suggestions.length === 0) {
+      if (!suggestingCategories.has(currentFilter)) {
+        suggestingCategories.add(currentFilter);
+        const cat = currentFilter;
+        suggestDimensions(cat).then(() => {
+          suggestingCategories.delete(cat);
+          if (currentFilter === cat) renderSubTags();
+        }).catch(() => {
+          suggestingCategories.delete(cat);
+          if (currentFilter === cat) renderSubTags();
+        });
       }
-      html += `<button class="sub-tag sub-tag--ai" id="dimensionAddBtn" title="Custom filter">\u2726</button>`;
-      html += `</div>`;
-      html += `<button class="sub-tags__close" id="subTagsClose" title="Hide">\u00d7</button>`;
-      subTagsEl.innerHTML = html;
-      subTagsEl.classList.add('sub-tags--visible');
+      if (suggestingCategories.has(currentFilter)) {
+        subTagsEl.innerHTML = `<span class="sub-tags__label sub-tags__label--loading" role="status">Suggesting filters\u2026</span>`;
+        subTagsEl.classList.add('sub-tags--visible');
+      } else {
+        subTagsEl.classList.remove('sub-tags--visible');
+      }
       return;
     }
 
-    // Trigger async fetch if not in flight
-    if (!suggestingCategories.has(currentFilter)) {
-      suggestingCategories.add(currentFilter);
-      const cat = currentFilter;
-      suggestDimensions(cat).then(() => {
-        suggestingCategories.delete(cat);
-        if (currentFilter === cat) renderSubTags();
-      }).catch(() => {
-        suggestingCategories.delete(cat);
-        if (currentFilter === cat) renderSubTags();
-      });
+    // ── Suggestions available — render unified chip row ──
+    // Trigger background pre-computation if not already running
+    if (!precomputingCategories.has(currentFilter)) {
+      precomputeDimensions(currentFilter, suggestions);
     }
 
-    // State: Loading
-    if (suggestingCategories.has(currentFilter)) {
-      subTagsEl.innerHTML = `<span class="sub-tags__label sub-tags__label--loading">Suggesting filters...</span>`;
-      subTagsEl.classList.add('sub-tags--visible');
+    // Get dimension data for the expanded chip (from precomputed cache or persisted dimension)
+    let expandedDim = null;
+    if (activeSuggestionPrompt) {
+      // Check persisted dimension first (already created via runDimensionPrompt)
+      const persisted = promptDims.find(d => d.prompt === activeSuggestionPrompt);
+      if (persisted) {
+        expandedDim = persisted;
+      } else {
+        // Fall back to precomputed cache
+        const pre = getPrecomputedDim(currentFilter, activeSuggestionPrompt);
+        if (pre) expandedDim = pre;
+      }
+    }
+
+    let html = `<div class="sub-tags__buttons" role="toolbar" aria-label="Filter dimensions">`;
+
+    for (const s of suggestions) {
+      const isExpanded = activeSuggestionPrompt === s.prompt;
+      const isLoading = isExpanded && !expandedDim;
+      const precomputed = getPrecomputedDim(currentFilter, s.prompt);
+
+      if (isExpanded && expandedDim) {
+        // ── Expanded chip — show label + tag buttons inline ──
+        const counts = {};
+        let untaggedCount = 0;
+        for (const link of allCategoryLinks) {
+          const tag = expandedDim.assignments?.[link.id] || null;
+          if (tag) counts[tag] = (counts[tag] || 0) + 1;
+          else untaggedCount++;
+        }
+
+        // Find the active filter — check currentFilters for the persisted dim ID, or use expandedDim
+        let activeFilter = null;
+        if (expandedDim.id) {
+          activeFilter = currentFilters[expandedDim.id] || null;
+        }
+
+        html += `<button class="sub-tag sub-tag--suggestion sub-tag--expanded" data-suggestion="${esc(s.prompt)}" aria-pressed="true" aria-expanded="true">`;
+        html += `${esc(s.label)}`;
+        html += `<span class="sub-tag__expanded" aria-live="polite">`;
+        html += `<span class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-subtag="" data-dim-prompt="${esc(s.prompt)}">All<span class="sub-tag__count">${allCategoryLinks.length}</span></span>`;
+        for (const tag of expandedDim.tags) {
+          const count = counts[tag] || 0;
+          if (count > 0) {
+            const active = activeFilter === tag ? 'sub-tag--active' : '';
+            html += `<span class="sub-tag ${active}" data-subtag="${esc(tag)}" data-dim-prompt="${esc(s.prompt)}">${cap(tag)}<span class="sub-tag__count">${count}</span></span>`;
+          }
+        }
+        if (untaggedCount > 0) {
+          const active = activeFilter === 'other' ? 'sub-tag--active' : '';
+          html += `<span class="sub-tag ${active}" data-subtag="other" data-dim-prompt="${esc(s.prompt)}">Other<span class="sub-tag__count">${untaggedCount}</span></span>`;
+        }
+        html += `</span>`;
+        html += `</button>`;
+      } else if (isLoading) {
+        // ── Loading chip — API call in flight ──
+        html += `<button class="sub-tag sub-tag--suggestion sub-tag--loading" data-suggestion="${esc(s.prompt)}" aria-pressed="true" aria-busy="true">${esc(s.label)}\u2026</button>`;
+      } else {
+        // ── Collapsed chip ──
+        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}" aria-pressed="false">${esc(s.label)}</button>`;
+      }
+    }
+
+    // ✦ AI custom filter button — always visible
+    html += `<button class="sub-tag sub-tag--ai" id="dimensionAddBtn" title="Custom filter" aria-label="Create custom filter">\u2726</button>`;
+
+    // Inline prompt form (if ✦ was clicked)
+    if (dimensionPromptOpen) {
+      html += `</div>`; // close buttons div
+      html += `<form class="dim-prompt-form" id="dimPromptForm">`;
+      html += `<input type="text" class="dim-prompt-input" id="dimPromptInput" placeholder="e.g. organize by brand tier..." autocomplete="off" maxlength="120" value="${esc(dimensionPromptPrefill)}" aria-label="Custom filter prompt" />`;
+      html += `<button type="submit" class="dim-prompt-submit">Go</button>`;
+      html += `<button type="button" class="dim-prompt-cancel" id="dimPromptCancel">Cancel</button>`;
+      html += `</form>`;
     } else {
-      subTagsEl.classList.remove('sub-tags--visible');
+      html += `</div>`;
+    }
+
+    // × close button — always pinned right
+    html += `<button class="sub-tags__close" id="subTagsClose" title="${activeSuggestionPrompt ? 'Clear filter' : 'Hide'}" aria-label="${activeSuggestionPrompt ? 'Clear filter' : 'Hide filter bar'}">\u00d7</button>`;
+
+    subTagsEl.innerHTML = html;
+    subTagsEl.classList.add('sub-tags--visible');
+
+    // Focus the prompt input if just opened
+    if (dimensionPromptOpen) {
+      const input = $('dimPromptInput');
+      if (input) {
+        input.focus();
+        if (dimensionPromptPrefill) input.setSelectionRange(dimensionPromptPrefill.length, dimensionPromptPrefill.length);
+      }
+
+      const form = $('dimPromptForm');
+      if (form) {
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          const promptText = input.value.trim();
+          if (!promptText) return;
+          dimensionPromptOpen = false;
+          await runDimensionPrompt(promptText);
+        };
+      }
+      const cancel = $('dimPromptCancel');
+      if (cancel) {
+        cancel.onclick = () => {
+          dimensionPromptOpen = false;
+          dimensionPromptPrefill = '';
+          renderSubTags();
+        };
+      }
     }
   }
 
@@ -14162,7 +14364,12 @@ Return JSON:
       if (activeFilters.length > 0) {
         const promptDims = loadPromptDimensions(currentFilter);
         const [dimId, filterVal] = activeFilters[0]; // single dimension
-        const dim = promptDims.find(d => d.id === dimId);
+        // Check persisted dimension first, then precomputed cache
+        let dim = promptDims.find(d => d.id === dimId);
+        if (!dim && activeSuggestionPrompt) {
+          const precomputed = getPrecomputedDim(currentFilter, activeSuggestionPrompt);
+          if (precomputed) dim = precomputed;
+        }
         if (dim) {
           links = links.filter(l => {
             if (l.loading) return true;
@@ -15097,6 +15304,8 @@ Return JSON:
 
       currentFilter = category;
       currentFilters = {}; // Reset dimension filters
+      activeSuggestionPrompt = null; // Reset expanded chip
+      dimensionPromptOpen = false; // Reset prompt form
       if (currentPlayer.linkId && currentFilter !== 'listen') closePlayer();
       localStorage.setItem(FILTER_KEY, currentFilter);
       renderFilters();
@@ -15110,24 +15319,28 @@ Return JSON:
     }
   };
 
-  // Sub-tag filter click handler — single row accordion
+  // Sub-tag filter click handler — inline expand accordion
   const subTagsEl = $('subTags');
   if (subTagsEl) {
     subTagsEl.onclick = (e) => {
       // × close button
       if (e.target.closest('#subTagsClose')) {
-        const promptDims = loadPromptDimensions(currentFilter);
-        if (Object.keys(currentFilters).filter(k => currentFilters[k]).length > 0 || promptDims.length > 0) {
-          // Active filter or dimension exists → clear and return to suggestions
+        if (dimensionPromptOpen) {
+          // Cancel prompt form → return to chips
+          dimensionPromptOpen = false;
+          dimensionPromptPrefill = '';
+        } else if (activeSuggestionPrompt) {
+          // Expanded chip → collapse and clear filter
+          const promptDims = loadPromptDimensions(currentFilter);
           currentFilters = {};
           if (promptDims.length > 0) {
             removePromptDimension(currentFilter, promptDims[0].id);
           }
+          activeSuggestionPrompt = null;
         } else {
           // On suggestions → hide bar entirely
           showSubTagsBar = false;
         }
-        dimensionPromptOpen = false;
         renderSubTags();
         renderGrid();
         return;
@@ -15139,23 +15352,51 @@ Return JSON:
         return;
       }
 
-      // Suggestion chip → auto-run AI dimension (skip form)
-      const suggestion = e.target.closest('[data-suggestion]');
-      if (suggestion) {
-        runDimensionPrompt(suggestion.dataset.suggestion);
+      // Tag button inside expanded chip (data-subtag + data-dim-prompt)
+      const tagBtn = e.target.closest('[data-subtag][data-dim-prompt]');
+      if (tagBtn) {
+        const prompt = tagBtn.dataset.dimPrompt;
+        const tag = tagBtn.dataset.subtag;
+
+        // Find the persisted dimension to use its ID for filtering
+        const promptDims = loadPromptDimensions(currentFilter);
+        const dim = promptDims.find(d => d.prompt === prompt);
+        if (dim) {
+          currentFilters[dim.id] = tag === '' ? null : tag;
+        }
+        renderSubTags();
+        renderGrid();
         return;
       }
 
-      // Tag button click (filter within a dimension)
-      const t = e.target.closest('.sub-tag');
-      if (!t) return;
-      const dimension = t.dataset.dimension;
-      const tag = t.dataset.subtag;
-      if (dimension) {
-        currentFilters[dimension] = tag === '' ? null : tag;
+      // Suggestion chip click — expand/collapse toggle
+      const suggestion = e.target.closest('[data-suggestion]');
+      if (suggestion) {
+        const prompt = suggestion.dataset.suggestion;
+
+        if (activeSuggestionPrompt === prompt) {
+          // Already expanded → collapse
+          activeSuggestionPrompt = null;
+          currentFilters = {};
+          // Remove persisted dimension so we go back to suggestion mode
+          const promptDims = loadPromptDimensions(currentFilter);
+          if (promptDims.length > 0) {
+            removePromptDimension(currentFilter, promptDims[0].id);
+          }
+          renderSubTags();
+          renderGrid();
+        } else {
+          // Expand this chip — clear any previous filter state
+          const promptDims = loadPromptDimensions(currentFilter);
+          if (promptDims.length > 0) {
+            removePromptDimension(currentFilter, promptDims[0].id);
+          }
+          currentFilters = {};
+          // Run dimension prompt (checks precomputed cache first for instant expand)
+          runDimensionPrompt(prompt);
+        }
+        return;
       }
-      renderSubTags();
-      renderGrid();
     };
   }
 
