@@ -18,7 +18,8 @@ interface Pin {
 }
 
 interface Request {
-  prompt: string
+  action?: 'suggest' | 'create' | 'assign'
+  prompt?: string
   category: string
   pins: Pin[]
   existingTags?: string[]
@@ -35,18 +36,107 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured')
     }
 
-    const { prompt, category, pins, existingTags } = await req.json() as Request
-
-    if (!prompt) {
-      return new Response(
-        JSON.stringify({ error: 'A prompt is required (e.g., "organize by brand tier")' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const { action, prompt, category, pins, existingTags } = await req.json() as Request
 
     if (!pins || pins.length === 0) {
       return new Response(
         JSON.stringify({ error: 'No pins to analyze' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ── Suggest mode: analyze pins and recommend dimension prompts ──
+    if (action === 'suggest') {
+      const sampledPins = pins.slice(0, 80)
+      const pinList = sampledPins
+        .map((p, i) => `${i + 1}. ${p.title || p.domain || p.url}${p.description ? ` — ${p.description}` : ''}`)
+        .join('\n')
+
+      const suggestPrompt = `You are analyzing a collection of saved links to suggest useful ways to organize them.
+
+The board category is "${category || 'custom'}".
+
+Here are the items (${sampledPins.length} total):
+${pinList}
+
+Suggest 2-4 meaningful ways this collection could be filtered/organized. Each suggestion should be a dimension that would create useful groupings.
+
+Respond with valid JSON only, no other text:
+{
+  "suggestions": [
+    { "prompt": "organize by type", "label": "Type" },
+    { "prompt": "organize by price range", "label": "Price Range" }
+  ]
+}
+
+Rules:
+1. Each "prompt" should be a natural instruction like "organize by ___" or "split by ___"
+2. Each "label" should be 1-3 words — the dimension name shown in the UI
+3. Suggestions should be distinct and meaningful for this specific content
+4. Adapt to what's actually in the collection — don't suggest generic categories
+5. Think about what a human curator would want to filter by
+6. Prioritize the most useful/obvious dimension first`
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: suggestPrompt }]
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('[generate-subcategories] Suggest API error:', error)
+        throw new Error(`Anthropic API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const content = data.content?.[0]?.text || '{}'
+
+      let result
+      try {
+        result = JSON.parse(content)
+      } catch {
+        let cleaned = content
+          .replace(/^```(?:json)?\s*\n?/m, '')
+          .replace(/\n?```\s*$/m, '')
+          .trim()
+        const firstBrace = cleaned.indexOf('{')
+        const lastBrace = cleaned.lastIndexOf('}')
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          cleaned = cleaned.slice(firstBrace, lastBrace + 1)
+        }
+        try {
+          result = JSON.parse(cleaned)
+        } catch {
+          return new Response(
+            JSON.stringify({ error: "Couldn't generate suggestions for this board." }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
+      const suggestions = Array.isArray(result.suggestions) ? result.suggestions.filter(
+        (s: { prompt?: string; label?: string }) => s.prompt && s.label
+      ).slice(0, 4) : []
+
+      return new Response(
+        JSON.stringify({ suggestions }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ── Create/Assign modes (existing behavior) ──
+    if (!prompt) {
+      return new Response(
+        JSON.stringify({ error: 'A prompt is required (e.g., "organize by brand tier")' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
