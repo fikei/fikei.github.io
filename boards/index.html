@@ -6401,8 +6401,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.2.0';
-  console.log('[boards] v' + VERSION + ' - AI-powered dimension suggestions replace built-in keyword filters');
+  const VERSION = '2.2.2';
+  console.log('[boards] v' + VERSION + ' - Fix suggestion infinite retry loop + cache errors');
 
   // ============================================
   // Supabase Setup
@@ -13977,7 +13977,16 @@ Return JSON:
       const data = await res.json();
       console.log('[suggestions] Response for', category, ':', data);
 
-      if (data.error || !data.suggestions) return [];
+      if (data.error || !data.suggestions) {
+        console.warn('[suggestions] Error for', category, ':', data.error || 'no suggestions');
+        // Cache empty result with 5-min TTL to prevent infinite retry loop
+        localStorage.setItem(cacheKey, JSON.stringify({
+          suggestions: [],
+          pinCount: pins.length,
+          ts: Date.now() - 86400000 + 300000 // expires in 5 minutes
+        }));
+        return [];
+      }
 
       localStorage.setItem(cacheKey, JSON.stringify({
         suggestions: data.suggestions,
@@ -13987,6 +13996,12 @@ Return JSON:
       return data.suggestions;
     } catch (err) {
       console.error('[suggestions] Fetch failed for', category, ':', err);
+      // Cache empty result with 5-min TTL to prevent infinite retry loop
+      localStorage.setItem(cacheKey, JSON.stringify({
+        suggestions: [],
+        pinCount: pins.length,
+        ts: Date.now() - 86400000 + 300000
+      }));
       return [];
     }
   }
