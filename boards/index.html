@@ -850,13 +850,17 @@ body {
   color: var(--bg);
 }
 
-/* Sub-tag filter bar — single horizontal row */
+/* Sub-tag filter bar — single horizontal row, sticky below category tabs */
 .sub-tags {
   display: none;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--subtle);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 9;
 }
 .sub-tags--visible { display: flex; }
 
@@ -919,13 +923,13 @@ body {
 }
 .sub-tag--ai:hover { border-color: var(--fg); color: var(--fg); }
 
-/* Suggestion chip — dotted border */
+/* Suggestion chip — visible border */
 .sub-tag--suggestion {
-  border: 1px dotted var(--subtle);
+  border: 1px solid var(--subtle);
   color: var(--fg-subtle);
-  padding: 2px 8px;
+  padding: 3px 10px;
   cursor: pointer;
-  font-size: 8px;
+  font-size: 9px;
   transition: all 0.15s;
 }
 .sub-tag--suggestion:hover { border-color: var(--fg); color: var(--fg); }
@@ -954,8 +958,8 @@ body {
   animation: dimPulse 1.5s ease-in-out infinite;
 }
 @keyframes dimPulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.7; }
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* Inline dimension prompt form */
@@ -6360,8 +6364,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.3.0';
-  console.log('[boards] v' + VERSION + ' - Horizontal accordion filter bar: single-row UI, one filter at a time');
+  const VERSION = '2.3.1';
+  console.log('[boards] v' + VERSION + ' - Fix filter bar visibility + remove type_signals sync error');
 
   // ============================================
   // Supabase Setup
@@ -12333,7 +12337,7 @@ Return JSON:
         // Enrichment fields
         content_type: link.content_type || null,
         type_confidence: link.type_confidence || null,
-        type_signals: link.type_signals || null,
+        // type_signals intentionally omitted — client-only field, no DB column
         image_source: link.image_source || null,
         // image_scores intentionally omitted — client-only field, DB column exists but
         // PostgREST schema cache may be stale. Scores live in localStorage and are recomputed.
@@ -13806,6 +13810,7 @@ Return JSON:
 
   // Batch re-classify "Other" pins after enrichment fills in metadata
   async function backfillOtherPins(enrichedLinkIds) {
+    console.log('[backfill-other] Starting for', enrichedLinkIds.length, 'enriched pins');
     const allLinks = getAllLinks();
     const enrichedById = {};
     for (const link of allLinks) {
@@ -13820,7 +13825,10 @@ Return JSON:
       categoriesProcessed.add(cat);
 
       const dims = loadPromptDimensions(cat);
-      if (dims.length === 0) continue;
+      if (dims.length === 0) {
+        console.log('[backfill-other] No dimensions for', cat, '— skipping');
+        continue;
+      }
 
       for (const dim of dims) {
         // Collect enriched pins that are unassigned ("Other") for this dimension
@@ -13839,8 +13847,12 @@ Return JSON:
             });
           }
         }
-        if (otherPins.length === 0) continue;
+        if (otherPins.length === 0) {
+          console.log('[backfill-other] No unassigned pins for dim', dim.label, 'in', cat);
+          continue;
+        }
 
+        console.log('[backfill-other] Re-classifying', otherPins.length, 'pins for dim', dim.label, 'in', cat);
         // Batch classify into existing tags (single API call per dimension)
         try {
           const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
@@ -13859,13 +13871,15 @@ Return JSON:
           const data = await res.json();
           if (data.assignments) {
             const updated = { ...dim.assignments };
+            let reclassified = 0;
             for (const [pinId, tag] of Object.entries(data.assignments)) {
-              if (tag) updated[pinId] = tag;
+              if (tag) { updated[pinId] = tag; reclassified++; }
             }
             updatePromptDimension(cat, dim.id, { assignments: updated });
+            console.log('[backfill-other] Reclassified', reclassified, 'of', otherPins.length, 'pins for', dim.label);
           }
         } catch (err) {
-          console.warn('[dimensions] Backfill failed for dim', dim.id, err);
+          console.warn('[backfill-other] Failed for dim', dim.label, err);
         }
       }
     }
@@ -13986,6 +14000,7 @@ Return JSON:
 
     const promptDims = loadPromptDimensions(currentFilter);
     const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
+    console.log('[filter-bar] render:', currentFilter, '| dims:', promptDims.length, '| pins:', allCategoryLinks.length, '| suggesting:', suggestingCategories.has(currentFilter));
 
     // Auto-heal broken prompt dims (created during 401 era — 0 assignments)
     for (const pd of promptDims) {
@@ -14001,6 +14016,7 @@ Return JSON:
     // ── State: Active dimension — show its tags in one row ──
     const activeDim = promptDims.length > 0 ? promptDims[0] : null;
     if (activeDim) {
+      console.log('[filter-bar] Active dimension:', activeDim.label, '| tags:', activeDim.tags?.length);
       const counts = {};
       let untaggedCount = 0;
       for (const link of allCategoryLinks) {
@@ -14054,6 +14070,7 @@ Return JSON:
 
     if (suggestions.length > 0) {
       // State: Suggestions available — show chips + ✦ + ×
+      console.log('[filter-bar] Showing', suggestions.length, 'suggestion chips for', currentFilter);
       let html = `<div class="sub-tags__buttons">`;
       for (const s of suggestions) {
         html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
