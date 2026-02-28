@@ -957,6 +957,23 @@ body {
   color: var(--fg-subtle);
 }
 
+.sub-tags__label--suggestions {
+  color: var(--fg-subtle);
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.sub-tags__label--loading {
+  color: var(--fg-subtle);
+  font-style: italic;
+  animation: dimPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dimPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
 .sub-tag--add {
   border: 1px dashed var(--subtle);
   color: var(--fg-subtle);
@@ -6384,8 +6401,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.1.2';
-  console.log('[boards] v' + VERSION + ' - Show full email when no username set');
+  const VERSION = '2.2.0';
+  console.log('[boards] v' + VERSION + ' - AI-powered dimension suggestions replace built-in keyword filters');
 
   // ============================================
   // Supabase Setup
@@ -12939,6 +12956,7 @@ Return JSON:
       data.categories[link.category] = { pinned: false };
     }
     save(data);
+    clearSuggestionCache(link.category);
     syncLinkToSupabase(newLink); // Background sync
     syncOrderToSupabase(data.linkOrder); // Background sync
     trackRecentlyAdded(link.url); // Suppress clipboard prompt for recently added URLs
@@ -13041,9 +13059,11 @@ Return JSON:
 
   function deleteLink(id) {
     const data = load();
+    const link = data.links.find(l => l.id === id);
     data.links = data.links.filter(l => l.id !== id);
     if (data.linkOrder) data.linkOrder = data.linkOrder.filter(i => i !== id);
     save(data);
+    if (link?.category) clearSuggestionCache(link.category);
     deleteLinkFromSupabase(id); // Background sync
     syncOrderToSupabase(data.linkOrder);
   }
@@ -13083,9 +13103,11 @@ Return JSON:
     const data = load();
     const targetMeta = data.categories[category];
     const isUserBoard = targetMeta?.isUserBoard;
+    const affectedCategories = new Set();
     for (const id of ids) {
       const i = data.links.findIndex(l => l.id === id);
       if (i !== -1) {
+        if (data.links[i].category) affectedCategories.add(data.links[i].category);
         if (isUserBoard && data.links[i].category !== category) {
           data.links[i].previousCategory = data.links[i].category;
         }
@@ -13093,6 +13115,8 @@ Return JSON:
         syncLinkToSupabase(data.links[i]); // Background sync
       }
     }
+    affectedCategories.add(category);
+    for (const cat of affectedCategories) clearSuggestionCache(cat);
     if (!data.categories[category]) data.categories[category] = { pinned: false };
     save(data);
     saveBoardMetadata(data.categories);
@@ -13873,6 +13897,7 @@ Return JSON:
 
   function queueAutoAssign(link) {
     pendingAutoAssign.push(link);
+    if (link.category) clearSuggestionCache(link.category);
     clearTimeout(autoAssignTimer);
     autoAssignTimer = setTimeout(flushAutoAssign, 2000);
   }
@@ -13881,6 +13906,59 @@ Return JSON:
     const batch = pendingAutoAssign.splice(0);
     if (batch.length === 0) return;
     await backfillOtherPins(batch.map(l => l.id));
+  }
+
+  // ============================================
+  // AI Dimension Suggestions — content-aware filter recommendations
+  // ============================================
+  const suggestingCategories = new Set(); // track in-flight suggestion requests
+
+  async function suggestDimensions(category) {
+    const cacheKey = `dim-suggestions-${category}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const { suggestions, pinCount, ts } = JSON.parse(cached);
+        const currentCount = getAllLinks().filter(l => l.category === category).length;
+        // Cache valid for 24h AND pin count hasn't drifted by more than 3
+        if (Date.now() - ts < 86400000 && Math.abs(currentCount - pinCount) <= 3) {
+          return suggestions;
+        }
+      } catch { /* ignore corrupt cache */ }
+    }
+
+    const pins = getAllLinks()
+      .filter(l => l.category === category && !l.loading)
+      .slice(0, 80)
+      .map(l => ({ id: l.id, title: l.title || l.domain || l.url, description: l.description || '', domain: l.domain || '', url: l.url }));
+
+    if (pins.length < 5) return [];
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ action: 'suggest', category, pins })
+    });
+    const data = await res.json();
+    if (data.error || !data.suggestions) return [];
+
+    localStorage.setItem(cacheKey, JSON.stringify({
+      suggestions: data.suggestions,
+      pinCount: pins.length,
+      ts: Date.now()
+    }));
+    return data.suggestions;
+  }
+
+  function clearSuggestionCache(category) {
+    localStorage.removeItem(`dim-suggestions-${category}`);
+  }
+
+  // Get first prompt dimension tag for card overlay display
+  function getPromptSubTag(link) {
+    const dims = loadPromptDimensions(link.category);
+    if (dims.length === 0) return null;
+    return dims[0].assignments?.[link.id] || null;
   }
 
   function renderSubTags() {
@@ -13898,8 +13976,6 @@ Return JSON:
       return;
     }
 
-    const categoryConfig = SUB_TAGS[currentFilter];
-    const builtinDims = categoryConfig?.dimensions || [];
     const promptDims = loadPromptDimensions(currentFilter);
 
     // Auto-heal broken prompt dims (created during 401 era — 0 assignments)
@@ -13913,34 +13989,73 @@ Return JSON:
       }
     }
 
-    const allDims = [
-      ...builtinDims.map(d => ({ ...d, source: 'builtin' })),
-      ...promptDims.map(d => ({ ...d, source: 'prompt' }))
-    ];
+    // All dimensions are now prompt-based (built-in keyword dims removed)
+    const allDims = promptDims.map(d => ({ ...d, source: 'prompt' }));
 
     const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
 
-    // Phase 4: "No filters yet" CTA for user-created boards with enough pins
-    const isUserBoard = !categoryConfig?.dimensions;
-    if (isUserBoard && promptDims.length === 0 && allCategoryLinks.length >= 5) {
-      let html = `<div class="sub-tags__dimension sub-tags__dimension--cta">`;
-      html += `<span class="sub-tags__label sub-tags__label--cta">No filters yet</span>`;
-      html += `<div class="sub-tags__buttons">`;
-      const suggestions = ['organize by type', 'organize by priority', 'organize by status'];
-      for (const s of suggestions) {
-        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s)}">${esc(s)}</button>`;
+    // AI-powered suggestions for boards with 5+ pins and room for more dims
+    if (promptDims.length < MAX_PROMPT_DIMS && allCategoryLinks.length >= 5) {
+      const cacheKey = `dim-suggestions-${currentFilter}`;
+      const cached = localStorage.getItem(cacheKey);
+      let suggestions = [];
+
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          const currentCount = allCategoryLinks.length;
+          if (Date.now() - parsed.ts < 86400000 && Math.abs(currentCount - parsed.pinCount) <= 3) {
+            suggestions = parsed.suggestions || [];
+          }
+        } catch { /* ignore */ }
       }
-      html += `<button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button>`;
-      html += `</div></div>`;
-      subTagsEl.innerHTML = html;
-      subTagsEl.classList.add('sub-tags--visible');
-      return;
+
+      // If no cached suggestions and not already fetching, trigger async fetch
+      if (suggestions.length === 0 && !suggestingCategories.has(currentFilter)) {
+        suggestingCategories.add(currentFilter);
+        const cat = currentFilter;
+        suggestDimensions(cat).then(s => {
+          suggestingCategories.delete(cat);
+          if (s.length > 0 && currentFilter === cat) renderSubTags();
+        }).catch(() => suggestingCategories.delete(cat));
+      }
+
+      // Build suggestion row HTML (only if we have suggestions to show)
+      if (suggestions.length > 0) {
+        // Filter out suggestions that match existing dimension prompts
+        const existingPrompts = new Set(promptDims.map(d => d.prompt?.toLowerCase()));
+        const filtered = suggestions.filter(s => !existingPrompts.has(s.prompt?.toLowerCase()));
+
+        if (filtered.length > 0 && allDims.length === 0) {
+          // No dims yet — show suggestions as primary content
+          let html = `<div class="sub-tags__dimension sub-tags__dimension--suggestions">`;
+          html += `<span class="sub-tags__label sub-tags__label--suggestions">Suggested</span>`;
+          html += `<div class="sub-tags__buttons">`;
+          for (const s of filtered) {
+            html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
+          }
+          html += `<button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button>`;
+          html += `</div></div>`;
+          subTagsEl.innerHTML = html;
+          subTagsEl.classList.add('sub-tags--visible');
+          return;
+        }
+        // If dims exist, suggestions will be appended after dimension rows below
+      } else if (suggestingCategories.has(currentFilter) && allDims.length === 0) {
+        // Loading state — no dims yet, show subtle loading indicator
+        subTagsEl.innerHTML = `<div class="sub-tags__dimension sub-tags__dimension--suggestions"><span class="sub-tags__label sub-tags__label--loading">Suggesting filters...</span></div>`;
+        subTagsEl.classList.add('sub-tags--visible');
+        return;
+      }
     }
 
-    // Hide if no dimensions at all and not enough pins for CTA
+    // Hide if no dimensions at all
     if (allDims.length === 0) {
-      subTagsEl.classList.remove('sub-tags--visible');
-      currentFilters = {};
+      // Keep visible if we're loading suggestions
+      if (!suggestingCategories.has(currentFilter)) {
+        subTagsEl.classList.remove('sub-tags--visible');
+        currentFilters = {};
+      }
       return;
     }
 
@@ -13955,15 +14070,9 @@ Return JSON:
         const otherFilter = currentFilters[otherDim.id];
         if (!otherFilter) continue;
         linksForCounting = linksForCounting.filter(l => {
-          if (otherDim.source === 'builtin') {
-            const tags = getTags(l) || {};
-            if (otherFilter === 'other') return !tags[otherDim.id];
-            return tags[otherDim.id] === otherFilter;
-          } else {
-            const assigned = otherDim.assignments?.[l.id];
-            if (otherFilter === 'other') return !assigned;
-            return assigned === otherFilter;
-          }
+          const assigned = otherDim.assignments?.[l.id];
+          if (otherFilter === 'other') return !assigned;
+          return assigned === otherFilter;
         });
       }
 
@@ -13971,13 +14080,7 @@ Return JSON:
       const counts = {};
       let untaggedCount = 0;
       for (const link of linksForCounting) {
-        let tag;
-        if (dim.source === 'builtin') {
-          const tags = getTags(link) || {};
-          tag = tags[dim.id];
-        } else {
-          tag = dim.assignments?.[link.id] || null;
-        }
+        const tag = dim.assignments?.[link.id] || null;
         if (tag) {
           counts[tag] = (counts[tag] || 0) + 1;
         } else {
@@ -13990,9 +14093,7 @@ Return JSON:
       anyDimensionHasItems = true;
 
       const activeFilter = currentFilters[dim.id];
-      const removeBtn = dim.source === 'prompt'
-        ? `<button class="sub-tags__remove" data-dim-remove="${dim.id}" title="Remove filter">\u00d7</button>`
-        : '';
+      const removeBtn = `<button class="sub-tags__remove" data-dim-remove="${dim.id}" title="Remove filter">\u00d7</button>`;
 
       let buttonsHtml = `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${dim.id}" data-subtag="">All<span class="sub-tag__count">${linksForCounting.length}</span></button>`;
 
@@ -14012,9 +14113,34 @@ Return JSON:
       html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label" data-dim-label="${dim.id}">${esc(dim.label)}</span><div class="sub-tags__buttons">${buttonsHtml}</div>${removeBtn}</div>`;
     }
 
-    // [+ Filter] button (if under the limit)
-    if (promptDims.length < MAX_PROMPT_DIMS) {
-      html += `<div class="sub-tags__dimension sub-tags__dimension--add"><button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button></div>`;
+    // Suggestion row (when dims exist but room for more)
+    if (promptDims.length < MAX_PROMPT_DIMS && allCategoryLinks.length >= 5) {
+      const cacheKey = `dim-suggestions-${currentFilter}`;
+      const cached = localStorage.getItem(cacheKey);
+      let suggestions = [];
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          const currentCount = allCategoryLinks.length;
+          if (Date.now() - parsed.ts < 86400000 && Math.abs(currentCount - parsed.pinCount) <= 3) {
+            suggestions = parsed.suggestions || [];
+          }
+        } catch { /* ignore */ }
+      }
+
+      const existingPrompts = new Set(promptDims.map(d => d.prompt?.toLowerCase()));
+      const filtered = suggestions.filter(s => !existingPrompts.has(s.prompt?.toLowerCase()));
+
+      if (filtered.length > 0) {
+        html += `<div class="sub-tags__dimension sub-tags__dimension--suggestions"><span class="sub-tags__label sub-tags__label--suggestions">Suggested</span><div class="sub-tags__buttons">`;
+        for (const s of filtered) {
+          html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
+        }
+        html += `<button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button>`;
+        html += `</div></div>`;
+      } else {
+        html += `<div class="sub-tags__dimension sub-tags__dimension--add"><button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button></div>`;
+      }
     }
 
     if (!anyDimensionHasItems && promptDims.length === 0) {
@@ -14450,8 +14576,8 @@ Return JSON:
 
       if (hasImg) {
         // Show sub-tag when filtered into a category, otherwise show category
-        const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
-          ? (getSubTag(l) || l.category)
+        const displayTag = (currentFilter !== 'all')
+          ? (getPromptSubTag(l) || l.category)
           : l.category;
 
         // Listen cards use specialized overlay; rich content cards use config-driven overlay
@@ -14482,8 +14608,8 @@ Return JSON:
           ${detailsHtml}
         </article>`;
       } else {
-        const displayTag = (currentFilter !== 'all' && SUB_TAGS[currentFilter])
-          ? (getSubTag(l) || l.category)
+        const displayTag = (currentFilter !== 'all')
+          ? (getPromptSubTag(l) || l.category)
           : l.category;
         const categoryClass = listenClass || richClass;
 
@@ -15051,10 +15177,10 @@ Return JSON:
         return;
       }
 
-      // Suggestion chip (user-created board CTA)
+      // Suggestion chip — auto-run AI dimension (skip form)
       const suggestion = e.target.closest('[data-suggestion]');
       if (suggestion) {
-        showDimensionPromptInput(suggestion.dataset.suggestion);
+        runDimensionPrompt(suggestion.dataset.suggestion);
         return;
       }
 
