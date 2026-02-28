@@ -1,4 +1,4 @@
-// Stub — will be implemented by graph-engine agent
+// ConceptDetail — expanded concept detail panel
 import type { Cluster, Pin } from '../lib/types';
 
 interface ConceptDetailProps {
@@ -20,7 +20,6 @@ export function ConceptDetail({ cluster, pins, totalPins, relatedClusters, onClo
         <input
           className="tg-detail__label"
           defaultValue={cluster.label}
-          readOnly
         />
         <span className="tg-detail__stat">{pct}% of saves</span>
         <button className="tg-btn tg-btn--close" onClick={onClose}>&times;</button>
@@ -39,18 +38,27 @@ export function ConceptDetail({ cluster, pins, totalPins, relatedClusters, onClo
       </div>
 
       {relatedClusters.length > 0 && (
-        <div className="tg-detail__related">
-          {relatedClusters.map(rc => (
-            <button
-              key={rc.id}
-              className="tg-detail__related-tag"
-              onClick={() => onSelectCluster(rc.id)}
-            >
-              {rc.label}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="tg-detail__section-header">RELATED</div>
+          <div className="tg-detail__related">
+            {relatedClusters.map(rc => (
+              <button
+                key={rc.id}
+                className="tg-detail__related-tag"
+                onClick={() => onSelectCluster(rc.id)}
+              >
+                {rc.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
+
+      <div className="tg-detail__actions">
+        <button className="tg-btn tg-btn--action">Merge</button>
+        <button className="tg-btn tg-btn--action">Split</button>
+        <button className="tg-btn tg-btn--action">Mute</button>
+      </div>
     </div>
   );
 }
