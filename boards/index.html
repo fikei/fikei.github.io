@@ -6364,8 +6364,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.3.1';
-  console.log('[boards] v' + VERSION + ' - Fix filter bar visibility + remove type_signals sync error');
+  const VERSION = '2.3.2';
+  console.log('[boards] v' + VERSION + ' - Only show lookback card on all page');
 
   // ============================================
   // Supabase Setup
@@ -14566,8 +14566,10 @@ Return JSON:
       }
     }
 
-    // Inject Lookback card at bottom of feed (after all pins)
-    html += renderLookbackCard(allLinks);
+    // Inject Lookback card at bottom of feed (only on "all" view)
+    if (currentFilter === 'all') {
+      html += renderLookbackCard(allLinks);
+    }
 
     // Add remaining inline widgets at end if not yet inserted
     while (widgetPosIdx < widgetPositionKeys.length) {
