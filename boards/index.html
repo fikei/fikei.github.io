@@ -850,27 +850,17 @@ body {
   color: var(--bg);
 }
 
-/* Sub-tag filter bar — visually secondary to category filters */
+/* Sub-tag filter bar — single horizontal row */
 .sub-tags {
   display: none;
-  flex-direction: column;
-  gap: 0;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-1) var(--space-4);
   border-bottom: 1px solid var(--subtle);
 }
+.sub-tags--visible { display: flex; }
 
-.sub-tags--visible {
-  display: flex;
-}
-
-/* Dimension row */
-.sub-tags__dimension {
-  display: flex;
-  gap: 0;
-  align-items: center;
-  padding: var(--space-1) 0;
-}
-
+/* Dimension label (when filter active) */
 .sub-tags__label {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -878,10 +868,10 @@ body {
   letter-spacing: 0.12em;
   color: var(--fg-subtle);
   flex-shrink: 0;
-  min-width: 44px;
   padding-right: var(--space-2);
 }
 
+/* Scrollable button strip */
 .sub-tags__buttons {
   display: flex;
   gap: var(--space-1);
@@ -890,12 +880,9 @@ body {
   scrollbar-width: none;
   flex: 1;
 }
+.sub-tags__buttons::-webkit-scrollbar { display: none; }
 
-.sub-tags__buttons::-webkit-scrollbar {
-  display: none;
-}
-
-/* Sub-tag: small, borderless text links — secondary to main category tokens */
+/* Base tag button */
 .sub-tag {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -912,15 +899,8 @@ body {
   white-space: nowrap;
   line-height: 1.4;
 }
-
-.sub-tag:hover {
-  color: var(--fg);
-}
-
-.sub-tag--active {
-  color: var(--fg);
-  background: var(--subtle);
-}
+.sub-tag:hover { color: var(--fg); }
+.sub-tag--active { color: var(--fg); background: var(--subtle); }
 
 .sub-tag__count {
   opacity: 0.4;
@@ -928,8 +908,30 @@ body {
   font-size: 8px;
 }
 
-/* Prompt-based dimension controls */
-.sub-tags__remove {
+/* AI star button — ✦ custom prompt trigger */
+.sub-tag--ai {
+  border: 1px solid var(--subtle);
+  color: var(--fg-subtle);
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 10px;
+}
+.sub-tag--ai:hover { border-color: var(--fg); color: var(--fg); }
+
+/* Suggestion chip — dotted border */
+.sub-tag--suggestion {
+  border: 1px dotted var(--subtle);
+  color: var(--fg-subtle);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 8px;
+  transition: all 0.15s;
+}
+.sub-tag--suggestion:hover { border-color: var(--fg); color: var(--fg); }
+
+/* × close button — pinned right */
+.sub-tags__close {
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 0 var(--space-1);
@@ -939,64 +941,21 @@ body {
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
-  margin-left: var(--space-1);
+  margin-left: auto;
   opacity: 0.4;
   transition: opacity 0.15s;
 }
-.sub-tags__remove:hover { opacity: 1; }
+.sub-tags__close:hover { opacity: 1; }
 
-.sub-tags__dimension--add {
-  padding: var(--space-1) var(--space-4);
-}
-
-.sub-tags__dimension--cta {
-  padding: var(--space-2) var(--space-4);
-}
-
-.sub-tags__label--cta {
-  color: var(--fg-subtle);
-}
-
-.sub-tags__label--suggestions {
-  color: var(--fg-subtle);
-  opacity: 0.6;
-  font-style: italic;
-}
-
+/* Loading state */
 .sub-tags__label--loading {
   color: var(--fg-subtle);
   font-style: italic;
   animation: dimPulse 1.5s ease-in-out infinite;
 }
-
 @keyframes dimPulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.7; }
-}
-
-.sub-tag--add {
-  border: 1px dashed var(--subtle);
-  color: var(--fg-subtle);
-  padding: 2px 8px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.sub-tag--add:hover {
-  border-color: var(--fg);
-  color: var(--fg);
-}
-
-.sub-tag--suggestion {
-  border: 1px dotted var(--subtle);
-  color: var(--fg-subtle);
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 8px;
-  transition: all 0.15s;
-}
-.sub-tag--suggestion:hover {
-  border-color: var(--fg);
-  color: var(--fg);
 }
 
 /* Inline dimension prompt form */
@@ -6401,8 +6360,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.2.2';
-  console.log('[boards] v' + VERSION + ' - Fix suggestion infinite retry loop + cache errors');
+  const VERSION = '2.3.0';
+  console.log('[boards] v' + VERSION + ' - Horizontal accordion filter bar: single-row UI, one filter at a time');
 
   // ============================================
   // Supabase Setup
@@ -13647,26 +13606,26 @@ Return JSON:
 
   function showDimensionPromptInput(prefill) {
     dimensionPromptOpen = true;
-    const addRow = document.querySelector('.sub-tags__dimension--add') || document.querySelector('.sub-tags__dimension--cta');
-    if (!addRow) return;
+    const subTagsEl = $('subTags');
+    if (!subTagsEl) return;
 
-    addRow.innerHTML = `
+    subTagsEl.innerHTML = `
       <form class="dim-prompt-form" id="dimPromptForm">
         <input type="text" class="dim-prompt-input" id="dimPromptInput"
           placeholder="e.g. organize by brand tier..." autocomplete="off" maxlength="120"
           value="${esc(prefill || '')}" />
-        <button type="submit" class="dim-prompt-submit">Analyze</button>
+        <button type="submit" class="dim-prompt-submit">Go</button>
         <button type="button" class="dim-prompt-cancel" id="dimPromptCancel">Cancel</button>
       </form>
+      <button class="sub-tags__close" id="subTagsClose" title="Cancel">\u00d7</button>
     `;
+    subTagsEl.classList.add('sub-tags--visible');
 
-    const form = $('dimPromptForm');
     const input = $('dimPromptInput');
-
     input.focus();
     if (prefill) input.setSelectionRange(prefill.length, prefill.length);
 
-    form.onsubmit = async (e) => {
+    $('dimPromptForm').onsubmit = async (e) => {
       e.preventDefault();
       const promptText = input.value.trim();
       if (!promptText) return;
@@ -13687,18 +13646,11 @@ Return JSON:
       return;
     }
 
-    const existing = loadPromptDimensions(currentFilter);
-    if (existing.length >= MAX_PROMPT_DIMS) {
-      toast('Maximum filters reached for this board');
-      dimensionPromptOpen = false;
-      renderSubTags();
-      return;
-    }
-
-    // Show loading state
-    const addRow = document.querySelector('.sub-tags__dimension--add') || document.querySelector('.sub-tags__dimension--cta');
-    if (addRow) {
-      addRow.innerHTML = `<span class="sub-tags__label">Analyzing pins...</span>`;
+    // Show loading state in the single-row bar
+    const subTagsEl = $('subTags');
+    if (subTagsEl) {
+      subTagsEl.innerHTML = `<span class="sub-tags__label sub-tags__label--loading">Analyzing pins...</span>`;
+      subTagsEl.classList.add('sub-tags--visible');
     }
 
     const pins = getAllLinks()
@@ -13750,6 +13702,11 @@ Return JSON:
         createdAt: Date.now(),
         analyzedAt: Date.now(),
       };
+
+      // Replace existing dimensions — one filter at a time
+      const existing = loadPromptDimensions(currentFilter);
+      for (const d of existing) removePromptDimension(currentFilter, d.id);
+      currentFilters = {};
 
       addPromptDimension(currentFilter, newDim);
       dimensionPromptOpen = false;
@@ -14021,18 +13978,14 @@ Return JSON:
     const subTagsEl = $('subTags');
     if (!subTagsEl) return;
 
-    if (!showSubTagsBar) {
-      subTagsEl.classList.remove('sub-tags--visible');
-      return;
-    }
-
-    if (currentFilter === 'all') {
+    if (!showSubTagsBar || currentFilter === 'all') {
       subTagsEl.classList.remove('sub-tags--visible');
       currentFilters = {};
       return;
     }
 
     const promptDims = loadPromptDimensions(currentFilter);
+    const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
 
     // Auto-heal broken prompt dims (created during 401 era — 0 assignments)
     for (const pd of promptDims) {
@@ -14045,172 +13998,94 @@ Return JSON:
       }
     }
 
-    // All dimensions are now prompt-based (built-in keyword dims removed)
-    const allDims = promptDims.map(d => ({ ...d, source: 'prompt' }));
-
-    const allCategoryLinks = getAllLinks().filter(l => l.category === currentFilter);
-
-    // AI-powered suggestions for boards with 5+ pins and room for more dims
-    if (promptDims.length < MAX_PROMPT_DIMS && allCategoryLinks.length >= 5) {
-      const cacheKey = `dim-suggestions-${currentFilter}`;
-      const cached = localStorage.getItem(cacheKey);
-      let suggestions = [];
-
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const currentCount = allCategoryLinks.length;
-          if (Date.now() - parsed.ts < 86400000 && Math.abs(currentCount - parsed.pinCount) <= 3) {
-            suggestions = parsed.suggestions || [];
-          }
-        } catch { /* ignore */ }
-      }
-
-      // If no cached suggestions and not already fetching, trigger async fetch
-      if (suggestions.length === 0 && !suggestingCategories.has(currentFilter)) {
-        suggestingCategories.add(currentFilter);
-        const cat = currentFilter;
-        suggestDimensions(cat).then(s => {
-          suggestingCategories.delete(cat);
-          if (currentFilter === cat) renderSubTags();
-        }).catch(err => {
-          console.error('[suggestions] Failed for', cat, err);
-          suggestingCategories.delete(cat);
-          if (currentFilter === cat) renderSubTags();
-        });
-      }
-
-      // Build suggestion row HTML (only if we have suggestions to show)
-      if (suggestions.length > 0) {
-        // Filter out suggestions that match existing dimension prompts
-        const existingPrompts = new Set(promptDims.map(d => d.prompt?.toLowerCase()));
-        const filtered = suggestions.filter(s => !existingPrompts.has(s.prompt?.toLowerCase()));
-
-        if (filtered.length > 0 && allDims.length === 0) {
-          // No dims yet — show suggestions as primary content
-          let html = `<div class="sub-tags__dimension sub-tags__dimension--suggestions">`;
-          html += `<span class="sub-tags__label sub-tags__label--suggestions">Suggested</span>`;
-          html += `<div class="sub-tags__buttons">`;
-          for (const s of filtered) {
-            html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
-          }
-          html += `<button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button>`;
-          html += `</div></div>`;
-          subTagsEl.innerHTML = html;
-          subTagsEl.classList.add('sub-tags--visible');
-          return;
-        }
-        // If dims exist, suggestions will be appended after dimension rows below
-      } else if (suggestingCategories.has(currentFilter) && allDims.length === 0) {
-        // Loading state — no dims yet, show subtle loading indicator
-        subTagsEl.innerHTML = `<div class="sub-tags__dimension sub-tags__dimension--suggestions"><span class="sub-tags__label sub-tags__label--loading">Suggesting filters...</span></div>`;
-        subTagsEl.classList.add('sub-tags--visible');
-        return;
-      }
-    }
-
-    // Hide if no dimensions at all
-    if (allDims.length === 0) {
-      // Keep visible if we're loading suggestions
-      if (!suggestingCategories.has(currentFilter)) {
-        subTagsEl.classList.remove('sub-tags--visible');
-        currentFilters = {};
-      }
-      return;
-    }
-
-    let html = '';
-    let anyDimensionHasItems = false;
-
-    for (const dim of allDims) {
-      // Pre-filter links by other active dimensions (AND logic for counts)
-      let linksForCounting = allCategoryLinks;
-      for (const otherDim of allDims) {
-        if (otherDim.id === dim.id) continue;
-        const otherFilter = currentFilters[otherDim.id];
-        if (!otherFilter) continue;
-        linksForCounting = linksForCounting.filter(l => {
-          const assigned = otherDim.assignments?.[l.id];
-          if (otherFilter === 'other') return !assigned;
-          return assigned === otherFilter;
-        });
-      }
-
-      // Count items per tag in this dimension
+    // ── State: Active dimension — show its tags in one row ──
+    const activeDim = promptDims.length > 0 ? promptDims[0] : null;
+    if (activeDim) {
       const counts = {};
       let untaggedCount = 0;
-      for (const link of linksForCounting) {
-        const tag = dim.assignments?.[link.id] || null;
-        if (tag) {
-          counts[tag] = (counts[tag] || 0) + 1;
-        } else {
-          untaggedCount++;
-        }
+      for (const link of allCategoryLinks) {
+        const tag = activeDim.assignments?.[link.id] || null;
+        if (tag) counts[tag] = (counts[tag] || 0) + 1;
+        else untaggedCount++;
       }
 
-      const hasTaggedItems = Object.keys(counts).length > 0;
-      if (!hasTaggedItems && untaggedCount === 0) continue;
-      anyDimensionHasItems = true;
+      const activeFilter = currentFilters[activeDim.id];
+      let html = `<span class="sub-tags__label">${esc(activeDim.label)}</span>`;
+      html += `<div class="sub-tags__buttons">`;
+      html += `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${activeDim.id}" data-subtag="">All<span class="sub-tag__count">${allCategoryLinks.length}</span></button>`;
 
-      const activeFilter = currentFilters[dim.id];
-      const removeBtn = `<button class="sub-tags__remove" data-dim-remove="${dim.id}" title="Remove filter">\u00d7</button>`;
-
-      let buttonsHtml = `<button class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-dimension="${dim.id}" data-subtag="">All<span class="sub-tag__count">${linksForCounting.length}</span></button>`;
-
-      for (const tag of dim.tags) {
+      for (const tag of activeDim.tags) {
         const count = counts[tag] || 0;
         if (count > 0) {
           const active = activeFilter === tag ? 'sub-tag--active' : '';
-          buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
+          html += `<button class="sub-tag ${active}" data-dimension="${activeDim.id}" data-subtag="${tag}">${cap(tag)}<span class="sub-tag__count">${count}</span></button>`;
         }
       }
-
       if (untaggedCount > 0) {
         const active = activeFilter === 'other' ? 'sub-tag--active' : '';
-        buttonsHtml += `<button class="sub-tag ${active}" data-dimension="${dim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
+        html += `<button class="sub-tag ${active}" data-dimension="${activeDim.id}" data-subtag="other">Other<span class="sub-tag__count">${untaggedCount}</span></button>`;
       }
 
-      html += `<div class="sub-tags__dimension" data-dimension="${dim.id}"><span class="sub-tags__label" data-dim-label="${dim.id}">${esc(dim.label)}</span><div class="sub-tags__buttons">${buttonsHtml}</div>${removeBtn}</div>`;
-    }
-
-    // Suggestion row (when dims exist but room for more)
-    if (promptDims.length < MAX_PROMPT_DIMS && allCategoryLinks.length >= 5) {
-      const cacheKey = `dim-suggestions-${currentFilter}`;
-      const cached = localStorage.getItem(cacheKey);
-      let suggestions = [];
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const currentCount = allCategoryLinks.length;
-          if (Date.now() - parsed.ts < 86400000 && Math.abs(currentCount - parsed.pinCount) <= 3) {
-            suggestions = parsed.suggestions || [];
-          }
-        } catch { /* ignore */ }
-      }
-
-      const existingPrompts = new Set(promptDims.map(d => d.prompt?.toLowerCase()));
-      const filtered = suggestions.filter(s => !existingPrompts.has(s.prompt?.toLowerCase()));
-
-      if (filtered.length > 0) {
-        html += `<div class="sub-tags__dimension sub-tags__dimension--suggestions"><span class="sub-tags__label sub-tags__label--suggestions">Suggested</span><div class="sub-tags__buttons">`;
-        for (const s of filtered) {
-          html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
-        }
-        html += `<button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button>`;
-        html += `</div></div>`;
-      } else {
-        html += `<div class="sub-tags__dimension sub-tags__dimension--add"><button class="sub-tag sub-tag--add" id="dimensionAddBtn">+ Filter</button></div>`;
-      }
-    }
-
-    if (!anyDimensionHasItems && promptDims.length === 0) {
-      subTagsEl.classList.remove('sub-tags--visible');
-      currentFilters = {};
+      html += `</div>`;
+      html += `<button class="sub-tags__close" id="subTagsClose" title="Clear filter">\u00d7</button>`;
+      subTagsEl.innerHTML = html;
+      subTagsEl.classList.add('sub-tags--visible');
       return;
     }
 
-    subTagsEl.innerHTML = html;
-    subTagsEl.classList.add('sub-tags--visible');
+    // ── No active dimension — show suggestions or loading ──
+    if (allCategoryLinks.length < 5) {
+      subTagsEl.classList.remove('sub-tags--visible');
+      return;
+    }
+
+    // Check suggestion cache
+    const cacheKey = `dim-suggestions-${currentFilter}`;
+    const cached = localStorage.getItem(cacheKey);
+    let suggestions = [];
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed.ts < 86400000 && Math.abs(allCategoryLinks.length - parsed.pinCount) <= 3) {
+          suggestions = parsed.suggestions || [];
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (suggestions.length > 0) {
+      // State: Suggestions available — show chips + ✦ + ×
+      let html = `<div class="sub-tags__buttons">`;
+      for (const s of suggestions) {
+        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}">${esc(s.label)}</button>`;
+      }
+      html += `<button class="sub-tag sub-tag--ai" id="dimensionAddBtn" title="Custom filter">\u2726</button>`;
+      html += `</div>`;
+      html += `<button class="sub-tags__close" id="subTagsClose" title="Hide">\u00d7</button>`;
+      subTagsEl.innerHTML = html;
+      subTagsEl.classList.add('sub-tags--visible');
+      return;
+    }
+
+    // Trigger async fetch if not in flight
+    if (!suggestingCategories.has(currentFilter)) {
+      suggestingCategories.add(currentFilter);
+      const cat = currentFilter;
+      suggestDimensions(cat).then(() => {
+        suggestingCategories.delete(cat);
+        if (currentFilter === cat) renderSubTags();
+      }).catch(() => {
+        suggestingCategories.delete(cat);
+        if (currentFilter === cat) renderSubTags();
+      });
+    }
+
+    // State: Loading
+    if (suggestingCategories.has(currentFilter)) {
+      subTagsEl.innerHTML = `<span class="sub-tags__label sub-tags__label--loading">Suggesting filters...</span>`;
+      subTagsEl.classList.add('sub-tags--visible');
+    } else {
+      subTagsEl.classList.remove('sub-tags--visible');
+    }
   }
 
   function handleSearch(e) {
@@ -14264,32 +14139,21 @@ Return JSON:
       ? allLinks
       : allLinks.filter(l => l.category === currentFilter || l.loading);
 
-    // Apply sub-tag filter (AND logic across built-in + prompt dimensions)
+    // Apply sub-tag filter (single dimension — one filter at a time)
     if (currentFilter !== 'all') {
       const activeFilters = Object.entries(currentFilters).filter(([, v]) => v);
       if (activeFilters.length > 0) {
         const promptDims = loadPromptDimensions(currentFilter);
-        const promptDimMap = {};
-        for (const pd of promptDims) promptDimMap[pd.id] = pd;
-
-        links = links.filter(l => {
-          if (l.loading) return true;
-          const builtinTags = getTags(l) || {};
-          for (const [dimId, filterVal] of activeFilters) {
-            const promptDim = promptDimMap[dimId];
-            if (promptDim) {
-              // Prompt-based dimension: check assignments map
-              const assigned = promptDim.assignments?.[l.id];
-              if (filterVal === 'other') { if (assigned) return false; }
-              else { if (assigned !== filterVal) return false; }
-            } else {
-              // Built-in dimension: check keyword-detected tags
-              if (filterVal === 'other') { if (builtinTags[dimId]) return false; }
-              else { if (builtinTags[dimId] !== filterVal) return false; }
-            }
-          }
-          return true;
-        });
+        const [dimId, filterVal] = activeFilters[0]; // single dimension
+        const dim = promptDims.find(d => d.id === dimId);
+        if (dim) {
+          links = links.filter(l => {
+            if (l.loading) return true;
+            const assigned = dim.assignments?.[l.id];
+            if (filterVal === 'other') return !assigned;
+            return assigned === filterVal;
+          });
+        }
       }
     }
 
@@ -15227,31 +15091,39 @@ Return JSON:
     }
   };
 
-  // Sub-tag filter click handler
+  // Sub-tag filter click handler — single row accordion
   const subTagsEl = $('subTags');
   if (subTagsEl) {
     subTagsEl.onclick = (e) => {
-      // [+ Filter] button
+      // × close button
+      if (e.target.closest('#subTagsClose')) {
+        const promptDims = loadPromptDimensions(currentFilter);
+        if (Object.keys(currentFilters).filter(k => currentFilters[k]).length > 0 || promptDims.length > 0) {
+          // Active filter or dimension exists → clear and return to suggestions
+          currentFilters = {};
+          if (promptDims.length > 0) {
+            removePromptDimension(currentFilter, promptDims[0].id);
+          }
+        } else {
+          // On suggestions → hide bar entirely
+          showSubTagsBar = false;
+        }
+        dimensionPromptOpen = false;
+        renderSubTags();
+        renderGrid();
+        return;
+      }
+
+      // ✦ AI custom filter button
       if (e.target.closest('#dimensionAddBtn')) {
         showDimensionPromptInput();
         return;
       }
 
-      // Suggestion chip — auto-run AI dimension (skip form)
+      // Suggestion chip → auto-run AI dimension (skip form)
       const suggestion = e.target.closest('[data-suggestion]');
       if (suggestion) {
         runDimensionPrompt(suggestion.dataset.suggestion);
-        return;
-      }
-
-      // [x] remove dimension button
-      const removeBtn = e.target.closest('[data-dim-remove]');
-      if (removeBtn) {
-        const dimId = removeBtn.dataset.dimRemove;
-        removePromptDimension(currentFilter, dimId);
-        delete currentFilters[dimId];
-        renderSubTags();
-        renderGrid();
         return;
       }
 
@@ -15266,24 +15138,6 @@ Return JSON:
       renderSubTags();
       renderGrid();
     };
-
-    // Long-press context menu for prompt-based dimensions
-    let longPressTimer = null;
-    subTagsEl.addEventListener('pointerdown', (e) => {
-      const label = e.target.closest('[data-dim-label]');
-      if (!label) return;
-      const dimId = label.dataset.dimLabel;
-      // Only prompt-based dimensions get context menu
-      const dims = loadPromptDimensions(currentFilter);
-      if (!dims.find(d => d.id === dimId)) return;
-
-      longPressTimer = setTimeout(() => {
-        showDimContextMenu(e, dimId);
-      }, 600);
-    });
-    subTagsEl.addEventListener('pointerup', () => clearTimeout(longPressTimer));
-    subTagsEl.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
-    subTagsEl.addEventListener('pointermove', () => clearTimeout(longPressTimer));
   }
 
   // Dimension context menu
