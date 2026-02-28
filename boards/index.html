@@ -13922,6 +13922,7 @@ Return JSON:
         const currentCount = getAllLinks().filter(l => l.category === category).length;
         // Cache valid for 24h AND pin count hasn't drifted by more than 3
         if (Date.now() - ts < 86400000 && Math.abs(currentCount - pinCount) <= 3) {
+          console.log('[suggestions] Cache hit for', category, ':', suggestions.length, 'suggestions');
           return suggestions;
         }
       } catch { /* ignore corrupt cache */ }
@@ -13932,22 +13933,34 @@ Return JSON:
       .slice(0, 80)
       .map(l => ({ id: l.id, title: l.title || l.domain || l.url, description: l.description || '', domain: l.domain || '', url: l.url }));
 
-    if (pins.length < 5) return [];
+    if (pins.length < 5) {
+      console.log('[suggestions] Not enough pins for', category, ':', pins.length);
+      return [];
+    }
 
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ action: 'suggest', category, pins })
-    });
-    const data = await res.json();
-    if (data.error || !data.suggestions) return [];
+    console.log('[suggestions] Fetching suggestions for', category, '(', pins.length, 'pins)');
 
-    localStorage.setItem(cacheKey, JSON.stringify({
-      suggestions: data.suggestions,
-      pinCount: pins.length,
-      ts: Date.now()
-    }));
-    return data.suggestions;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-subcategories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ action: 'suggest', category, pins })
+      });
+      const data = await res.json();
+      console.log('[suggestions] Response for', category, ':', data);
+
+      if (data.error || !data.suggestions) return [];
+
+      localStorage.setItem(cacheKey, JSON.stringify({
+        suggestions: data.suggestions,
+        pinCount: pins.length,
+        ts: Date.now()
+      }));
+      return data.suggestions;
+    } catch (err) {
+      console.error('[suggestions] Fetch failed for', category, ':', err);
+      return [];
+    }
   }
 
   function clearSuggestionCache(category) {
@@ -14016,8 +14029,12 @@ Return JSON:
         const cat = currentFilter;
         suggestDimensions(cat).then(s => {
           suggestingCategories.delete(cat);
-          if (s.length > 0 && currentFilter === cat) renderSubTags();
-        }).catch(() => suggestingCategories.delete(cat));
+          if (currentFilter === cat) renderSubTags();
+        }).catch(err => {
+          console.error('[suggestions] Failed for', cat, err);
+          suggestingCategories.delete(cat);
+          if (currentFilter === cat) renderSubTags();
+        });
       }
 
       // Build suggestion row HTML (only if we have suggestions to show)
