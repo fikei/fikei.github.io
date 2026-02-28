@@ -448,7 +448,16 @@ serve(async (req) => {
       console.log('[enrich-link] Step 2.6: Book enrichment (Open Library → AI)')
 
       // 1. Try Open Library first (free, structured data)
-      const olResult = await lookupOpenLibrary(title || '')
+      // For blocked sites (B&N, etc.), extract search title from URL path
+      let bookSearchTitle = title || ''
+      if (url.includes('barnesandnoble.com/w/')) {
+        const bnMatch = url.match(/barnesandnoble\.com\/w\/([^\/]+)/)
+        if (bnMatch && (!bookSearchTitle || bookSearchTitle === domain)) {
+          bookSearchTitle = bnMatch[1].replace(/-/g, ' ')
+          console.log('[enrich-link] B&N title from URL slug:', bookSearchTitle)
+        }
+      }
+      const olResult = await lookupOpenLibrary(bookSearchTitle)
 
       // 2. Only call AI if Open Library left gaps
       const needsAI = !olResult
@@ -480,6 +489,15 @@ serve(async (req) => {
       }
 
       console.log('[enrich-link] Book enrichment result:', bookMeta)
+
+      // Prefer stable book cover (Open Library) over scraped og:image
+      if (bookMeta?.coverPath) {
+        const olCoverUrl = `https://covers.openlibrary.org/b/id/${bookMeta.coverPath}-L.jpg`
+        console.log('[enrich-link] Book cover from Open Library, overriding scraped image:', olCoverUrl)
+        imageUrl = olCoverUrl
+        imageSource = 'openlibrary'
+        imageScores = { evaluation_method: 'known_good_source', tier: 'trusted' }
+      }
     }
 
     // ========================================
@@ -1420,6 +1438,9 @@ async function lookupOpenLibrary(rawTitle: string): Promise<{
 
   // Clean title: strip common suffixes
   const cleanTitle = rawTitle
+    .replace(/\s*-\s*Wikipedia\s*$/i, '')  // "Hyperion (novel) - Wikipedia"
+    .replace(/\s*[\|\-–—]\s*Wikipedia\s*$/i, '')  // "Hyperion | Wikipedia"
+    .replace(/\s*\([^)]*(?:novel|book|story|memoir|essay|anthology|series|autobiography|biography|poem|play|novella|collection|treatise|manuscript)[^)]*\)\s*/gi, '')  // "(Simmons novel)"
     .replace(/\s*[\|\-–—]\s*(Goodreads|Amazon|Barnes & Noble|Bookshop|Book|Read|Review|Buy|Kindle|Audible|Open Library).*$/i, '')
     .replace(/\s*by\s+.+$/i, '')
     .replace(/\s*\(\d{4}\)\s*$/, '')
@@ -1851,7 +1872,8 @@ const LOGO_PATTERNS = [
   /placeholder/i, /default/i, /blank/i, /spacer/i,
   /pixel/i, /1x1/i, /transparent/i, /sprite/i,
   /tracking/i, /beacon/i, /badge/i, /button/i,
-  /banner-ad/i, /ad-banner/i, /widget-icon/i
+  /banner-ad/i, /ad-banner/i, /widget-icon/i,
+  /static\/images\/project-logos\//i  // Wikipedia project logos (globe icon)
 ]
 
 // Known CDN placeholder URL patterns
@@ -1861,7 +1883,9 @@ const PLACEHOLDER_URL_PATTERNS = [
   /fallback/i,
   /placeholder\.(jpg|png|gif|svg|webp)/i,
   /default\.(jpg|png|gif|svg|webp)/i,
-  /blank\.(jpg|png|gif|svg|webp)/i
+  /blank\.(jpg|png|gif|svg|webp)/i,
+  /Wikipedia-logo/i,  // Wikipedia logo files
+  /Wiki-logo/i        // Variant wiki logos
 ]
 
 function isLikelyLogo(url: string): boolean {
