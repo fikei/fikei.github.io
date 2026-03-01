@@ -1873,6 +1873,44 @@ body {
 /* ============================================
    Filter Token — User Board Indicator
    ============================================ */
+/* Drag-to-category: highlight filter token when dragging a pin over it */
+.filter-token--drag-target {
+  background: var(--fg) !important;
+  color: var(--bg) !important;
+  transform: scale(1.08);
+  transition: transform 0.15s ease, background 0.15s ease;
+  position: relative;
+  z-index: 10;
+}
+.filter-token--drag-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 4px 10px;
+  pointer-events: none;
+  z-index: 11;
+}
+
+/* Category reorder drag indicators */
+.filter-token--cat-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.filter-token--cat-drag-before {
+  box-shadow: -3px 0 0 0 var(--fg);
+}
+.filter-token--cat-drag-after {
+  box-shadow: 3px 0 0 0 var(--fg);
+}
+
 .filter-token--new-board {
   color: var(--muted);
   border-color: rgba(255,255,255,0.2);
@@ -5692,10 +5730,11 @@ body {
     <button id="dimCtxRemove">Remove filter</button>
   </div>
 
-  <!-- Board context menu (right-click / long-press on user board token) -->
+  <!-- Category context menu (right-click / long-press on any category token) -->
   <div class="dim-context-menu" id="boardContextMenu" style="display:none" role="menu">
-    <button id="boardCtxRename">Rename board</button>
-    <button id="boardCtxDelete" class="dim-context-menu__item--danger">Delete board</button>
+    <button id="boardCtxEdit">Edit name</button>
+    <button id="boardCtxShare">Share</button>
+    <button id="boardCtxDelete" class="dim-context-menu__item--danger">Delete</button>
   </div>
 
   <!-- Listen view toggle (grid/list) — visible only when listen filter active -->
@@ -6188,6 +6227,9 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn" id="devToggleWidgets">Widgets: OFF</button>
     <button class="dev-menu__btn" id="devWidgetInspector">Widget Inspector</button>
     <button class="dev-menu__btn dev-menu__btn--admin" id="devAdminPanel" style="display:none;">Admin Panel</button>
+    <div class="dev-menu__divider"></div>
+    <div class="dev-menu__title" style="font-size:9px;margin-top:4px;">Beta Features</div>
+    <button class="dev-menu__btn" id="devToggleReviewQueue">Review Queue: OFF</button>
   </div>
 
   <!-- Widget Inspector Overlay -->
@@ -6438,8 +6480,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.5.0';
-  console.log('[boards] v' + VERSION + ' - Dismiss and reorder filter dimension chips');
+  const VERSION = '2.7.1';
+  console.log('[boards] v' + VERSION + ' - Echo voice quality: natural pauses, breaths, cadence');
 
   // ============================================
   // Supabase Setup
@@ -7193,6 +7235,16 @@ Return JSON:
     }
     console.log('[widgets] ' + (widgetDSEnabled ? 'ON' : 'OFF — enable via window.enableWidgetDS()'));
   })();
+
+  // Beta features — toggled via dev menu (Ctrl+Shift+D)
+  const BETA_FEATURES_KEY = 'boards_beta_features';
+  function loadBetaFeatures() {
+    try { return JSON.parse(localStorage.getItem(BETA_FEATURES_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function saveBetaFeatures(f) { localStorage.setItem(BETA_FEATURES_KEY, JSON.stringify(f)); }
+  let betaFeatures = loadBetaFeatures();
+  if (betaFeatures.reviewQueue === undefined) betaFeatures.reviewQueue = false;
 
   // Cache for widget AI results
   const WIDGET_CACHE_KEY = 'boards_widget_cache';
@@ -13147,6 +13199,26 @@ Return JSON:
     syncOrderToSupabase(data.linkOrder); // Background sync
   }
 
+  function reorderCategory(fromSlug, toSlug, position = 'before') {
+    const data = load();
+    const allSlugs = Object.keys(data.categories).filter(s => s !== 'uncategorized');
+    let order = data.categoryOrder ? [...data.categoryOrder] : [...allSlugs];
+    // Ensure all slugs are represented
+    for (const s of allSlugs) { if (!order.includes(s)) order.push(s); }
+    // Remove stale slugs not in categories
+    order = order.filter(s => data.categories[s]);
+    // Perform the move
+    order = order.filter(s => s !== fromSlug);
+    const toIdx = order.indexOf(toSlug);
+    if (toIdx === -1) { order.push(fromSlug); }
+    else {
+      const insertAt = position === 'after' ? toIdx + 1 : toIdx;
+      order.splice(insertAt, 0, fromSlug);
+    }
+    data.categoryOrder = order;
+    save(data);
+  }
+
   function createCategory(name, opts = {}) {
     const data = load();
     const n = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -13220,8 +13292,9 @@ Return JSON:
       }
     }
 
-    // Remove the category
+    // Remove the category and clean up category order
     delete data.categories[slug];
+    if (data.categoryOrder) data.categoryOrder = data.categoryOrder.filter(s => s !== slug);
     save(data);
     saveBoardMetadata(data.categories);
 
@@ -13696,6 +13769,7 @@ Return JSON:
     const links = getAllLinks();
     const counts = { all: links.length };
     for (const l of links) counts[l.category] = (counts[l.category] || 0) + 1;
+    const categoryOrder = load().categoryOrder; // null or array of slugs
 
     let html = `<input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off" value="${esc(searchQuery)}">`;
     const allActive = currentFilter === 'all';
@@ -13704,17 +13778,27 @@ Return JSON:
     const sorted = Object.entries(cats)
       .filter(([n, meta]) => (counts[n] > 0 || meta.isUserBoard) && n !== 'uncategorized')
       .sort((a, b) => {
-        const aM = a[1], bM = b[1];
-        // Pinned AI categories first
-        const aPinned = aM.pinned && !aM.isUserBoard ? 1 : 0;
-        const bPinned = bM.pinned && !bM.isUserBoard ? 1 : 0;
+        const [slugA, metaA] = a;
+        const [slugB, metaB] = b;
+
+        // If user has set a custom category order, use it
+        if (categoryOrder) {
+          const idxA = categoryOrder.indexOf(slugA);
+          const idxB = categoryOrder.indexOf(slugB);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          // New categories not yet in order: fall through to default sort
+        }
+
+        // Default sort: pinned AI first, user boards second, then by count
+        const aPinned = metaA.pinned && !metaA.isUserBoard ? 1 : 0;
+        const bPinned = metaB.pinned && !metaB.isUserBoard ? 1 : 0;
         if (aPinned !== bPinned) return bPinned - aPinned;
-        // User boards second group
-        const aUser = aM.isUserBoard ? 1 : 0;
-        const bUser = bM.isUserBoard ? 1 : 0;
+        const aUser = metaA.isUserBoard ? 1 : 0;
+        const bUser = metaB.isUserBoard ? 1 : 0;
         if (aUser !== bUser) return aUser - bUser;
-        // Within group, sort by pin count
-        return (counts[b[0]] || 0) - (counts[a[0]] || 0);
+        return (counts[slugB] || 0) - (counts[slugA] || 0);
       });
 
     for (const [name, meta] of sorted) {
@@ -13722,17 +13806,17 @@ Return JSON:
       const active = currentFilter === name;
       const activeClass = active ? 'filter-token--active' : '';
       const userClass = meta.isUserBoard ? ' filter-token--user-board' : '';
-      const label = meta.isUserBoard ? `✦ ${meta.displayName || cap(name)}` : cap(name);
+      const label = meta.isUserBoard ? `✦ ${meta.displayName || cap(name)}` : (meta.displayName || cap(name));
       const badge = name === 'uncategorized' && c > 0 ? ` (${c})` : '';
-      html += `<button class="filter-token${userClass} ${activeClass}" data-category="${name}" role="tab" aria-selected="${active}">${label}${badge}</button>`;
+      html += `<button class="filter-token${userClass} ${activeClass}" data-category="${name}" draggable="true" role="tab" aria-selected="${active}">${label}${badge}</button>`;
     }
 
     // Add "New Board" button in filter bar
     html += `<button class="filter-token filter-token--new-board" id="createBoardBtn" aria-label="Create new board">+ Board</button>`;
 
-    // Add cleanup pill if queue has 3+ items
+    // Add cleanup pill (beta feature — enable via dev menu)
     cleanupQueueCache = getCleanupQueue(links);
-    if (cleanupQueueCache.length >= 1) {
+    if (betaFeatures.reviewQueue && cleanupQueueCache.length >= 1) {
       const cleanupActive = cleanupViewActive;
       const activeClass = cleanupActive ? 'filter-token--active' : '';
       const count = cleanupQueueCache.length > 25 ? '25+' : cleanupQueueCache.length;
@@ -15454,6 +15538,9 @@ Return JSON:
   };
 
   filters.onclick = (e) => {
+    // Don't fire click when a drag-drop just completed
+    if (isDragging) return;
+
     const t = e.target.closest('.filter-token');
     if (t) {
       const category = t.dataset.category;
@@ -15722,24 +15809,34 @@ Return JSON:
   });
 
   // =============================================================================
-  // Board context menu (right-click + long-press on user board tokens)
+  // Category context menu (right-click + long-press on any category token)
   // =============================================================================
   let boardContextTarget = null;
+  let boardContextType = null; // 'ai' | 'user-board'
 
   function showBoardContextMenu(e, slug) {
     hideDimContextMenu();
     boardContextTarget = slug;
+    const cats = getCategories();
+    const meta = cats[slug] || {};
+    boardContextType = meta.isUserBoard ? 'user-board' : 'ai';
+
+    // Update delete label based on type
+    const deleteBtn = $('boardCtxDelete');
+    if (deleteBtn) deleteBtn.textContent = meta.isUserBoard ? 'Delete board' : 'Delete category';
+
     const menu = $('boardContextMenu');
     if (!menu) return;
     menu.style.display = 'block';
-    menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px';
-    menu.style.top = Math.min(e.clientY, window.innerHeight - 100) + 'px';
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+    menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
   }
 
   function hideBoardContextMenu() {
     const menu = $('boardContextMenu');
     if (menu) menu.style.display = 'none';
     boardContextTarget = null;
+    boardContextType = null;
   }
 
   // Dismiss on outside click
@@ -15747,39 +15844,175 @@ Return JSON:
     if (!e.target.closest('#boardContextMenu')) hideBoardContextMenu();
   });
 
-  // Right-click (desktop)
+  // Right-click (desktop) — works on ALL category tokens
   document.addEventListener('contextmenu', (e) => {
-    const token = e.target.closest('.filter-token--user-board');
+    const token = e.target.closest('.filter-token[data-category]');
     if (!token) return;
+    const slug = token.dataset.category;
+    if (slug === 'all' || slug === 'cleanup' || token.id === 'createBoardBtn') return;
     e.preventDefault();
-    showBoardContextMenu(e, token.dataset.category);
+    showBoardContextMenu(e, slug);
   });
 
-  // Long-press (mobile) — mirrors dimension label pattern
+  // Long-press (mobile) — works on ALL category tokens
   let boardLongPressTimer = null;
   filters.addEventListener('pointerdown', (e) => {
-    const token = e.target.closest('.filter-token--user-board');
+    const token = e.target.closest('.filter-token[data-category]');
     if (!token) return;
+    const slug = token.dataset.category;
+    if (slug === 'all' || slug === 'cleanup' || token.id === 'createBoardBtn') return;
     boardLongPressTimer = setTimeout(() => {
-      showBoardContextMenu(e, token.dataset.category);
+      showBoardContextMenu(e, slug);
     }, 600);
   });
   filters.addEventListener('pointerup', () => clearTimeout(boardLongPressTimer));
   filters.addEventListener('pointercancel', () => clearTimeout(boardLongPressTimer));
   filters.addEventListener('pointermove', () => clearTimeout(boardLongPressTimer));
 
-  // Menu actions
-  $('boardCtxDelete')?.addEventListener('click', () => {
+  // ── Menu action: Edit name (inline rename) ──
+  $('boardCtxEdit')?.addEventListener('click', () => {
     const slug = boardContextTarget;
     hideBoardContextMenu();
-    if (slug) deleteUserBoard(slug);
+    if (!slug) return;
+
+    const token = filters.querySelector(`.filter-token[data-category="${slug}"]`);
+    if (!token) return;
+
+    const cats = getCategories();
+    const meta = cats[slug] || {};
+    const currentName = meta.displayName || cap(slug);
+
+    // Replace token content with inline input
+    const originalHTML = token.innerHTML;
+    token.innerHTML = '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.style.cssText = 'background:transparent;border:none;border-bottom:1px solid currentColor;outline:none;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;width:' + Math.max(60, currentName.length * 7) + 'px;text-align:center;padding:0;margin:0;';
+    token.appendChild(input);
+    input.focus();
+    input.select();
+
+    let saved = false;
+    function commitRename() {
+      if (saved) return;
+      saved = true;
+      const newName = input.value.trim();
+      if (!newName || newName === currentName) {
+        token.innerHTML = originalHTML;
+        return;
+      }
+      const data = load();
+      if (!data.categories[slug]) data.categories[slug] = { pinned: false };
+      data.categories[slug].displayName = newName;
+      save(data);
+      saveBoardMetadata(data.categories);
+      renderFilters();
+      toast('Renamed to "' + newName + '"');
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+      if (e.key === 'Escape') { saved = true; token.innerHTML = originalHTML; }
+      e.stopPropagation(); // prevent keyboard shortcuts while editing
+    });
+    input.addEventListener('blur', commitRename);
   });
 
-  $('boardCtxRename')?.addEventListener('click', () => {
+  // ── Menu action: Share ──
+  $('boardCtxShare')?.addEventListener('click', () => {
     const slug = boardContextTarget;
     hideBoardContextMenu();
-    if (slug) toast('Rename coming soon');
+    if (slug) openShareModal(slug);
   });
+
+  // ── Menu action: Delete (type-aware) ──
+  $('boardCtxDelete')?.addEventListener('click', () => {
+    const slug = boardContextTarget;
+    const type = boardContextType;
+    hideBoardContextMenu();
+    if (!slug) return;
+    if (type === 'user-board') {
+      deleteUserBoard(slug);
+    } else {
+      deleteAICategory(slug);
+    }
+  });
+
+  // Delete AI category: re-evaluate pins via AI, then remove category
+  async function deleteAICategory(slug) {
+    const data = load();
+    const meta = data.categories[slug];
+    const catName = (meta && meta.displayName) ? meta.displayName : cap(slug);
+    const affectedPins = data.links.filter(l => l.category === slug);
+    const pinCount = affectedPins.length;
+
+    let confirmMsg = 'Delete category "' + catName + '"?';
+    if (pinCount > 0) {
+      confirmMsg += '\n' + pinCount + ' pin' + (pinCount !== 1 ? 's' : '') + ' will be re-categorized by AI.';
+    }
+    const confirmed = await showConfirm(confirmMsg, 'Delete Category');
+    if (!confirmed) return;
+
+    if (pinCount === 0) {
+      const d = load();
+      delete d.categories[slug];
+      if (d.categoryOrder) d.categoryOrder = d.categoryOrder.filter(s => s !== slug);
+      save(d);
+      saveBoardMetadata(d.categories);
+      if (currentFilter === slug) {
+        currentFilter = 'all';
+        currentFilters = {};
+        localStorage.setItem(FILTER_KEY, currentFilter);
+      }
+      renderFilters();
+      renderGrid();
+      toast('Category "' + catName + '" deleted');
+      return;
+    }
+
+    // Re-evaluate pins via AI
+    toast('Re-categorizing ' + pinCount + ' pins...', { id: 'recat-progress' });
+    let processed = 0;
+
+    for (const link of affectedPins) {
+      try {
+        // Clear domain cache to force fresh AI call
+        const domain = link.domain || (link.url ? new URL(link.url).hostname : '');
+        if (typeof categoryCache !== 'undefined' && domain) delete categoryCache[domain];
+
+        const result = await smartCategorize(link);
+        const newCat = (result && result.category !== slug) ? result.category : 'uncategorized';
+        updateLink(link.id, { category: newCat, confidence: result ? result.confidence : 0 });
+      } catch (err) {
+        console.error('[deleteAICategory] Failed to re-categorize', link.id, err);
+        updateLink(link.id, { category: 'uncategorized' });
+      }
+      processed++;
+      if (processed % 5 === 0 || processed === pinCount) {
+        toast('Re-categorizing... ' + processed + '/' + pinCount, { id: 'recat-progress' });
+      }
+    }
+
+    // Remove the category
+    const d = load();
+    delete d.categories[slug];
+    if (d.categoryOrder) d.categoryOrder = d.categoryOrder.filter(s => s !== slug);
+    save(d);
+    saveBoardMetadata(d.categories);
+    try { localStorage.removeItem(DIMS_KEY_PREFIX + slug); } catch {}
+
+    if (currentFilter === slug) {
+      currentFilter = 'all';
+      currentFilters = {};
+      localStorage.setItem(FILTER_KEY, currentFilter);
+    }
+
+    renderFilters();
+    renderGrid();
+    generateWidgets();
+    toast('"' + catName + '" deleted. ' + processed + ' pins re-categorized');
+  }
 
   // Listen view toggle disabled — always list view
 
@@ -16283,9 +16516,10 @@ Return JSON:
     }
   }, true);
 
-  // Drag and drop reordering (links + widgets)
+  // Drag and drop reordering (links + widgets + categories)
   let draggedId = null;
   let draggedWidgetId = null;
+  let draggedCategorySlug = null;
   let isDragging = false;
   let dropPosition = null; // 'before' or 'after'
 
@@ -16331,6 +16565,7 @@ Return JSON:
     const widget = e.target.closest('.widget-inline');
     if (widget) widget.classList.remove('dragging');
     clearDragClasses();
+    clearFilterDragClasses();
     draggedId = null;
     draggedWidgetId = null;
     dropPosition = null;
@@ -16415,6 +16650,163 @@ Return JSON:
     }
   };
 
+  // ── Drag-to-category: drop a pin onto a filter token to move it ──
+
+  function clearFilterDragClasses() {
+    filters.querySelectorAll('.filter-token--drag-target').forEach(el => {
+      el.classList.remove('filter-token--drag-target');
+      const lbl = el.querySelector('.filter-token--drag-label');
+      if (lbl) lbl.remove();
+    });
+  }
+
+  function clearCategoryDragClasses() {
+    filters.querySelectorAll('.filter-token--cat-drag-before, .filter-token--cat-drag-after').forEach(el => {
+      el.classList.remove('filter-token--cat-drag-before', 'filter-token--cat-drag-after');
+    });
+  }
+
+  filters.addEventListener('dragover', (e) => {
+    if (!draggedId) return; // only for link cards, not widgets
+    const token = e.target.closest('.filter-token');
+    if (!token || !token.dataset.category) return;
+    const cat = token.dataset.category;
+    // Don't allow drop on "all", "cleanup", or create-board
+    if (cat === 'all' || cat === 'cleanup' || token.id === 'createBoardBtn') return;
+    // Don't allow drop on the pin's current category
+    const pin = getAllLinks().find(l => l.id === draggedId);
+    if (pin && pin.category === cat) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    // Show highlight if not already shown
+    if (!token.classList.contains('filter-token--drag-target')) {
+      clearFilterDragClasses();
+      token.classList.add('filter-token--drag-target');
+      // Add "Move to [Category]" label
+      const label = document.createElement('span');
+      label.className = 'filter-token--drag-label';
+      const cats = getCategories();
+      const meta = cats[cat];
+      const displayName = (meta && meta.displayName) ? meta.displayName : cap(cat);
+      label.textContent = 'Move to ' + displayName;
+      token.style.position = 'relative';
+      token.appendChild(label);
+    }
+  });
+
+  filters.addEventListener('dragleave', (e) => {
+    const token = e.target.closest('.filter-token');
+    if (token) {
+      // Only clear if we're actually leaving the token (not entering a child)
+      const related = e.relatedTarget;
+      if (!token.contains(related)) {
+        token.classList.remove('filter-token--drag-target');
+        const lbl = token.querySelector('.filter-token--drag-label');
+        if (lbl) lbl.remove();
+      }
+    }
+  });
+
+  filters.addEventListener('drop', (e) => {
+    if (!draggedId) return;
+    const token = e.target.closest('.filter-token');
+    if (!token || !token.dataset.category) { clearFilterDragClasses(); return; }
+    const cat = token.dataset.category;
+    if (cat === 'all' || cat === 'cleanup' || token.id === 'createBoardBtn') { clearFilterDragClasses(); return; }
+    const pin = getAllLinks().find(l => l.id === draggedId);
+    if (pin && pin.category === cat) { clearFilterDragClasses(); return; }
+
+    e.preventDefault();
+    e.stopPropagation();
+    clearFilterDragClasses();
+
+    // Move the pin to the target category
+    const cats = getCategories();
+    const meta = cats[cat];
+    const displayName = (meta && meta.displayName) ? meta.displayName : cap(cat);
+    updateLink(draggedId, { category: cat });
+    renderFilters();
+    renderGrid();
+    generateWidgets();
+    toast('Moved to ' + displayName);
+
+    // Clean up drag state
+    draggedId = null;
+    isDragging = false;
+  });
+
+  // ── Category reorder: drag filter tokens to reorder categories ──
+
+  filters.addEventListener('dragstart', (e) => {
+    const token = e.target.closest('.filter-token[data-category]');
+    if (!token || !token.draggable) return;
+    const slug = token.dataset.category;
+    if (slug === 'all' || slug === 'cleanup' || token.id === 'createBoardBtn') return;
+    // Only start category drag if not already dragging a pin card
+    if (draggedId) return;
+    draggedCategorySlug = slug;
+    isDragging = true;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'category:' + slug);
+    token.classList.add('filter-token--cat-dragging');
+  });
+
+  filters.addEventListener('dragend', (e) => {
+    if (!draggedCategorySlug) return;
+    const token = e.target.closest('.filter-token[data-category]');
+    if (token) token.classList.remove('filter-token--cat-dragging');
+    clearCategoryDragClasses();
+    draggedCategorySlug = null;
+    setTimeout(() => { isDragging = false; }, 100);
+  });
+
+  // Override dragover for category reorder (separate from pin-to-category)
+  filters.addEventListener('dragover', (e) => {
+    if (!draggedCategorySlug) return;
+    if (draggedId) return;
+    const token = e.target.closest('.filter-token[data-category]');
+    if (!token) return;
+    const slug = token.dataset.category;
+    if (slug === draggedCategorySlug || slug === 'all' || slug === 'cleanup' || token.id === 'createBoardBtn') return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    clearCategoryDragClasses();
+    const rect = token.getBoundingClientRect();
+    const isBefore = e.clientX < rect.left + rect.width / 2;
+    token.classList.add(isBefore ? 'filter-token--cat-drag-before' : 'filter-token--cat-drag-after');
+  }, true); // capture phase to fire before pin-to-category handler
+
+  filters.addEventListener('dragleave', (e) => {
+    if (!draggedCategorySlug) return;
+    const token = e.target.closest('.filter-token[data-category]');
+    if (token) {
+      const related = e.relatedTarget;
+      if (!token.contains(related)) {
+        token.classList.remove('filter-token--cat-drag-before', 'filter-token--cat-drag-after');
+      }
+    }
+  });
+
+  filters.addEventListener('drop', (e) => {
+    if (!draggedCategorySlug) return;
+    const token = e.target.closest('.filter-token[data-category]');
+    if (!token) { clearCategoryDragClasses(); draggedCategorySlug = null; return; }
+    const targetSlug = token.dataset.category;
+    if (targetSlug === draggedCategorySlug || targetSlug === 'all' || targetSlug === 'cleanup' || token.id === 'createBoardBtn') {
+      clearCategoryDragClasses(); draggedCategorySlug = null; return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const isBefore = token.classList.contains('filter-token--cat-drag-before');
+    clearCategoryDragClasses();
+    reorderCategory(draggedCategorySlug, targetSlug, isBefore ? 'before' : 'after');
+    draggedCategorySlug = null;
+    isDragging = false;
+    renderFilters();
+  }, true); // capture phase
+
   // Drag-to-resize functionality
   let resizeState = null;
   const RESIZE_THRESHOLD = 50; // pixels to trigger size change
@@ -16492,6 +16884,7 @@ Return JSON:
       e.preventDefault();
       $('devMenu').classList.toggle('dev-menu--visible');
       $('devToggleWidgets').textContent = 'Widgets: ' + (widgetDSEnabled ? 'ON' : 'OFF');
+      $('devToggleReviewQueue').textContent = 'Review Queue: ' + (betaFeatures.reviewQueue ? 'ON' : 'OFF');
     }
   };
 
@@ -16653,6 +17046,16 @@ Return JSON:
       $('devToggleWidgets').textContent = 'Widgets: ON';
       toast('Widgets enabled');
     }
+  };
+
+  // Beta feature toggles
+  $('devToggleReviewQueue').onclick = () => {
+    betaFeatures.reviewQueue = !betaFeatures.reviewQueue;
+    saveBetaFeatures(betaFeatures);
+    $('devToggleReviewQueue').textContent = 'Review Queue: ' + (betaFeatures.reviewQueue ? 'ON' : 'OFF');
+    $('devMenu').classList.remove('dev-menu--visible');
+    renderFilters();
+    toast('Review Queue ' + (betaFeatures.reviewQueue ? 'enabled' : 'disabled'));
   };
 
   // =============================================================================
