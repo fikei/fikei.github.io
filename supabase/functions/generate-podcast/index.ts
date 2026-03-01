@@ -80,8 +80,8 @@ function setCached(key: string, episode: Episode): void {
 // ============================================================
 
 async function fetchSources(topic: string): Promise<Source[]> {
-  const serpApiKey = Deno.env.get('SERPAPI_KEY')
-  if (!serpApiKey) throw new Error('SERPAPI_KEY not configured')
+  const serpApiKey = Deno.env.get('SERP_API_KEY')
+  if (!serpApiKey) throw new Error('SERP_API_KEY not configured')
 
   const queries = [
     `"${topic}" debate perspectives`,
