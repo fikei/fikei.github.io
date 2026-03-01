@@ -295,6 +295,8 @@ Respond with a JSON array:
   })
 
   if (!structureRes.ok) {
+    const errBody = await structureRes.text()
+    console.error('[generate-podcast] Claude structure error:', structureRes.status, errBody)
     throw new Error(`Claude structure call failed: ${structureRes.status}`)
   }
 
@@ -361,12 +363,14 @@ Respond with ONLY a JSON array of transcript cues:
     },
     body: JSON.stringify({
       model: 'claude-3-haiku-20240307',
-      max_tokens: 8192,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: scriptPrompt }],
     }),
   })
 
   if (!scriptRes.ok) {
+    const errBody = await scriptRes.text()
+    console.error('[generate-podcast] Claude script error:', scriptRes.status, errBody)
     throw new Error(`Claude script call failed: ${scriptRes.status}`)
   }
 
