@@ -2,7 +2,7 @@
 // 4-stage AI pipeline: source aggregation → bias classification → script generation → ElevenLabs TTS
 //
 // POST /functions/v1/generate-podcast
-// Body: { topic: string, mode: "news" | "deep-dive" | "debate", userId?: string }
+// Body: { topic: string, mode: "news" | "deep-dive" | "debate", userId?: string, biasPreference?: "left" | "center" | "right" | "balanced" }
 // Returns: { episode: { id, topic, mode, transcript, sources, biasDistribution, audioUrls, durationSeconds, status } }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -46,6 +46,7 @@ interface BiasDistribution {
 interface Episode {
   id: string
   topic: string
+  title: string              // Headline-style title generated from transcript
   mode: string
   transcript: TranscriptCue[]
   sources: Source[]
@@ -232,8 +233,56 @@ async function fetchSources(topic: string, mode: string = 'news'): Promise<Sourc
   }
 
   console.log(`[Stage 1] Total: ${allResults.length} raw → ${deduped.length} deduped sources`)
-  // Return 8–12 sources
-  return deduped.slice(0, 12)
+
+  // Ensure source diversity: categorize domains by known bias tendencies
+  // This pre-classification is rough — Claude refines bias in Stage 2
+  const KNOWN_LEFT = new Set(['nytimes.com', 'washingtonpost.com', 'msnbc.com', 'theguardian.com', 'vox.com', 'slate.com', 'motherjones.com', 'huffpost.com', 'thenation.com', 'theatlantic.com', 'cnn.com'])
+  const KNOWN_RIGHT = new Set(['foxnews.com', 'nationalreview.com', 'dailywire.com', 'washingtontimes.com', 'breitbart.com', 'nypost.com', 'wsj.com', 'freebeacon.com', 'thefederalist.com', 'dailycaller.com', 'newsmax.com'])
+  const KNOWN_INTL = new Set(['bbc.com', 'bbc.co.uk', 'reuters.com', 'aljazeera.com', 'dw.com', 'france24.com', 'scmp.com', 'japantimes.co.jp'])
+
+  function roughBias(domain: string): string {
+    if (KNOWN_LEFT.has(domain)) return 'left'
+    if (KNOWN_RIGHT.has(domain)) return 'right'
+    if (KNOWN_INTL.has(domain)) return 'international'
+    return 'center'
+  }
+
+  // Group sources by rough bias bucket
+  const buckets: Record<string, Source[]> = { left: [], center: [], right: [], international: [] }
+  for (const s of deduped) {
+    const bucket = roughBias(s.domain)
+    buckets[bucket].push(s)
+  }
+  console.log(`[Stage 1] Diversity buckets: L=${buckets.left.length} C=${buckets.center.length} R=${buckets.right.length} I=${buckets.international.length}`)
+
+  // Round-robin across buckets to ensure diversity (aim for mix of perspectives)
+  const diverse: Source[] = []
+  const TARGET = 12
+  const bucketKeys = ['left', 'center', 'right', 'international']
+  const bucketIndices = { left: 0, center: 0, right: 0, international: 0 }
+
+  // Keep cycling through buckets until we have enough or exhausted all
+  let passes = 0
+  while (diverse.length < TARGET && passes < 10) {
+    let addedThisPass = false
+    for (const key of bucketKeys) {
+      const idx = bucketIndices[key as keyof typeof bucketIndices]
+      if (idx < buckets[key].length) {
+        diverse.push(buckets[key][idx])
+        bucketIndices[key as keyof typeof bucketIndices]++
+        addedThisPass = true
+        if (diverse.length >= TARGET) break
+      }
+    }
+    if (!addedThisPass) break
+    passes++
+  }
+
+  // Re-number indices sequentially
+  diverse.forEach((s, i) => { s.index = i + 1 })
+
+  console.log(`[Stage 1] Final: ${diverse.length} diverse sources`)
+  return diverse
 }
 
 // ============================================================
@@ -271,7 +320,7 @@ Respond ONLY with the JSON objects, one per line, no other text.`
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -348,7 +397,7 @@ const SEGMENTS = [
   'synthesis',
 ]
 
-async function generateScript(topic: string, sources: Source[], mode: string = 'news'): Promise<TranscriptCue[]> {
+async function generateScript(topic: string, sources: Source[], mode: string = 'news', biasPreference: string = 'balanced'): Promise<TranscriptCue[]> {
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -362,8 +411,17 @@ async function generateScript(topic: string, sources: Source[], mode: string = '
     ? `\n\nIMPORTANT: This is a DAILY NEWS episode recorded on ${today}. Focus on what is happening RIGHT NOW — the latest developments, breaking news, and current events. Reference specific recent events and dates. Do NOT discuss this topic in the abstract or historically — ground everything in TODAY's news.`
     : `\n\nThis is a DEEP DIVE episode exploring this topic in depth with historical context, research, and multiple expert perspectives.`
 
+  // Bias preference framing
+  const biasContext = biasPreference === 'balanced'
+    ? '\n\nPresent all perspectives equally and fairly. Give roughly equal time to left, center, and right viewpoints.'
+    : biasPreference === 'left'
+    ? '\n\nThe listener prefers a left-leaning perspective. Lead with progressive viewpoints and arguments, but still acknowledge and present opposing views for balance. Aim for roughly 60% left-leaning content, 20% center, 20% right.'
+    : biasPreference === 'right'
+    ? '\n\nThe listener prefers a right-leaning perspective. Lead with conservative viewpoints and arguments, but still acknowledge and present opposing views for balance. Aim for roughly 60% right-leaning content, 20% center, 20% left.'
+    : '\n\nThe listener prefers a centrist perspective. Emphasize moderate, pragmatic viewpoints. Present both left and right arguments but focus on where they converge, common ground, and evidence-based middle positions. Aim for roughly 60% center content, 20% left, 20% right.'
+
   const structurePrompt = `You are structuring a balanced podcast episode on: "${topic}"
-${modeContext}
+${modeContext}${biasContext}
 
 Available sources (with bias labels):
 ${sourcesSummary}
@@ -395,7 +453,7 @@ Respond with a JSON array:
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
       messages: [{ role: 'user', content: structurePrompt }],
     }),
@@ -441,7 +499,7 @@ Respond with a JSON array:
 
   // Call 2: Full script generation
   const scriptPrompt = `You are writing a podcast script on: "${topic}"
-${modeContext}
+${modeContext}${biasContext}
 
 Use this argument structure:
 ${JSON.stringify(argumentStructure, null, 2)}
@@ -473,8 +531,8 @@ Respond with ONLY a JSON array of transcript cues:
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 4096,
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8192,
       messages: [{ role: 'user', content: scriptPrompt }],
     }),
   })
@@ -641,6 +699,58 @@ function estimateDuration(transcript: TranscriptCue[]): number {
 }
 
 // ============================================================
+// Generate headline-style episode title from transcript
+// ============================================================
+
+async function generateTitle(topic: string, transcript: TranscriptCue[]): Promise<string> {
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!anthropicKey) return topic  // fallback to raw topic
+
+  // Extract first few cues for context
+  const preview = transcript.slice(0, 3).map(c => c.text).join(' ').substring(0, 500)
+
+  try {
+    console.log(`[Title] Generating headline for: "${topic}"`)
+    const t0 = Date.now()
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: `Generate a compelling, concise podcast episode headline (5-10 words) for a topic about "${topic}". The episode discusses: ${preview}
+
+Rules:
+- Write like a news headline or podcast episode title
+- Be specific and intriguing, not generic
+- Do NOT include quotes or punctuation wrapping
+- Respond with ONLY the title, nothing else
+
+Examples of good titles:
+"The Race to Regulate AI Before It's Too Late"
+"Inside the Nuclear Energy Comeback"
+"Why Housing Costs Won't Come Down"
+"America's Psychedelic Therapy Revolution"` }],
+      }),
+    })
+    console.log(`[Title] Claude response: ${res.status} (${Date.now() - t0}ms)`)
+
+    if (!res.ok) return topic
+
+    const data = await res.json()
+    const title = data.content?.[0]?.text?.trim() ?? topic
+    console.log(`[Title] Generated: "${title}"`)
+    return title
+  } catch {
+    return topic
+  }
+}
+
+// ============================================================
 // Main handler
 // ============================================================
 
@@ -651,7 +761,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, mode = 'news', userId } = await req.json()
+    const { topic, mode = 'news', userId, biasPreference = 'balanced' } = await req.json()
 
     if (!topic || typeof topic !== 'string' || topic.trim().length === 0) {
       return new Response(
@@ -661,9 +771,10 @@ serve(async (req) => {
     }
 
     const normalizedTopic = topic.trim()
-    const cacheKey = `${normalizedTopic}:${mode}`
+    const normalizedBias = ['left', 'center', 'right', 'balanced'].includes(biasPreference) ? biasPreference : 'balanced'
+    const cacheKey = `${normalizedTopic}:${mode}:${normalizedBias}`
 
-    console.log('[generate-podcast] Request:', { topic: normalizedTopic, mode, userId })
+    console.log('[generate-podcast] Request:', { topic: normalizedTopic, mode, userId, biasPreference: normalizedBias })
 
     // Check cache
     const cached = getCached(cacheKey)
@@ -717,7 +828,7 @@ serve(async (req) => {
     console.log('[generate-podcast] Stage 3: Generating script')
     let transcript: TranscriptCue[]
     try {
-      transcript = await generateScript(normalizedTopic, sources, mode)
+      transcript = await generateScript(normalizedTopic, sources, mode, normalizedBias)
       if (transcript.length === 0) {
         throw new Error('Script generation returned empty transcript')
       }
@@ -732,23 +843,39 @@ serve(async (req) => {
 
     const durationSeconds = estimateDuration(transcript)
 
-    // Stage 4: TTS synthesis (non-fatal — return transcript even if audio fails)
-    console.log('[generate-podcast] Stage 4: Synthesizing audio')
+    // Stage 4: TTS synthesis + title generation (run in parallel)
+    console.log('[generate-podcast] Stage 4: Synthesizing audio + generating title')
     let audioUrls: string[] = []
     let status: Episode['status'] = 'ready'
+    let title = normalizedTopic  // fallback
 
     try {
-      audioUrls = await synthesizeAll(transcript, episodeId, supabase)
-      if (audioUrls.length === 0) {
+      // Run TTS and title generation concurrently
+      const [ttsResult, titleResult] = await Promise.allSettled([
+        synthesizeAll(transcript, episodeId, supabase),
+        generateTitle(normalizedTopic, transcript),
+      ])
+
+      if (ttsResult.status === 'fulfilled') {
+        audioUrls = ttsResult.value
+        if (audioUrls.length === 0) {
+          status = 'no-audio'
+        } else if (audioUrls.length < transcript.length) {
+          status = 'partial'
+        }
+      } else {
+        console.error('[generate-podcast] Stage 4 TTS failed (non-fatal):', ttsResult.reason)
         status = 'no-audio'
-      } else if (audioUrls.length < transcript.length) {
-        status = 'partial'
+      }
+
+      if (titleResult.status === 'fulfilled') {
+        title = titleResult.value
       }
     } catch (err) {
       console.error('[generate-podcast] Stage 4 failed (non-fatal):', err)
       status = 'no-audio'
     }
-    console.log(`[generate-podcast] Stage 4 complete: ${audioUrls.length}/${transcript.length} audio chunks`)
+    console.log(`[generate-podcast] Stage 4 complete: ${audioUrls.length}/${transcript.length} audio chunks, title: "${title}"`)
 
     // Remove snippets from final sources (not needed in response)
     const finalSources = sources.map(({ snippet: _snippet, ...s }) => s)
@@ -756,6 +883,7 @@ serve(async (req) => {
     const episode: Episode = {
       id: episodeId,
       topic: normalizedTopic,
+      title,
       mode,
       transcript,
       sources: finalSources,
