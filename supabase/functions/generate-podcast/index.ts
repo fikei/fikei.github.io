@@ -575,24 +575,27 @@ Respond with ONLY a JSON array of transcript cues:
 // Stage 4: TTS Synthesis via ElevenLabs
 // ============================================================
 
-// ElevenLabs voice IDs — distinct characters for the podcast
-// These are pre-made voices from the ElevenLabs library.
-// Replace with custom/cloned voice IDs for a unique show identity.
-const VOICE_MAP: Record<string, { voiceId: string; stability: number; similarity: number }> = {
+// ElevenLabs voice IDs — NPR Up First inspired cast
+// Drew + Sarah give an A Martinez / Leila Fadel conversational warmth.
+// Daniel provides authoritative expert gravitas with a distinct British timbre.
+const VOICE_MAP: Record<string, { voiceId: string; stability: number; similarity: number; style: number }> = {
   synthesizer: {
-    voiceId: 'pNInz6obpgDQGcFmaJgB',  // Adam — warm, measured, authoritative
-    stability: 0.6,
-    similarity: 0.8,
+    voiceId: '29vD33N1CtxCmqQRPOHJ',  // Drew — warm, well-rounded American male (NPR anchor feel)
+    stability: 0.45,                     // lower = more conversational variation
+    similarity: 0.78,
+    style: 0.45,                         // higher style = more expressive, natural delivery
   },
   challenger: {
-    voiceId: 'ErXwobaYiN019PkySvjV',  // Antoni — direct, probing, energetic
-    stability: 0.4,                      // lower stability = more expressive/skeptical
+    voiceId: 'EXAVITQu4vr4xnSDxMaL',  // Sarah — soft, clear American female (warm co-host feel)
+    stability: 0.40,                     // low stability = natural, probing energy
     similarity: 0.75,
+    style: 0.50,                         // more expressive for the challenger role
   },
   expert: {
-    voiceId: 'VR6AewLTigWG4xSOukaG',  // Arnold — deep, precise, gravitas
-    stability: 0.7,
-    similarity: 0.85,
+    voiceId: 'onwK4e9ZLuTAKqWW03F9',  // Daniel — deep, measured British male (distinct expert)
+    stability: 0.55,                     // more measured for expert authority
+    similarity: 0.82,
+    style: 0.35,                         // slightly reserved expert delivery
   },
 }
 
@@ -606,7 +609,7 @@ async function synthesizeCue(
   if (!elevenLabsKey) return null
 
   const voiceConfig = VOICE_MAP[cue.speaker] ?? VOICE_MAP.synthesizer
-  const { voiceId, stability, similarity } = voiceConfig
+  const { voiceId, stability, similarity, style } = voiceConfig
 
   try {
     const wordCount = cue.text.split(/\s+/).length
@@ -623,11 +626,11 @@ async function synthesizeCue(
         },
         body: JSON.stringify({
           text: cue.text,
-          model_id: 'eleven_multilingual_v2',
+          model_id: 'eleven_turbo_v2_5',  // faster + more natural for English
           voice_settings: {
             stability,
             similarity_boost: similarity,
-            style: 0.3,
+            style,
             use_speaker_boost: true,
           },
         }),
