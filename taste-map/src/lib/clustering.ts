@@ -184,7 +184,11 @@ export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): 
     const categories = members.map(m => m.pin.category).filter(Boolean);
     const dominantCat = mode(categories) || 'uncategorized';
     const top = topTokens(centroid, 8);
-    const label = top[0] ? top[0].charAt(0).toUpperCase() + top[0].slice(1) : `Cluster ${clusterIdx}`;
+    // Combine top 2 tokens for a more evocative auto-label (e.g. "Ambient Tape" not just "Ambient")
+    const labelParts = top.slice(0, 2).filter(Boolean);
+    const label = labelParts.length > 0
+      ? labelParts.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ')
+      : `Cluster ${clusterIdx}`;
 
     clusters.push({
       id: `${idPrefix}${clusterIdx}`,

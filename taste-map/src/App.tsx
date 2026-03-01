@@ -20,7 +20,7 @@ import { EdgeDetail } from './components/EdgeDetail';
 
 type AppState = 'loading' | 'empty' | 'clustering' | 'labeling' | 'ready';
 
-const CACHE_KEY_PREFIX = 'boards-taste-graph-v2-';
+const CACHE_KEY_PREFIX = 'boards-taste-graph-v3-';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function clusterFingerprint(clusters: Cluster[]): string {
@@ -253,19 +253,20 @@ export default function App() {
         </div>
       )}
 
-      <div className="tg-stage" style={{ paddingTop: showBreadcrumb ? '68px' : '44px' }}>
-        {(state === 'loading' || state === 'clustering' || state === 'labeling') && (
-          <LoadingState
-            message={
-              state === 'loading'
-                ? 'Loading your library'
-                : state === 'clustering'
-                ? 'Mapping your taste'
-                : 'Labeling clusters'
-            }
-          />
-        )}
+      {/* Full-screen loading overlay (outside stage, like Soundscape) */}
+      {(state === 'loading' || state === 'clustering' || state === 'labeling') && (
+        <LoadingState
+          message={
+            state === 'loading'
+              ? 'Loading your library'
+              : state === 'clustering'
+              ? 'Mapping your taste'
+              : 'Labeling clusters'
+          }
+        />
+      )}
 
+      <div className={`tg-stage ${showBreadcrumb ? 'tg-stage--with-breadcrumb' : ''}`}>
         {state === 'empty' && (
           <div className="tg-empty">
             <p className="tg-empty__title">
