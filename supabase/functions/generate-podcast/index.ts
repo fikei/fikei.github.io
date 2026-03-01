@@ -2,7 +2,7 @@
 // 4-stage AI pipeline: source aggregation → bias classification → script generation → ElevenLabs TTS
 //
 // POST /functions/v1/generate-podcast
-// Body: { topic: string, mode: "news" | "deep-dive" | "debate", userId?: string, biasPreference?: "left" | "center" | "right" | "balanced" }
+// Body: { topic: string, mode: "news" | "deep-dive" | "investigative" | "opinion" | "wormhole", userId?: string, biasPreference?: "left" | "center" | "right" | "balanced" }
 // Returns: { episode: { id, topic, mode, transcript, sources, biasDistribution, audioUrls, durationSeconds, status } }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -46,7 +46,7 @@ interface BiasDistribution {
 interface Episode {
   id: string
   topic: string
-  title: string              // Headline-style title generated from transcript
+  title: string
   mode: string
   transcript: TranscriptCue[]
   sources: Source[]
@@ -54,6 +54,135 @@ interface Episode {
   audioUrls: string[]
   durationSeconds: number
   status: 'ready' | 'partial' | 'no-audio'
+}
+
+// ============================================================
+// Mode configurations — search strategies, segments, word targets
+// ============================================================
+
+interface ModeConfig {
+  searchStrategy: 'breaking' | 'broad' | 'investigative' | 'opinion' | 'lateral'
+  segments: string[]
+  targetWords: number
+  voiceStyle: string  // prompt instructions for voice tone
+  structurePrompt: string  // how to structure the argument
+  scriptStyle: string  // how the script should read
+}
+
+const MODE_CONFIGS: Record<string, ModeConfig> = {
+  news: {
+    searchStrategy: 'breaking',
+    segments: ['headline', 'context', 'key_developments', 'implications', 'wrap'],
+    targetWords: 750,  // ~5 min at 150 wpm
+    voiceStyle: 'Crisp, urgent, clear. Like the top of an NPR newscast.',
+    structurePrompt: `Use the INVERTED TRIANGLE structure:
+1. headline — the single most important thing (who, what, when, where)
+2. context — essential background in 2-3 sentences
+3. key_developments — the 2-3 most important new facts or developments
+4. implications — why this matters, what happens next
+5. wrap — one-sentence signoff
+
+This is a 5-minute briefing. Be concise. No filler. Every sentence earns its place.`,
+    scriptStyle: `Write like a tight news briefing. Short sentences. Active voice. Lead with the most important fact.
+- synthesizer: anchor delivering the news clearly and concisely
+- challenger: asks the one question the audience is thinking
+- expert: provides the critical context in 1-2 sentences
+Total ~750 words. No meandering. Cut anything that doesn't inform.`,
+  },
+
+  'deep-dive': {
+    searchStrategy: 'broad',
+    segments: ['cold_open', 'context', 'history', 'argument_a', 'argument_b', 'expert_insight', 'cross_examination', 'synthesis'],
+    targetWords: 3500,  // ~23 min at 150 wpm
+    voiceStyle: 'Conversational but substantive. Like a long-form NPR feature.',
+    structurePrompt: `Structure as a comprehensive exploration:
+1. cold_open — hook the listener with a surprising fact or question
+2. context — what's happening now and why it matters
+3. history — how we got here (key turning points)
+4. argument_a — the strongest case for one perspective
+5. argument_b — the strongest counter-perspective
+6. expert_insight — deeper technical or domain-specific analysis
+7. cross_examination — challenge both sides, find the weak points
+8. synthesis — what we actually know, what remains uncertain
+
+This is a 20-30 minute deep dive. Go deep on context and history that a quick news briefing would skip.`,
+    scriptStyle: `Write like a long-form NPR feature with real depth. Each segment should feel like a mini-chapter.
+- synthesizer: guides the narrative, connects ideas, provides transitions
+- challenger: probes assumptions, surfaces contradictions, plays devil's advocate
+- expert: provides the depth — data, historical parallels, domain expertise
+Total ~3500 words. Allow ideas to breathe. Use specific examples and data.`,
+  },
+
+  investigative: {
+    searchStrategy: 'investigative',
+    segments: ['cold_open', 'the_question', 'evidence_trail', 'key_players', 'contradictions', 'expert_analysis', 'connecting_dots', 'what_we_know', 'unanswered'],
+    targetWords: 4500,  // ~30 min at 150 wpm
+    voiceStyle: 'Serious, methodical, building tension. Like a podcast version of investigative journalism.',
+    structurePrompt: `Structure as an investigative narrative that follows the evidence:
+1. cold_open — the scene-setter: a specific moment, fact, or detail that hooks the listener
+2. the_question — frame the central question this investigation is trying to answer
+3. evidence_trail — walk through the key evidence chronologically, source by source
+4. key_players — who is involved, what are their motivations and interests
+5. contradictions — where do official narratives break down, what doesn't add up
+6. expert_analysis — domain experts weigh in on what the evidence means
+7. connecting_dots — the big picture: how individual facts form a pattern
+8. what_we_know — state clearly and precisely what is established vs. alleged
+9. unanswered — honest about what remains unknown, what needs further investigation
+
+This is a 30-minute investigative episode. Follow the facts. Name sources. Be precise about what is established vs. what is alleged. Build narrative tension by revealing facts in order.`,
+    scriptStyle: `Write like investigative journalism for audio. Precise. Source-heavy. Build narrative momentum.
+- synthesizer: the investigative narrator — walks through evidence methodically, builds the case
+- challenger: the skeptic — "but wait, how do we know that?", "who benefits from this narrative?"
+- expert: the analyst — connects this to broader patterns, provides forensic-level detail
+Total ~4500 words. Every claim needs a source. Distinguish clearly between fact, allegation, and inference. Use phrases like "according to [source]", "records show", "what we can verify is".`,
+  },
+
+  opinion: {
+    searchStrategy: 'opinion',
+    segments: ['framing', 'perspective_1', 'steelman_1', 'perspective_2', 'steelman_2', 'perspective_3', 'clash', 'common_ground', 'listener_challenge'],
+    targetWords: 4500,  // ~30 min at 150 wpm
+    voiceStyle: 'Passionate but fair. Like a great roundtable debate where everyone gets their best shot.',
+    structurePrompt: `Structure as a rigorous exploration of multiple perspectives:
+1. framing — present the topic and why reasonable people disagree about it
+2. perspective_1 — the strongest version of the first major viewpoint
+3. steelman_1 — make this perspective even stronger than its proponents usually do
+4. perspective_2 — the strongest version of the opposing viewpoint
+5. steelman_2 — steelman this perspective too
+6. perspective_3 — a third perspective that complicates the binary (could be international, historical, or non-obvious)
+7. clash — direct confrontation of the strongest arguments from each side
+8. common_ground — where do these perspectives actually agree, even if they don't realize it
+9. listener_challenge — pose the question back to the listener with the best evidence from all sides
+
+This is a 30-minute opinion exploration. The goal is NOT to be neutral — it's to make every perspective as strong as possible, then let them collide. The listener should feel genuinely torn.`,
+    scriptStyle: `Write like a world-class debate where every participant is at their best. No straw men.
+- synthesizer: the moderator — frames fairly, ensures each perspective gets its strongest airing
+- challenger: the provocateur — deliberately takes each side to its logical extreme, asks "so what?"
+- expert: the evidence-keeper — grounds opinions in data, history, and real-world outcomes
+Total ~4500 words. Each perspective should be presented so well that the listener could mistake the show for actually advocating it. Use real quotes and data from sources.`,
+  },
+
+  wormhole: {
+    searchStrategy: 'lateral',
+    segments: ['hook', 'the_rabbit_hole', 'unexpected_connection', 'deep_weird', 'historical_parallel', 'expert_tangent', 'mind_blown', 'return_to_surface'],
+    targetWords: 4500,  // ~30 min at 150 wpm
+    voiceStyle: 'Curious, playful, increasingly amazed. Like discovering something incredible at 2am.',
+    structurePrompt: `Structure as a journey down an unexpected rabbit hole:
+1. hook — start with the topic as the audience knows it, then reveal the weird angle
+2. the_rabbit_hole — the first unexpected connection or fact that pulls us deeper
+3. unexpected_connection — how this topic connects to something seemingly unrelated
+4. deep_weird — the strangest, most surprising aspect — the thing that makes you go "wait, WHAT?"
+5. historical_parallel — a bizarre historical echo or precedent nobody talks about
+6. expert_tangent — an expert perspective that reframes everything
+7. mind_blown — the moment where all the threads come together into something genuinely surprising
+8. return_to_surface — come back to the original topic, but now the listener sees it completely differently
+
+This is a 30-minute wormhole episode. The goal is to take a familiar topic and find the angle nobody is talking about. Think: "the real story behind the story", unexpected consequences, hidden connections, the absurd detail that reveals a deeper truth. Be genuinely curious and surprised.`,
+    scriptStyle: `Write like the best late-night Wikipedia rabbit hole, but with the production quality of Radiolab.
+- synthesizer: the curious guide — "okay but here's where it gets weird", genuinely delighted by discoveries
+- challenger: the grounding voice — "hold on, is this actually true?", keeps things honest
+- expert: the obsessive — knows the deep lore, the footnotes, the connections nobody else sees
+Total ~4500 words. Prioritize surprise and genuine discovery. Use narrative cliffhangers between segments. The tone should be: "you're not going to believe this, but it's all real".`,
+  },
 }
 
 // ============================================================
@@ -84,145 +213,126 @@ async function fetchSources(topic: string, mode: string = 'news'): Promise<Sourc
   const serpApiKey = Deno.env.get('SERP_API_KEY')
   if (!serpApiKey) throw new Error('SERP_API_KEY not configured')
 
+  const config = MODE_CONFIGS[mode] ?? MODE_CONFIGS.news
   const allResults: Source[] = []
   let index = 1
 
-  if (mode === 'news') {
-    // ---- NEWS MODE: Use Google News engine for breaking/recent stories ----
-    // Query 1: Google News (last 24-48 hours, sorted by date)
-    const newsQueries = [
-      `${topic}`,
-      `${topic} analysis perspectives`,
-    ]
-
+  if (config.searchStrategy === 'breaking') {
+    // NEWS: Google News for recency + recent analysis
+    const newsQueries = [`${topic}`, `${topic} analysis perspectives`]
     for (const query of newsQueries) {
       console.log(`[Stage 1] SerpAPI Google News query: "${query}"`)
       const params = new URLSearchParams({
-        api_key: serpApiKey,
-        engine: 'google_news',
-        q: query,
-        hl: 'en',
-        gl: 'us',
+        api_key: serpApiKey, engine: 'google_news', q: query, hl: 'en', gl: 'us',
       })
-
       const t0 = Date.now()
       const res = await fetch(`https://serpapi.com/search.json?${params}`)
       console.log(`[Stage 1] SerpAPI News response: ${res.status} (${Date.now() - t0}ms)`)
-      if (!res.ok) {
-        const errText = await res.text()
-        console.error(`[Stage 1] SerpAPI News error:`, errText)
-        continue
-      }
-
+      if (!res.ok) { console.error(`[Stage 1] SerpAPI News error:`, await res.text()); continue }
       const data = await res.json()
-      const results = data.news_results ?? []
-      console.log(`[Stage 1] Got ${results.length} news results`)
-
-      for (const result of results.slice(0, 6)) {
+      for (const result of (data.news_results ?? []).slice(0, 6)) {
         const link = result.link ?? result.stories?.[0]?.link
         const title = result.title ?? result.stories?.[0]?.title
         if (!link || !title) continue
-        let domain = ''
-        try {
-          domain = new URL(link).hostname.replace('www.', '')
-        } catch {
-          continue
-        }
-        allResults.push({
-          index: index++,
-          title,
-          url: link,
-          domain,
-          snippet: result.snippet ?? result.date ?? '',
-        })
+        try { allResults.push({ index: index++, title, url: link, domain: new URL(link).hostname.replace('www.', ''), snippet: result.snippet ?? result.date ?? '' }) } catch { continue }
       }
     }
-
-    // Query 2: Also do a regular Google search with time filter for opinion/analysis
-    console.log(`[Stage 1] SerpAPI Google (recent) query: "${topic} opinion analysis"`)
-    const analysisParams = new URLSearchParams({
-      api_key: serpApiKey,
-      engine: 'google',
-      q: `${topic} opinion analysis`,
-      num: '6',
-      hl: 'en',
-      tbs: 'qdr:w',  // Last week
-    })
-
-    const t1 = Date.now()
+    // Also grab recent opinion/analysis
+    const analysisParams = new URLSearchParams({ api_key: serpApiKey, engine: 'google', q: `${topic} opinion analysis`, num: '6', hl: 'en', tbs: 'qdr:w' })
     const analysisRes = await fetch(`https://serpapi.com/search.json?${analysisParams}`)
-    console.log(`[Stage 1] SerpAPI Google recent response: ${analysisRes.status} (${Date.now() - t1}ms)`)
     if (analysisRes.ok) {
       const data = await analysisRes.json()
-      const results = data.organic_results ?? []
-      console.log(`[Stage 1] Got ${results.length} recent analysis results`)
-      for (const result of results.slice(0, 4)) {
+      for (const result of (data.organic_results ?? []).slice(0, 4)) {
         if (!result.link || !result.title) continue
-        let domain = ''
-        try {
-          domain = new URL(result.link).hostname.replace('www.', '')
-        } catch {
-          continue
-        }
-        allResults.push({
-          index: index++,
-          title: result.title,
-          url: result.link,
-          domain,
-          snippet: result.snippet ?? '',
-        })
+        try { allResults.push({ index: index++, title: result.title, url: result.link, domain: new URL(result.link).hostname.replace('www.', ''), snippet: result.snippet ?? '' }) } catch { continue }
       }
     }
-  } else {
-    // ---- DEEP DIVE MODE: Broader search for depth, not just recency ----
-    const queries = [
-      `${topic} debate perspectives`,
-      `${topic} analysis research`,
-    ]
 
+  } else if (config.searchStrategy === 'investigative') {
+    // INVESTIGATIVE: primary sources, documents, timelines, fact-checks
+    const queries = [
+      `${topic} investigation facts timeline`,
+      `${topic} documents records evidence`,
+      `${topic} fact check analysis`,
+      `${topic} who what when where`,
+    ]
     for (const query of queries) {
       console.log(`[Stage 1] SerpAPI query: "${query}"`)
-      const params = new URLSearchParams({
-        api_key: serpApiKey,
-        engine: 'google',
-        q: query,
-        num: '8',
-        hl: 'en',
-      })
-
+      const params = new URLSearchParams({ api_key: serpApiKey, engine: 'google', q: query, num: '6', hl: 'en' })
       const t0 = Date.now()
       const res = await fetch(`https://serpapi.com/search.json?${params}`)
       console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
-      if (!res.ok) {
-        const errText = await res.text()
-        console.error(`[Stage 1] SerpAPI error body:`, errText)
-        continue
-      }
-
+      if (!res.ok) { console.error(`[Stage 1] SerpAPI error:`, await res.text()); continue }
       const data = await res.json()
-      const results = data.organic_results ?? []
-      console.log(`[Stage 1] Got ${results.length} organic results`)
-
-      for (const result of results.slice(0, 6)) {
+      for (const result of (data.organic_results ?? []).slice(0, 5)) {
         if (!result.link || !result.title) continue
-        let domain = ''
-        try {
-          domain = new URL(result.link).hostname.replace('www.', '')
-        } catch {
-          continue
-        }
-        allResults.push({
-          index: index++,
-          title: result.title,
-          url: result.link,
-          domain,
-          snippet: result.snippet ?? '',
-        })
+        try { allResults.push({ index: index++, title: result.title, url: result.link, domain: new URL(result.link).hostname.replace('www.', ''), snippet: result.snippet ?? '' }) } catch { continue }
+      }
+    }
+
+  } else if (config.searchStrategy === 'opinion') {
+    // OPINION: explicitly seek diverse editorial perspectives
+    const queries = [
+      `${topic} editorial opinion`,
+      `${topic} conservative perspective`,
+      `${topic} progressive perspective`,
+      `${topic} international view`,
+    ]
+    for (const query of queries) {
+      console.log(`[Stage 1] SerpAPI query: "${query}"`)
+      const params = new URLSearchParams({ api_key: serpApiKey, engine: 'google', q: query, num: '6', hl: 'en' })
+      const t0 = Date.now()
+      const res = await fetch(`https://serpapi.com/search.json?${params}`)
+      console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
+      if (!res.ok) { console.error(`[Stage 1] SerpAPI error:`, await res.text()); continue }
+      const data = await res.json()
+      for (const result of (data.organic_results ?? []).slice(0, 5)) {
+        if (!result.link || !result.title) continue
+        try { allResults.push({ index: index++, title: result.title, url: result.link, domain: new URL(result.link).hostname.replace('www.', ''), snippet: result.snippet ?? '' }) } catch { continue }
+      }
+    }
+
+  } else if (config.searchStrategy === 'lateral') {
+    // WORMHOLE: weird angles, unexpected connections, historical oddities
+    const queries = [
+      `${topic} unexpected surprising fact`,
+      `${topic} history bizarre strange`,
+      `${topic} connection nobody talks about`,
+      `${topic} rabbit hole deep dive weird`,
+    ]
+    for (const query of queries) {
+      console.log(`[Stage 1] SerpAPI query: "${query}"`)
+      const params = new URLSearchParams({ api_key: serpApiKey, engine: 'google', q: query, num: '6', hl: 'en' })
+      const t0 = Date.now()
+      const res = await fetch(`https://serpapi.com/search.json?${params}`)
+      console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
+      if (!res.ok) { console.error(`[Stage 1] SerpAPI error:`, await res.text()); continue }
+      const data = await res.json()
+      for (const result of (data.organic_results ?? []).slice(0, 5)) {
+        if (!result.link || !result.title) continue
+        try { allResults.push({ index: index++, title: result.title, url: result.link, domain: new URL(result.link).hostname.replace('www.', ''), snippet: result.snippet ?? '' }) } catch { continue }
+      }
+    }
+
+  } else {
+    // BROAD (deep-dive default): depth + breadth
+    const queries = [`${topic} debate perspectives`, `${topic} analysis research`]
+    for (const query of queries) {
+      console.log(`[Stage 1] SerpAPI query: "${query}"`)
+      const params = new URLSearchParams({ api_key: serpApiKey, engine: 'google', q: query, num: '8', hl: 'en' })
+      const t0 = Date.now()
+      const res = await fetch(`https://serpapi.com/search.json?${params}`)
+      console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
+      if (!res.ok) { console.error(`[Stage 1] SerpAPI error:`, await res.text()); continue }
+      const data = await res.json()
+      for (const result of (data.organic_results ?? []).slice(0, 6)) {
+        if (!result.link || !result.title) continue
+        try { allResults.push({ index: index++, title: result.title, url: result.link, domain: new URL(result.link).hostname.replace('www.', ''), snippet: result.snippet ?? '' }) } catch { continue }
       }
     }
   }
 
-  // Deduplicate by domain (keep first occurrence per domain)
+  // Deduplicate by domain
   const seen = new Set<string>()
   const deduped: Source[] = []
   for (const source of allResults) {
@@ -231,11 +341,9 @@ async function fetchSources(topic: string, mode: string = 'news'): Promise<Sourc
       deduped.push(source)
     }
   }
-
   console.log(`[Stage 1] Total: ${allResults.length} raw → ${deduped.length} deduped sources`)
 
-  // Ensure source diversity: categorize domains by known bias tendencies
-  // This pre-classification is rough — Claude refines bias in Stage 2
+  // Source diversity: round-robin across bias buckets
   const KNOWN_LEFT = new Set(['nytimes.com', 'washingtonpost.com', 'msnbc.com', 'theguardian.com', 'vox.com', 'slate.com', 'motherjones.com', 'huffpost.com', 'thenation.com', 'theatlantic.com', 'cnn.com'])
   const KNOWN_RIGHT = new Set(['foxnews.com', 'nationalreview.com', 'dailywire.com', 'washingtontimes.com', 'breitbart.com', 'nypost.com', 'wsj.com', 'freebeacon.com', 'thefederalist.com', 'dailycaller.com', 'newsmax.com'])
   const KNOWN_INTL = new Set(['bbc.com', 'bbc.co.uk', 'reuters.com', 'aljazeera.com', 'dw.com', 'france24.com', 'scmp.com', 'japantimes.co.jp'])
@@ -247,29 +355,22 @@ async function fetchSources(topic: string, mode: string = 'news'): Promise<Sourc
     return 'center'
   }
 
-  // Group sources by rough bias bucket
   const buckets: Record<string, Source[]> = { left: [], center: [], right: [], international: [] }
-  for (const s of deduped) {
-    const bucket = roughBias(s.domain)
-    buckets[bucket].push(s)
-  }
-  console.log(`[Stage 1] Diversity buckets: L=${buckets.left.length} C=${buckets.center.length} R=${buckets.right.length} I=${buckets.international.length}`)
+  for (const s of deduped) { buckets[roughBias(s.domain)].push(s) }
+  console.log(`[Stage 1] Diversity: L=${buckets.left.length} C=${buckets.center.length} R=${buckets.right.length} I=${buckets.international.length}`)
 
-  // Round-robin across buckets to ensure diversity (aim for mix of perspectives)
   const diverse: Source[] = []
-  const TARGET = 12
+  const TARGET = mode === 'news' ? 8 : 14
   const bucketKeys = ['left', 'center', 'right', 'international']
-  const bucketIndices = { left: 0, center: 0, right: 0, international: 0 }
+  const bucketIndices: Record<string, number> = { left: 0, center: 0, right: 0, international: 0 }
 
-  // Keep cycling through buckets until we have enough or exhausted all
   let passes = 0
   while (diverse.length < TARGET && passes < 10) {
     let addedThisPass = false
     for (const key of bucketKeys) {
-      const idx = bucketIndices[key as keyof typeof bucketIndices]
-      if (idx < buckets[key].length) {
-        diverse.push(buckets[key][idx])
-        bucketIndices[key as keyof typeof bucketIndices]++
+      if (bucketIndices[key] < buckets[key].length) {
+        diverse.push(buckets[key][bucketIndices[key]])
+        bucketIndices[key]++
         addedThisPass = true
         if (diverse.length >= TARGET) break
       }
@@ -278,24 +379,20 @@ async function fetchSources(topic: string, mode: string = 'news'): Promise<Sourc
     passes++
   }
 
-  // Re-number indices sequentially
   diverse.forEach((s, i) => { s.index = i + 1 })
-
   console.log(`[Stage 1] Final: ${diverse.length} diverse sources`)
   return diverse
 }
 
 // ============================================================
-// Stage 2: Bias Classification via Claude Haiku
+// Stage 2: Bias Classification via Claude
 // ============================================================
 
 async function classifySources(sources: Source[]): Promise<Source[]> {
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
-  const sourceList = sources
-    .map(s => `${s.index}. [${s.domain}] ${s.title}\n   ${s.snippet}`)
-    .join('\n\n')
+  const sourceList = sources.map(s => `${s.index}. [${s.domain}] ${s.title}\n   ${s.snippet}`).join('\n\n')
 
   const prompt = `Classify each source's political/ideological bias and content type.
 
@@ -310,67 +407,35 @@ Type categories: news, opinion, analysis, research, government
 
 Respond ONLY with the JSON objects, one per line, no other text.`
 
-  console.log(`[Stage 2] Calling Claude Haiku for bias classification (${sources.length} sources)`)
+  console.log(`[Stage 2] Calling Claude for bias classification (${sources.length} sources)`)
   const t0 = Date.now()
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
   })
   console.log(`[Stage 2] Claude response: ${res.status} (${Date.now() - t0}ms)`)
 
-  if (!res.ok) {
-    const errBody = await res.text()
-    console.error('[Stage 2] Claude bias error body:', errBody)
-    return sources
-  }
+  if (!res.ok) { console.error('[Stage 2] Claude error:', await res.text()); return sources }
 
   const data = await res.json()
   const text: string = data.content?.[0]?.text ?? ''
-
-  // Parse line-by-line JSON
   const classificationMap = new Map<number, { bias: string; type: string }>()
   for (const line of text.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed.startsWith('{')) continue
     try {
       const parsed = JSON.parse(trimmed)
-      if (parsed.index && parsed.bias && parsed.type) {
-        classificationMap.set(parsed.index, { bias: parsed.bias, type: parsed.type })
-      }
-    } catch {
-      // skip malformed lines
-    }
+      if (parsed.index && parsed.bias && parsed.type) classificationMap.set(parsed.index, { bias: parsed.bias, type: parsed.type })
+    } catch { /* skip */ }
   }
 
-  return sources.map(s => ({
-    ...s,
-    bias: classificationMap.get(s.index)?.bias ?? 'center',
-    type: classificationMap.get(s.index)?.type ?? 'news',
-  }))
+  return sources.map(s => ({ ...s, bias: classificationMap.get(s.index)?.bias ?? 'center', type: classificationMap.get(s.index)?.type ?? 'news' }))
 }
 
 function computeBiasDistribution(sources: Source[]): BiasDistribution {
-  const counts: Record<string, number> = {
-    left: 0,
-    'center-left': 0,
-    center: 0,
-    'center-right': 0,
-    right: 0,
-    international: 0,
-  }
-  for (const s of sources) {
-    const bias = s.bias ?? 'center'
-    if (bias in counts) counts[bias]++
-  }
+  const counts: Record<string, number> = { left: 0, 'center-left': 0, center: 0, 'center-right': 0, right: 0, international: 0 }
+  for (const s of sources) { const bias = s.bias ?? 'center'; if (bias in counts) counts[bias]++ }
   const total = sources.length || 1
   return {
     left: Math.round((counts.left / total) * 100),
@@ -383,51 +448,43 @@ function computeBiasDistribution(sources: Source[]): BiasDistribution {
 }
 
 // ============================================================
-// Stage 3: Script Generation via Claude Haiku (two calls)
+// Stage 3: Script Generation via Claude (two calls)
 // ============================================================
-
-const SEGMENTS = [
-  'cold_open',
-  'context',
-  'argument_a',
-  'argument_b',
-  'expert_insight',
-  'cross_examination',
-  'consensus',
-  'synthesis',
-]
 
 async function generateScript(topic: string, sources: Source[], mode: string = 'news', biasPreference: string = 'balanced'): Promise<TranscriptCue[]> {
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
+  const config = MODE_CONFIGS[mode] ?? MODE_CONFIGS.news
+
   const sourcesSummary = sources
     .map(s => `[${s.index}] ${s.title} (${s.domain}, bias: ${s.bias ?? 'unknown'}, type: ${s.type ?? 'unknown'})\n    Snippet: ${s.snippet}`)
     .join('\n\n')
 
-  // Call 1: Argument structuring
   const today = new Date().toISOString().slice(0, 10)
-  const modeContext = mode === 'news'
-    ? `\n\nIMPORTANT: This is a DAILY NEWS episode recorded on ${today}. Focus on what is happening RIGHT NOW — the latest developments, breaking news, and current events. Reference specific recent events and dates. Do NOT discuss this topic in the abstract or historically — ground everything in TODAY's news.`
-    : `\n\nThis is a DEEP DIVE episode exploring this topic in depth with historical context, research, and multiple expert perspectives.`
+
+  // Date context for modes that need recency
+  const dateContext = (mode === 'news' || mode === 'investigative')
+    ? `\n\nToday's date is ${today}. Ground your discussion in current events and recent developments.`
+    : `\n\nToday's date is ${today}.`
 
   // Bias preference framing
   const biasContext = biasPreference === 'balanced'
-    ? '\n\nPresent all perspectives equally and fairly. Give roughly equal time to left, center, and right viewpoints.'
+    ? '\n\nPresent all perspectives equally and fairly.'
     : biasPreference === 'left'
-    ? '\n\nThe listener prefers a left-leaning perspective. Lead with progressive viewpoints and arguments, but still acknowledge and present opposing views for balance. Aim for roughly 60% left-leaning content, 20% center, 20% right.'
+    ? '\n\nThe listener prefers a left-leaning perspective. Lead with progressive viewpoints but still present opposing views. Aim for 60% left, 20% center, 20% right.'
     : biasPreference === 'right'
-    ? '\n\nThe listener prefers a right-leaning perspective. Lead with conservative viewpoints and arguments, but still acknowledge and present opposing views for balance. Aim for roughly 60% right-leaning content, 20% center, 20% left.'
-    : '\n\nThe listener prefers a centrist perspective. Emphasize moderate, pragmatic viewpoints. Present both left and right arguments but focus on where they converge, common ground, and evidence-based middle positions. Aim for roughly 60% center content, 20% left, 20% right.'
+    ? '\n\nThe listener prefers a right-leaning perspective. Lead with conservative viewpoints but still present opposing views. Aim for 60% right, 20% center, 20% left.'
+    : '\n\nThe listener prefers a centrist perspective. Emphasize moderate, pragmatic viewpoints. Aim for 60% center, 20% left, 20% right.'
 
-  const structurePrompt = `You are structuring a balanced podcast episode on: "${topic}"
-${modeContext}${biasContext}
+  // Call 1: Argument structuring
+  const structurePrompt = `You are structuring a podcast episode on: "${topic}"
+${dateContext}${biasContext}
+
+${config.structurePrompt}
 
 Available sources (with bias labels):
 ${sourcesSummary}
-
-Create a balanced argument structure for an 18-minute podcast episode with these segments:
-${SEGMENTS.join(', ')}
 
 Three voices:
 - synthesizer: balanced moderator, presents multiple views
@@ -438,68 +495,51 @@ For each segment, specify:
 1. Which speaker leads
 2. Key points to cover
 3. Which source indices to cite (use [1], [2], etc.)
-4. Target word count (total ~2700 words across all segments)
+4. Target word count (total ~${config.targetWords} words across all segments)
+
+Segments: ${config.segments.join(', ')}
 
 Respond with a JSON array:
-[{"segment": "cold_open", "speaker": "synthesizer", "keyPoints": ["..."], "citations": [1, 2], "targetWords": 120}, ...]`
+[{"segment": "${config.segments[0]}", "speaker": "synthesizer", "keyPoints": ["..."], "citations": [1, 2], "targetWords": ${Math.round(config.targetWords / config.segments.length)}}, ...]`
 
-  console.log(`[Stage 3a] Calling Claude Haiku for argument structure`)
+  console.log(`[Stage 3a] Calling Claude for argument structure (mode: ${mode})`)
   const t1 = Date.now()
   const structureRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: structurePrompt }],
-    }),
+    headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, messages: [{ role: 'user', content: structurePrompt }] }),
   })
   console.log(`[Stage 3a] Claude response: ${structureRes.status} (${Date.now() - t1}ms)`)
 
   if (!structureRes.ok) {
-    const errBody = await structureRes.text()
-    console.error('[Stage 3a] Claude structure error body:', errBody)
+    console.error('[Stage 3a] Claude error:', await structureRes.text())
     throw new Error(`Claude structure call failed: ${structureRes.status}`)
   }
 
   const structureData = await structureRes.json()
   const structureText: string = structureData.content?.[0]?.text ?? '[]'
 
-  let argumentStructure: Array<{
-    segment: string
-    speaker: string
-    keyPoints: string[]
-    citations: number[]
-    targetWords: number
-  }> = []
-
+  let argumentStructure: Array<{ segment: string; speaker: string; keyPoints: string[]; citations: number[]; targetWords: number }> = []
   try {
     const jsonMatch = structureText.match(/\[[\s\S]*\]/)
-    if (jsonMatch) {
-      argumentStructure = JSON.parse(jsonMatch[0])
-    }
-  } catch {
-    console.error('[generate-podcast] Failed to parse argument structure')
-  }
+    if (jsonMatch) argumentStructure = JSON.parse(jsonMatch[0])
+  } catch { console.error('[Stage 3a] Failed to parse argument structure') }
 
   if (argumentStructure.length === 0) {
-    // Fallback: create a basic structure
-    argumentStructure = SEGMENTS.map((seg, i) => ({
+    argumentStructure = config.segments.map((seg, i) => ({
       segment: seg,
       speaker: i % 3 === 0 ? 'synthesizer' : i % 3 === 1 ? 'challenger' : 'expert',
       keyPoints: [`Discuss ${topic} from the ${seg} perspective`],
       citations: sources.slice(0, 2).map(s => s.index),
-      targetWords: 340,
+      targetWords: Math.round(config.targetWords / config.segments.length),
     }))
   }
 
   // Call 2: Full script generation
   const scriptPrompt = `You are writing a podcast script on: "${topic}"
-${modeContext}${biasContext}
+${dateContext}${biasContext}
+
+${config.voiceStyle}
 
 Use this argument structure:
 ${JSON.stringify(argumentStructure, null, 2)}
@@ -507,40 +547,27 @@ ${JSON.stringify(argumentStructure, null, 2)}
 Source reference (cite by index number):
 ${sources.map(s => `[${s.index}] ${s.title} — ${s.domain}`).join('\n')}
 
-Write the complete conversational script. Each speaker should sound distinct:
-- synthesizer: measured, fair, connects ideas across perspectives
-- challenger: skeptical, probing, surfaces uncomfortable questions
-- expert: precise, evidence-based, contextualizes complexity
+${config.scriptStyle}
 
 Rules:
-- Total ~2700 words across all cues
 - Natural spoken language (no bullet points, no headers in speech)
 - Each cue is 1-3 paragraphs of continuous speech
 - Include real citation references naturally in speech (e.g., "According to [source 3]...")
 
 Respond with ONLY a JSON array of transcript cues:
-[{"speaker": "synthesizer", "text": "...", "segment": "cold_open", "citations": [1, 2]}, ...]`
+[{"speaker": "synthesizer", "text": "...", "segment": "${config.segments[0]}", "citations": [1, 2]}, ...]`
 
-  console.log(`[Stage 3b] Calling Claude Haiku for full script (${argumentStructure.length} segments)`)
+  console.log(`[Stage 3b] Calling Claude for full script (${argumentStructure.length} segments, target ~${config.targetWords} words)`)
   const t2 = Date.now()
   const scriptRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      messages: [{ role: 'user', content: scriptPrompt }],
-    }),
+    headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 16384, messages: [{ role: 'user', content: scriptPrompt }] }),
   })
   console.log(`[Stage 3b] Claude response: ${scriptRes.status} (${Date.now() - t2}ms)`)
 
   if (!scriptRes.ok) {
-    const errBody = await scriptRes.text()
-    console.error('[Stage 3b] Claude script error body:', errBody)
+    console.error('[Stage 3b] Claude error:', await scriptRes.text())
     throw new Error(`Claude script call failed: ${scriptRes.status}`)
   }
 
@@ -548,10 +575,8 @@ Respond with ONLY a JSON array of transcript cues:
   const scriptText: string = scriptData.content?.[0]?.text ?? '[]'
   const stopReason = scriptData.stop_reason ?? 'unknown'
   const outputTokens = scriptData.usage?.output_tokens ?? 0
-  console.log(`[Stage 3b] Script response: ${scriptText.length} chars, stop_reason: ${stopReason}, output_tokens: ${outputTokens}`)
-
-  // Log first 200 chars of response for debugging
-  console.log(`[Stage 3b] Script preview: ${scriptText.substring(0, 200)}...`)
+  console.log(`[Stage 3b] Script: ${scriptText.length} chars, stop: ${stopReason}, tokens: ${outputTokens}`)
+  console.log(`[Stage 3b] Preview: ${scriptText.substring(0, 200)}...`)
 
   try {
     const jsonMatch = scriptText.match(/\[[\s\S]*\]/)
@@ -560,12 +585,12 @@ Respond with ONLY a JSON array of transcript cues:
       console.log(`[Stage 3b] Parsed ${parsed.length} transcript cues`)
       return parsed
     } else {
-      console.error('[Stage 3b] No JSON array found in script response')
+      console.error('[Stage 3b] No JSON array found in response')
       console.error('[Stage 3b] Full response:', scriptText.substring(0, 500))
     }
   } catch (parseErr) {
     console.error('[Stage 3b] JSON parse failed:', (parseErr as Error).message)
-    console.error('[Stage 3b] Raw text (first 500 chars):', scriptText.substring(0, 500))
+    console.error('[Stage 3b] Raw (first 500):', scriptText.substring(0, 500))
   }
 
   return []
@@ -575,27 +600,24 @@ Respond with ONLY a JSON array of transcript cues:
 // Stage 4: TTS Synthesis via ElevenLabs
 // ============================================================
 
-// ElevenLabs voice IDs — NPR Up First inspired cast
-// Drew + Sarah give an A Martinez / Leila Fadel conversational warmth.
-// Daniel provides authoritative expert gravitas with a distinct British timbre.
 const VOICE_MAP: Record<string, { voiceId: string; stability: number; similarity: number; style: number }> = {
   synthesizer: {
-    voiceId: '29vD33N1CtxCmqQRPOHJ',  // Drew — warm, well-rounded American male (NPR anchor feel)
-    stability: 0.45,                     // lower = more conversational variation
+    voiceId: '29vD33N1CtxCmqQRPOHJ',  // Drew — warm, well-rounded American male
+    stability: 0.45,
     similarity: 0.78,
-    style: 0.45,                         // higher style = more expressive, natural delivery
+    style: 0.45,
   },
   challenger: {
-    voiceId: 'EXAVITQu4vr4xnSDxMaL',  // Sarah — soft, clear American female (warm co-host feel)
-    stability: 0.40,                     // low stability = natural, probing energy
+    voiceId: 'EXAVITQu4vr4xnSDxMaL',  // Sarah — soft, clear American female
+    stability: 0.40,
     similarity: 0.75,
-    style: 0.50,                         // more expressive for the challenger role
+    style: 0.50,
   },
   expert: {
-    voiceId: 'onwK4e9ZLuTAKqWW03F9',  // Daniel — deep, measured British male (distinct expert)
-    stability: 0.55,                     // more measured for expert authority
+    voiceId: 'onwK4e9ZLuTAKqWW03F9',  // Daniel — deep, measured British male
+    stability: 0.55,
     similarity: 0.82,
-    style: 0.35,                         // slightly reserved expert delivery
+    style: 0.35,
   },
 }
 
@@ -613,52 +635,27 @@ async function synthesizeCue(
 
   try {
     const wordCount = cue.text.split(/\s+/).length
-    console.log(`[Stage 4] TTS cue ${index}: speaker=${cue.speaker}, voice=${voiceId}, words=${wordCount}`)
+    console.log(`[Stage 4] TTS cue ${index}: speaker=${cue.speaker}, words=${wordCount}`)
     const t0 = Date.now()
-    const res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        method: 'POST',
-        headers: {
-          'xi-api-key': elevenLabsKey,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg',
-        },
-        body: JSON.stringify({
-          text: cue.text,
-          model_id: 'eleven_turbo_v2_5',  // faster + more natural for English
-          voice_settings: {
-            stability,
-            similarity_boost: similarity,
-            style,
-            use_speaker_boost: true,
-          },
-        }),
-      }
-    )
-    console.log(`[Stage 4] ElevenLabs response cue ${index}: ${res.status} (${Date.now() - t0}ms)`)
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: { 'xi-api-key': elevenLabsKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+      body: JSON.stringify({
+        text: cue.text,
+        model_id: 'eleven_turbo_v2_5',
+        voice_settings: { stability, similarity_boost: similarity, style, use_speaker_boost: true },
+      }),
+    })
+    console.log(`[Stage 4] ElevenLabs cue ${index}: ${res.status} (${Date.now() - t0}ms)`)
 
-    if (!res.ok) {
-      const errText = await res.text()
-      console.error(`[Stage 4] ElevenLabs error cue ${index}:`, errText)
-      return null
-    }
+    if (!res.ok) { console.error(`[Stage 4] ElevenLabs error cue ${index}:`, await res.text()); return null }
 
     const audioBuffer = await res.arrayBuffer()
     console.log(`[Stage 4] Audio cue ${index}: ${(audioBuffer.byteLength / 1024).toFixed(1)}KB`)
     const filePath = `${episodeId}/chunk_${index}.mp3`
 
-    const { error: uploadError } = await supabase.storage
-      .from('echo-audio')
-      .upload(filePath, audioBuffer, {
-        contentType: 'audio/mpeg',
-        upsert: true,
-      })
-
-    if (uploadError) {
-      console.error(`[Stage 4] Storage upload failed cue ${index}:`, JSON.stringify(uploadError))
-      return null
-    }
+    const { error: uploadError } = await supabase.storage.from('echo-audio').upload(filePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+    if (uploadError) { console.error(`[Stage 4] Upload failed cue ${index}:`, JSON.stringify(uploadError)); return null }
 
     const { data: urlData } = supabase.storage.from('echo-audio').getPublicUrl(filePath)
     console.log(`[Stage 4] Uploaded cue ${index}: ${filePath}`)
@@ -674,19 +671,13 @@ async function synthesizeAll(
   episodeId: string,
   supabase: ReturnType<typeof createClient>
 ): Promise<string[]> {
-  const BATCH_SIZE = 3  // ElevenLabs rate limits are tighter than OpenAI
+  const BATCH_SIZE = 3
   const audioUrls: (string | null)[] = new Array(transcript.length).fill(null)
-
   for (let i = 0; i < transcript.length; i += BATCH_SIZE) {
     const batch = transcript.slice(i, i + BATCH_SIZE)
-    const results = await Promise.all(
-      batch.map((cue, batchIdx) => synthesizeCue(cue, i + batchIdx, episodeId, supabase))
-    )
-    for (let j = 0; j < results.length; j++) {
-      audioUrls[i + j] = results[j]
-    }
+    const results = await Promise.all(batch.map((cue, batchIdx) => synthesizeCue(cue, i + batchIdx, episodeId, supabase)))
+    for (let j = 0; j < results.length; j++) { audioUrls[i + j] = results[j] }
   }
-
   return audioUrls.filter((url): url is string => url !== null)
 }
 
@@ -695,9 +686,7 @@ async function synthesizeAll(
 // ============================================================
 
 function estimateDuration(transcript: TranscriptCue[]): number {
-  const totalWords = transcript.reduce((sum, cue) => {
-    return sum + cue.text.split(/\s+/).length
-  }, 0)
+  const totalWords = transcript.reduce((sum, cue) => sum + cue.text.split(/\s+/).length, 0)
   return Math.round((totalWords / 150) * 60)
 }
 
@@ -705,60 +694,54 @@ function estimateDuration(transcript: TranscriptCue[]): number {
 // Generate headline-style episode title from transcript
 // ============================================================
 
-async function generateTitle(topic: string, transcript: TranscriptCue[]): Promise<string> {
+async function generateTitle(topic: string, mode: string, transcript: TranscriptCue[]): Promise<string> {
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
-  if (!anthropicKey) return topic  // fallback to raw topic
+  if (!anthropicKey) return topic
 
-  // Extract first few cues for context
   const preview = transcript.slice(0, 3).map(c => c.text).join(' ').substring(0, 500)
 
+  const modeHint: Record<string, string> = {
+    news: 'a concise news headline',
+    'deep-dive': 'a compelling feature episode title',
+    investigative: 'an investigative journalism headline that hints at what was uncovered',
+    opinion: 'a thought-provoking title that captures the central tension',
+    wormhole: 'a surprising, curiosity-driven title that makes you go "wait, what?"',
+  }
+
   try {
-    console.log(`[Title] Generating headline for: "${topic}"`)
+    console.log(`[Title] Generating headline for: "${topic}" (mode: ${mode})`)
     const t0 = Date.now()
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
+      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 100,
-        messages: [{ role: 'user', content: `Generate a compelling, concise podcast episode headline (5-10 words) for a topic about "${topic}". The episode discusses: ${preview}
+        messages: [{ role: 'user', content: `Generate ${modeHint[mode] ?? 'a compelling podcast episode headline'} (5-10 words) for a topic about "${topic}". The episode discusses: ${preview}
 
 Rules:
-- Write like a news headline or podcast episode title
+- Write like a podcast episode title
 - Be specific and intriguing, not generic
 - Do NOT include quotes or punctuation wrapping
-- Respond with ONLY the title, nothing else
-
-Examples of good titles:
-"The Race to Regulate AI Before It's Too Late"
-"Inside the Nuclear Energy Comeback"
-"Why Housing Costs Won't Come Down"
-"America's Psychedelic Therapy Revolution"` }],
+- Respond with ONLY the title, nothing else` }],
       }),
     })
     console.log(`[Title] Claude response: ${res.status} (${Date.now() - t0}ms)`)
-
     if (!res.ok) return topic
-
     const data = await res.json()
     const title = data.content?.[0]?.text?.trim() ?? topic
     console.log(`[Title] Generated: "${title}"`)
     return title
-  } catch {
-    return topic
-  }
+  } catch { return topic }
 }
 
 // ============================================================
 // Main handler
 // ============================================================
 
+const VALID_MODES = new Set(['news', 'deep-dive', 'investigative', 'opinion', 'wormhole'])
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -774,39 +757,30 @@ serve(async (req) => {
     }
 
     const normalizedTopic = topic.trim()
+    const normalizedMode = VALID_MODES.has(mode) ? mode : 'news'
     const normalizedBias = ['left', 'center', 'right', 'balanced'].includes(biasPreference) ? biasPreference : 'balanced'
-    const cacheKey = `${normalizedTopic}:${mode}:${normalizedBias}`
+    const cacheKey = `${normalizedTopic}:${normalizedMode}:${normalizedBias}`
 
-    console.log('[generate-podcast] Request:', { topic: normalizedTopic, mode, userId, biasPreference: normalizedBias })
+    console.log('[generate-podcast] Request:', { topic: normalizedTopic, mode: normalizedMode, userId, biasPreference: normalizedBias })
 
-    // Check cache
     const cached = getCached(cacheKey)
     if (cached) {
       console.log('[generate-podcast] Cache hit:', cacheKey)
-      return new Response(
-        JSON.stringify({ episode: cached }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ episode: cached }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const episodeId = crypto.randomUUID()
-
-    // Initialize Supabase client for storage
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase env vars not configured')
-    }
+    if (!supabaseUrl || !supabaseServiceKey) throw new Error('Supabase env vars not configured')
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Stage 1: Source aggregation
     console.log('[generate-podcast] Stage 1: Fetching sources')
     let sources: Source[]
     try {
-      sources = await fetchSources(normalizedTopic, mode)
-      if (sources.length === 0) {
-        throw new Error('No sources found from SerpAPI')
-      }
+      sources = await fetchSources(normalizedTopic, normalizedMode)
+      if (sources.length === 0) throw new Error('No sources found')
     } catch (err) {
       console.error('[generate-podcast] Stage 1 failed:', err)
       return new Response(
@@ -818,23 +792,16 @@ serve(async (req) => {
 
     // Stage 2: Bias classification
     console.log('[generate-podcast] Stage 2: Classifying sources')
-    try {
-      sources = await classifySources(sources)
-    } catch (err) {
-      console.error('[generate-podcast] Stage 2 failed (non-fatal):', err)
-      // Continue with unclassified sources
-    }
+    try { sources = await classifySources(sources) } catch (err) { console.error('[generate-podcast] Stage 2 failed (non-fatal):', err) }
     const biasDistribution = computeBiasDistribution(sources)
-    console.log('[generate-podcast] Stage 2 complete. Bias distribution:', biasDistribution)
+    console.log('[generate-podcast] Stage 2 complete. Bias:', biasDistribution)
 
     // Stage 3: Script generation
     console.log('[generate-podcast] Stage 3: Generating script')
     let transcript: TranscriptCue[]
     try {
-      transcript = await generateScript(normalizedTopic, sources, mode, normalizedBias)
-      if (transcript.length === 0) {
-        throw new Error('Script generation returned empty transcript')
-      }
+      transcript = await generateScript(normalizedTopic, sources, normalizedMode, normalizedBias)
+      if (transcript.length === 0) throw new Error('Script generation returned empty transcript')
     } catch (err) {
       console.error('[generate-podcast] Stage 3 failed:', err)
       return new Response(
@@ -842,69 +809,45 @@ serve(async (req) => {
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log(`[generate-podcast] Stage 3 complete: ${transcript.length} transcript cues`)
+    console.log(`[generate-podcast] Stage 3 complete: ${transcript.length} cues`)
 
     const durationSeconds = estimateDuration(transcript)
 
-    // Stage 4: TTS synthesis + title generation (run in parallel)
-    console.log('[generate-podcast] Stage 4: Synthesizing audio + generating title')
+    // Stage 4: TTS + title (parallel)
+    console.log('[generate-podcast] Stage 4: TTS + title')
     let audioUrls: string[] = []
     let status: Episode['status'] = 'ready'
-    let title = normalizedTopic  // fallback
+    let title = normalizedTopic
 
     try {
-      // Run TTS and title generation concurrently
       const [ttsResult, titleResult] = await Promise.allSettled([
         synthesizeAll(transcript, episodeId, supabase),
-        generateTitle(normalizedTopic, transcript),
+        generateTitle(normalizedTopic, normalizedMode, transcript),
       ])
 
       if (ttsResult.status === 'fulfilled') {
         audioUrls = ttsResult.value
-        if (audioUrls.length === 0) {
-          status = 'no-audio'
-        } else if (audioUrls.length < transcript.length) {
-          status = 'partial'
-        }
+        if (audioUrls.length === 0) status = 'no-audio'
+        else if (audioUrls.length < transcript.length) status = 'partial'
       } else {
-        console.error('[generate-podcast] Stage 4 TTS failed (non-fatal):', ttsResult.reason)
+        console.error('[generate-podcast] TTS failed:', ttsResult.reason)
         status = 'no-audio'
       }
 
-      if (titleResult.status === 'fulfilled') {
-        title = titleResult.value
-      }
+      if (titleResult.status === 'fulfilled') title = titleResult.value
     } catch (err) {
-      console.error('[generate-podcast] Stage 4 failed (non-fatal):', err)
+      console.error('[generate-podcast] Stage 4 failed:', err)
       status = 'no-audio'
     }
-    console.log(`[generate-podcast] Stage 4 complete: ${audioUrls.length}/${transcript.length} audio chunks, title: "${title}"`)
+    console.log(`[generate-podcast] Stage 4 complete: ${audioUrls.length}/${transcript.length} audio, title: "${title}"`)
 
-    // Remove snippets from final sources (not needed in response)
     const finalSources = sources.map(({ snippet: _snippet, ...s }) => s)
+    const episode: Episode = { id: episodeId, topic: normalizedTopic, title, mode: normalizedMode, transcript, sources: finalSources, biasDistribution, audioUrls, durationSeconds, status }
 
-    const episode: Episode = {
-      id: episodeId,
-      topic: normalizedTopic,
-      title,
-      mode,
-      transcript,
-      sources: finalSources,
-      biasDistribution,
-      audioUrls,
-      durationSeconds,
-      status,
-    }
-
-    // Cache and return
     setCached(cacheKey, episode)
+    console.log('[generate-podcast] Done. ID:', episodeId, 'Status:', status, 'Duration:', durationSeconds)
 
-    console.log('[generate-podcast] Done. Episode ID:', episodeId, 'Status:', status)
-
-    return new Response(
-      JSON.stringify({ episode }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ episode }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
     console.error('[generate-podcast] Unhandled error:', err)
     return new Response(
