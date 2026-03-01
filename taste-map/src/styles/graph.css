@@ -1,22 +1,21 @@
 /* ============================================
-   Taste Map — Design Tokens + Graph Styles
-   Matches ctrl.rodeo design language:
-   black/white, Space Grotesk, sharp corners,
-   borders over fills, UPPERCASE labels
+   Taste Map — 3D Terminal Aesthetic
+   Pure black, IBM Plex Mono, web 1.0 coder vibes
+   Soundscape-inspired: hard snaps, crosshair, blink
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
-
 :root {
-  --bg: #111;
+  --bg: #000;
   --fg: #fff;
-  --muted: #666;
-  --subtle: #333;
-  --font-mono: 'Space Grotesk', system-ui, sans-serif;
+  --muted: #555;
+  --subtle: #222;
+  --accent: #888;
+  --font-mono: 'IBM Plex Mono', 'Space Grotesk', monospace;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-size-xs: 9px;
   --font-size-sm: 11px;
-  --font-size-base: 14px;
-  --font-size-lg: 18px;
+  --font-size-base: 13px;
+  --font-size-lg: 16px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -41,6 +40,11 @@ html, body, #root {
   color: var(--fg);
   font-family: var(--font-mono);
 }
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--subtle); }
 
 /* --- App Shell --- */
 
@@ -72,7 +76,7 @@ html, body, #root {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   font-weight: 500;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
 }
 
@@ -81,17 +85,20 @@ html, body, #root {
   gap: var(--space-2);
 }
 
+/* --- Buttons --- */
+
 .tg-btn {
   background: none;
   border: 1px solid var(--subtle);
   color: var(--fg);
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.10em;
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition: none; /* hard snap */
+  text-decoration: none;
 }
 
 .tg-btn:hover {
@@ -106,87 +113,185 @@ html, body, #root {
   line-height: 1;
 }
 
-/* --- Stage (SVG container) --- */
+.tg-btn--drill {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--fg);
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.10em;
+}
+
+/* --- Stage (3D Canvas container) --- */
 
 .tg-stage {
   flex: 1;
   padding-top: 44px; /* header height */
   overflow: hidden;
   position: relative;
+  cursor: crosshair;
 }
 
-.tg-stage svg {
-  width: 100%;
-  height: 100%;
+.tg-stage canvas {
+  width: 100% !important;
+  height: 100% !important;
   display: block;
 }
 
-/* --- SVG Graph Elements --- */
+/* --- Breadcrumb Bar --- */
 
-.tg-edge {
-  stroke: var(--fg);
-  pointer-events: none;
-}
-
-.tg-node {
-  cursor: pointer;
-}
-
-.tg-node circle {
-  transition: r 0.15s ease;
-}
-
-.tg-node:hover circle {
-  filter: brightness(1.3);
-}
-
-.tg-node--expanded circle {
-  fill: var(--fg) !important;
-}
-
-.tg-node--expanded .tg-label {
-  fill: var(--bg);
-}
-
-.tg-node--dimmed {
-  opacity: 0.2;
-}
-
-.tg-node--highlighted circle {
-  stroke-width: 3;
-}
-
-.tg-label {
+.tg-breadcrumb {
+  position: fixed;
+  top: calc(44px + var(--safe-top));
+  left: 0;
+  right: 0;
+  padding: var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--subtle);
+  background: var(--bg);
+  z-index: 10;
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  fill: var(--fg);
-  text-anchor: middle;
-  dominant-baseline: middle;
-  pointer-events: none;
-  user-select: none;
+  letter-spacing: 0.10em;
 }
 
-.tg-count {
+.tg-breadcrumb__crumb {
+  background: none;
+  border: none;
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 7px;
-  fill: var(--muted);
-  text-anchor: middle;
-  pointer-events: none;
-  user-select: none;
-}
-
-.tg-pin-dot {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
   cursor: pointer;
+  padding: var(--space-1) var(--space-1);
+  white-space: nowrap;
+  transition: none;
 }
 
-.tg-pin-label {
+.tg-breadcrumb__crumb:hover {
+  color: var(--fg);
+}
+
+.tg-breadcrumb__crumb--active {
+  color: var(--fg);
+  cursor: default;
+}
+
+.tg-breadcrumb__sep {
+  color: var(--muted);
+}
+
+/* --- 3D Node Labels (rendered via drei <Html>) --- */
+
+.tg-3d-label {
   font-family: var(--font-mono);
-  font-size: 7px;
-  fill: var(--muted);
-  pointer-events: none;
+  font-size: 11px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  border: 1px solid var(--subtle);
+  padding: 4px 8px;
+  white-space: nowrap;
+  cursor: pointer;
   user-select: none;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.85);
+  transition: none; /* hard snap */
+  line-height: 1.4;
+}
+
+.tg-3d-label:hover {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.tg-3d-label--selected {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.tg-3d-label--dimmed {
+  opacity: 0.12;
+}
+
+.tg-3d-label--highlighted {
+  border: 2px solid var(--fg);
+}
+
+.tg-3d-label__name {
+  display: block;
+  font-weight: 500;
+}
+
+.tg-3d-label__count {
+  display: block;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+.tg-3d-label--selected .tg-3d-label__count {
+  color: var(--subtle);
+}
+
+/* --- Edge Detail Tooltip --- */
+
+.tg-edge-detail {
+  position: fixed;
+  z-index: 25;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  padding: var(--space-2) var(--space-3);
+  pointer-events: auto;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+.tg-edge-detail__title {
+  color: var(--fg);
+  margin-bottom: var(--space-1);
+  font-weight: 500;
+}
+
+.tg-edge-detail__stat {
+  color: var(--muted);
+}
+
+.tg-edge-detail__reason {
+  color: var(--accent);
+  margin-top: var(--space-1);
+  font-style: italic;
+  text-transform: none;
+}
+
+.tg-edge-detail__close {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: none;
+}
+
+.tg-edge-detail__close:hover {
+  color: var(--fg);
 }
 
 /* --- Loading State --- */
@@ -207,12 +312,16 @@ html, body, #root {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.15em;
-  animation: tg-pulse 2s ease-in-out infinite;
 }
 
-@keyframes tg-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+.tg-loading__cursor {
+  display: inline-block;
+  animation: tg-blink 1s step-start infinite;
+}
+
+@keyframes tg-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .tg-empty {
@@ -277,7 +386,7 @@ html, body, #root {
   padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
   background: none;
-  transition: color 0.1s, border-color 0.1s;
+  transition: none; /* hard snap */
 }
 
 .tg-motif:hover,
@@ -311,133 +420,156 @@ html, body, #root {
   margin-left: auto;
 }
 
-/* --- Concept Detail Panel --- */
+/* --- Concept Detail Panel (right side) --- */
 
 .tg-detail {
   position: fixed;
-  bottom: 0;
-  left: 0;
+  top: 0;
   right: 0;
-  max-height: 50vh;
+  bottom: 0;
+  width: 320px;
   background: var(--bg);
-  border-top: 2px solid var(--fg);
-  padding: var(--space-4);
+  border-left: 1px solid var(--subtle);
+  padding: calc(44px + var(--safe-top) + var(--space-4)) var(--space-4) var(--space-4);
   z-index: 20;
   overflow-y: auto;
-  transform: translateY(100%);
-  transition: transform 0.2s ease;
+  transform: translateX(100%);
+  transition: transform 0.15s ease;
 }
 
 .tg-detail--visible {
-  transform: translateY(0);
+  transform: translateX(0);
 }
 
-.tg-detail__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-3);
+.tg-detail__depth {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  margin-bottom: var(--space-2);
 }
 
 .tg-detail__label {
   font-family: var(--font-mono);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-lg);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--subtle);
+  letter-spacing: 0.10em;
   color: var(--fg);
-  padding: var(--space-1) 0;
-  width: 100%;
-  max-width: 300px;
+  margin-bottom: var(--space-4);
 }
 
-.tg-detail__label:focus {
-  outline: none;
-  border-bottom-color: var(--fg);
-}
-
-.tg-detail__stat {
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.tg-detail__pins {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: var(--space-2);
-  margin: var(--space-3) 0;
-}
-
-.tg-detail__pin-thumb {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border: 1px solid var(--subtle);
-}
-
-.tg-detail__pin-placeholder {
-  width: 100%;
-  aspect-ratio: 1;
-  background: var(--subtle);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 7px;
-  color: var(--muted);
-  text-transform: uppercase;
-  overflow: hidden;
-  padding: 2px;
-  text-align: center;
-  word-break: break-all;
-}
-
-.tg-detail__related {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-top: var(--space-3);
-}
-
-.tg-detail__related-tag {
+.tg-detail__section-header {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.tg-detail__description {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  color: var(--accent);
+  line-height: 1.6;
+  margin-bottom: var(--space-1);
+}
+
+.tg-detail__stat {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: var(--space-4);
+}
+
+/* Chips */
+
+.tg-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--subtle);
   background: none;
+  color: var(--muted);
+  transition: none;
+  white-space: nowrap;
+}
+
+.tg-chip--token {
+  cursor: default;
+}
+
+.tg-chip--related {
   cursor: pointer;
 }
 
-.tg-detail__related-tag:hover {
+.tg-chip--related:hover {
   color: var(--fg);
   border-color: var(--fg);
 }
 
-.tg-detail__section-header {
-  font-family: var(--font-mono);
-  font-size: 7px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  margin-top: var(--space-3);
-}
-
-.tg-detail__actions {
+.tg-detail__chips {
   display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  border-top: 1px solid var(--subtle);
-  padding-top: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
 }
 
-.tg-btn--action {
+/* Sample titles */
+
+.tg-detail__sample {
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  padding: var(--space-1) var(--space-3);
+  color: var(--muted);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Close button */
+
+.tg-detail__close {
+  position: absolute;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: none;
+}
+
+.tg-detail__close:hover {
+  color: var(--fg);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 700px) {
+  .tg-detail {
+    width: 100%;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 60vh;
+    border-left: none;
+    border-top: 1px solid var(--subtle);
+    padding-top: var(--space-4);
+    transform: translateY(100%);
+  }
+  .tg-detail--visible {
+    transform: translateY(0);
+  }
 }

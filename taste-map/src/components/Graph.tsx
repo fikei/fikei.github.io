@@ -1,16 +1,22 @@
-// Graph — Main SVG force-directed graph with pan/zoom
-import { useEffect, useRef, useState, useCallback } from 'react';
-import type { Cluster, GraphEdge, GraphNode, Pin } from '../lib/types';
+// Graph — 3D force-directed graph with R3F Canvas
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { OrbitControls, Line } from '@react-three/drei';
+import * as THREE from 'three';
+import type { Cluster, GraphEdge, GraphNode, Pin, Insights } from '../lib/types';
 import { createSimulation } from '../lib/force';
-import { ConceptNode } from './ConceptNode';
+import { Node3D } from './Node3D';
 
 interface GraphProps {
   clusters: Cluster[];
   edges: GraphEdge[];
   pins: Pin[];
+  insights: Insights;
   onSelectCluster: (id: string | null) => void;
   selectedCluster: string | null;
   highlightedMotif: string | null;
+  onDrillIn: (clusterId: string) => void;
+  onSelectEdge: (edge: GraphEdge | null, screenPos: { x: number; y: number } | null) => void;
 }
 
 function clustersToNodes(clusters: Cluster[]): GraphNode[] {
@@ -18,8 +24,10 @@ function clustersToNodes(clusters: Cluster[]): GraphNode[] {
     id: cluster.id,
     x: 0,
     y: 0,
+    z: 0,
     vx: 0,
     vy: 0,
+    vz: 0,
     radius: Math.max(18, Math.min(60, Math.sqrt(cluster.pinCount) * 4)),
     cluster,
   }));
@@ -31,22 +39,20 @@ function isMotifMatch(cluster: Cluster, motif: string): boolean {
   return cluster.topTokens.some(t => t.toLowerCase().includes(lower));
 }
 
-export function Graph({
+// Inner scene component — has access to R3F context
+function GraphScene({
   clusters,
   edges,
-  pins,
+  insights: _insights,
   onSelectCluster,
   selectedCluster,
   highlightedMotif,
-}: GraphProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  onDrillIn,
+  onSelectEdge,
+}: Omit<GraphProps, 'pins'>) {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
-  const [, forceUpdate] = useState(0);
-
-  // Pan state
-  const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const panRef = useRef({ dragging: false, startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0 });
+  const simRef = useRef<ReturnType<typeof createSimulation> | null>(null);
+  const { camera, gl } = useThree();
 
   // Run force simulation
   useEffect(() => {
@@ -56,6 +62,11 @@ export function Graph({
     const height = 600;
     const graphNodes = clustersToNodes(clusters);
     const sim = createSimulation(graphNodes, edges, width, height);
+    simRef.current = sim;
+
+    // Center the sim around origin for Three.js (shift by -cx, -cy)
+    const cx = width / 2;
+    const cy = height / 2;
 
     let frame = 0;
     const maxFrames = 200;
@@ -64,8 +75,15 @@ export function Graph({
     function step() {
       sim.tick();
       frame++;
-      setNodes([...sim.nodes]);
-      forceUpdate(f => f + 1);
+
+      // Shift to origin-centered coordinates for 3D
+      const centered = sim.nodes.map(n => ({
+        ...n,
+        x: n.x - cx,
+        y: -(n.y - cy), // flip Y for Three.js (Y-up)
+      }));
+
+      setNodes(centered);
 
       if (!sim.isSettled() && frame < maxFrames) {
         raf = requestAnimationFrame(step);
@@ -76,135 +94,135 @@ export function Graph({
     return () => cancelAnimationFrame(raf);
   }, [clusters, edges]);
 
-  // Compute viewBox
-  const width = 800;
-  const height = 600;
-  const vbX = -viewOffset.x / zoom;
-  const vbY = -viewOffset.y / zoom;
-  const vbW = width / zoom;
-  const vbH = height / zoom;
+  // Build node lookup
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, GraphNode>();
+    for (const n of nodes) map.set(n.id, n);
+    return map;
+  }, [nodes]);
 
-  // Pan handlers
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    panRef.current = {
-      dragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      startOffsetX: viewOffset.x,
-      startOffsetY: viewOffset.y,
-    };
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [viewOffset]);
+  // Edge click handler: project midpoint to screen
+  const handleEdgeClick = useCallback((edge: GraphEdge) => {
+    const source = nodeMap.get(edge.source);
+    const target = nodeMap.get(edge.target);
+    if (!source || !target) return;
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!panRef.current.dragging) return;
-    const dx = e.clientX - panRef.current.startX;
-    const dy = e.clientY - panRef.current.startY;
-    setViewOffset({
-      x: panRef.current.startOffsetX + dx,
-      y: panRef.current.startOffsetY + dy,
-    });
-  }, []);
+    const mid = new THREE.Vector3(
+      (source.x + target.x) / 2,
+      (source.y + target.y) / 2,
+      (source.z + target.z) / 2
+    );
+    mid.project(camera);
 
-  const handlePointerUp = useCallback(() => {
-    panRef.current.dragging = false;
-  }, []);
+    const rect = gl.domElement.getBoundingClientRect();
+    const screenX = ((mid.x + 1) / 2) * rect.width + rect.left;
+    const screenY = ((-mid.y + 1) / 2) * rect.height + rect.top;
 
-  // Zoom handler
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom(z => Math.max(0.3, Math.min(3, z * delta)));
-  }, []);
-
-  // Build a node lookup for edge rendering
-  const nodeMap = new Map<string, GraphNode>();
-  for (const n of nodes) nodeMap.set(n.id, n);
-
-  // Expanded cluster pins (orbital layout)
-  const selectedNode = selectedCluster ? nodeMap.get(selectedCluster) : null;
-  const selectedPins = selectedNode
-    ? pins.filter(p => selectedNode.cluster.pinIds.includes(p.id)).slice(0, 24)
-    : [];
+    onSelectEdge(edge, { x: screenX, y: screenY });
+  }, [nodeMap, camera, gl, onSelectEdge]);
 
   return (
-    <svg
-      ref={svgRef}
-      className="tg-svg"
-      viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onWheel={handleWheel}
-      style={{ width: '100%', height: '100%', touchAction: 'none' }}
-    >
+    <>
+      <color attach="background" args={['#000000']} />
+      <OrbitControls
+        enableDamping
+        dampingFactor={0.1}
+        rotateSpeed={0.5}
+        panSpeed={0.8}
+        zoomSpeed={0.8}
+        minDistance={100}
+        maxDistance={1200}
+      />
+
       {/* Edges */}
-      <g className="tg-edges">
-        {edges.map(edge => {
-          const source = nodeMap.get(edge.source);
-          const target = nodeMap.get(edge.target);
-          if (!source || !target) return null;
-          return (
-            <line
-              key={`${edge.source}-${edge.target}`}
-              className="tg-edge"
-              x1={source.x}
-              y1={source.y}
-              x2={target.x}
-              y2={target.y}
-              stroke="var(--fg)"
-              strokeWidth={1}
-              opacity={0.1 + edge.weight * 0.5}
+      {edges.map(edge => {
+        const source = nodeMap.get(edge.source);
+        const target = nodeMap.get(edge.target);
+        if (!source || !target) return null;
+
+        const points: [number, number, number][] = [
+          [source.x, source.y, source.z],
+          [target.x, target.y, target.z],
+        ];
+
+        const opacity = 0.08 + edge.weight * 0.3;
+
+        return (
+          <group key={`${edge.source}-${edge.target}`}>
+            {/* Visible edge */}
+            <Line
+              points={points}
+              color="white"
+              lineWidth={1}
+              opacity={opacity}
+              transparent
             />
-          );
-        })}
-      </g>
+            {/* Invisible hit target */}
+            <Line
+              points={points}
+              color="white"
+              lineWidth={12}
+              opacity={0}
+              transparent
+              onClick={() => handleEdgeClick(edge)}
+              onPointerOver={(e) => {
+                e.stopPropagation();
+                document.body.style.cursor = 'pointer';
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = '';
+              }}
+            />
+          </group>
+        );
+      })}
 
       {/* Nodes */}
-      <g className="tg-nodes">
-        {nodes.map(node => {
-          const isExpanded = selectedCluster === node.id;
-          const isDimmed = highlightedMotif != null && !isMotifMatch(node.cluster, highlightedMotif);
-          const isHighlighted = highlightedMotif != null && isMotifMatch(node.cluster, highlightedMotif);
+      {nodes.map(node => {
+        const isSelected = selectedCluster === node.id;
+        const isDimmed = highlightedMotif != null && !isMotifMatch(node.cluster, highlightedMotif);
+        const isHighlighted = highlightedMotif != null && isMotifMatch(node.cluster, highlightedMotif);
 
-          return (
-            <ConceptNode
-              key={node.id}
-              node={node}
-              isExpanded={isExpanded}
-              isDimmed={isDimmed}
-              isHighlighted={isHighlighted}
-              onClick={() => onSelectCluster(isExpanded ? null : node.id)}
-            />
-          );
-        })}
-      </g>
+        return (
+          <Node3D
+            key={node.id}
+            node={node}
+            isSelected={isSelected}
+            isDimmed={isDimmed}
+            isHighlighted={isHighlighted}
+            onClick={() => onSelectCluster(isSelected ? null : node.id)}
+            onDoubleClick={() => {
+              if (node.cluster.drillable) {
+                onDrillIn(node.id);
+              }
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
 
-      {/* Expanded cluster: pin dots in orbital layout */}
-      {selectedNode && selectedPins.length > 0 && (
-        <g className="tg-pin-orbits">
-          {selectedPins.map((pin, i) => {
-            const angle = (2 * Math.PI * i) / selectedPins.length;
-            const orbitR = selectedNode.radius + 25;
-            const px = selectedNode.x + Math.cos(angle) * orbitR;
-            const py = selectedNode.y + Math.sin(angle) * orbitR;
-            return (
-              <g key={pin.id}>
-                <circle
-                  cx={px}
-                  cy={py}
-                  r={5}
-                  fill="var(--fg)"
-                  opacity={0.7}
-                  style={{ cursor: 'pointer' }}
-                />
-                <title>{pin.title}</title>
-              </g>
-            );
-          })}
-        </g>
-      )}
-    </svg>
+export function Graph(props: GraphProps) {
+  return (
+    <Canvas
+      camera={{ position: [0, 0, 500], fov: 50, near: 1, far: 5000 }}
+      style={{ width: '100%', height: '100%' }}
+      onPointerMissed={() => {
+        props.onSelectCluster(null);
+        props.onSelectEdge(null, null);
+      }}
+    >
+      <GraphScene
+        clusters={props.clusters}
+        edges={props.edges}
+        insights={props.insights}
+        onSelectCluster={props.onSelectCluster}
+        selectedCluster={props.selectedCluster}
+        highlightedMotif={props.highlightedMotif}
+        onDrillIn={props.onDrillIn}
+        onSelectEdge={props.onSelectEdge}
+      />
+    </Canvas>
   );
 }

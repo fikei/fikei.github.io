@@ -97,7 +97,7 @@ function topTokens(centroid: Map<string, number>, n: number): string[] {
     .map(([token]) => token);
 }
 
-export function buildClusters(pins: Pin[]): Cluster[] {
+export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): Cluster[] {
   const idf = computeIDF(pins);
 
   const pinVectors: PinVector[] = pins.map(p => {
@@ -109,7 +109,7 @@ export function buildClusters(pins: Pin[]): Cluster[] {
   const validPins = pinVectors.filter(pv => pv.vector.size > 0);
   if (validPins.length === 0) return [];
 
-  const K = Math.min(40, Math.max(8, Math.floor(validPins.length / 8)));
+  const K = kOverride ?? Math.min(40, Math.max(8, Math.floor(validPins.length / 8)));
   let centroids = kmeansppInit(validPins, K);
   const assignments = new Int32Array(validPins.length);
 
@@ -187,7 +187,7 @@ export function buildClusters(pins: Pin[]): Cluster[] {
     const label = top[0] ? top[0].charAt(0).toUpperCase() + top[0].slice(1) : `Cluster ${clusterIdx}`;
 
     clusters.push({
-      id: `c${clusterIdx}`,
+      id: `${idPrefix}${clusterIdx}`,
       pinIds: members.map(m => m.pin.id),
       centroidVector: centroid,
       topTokens: top,
@@ -196,11 +196,18 @@ export function buildClusters(pins: Pin[]): Cluster[] {
       pinCount: members.length,
       label,
       domain: CATEGORY_DOMAIN_MAP[dominantCat] || 'other',
+      drillable: members.length >= 4,
     });
     clusterIdx++;
   }
 
   return clusters;
+}
+
+export function buildSubClusters(pins: Pin[], parentId: string): Cluster[] {
+  if (pins.length < 4) return [];
+  const K = Math.min(12, Math.max(3, Math.floor(pins.length / 4)));
+  return buildClusters(pins, `${parentId}-s`, K);
 }
 
 export function buildEdges(clusters: Cluster[]): GraphEdge[] {

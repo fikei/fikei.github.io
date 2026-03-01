@@ -15,10 +15,17 @@ interface ClusterInput {
   pinCount: number
 }
 
+interface ClusterDescription {
+  whatItIs: string
+  whyYou: string
+  howItChanged: string
+}
+
 interface LabeledCluster {
   id: string
   label: string
   domain: string
+  description?: ClusterDescription
 }
 
 interface Insights {
@@ -90,15 +97,26 @@ serve(async (req) => {
 
         const labelPrompt = `You are labeling clusters of content a user has saved. Each cluster represents a group of related saved links.
 
-For each cluster, create a short label (1-3 words, title case) and assign a domain from: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other.
+For each cluster:
+1. Create a short label (1-3 words, title case)
+2. Assign a domain from: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other
+3. Write a "description" object with three fields:
+   - "whatItIs": one lowercase sentence (under 20 words) describing what this interest cluster contains
+   - "whyYou": one lowercase sentence (under 20 words, 2nd person) about why the user gravitates to this
+   - "howItChanged": one lowercase sentence (under 20 words) about how this interest evolved over time
+
+Be poetic, brutally specific, and avoid generic platitudes. Write like Co-Star horoscopes.
+
+Example description:
+{"whatItIs": "a relentless archive of sounds that refuse to stay in one genre", "whyYou": "you treat every algorithm recommendation as a challenge to prove it wrong", "howItChanged": "what started as weekend crate-digging became a full identity"}
 
 Clusters:
 ${clusterDesc}
 
 Respond with ONLY a JSON object:
-{"clusters": [{"id": "c0", "label": "Short Label", "domain": "music"}, ...]}`
+{"clusters": [{"id": "c0", "label": "Short Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
 
-        const labelText = await callAnthropic(labelPrompt, 500)
+        const labelText = await callAnthropic(labelPrompt, 1200)
         const parsed = parseJSON(labelText) as { clusters: LabeledCluster[] }
         labeledClusters = parsed.clusters || []
       } catch (e) {

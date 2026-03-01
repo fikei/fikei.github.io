@@ -60,6 +60,12 @@ export interface Pin {
 
 // --- Clustering ---
 
+export interface ClusterDescription {
+  whatItIs: string;
+  whyYou: string;
+  howItChanged: string;
+}
+
 export interface Cluster {
   id: string;
   pinIds: string[];
@@ -70,6 +76,8 @@ export interface Cluster {
   pinCount: number;
   label: string;
   domain: string;
+  description?: ClusterDescription;
+  drillable: boolean;
 }
 
 export interface GraphEdge {
@@ -84,8 +92,10 @@ export interface GraphNode {
   id: string;
   x: number;
   y: number;
+  z: number;
   vx: number;
   vy: number;
+  vz: number;
   radius: number;
   cluster: Cluster;
 }
@@ -119,6 +129,19 @@ export interface LabeledCluster {
   id: string;
   label: string;
   domain: string;
+  description?: ClusterDescription;
+}
+
+// --- Drill-down ---
+
+export interface DrillFrame {
+  depth: number;
+  parentClusterId: string | null;
+  parentLabel: string;
+  pinIds: string[];
+  clusters: Cluster[];
+  edges: GraphEdge[];
+  focusNodeId?: string;
 }
 
 export interface TasteGraphResponse {
