@@ -1873,6 +1873,32 @@ body {
 /* ============================================
    Filter Token — User Board Indicator
    ============================================ */
+/* Drag-to-category: highlight filter token when dragging a pin over it */
+.filter-token--drag-target {
+  background: var(--fg) !important;
+  color: var(--bg) !important;
+  transform: scale(1.08);
+  transition: transform 0.15s ease, background 0.15s ease;
+  position: relative;
+  z-index: 10;
+}
+.filter-token--drag-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 4px 10px;
+  pointer-events: none;
+  z-index: 11;
+}
+
 .filter-token--new-board {
   color: var(--muted);
   border-color: rgba(255,255,255,0.2);
@@ -6438,8 +6464,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.5.0';
-  console.log('[boards] v' + VERSION + ' - Dismiss and reorder filter dimension chips');
+  const VERSION = '2.6.0';
+  console.log('[boards] v' + VERSION + ' - Drag pin to category tab to move it');
 
   // ============================================
   // Supabase Setup
@@ -15454,6 +15480,9 @@ Return JSON:
   };
 
   filters.onclick = (e) => {
+    // Don't fire click when a drag-drop just completed
+    if (isDragging) return;
+
     const t = e.target.closest('.filter-token');
     if (t) {
       const category = t.dataset.category;
@@ -16331,6 +16360,7 @@ Return JSON:
     const widget = e.target.closest('.widget-inline');
     if (widget) widget.classList.remove('dragging');
     clearDragClasses();
+    clearFilterDragClasses();
     draggedId = null;
     draggedWidgetId = null;
     dropPosition = null;
@@ -16414,6 +16444,87 @@ Return JSON:
       }
     }
   };
+
+  // ── Drag-to-category: drop a pin onto a filter token to move it ──
+
+  function clearFilterDragClasses() {
+    filters.querySelectorAll('.filter-token--drag-target').forEach(el => {
+      el.classList.remove('filter-token--drag-target');
+      const lbl = el.querySelector('.filter-token--drag-label');
+      if (lbl) lbl.remove();
+    });
+  }
+
+  filters.addEventListener('dragover', (e) => {
+    if (!draggedId) return; // only for link cards, not widgets
+    const token = e.target.closest('.filter-token');
+    if (!token || !token.dataset.category) return;
+    const cat = token.dataset.category;
+    // Don't allow drop on "all", "cleanup", or create-board
+    if (cat === 'all' || cat === 'cleanup' || token.id === 'createBoardBtn') return;
+    // Don't allow drop on the pin's current category
+    const pin = getAllLinks().find(l => l.id === draggedId);
+    if (pin && pin.category === cat) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    // Show highlight if not already shown
+    if (!token.classList.contains('filter-token--drag-target')) {
+      clearFilterDragClasses();
+      token.classList.add('filter-token--drag-target');
+      // Add "Move to [Category]" label
+      const label = document.createElement('span');
+      label.className = 'filter-token--drag-label';
+      const cats = getCategories();
+      const meta = cats[cat];
+      const displayName = (meta && meta.displayName) ? meta.displayName : cap(cat);
+      label.textContent = 'Move to ' + displayName;
+      token.style.position = 'relative';
+      token.appendChild(label);
+    }
+  });
+
+  filters.addEventListener('dragleave', (e) => {
+    const token = e.target.closest('.filter-token');
+    if (token) {
+      // Only clear if we're actually leaving the token (not entering a child)
+      const related = e.relatedTarget;
+      if (!token.contains(related)) {
+        token.classList.remove('filter-token--drag-target');
+        const lbl = token.querySelector('.filter-token--drag-label');
+        if (lbl) lbl.remove();
+      }
+    }
+  });
+
+  filters.addEventListener('drop', (e) => {
+    if (!draggedId) return;
+    const token = e.target.closest('.filter-token');
+    if (!token || !token.dataset.category) { clearFilterDragClasses(); return; }
+    const cat = token.dataset.category;
+    if (cat === 'all' || cat === 'cleanup' || token.id === 'createBoardBtn') { clearFilterDragClasses(); return; }
+    const pin = getAllLinks().find(l => l.id === draggedId);
+    if (pin && pin.category === cat) { clearFilterDragClasses(); return; }
+
+    e.preventDefault();
+    e.stopPropagation();
+    clearFilterDragClasses();
+
+    // Move the pin to the target category
+    const cats = getCategories();
+    const meta = cats[cat];
+    const displayName = (meta && meta.displayName) ? meta.displayName : cap(cat);
+    updateLink(draggedId, { category: cat });
+    renderFilters();
+    renderGrid();
+    generateWidgets();
+    toast('Moved to ' + displayName);
+
+    // Clean up drag state
+    draggedId = null;
+    isDragging = false;
+  });
 
   // Drag-to-resize functionality
   let resizeState = null;
