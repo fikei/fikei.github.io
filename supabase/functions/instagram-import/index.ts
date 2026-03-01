@@ -117,7 +117,13 @@ async function extractReel(url: string): Promise<ReelData> {
     throw new Error(`ScrapeCreators API error ${resp.status}: ${text}`)
   }
 
-  const raw = await resp.json()
+  const rawText = await resp.text()
+  let raw
+  try {
+    raw = JSON.parse(rawText)
+  } catch {
+    throw new Error(`ScrapeCreators returned invalid JSON: ${rawText.substring(0, 200)}`)
+  }
   const post = raw.shortcode ? raw : (raw.data || raw)
 
   // Extract audio track from music metadata
@@ -340,11 +346,17 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
   })
 
   if (!resp.ok) {
-    const text = await resp.text()
-    throw new Error(`Claude API error ${resp.status}: ${text}`)
+    const errText = await resp.text()
+    throw new Error(`Claude API error ${resp.status}: ${errText}`)
   }
 
-  const result = await resp.json()
+  const rawBody = await resp.text()
+  let result
+  try {
+    result = JSON.parse(rawBody)
+  } catch {
+    throw new Error(`Claude API returned invalid JSON: ${rawBody.substring(0, 200)}`)
+  }
   let text = result.content[0].text.trim()
 
   // Strip markdown fences if present
@@ -352,7 +364,19 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
     text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
   }
 
-  return JSON.parse(text) as ExtractionResult
+  // Try parsing directly, then try extracting JSON object if Claude appended text
+  try {
+    return JSON.parse(text) as ExtractionResult
+  } catch (parseErr) {
+    console.warn('[instagram-import] Claude returned non-clean JSON, attempting extraction:', (parseErr as Error).message)
+    console.warn('[instagram-import] Raw text:', text.substring(0, 500))
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start !== -1 && end > start) {
+      return JSON.parse(text.substring(start, end + 1)) as ExtractionResult
+    }
+    throw new Error(`Failed to parse entity extraction: ${(parseErr as Error).message}`)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1002,7 +1026,15 @@ serve(async (req) => {
   const headers = { ...corsHeaders, 'Content-Type': 'application/json' }
 
   try {
-    const body = await req.json()
+    let body
+    try {
+      body = await req.json()
+    } catch (parseErr) {
+      return new Response(
+        JSON.stringify({ error: `Invalid request body: ${(parseErr as Error).message}` }),
+        { status: 400, headers }
+      )
+    }
     const { url, urls, posts } = body
 
     // Single URL mode
