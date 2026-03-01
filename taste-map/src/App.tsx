@@ -20,7 +20,7 @@ import { EdgeDetail } from './components/EdgeDetail';
 
 type AppState = 'loading' | 'empty' | 'clustering' | 'labeling' | 'ready';
 
-const CACHE_KEY_PREFIX = 'boards-taste-graph-v3-';
+const CACHE_KEY_PREFIX = 'boards-taste-graph-v4-';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function clusterFingerprint(clusters: Cluster[]): string {
