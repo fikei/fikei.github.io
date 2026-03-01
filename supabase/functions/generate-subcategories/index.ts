@@ -151,9 +151,19 @@ Rules:
     // Sample pins if too many (most recent first — array order preserved from client)
     const sampledPins = pins.slice(0, MAX_PINS)
 
-    // Build the pin list for the prompt
+    // Use short IDs in the prompt (p1, p2, ...) so Haiku can reliably copy them.
+    // Map back to real UUIDs before returning.
+    const shortIdToReal: Record<string, string> = {}
     const pinList = sampledPins
-      .map((p, i) => `${i + 1}. [${p.id}] ${p.title || p.domain || p.url}${p.description ? ` — ${p.description}` : ''}`)
+      .map((p, i) => {
+        const shortId = `p${i + 1}`
+        shortIdToReal[shortId] = p.id
+        // Also map common Haiku mistakes: numeric index, "item-N", bracketed
+        shortIdToReal[String(i + 1)] = p.id
+        shortIdToReal[`item-${i + 1}`] = p.id
+        shortIdToReal[`item${i + 1}`] = p.id
+        return `${i + 1}. [${shortId}] ${p.title || p.domain || p.url}${p.description ? ` — ${p.description}` : ''}`
+      })
       .join('\n')
 
     // Build the Claude prompt based on whether we're creating or assigning
@@ -176,13 +186,14 @@ Respond with valid JSON only, no other text:
   "dimensionLabel": "${existingTags.length > 0 ? 'existing' : prompt}",
   "tags": ${JSON.stringify(existingTags)},
   "assignments": {
-    "item-id-1": "tag-value",
-    "item-id-2": "tag-value"
+    "p1": "tag-value",
+    "p2": "tag-value"
   }
 }
 
 Rules:
-- Every item id must appear in assignments
+- Every item id (p1, p2, etc.) must appear in assignments
+- Use the exact ids from the brackets: p1, p2, p3, etc.
 - Only use tags from the provided list: ${JSON.stringify(existingTags)}
 - If an item doesn't clearly fit any tag, assign it to the most generic/closest tag`
     } else {
@@ -199,15 +210,15 @@ Respond with valid JSON only, no other text:
   "dimensionLabel": "Short Label",
   "tags": ["tag-1", "tag-2", "tag-3"],
   "assignments": {
-    "item-id-1": "tag-1",
-    "item-id-2": "tag-2"
+    "p1": "tag-1",
+    "p2": "tag-2"
   }
 }
 
 Rules:
 1. dimensionLabel: a clear 1-3 word name for this grouping (e.g., "Brand Tier", "Price Range", "Mood")
 2. tags: 2-8 distinct values covering this dimension. Short (1-3 words), lowercase, use hyphens for multi-word tags
-3. assignments: map every item id to exactly one tag from your tags array
+3. assignments: map every item id (p1, p2, p3, etc.) to exactly one tag from your tags array. Use the exact ids from the square brackets.
 4. Generate tags from the actual content — adapt to what's there
 5. If an item doesn't clearly fit any tag, assign it to the most generic tag
 6. Tags should be mutually exclusive and collectively exhaustive for the items`
@@ -287,16 +298,18 @@ Rules:
     }
     const cleanAssignments: Record<string, string | null> = {}
     if (result.assignments && typeof result.assignments === 'object') {
-      for (const [pinId, tag] of Object.entries(result.assignments)) {
+      for (const [shortId, tag] of Object.entries(result.assignments)) {
+        // Resolve short ID (p1, p2, ...) back to real UUID
+        const realId = shortIdToReal[shortId] || shortIdToReal[shortId.toLowerCase()] || shortId
         if (typeof tag !== 'string') {
-          cleanAssignments[pinId] = null
+          cleanAssignments[realId] = null
           continue
         }
         // Try exact match first, then normalized variants
         const matched = validTags.has(tag)
           ? tag
           : normalizedTagMap[tag] || normalizedTagMap[tag.toLowerCase()] || normalizedTagMap[tag.toLowerCase().replace(/[\s_]+/g, '-')] || normalizedTagMap[tag.toLowerCase().replace(/[-_]+/g, ' ')] || null
-        cleanAssignments[pinId] = matched
+        cleanAssignments[realId] = matched
       }
     }
 
