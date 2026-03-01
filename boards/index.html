@@ -964,10 +964,39 @@ body {
   color: var(--bg);
 }
 
+/* Dismiss (×) button inside suggestion chip — revealed on hover */
+.sub-tag__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  opacity: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--fg-subtle);
+  border-radius: 1px;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.sub-tag--suggestion:hover .sub-tag__dismiss { opacity: 0.5; }
+.sub-tag__dismiss:hover { opacity: 1 !important; color: var(--fg); }
+@media (hover: none) {
+  .sub-tag__dismiss { opacity: 0.4; }
+}
+
+/* Chip drag states — horizontal reorder feedback */
+.sub-tag--suggestion.chip-dragging { opacity: 0.4; cursor: grabbing; }
+.sub-tag--suggestion.chip-drag-before { box-shadow: -3px 0 0 0 var(--fg); }
+.sub-tag--suggestion.chip-drag-after { box-shadow: 3px 0 0 0 var(--fg); }
+.sub-tag--suggestion[draggable="true"] { cursor: grab; }
+
 /* Loading state on individual chip */
 .sub-tag--loading {
   opacity: 0.5;
   pointer-events: none;
+  cursor: default;
 }
 
 /* Accessibility: better contrast for interactive elements */
@@ -6409,8 +6438,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.4.7';
-  console.log('[boards] v' + VERSION + ' - Fix filter assignments: short IDs in edge function prompt');
+  const VERSION = '2.5.0';
+  console.log('[boards] v' + VERSION + ' - Dismiss and reorder filter dimension chips');
 
   // ============================================
   // Supabase Setup
@@ -13303,6 +13332,41 @@ Return JSON:
     localStorage.removeItem(PRECOMPUTED_KEY_PREFIX + category);
   }
 
+  // Dismissed suggestions — per-category set of prompt strings the user doesn't want
+  const DISMISSED_KEY_PREFIX = 'dim-dismissed-';
+  const SUGGESTION_DISPLAY_COUNT = 3;
+  let chipDraggedPrompt = null; // prompt string of chip being dragged
+
+  function loadDismissed(category) {
+    try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY_PREFIX + category) || '[]')); }
+    catch { return new Set(); }
+  }
+  function saveDismissed(category, dismissedSet) {
+    try { localStorage.setItem(DISMISSED_KEY_PREFIX + category, JSON.stringify([...dismissedSet])); }
+    catch {}
+  }
+  function dismissSuggestion(category, prompt) {
+    const dismissed = loadDismissed(category);
+    dismissed.add(prompt);
+    saveDismissed(category, dismissed);
+  }
+  function loadSuggestionOrder(category) {
+    try {
+      const cached = localStorage.getItem(`dim-suggestions-${category}`);
+      if (!cached) return null;
+      return JSON.parse(cached).order || null;
+    } catch { return null; }
+  }
+  function saveSuggestionOrder(category, orderArray) {
+    try {
+      const cached = localStorage.getItem(`dim-suggestions-${category}`);
+      if (!cached) return;
+      const parsed = JSON.parse(cached);
+      parsed.order = orderArray;
+      localStorage.setItem(`dim-suggestions-${category}`, JSON.stringify(parsed));
+    } catch {}
+  }
+
   // ============================================
   // Pin Merging
   // ============================================
@@ -14175,6 +14239,19 @@ Return JSON:
     console.log('[precompute] All done for', category);
   }
 
+  // After a dismiss reveals a new pool suggestion, precompute it if not already cached
+  function triggerPrecomputeForNewlyVisible(category) {
+    try {
+      const dismissed = loadDismissed(category);
+      const pool = JSON.parse(localStorage.getItem(`dim-suggestions-${category}`) || '{}').suggestions || [];
+      const visible = pool.filter(s => !dismissed.has(s.prompt)).slice(0, SUGGESTION_DISPLAY_COUNT);
+      const uncached = visible.filter(s => !getPrecomputedDim(category, s.prompt));
+      if (uncached.length > 0 && !precomputingCategories.has(category)) {
+        precomputeDimensions(category, uncached);
+      }
+    } catch {}
+  }
+
   // Get first prompt dimension tag for card overlay display
   function getPromptSubTag(link) {
     const dims = loadPromptDimensions(link.category);
@@ -14251,10 +14328,28 @@ Return JSON:
       return;
     }
 
-    // ── Suggestions available — render unified chip row ──
-    // Trigger background pre-computation if not already running
+    // ── Suggestions available — filter dismissed, apply order, compute visible set ──
+    const dismissed = loadDismissed(currentFilter);
+    const poolSuggestions = suggestions.filter(s => !dismissed.has(s.prompt));
+
+    // Apply user-defined order (if present)
+    const savedOrder = loadSuggestionOrder(currentFilter);
+    let orderedSuggestions = poolSuggestions;
+    if (savedOrder && savedOrder.length > 0) {
+      const orderMap = new Map(savedOrder.map((p, i) => [p, i]));
+      orderedSuggestions = [...poolSuggestions].sort((a, b) => {
+        const ai = orderMap.has(a.prompt) ? orderMap.get(a.prompt) : 999;
+        const bi = orderMap.has(b.prompt) ? orderMap.get(b.prompt) : 999;
+        return ai - bi;
+      });
+    }
+
+    // Display first N from pool (rest are reserve for future dismissals)
+    const visibleSuggestions = orderedSuggestions.slice(0, SUGGESTION_DISPLAY_COUNT);
+
+    // Trigger background pre-computation for ALL pool items (not just visible)
     if (!precomputingCategories.has(currentFilter)) {
-      precomputeDimensions(currentFilter, suggestions);
+      precomputeDimensions(currentFilter, poolSuggestions);
     }
 
     // Get dimension data for the expanded chip (from precomputed cache or persisted dimension)
@@ -14305,7 +14400,12 @@ Return JSON:
 
     let html = `<div class="sub-tags__buttons" role="toolbar" aria-label="Filter dimensions">`;
 
-    for (const s of suggestions) {
+    if (visibleSuggestions.length === 0 && !activeSuggestionPrompt) {
+      // All pool suggestions dismissed — show label only
+      html += `<span class="sub-tags__label" aria-label="All suggestions dismissed">Filters</span>`;
+    }
+
+    for (const s of visibleSuggestions) {
       const isExpanded = activeSuggestionPrompt === s.prompt;
       const isLoading = isExpanded && !expandedDim;
 
@@ -14315,13 +14415,13 @@ Return JSON:
         // ── Loading chip — API call in flight ──
         html += `<button class="sub-tag sub-tag--suggestion sub-tag--loading" data-suggestion="${esc(s.prompt)}" aria-pressed="true" aria-busy="true">${esc(s.label)}\u2026</button>`;
       } else {
-        // ── Collapsed chip ──
-        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}" aria-pressed="false">${esc(s.label)}</button>`;
+        // ── Collapsed chip — with dismiss × and draggable ──
+        html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}" draggable="true" aria-pressed="false">${esc(s.label)}<span class="sub-tag__dismiss" data-dismiss-suggestion="${esc(s.prompt)}" aria-label="Dismiss ${esc(s.label)}">\u00d7</span></button>`;
       }
     }
 
     // ── Custom prompt chip — when activeSuggestionPrompt doesn't match any suggestion ──
-    const isCustomPrompt = activeSuggestionPrompt && !suggestions.some(s => s.prompt === activeSuggestionPrompt);
+    const isCustomPrompt = activeSuggestionPrompt && !visibleSuggestions.some(s => s.prompt === activeSuggestionPrompt) && !dismissed.has(activeSuggestionPrompt);
     if (isCustomPrompt) {
       const isLoading = dimPromptInFlight === activeSuggestionPrompt;
       if (isLoading) {
@@ -15428,6 +15528,26 @@ Return JSON:
         return;
       }
 
+      // Dismiss suggestion chip (× inside chip)
+      const dismissBtn = e.target.closest('[data-dismiss-suggestion]');
+      if (dismissBtn) {
+        e.stopPropagation();
+        const prompt = dismissBtn.dataset.dismissSuggestion;
+        // If dismissing the currently expanded chip, collapse first
+        if (activeSuggestionPrompt === prompt) {
+          activeSuggestionPrompt = null;
+          currentFilters = {};
+          const promptDims = loadPromptDimensions(currentFilter);
+          if (promptDims.length > 0) removePromptDimension(currentFilter, promptDims[0].id);
+        }
+        dismissSuggestion(currentFilter, prompt);
+        renderSubTags();
+        renderGrid();
+        // Trigger precompute for newly visible suggestion from pool
+        triggerPrecomputeForNewlyVisible(currentFilter);
+        return;
+      }
+
       // Tag button inside expanded chip (data-subtag + data-dim-prompt)
       const tagBtn = e.target.closest('[data-subtag][data-dim-prompt]');
       if (tagBtn) {
@@ -15473,6 +15593,84 @@ Return JSON:
         }
         return;
       }
+    };
+
+    // ── Drag-to-reorder suggestion chips ──
+    subTagsEl.ondragstart = (e) => {
+      const chip = e.target.closest('[data-suggestion][draggable]');
+      if (!chip) return;
+      chipDraggedPrompt = chip.dataset.suggestion;
+      chip.classList.add('chip-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', chipDraggedPrompt);
+    };
+
+    subTagsEl.ondragend = () => {
+      subTagsEl.querySelectorAll('.chip-dragging, .chip-drag-before, .chip-drag-after').forEach(el => {
+        el.classList.remove('chip-dragging', 'chip-drag-before', 'chip-drag-after');
+      });
+      chipDraggedPrompt = null;
+    };
+
+    subTagsEl.ondragover = (e) => {
+      if (!chipDraggedPrompt) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const chip = e.target.closest('[data-suggestion][draggable]');
+      if (!chip || chip.dataset.suggestion === chipDraggedPrompt) return;
+
+      const rect = chip.getBoundingClientRect();
+      const isBefore = e.clientX < rect.left + rect.width / 2;
+
+      // Clear previous indicators
+      subTagsEl.querySelectorAll('.chip-drag-before, .chip-drag-after').forEach(el => {
+        el.classList.remove('chip-drag-before', 'chip-drag-after');
+      });
+
+      chip.classList.add(isBefore ? 'chip-drag-before' : 'chip-drag-after');
+    };
+
+    subTagsEl.ondragleave = (e) => {
+      const chip = e.target.closest('[data-suggestion][draggable]');
+      if (chip) chip.classList.remove('chip-drag-before', 'chip-drag-after');
+    };
+
+    subTagsEl.ondrop = (e) => {
+      e.preventDefault();
+      subTagsEl.querySelectorAll('.chip-drag-before, .chip-drag-after').forEach(el => {
+        el.classList.remove('chip-drag-before', 'chip-drag-after');
+      });
+
+      if (!chipDraggedPrompt) return;
+
+      // Determine drop target and position
+      const chip = e.target.closest('[data-suggestion][draggable]');
+      if (!chip || chip.dataset.suggestion === chipDraggedPrompt) { chipDraggedPrompt = null; return; }
+
+      const rect = chip.getBoundingClientRect();
+      const isBefore = e.clientX < rect.left + rect.width / 2;
+      const targetPrompt = chip.dataset.suggestion;
+
+      // Read current visible order and apply reorder
+      const dismissed = loadDismissed(currentFilter);
+      try {
+        const cacheKey = `dim-suggestions-${currentFilter}`;
+        const pool = JSON.parse(localStorage.getItem(cacheKey) || '{}').suggestions || [];
+        const visible = pool.filter(s => !dismissed.has(s.prompt)).slice(0, SUGGESTION_DISPLAY_COUNT);
+        const order = visible.map(s => s.prompt);
+
+        const fromIdx = order.indexOf(chipDraggedPrompt);
+        const toIdx = order.indexOf(targetPrompt);
+        if (fromIdx !== -1 && toIdx !== -1) {
+          order.splice(fromIdx, 1);
+          const insertAt = isBefore ? toIdx - (fromIdx < toIdx ? 1 : 0) : toIdx + (fromIdx < toIdx ? 0 : 1);
+          order.splice(Math.max(0, insertAt), 0, chipDraggedPrompt);
+          saveSuggestionOrder(currentFilter, order);
+        }
+      } catch {}
+
+      chipDraggedPrompt = null;
+      renderSubTags();
     };
   }
 
@@ -16427,7 +16625,7 @@ Return JSON:
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith(DIMS_KEY_PREFIX) || key.startsWith(PRECOMPUTED_KEY_PREFIX) || key.startsWith('dim-suggestions-'))) {
+      if (key && (key.startsWith(DIMS_KEY_PREFIX) || key.startsWith(PRECOMPUTED_KEY_PREFIX) || key.startsWith('dim-suggestions-') || key.startsWith(DISMISSED_KEY_PREFIX))) {
         keysToRemove.push(key);
       }
     }
