@@ -92,6 +92,7 @@ async function fetchSources(topic: string): Promise<Source[]> {
   let index = 1
 
   for (const query of queries) {
+    console.log(`[Stage 1] SerpAPI query: "${query}"`)
     const params = new URLSearchParams({
       api_key: serpApiKey,
       engine: 'google',
@@ -100,14 +101,18 @@ async function fetchSources(topic: string): Promise<Source[]> {
       hl: 'en',
     })
 
+    const t0 = Date.now()
     const res = await fetch(`https://serpapi.com/search.json?${params}`)
+    console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
     if (!res.ok) {
-      console.error('[generate-podcast] SerpAPI error:', res.status, await res.text())
+      const errText = await res.text()
+      console.error(`[Stage 1] SerpAPI error body:`, errText)
       continue
     }
 
     const data = await res.json()
     const results = data.organic_results ?? []
+    console.log(`[Stage 1] Got ${results.length} organic results for query`)
 
     for (const result of results.slice(0, 6)) {
       if (!result.link || !result.title) continue
@@ -166,6 +171,8 @@ Type categories: news, opinion, analysis, research, government
 
 Respond ONLY with the JSON objects, one per line, no other text.`
 
+  console.log(`[Stage 2] Calling Claude Haiku for bias classification (${sources.length} sources)`)
+  const t0 = Date.now()
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -179,9 +186,11 @@ Respond ONLY with the JSON objects, one per line, no other text.`
       messages: [{ role: 'user', content: prompt }],
     }),
   })
+  console.log(`[Stage 2] Claude response: ${res.status} (${Date.now() - t0}ms)`)
 
   if (!res.ok) {
-    console.error('[generate-podcast] Claude bias classification error:', res.status)
+    const errBody = await res.text()
+    console.error('[Stage 2] Claude bias error body:', errBody)
     return sources
   }
 
@@ -280,6 +289,8 @@ For each segment, specify:
 Respond with a JSON array:
 [{"segment": "cold_open", "speaker": "synthesizer", "keyPoints": ["..."], "citations": [1, 2], "targetWords": 120}, ...]`
 
+  console.log(`[Stage 3a] Calling Claude Haiku for argument structure`)
+  const t1 = Date.now()
   const structureRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -293,10 +304,11 @@ Respond with a JSON array:
       messages: [{ role: 'user', content: structurePrompt }],
     }),
   })
+  console.log(`[Stage 3a] Claude response: ${structureRes.status} (${Date.now() - t1}ms)`)
 
   if (!structureRes.ok) {
     const errBody = await structureRes.text()
-    console.error('[generate-podcast] Claude structure error:', structureRes.status, errBody)
+    console.error('[Stage 3a] Claude structure error body:', errBody)
     throw new Error(`Claude structure call failed: ${structureRes.status}`)
   }
 
@@ -354,6 +366,8 @@ Rules:
 Respond with ONLY a JSON array of transcript cues:
 [{"speaker": "synthesizer", "text": "...", "segment": "cold_open", "citations": [1, 2]}, ...]`
 
+  console.log(`[Stage 3b] Calling Claude Haiku for full script (${argumentStructure.length} segments)`)
+  const t2 = Date.now()
   const scriptRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -367,23 +381,36 @@ Respond with ONLY a JSON array of transcript cues:
       messages: [{ role: 'user', content: scriptPrompt }],
     }),
   })
+  console.log(`[Stage 3b] Claude response: ${scriptRes.status} (${Date.now() - t2}ms)`)
 
   if (!scriptRes.ok) {
     const errBody = await scriptRes.text()
-    console.error('[generate-podcast] Claude script error:', scriptRes.status, errBody)
+    console.error('[Stage 3b] Claude script error body:', errBody)
     throw new Error(`Claude script call failed: ${scriptRes.status}`)
   }
 
   const scriptData = await scriptRes.json()
   const scriptText: string = scriptData.content?.[0]?.text ?? '[]'
+  const stopReason = scriptData.stop_reason ?? 'unknown'
+  const outputTokens = scriptData.usage?.output_tokens ?? 0
+  console.log(`[Stage 3b] Script response: ${scriptText.length} chars, stop_reason: ${stopReason}, output_tokens: ${outputTokens}`)
+
+  // Log first 200 chars of response for debugging
+  console.log(`[Stage 3b] Script preview: ${scriptText.substring(0, 200)}...`)
 
   try {
     const jsonMatch = scriptText.match(/\[[\s\S]*\]/)
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as TranscriptCue[]
+      const parsed = JSON.parse(jsonMatch[0]) as TranscriptCue[]
+      console.log(`[Stage 3b] Parsed ${parsed.length} transcript cues`)
+      return parsed
+    } else {
+      console.error('[Stage 3b] No JSON array found in script response')
+      console.error('[Stage 3b] Full response:', scriptText.substring(0, 500))
     }
-  } catch {
-    console.error('[generate-podcast] Failed to parse script JSON')
+  } catch (parseErr) {
+    console.error('[Stage 3b] JSON parse failed:', (parseErr as Error).message)
+    console.error('[Stage 3b] Raw text (first 500 chars):', scriptText.substring(0, 500))
   }
 
   return []
@@ -427,6 +454,9 @@ async function synthesizeCue(
   const { voiceId, stability, similarity } = voiceConfig
 
   try {
+    const wordCount = cue.text.split(/\s+/).length
+    console.log(`[Stage 4] TTS cue ${index}: speaker=${cue.speaker}, voice=${voiceId}, words=${wordCount}`)
+    const t0 = Date.now()
     const res = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
@@ -448,13 +478,16 @@ async function synthesizeCue(
         }),
       }
     )
+    console.log(`[Stage 4] ElevenLabs response cue ${index}: ${res.status} (${Date.now() - t0}ms)`)
 
     if (!res.ok) {
-      console.error(`[generate-podcast] ElevenLabs TTS failed for cue ${index}:`, res.status, await res.text())
+      const errText = await res.text()
+      console.error(`[Stage 4] ElevenLabs error cue ${index}:`, errText)
       return null
     }
 
     const audioBuffer = await res.arrayBuffer()
+    console.log(`[Stage 4] Audio cue ${index}: ${(audioBuffer.byteLength / 1024).toFixed(1)}KB`)
     const filePath = `${episodeId}/chunk_${index}.mp3`
 
     const { error: uploadError } = await supabase.storage
@@ -465,14 +498,15 @@ async function synthesizeCue(
       })
 
     if (uploadError) {
-      console.error(`[generate-podcast] Storage upload failed for cue ${index}:`, uploadError)
+      console.error(`[Stage 4] Storage upload failed cue ${index}:`, JSON.stringify(uploadError))
       return null
     }
 
     const { data: urlData } = supabase.storage.from('echo-audio').getPublicUrl(filePath)
+    console.log(`[Stage 4] Uploaded cue ${index}: ${filePath}`)
     return urlData.publicUrl
   } catch (err) {
-    console.error(`[generate-podcast] TTS synthesis error for cue ${index}:`, err)
+    console.error(`[Stage 4] TTS error cue ${index}:`, (err as Error).message)
     return null
   }
 }
