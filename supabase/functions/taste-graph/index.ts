@@ -95,35 +95,65 @@ serve(async (req) => {
           .map(c => `- id: "${c.id}", tokens: [${c.topTokens.join(', ')}], samples: [${c.sampleTitles.slice(0, 3).join(', ')}], category: ${c.dominantCategory}, pins: ${c.pinCount}`)
           .join('\n')
 
-        const labelPrompt = `You are analyzing clusters of a user's saved links to identify their TASTE PATTERNS — the aesthetic sensibilities, cultural instincts, and recurring obsessions that connect saves across categories.
+        const labelPrompt = `You are a taste profiler. A user saved hundreds of links over time. We clustered them by embedding similarity. Your job: identify the CULTURAL SENSIBILITY behind each cluster — the taste instinct, not the object type.
 
-Your job is to name the UNDERLYING PATTERN, never the surface object. Look across the tokens and sample titles for what draws these saves together — the shared vibe, not the shared noun.
+CRITICAL RULES:
+- Labels name a TASTE IDENTITY or AESTHETIC MOVEMENT — never the object.
+- Descriptions speak to the PERSON'S INSTINCT — never summarize the content.
+- Think: "what kind of person saves all of these?" — that instinct IS the label.
 
-NEVER DO THIS (object-level):
-- "Pants", "Restaurants", "Songs", "Tables", "Sneakers", "Movies"
+BAD labels (describe objects):
+"Black Pants", "Ambient Music", "Japanese Food", "Modern Chairs", "Techno Tracks", "Interior Design"
 
-DO THIS (taste-level):
-- "Utilitarian Uniform", "Omakase Energy", "Melancholic Ambient", "Brutalist Living", "Archive Fever", "Quiet Maximalism"
+GOOD labels (describe taste):
+"Utilitarian Uniform", "Slow Frequencies", "Omakase Discipline", "Scandinavian Minimalism", "Grimy New Wave", "Archive Fever"
 
-For each cluster:
-1. Label (1-3 words, title case): Name the AESTHETIC SENSIBILITY or CULTURAL PATTERN connecting these saves. Ask yourself: what is the taste instinct that makes someone save ALL of these? Never use the object category as the label.
-2. Domain: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other
-3. Description object with three fields:
-   - "whatItIs": one lowercase sentence (under 20 words). Describe the pattern that connects these saves — the shared aesthetic, not the object type. What is the throughline?
-   - "whyYou": one lowercase sentence (under 20 words, 2nd person). What does this pattern reveal about how the user sees the world? What instinct does it satisfy?
-   - "howItChanged": one lowercase sentence (under 20 words). How does a taste like this typically deepen or evolve? Speak to the trajectory.
+BAD descriptions (summarize pins):
+"a collection of black clothing items and minimal wardrobe pieces"
+"links about ambient music and lo-fi producers"
 
-Write like Co-Star horoscopes — poetic, uncomfortably specific, zero platitudes.
+GOOD descriptions (profile the person):
+"a wardrobe built on the belief that reduction is the only honest form of style"
+"sound that insists on being felt in the body before it reaches the brain"
 
-Examples of good labels + descriptions:
-- Tokens: [pants, black, minimal, cut, slim] → Label: "Utilitarian Uniform", description: {"whatItIs": "a wardrobe built on the belief that reduction is the only honest form of style", "whyYou": "you decided long ago that getting dressed should feel like loading ammunition", "howItChanged": "it stopped being about clothes and became a daily practice of disappearing into intention"}
-- Tokens: [ambient, tape, loop, drone, analog] → Label: "Slow Frequencies", description: {"whatItIs": "sound that insists on being felt in the body before it reaches the brain", "whyYou": "you need proof that stillness and intensity are the same thing", "howItChanged": "the playlists got longer and the volume got lower and somehow it hit harder"}
-- Tokens: [concrete, furniture, space, raw, light] → Label: "Brutalist Living", description: {"whatItIs": "interiors where every material announces exactly what it is and dares you to look away", "whyYou": "you find comfort in spaces that refuse to perform comfort", "howItChanged": "what started as an aesthetic preference became a test you apply to everything"}
+For each cluster, provide:
+1. label (1-3 words, title case): The TASTE IDENTITY. Name the aesthetic instinct, cultural posture, or design philosophy — as if naming a subculture or movement, not a product category.
+2. domain: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other
+3. description with three fields. Write like Co-Star — poetic, uncomfortably specific, zero platitudes:
+   - "whatItIs": one lowercase sentence (max 20 words). The shared aesthetic POSTURE — not what the saves contain, but the sensibility that connects them.
+   - "whyYou": one lowercase sentence (max 20 words, 2nd person). The psychological need this taste satisfies. Why does this person gravitate here?
+   - "howItChanged": one lowercase sentence (max 20 words). The trajectory of this taste — how it deepens, mutates, or takes over.
+
+WORKED EXAMPLES:
+
+Tokens: [pants, black, minimal, cut, slim], Samples: [Veilance System_A, Rick Owens DRKSHDW, COS essentials]
+→ Label: "Utilitarian Uniform"
+  whatItIs: "a wardrobe built on the belief that reduction is the only honest form of style"
+  whyYou: "you decided long ago that getting dressed should feel like loading ammunition"
+  howItChanged: "it stopped being about clothes and became a daily practice of disappearing into intention"
+
+Tokens: [techno, dark, warehouse, bass, berlin], Samples: [Berghain sets, DVS1 podcast, Blawan live]
+→ Label: "Grimy New Wave"
+  whatItIs: "sound designed for rooms where the architecture does half the work"
+  whyYou: "you need music that treats subtlety and violence as the same gesture"
+  howItChanged: "the BPM kept climbing but the spaces you listened in kept getting smaller"
+
+Tokens: [wood, light, clean, form, nordic], Samples: [Muuto pendant, HAY sofa, Kinfolk interiors]
+→ Label: "Scandinavian Silence"
+  whatItIs: "objects that treat emptiness as a material and restraint as luxury"
+  whyYou: "you believe a room should feel like a held breath"
+  howItChanged: "it became less about furniture and more about editing out everything that doesn't earn its place"
+
+Tokens: [film, slow, arthouse, frame, mood], Samples: [Wong Kar-wai stills, Tarkovsky mirror, A24 catalog]
+→ Label: "Patient Frame"
+  whatItIs: "cinema where the camera refuses to look away until you feel something shift"
+  whyYou: "you distrust any story that resolves faster than it takes to sit with the question"
+  howItChanged: "you stopped watching for plot and started watching for the moment the light changes"
 
 Clusters:
 ${clusterDesc}
 
-Respond with ONLY a JSON object:
+Respond with ONLY valid JSON:
 {"clusters": [{"id": "c0", "label": "Short Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
 
         const labelText = await callAnthropic(labelPrompt, 1500)
