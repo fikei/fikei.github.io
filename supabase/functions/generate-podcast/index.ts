@@ -79,56 +79,145 @@ function setCached(key: string, episode: Episode): void {
 // Stage 1: Source Aggregation via SerpAPI
 // ============================================================
 
-async function fetchSources(topic: string): Promise<Source[]> {
+async function fetchSources(topic: string, mode: string = 'news'): Promise<Source[]> {
   const serpApiKey = Deno.env.get('SERP_API_KEY')
   if (!serpApiKey) throw new Error('SERP_API_KEY not configured')
-
-  const queries = [
-    `"${topic}" debate perspectives`,
-    `"${topic}" analysis opinion`,
-  ]
 
   const allResults: Source[] = []
   let index = 1
 
-  for (const query of queries) {
-    console.log(`[Stage 1] SerpAPI query: "${query}"`)
-    const params = new URLSearchParams({
-      api_key: serpApiKey,
-      engine: 'google',
-      q: query,
-      num: '8',
-      hl: 'en',
-    })
+  if (mode === 'news') {
+    // ---- NEWS MODE: Use Google News engine for breaking/recent stories ----
+    // Query 1: Google News (last 24-48 hours, sorted by date)
+    const newsQueries = [
+      `${topic}`,
+      `${topic} analysis perspectives`,
+    ]
 
-    const t0 = Date.now()
-    const res = await fetch(`https://serpapi.com/search.json?${params}`)
-    console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
-    if (!res.ok) {
-      const errText = await res.text()
-      console.error(`[Stage 1] SerpAPI error body:`, errText)
-      continue
-    }
+    for (const query of newsQueries) {
+      console.log(`[Stage 1] SerpAPI Google News query: "${query}"`)
+      const params = new URLSearchParams({
+        api_key: serpApiKey,
+        engine: 'google_news',
+        q: query,
+        hl: 'en',
+        gl: 'us',
+      })
 
-    const data = await res.json()
-    const results = data.organic_results ?? []
-    console.log(`[Stage 1] Got ${results.length} organic results for query`)
-
-    for (const result of results.slice(0, 6)) {
-      if (!result.link || !result.title) continue
-      let domain = ''
-      try {
-        domain = new URL(result.link).hostname.replace('www.', '')
-      } catch {
+      const t0 = Date.now()
+      const res = await fetch(`https://serpapi.com/search.json?${params}`)
+      console.log(`[Stage 1] SerpAPI News response: ${res.status} (${Date.now() - t0}ms)`)
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error(`[Stage 1] SerpAPI News error:`, errText)
         continue
       }
-      allResults.push({
-        index: index++,
-        title: result.title,
-        url: result.link,
-        domain,
-        snippet: result.snippet ?? '',
+
+      const data = await res.json()
+      const results = data.news_results ?? []
+      console.log(`[Stage 1] Got ${results.length} news results`)
+
+      for (const result of results.slice(0, 6)) {
+        const link = result.link ?? result.stories?.[0]?.link
+        const title = result.title ?? result.stories?.[0]?.title
+        if (!link || !title) continue
+        let domain = ''
+        try {
+          domain = new URL(link).hostname.replace('www.', '')
+        } catch {
+          continue
+        }
+        allResults.push({
+          index: index++,
+          title,
+          url: link,
+          domain,
+          snippet: result.snippet ?? result.date ?? '',
+        })
+      }
+    }
+
+    // Query 2: Also do a regular Google search with time filter for opinion/analysis
+    console.log(`[Stage 1] SerpAPI Google (recent) query: "${topic} opinion analysis"`)
+    const analysisParams = new URLSearchParams({
+      api_key: serpApiKey,
+      engine: 'google',
+      q: `${topic} opinion analysis`,
+      num: '6',
+      hl: 'en',
+      tbs: 'qdr:w',  // Last week
+    })
+
+    const t1 = Date.now()
+    const analysisRes = await fetch(`https://serpapi.com/search.json?${analysisParams}`)
+    console.log(`[Stage 1] SerpAPI Google recent response: ${analysisRes.status} (${Date.now() - t1}ms)`)
+    if (analysisRes.ok) {
+      const data = await analysisRes.json()
+      const results = data.organic_results ?? []
+      console.log(`[Stage 1] Got ${results.length} recent analysis results`)
+      for (const result of results.slice(0, 4)) {
+        if (!result.link || !result.title) continue
+        let domain = ''
+        try {
+          domain = new URL(result.link).hostname.replace('www.', '')
+        } catch {
+          continue
+        }
+        allResults.push({
+          index: index++,
+          title: result.title,
+          url: result.link,
+          domain,
+          snippet: result.snippet ?? '',
+        })
+      }
+    }
+  } else {
+    // ---- DEEP DIVE MODE: Broader search for depth, not just recency ----
+    const queries = [
+      `${topic} debate perspectives`,
+      `${topic} analysis research`,
+    ]
+
+    for (const query of queries) {
+      console.log(`[Stage 1] SerpAPI query: "${query}"`)
+      const params = new URLSearchParams({
+        api_key: serpApiKey,
+        engine: 'google',
+        q: query,
+        num: '8',
+        hl: 'en',
       })
+
+      const t0 = Date.now()
+      const res = await fetch(`https://serpapi.com/search.json?${params}`)
+      console.log(`[Stage 1] SerpAPI response: ${res.status} (${Date.now() - t0}ms)`)
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error(`[Stage 1] SerpAPI error body:`, errText)
+        continue
+      }
+
+      const data = await res.json()
+      const results = data.organic_results ?? []
+      console.log(`[Stage 1] Got ${results.length} organic results`)
+
+      for (const result of results.slice(0, 6)) {
+        if (!result.link || !result.title) continue
+        let domain = ''
+        try {
+          domain = new URL(result.link).hostname.replace('www.', '')
+        } catch {
+          continue
+        }
+        allResults.push({
+          index: index++,
+          title: result.title,
+          url: result.link,
+          domain,
+          snippet: result.snippet ?? '',
+        })
+      }
     }
   }
 
@@ -142,6 +231,7 @@ async function fetchSources(topic: string): Promise<Source[]> {
     }
   }
 
+  console.log(`[Stage 1] Total: ${allResults.length} raw → ${deduped.length} deduped sources`)
   // Return 8–12 sources
   return deduped.slice(0, 12)
 }
@@ -258,7 +348,7 @@ const SEGMENTS = [
   'synthesis',
 ]
 
-async function generateScript(topic: string, sources: Source[]): Promise<TranscriptCue[]> {
+async function generateScript(topic: string, sources: Source[], mode: string = 'news'): Promise<TranscriptCue[]> {
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -267,7 +357,13 @@ async function generateScript(topic: string, sources: Source[]): Promise<Transcr
     .join('\n\n')
 
   // Call 1: Argument structuring
+  const today = new Date().toISOString().slice(0, 10)
+  const modeContext = mode === 'news'
+    ? `\n\nIMPORTANT: This is a DAILY NEWS episode recorded on ${today}. Focus on what is happening RIGHT NOW — the latest developments, breaking news, and current events. Reference specific recent events and dates. Do NOT discuss this topic in the abstract or historically — ground everything in TODAY's news.`
+    : `\n\nThis is a DEEP DIVE episode exploring this topic in depth with historical context, research, and multiple expert perspectives.`
+
   const structurePrompt = `You are structuring a balanced podcast episode on: "${topic}"
+${modeContext}
 
 Available sources (with bias labels):
 ${sourcesSummary}
@@ -345,6 +441,7 @@ Respond with a JSON array:
 
   // Call 2: Full script generation
   const scriptPrompt = `You are writing a podcast script on: "${topic}"
+${modeContext}
 
 Use this argument structure:
 ${JSON.stringify(argumentStructure, null, 2)}
@@ -592,7 +689,7 @@ serve(async (req) => {
     console.log('[generate-podcast] Stage 1: Fetching sources')
     let sources: Source[]
     try {
-      sources = await fetchSources(normalizedTopic)
+      sources = await fetchSources(normalizedTopic, mode)
       if (sources.length === 0) {
         throw new Error('No sources found from SerpAPI')
       }
@@ -620,7 +717,7 @@ serve(async (req) => {
     console.log('[generate-podcast] Stage 3: Generating script')
     let transcript: TranscriptCue[]
     try {
-      transcript = await generateScript(normalizedTopic, sources)
+      transcript = await generateScript(normalizedTopic, sources, mode)
       if (transcript.length === 0) {
         throw new Error('Script generation returned empty transcript')
       }
