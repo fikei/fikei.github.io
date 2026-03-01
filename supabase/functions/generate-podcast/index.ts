@@ -174,7 +174,7 @@ Respond ONLY with the JSON objects, one per line, no other text.`
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -288,7 +288,7 @@ Respond with a JSON array:
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 2048,
       messages: [{ role: 'user', content: structurePrompt }],
     }),
@@ -360,7 +360,7 @@ Respond with ONLY a JSON array of transcript cues:
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 8192,
       messages: [{ role: 'user', content: scriptPrompt }],
     }),
