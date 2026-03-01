@@ -222,7 +222,7 @@ Rules:
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 1024,
+        max_tokens: 4096,
         messages: [
           { role: 'user', content: claudePrompt }
         ]
@@ -275,16 +275,28 @@ Rules:
       )
     }
 
-    // Ensure assignments only use valid tags
+    // Ensure assignments only use valid tags (with fuzzy matching)
     const validTags = new Set(result.tags)
+    // Build normalized lookup: "running shoes" / "Running Shoes" / "running-shoes" all match "running-shoes"
+    const normalizedTagMap: Record<string, string> = {}
+    for (const tag of result.tags) {
+      normalizedTagMap[tag] = tag
+      normalizedTagMap[tag.toLowerCase()] = tag
+      normalizedTagMap[tag.toLowerCase().replace(/[\s_]+/g, '-')] = tag
+      normalizedTagMap[tag.toLowerCase().replace(/[-_]+/g, ' ')] = tag
+    }
     const cleanAssignments: Record<string, string | null> = {}
     if (result.assignments && typeof result.assignments === 'object') {
       for (const [pinId, tag] of Object.entries(result.assignments)) {
-        if (typeof tag === 'string' && validTags.has(tag)) {
-          cleanAssignments[pinId] = tag
-        } else {
+        if (typeof tag !== 'string') {
           cleanAssignments[pinId] = null
+          continue
         }
+        // Try exact match first, then normalized variants
+        const matched = validTags.has(tag)
+          ? tag
+          : normalizedTagMap[tag] || normalizedTagMap[tag.toLowerCase()] || normalizedTagMap[tag.toLowerCase().replace(/[\s_]+/g, '-')] || normalizedTagMap[tag.toLowerCase().replace(/[-_]+/g, ' ')] || null
+        cleanAssignments[pinId] = matched
       }
     }
 
