@@ -6409,8 +6409,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.4.3';
-  console.log('[boards] v' + VERSION + ' - Add Clear Filter Dimensions to dev menu');
+  const VERSION = '2.4.4';
+  console.log('[boards] v' + VERSION + ' - Fix Other classification: auto-heal partial dims, clear caches on merge');
 
   // ============================================
   // Supabase Setup
@@ -13372,6 +13372,17 @@ Return JSON:
 
     save(data);
 
+    // Invalidate dimension caches — merged pin has new ID not in cached assignments
+    const cat = merged.category;
+    if (cat) {
+      clearPrecomputedDims(cat);
+      clearSuggestionCache(cat);
+      // Remove persisted dimensions (assignments reference deleted source IDs)
+      const dims = loadPromptDimensions(cat);
+      for (const d of dims) removePromptDimension(cat, d.id);
+      console.log('[merge] Cleared dimension caches for', cat);
+    }
+
     // Sync: delete sources, upload merged
     for (const id of sourceIds) {
       deleteLinkFromSupabase(id);
@@ -14163,13 +14174,16 @@ Return JSON:
       return;
     }
 
-    // Auto-heal broken persisted dims
+    // Auto-heal broken or partial persisted dims
     const promptDims = loadPromptDimensions(currentFilter);
     for (const pd of promptDims) {
+      if (!pd.prompt || healedDimIds.has(pd.id)) continue;
       const assigned = Object.values(pd.assignments || {}).filter(v => v);
-      if (assigned.length === 0 && pd.prompt && !healedDimIds.has(pd.id)) {
+      const totalPins = allCategoryLinks.length;
+      // Heal if: zero assignments, OR fewer than 50% of pins are assigned (truncated response)
+      if (assigned.length === 0 || (totalPins > 5 && assigned.length < totalPins * 0.5)) {
         healedDimIds.add(pd.id);
-        console.log('[dimensions] Auto-healing broken dimension:', pd.label);
+        console.log('[dimensions] Auto-healing dimension:', pd.label, '| assigned:', assigned.length, '/', totalPins);
         reanalyzeDimension(currentFilter, pd.id)
           .catch(err => console.warn('[dimensions] Auto-heal failed:', err));
       }
