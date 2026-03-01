@@ -32,7 +32,7 @@ export function Node3D({
     <group position={[node.x, node.y, node.z]}>
       <Html
         center
-        distanceFactor={8}
+        distanceFactor={300}
         style={{ pointerEvents: 'auto' }}
         zIndexRange={[10, 0]}
       >
