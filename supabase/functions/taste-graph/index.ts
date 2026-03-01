@@ -95,20 +95,30 @@ serve(async (req) => {
           .map(c => `- id: "${c.id}", tokens: [${c.topTokens.join(', ')}], samples: [${c.sampleTitles.slice(0, 3).join(', ')}], category: ${c.dominantCategory}, pins: ${c.pinCount}`)
           .join('\n')
 
-        const labelPrompt = `You are labeling clusters of content a user has saved. Each cluster represents a group of related saved links.
+        const labelPrompt = `You are analyzing clusters of a user's saved links to identify their TASTE PATTERNS — the aesthetic sensibilities, cultural instincts, and recurring obsessions that connect saves across categories.
+
+Your job is to name the UNDERLYING PATTERN, never the surface object. Look across the tokens and sample titles for what draws these saves together — the shared vibe, not the shared noun.
+
+NEVER DO THIS (object-level):
+- "Pants", "Restaurants", "Songs", "Tables", "Sneakers", "Movies"
+
+DO THIS (taste-level):
+- "Utilitarian Uniform", "Omakase Energy", "Melancholic Ambient", "Brutalist Living", "Archive Fever", "Quiet Maximalism"
 
 For each cluster:
-1. Create a short label (1-3 words, title case)
-2. Assign a domain from: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other
-3. Write a "description" object with three fields:
-   - "whatItIs": one lowercase sentence (under 20 words) describing what this interest cluster contains
-   - "whyYou": one lowercase sentence (under 20 words, 2nd person) about why the user gravitates to this
-   - "howItChanged": one lowercase sentence (under 20 words) about how this interest evolved over time
+1. Label (1-3 words, title case): Name the AESTHETIC SENSIBILITY or CULTURAL PATTERN connecting these saves. Ask yourself: what is the taste instinct that makes someone save ALL of these? Never use the object category as the label.
+2. Domain: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other
+3. Description object with three fields:
+   - "whatItIs": one lowercase sentence (under 20 words). Describe the pattern that connects these saves — the shared aesthetic, not the object type. What is the throughline?
+   - "whyYou": one lowercase sentence (under 20 words, 2nd person). What does this pattern reveal about how the user sees the world? What instinct does it satisfy?
+   - "howItChanged": one lowercase sentence (under 20 words). How does a taste like this typically deepen or evolve? Speak to the trajectory.
 
-Be poetic, brutally specific, and avoid generic platitudes. Write like Co-Star horoscopes.
+Write like Co-Star horoscopes — poetic, uncomfortably specific, zero platitudes.
 
-Example description:
-{"whatItIs": "a relentless archive of sounds that refuse to stay in one genre", "whyYou": "you treat every algorithm recommendation as a challenge to prove it wrong", "howItChanged": "what started as weekend crate-digging became a full identity"}
+Examples of good labels + descriptions:
+- Tokens: [pants, black, minimal, cut, slim] → Label: "Utilitarian Uniform", description: {"whatItIs": "a wardrobe built on the belief that reduction is the only honest form of style", "whyYou": "you decided long ago that getting dressed should feel like loading ammunition", "howItChanged": "it stopped being about clothes and became a daily practice of disappearing into intention"}
+- Tokens: [ambient, tape, loop, drone, analog] → Label: "Slow Frequencies", description: {"whatItIs": "sound that insists on being felt in the body before it reaches the brain", "whyYou": "you need proof that stillness and intensity are the same thing", "howItChanged": "the playlists got longer and the volume got lower and somehow it hit harder"}
+- Tokens: [concrete, furniture, space, raw, light] → Label: "Brutalist Living", description: {"whatItIs": "interiors where every material announces exactly what it is and dares you to look away", "whyYou": "you find comfort in spaces that refuse to perform comfort", "howItChanged": "what started as an aesthetic preference became a test you apply to everything"}
 
 Clusters:
 ${clusterDesc}
@@ -116,7 +126,7 @@ ${clusterDesc}
 Respond with ONLY a JSON object:
 {"clusters": [{"id": "c0", "label": "Short Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
 
-        const labelText = await callAnthropic(labelPrompt, 1200)
+        const labelText = await callAnthropic(labelPrompt, 1500)
         const parsed = parseJSON(labelText) as { clusters: LabeledCluster[] }
         labeledClusters = parsed.clusters || []
       } catch (e) {
@@ -124,8 +134,8 @@ Respond with ONLY a JSON object:
         // Fallback: auto-labels from top token
         labeledClusters = clusters.map(c => ({
           id: c.id,
-          label: c.topTokens[0]
-            ? c.topTokens[0].charAt(0).toUpperCase() + c.topTokens[0].slice(1)
+          label: c.topTokens.length > 0
+            ? c.topTokens.slice(0, 2).map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ')
             : `Cluster`,
           domain: 'other',
         }))

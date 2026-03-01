@@ -127,11 +127,17 @@ html, body, #root {
 /* --- Stage (3D Canvas container) --- */
 
 .tg-stage {
-  flex: 1;
-  padding-top: 44px; /* header height */
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
-  position: relative;
   cursor: crosshair;
+}
+
+.tg-stage--with-breadcrumb {
+  top: 68px;
 }
 
 .tg-stage canvas {
@@ -294,34 +300,53 @@ html, body, #root {
   color: var(--fg);
 }
 
-/* --- Loading State --- */
+/* --- Loading Overlay (Soundscape-style) --- */
 
-.tg-loading {
-  position: absolute;
-  inset: 0;
+.tg-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000000;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
+  transition: opacity 0.3s ease;
 }
 
-.tg-loading__text {
+.tg-loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tg-loading-overlay__title {
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  color: #ffffff;
 }
 
-.tg-loading__cursor {
-  display: inline-block;
-  animation: tg-blink 1s step-start infinite;
+.tg-loading-overlay__spinner {
+  margin-top: 1rem;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #333333;
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: tg-spin 1s linear infinite;
 }
 
-@keyframes tg-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+.tg-loading-overlay__message {
+  display: none;
+}
+
+@keyframes tg-spin {
+  to { transform: rotate(360deg); }
 }
 
 .tg-empty {

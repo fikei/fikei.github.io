@@ -1,4 +1,4 @@
-// Loading state with terminal cursor blink
+// Loading state — Soundscape-style full-screen overlay with spinner
 
 interface LoadingStateProps {
   message: string;
@@ -6,10 +6,10 @@ interface LoadingStateProps {
 
 export function LoadingState({ message }: LoadingStateProps) {
   return (
-    <div className="tg-loading">
-      <span className="tg-loading__text">
-        {message}<span className="tg-loading__cursor">{'\u2588'}</span>
-      </span>
+    <div className="tg-loading-overlay">
+      <h1 className="tg-loading-overlay__title">TASTE MAP</h1>
+      <div className="tg-loading-overlay__spinner" />
+      <span className="tg-loading-overlay__message">{message}</span>
     </div>
   );
 }
