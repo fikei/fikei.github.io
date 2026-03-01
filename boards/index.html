@@ -6409,8 +6409,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.4.4';
-  console.log('[boards] v' + VERSION + ' - Fix Other classification: auto-heal partial dims, clear caches on merge');
+  const VERSION = '2.4.5';
+  console.log('[boards] v' + VERSION + ' - Fix custom filter prompt: render chip with loading state and expanded tags');
 
   // ============================================
   // Supabase Setup
@@ -14244,6 +14244,38 @@ Return JSON:
       }
     }
 
+    // Helper: render an expanded chip with tag buttons inline
+    function renderExpandedChip(prompt, label, dim) {
+      const counts = {};
+      let untaggedCount = 0;
+      for (const link of allCategoryLinks) {
+        const tag = dim.assignments?.[link.id] || null;
+        if (tag) counts[tag] = (counts[tag] || 0) + 1;
+        else untaggedCount++;
+      }
+      let activeFilter = null;
+      if (dim.id) activeFilter = currentFilters[dim.id] || null;
+
+      let h = `<button class="sub-tag sub-tag--suggestion sub-tag--expanded" data-suggestion="${esc(prompt)}" aria-pressed="true" aria-expanded="true">`;
+      h += `${esc(label)}`;
+      h += `<span class="sub-tag__expanded" aria-live="polite">`;
+      h += `<span class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-subtag="" data-dim-prompt="${esc(prompt)}">All<span class="sub-tag__count">${allCategoryLinks.length}</span></span>`;
+      for (const tag of dim.tags) {
+        const count = counts[tag] || 0;
+        if (count > 0) {
+          const active = activeFilter === tag ? 'sub-tag--active' : '';
+          h += `<span class="sub-tag ${active}" data-subtag="${esc(tag)}" data-dim-prompt="${esc(prompt)}">${esc(cap(tag))}<span class="sub-tag__count">${count}</span></span>`;
+        }
+      }
+      if (untaggedCount > 0) {
+        const active = activeFilter === 'other' ? 'sub-tag--active' : '';
+        h += `<span class="sub-tag ${active}" data-subtag="other" data-dim-prompt="${esc(prompt)}">Other<span class="sub-tag__count">${untaggedCount}</span></span>`;
+      }
+      h += `</span>`;
+      h += `</button>`;
+      return h;
+    }
+
     let html = `<div class="sub-tags__buttons" role="toolbar" aria-label="Filter dimensions">`;
 
     for (const s of suggestions) {
@@ -14251,44 +14283,26 @@ Return JSON:
       const isLoading = isExpanded && !expandedDim;
 
       if (isExpanded && expandedDim) {
-        // ── Expanded chip — show label + tag buttons inline ──
-        const counts = {};
-        let untaggedCount = 0;
-        for (const link of allCategoryLinks) {
-          const tag = expandedDim.assignments?.[link.id] || null;
-          if (tag) counts[tag] = (counts[tag] || 0) + 1;
-          else untaggedCount++;
-        }
-
-        // Find the active filter — check currentFilters for the persisted dim ID, or use expandedDim
-        let activeFilter = null;
-        if (expandedDim.id) {
-          activeFilter = currentFilters[expandedDim.id] || null;
-        }
-
-        html += `<button class="sub-tag sub-tag--suggestion sub-tag--expanded" data-suggestion="${esc(s.prompt)}" aria-pressed="true" aria-expanded="true">`;
-        html += `${esc(s.label)}`;
-        html += `<span class="sub-tag__expanded" aria-live="polite">`;
-        html += `<span class="sub-tag ${!activeFilter ? 'sub-tag--active' : ''}" data-subtag="" data-dim-prompt="${esc(s.prompt)}">All<span class="sub-tag__count">${allCategoryLinks.length}</span></span>`;
-        for (const tag of expandedDim.tags) {
-          const count = counts[tag] || 0;
-          if (count > 0) {
-            const active = activeFilter === tag ? 'sub-tag--active' : '';
-            html += `<span class="sub-tag ${active}" data-subtag="${esc(tag)}" data-dim-prompt="${esc(s.prompt)}">${esc(cap(tag))}<span class="sub-tag__count">${count}</span></span>`;
-          }
-        }
-        if (untaggedCount > 0) {
-          const active = activeFilter === 'other' ? 'sub-tag--active' : '';
-          html += `<span class="sub-tag ${active}" data-subtag="other" data-dim-prompt="${esc(s.prompt)}">Other<span class="sub-tag__count">${untaggedCount}</span></span>`;
-        }
-        html += `</span>`;
-        html += `</button>`;
+        html += renderExpandedChip(s.prompt, s.label, expandedDim);
       } else if (isLoading) {
         // ── Loading chip — API call in flight ──
         html += `<button class="sub-tag sub-tag--suggestion sub-tag--loading" data-suggestion="${esc(s.prompt)}" aria-pressed="true" aria-busy="true">${esc(s.label)}\u2026</button>`;
       } else {
         // ── Collapsed chip ──
         html += `<button class="sub-tag sub-tag--suggestion" data-suggestion="${esc(s.prompt)}" aria-pressed="false">${esc(s.label)}</button>`;
+      }
+    }
+
+    // ── Custom prompt chip — when activeSuggestionPrompt doesn't match any suggestion ──
+    const isCustomPrompt = activeSuggestionPrompt && !suggestions.some(s => s.prompt === activeSuggestionPrompt);
+    if (isCustomPrompt) {
+      const isLoading = dimPromptInFlight === activeSuggestionPrompt;
+      if (isLoading) {
+        // Show chip with spinner while API call is in flight
+        html += `<button class="sub-tag sub-tag--suggestion sub-tag--loading" data-suggestion="${esc(activeSuggestionPrompt)}" aria-pressed="true" aria-busy="true">${esc(activeSuggestionPrompt.length > 24 ? activeSuggestionPrompt.slice(0, 22) + '\u2026' : activeSuggestionPrompt)}</button>`;
+      } else if (expandedDim) {
+        // Show expanded chip with AI-generated label and tag buttons
+        html += renderExpandedChip(activeSuggestionPrompt, expandedDim.label || activeSuggestionPrompt, expandedDim);
       }
     }
 
