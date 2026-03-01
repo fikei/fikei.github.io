@@ -6153,6 +6153,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     <button class="dev-menu__btn" id="devMigrate">Re-categorize All (AI)</button>
     <button class="dev-menu__btn" id="devEnrich">Run AI Enrichment Pipeline</button>
     <button class="dev-menu__btn" id="devClearCache">Clear AI Cache</button>
+    <button class="dev-menu__btn" id="devClearDims">Clear Filter Dimensions</button>
     <button class="dev-menu__btn dev-menu__btn--danger" id="devClearAll">Clear All Data</button>
     <div class="dev-menu__divider"></div>
     <button class="dev-menu__btn" id="devToggleWidgets">Widgets: OFF</button>
@@ -6408,8 +6409,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.4.2';
-  console.log('[boards] v' + VERSION + ' - Fix Taste Map deployment for GitHub Pages');
+  const VERSION = '2.4.3';
+  console.log('[boards] v' + VERSION + ' - Add Clear Filter Dimensions to dev menu');
 
   // ============================================
   // Supabase Setup
@@ -16364,6 +16365,29 @@ Return JSON:
     saveCategoryCache(categoryCache);
     $('devMenu').classList.remove('dev-menu--visible');
     toast('AI category cache cleared');
+  };
+
+  $('devClearDims').onclick = () => {
+    let cleared = 0;
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith(DIMS_KEY_PREFIX) || key.startsWith(PRECOMPUTED_KEY_PREFIX) || key.startsWith('dim-suggestions-'))) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+      cleared++;
+    }
+    // Reset runtime state
+    currentFilters = {};
+    activeSuggestionPrompt = null;
+    dimensionPromptOpen = false;
+    $('devMenu').classList.remove('dev-menu--visible');
+    renderSubTags();
+    renderGrid();
+    toast(`Cleared ${cleared} filter dimension keys`);
   };
 
   $('devToggleWidgets').onclick = () => {
