@@ -51,12 +51,16 @@ function GraphScene({
   onSelectEdge,
 }: Omit<GraphProps, 'pins'>) {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
+  const [settled, setSettled] = useState(false);
   const simRef = useRef<ReturnType<typeof createSimulation> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const controlsRef = useRef<any>(null);
   const { camera, gl } = useThree();
 
   // Run force simulation
   useEffect(() => {
     if (clusters.length === 0) return;
+    setSettled(false);
 
     const width = 800;
     const height = 600;
@@ -87,12 +91,43 @@ function GraphScene({
 
       if (!sim.isSettled() && frame < maxFrames) {
         raf = requestAnimationFrame(step);
+      } else {
+        setSettled(true);
       }
     }
 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [clusters, edges]);
+
+  // Fit camera to node cloud when simulation settles
+  useEffect(() => {
+    if (!settled || nodes.length === 0 || !controlsRef.current) return;
+
+    // Compute centroid
+    let cx = 0, cy = 0, cz = 0;
+    for (const n of nodes) { cx += n.x; cy += n.y; cz += n.z; }
+    cx /= nodes.length; cy /= nodes.length; cz /= nodes.length;
+
+    // Compute bounding sphere radius from centroid
+    let maxDist = 0;
+    for (const n of nodes) {
+      const dx = n.x - cx, dy = n.y - cy, dz = n.z - cz;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist > maxDist) maxDist = dist;
+    }
+
+    // Point orbit controls at centroid
+    controlsRef.current.target.set(cx, cy, cz);
+
+    // Position camera to frame the bounding sphere with padding
+    const fov = ((camera as THREE.PerspectiveCamera).fov * Math.PI) / 180;
+    const fitDist = (maxDist + 80) / Math.tan(fov / 2);
+    const camDist = Math.max(fitDist, 250);
+    camera.position.set(cx, cy, cz + camDist);
+
+    controlsRef.current.update();
+  }, [settled, nodes, camera]);
 
   // Build node lookup
   const nodeMap = useMemo(() => {
@@ -125,6 +160,7 @@ function GraphScene({
     <>
       <color attach="background" args={['#000000']} />
       <OrbitControls
+        ref={controlsRef}
         enableDamping
         dampingFactor={0.1}
         rotateSpeed={0.5}
@@ -132,6 +168,10 @@ function GraphScene({
         zoomSpeed={0.8}
         minDistance={100}
         maxDistance={1200}
+        autoRotate
+        autoRotateSpeed={0.3}
+        minPolarAngle={Math.PI * 0.15}
+        maxPolarAngle={Math.PI * 0.85}
       />
 
       {/* Edges */}
