@@ -6409,8 +6409,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.4.5';
-  console.log('[boards] v' + VERSION + ' - Fix custom filter prompt: render chip with loading state and expanded tags');
+  const VERSION = '2.4.6';
+  console.log('[boards] v' + VERSION + ' - Version-aware cache invalidation for filter dimensions');
 
   // ============================================
   // Supabase Setup
@@ -13261,14 +13261,39 @@ Return JSON:
   }
 
   // Precomputed dimension cache — eager background classification results
+  const PRECOMPUTED_TTL = 12 * 60 * 60 * 1000; // 12 hours
   function loadPrecomputedDims(category) {
     try { return JSON.parse(localStorage.getItem(PRECOMPUTED_KEY_PREFIX + category) || '{}'); }
     catch { return {}; }
   }
   function getPrecomputedDim(category, prompt) {
-    return loadPrecomputedDims(category)[prompt] || null;
+    const entry = loadPrecomputedDims(category)[prompt] || null;
+    if (!entry) return null;
+    // Reject stale entries: wrong version or expired TTL
+    if (entry.version !== VERSION || (Date.now() - (entry.precomputedAt || 0)) > PRECOMPUTED_TTL) {
+      console.log('[precompute] Stale cache for', prompt, '— version:', entry.version, 'age:', Math.round((Date.now() - (entry.precomputedAt || 0)) / 60000), 'min');
+      // Remove the stale entry
+      const all = loadPrecomputedDims(category);
+      delete all[prompt];
+      try { localStorage.setItem(PRECOMPUTED_KEY_PREFIX + category, JSON.stringify(all)); } catch {}
+      return null;
+    }
+    // Quality check: reject if assignments are mostly empty (broken data)
+    if (entry.assignments) {
+      const assigned = Object.values(entry.assignments).filter(v => v);
+      const total = Object.keys(entry.assignments).length;
+      if (total > 3 && assigned.length < total * 0.3) {
+        console.log('[precompute] Low-quality cache for', prompt, '— assigned:', assigned.length, '/', total);
+        const all = loadPrecomputedDims(category);
+        delete all[prompt];
+        try { localStorage.setItem(PRECOMPUTED_KEY_PREFIX + category, JSON.stringify(all)); } catch {}
+        return null;
+      }
+    }
+    return entry;
   }
   function setPrecomputedDim(category, prompt, dimData) {
+    dimData.version = VERSION; // stamp with current version for cache invalidation
     const all = loadPrecomputedDims(category);
     all[prompt] = dimData;
     try { localStorage.setItem(PRECOMPUTED_KEY_PREFIX + category, JSON.stringify(all)); }
@@ -14029,10 +14054,10 @@ Return JSON:
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
-        const { suggestions, pinCount, ts } = JSON.parse(cached);
+        const { suggestions, pinCount, ts, version } = JSON.parse(cached);
         const currentCount = getAllLinks().filter(l => l.category === category).length;
         // Cache valid for 24h AND pin count hasn't drifted by more than 3
-        if (Date.now() - ts < 86400000 && Math.abs(currentCount - pinCount) <= 3) {
+        if (version === VERSION && Date.now() - ts < 86400000 && Math.abs(currentCount - pinCount) <= 3) {
           console.log('[suggestions] Cache hit for', category, ':', suggestions.length, 'suggestions');
           return suggestions;
         }
@@ -14074,7 +14099,8 @@ Return JSON:
       localStorage.setItem(cacheKey, JSON.stringify({
         suggestions: data.suggestions,
         pinCount: pins.length,
-        ts: Date.now()
+        ts: Date.now(),
+        version: VERSION
       }));
       return data.suggestions;
     } catch (err) {
@@ -14083,7 +14109,8 @@ Return JSON:
       localStorage.setItem(cacheKey, JSON.stringify({
         suggestions: [],
         pinCount: pins.length,
-        ts: Date.now() - 86400000 + 300000
+        ts: Date.now() - 86400000 + 300000,
+        version: VERSION
       }));
       return [];
     }
@@ -14196,7 +14223,7 @@ Return JSON:
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.ts < 86400000 && Math.abs(allCategoryLinks.length - parsed.pinCount) <= 3) {
+        if (parsed.version === VERSION && Date.now() - parsed.ts < 86400000 && Math.abs(allCategoryLinks.length - parsed.pinCount) <= 3) {
           suggestions = parsed.suggestions || [];
         }
       } catch { /* ignore */ }
