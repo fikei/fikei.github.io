@@ -229,7 +229,14 @@ Claude Code is authorized to perform the following operations **without asking f
 - **Assign all PRs to `fikei`** so they appear in the GitHub mobile app for quick merge
 - **Create and push branches** for feature work
 - **Close stale branches** after successful merges
-- **Bump the boards version on every push** — increment `const VERSION` in `boards/index.html` (line ~6354) and update the console.log description on the next line. Use semver: patch (Z) for fixes/small changes, minor (Y) for new features or behavioral changes, major (X) for breaking/structural changes. Include the version bump in the same commit as your changes
+- **Bump product versions when their code changes** — each product has a `const VERSION` and console.log that must be incremented when that product's code is modified. Only bump the products actually changed in the commit. Use semver: patch (Z) for fixes/small changes, minor (Y) for new features or behavioral changes, major (X) for breaking/structural changes. Include the version bump in the same commit as your changes.
+
+  | Product | Version location | Console pattern |
+  |---------|-----------------|-----------------|
+  | Boards | `boards/index.html` ~line 6483: `const VERSION = 'X.Y.Z'` | `[boards] vX.Y.Z - description` |
+  | Supabase functions | Each function's `index.ts` top: `const VERSION = 'X.Y.Z'` | `[function-name] vX.Y.Z - description` |
+
+  When adding a new product or function, add a `const VERSION` + `console.log` at the top of its entry point following this pattern.
 
 ### Supabase Deployment
 - **Always deploy any updated Supabase edge functions after merge** — if any files in `supabase/functions/` changed, run `supabase functions deploy <function-name>` immediately after merging without asking
