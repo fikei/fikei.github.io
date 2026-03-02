@@ -88,7 +88,8 @@ This is a 5-minute briefing. Be concise. No filler. Every sentence earns its pla
 - synthesizer: anchor delivering the news clearly and concisely
 - challenger: asks the one question the audience is thinking
 - expert: provides the critical context in 1-2 sentences
-Total ~750 words. No meandering. Cut anything that doesn't inform.`,
+Total ~750 words. No meandering. Cut anything that doesn't inform.
+TTS delivery: use short, punchy sentences. Vary between 5-word and 15-word sentences. News cues should feel clipped and urgent. Use em-dashes for pivots: "Three people are dead — and officials still have no answers."`,
   },
 
   'deep-dive': {
@@ -111,7 +112,8 @@ This is a 20-30 minute deep dive. Go deep on context and history that a quick ne
 - synthesizer: guides the narrative, connects ideas, provides transitions
 - challenger: probes assumptions, surfaces contradictions, plays devil's advocate
 - expert: provides the depth — data, historical parallels, domain expertise
-Total ~3500 words. Allow ideas to breathe. Use specific examples and data.`,
+Total ~3500 words. Allow ideas to breathe. Use specific examples and data.
+TTS delivery: vary sentence rhythm deliberately. Use long sentences to build context, then land with a short one. Use ellipses to signal transitions: "And that changed everything..." Use natural thinking patterns: "Which raises the question...", "But here's what nobody was expecting:"`,
   },
 
   investigative: {
@@ -135,7 +137,8 @@ This is a 30-minute investigative episode. Follow the facts. Name sources. Be pr
 - synthesizer: the investigative narrator — walks through evidence methodically, builds the case
 - challenger: the skeptic — "but wait, how do we know that?", "who benefits from this narrative?"
 - expert: the analyst — connects this to broader patterns, provides forensic-level detail
-Total ~4500 words. Every claim needs a source. Distinguish clearly between fact, allegation, and inference. Use phrases like "according to [source]", "records show", "what we can verify is".`,
+Total ~4500 words. Every claim needs a source. Distinguish clearly between fact, allegation, and inference. Use phrases like "according to [source]", "records show", "what we can verify is".
+TTS delivery: use sentence fragments for dramatic effect. "Records show the transfer happened at 11:47pm. Two hours before the press conference." Build suspense with short declarative sentences followed by longer reveals.`,
   },
 
   opinion: {
@@ -159,7 +162,8 @@ This is a 30-minute opinion exploration. The goal is NOT to be neutral — it's 
 - synthesizer: the moderator — frames fairly, ensures each perspective gets its strongest airing
 - challenger: the provocateur — deliberately takes each side to its logical extreme, asks "so what?"
 - expert: the evidence-keeper — grounds opinions in data, history, and real-world outcomes
-Total ~4500 words. Each perspective should be presented so well that the listener could mistake the show for actually advocating it. Use real quotes and data from sources.`,
+Total ~4500 words. Each perspective should be presented so well that the listener could mistake the show for actually advocating it. Use real quotes and data from sources.
+TTS delivery: challenger cues should feel argumentative — use rising phrases that invite response: "But what about—", "That assumes—". Synthesizer cues should feel measured and fair. Use rhetorical questions for emphasis: "Is that really the standard we want to set?"`,
   },
 
   wormhole: {
@@ -182,7 +186,8 @@ This is a 30-minute wormhole episode. The goal is to take a familiar topic and f
 - synthesizer: the curious guide — "okay but here's where it gets weird", genuinely delighted by discoveries
 - challenger: the grounding voice — "hold on, is this actually true?", keeps things honest
 - expert: the obsessive — knows the deep lore, the footnotes, the connections nobody else sees
-Total ~4500 words. Prioritize surprise and genuine discovery. Use narrative cliffhangers between segments. The tone should be: "you're not going to believe this, but it's all real".`,
+Total ~4500 words. Prioritize surprise and genuine discovery. Use narrative cliffhangers between segments. The tone should be: "you're not going to believe this, but it's all real".
+TTS delivery: use excited sentence structure — build to a reveal. "And then — this is the part that broke my brain — it turns out..." Use genuine reaction language: "Wait. Wait, wait, wait." Short bursts of astonishment work well for spoken delivery.`,
   },
 }
 
@@ -550,9 +555,17 @@ ${sources.map(s => `[${s.index}] ${s.title} — ${s.domain}`).join('\n')}
 
 ${config.scriptStyle}
 
-Rules:
-- Natural spoken language (no bullet points, no headers in speech)
-- Each cue is 1-3 paragraphs of continuous speech
+Rules for natural spoken delivery:
+- Write for the ear, not the eye. Every sentence must sound natural spoken aloud.
+- Vary sentence length deliberately. Short sentences punch. Longer sentences let ideas breathe and build momentum before landing.
+- Use em-dashes for mid-sentence pauses — "The data is clear — and it contradicts everything we assumed."
+- Use ellipses for trailing thoughts or leading into a point: "And that's where it gets interesting..."
+- Use commas generously to create natural breath points within long sentences.
+- Include natural interjections and conversational pivots: "Now—", "Look,", "Here's the thing:", "Actually,"
+- Build emphasis through word choice, not formatting. Prefer "staggering" over "very large."
+- Start cues with energy — avoid opening with "Well," or "So,". Use a direct statement or active clause.
+- End cues with a complete thought — not cut off mid-idea.
+- Each cue is 1-3 short paragraphs (2-4 sentences each) of continuous speech. No bullet points, no headers.
 - Include real citation references naturally in speech (e.g., "According to [source 3]...")
 
 Respond with ONLY a JSON array of transcript cues:
@@ -604,22 +617,45 @@ Respond with ONLY a JSON array of transcript cues:
 const VOICE_MAP: Record<string, { voiceId: string; stability: number; similarity: number; style: number }> = {
   synthesizer: {
     voiceId: '29vD33N1CtxCmqQRPOHJ',  // Drew — warm, well-rounded American male
-    stability: 0.45,
-    similarity: 0.78,
-    style: 0.45,
+    stability: 0.35,       // lower for natural cadence variation
+    similarity: 0.80,
+    style: 0.55,           // higher for expressive delivery
   },
   challenger: {
     voiceId: 'EXAVITQu4vr4xnSDxMaL',  // Sarah — soft, clear American female
-    stability: 0.40,
+    stability: 0.30,       // lowest: most animated, questioning energy
     similarity: 0.75,
-    style: 0.50,
+    style: 0.65,           // highest: skeptical, challenging tone
   },
   expert: {
     voiceId: 'onwK4e9ZLuTAKqWW03F9',  // Daniel — deep, measured British male
-    stability: 0.55,
-    similarity: 0.82,
-    style: 0.35,
+    stability: 0.45,       // slightly lower: less flat, still authoritative
+    similarity: 0.85,
+    style: 0.45,           // slightly higher: measured but not robotic
   },
+}
+
+// Preprocess transcript text for natural TTS delivery.
+// Inserts SSML <break> tags at natural pause points (paragraph breaks,
+// sentence boundaries, em-dashes, ellipses, colons) so ElevenLabs
+// produces speech with realistic pauses and breathing room.
+function preprocessForTTS(text: string): string {
+  let processed = text
+  // Paragraph breaks → breath pause
+  processed = processed.replace(/\n\n+/g, ' <break time="0.8s"/> ')
+  // Line breaks → short pause
+  processed = processed.replace(/\n/g, ' <break time="0.4s"/> ')
+  // Between sentences (period/question/exclamation followed by new sentence)
+  processed = processed.replace(/([.!?])\s+([A-Z])/g, '$1 <break time="0.3s"/> $2')
+  // Em-dashes → dramatic pause
+  processed = processed.replace(/\s*—\s*/g, ' <break time="0.4s"/> ')
+  // Ellipses → trailing thought pause
+  processed = processed.replace(/\.\.\./g, '<break time="0.6s"/>')
+  // Colons → setup-payoff pause
+  processed = processed.replace(/:\s+/g, ': <break time="0.3s"/>')
+  // Clean up double spaces
+  processed = processed.replace(/  +/g, ' ').trim()
+  return processed
 }
 
 async function synthesizeCue(
@@ -642,8 +678,8 @@ async function synthesizeCue(
       method: 'POST',
       headers: { 'xi-api-key': elevenLabsKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
       body: JSON.stringify({
-        text: cue.text,
-        model_id: 'eleven_turbo_v2_5',
+        text: preprocessForTTS(cue.text),
+        model_id: 'eleven_multilingual_v2',
         voice_settings: { stability, similarity_boost: similarity, style, use_speaker_boost: true },
       }),
     })
