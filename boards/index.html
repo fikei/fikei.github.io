@@ -6480,8 +6480,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.8.1';
-  console.log('[boards] v' + VERSION + ' - Fix extension popup spinner CSS specificity');
+  const VERSION = '2.8.2';
+  console.log('[boards] v' + VERSION + ' - Fix pin deletion resurrection, enrichment persistence, and duplicate detection');
 
   // ============================================
   // Supabase Setup
@@ -10670,6 +10670,7 @@ Return JSON:
           link.image = best.image || link.image;
           link.image_source = best.image_source || link.image_source;
           link.image_scores = best.image_scores || link.image_scores;
+          link.updatedAt = new Date().toISOString();
           save(data);
           syncLinkToSupabase(link);
           continue;
@@ -10881,6 +10882,8 @@ Return JSON:
           link.description = result.description;
         }
 
+        // Bump updatedAt so cross-browser merge logic recognizes this as newer
+        link.updatedAt = new Date().toISOString();
         save(data);
 
         // Sync enrichment to Supabase (don't await — fire and forget)
@@ -12321,6 +12324,41 @@ Return JSON:
   // ============================================
   const STORAGE_KEY = 'things-i-like';
   const EXPANDED_KEY = 'boards-expanded-cards';
+  const DELETED_IDS_KEY = 'boards-deleted-ids';
+
+  // Tombstone tracking: remember deleted pin IDs so polling doesn't resurrect them.
+  // Tombstones expire after 7 days to avoid unbounded growth.
+  const TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+  function getDeletedIds() {
+    try {
+      const raw = localStorage.getItem(DELETED_IDS_KEY);
+      if (!raw) return {};
+      const entries = JSON.parse(raw);
+      const now = Date.now();
+      let pruned = false;
+      for (const id in entries) {
+        if (now - entries[id] > TOMBSTONE_TTL_MS) {
+          delete entries[id];
+          pruned = true;
+        }
+      }
+      if (pruned) localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(entries));
+      return entries;
+    } catch { return {}; }
+  }
+
+  function markDeleted(id) {
+    const entries = getDeletedIds();
+    entries[id] = Date.now();
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(entries));
+  }
+
+  function clearDeletedId(id) {
+    const entries = getDeletedIds();
+    delete entries[id];
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(entries));
+  }
 
   // Load/save expanded cards state (localStorage + Supabase sync)
   function loadExpandedCards() {
@@ -12571,21 +12609,30 @@ Return JSON:
     } catch (e) { console.error('[sync] Order sync error:', e); }
   }
 
-  async function deleteLinkFromSupabase(id) {
+  async function deleteLinkFromSupabase(id, retries = 3) {
     if (!currentUser) return;
     const accessToken = getAccessToken();
     if (!accessToken) return;
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
-        method: 'DELETE',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken}`
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+        if (res.ok) {
+          console.log('[sync] Deleted:', id);
+          return; // Success — tombstone stays until TTL to guard against race conditions
         }
-      });
-      if (!res.ok) console.error('[sync] Delete failed:', res.status);
-      else console.log('[sync] Deleted:', id);
-    } catch (e) { console.error('[sync] Delete error:', e); }
+        console.error(`[sync] Delete failed (attempt ${attempt}/${retries}):`, res.status);
+      } catch (e) {
+        console.error(`[sync] Delete error (attempt ${attempt}/${retries}):`, e);
+      }
+      if (attempt < retries) await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+    console.error('[sync] Delete exhausted retries for:', id, '— tombstone will prevent resurrection');
   }
 
   // Sync all local data to Supabase
@@ -13180,6 +13227,8 @@ Return JSON:
     data.links = data.links.filter(l => l.id !== id);
     if (data.linkOrder) data.linkOrder = data.linkOrder.filter(i => i !== id);
     save(data);
+    // Record tombstone so polling doesn't resurrect this pin
+    markDeleted(id);
     if (link?.category) clearSuggestionCache(link.category);
     deleteLinkFromSupabase(id); // Background sync
     syncOrderToSupabase(data.linkOrder);
@@ -19965,9 +20014,55 @@ Return JSON:
         const localData = load();
         console.log('[sync] cloud:', cloudData.links.length, 'links, local:', localData.links.length, 'links');
 
+        // Filter out tombstoned pins (deleted locally but not yet removed from Supabase)
+        const tombstones = getDeletedIds();
+        const tombstoneIds = Object.keys(tombstones);
+        if (tombstoneIds.length > 0) {
+          const before = cloudData.links.length;
+          cloudData.links = cloudData.links.filter(l => !tombstones[l.id]);
+          cloudData.linkOrder = cloudData.linkOrder.filter(id => !tombstones[id]);
+          const removed = before - cloudData.links.length;
+          if (removed > 0) {
+            console.log('[sync] Filtered', removed, 'tombstoned pins from cloud data');
+            // Retry deleting from Supabase in background
+            for (const id of tombstoneIds) {
+              deleteLinkFromSupabase(id);
+            }
+          }
+        }
+
+        // Deduplicate cloud links by URL (keep the newest by updatedAt, then addedAt)
+        const urlMap = new Map();
+        for (const link of cloudData.links) {
+          const existing = urlMap.get(link.url);
+          if (existing) {
+            const existingTime = new Date(existing.updatedAt || existing.addedAt || 0).getTime();
+            const newTime = new Date(link.updatedAt || link.addedAt || 0).getTime();
+            if (newTime > existingTime) {
+              // New one is newer — delete the old duplicate from Supabase
+              console.log('[sync] Dedup: keeping newer copy of', link.url);
+              deleteLinkFromSupabase(existing.id);
+              urlMap.set(link.url, link);
+            } else {
+              // Existing is newer — delete this duplicate
+              console.log('[sync] Dedup: removing older copy of', link.url);
+              deleteLinkFromSupabase(link.id);
+            }
+          } else {
+            urlMap.set(link.url, link);
+          }
+        }
+        if (urlMap.size < cloudData.links.length) {
+          const removed = cloudData.links.length - urlMap.size;
+          console.log('[sync] Removed', removed, 'duplicate pins by URL');
+          const dedupedIds = new Set([...urlMap.values()].map(l => l.id));
+          cloudData.links = [...urlMap.values()];
+          cloudData.linkOrder = cloudData.linkOrder.filter(id => dedupedIds.has(id));
+        }
+
         // Merge: push local-only pins to cloud before overwriting
         const cloudIds = new Set(cloudData.links.map(l => l.id));
-        const localOnly = localData.links.filter(l => !cloudIds.has(l.id));
+        const localOnly = localData.links.filter(l => !cloudIds.has(l.id) && !tombstones[l.id]);
         if (localOnly.length > 0) {
           console.log('[sync] Found', localOnly.length, 'local-only pins — pushing to cloud');
           for (const link of localOnly) {
@@ -20084,13 +20179,29 @@ Return JSON:
     const cloudData = await fetchFromSupabase();
     if (!cloudData) return;
 
+    // Filter out tombstoned pins (deleted locally but still in Supabase)
+    const tombstones = getDeletedIds();
+    const tombstoneIds = Object.keys(tombstones);
+    if (tombstoneIds.length > 0) {
+      const before = cloudData.links.length;
+      cloudData.links = cloudData.links.filter(l => !tombstones[l.id]);
+      cloudData.linkOrder = cloudData.linkOrder.filter(id => !tombstones[id]);
+      const removed = before - cloudData.links.length;
+      if (removed > 0) {
+        console.log('[poll] Filtered', removed, 'tombstoned pins from cloud data');
+        for (const id of tombstoneIds) {
+          deleteLinkFromSupabase(id);
+        }
+      }
+    }
+
     const localData = load();
     const localIds = new Set(localData.links.map(l => l.id));
     const cloudIds = new Set(cloudData.links.map(l => l.id));
 
     // Protect local-only pins: push them to cloud before overwriting
     // (mirrors the same merge logic used in init())
-    const localOnly = localData.links.filter(l => !cloudIds.has(l.id));
+    const localOnly = localData.links.filter(l => !cloudIds.has(l.id) && !tombstones[l.id]);
     if (localOnly.length > 0) {
       console.log('[poll] Found', localOnly.length, 'local-only pins — pushing to cloud before merge');
       for (const link of localOnly) {
