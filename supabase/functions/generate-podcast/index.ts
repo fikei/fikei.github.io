@@ -3,7 +3,7 @@
 //
 // POST /functions/v1/generate-podcast
 // Body: { topic: string, mode: "news" | "deep-dive" | "investigative" | "opinion" | "wormhole", userId?: string, biasPreference?: "left" | "center" | "right" | "balanced" }
-// Returns: { episode: { id, topic, mode, transcript, sources, biasDistribution, audioUrls, durationSeconds, status } }
+// Returns: { episode: { id, topic, title, description, mode, transcript, sources, biasDistribution, audioUrls, durationSeconds, status } }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -47,6 +47,7 @@ interface Episode {
   id: string
   topic: string
   title: string
+  description: string
   mode: string
   transcript: TranscriptCue[]
   sources: Source[]
@@ -772,6 +773,57 @@ Rules:
 }
 
 // ============================================================
+// Generate a 2-3 sentence episode description for the player
+// ============================================================
+
+async function generateDescription(topic: string, mode: string, transcript: TranscriptCue[], sources: Source[]): Promise<string> {
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!anthropicKey) return ''
+
+  const preview = transcript.slice(0, 5).map(c => c.text).join(' ').substring(0, 800)
+  const sourceList = sources.slice(0, 5).map(s => s.title).join(', ')
+
+  const modeHint: Record<string, string> = {
+    news: 'a concise news briefing',
+    'deep-dive': 'a deep-dive analysis',
+    investigative: 'an investigative report',
+    opinion: 'an opinion roundtable',
+    wormhole: 'an unexpected exploration',
+  }
+
+  try {
+    console.log(`[Description] Generating for: "${topic}" (mode: ${mode})`)
+    const t0 = Date.now()
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: `Write a 2-3 sentence episode description for ${modeHint[mode] ?? 'a podcast episode'} about "${topic}".
+
+The episode covers: ${preview}
+
+Sources referenced: ${sourceList}
+
+Rules:
+- Write in present tense, like a podcast show notes description
+- Be specific about what the listener will learn
+- Keep it engaging but informative
+- 2-3 sentences only, no more
+- Respond with ONLY the description, nothing else` }],
+      }),
+    })
+    console.log(`[Description] Claude response: ${res.status} (${Date.now() - t0}ms)`)
+    if (!res.ok) return ''
+    const data = await res.json()
+    const desc = data.content?.[0]?.text?.trim() ?? ''
+    console.log(`[Description] Generated: "${desc.substring(0, 80)}..."`)
+    return desc
+  } catch { return '' }
+}
+
+// ============================================================
 // Main handler
 // ============================================================
 
@@ -849,16 +901,18 @@ serve(async (req) => {
 
     const durationSeconds = estimateDuration(transcript)
 
-    // Stage 4: TTS + title (parallel)
-    console.log('[generate-podcast] Stage 4: TTS + title')
+    // Stage 4: TTS + title + description (parallel)
+    console.log('[generate-podcast] Stage 4: TTS + title + description')
     let audioUrls: string[] = []
     let status: Episode['status'] = 'ready'
     let title = normalizedTopic
+    let description = ''
 
     try {
-      const [ttsResult, titleResult] = await Promise.allSettled([
+      const [ttsResult, titleResult, descResult] = await Promise.allSettled([
         synthesizeAll(transcript, episodeId, supabase),
         generateTitle(normalizedTopic, normalizedMode, transcript),
+        generateDescription(normalizedTopic, normalizedMode, transcript, sources),
       ])
 
       if (ttsResult.status === 'fulfilled') {
@@ -871,6 +925,7 @@ serve(async (req) => {
       }
 
       if (titleResult.status === 'fulfilled') title = titleResult.value
+      if (descResult.status === 'fulfilled') description = descResult.value
     } catch (err) {
       console.error('[generate-podcast] Stage 4 failed:', err)
       status = 'no-audio'
@@ -878,7 +933,7 @@ serve(async (req) => {
     console.log(`[generate-podcast] Stage 4 complete: ${audioUrls.length}/${transcript.length} audio, title: "${title}"`)
 
     const finalSources = sources.map(({ snippet: _snippet, ...s }) => s)
-    const episode: Episode = { id: episodeId, topic: normalizedTopic, title, mode: normalizedMode, transcript, sources: finalSources, biasDistribution, audioUrls, durationSeconds, status }
+    const episode: Episode = { id: episodeId, topic: normalizedTopic, title, description, mode: normalizedMode, transcript, sources: finalSources, biasDistribution, audioUrls, durationSeconds, status }
 
     setCached(cacheKey, episode)
     console.log('[generate-podcast] Done. ID:', episodeId, 'Status:', status, 'Duration:', durationSeconds)
