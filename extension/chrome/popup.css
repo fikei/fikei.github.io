@@ -68,7 +68,7 @@ body {
 }
 
 .state[hidden] {
-  display: none;
+  display: none !important;
 }
 
 /* ============================================
