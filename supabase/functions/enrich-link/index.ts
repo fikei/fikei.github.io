@@ -1707,8 +1707,15 @@ async function resolvePlatformImage(url: string): Promise<{ url: string, source:
       if (response.ok) {
         const data = await response.json()
         if (data.thumbnail_url) {
-          console.log('[platform] Spotify oEmbed thumbnail:', data.thumbnail_url)
-          return { url: data.thumbnail_url, source: 'platform' }
+          // oEmbed returns spotifycdn.com 300x300 thumbnails — upgrade to i.scdn.co 640x640
+          // Image hash prefix ab67616d00001e02 = 300px, ab67616d0000b273 = 640px
+          let thumbUrl = data.thumbnail_url
+          const hashMatch = thumbUrl.match(/\/image\/(ab67616d\w{8})(\w{24})/)
+          if (hashMatch) {
+            thumbUrl = `https://i.scdn.co/image/ab67616d0000b273${hashMatch[2]}`
+            console.log('[platform] Spotify thumbnail upgraded to 640px:', thumbUrl)
+          }
+          return { url: thumbUrl, source: 'platform' }
         }
         console.log('[platform] Spotify oEmbed response missing thumbnail_url:', JSON.stringify(data).slice(0, 200))
       }
@@ -1922,6 +1929,7 @@ const KNOWN_GOOD_SOURCES = [
   /opengraph\.githubassets\.com\//,
   /i\.scdn\.co\//,
   /mosaic\.scdn\.co\//,
+  /image-cdn.*\.spotifycdn\.com\//,
   /image\.tmdb\.org\//,
   /m\.media-amazon\.com\//,
   /images-na\.ssl-images-amazon\.com\//,
