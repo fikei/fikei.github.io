@@ -722,6 +722,31 @@ serve(async (req) => {
         } catch (e) { console.warn('[enrich-link] enrich-music call failed:', (e as Error).message) }
       }
 
+      // 7. GetSongBPM for BPM + musical key (server-side to avoid CORS)
+      if (musicResult.artist && musicResult.trackTitle) {
+        try {
+          const bpmApiKey = Deno.env.get('GETSONGBPM_API_KEY') || '2309ca61f21b623b59ee2f734e67a456'
+          const query = encodeURIComponent(`${musicResult.artist} ${musicResult.trackTitle}`)
+          const bpmResp = await fetch(
+            `https://api.getsongbpm.com/search/?api_key=${bpmApiKey}&type=both&lookup=${query}`,
+            { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo/1.0)' } }
+          )
+          if (bpmResp.ok) {
+            const bpmData = await bpmResp.json()
+            if (bpmData.search?.length) {
+              const hit = bpmData.search[0]
+              if (hit.tempo) musicResult.bpm = parseInt(hit.tempo, 10)
+              if (hit.key_of || hit.song_key) musicResult.key = hit.key_of || hit.song_key
+              console.log('[enrich-link] GetSongBPM result:', { bpm: musicResult.bpm, key: musicResult.key })
+            } else {
+              console.log('[enrich-link] GetSongBPM: no results for', musicResult.artist, musicResult.trackTitle)
+            }
+          } else {
+            console.warn('[enrich-link] GetSongBPM HTTP', bpmResp.status)
+          }
+        } catch (e) { console.warn('[enrich-link] GetSongBPM failed:', (e as Error).message) }
+      }
+
       // Return if we got anything useful
       const hasData = musicResult.artist || musicResult.trackTitle || musicResult.contentFormat
       if (hasData) {

@@ -6480,8 +6480,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.8.3';
-  console.log('[boards] v' + VERSION + ' - Fix pin deletion resurrection, enrichment persistence, and duplicate detection');
+  const VERSION = '2.8.4';
+  console.log('[boards] v' + VERSION + ' - Move BPM/key lookup server-side, fix merge handler');
 
   // ============================================
   // Supabase Setup
@@ -10848,9 +10848,8 @@ Return JSON:
             duration: existing.duration || result.music.duration || null,
             contentFormat: existing.contentFormat || result.music.contentFormat || null,
             isExplicit: existing.isExplicit ?? result.music.isExplicit ?? null,
-            // Preserve client-side fields (BPM/key from GetSongBPM, embed from URL parsing)
-            bpm: existing.bpm || null,
-            key: existing.key || null,
+            bpm: existing.bpm || result.music.bpm || null,
+            key: existing.key || result.music.key || null,
             embedUrl: result.music.embedUrl || existing.embedUrl || null,
             embedType: result.music.embedType || existing.embedType || null,
             embedHeight: result.music.embedHeight || existing.embedHeight || null,
