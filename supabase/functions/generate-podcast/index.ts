@@ -8,8 +8,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VERSION = '1.1.0'
-console.log(`[generate-podcast] v${VERSION} - Add episode description generation`)
+const VERSION = '1.2.0'
+console.log(`[generate-podcast] v${VERSION} - ElevenLabs v3 with audio tags, disfluency, cross-talk`)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,7 +92,7 @@ This is a 5-minute briefing. Be concise. No filler. Every sentence earns its pla
 - challenger: asks the one question the audience is thinking
 - expert: provides the critical context in 1-2 sentences
 Total ~750 words. No meandering. Cut anything that doesn't inform.
-TTS delivery: use short, punchy sentences. Vary between 5-word and 15-word sentences. News cues should feel clipped and urgent. Use em-dashes for pivots: "Three people are dead — and officials still have no answers."`,
+Voice direction: [serious tone] and [urgent] on synthesizer cues. Challenger asks one sharp question — can start with [cuts in]. Expert gives a [matter-of-fact] two-sentence verdict. Tight, clipped delivery. Em-dashes for pivots: "Three people are dead — and officials still have no answers."`,
   },
 
   'deep-dive': {
@@ -101,7 +101,7 @@ TTS delivery: use short, punchy sentences. Vary between 5-word and 15-word sente
     targetWords: 3500,  // ~23 min at 150 wpm
     voiceStyle: 'Conversational but substantive. Like a long-form NPR feature.',
     structurePrompt: `Structure as a comprehensive exploration:
-1. cold_open — hook the listener with a surprising fact or question
+1. cold_open — drop the listener mid-conversation, as if they walked in on a discussion already happening. No "Welcome to the show." Start with a provocative statement or mid-thought
 2. context — what's happening now and why it matters
 3. history — how we got here (key turning points)
 4. argument_a — the strongest case for one perspective
@@ -116,7 +116,7 @@ This is a 20-30 minute deep dive. Go deep on context and history that a quick ne
 - challenger: probes assumptions, surfaces contradictions, plays devil's advocate
 - expert: provides the depth — data, historical parallels, domain expertise
 Total ~3500 words. Allow ideas to breathe. Use specific examples and data.
-TTS delivery: vary sentence rhythm deliberately. Use long sentences to build context, then land with a short one. Use ellipses to signal transitions: "And that changed everything..." Use natural thinking patterns: "Which raises the question...", "But here's what nobody was expecting:"`,
+Voice direction: synthesizer uses [thoughtful] and [curious] transitions. Challenger uses [skeptical] and [hesitates] before pushing back. Expert uses [matter-of-fact] for data and [emphatic] for key insights. Use "uh" and "I mean" before complex explanations. Allow moments of genuine surprise: "[gasps] Wait, that can't be right."`,
   },
 
   investigative: {
@@ -125,7 +125,7 @@ TTS delivery: vary sentence rhythm deliberately. Use long sentences to build con
     targetWords: 4500,  // ~30 min at 150 wpm
     voiceStyle: 'Serious, methodical, building tension. Like a podcast version of investigative journalism.',
     structurePrompt: `Structure as an investigative narrative that follows the evidence:
-1. cold_open — the scene-setter: a specific moment, fact, or detail that hooks the listener
+1. cold_open — drop in mid-conversation. No formal intro. Start with a specific, gripping detail that makes the listener lean in
 2. the_question — frame the central question this investigation is trying to answer
 3. evidence_trail — walk through the key evidence chronologically, source by source
 4. key_players — who is involved, what are their motivations and interests
@@ -141,7 +141,7 @@ This is a 30-minute investigative episode. Follow the facts. Name sources. Be pr
 - challenger: the skeptic — "but wait, how do we know that?", "who benefits from this narrative?"
 - expert: the analyst — connects this to broader patterns, provides forensic-level detail
 Total ~4500 words. Every claim needs a source. Distinguish clearly between fact, allegation, and inference. Use phrases like "according to [source]", "records show", "what we can verify is".
-TTS delivery: use sentence fragments for dramatic effect. "Records show the transfer happened at 11:47pm. Two hours before the press conference." Build suspense with short declarative sentences followed by longer reveals.`,
+Voice direction: synthesizer uses [serious tone] throughout, [dramatic tone] before key reveals. Challenger uses [skeptical] "but wait, how do we know that?" and [scoffs] at weak claims. Expert uses [matter-of-fact] for evidence and [pause] before connecting dots. Use sentence fragments for impact: "11:47pm. Two hours before the press conference." Build with [whispers] for tension: "[whispers] And here's what they didn't want anyone to see."`,
   },
 
   opinion: {
@@ -166,7 +166,7 @@ This is a 30-minute opinion exploration. The goal is NOT to be neutral — it's 
 - challenger: the provocateur — deliberately takes each side to its logical extreme, asks "so what?"
 - expert: the evidence-keeper — grounds opinions in data, history, and real-world outcomes
 Total ~4500 words. Each perspective should be presented so well that the listener could mistake the show for actually advocating it. Use real quotes and data from sources.
-TTS delivery: challenger cues should feel argumentative — use rising phrases that invite response: "But what about—", "That assumes—". Synthesizer cues should feel measured and fair. Use rhetorical questions for emphasis: "Is that really the standard we want to set?"`,
+Voice direction: challenger uses [interrupting] during clashes and [passionate] when advocating: "[cuts in] But that completely ignores—". Synthesizer stays [thoughtful] and measured: "[sighs] Look, I hear both sides, but..." Expert uses [emphatic] on data points. Use rhetorical questions: "Is that really the standard we want to set?" Disfluency matters here — "I mean, you know, that's — that's a really hard question."`,
   },
 
   wormhole: {
@@ -175,7 +175,7 @@ TTS delivery: challenger cues should feel argumentative — use rising phrases t
     targetWords: 4500,  // ~30 min at 150 wpm
     voiceStyle: 'Curious, playful, increasingly amazed. Like discovering something incredible at 2am.',
     structurePrompt: `Structure as a journey down an unexpected rabbit hole:
-1. hook — start with the topic as the audience knows it, then reveal the weird angle
+1. hook — drop in mid-discovery. Start as if the hosts just found something wild: "—okay so I was reading about this and you're not going to believe—"
 2. the_rabbit_hole — the first unexpected connection or fact that pulls us deeper
 3. unexpected_connection — how this topic connects to something seemingly unrelated
 4. deep_weird — the strangest, most surprising aspect — the thing that makes you go "wait, WHAT?"
@@ -190,7 +190,7 @@ This is a 30-minute wormhole episode. The goal is to take a familiar topic and f
 - challenger: the grounding voice — "hold on, is this actually true?", keeps things honest
 - expert: the obsessive — knows the deep lore, the footnotes, the connections nobody else sees
 Total ~4500 words. Prioritize surprise and genuine discovery. Use narrative cliffhangers between segments. The tone should be: "you're not going to believe this, but it's all real".
-TTS delivery: use excited sentence structure — build to a reveal. "And then — this is the part that broke my brain — it turns out..." Use genuine reaction language: "Wait. Wait, wait, wait." Short bursts of astonishment work well for spoken delivery.`,
+Voice direction: synthesizer uses [excited] builds to reveals: "[excited] And then — this is the part that broke my brain — it turns out..." Challenger uses [skeptical] grounding: "[scoffs] Hold on, is this actually true?" Expert uses [awe] for genuine wonder. All speakers should react: "[gasps] Wait. Wait, wait, wait." "[laughs] I know, right?" Use disfluency for discovery: "so it's, uh, it's actually connected to — okay you're not gonna believe this."`,
   },
 }
 
@@ -558,18 +558,37 @@ ${sources.map(s => `[${s.index}] ${s.title} — ${s.domain}`).join('\n')}
 
 ${config.scriptStyle}
 
-Rules for natural spoken delivery:
-- Write for the ear, not the eye. Every sentence must sound natural spoken aloud.
-- Vary sentence length deliberately. Short sentences punch. Longer sentences let ideas breathe and build momentum before landing.
-- Use em-dashes for mid-sentence pauses — "The data is clear — and it contradicts everything we assumed."
-- Use ellipses for trailing thoughts or leading into a point: "And that's where it gets interesting..."
-- Use commas generously to create natural breath points within long sentences.
-- Include natural interjections and conversational pivots: "Now—", "Look,", "Here's the thing:", "Actually,"
-- Build emphasis through word choice, not formatting. Prefer "staggering" over "very large."
-- Start cues with energy — avoid opening with "Well," or "So,". Use a direct statement or active clause.
-- End cues with a complete thought — not cut off mid-idea.
-- Each cue is 1-3 short paragraphs (2-4 sentences each) of continuous speech. No bullet points, no headers.
-- Include real citation references naturally in speech (e.g., "According to [source 3]...")
+Rules for human-sounding podcast speech:
+
+DISFLUENCY — sound like real humans thinking out loud:
+- Use filler words before complex explanations: "I mean," "you know," "uh," "like"
+- Include mid-thought corrections: "it was — no, actually it was..."
+- Use verbal thinking: "So what that means is..." / "Let me put it this way..."
+- Add brief affirmations reacting to the previous speaker: "Right." / "Exactly." / "Mmhmm."
+- Don't overdo it — 2-3 disfluencies per cue maximum. Place them where a human would genuinely pause to think.
+
+AUDIO PERFORMANCE TAGS — embed these directly in the text to direct how lines are spoken:
+- Use [laughs], [sighs], [hesitates], [scoffs], [gasps] for natural non-verbal moments
+- Use [serious tone], [lighthearted], [excited], [matter-of-fact] to set emotional register
+- Use [pause] or [long pause] for dramatic beats
+- Use [interrupting] or [cuts in] when a speaker jumps in before another finishes
+- Use [whispers] or [speaking softly] for intimate or tense moments
+- Place tags BEFORE the text they affect: "[hesitates] I'm not sure that's the whole story."
+- Use sparingly — 1-3 tags per cue. Let the words do most of the work.
+
+CROSS-TALK AND REACTIONS:
+- Challenger should occasionally start with [interrupting] or [cuts in]
+- Short reactive interjections are powerful: "Wait—", "Hold on—", "That's huge.", "Okay, wow."
+- Reference what the previous speaker said: "Building on what you just said..." or "I hear you, but—"
+
+RHYTHM AND PACING:
+- Write in bursts, not perfect paragraphs. Humans speak in fragments.
+- Vary sentence length: short punches + longer builds. Land key points on short sentences.
+- Use em-dashes for mid-sentence pivots — "The data is clear — and it contradicts everything."
+- Use ellipses for trailing thoughts: "And that's where it gets interesting..."
+- Start cues mid-thought, not with formal openers. No "Welcome to the show" energy.
+- Each cue is 1-3 short paragraphs of continuous speech. No bullet points, no headers.
+- Include real citation references naturally: "According to [source 3]..."
 
 Respond with ONLY a JSON array of transcript cues:
 [{"speaker": "synthesizer", "text": "...", "segment": "${config.segments[0]}", "citations": [1, 2]}, ...]`
@@ -620,42 +639,35 @@ Respond with ONLY a JSON array of transcript cues:
 const VOICE_MAP: Record<string, { voiceId: string; stability: number; similarity: number; style: number }> = {
   synthesizer: {
     voiceId: '29vD33N1CtxCmqQRPOHJ',  // Drew — warm, well-rounded American male
-    stability: 0.35,       // lower for natural cadence variation
+    stability: 0.45,       // v3: slightly higher, expressiveness comes from audio tags
     similarity: 0.80,
-    style: 0.55,           // higher for expressive delivery
+    style: 0.10,           // v3: near-zero, model handles expression natively
   },
   challenger: {
     voiceId: 'EXAVITQu4vr4xnSDxMaL',  // Sarah — soft, clear American female
-    stability: 0.30,       // lowest: most animated, questioning energy
+    stability: 0.35,       // v3: slightly more animated
     similarity: 0.75,
-    style: 0.65,           // highest: skeptical, challenging tone
+    style: 0.15,           // v3: slight style for challenger energy
   },
   expert: {
     voiceId: 'onwK4e9ZLuTAKqWW03F9',  // Daniel — deep, measured British male
-    stability: 0.45,       // slightly lower: less flat, still authoritative
+    stability: 0.55,       // v3: most stable for authoritative delivery
     similarity: 0.85,
-    style: 0.45,           // slightly higher: measured but not robotic
+    style: 0.05,           // v3: minimal style for measured authority
   },
 }
 
-// Preprocess transcript text for natural TTS delivery.
-// Inserts SSML <break> tags at natural pause points (paragraph breaks,
-// sentence boundaries, em-dashes, ellipses, colons) so ElevenLabs
-// produces speech with realistic pauses and breathing room.
+// Preprocess transcript text for ElevenLabs v3 TTS delivery.
+// v3 uses [audio tags] instead of SSML <break> tags.
+// Em-dashes and ellipses are left as-is — v3 interprets them natively.
 function preprocessForTTS(text: string): string {
   let processed = text
-  // Paragraph breaks → breath pause
-  processed = processed.replace(/\n\n+/g, ' <break time="0.8s"/> ')
-  // Line breaks → short pause
-  processed = processed.replace(/\n/g, ' <break time="0.4s"/> ')
-  // Between sentences (period/question/exclamation followed by new sentence)
-  processed = processed.replace(/([.!?])\s+([A-Z])/g, '$1 <break time="0.3s"/> $2')
-  // Em-dashes → dramatic pause
-  processed = processed.replace(/\s*—\s*/g, ' <break time="0.4s"/> ')
-  // Ellipses → trailing thought pause
-  processed = processed.replace(/\.\.\./g, '<break time="0.6s"/>')
-  // Colons → setup-payoff pause
-  processed = processed.replace(/:\s+/g, ': <break time="0.3s"/>')
+  // Paragraph breaks → breath pause via v3 tag
+  processed = processed.replace(/\n\n+/g, ' [long pause] ')
+  // Line breaks → beat pause
+  processed = processed.replace(/\n/g, ' [pause] ')
+  // Strip any leftover SSML tags from old content or edge cases
+  processed = processed.replace(/<[^>]+\/>/g, '')
   // Clean up double spaces
   processed = processed.replace(/  +/g, ' ').trim()
   return processed
@@ -682,7 +694,7 @@ async function synthesizeCue(
       headers: { 'xi-api-key': elevenLabsKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
       body: JSON.stringify({
         text: preprocessForTTS(cue.text),
-        model_id: 'eleven_multilingual_v2',
+        model_id: 'eleven_v3',
         voice_settings: { stability, similarity_boost: similarity, style, use_speaker_boost: true },
       }),
     })
