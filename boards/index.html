@@ -6480,8 +6480,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.8.5';
-  console.log('[boards] v' + VERSION + ' - Fix AudD fingerprinting gate for reels with unmentioned songs');
+  const VERSION = '2.8.6';
+  console.log('[boards] v' + VERSION + ' - Switch recommendation suggestions to list view layout');
 
   // ============================================
   // Supabase Setup
@@ -8189,31 +8189,31 @@ Return JSON:
         ? `<img src="${secureImg(sug.productImage)}" alt="${esc(sug.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="w-img__placeholder" style="display:none">${icon}</div>`
         : `<div class="w-img__placeholder">${icon}</div>`;
 
-      // Render as link only if we have a valid URL, otherwise render as non-clickable card
+      // Render as list row — link if URL available, div otherwise
       if (hasUrl) {
-        // Phase 1: Track click for instrumentation
         const trackClick = `trackWidgetEvent('click', 'complete-the-look', {brand:'${esc(sug.brand)}',name:'${esc(sug.name).replace(/'/g, "\\'")}',hasImage:${hasProductImage}})`;
         suggestionsHtml += `
           <a href="${esc(sug.productUrl)}" target="_blank" rel="noopener" class="w-item" onclick="${trackClick}">
             <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
-            ${brandDisplay}
-            <span class="w-text">${esc(sug.name)}</span>
-            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
-            <span class="w-btn w-btn--sm">Shop Now →</span>
+            <div class="w-item__text">
+              <span class="w-text">${esc(sug.name)}</span>
+              ${brandDisplay}
+              <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
+            </div>
           </a>`;
       } else {
-        // No valid URL - render as non-clickable suggestion
         suggestionsHtml += `
           <div class="w-item">
             <div class="w-img" style="border:var(--border-thin) solid var(--border-subtle)">
               ${imageContent}
             </div>
-            ${brandDisplay}
-            <span class="w-text">${esc(sug.name)}</span>
-            <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
-            <span class="w-btn w-btn--sm" style="opacity:0.5">Search for this item</span>
+            <div class="w-item__text">
+              <span class="w-text">${esc(sug.name)}</span>
+              ${brandDisplay}
+              <span class="w-text w-text--note">${esc(sug.reason || '')} ${priceDisplay}</span>
+            </div>
           </div>`;
       }
     }
@@ -8224,7 +8224,7 @@ Return JSON:
         <div class="w-body">
           <div class="w-items">${userItemsHtml}</div>
           <div class="w-divider"><span class="w-divider__label">+</span></div>
-          <div class="w-items">${suggestionsHtml}</div>
+          <div class="w-items w-items--list">${suggestionsHtml}</div>
         </div>
       </div>`;
   }
