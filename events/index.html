@@ -1063,6 +1063,10 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 /* ---- Responsive: Tablet (768px) ---- */
 @media (max-width: 768px) {
@@ -1278,6 +1282,7 @@ body {
     <!-- Sources bar -->
     <div class="sources-bar">
       <div class="sources-bar__chips" id="sourceChips"></div>
+      <button class="btn btn--sm btn--ghost" id="forceRefreshBtn" title="Force refresh all sources (Shift+R)" style="padding:4px 6px;font-size:14px;line-height:1;opacity:0.5;min-width:0;" onclick="window.__forceRefreshSources && window.__forceRefreshSources()">⟳</button>
       <button class="btn btn--sm btn--dashed" id="addSourceBtn">Manage Sources</button>
       <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
@@ -1571,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.2.0';
-  console.log(`[events] v${VERSION} - source auto-repair`);
+  const VERSION = '1.3.0';
+  console.log(`[events] v${VERSION} - source auto-repair + force refresh`);
 
   // ============================================
   // Stock Sources Catalog
@@ -5124,7 +5129,22 @@ body {
         modal.classList.remove('modal--visible');
       }
       if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); filterSearch.focus(); }
+      // Shift+R: force refresh all sources (bypasses cache)
+      if (e.key === 'R' && e.shiftKey && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        window.__forceRefreshSources && window.__forceRefreshSources();
+      }
     });
+
+    // Expose force refresh for button + keyboard shortcut
+    window.__forceRefreshSources = function() {
+      const btn = document.getElementById('forceRefreshBtn');
+      if (btn) { btn.style.opacity = '1'; btn.textContent = '⟳'; btn.style.animation = 'spin 0.8s linear infinite'; }
+      log('Force refresh triggered');
+      fetchAllSources(true).then(() => {
+        if (btn) { btn.style.opacity = '0.5'; btn.style.animation = ''; }
+      });
+    };
   }
 
   // --- Onboarding (3-step: region → interests → sources) ---
