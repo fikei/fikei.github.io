@@ -19,7 +19,7 @@ Each decision follows this format:
 ### ADR-001: Use Vanilla JavaScript (No Frameworks)
 
 **Date**: 2026-01-XX
-**Status**: Accepted
+**Status**: Superseded by ADR-014
 
 **Context**: Need to decide on frontend technology stack. Options include React, Vue, Svelte, or vanilla JS.
 
@@ -73,7 +73,7 @@ Each decision follows this format:
 ### ADR-004: GitHub Pages Hosting
 
 **Date**: 2026-01-XX
-**Status**: Accepted
+**Status**: Superseded by ADR-015
 
 **Context**: Need hosting for static frontend. Options: Vercel, Netlify, GitHub Pages, Cloudflare Pages.
 
@@ -200,7 +200,7 @@ Each decision follows this format:
 ### ADR-011: Single-File Frontend (No Build Step)
 
 **Date**: 2025-12-XX
-**Status**: Accepted (with reservations — see [R2 in Risks](../infrastructure/risks.md))
+**Status**: Superseded by ADR-014
 
 **Context**: As the app grew, all code accumulated in `boards/index.html` (~9,100 lines). Options: extract into modules with a bundler (webpack, vite), extract into separate files with `<script>` tags, or keep as single file.
 
@@ -256,6 +256,89 @@ Each decision follows this format:
 
 ---
 
+### ADR-014: React + TypeScript Rewrite (Supersedes ADR-001, ADR-011)
+
+**Date**: 2026-03-05
+**Status**: Accepted
+
+**Context**: The Boards monolith (`boards/index.html`) has grown to 20,040 lines with no module boundaries, no type safety, and no component isolation. Development velocity is degrading — every change risks side effects across the application. There are no tests, no code splitting, and security issues (client-side API key exposure in `classifyByAI()`). ADR-001 (Vanilla JS) and ADR-011 (Single-File) were correct for rapid prototyping but are now net negatives.
+
+**Decision**: Rewrite Boards in React 18 + TypeScript 5.x + Vite 5.x. Use Zustand for client state (flat store fits interconnected slices better than Redux boilerplate or Jotai atoms). Use TanStack Query for server state (stale-while-revalidate, optimistic updates, retry). Use @dnd-kit for drag-and-drop (accessible, composable, custom collision detection for merge zones). Use CSS Modules with existing `design-system/tokens.css` as sole source of truth (no styled-components or Tailwind — the design system already exists). See PRD: `docs/strategy/prds/boards-react-rewrite.md`.
+
+**Consequences**:
+- (+) Type safety catches bugs before runtime
+- (+) Component isolation makes features independently testable
+- (+) Code splitting — users load only what they use
+- (+) 17,600 lines become ~40 focused modules
+- (+) Test coverage possible from day one (Vitest + MSW + Playwright)
+- (-) 20-week migration effort across 5 phases
+- (-) Two apps to maintain during migration period
+- (-) Build step required (Vite) — no more edit-push-done
+- (-) New dependencies (React, Zustand, TanStack Query, Dexie, @dnd-kit)
+
+---
+
+### ADR-015: Cloudflare Pages Hosting (Supersedes ADR-004)
+
+**Date**: 2026-03-05
+**Status**: Accepted
+
+**Context**: GitHub Pages cannot serve single-page applications correctly — path-based URLs like `/boards/cleanup` return 404 on hard refresh. The React rewrite needs proper SPA routing. Options: GitHub Pages with 404.html hack, hash-based routing, Vercel, Netlify, Cloudflare Pages.
+
+**Decision**: Host the React app on Cloudflare Pages. Staging URL `next.ctrl.rodeo` during migration, DNS cutover to `ctrl.rodeo` at Phase R5. GitHub Pages remains for the Jekyll landing site during transition.
+
+**Consequences**:
+- (+) Native SPA routing — all paths resolve to index.html
+- (+) Global edge CDN with edge caching (faster than GitHub Pages)
+- (+) Preview deployments per PR (every branch gets a unique URL)
+- (+) Free tier: 500 builds/month, unlimited bandwidth
+- (+) Future option: Cloudflare Workers for edge-side backend
+- (-) DNS change required at cutover (brief SSL/propagation risk)
+- (-) Must add new domains to Supabase Auth redirect URLs
+- (-) Separate deployment pipeline from the Jekyll site
+
+---
+
+### ADR-016: IndexedDB via Dexie.js (Supersedes ADR-006 partially)
+
+**Date**: 2026-03-05
+**Status**: Accepted
+
+**Context**: The monolith uses 16+ localStorage keys with inconsistent naming, no versioning, and the 5MB storage limit. The offline-first principle from ADR-006 remains correct, but localStorage is the wrong persistence layer for an app with 1000+ pins and structured data.
+
+**Decision**: Replace localStorage with Dexie.js (IndexedDB wrapper) for all persistent data. Preserve the offline-first architecture: Zustand store (in-memory) → Dexie (local DB) → Supabase (cloud sync). Same stale-while-revalidate pattern. Include a one-time migration utility that reads all 16 legacy localStorage keys into Dexie tables.
+
+**Consequences**:
+- (+) No 5MB storage limit (IndexedDB has effectively unlimited storage)
+- (+) Async operations don't block main thread
+- (+) Structured queries (indexes on category, contentType, syncStatus)
+- (+) Schema migrations built-in (Dexie version system)
+- (+) Consistent key naming (one schema definition)
+- (-) More complex API than localStorage get/set
+- (-) Migration utility needed for existing users
+- (-) IndexedDB can be cleared by browser (same risk as localStorage)
+
+---
+
+### ADR-017: Server-Side Classification (Supersedes ADR-007 partially)
+
+**Date**: 2026-03-05
+**Status**: Accepted
+
+**Context**: ADR-007 accepted CORS proxies "with reservations." The monolith leaks every user URL to `allorigins.win` and `codetabs.com`. Additionally, `classifyByAI()` calls the Anthropic API directly from the browser, exposing the API key. Both are security issues that cannot be fixed without server-side alternatives.
+
+**Decision**: Create two new Supabase Edge Functions: `fetch-metadata` (replaces CORS proxies) and extend `classify` (absorbs client-side `classifyByAI()`). No user URLs leave the Supabase infrastructure. No API keys in the browser.
+
+**Consequences**:
+- (+) User URLs never sent to third-party CORS proxies
+- (+) Anthropic API key removed from client-side code
+- (+) Server-side scraping bypasses CORS entirely
+- (+) Bot protection on target sites is easier to handle server-side
+- (-) Requires Supabase auth for metadata fetching (no anonymous enrichment)
+- (-) Edge function invocations have cost (mitigated by domain profile caching per ADR-008)
+
+---
+
 ## Template
 
 ```markdown
@@ -275,4 +358,4 @@ Each decision follows this format:
 
 ---
 
-*Last updated: 2026-02-06*
+*Last updated: 2026-03-05*
