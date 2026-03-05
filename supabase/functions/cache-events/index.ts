@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.2.0'
-console.log(`[cache-events] v${VERSION} - responsive status derivation`)
+const VERSION = '1.3.0'
+console.log(`[cache-events] v${VERSION} - event count degradation detection`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -65,7 +65,7 @@ interface SourceOutcome {
 
 // --- Source Health Upsert (mirrors domain_profiles pattern from enrich-link) ---
 
-function deriveStatus(successRate: number, consecutiveFailures: number, totalScrapes: number): string {
+function deriveStatus(successRate: number, consecutiveFailures: number, totalScrapes: number, countDegraded = false): string {
   if (totalScrapes === 0) return 'unknown'
   // Broken: persistent failure pattern
   if (consecutiveFailures >= 6) return 'broken'
@@ -75,6 +75,8 @@ function deriveStatus(successRate: number, consecutiveFailures: number, totalScr
   if (consecutiveFailures >= 3) return 'degraded'
   if (totalScrapes >= 3 && successRate < 0.65) return 'degraded'
   if (consecutiveFailures >= 1 && successRate < 0.5) return 'degraded' // early warning
+  // Event count degradation: source works but returns far fewer events than peak
+  if (countDegraded) return 'degraded'
   // Healthy: consistent success
   if (successRate >= 0.8 && consecutiveFailures === 0) return 'healthy'
   if (totalScrapes === 1 && successRate === 1.0) return 'healthy' // first scrape succeeded
@@ -100,13 +102,28 @@ async function upsertSourceHealth(
     const outcomesSeen = existing.outcomes_seen || {}
     outcomesSeen[outcomeKey] = (outcomesSeen[outcomeKey] || 0) + 1
 
+    // Track peak event count (stored in JSONB to avoid migration)
+    const previousPeak = outcomesSeen.peak_event_count || 0
+    if (isSuccess && outcome.eventCount > previousPeak) {
+      outcomesSeen.peak_event_count = outcome.eventCount
+    }
+    const peakCount = outcomesSeen.peak_event_count || 0
+
+    // Detect event count degradation: source returns >0 events but far fewer than peak
+    // Threshold: >50% drop from peak, and peak must be meaningful (>20 events)
+    const countDegraded = isSuccess && peakCount > 20 && outcome.eventCount < peakCount * 0.5
+    if (countDegraded) {
+      outcomesSeen.count_drop = (outcomesSeen.count_drop || 0) + 1
+      console.log(`[cache-events] Count degradation: ${outcome.sourceId} returned ${outcome.eventCount} vs peak ${peakCount} (${Math.round(outcome.eventCount / peakCount * 100)}%)`)
+    }
+
     const total = existing.total_scrapes + 1
     const successCount = existing.success_count + (isSuccess ? 1 : 0)
     const zeroCount = existing.zero_result_count + (outcomeKey === 'zero_results' ? 1 : 0)
     const errorCount = existing.error_count + (!outcome.ok ? 1 : 0)
     const successRate = total > 0 ? successCount / total : 1.0
     const consecutiveFailures = isSuccess ? 0 : existing.consecutive_failures + 1
-    const status = deriveStatus(successRate, consecutiveFailures, total)
+    const status = deriveStatus(successRate, consecutiveFailures, total, countDegraded)
 
     await supabase.from('source_health').update({
       source_name: outcome.sourceName,
@@ -127,7 +144,11 @@ async function upsertSourceHealth(
       last_scraped_at: new Date().toISOString(),
     }).eq('source_id', outcome.sourceId)
   } else {
-    const outcomesSeen = { [outcomeKey]: 1 }
+    const outcomesSeen: Record<string, unknown> = { [outcomeKey]: 1 }
+    // Track peak event count from first scrape
+    if (isSuccess && outcome.eventCount > 0) {
+      outcomesSeen.peak_event_count = outcome.eventCount
+    }
     await supabase.from('source_health').insert({
       source_id: outcome.sourceId,
       source_name: outcome.sourceName,
