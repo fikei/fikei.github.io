@@ -117,7 +117,13 @@ async function extractReel(url: string): Promise<ReelData> {
     throw new Error(`ScrapeCreators API error ${resp.status}: ${text}`)
   }
 
-  const raw = await resp.json()
+  const rawText = await resp.text()
+  let raw
+  try {
+    raw = JSON.parse(rawText)
+  } catch {
+    throw new Error(`ScrapeCreators returned invalid JSON: ${rawText.substring(0, 200)}`)
+  }
   const post = raw.shortcode ? raw : (raw.data || raw)
 
   // Extract audio track from music metadata
@@ -340,11 +346,17 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
   })
 
   if (!resp.ok) {
-    const text = await resp.text()
-    throw new Error(`Claude API error ${resp.status}: ${text}`)
+    const errText = await resp.text()
+    throw new Error(`Claude API error ${resp.status}: ${errText}`)
   }
 
-  const result = await resp.json()
+  const rawBody = await resp.text()
+  let result
+  try {
+    result = JSON.parse(rawBody)
+  } catch {
+    throw new Error(`Claude API returned invalid JSON: ${rawBody.substring(0, 200)}`)
+  }
   let text = result.content[0].text.trim()
 
   // Strip markdown fences if present
@@ -352,7 +364,19 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
     text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
   }
 
-  return JSON.parse(text) as ExtractionResult
+  // Try parsing directly, then try extracting JSON object if Claude appended text
+  try {
+    return JSON.parse(text) as ExtractionResult
+  } catch (parseErr) {
+    console.warn('[instagram-import] Claude returned non-clean JSON, attempting extraction:', (parseErr as Error).message)
+    console.warn('[instagram-import] Raw text:', text.substring(0, 500))
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start !== -1 && end > start) {
+      return JSON.parse(text.substring(start, end + 1)) as ExtractionResult
+    }
+    throw new Error(`Failed to parse entity extraction: ${(parseErr as Error).message}`)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -538,20 +562,28 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
   }
 
   // Phase 5: Enhanced music resolution (Spotify + AudD multi-track)
+  // AudD fingerprinting runs for ANY reel with a video URL and non-original audio,
+  // even when no music entities were extracted from text. This handles reels where
+  // songs play without being verbally mentioned or named in the caption.
   const musicEntities = toResolve.filter(e => isMusicEntity(e))
-  if (musicEntities.length > 0) {
-    console.log(`[instagram-import] Phase 5: Enhanced music resolution for ${musicEntities.length} entities`)
+  const streamingRegex = /spotify\.com|music\.apple\.com|soundcloud\.com|beatport\.com|bandcamp\.com|tidal\.com|deezer\.com|audiomack\.com|youtube\.com\/watch|music\.youtube\.com/
 
-    // Tier 2 prep: fingerprint ALL tracks in one call (before entity loop)
-    let fingerprints: FingerprintResult[] = []
-    const streamingRegex = /spotify\.com|music\.apple\.com|soundcloud\.com|beatport\.com|bandcamp\.com|tidal\.com|deezer\.com|audiomack\.com|youtube\.com\/watch|music\.youtube\.com/
-    const anyNeedFingerprint = musicEntities.some(e => {
+  // Always fingerprint when there's a video with non-original audio
+  let fingerprints: FingerprintResult[] = []
+  if (reel.video_url && !isOriginalAudio(reel)) {
+    // Skip fingerprinting only if ALL music entities are already resolved to streaming URLs
+    const allResolved = musicEntities.length > 0 && musicEntities.every(e => {
       const isStreaming = e.resolved_url && streamingRegex.test(e.resolved_url)
-      return !(isStreaming && e.match_quality >= 0.7)
+      return isStreaming && e.match_quality >= 0.7
     })
-    if (anyNeedFingerprint && reel.video_url) {
+
+    if (!allResolved) {
       fingerprints = await fingerprintAllTracks(reel.video_url)
     }
+  }
+
+  if (musicEntities.length > 0) {
+    console.log(`[instagram-import] Phase 5: Enhanced music resolution for ${musicEntities.length} entities`)
 
     for (const entity of musicEntities) {
       // Check if Tier 0 already resolved to a streaming service with high quality
@@ -599,19 +631,35 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
         }
       }
     }
+  }
 
-    // Create entities for unmatched fingerprints (tracks not in caption/transcript)
+  // Create entities for unmatched fingerprints (tracks not in caption/transcript).
+  // This runs regardless of whether music entities existed — it's the primary
+  // discovery mechanism for songs that aren't mentioned in text.
+  if (fingerprints.length > 0) {
     for (const fp of fingerprints) {
       if (fp._matched) continue
       console.log(`[instagram-import] AudD new track: ${fp.artist} - ${fp.track} (offset: ${fp.offset}s)`)
+
+      // Try Spotify search for a proper URL if AudD didn't return one
+      let resolvedUrl = fp.spotifyUrl || null
+      let resolvedVia = 'audd-fingerprint'
+      if (!resolvedUrl && fp.artist && fp.track) {
+        const spotifyResult = await searchSpotify(fp.artist, fp.track)
+        if (spotifyResult) {
+          resolvedUrl = spotifyResult.url
+          resolvedVia = 'audd-fingerprint+spotify'
+        }
+      }
+
       entities.push({
         type: 'song',
         name: `${fp.artist} - ${fp.track}`,
         category: 'listen',
         confidence: 0.8,
         source: 'audio_fingerprint',
-        resolved_url: fp.spotifyUrl || null,
-        resolved_via: 'audd-fingerprint',
+        resolved_url: resolvedUrl,
+        resolved_via: resolvedVia,
         match_quality: 0.85,
         status: 'review',
         location_hint: null,
@@ -1002,7 +1050,15 @@ serve(async (req) => {
   const headers = { ...corsHeaders, 'Content-Type': 'application/json' }
 
   try {
-    const body = await req.json()
+    let body
+    try {
+      body = await req.json()
+    } catch (parseErr) {
+      return new Response(
+        JSON.stringify({ error: `Invalid request body: ${(parseErr as Error).message}` }),
+        { status: 400, headers }
+      )
+    }
     const { url, urls, posts } = body
 
     // Single URL mode

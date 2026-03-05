@@ -1,0 +1,291 @@
+/* Rodeo Extension — Popup Styles
+   Design system tokens ported from design-system/tokens.css
+   Dark-first, Space Grotesk, minimal */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --color-black: #000;
+  --color-white: #fff;
+  --gray-100: #111;
+  --gray-200: #1a1a1a;
+  --gray-300: #222;
+  --gray-400: #333;
+  --gray-500: #666;
+  --gray-600: #999;
+  --color-success: #0f0;
+  --color-error: #c00;
+  --color-warning: #f90;
+
+  --bg: var(--gray-100);
+  --bg-surface: var(--gray-200);
+  --fg: var(--color-white);
+  --fg-muted: var(--gray-600);
+  --fg-subtle: var(--gray-500);
+  --border: var(--color-white);
+  --border-subtle: var(--gray-400);
+
+  --font-primary: "Space Grotesk", sans-serif;
+  --text-xs: 10px;
+  --text-sm: 10px;
+  --text-lg: 12px;
+  --text-xl: 14px;
+  --text-2xl: 18px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --radius-sm: 2px;
+  --duration-fast: 0.1s;
+  --duration-normal: 0.15s;
+}
+
+body {
+  width: 320px;
+  min-height: 120px;
+  max-height: 480px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  overflow: hidden;
+}
+
+/* ============================================
+   States
+   ============================================ */
+.state {
+  padding: var(--space-4);
+}
+
+.state[hidden] {
+  display: none !important;
+}
+
+/* ============================================
+   Logo
+   ============================================ */
+.logo {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: var(--fg-muted);
+  margin-bottom: var(--space-3);
+}
+
+/* ============================================
+   Buttons (matches design-system .btn patterns)
+   ============================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all var(--duration-normal) ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn--filled {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.btn--filled:hover {
+  background: transparent;
+  color: var(--fg);
+}
+
+.btn--outline {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border-subtle);
+}
+
+.btn--outline:hover {
+  border-color: var(--fg);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ============================================
+   Loading
+   ============================================ */
+#state-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-subtle);
+  border-top-color: var(--fg);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Auth State
+   ============================================ */
+.auth-container {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.auth-message {
+  color: var(--fg-muted);
+  margin-bottom: var(--space-4);
+}
+
+/* ============================================
+   Unsupported State
+   ============================================ */
+.unsupported-container {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.unsupported-message {
+  color: var(--fg-subtle);
+}
+
+/* ============================================
+   Save State
+   ============================================ */
+.save-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.save-preview {
+  margin-bottom: var(--space-4);
+}
+
+.save-domain {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-title {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ============================================
+   Selection Preview
+   ============================================ */
+.selection-preview {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.selection-label {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--fg-subtle);
+  margin-bottom: var(--space-1);
+}
+
+.selection-text {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+}
+
+/* ============================================
+   Saving State
+   ============================================ */
+.saving-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) 0;
+  gap: var(--space-3);
+}
+
+.saving-message {
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ============================================
+   Saved State
+   ============================================ */
+.saved-container {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.saved-check {
+  font-size: var(--text-2xl);
+  color: var(--color-success);
+  margin-bottom: var(--space-2);
+}
+
+.duplicate-check {
+  color: var(--color-warning);
+}
+
+.saved-message {
+  color: var(--fg-muted);
+  margin-bottom: var(--space-4);
+}
+
+/* ============================================
+   Error State
+   ============================================ */
+.error-container {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.error-message {
+  color: var(--color-error);
+  margin-bottom: var(--space-4);
+}

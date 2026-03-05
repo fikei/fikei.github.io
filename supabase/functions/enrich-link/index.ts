@@ -722,6 +722,31 @@ serve(async (req) => {
         } catch (e) { console.warn('[enrich-link] enrich-music call failed:', (e as Error).message) }
       }
 
+      // 7. GetSongBPM for BPM + musical key (server-side to avoid CORS)
+      if (musicResult.artist && musicResult.trackTitle) {
+        try {
+          const bpmApiKey = Deno.env.get('GETSONGBPM_API_KEY') || '2309ca61f21b623b59ee2f734e67a456'
+          const query = encodeURIComponent(`${musicResult.artist} ${musicResult.trackTitle}`)
+          const bpmResp = await fetch(
+            `https://api.getsongbpm.com/search/?api_key=${bpmApiKey}&type=both&lookup=${query}`,
+            { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo/1.0)' } }
+          )
+          if (bpmResp.ok) {
+            const bpmData = await bpmResp.json()
+            if (bpmData.search?.length) {
+              const hit = bpmData.search[0]
+              if (hit.tempo) musicResult.bpm = parseInt(hit.tempo, 10)
+              if (hit.key_of || hit.song_key) musicResult.key = hit.key_of || hit.song_key
+              console.log('[enrich-link] GetSongBPM result:', { bpm: musicResult.bpm, key: musicResult.key })
+            } else {
+              console.log('[enrich-link] GetSongBPM: no results for', musicResult.artist, musicResult.trackTitle)
+            }
+          } else {
+            console.warn('[enrich-link] GetSongBPM HTTP', bpmResp.status)
+          }
+        } catch (e) { console.warn('[enrich-link] GetSongBPM failed:', (e as Error).message) }
+      }
+
       // Return if we got anything useful
       const hasData = musicResult.artist || musicResult.trackTitle || musicResult.contentFormat
       if (hasData) {
@@ -1707,8 +1732,15 @@ async function resolvePlatformImage(url: string): Promise<{ url: string, source:
       if (response.ok) {
         const data = await response.json()
         if (data.thumbnail_url) {
-          console.log('[platform] Spotify oEmbed thumbnail:', data.thumbnail_url)
-          return { url: data.thumbnail_url, source: 'platform' }
+          // oEmbed returns spotifycdn.com 300x300 thumbnails — upgrade to i.scdn.co 640x640
+          // Image hash prefix ab67616d00001e02 = 300px, ab67616d0000b273 = 640px
+          let thumbUrl = data.thumbnail_url
+          const hashMatch = thumbUrl.match(/\/image\/(ab67616d\w{8})(\w{24})/)
+          if (hashMatch) {
+            thumbUrl = `https://i.scdn.co/image/ab67616d0000b273${hashMatch[2]}`
+            console.log('[platform] Spotify thumbnail upgraded to 640px:', thumbUrl)
+          }
+          return { url: thumbUrl, source: 'platform' }
         }
         console.log('[platform] Spotify oEmbed response missing thumbnail_url:', JSON.stringify(data).slice(0, 200))
       }
@@ -1922,6 +1954,7 @@ const KNOWN_GOOD_SOURCES = [
   /opengraph\.githubassets\.com\//,
   /i\.scdn\.co\//,
   /mosaic\.scdn\.co\//,
+  /image-cdn.*\.spotifycdn\.com\//,
   /image\.tmdb\.org\//,
   /m\.media-amazon\.com\//,
   /images-na\.ssl-images-amazon\.com\//,

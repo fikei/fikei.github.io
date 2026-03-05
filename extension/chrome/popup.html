@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=360">
+  <title>Rodeo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- State: Loading -->
+  <div id="state-loading" class="state">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- State: Not signed in -->
+  <div id="state-auth" class="state" hidden>
+    <div class="auth-container">
+      <div class="logo">RODEO</div>
+      <p class="auth-message">Sign in to start saving</p>
+      <button id="btn-signin" class="btn btn--filled btn--block">
+        Open ctrl.rodeo
+      </button>
+    </div>
+  </div>
+
+  <!-- State: Unsupported page -->
+  <div id="state-unsupported" class="state" hidden>
+    <div class="unsupported-container">
+      <div class="logo">RODEO</div>
+      <p class="unsupported-message">Can't save this page</p>
+    </div>
+  </div>
+
+  <!-- State: Ready to save -->
+  <div id="state-save" class="state" hidden>
+    <div class="save-header">
+      <div class="logo">RODEO</div>
+    </div>
+
+    <div class="save-preview">
+      <div class="save-domain" id="save-domain"></div>
+      <div class="save-title" id="save-title"></div>
+      <div id="selection-preview" class="selection-preview" hidden>
+        <div class="selection-label">SELECTED TEXT</div>
+        <div class="selection-text" id="selection-text"></div>
+      </div>
+    </div>
+
+    <button id="btn-save" class="btn btn--filled btn--block">
+      Save to Rodeo
+    </button>
+  </div>
+
+  <!-- State: Saving -->
+  <div id="state-saving" class="state" hidden>
+    <div class="saving-container">
+      <div class="loading-spinner"></div>
+      <p class="saving-message">Saving...</p>
+    </div>
+  </div>
+
+  <!-- State: Saved -->
+  <div id="state-saved" class="state" hidden>
+    <div class="saved-container">
+      <div class="saved-check">&#10003;</div>
+      <p class="saved-message">Saved</p>
+      <button id="btn-view" class="btn btn--outline btn--block">
+        View in Library
+      </button>
+    </div>
+  </div>
+
+  <!-- State: Already saved (duplicate) -->
+  <div id="state-duplicate" class="state" hidden>
+    <div class="saved-container">
+      <div class="saved-check duplicate-check">&#9679;</div>
+      <p class="saved-message">Already in your library</p>
+      <button id="btn-view-dup" class="btn btn--outline btn--block">
+        View in Library
+      </button>
+    </div>
+  </div>
+
+  <!-- State: Error -->
+  <div id="state-error" class="state" hidden>
+    <div class="error-container">
+      <p class="error-message" id="error-message">Something went wrong</p>
+      <button id="btn-retry" class="btn btn--outline btn--block">
+        Try Again
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

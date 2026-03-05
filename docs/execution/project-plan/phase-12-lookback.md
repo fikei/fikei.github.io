@@ -325,6 +325,27 @@ These tasks must be complete before Epic 12.1 can begin.
 | | "Connections" subsection in Lookback View | Pending |
 | | Minimum: confidence > 0.75 | Pending |
 
+### Story 3a: Taste-Graph Enhanced Event Recommendations
+
+<!-- Reference: PRD at docs/strategy/prds/event-connections.md -->
+
+| Story | Tasks | Status |
+|-------|-------|--------|
+| **Server: TasteContext in recommend-events** | | Complete |
+| | Add `TasteContext`, `TasteCluster`, `TasteBridge` types to `recommend-events` | Complete |
+| | Extend `EventProfile` with optional `tasteContext` field | Complete |
+| | Inject taste identities, bridges, motifs into AI ranking prompt | Complete |
+| | Add taste-aware rule to prompt RULES block | Complete |
+| | Trim `topCategories` from 5→3 to offset token budget | Complete |
+| | Version bump to 1.1.0 | Complete |
+| **Client: taste pipeline in Boards** | | Complete |
+| | `buildClustersFromLinks()` — group pins by category, extract topTokens | Complete |
+| | `loadTasteContext()` — call taste-graph with 6h localStorage cache | Complete |
+| | Wire into `loadEventsForYouWidget()` — attach tasteContext to profile | Complete |
+| **Client: taste pipeline in Events** | | Complete |
+| | Duplicate `buildClustersFromLinks` + `loadTasteContext` in events/index.html | Complete |
+| | Wire into `loadRecommendedEvents()` — attach tasteContext to profile | Complete |
+
 ### Story 4: Taste Drift
 
 | Story | Tasks | Status |

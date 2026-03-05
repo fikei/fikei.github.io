@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-02-23 (PR #143: TF-IDF board suggestions, board_metadata, link tags, GENRE_NORMALIZE expansion)
+> **Last Updated**: 2026-03-05 (Added Phase 13: Boards React Rewrite — 5 sub-phases, R1–R5)
 
 ---
 
@@ -29,12 +29,22 @@
 | [Phase 9: Bulk Import](./phase-9-bulk-import.md) | Pending | 0/132 |
 | [Phase 10: Image Validation & Enrichment](./phase-10-image-validation.md) | IN PROGRESS | 68/126 |
 | [Phase 11: Instagram Import](./phase-11-instagram-import.md) | Pending | 0/73 |
-| [Phase 12: Lookback](./phase-12-lookback.md) | IN PROGRESS | 34/236 |
+| [Phase 12: Lookback](./phase-12-lookback.md) | IN PROGRESS | 47/249 |
+| [Phase 13: Boards React Rewrite](./phase-13-react-rewrite.md) | Pending | 0/272 |
 | [Backlog](./backlog.md) | Future | 1/102 |
 
 ---
 
 ## Recent Milestones
+
+### Boards React Rewrite — Planned
+**Added: 2026-03-05** — Phase 13 filed from [PRD: Boards React Rewrite](/docs/strategy/prds/boards-react-rewrite.md)
+
+- **5 sub-phases (R1–R5)** covering Foundation → Core Display → Capture & CRUD → Auth/Sharing/Advanced → Hardening
+- **Security fixes in R1**: `fetch-metadata` edge function (eliminates CORS proxy URL leakage), extended `classify` function (eliminates client-side Anthropic API key exposure)
+- **Platform migration**: 20,040-line monolith → React 18 + TypeScript 5.x + Vite on Cloudflare Pages
+- **Data layer**: 16+ localStorage keys replaced by Dexie.js (IndexedDB) with typed schema and migration utility
+- **DNS cutover at R5**: `ctrl.rodeo/boards/` moves from GitHub Pages to Cloudflare Pages; monolith archived
 
 ### Create a Board — Infrastructure Sprint ⚡
 **Completed: 2026-02-23** — PR #143
@@ -134,9 +144,10 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 9: Bulk Import | 0 | 0 | 132 | 0 |
 | Phase 10: Image Validation | 68 | 0 | 58 | 0 |
 | Phase 11: Instagram Import | 0 | 0 | 73 | 0 |
-| Phase 12: Lookback | 34 | 0 | 197 | 5 |
+| Phase 12: Lookback | 47 | 0 | 197 | 5 |
+| Phase 13: React Rewrite | 0 | 0 | 272 | 0 |
 | Backlog | 1 | 0 | 100 | 0 |
-| **TOTAL** | **343** | **5** | **1225** | **9** |
+| **TOTAL** | **356** | **5** | **1497** | **9** |
 
 ---
 

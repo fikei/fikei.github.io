@@ -59,7 +59,7 @@ The board category is "${category || 'custom'}".
 Here are the items (${sampledPins.length} total):
 ${pinList}
 
-Suggest 2-4 meaningful ways this collection could be filtered/organized. Each suggestion should be a dimension that would create useful groupings.
+Suggest 5-6 meaningful ways this collection could be filtered/organized. Each suggestion should be a dimension that would create useful groupings.
 
 Respond with valid JSON only, no other text:
 {
@@ -86,7 +86,7 @@ Rules:
         },
         body: JSON.stringify({
           model: 'claude-3-haiku-20240307',
-          max_tokens: 512,
+          max_tokens: 1024,
           messages: [{ role: 'user', content: suggestPrompt }]
         })
       })
@@ -125,7 +125,7 @@ Rules:
 
       const suggestions = Array.isArray(result.suggestions) ? result.suggestions.filter(
         (s: { prompt?: string; label?: string }) => s.prompt && s.label
-      ).slice(0, 4) : []
+      ).slice(0, 6) : []
 
       return new Response(
         JSON.stringify({ suggestions }),
