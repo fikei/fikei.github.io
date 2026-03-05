@@ -190,12 +190,20 @@ export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): 
       ? labelParts.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ')
       : `Cluster ${clusterIdx}`;
 
+    // Sort members by cosine similarity to centroid (descending = most representative first)
+    const ranked = [...members].sort((a, b) =>
+      cosineSimilarity(b.vector, centroid) - cosineSimilarity(a.vector, centroid)
+    );
+    const sampleTitles = ranked.slice(0, 10).map(m => m.pin.title).filter(Boolean);
+    const representativeTitle = ranked[0]?.pin.title || '';
+
     clusters.push({
       id: `${idPrefix}${clusterIdx}`,
       pinIds: members.map(m => m.pin.id),
       centroidVector: centroid,
       topTokens: top,
-      sampleTitles: members.slice(0, 5).map(m => m.pin.title),
+      sampleTitles,
+      representativeTitle,
       dominantCategory: dominantCat,
       pinCount: members.length,
       label,

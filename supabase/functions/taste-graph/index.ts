@@ -1,5 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
+const VERSION = '0.2.0'
+console.log(`[taste-graph] v${VERSION} - genre-style labels, reasoning scratchpad, tighter descriptions`)
+
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
 const corsHeaders = {
@@ -11,6 +14,7 @@ interface ClusterInput {
   id: string
   topTokens: string[]
   sampleTitles: string[]
+  representativeTitle: string
   dominantCategory: string
   pinCount: number
 }
@@ -92,76 +96,57 @@ serve(async (req) => {
     if (ANTHROPIC_API_KEY) {
       try {
         const clusterDesc = clusters
-          .map(c => `- id: "${c.id}", tokens: [${c.topTokens.join(', ')}], samples: [${c.sampleTitles.slice(0, 3).join(', ')}], category: ${c.dominantCategory}, pins: ${c.pinCount}`)
+          .map(c => [
+            `id: "${c.id}"`,
+            `tokens: [${c.topTokens.join(', ')}]`,
+            `representative: "${c.representativeTitle || c.sampleTitles[0] || ''}"`,
+            `samples: [${c.sampleTitles.slice(0, 8).join(' | ')}]`,
+            `category: ${c.dominantCategory}`,
+            `pins: ${c.pinCount}`,
+          ].join(', '))
           .join('\n')
 
-        const labelPrompt = `You are a taste profiler. A user saved hundreds of links over time. We clustered them by embedding similarity. Your job: identify the CULTURAL SENSIBILITY behind each cluster — the taste instinct, not the object type.
+        const labelPrompt = `You are a taste profiler. A user saved hundreds of links over time. We clustered them by embedding similarity. Your job: name the CULTURAL SENSIBILITY behind each cluster.
 
-CRITICAL RULES:
-- Labels name a TASTE IDENTITY or AESTHETIC MOVEMENT — never the object.
-- Descriptions speak to the PERSON'S INSTINCT — never summarize the content.
-- Think: "what kind of person saves all of these?" — that instinct IS the label.
+HOW TO READ THE DATA:
+- tokens: TF-IDF terms from pin titles/tags. Proper nouns (brand names, artist names, domain names like "bandcamp", "pitchfork", "nike") are OBJECT ANCHORS — ignore them when choosing a label. Focus on descriptive tokens (adjectives, genres, aesthetic words) for the underlying sensibility.
+- representative: The single pin closest to the cluster center — highest-signal example.
+- samples: Literal pin titles. Use them to understand WHAT is saved, then ask: what sensibility connects ALL of these?
 
-BAD labels (describe objects):
-"Black Pants", "Ambient Music", "Japanese Food", "Modern Chairs", "Techno Tracks", "Interior Design"
+LABELING RULES:
+Think of how niche music genres work: "dark ambient", "lo-fi hip hop", "progressive house", "midwest emo". These are specific enough to search for and find more of, but abstract enough to capture a sensibility beyond any single track. Apply that same logic to every domain.
 
-GOOD labels (describe taste):
-"Utilitarian Uniform", "Slow Frequencies", "Omakase Discipline", "Scandinavian Minimalism", "Grimy New Wave", "Archive Fever"
+Labels should be 2-5 words, title case. They should be ACTIONABLE — someone could use the label to find more things that match this taste. They should describe the sensibility, not the object category.
 
-BAD descriptions (summarize pins):
-"a collection of black clothing items and minimal wardrobe pieces"
-"links about ambient music and lo-fi producers"
+BAD (object categories): "Running Shoes", "Pasta Recipes", "Techno Music", "Modern Furniture"
+BAD (too abstract/poetic): "Archive Fever", "Patient Frame", "Slow Frequencies"
+GOOD (actionable taste identities): "Dark Industrial Techno", "Warm Scandinavian Minimalism", "Raw Concrete Interiors", "Methodical Italian Cooking", "Functional Techwear"
 
-GOOD descriptions (profile the person):
-"a wardrobe built on the belief that reduction is the only honest form of style"
-"sound that insists on being felt in the body before it reaches the brain"
+DESCRIPTION RULES:
+Write like a knowledgeable friend — specific, concrete, grounded. Not poetic.
+CRITICAL: Each field must be ONE SHORT sentence, STRICTLY under 15 words. No exceptions. If your sentence is over 15 words, cut it shorter.
+- "whatItIs": lowercase, under 15 words. The shared aesthetic — name materials, moods, references.
+- "whyYou": lowercase, under 15 words, 2nd person "you". The instinct or values behind this taste.
+- "howItChanged": lowercase, under 15 words. How this taste deepens or evolves.
+Do NOT start with "you are drawn to" or "you gravitate toward". Be direct.
 
-For each cluster, provide:
-1. label (1-3 words, title case): The TASTE IDENTITY. Name the aesthetic instinct, cultural posture, or design philosophy — as if naming a subculture or movement, not a product category.
-2. domain: music, fashion, film, food, design, tech, travel, books, art, lifestyle, fitness, other
-3. description with three fields. Write like Co-Star — poetic, uncomfortably specific, zero platitudes:
-   - "whatItIs": one lowercase sentence (max 20 words). The shared aesthetic POSTURE — not what the saves contain, but the sensibility that connects them.
-   - "whyYou": one lowercase sentence (max 20 words, 2nd person). The psychological need this taste satisfies. Why does this person gravitate here?
-   - "howItChanged": one lowercase sentence (max 20 words). The trajectory of this taste — how it deepens, mutates, or takes over.
+PROCESS: For each cluster, first write a brief "reasoning" field where you identify the core sensibility. Then derive the label and descriptions from that reasoning.
 
-WORKED EXAMPLES:
-
-Tokens: [pants, black, minimal, cut, slim], Samples: [Veilance System_A, Rick Owens DRKSHDW, COS essentials]
-→ Label: "Utilitarian Uniform"
-  whatItIs: "a wardrobe built on the belief that reduction is the only honest form of style"
-  whyYou: "you decided long ago that getting dressed should feel like loading ammunition"
-  howItChanged: "it stopped being about clothes and became a daily practice of disappearing into intention"
-
-Tokens: [techno, dark, warehouse, bass, berlin], Samples: [Berghain sets, DVS1 podcast, Blawan live]
-→ Label: "Grimy New Wave"
-  whatItIs: "sound designed for rooms where the architecture does half the work"
-  whyYou: "you need music that treats subtlety and violence as the same gesture"
-  howItChanged: "the BPM kept climbing but the spaces you listened in kept getting smaller"
-
-Tokens: [wood, light, clean, form, nordic], Samples: [Muuto pendant, HAY sofa, Kinfolk interiors]
-→ Label: "Scandinavian Silence"
-  whatItIs: "objects that treat emptiness as a material and restraint as luxury"
-  whyYou: "you believe a room should feel like a held breath"
-  howItChanged: "it became less about furniture and more about editing out everything that doesn't earn its place"
-
-Tokens: [film, slow, arthouse, frame, mood], Samples: [Wong Kar-wai stills, Tarkovsky mirror, A24 catalog]
-→ Label: "Patient Frame"
-  whatItIs: "cinema where the camera refuses to look away until you feel something shift"
-  whyYou: "you distrust any story that resolves faster than it takes to sit with the question"
-  howItChanged: "you stopped watching for plot and started watching for the moment the light changes"
+ANTI-COPY RULE: Do not reuse any label, phrase, or wording from these instructions. Generate entirely original output.
 
 Clusters:
 ${clusterDesc}
 
 Respond with ONLY valid JSON:
-{"clusters": [{"id": "c0", "label": "Short Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
+{"clusters": [{"id": "c0", "reasoning": "brief note about the sensibility", "label": "Actionable Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
 
-        const labelText = await callAnthropic(labelPrompt, 1500)
-        const parsed = parseJSON(labelText) as { clusters: LabeledCluster[] }
-        labeledClusters = parsed.clusters || []
+        const labelText = await callAnthropic(labelPrompt, 2000)
+        const parsed = parseJSON(labelText) as { clusters: Array<LabeledCluster & { reasoning?: string }> }
+        // Strip reasoning scratchpad before returning to client
+        labeledClusters = (parsed.clusters || []).map(({ reasoning, ...rest }) => rest)
       } catch (e) {
         console.error('Label call failed:', e)
-        // Fallback: auto-labels from top token
+        // Fallback: auto-labels from top tokens
         labeledClusters = clusters.map(c => ({
           id: c.id,
           label: c.topTokens.length > 0
