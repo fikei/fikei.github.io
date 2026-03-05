@@ -72,6 +72,7 @@ export interface Cluster {
   centroidVector: Map<string, number>;
   topTokens: string[];
   sampleTitles: string[];
+  representativeTitle: string;
   dominantCategory: string;
   pinCount: number;
   label: string;
@@ -121,6 +122,7 @@ export interface ClusterInput {
   id: string;
   topTokens: string[];
   sampleTitles: string[];
+  representativeTitle: string;
   dominantCategory: string;
   pinCount: number;
 }
