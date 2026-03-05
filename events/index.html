@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.3.1';
-  console.log(`[events] v${VERSION} - source auto-repair + force refresh + health debug`);
+  const VERSION = '1.3.2';
+  console.log(`[events] v${VERSION} - responsive health status + degraded auto-repair`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2392,16 +2392,18 @@ body {
       log(`Source health loaded: ${healthRows.length} sources — ` +
         `${healthRows.filter(r => r.status === 'healthy').length} healthy, ` +
         `${healthRows.filter(r => r.status === 'degraded').length} degraded, ` +
-        `${healthRows.filter(r => r.status === 'broken').length} broken`);
+        `${healthRows.filter(r => r.status === 'broken').length} broken, ` +
+        `${healthRows.filter(r => r.status === 'unknown').length} unknown`);
 
       // Surface broken/degraded sources
       const broken = healthRows.filter(r => r.status === 'broken');
       const degraded = healthRows.filter(r => r.status === 'degraded');
       if (broken.length > 0 || degraded.length > 0) {
         showSourceHealthWarning(broken, degraded);
-        // Trigger auto-repair for broken sources (non-blocking)
-        if (broken.length > 0 && !state.repairInProgress) {
-          attemptAutoRepair(broken).catch(e => log('Auto-repair error: ' + e.message));
+        // Trigger auto-repair for broken and degraded sources (non-blocking)
+        const repairTargets = [...broken, ...degraded];
+        if (repairTargets.length > 0 && !state.repairInProgress) {
+          attemptAutoRepair(repairTargets).catch(e => log('Auto-repair error: ' + e.message));
         }
       } else {
         // Clear any existing warning
