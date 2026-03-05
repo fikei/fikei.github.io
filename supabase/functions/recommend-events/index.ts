@@ -7,8 +7,11 @@
 // 3. AI ranking: Claude Haiku ranks top candidates with relevance explanations
 //
 // POST /functions/v1/recommend-events
-// Body: { profile: { categories, artists, genres, keywords, domains, contentTypes }, filters? }
+// Body: { profile: { categories, artists, genres, keywords, domains, contentTypes, tasteContext? }, filters? }
 // Returns: { events: [...], meta: { eventsScanned, profileSignals, algorithm } }
+
+const VERSION = '1.1.0'
+console.log(`[recommend-events] v${VERSION} — taste-graph context`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -30,6 +33,24 @@ function getSupabase() {
 
 // --- Types ---
 
+interface TasteCluster {
+  label: string       // e.g. "Grimy New Wave"
+  domain: string      // e.g. "music"
+  pinCount: number
+}
+
+interface TasteBridge {
+  clusterA: string
+  clusterB: string
+  reason: string
+}
+
+interface TasteContext {
+  clusters: TasteCluster[]
+  bridges: TasteBridge[]
+  motifs: string[]
+}
+
 interface EventProfile {
   categories: Record<string, number>
   artists: string[]
@@ -37,6 +58,7 @@ interface EventProfile {
   keywords: string[]
   domains: Record<string, number>
   contentTypes: Record<string, number>
+  tasteContext?: TasteContext
 }
 
 interface EventFilters {
@@ -296,10 +318,31 @@ async function rankEventsWithAI(
   }
   const topCategories = Object.entries(profile.categories)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
+    .slice(0, 3)
     .map(([cat, count]) => `${cat} (${count})`)
   if (topCategories.length > 0) {
     profileSummary.push(`Content categories: ${topCategories.join(', ')}`)
+  }
+
+  // Inject taste context if available (from taste-graph)
+  if (profile.tasteContext?.clusters?.length) {
+    const labels = profile.tasteContext.clusters
+      .sort((a, b) => b.pinCount - a.pinCount)
+      .slice(0, 6)
+      .map(c => `${c.label} (${c.domain})`)
+      .join(', ')
+    profileSummary.push(`Taste identities: ${labels}`)
+
+    if (profile.tasteContext.bridges?.length) {
+      const bridgeText = profile.tasteContext.bridges.slice(0, 2)
+        .map(b => `"${b.clusterA}" connects to "${b.clusterB}" — ${b.reason}`)
+        .join('; ')
+      profileSummary.push(`Cross-domain connections: ${bridgeText}`)
+    }
+
+    if (profile.tasteContext.motifs?.length) {
+      profileSummary.push(`Recurring themes: ${profile.tasteContext.motifs.slice(0, 3).join(', ')}`)
+    }
   }
 
   // Build events list
@@ -326,6 +369,7 @@ RULES:
 - Only include events scoring above 0.3
 - Reasons must reference specific user interests (artist names, genres, keywords)
 - Prefer exact artist/genre matches over vague keyword overlap
+- Use taste identity labels to reason about aesthetic and cultural fit, not just literal keyword overlap
 - If no events are relevant, return {"rankings": [], "confidence": 0}
 - Keep each reason under 15 words
 
@@ -414,7 +458,10 @@ serve(async (req) => {
       (profile.genres?.length || 0) +
       (profile.keywords?.length || 0)
 
-    console.log(`[recommend-events] Profile: ${profileSignals} signals, ${Object.keys(profile.categories || {}).length} categories${filters.sourceIds?.length ? `, region filter: ${filters.sourceIds.length} sources` : ''}`)
+    const tasteInfo = profile.tasteContext?.clusters?.length
+      ? `, taste: ${profile.tasteContext.clusters.length} clusters`
+      : ''
+    console.log(`[recommend-events] Profile: ${profileSignals} signals, ${Object.keys(profile.categories || {}).length} categories${tasteInfo}${filters.sourceIds?.length ? `, region filter: ${filters.sourceIds.length} sources` : ''}`)
 
     // Step 1: Fetch upcoming events
     const allEvents = await fetchUpcomingEvents(filters)

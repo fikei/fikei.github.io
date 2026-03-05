@@ -8767,6 +8767,10 @@ Return JSON:
   // Recommends upcoming events based on Boards content
   // =============================================================================
 
+  // Taste context cache for enriching event recommendations
+  const TASTE_CACHE_KEY = 'ctrl-rodeo-taste-cache';
+  const TASTE_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
   // Region → source IDs (must stay in sync with STOCK_SOURCES in events/index.html)
   const EVENT_SOURCE_REGIONS = {
     'bay-area': ['19hz-bayarea', 'ra-bayarea', 'sf-punchline', 'cobbs-sf', 'roxie-sf', 'screenslate-sf'],
@@ -8852,6 +8856,121 @@ Return JSON:
     return profile;
   }
 
+  function buildClustersFromLinks(links) {
+    var groups = {};
+    for (var i = 0; i < links.length; i++) {
+      var cat = links[i].category || 'uncategorized';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(links[i]);
+    }
+
+    var clusters = [];
+    var idx = 0;
+    var cats = Object.keys(groups);
+    for (var c = 0; c < cats.length; c++) {
+      var cat = cats[c];
+      var items = groups[cat];
+      if (items.length < 3) continue;
+
+      var wordFreq = {};
+      for (var j = 0; j < items.length; j++) {
+        if (!items[j].title) continue;
+        var words = items[j].title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+        for (var w = 0; w < words.length; w++) {
+          if (words[w].length > 3 && !EVENTS_STOPWORDS.has(words[w])) {
+            wordFreq[words[w]] = (wordFreq[words[w]] || 0) + 1;
+          }
+        }
+      }
+
+      var topTokens = Object.entries(wordFreq)
+        .sort(function(a, b) { return b[1] - a[1]; })
+        .slice(0, 8)
+        .map(function(e) { return e[0]; });
+
+      var sampleTitles = items.slice(0, 3)
+        .map(function(l) { return l.title || ''; })
+        .filter(Boolean);
+
+      clusters.push({
+        id: 'c' + idx,
+        topTokens: topTokens,
+        sampleTitles: sampleTitles,
+        dominantCategory: cat,
+        pinCount: items.length,
+      });
+      idx++;
+    }
+    return clusters;
+  }
+
+  async function loadTasteContext(links) {
+    // Check cache
+    try {
+      var raw = localStorage.getItem(TASTE_CACHE_KEY);
+      if (raw) {
+        var cached = JSON.parse(raw);
+        var age = Date.now() - (cached.timestamp || 0);
+        var pinDrift = Math.abs((cached.pinCount || 0) - links.length);
+        if (age < TASTE_CACHE_TTL && pinDrift <= 5) {
+          console.log('[taste-context] Cache hit (' + cached.tasteContext.clusters.length + ' clusters)');
+          return cached.tasteContext;
+        }
+      }
+    } catch (e) { /* ignore cache errors */ }
+
+    // Build clusters
+    var clusters = buildClustersFromLinks(links);
+    if (clusters.length < 2) {
+      console.log('[taste-context] Not enough clusters (' + clusters.length + '), skipping');
+      return null;
+    }
+
+    // Call taste-graph
+    try {
+      var resp = await fetch(SUPABASE_URL + '/functions/v1/taste-graph', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ clusters: clusters }),
+      });
+      if (!resp.ok) return null;
+
+      var data = await resp.json();
+      if (!data.clusters || data.clusters.length === 0) return null;
+
+      var tasteContext = {
+        clusters: data.clusters.map(function(c) {
+          var orig = clusters.find(function(cl) { return cl.id === c.id; });
+          return {
+            label: c.label,
+            domain: c.domain,
+            pinCount: orig ? orig.pinCount : 0,
+          };
+        }),
+        bridges: (data.insights && data.insights.bridges) || [],
+        motifs: (data.insights && data.insights.motifs) || [],
+      };
+
+      // Cache result
+      try {
+        localStorage.setItem(TASTE_CACHE_KEY, JSON.stringify({
+          tasteContext: tasteContext,
+          timestamp: Date.now(),
+          pinCount: links.length,
+        }));
+      } catch (e) { /* ignore storage errors */ }
+
+      console.log('[taste-context] Loaded ' + tasteContext.clusters.length + ' clusters, ' + tasteContext.bridges.length + ' bridges');
+      return tasteContext;
+    } catch (err) {
+      console.warn('[taste-context] Error:', err);
+      return null;
+    }
+  }
+
   function renderEventsWidget(events) {
     const footerSection = document.getElementById('widgetFooter');
     const footerContent = document.getElementById('widgetFooterContent');
@@ -8905,6 +9024,12 @@ Return JSON:
     // Require at least some meaningful signals
     const signalCount = profile.artists.length + profile.genres.length + profile.keywords.length;
     if (signalCount === 0) return;
+
+    // Enrich with taste context (cached, non-blocking on failure)
+    var tasteContext = await loadTasteContext(items);
+    if (tasteContext) {
+      profile.tasteContext = tasteContext;
+    }
 
     // Region filter: only recommend events from user's region
     const region = localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area';
