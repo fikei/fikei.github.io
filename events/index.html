@@ -1059,6 +1059,10 @@ body {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 
 /* ---- Responsive: Tablet (768px) ---- */
 @media (max-width: 768px) {
@@ -1567,8 +1571,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.1.0';
-  console.log(`[events] v${VERSION} - source health tracking`);
+  const VERSION = '1.2.0';
+  console.log(`[events] v${VERSION} - source auto-repair`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1678,6 +1682,8 @@ body {
     sources: [],
     sourceErrors: {},  // { sourceId: { reason: 'timeout'|'blocked'|'offline'|'empty'|'unknown', message: '...' } }
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
+    repairedThisSession: new Set(),  // sourceIds repaired this page load (avoid loops)
+    repairInProgress: false,  // true while auto-repair is running
     filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' },
     sort: { key: 'date', dir: 'asc' },
     view: 'table',
@@ -2078,6 +2084,7 @@ body {
 
   // --- Fetch via Edge Function (primary) then CORS proxies (fallback) ---
   const FETCH_SOURCE_URL = SUPABASE_URL + '/functions/v1/fetch-source';
+  const VALIDATE_SOURCE_URL = SUPABASE_URL + '/functions/v1/validate-source';
 
   async function proxyFetch(url) {
     log(`Fetching: ${url}`);
@@ -2364,7 +2371,7 @@ body {
     try {
       const { data: healthRows } = await supabaseClient
         .from('source_health')
-        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes')
+        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes, repair_attempted_at, repair_strategy, repair_result')
         .in('source_id', enabledIds);
 
       if (!healthRows) return;
@@ -2384,6 +2391,10 @@ body {
       const degraded = healthRows.filter(r => r.status === 'degraded');
       if (broken.length > 0 || degraded.length > 0) {
         showSourceHealthWarning(broken, degraded);
+        // Trigger auto-repair for broken sources (non-blocking)
+        if (broken.length > 0 && !state.repairInProgress) {
+          attemptAutoRepair(broken).catch(e => log('Auto-repair error: ' + e.message));
+        }
       } else {
         // Clear any existing warning
         const existing = document.getElementById('sourceHealthWarning');
@@ -2431,6 +2442,340 @@ body {
     const insertBefore = chips || cal || container?.firstChild;
     if (insertBefore && container) {
       container.insertBefore(warn, insertBefore);
+    }
+  }
+
+  // --- Auto-Repair System ---
+  // When broken/degraded sources are detected, attempt autonomous repair:
+  // 1. Probe via validate-source edge function (structural analysis)
+  // 2. Try alternative parser types if structure changed
+  // 3. Report results to source_health table
+
+  const MAX_REPAIRS_PER_SESSION = 3;
+  const REPAIR_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours between repair attempts per source
+
+  async function callValidateSource(sourceId, url, currentType, includeAiAnalysis = false) {
+    try {
+      const resp = await fetch(VALIDATE_SOURCE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ sourceId, url, currentType, includeAiAnalysis }),
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        log(`validate-source error: ${resp.status} ${errText}`);
+        return null;
+      }
+      return await resp.json();
+    } catch (e) {
+      log(`validate-source call failed: ${e.message}`);
+      return null;
+    }
+  }
+
+  async function fetchSingleSource(source) {
+    const type = source.type === 'auto' ? detectSourceType(source.url) : source.type;
+    if (type === 'screenslate') return await fetchScreenSlate(source);
+    if (type === 'ra') return await fetchRA(source);
+    if (type === 'garysguide') return await fetchGarysGuide(source);
+    if (type === 'bonobo') return await fetchBonobo(source);
+    if (type === 'html') return await fetchHtml(source);
+    if (type === 'ical') return await fetchIcal(source);
+    if (type === 'json') return await fetchJson(source);
+    if (type === 'rss') return await fetchRss(source);
+    if (type === 'discord') return await fetchDiscord(source);
+    return [];
+  }
+
+  async function tryAlternativeParser(source, newType) {
+    const originalType = source.type;
+    log(`Auto-repair: trying "${source.name}" with type="${newType}" (was "${originalType}")`);
+    source.type = newType;
+    try {
+      const events = await fetchSingleSource(source);
+      if (events && events.length > 0) {
+        log(`Auto-repair: SUCCESS! "${source.name}" returned ${events.length} events with type="${newType}"`);
+        // Keep the new type for this session
+        return { success: true, events, newType, eventCount: events.length };
+      }
+      log(`Auto-repair: "${source.name}" with type="${newType}" returned 0 events`);
+    } catch (e) {
+      log(`Auto-repair: "${source.name}" with type="${newType}" threw: ${e.message}`);
+    }
+    // Restore original type on failure
+    source.type = originalType;
+    return { success: false, events: [], newType, eventCount: 0 };
+  }
+
+  async function reportRepairResult(sourceId, strategy, result) {
+    if (!supabaseClient) return;
+    try {
+      await supabaseClient.from('source_health').update({
+        repair_attempted_at: new Date().toISOString(),
+        repair_strategy: strategy,
+        repair_result: JSON.stringify(result),
+      }).eq('source_id', sourceId);
+      log(`Auto-repair: reported result for "${sourceId}": strategy=${strategy} success=${result.success}`);
+    } catch (e) {
+      log(`Auto-repair: failed to report result: ${e.message}`);
+    }
+  }
+
+  function selectRepairStrategy(validation) {
+    if (!validation) return { strategy: 'probe-failed', action: 'none' };
+    if (!validation.reachable) {
+      if (validation.httpStatus === 403 || validation.httpStatus === 429) {
+        return { strategy: 'blocked', action: 'none' };
+      }
+      if (validation.httpStatus === 404) {
+        return { strategy: 'url-changed', action: 'none' };
+      }
+      return { strategy: 'unreachable', action: 'none' };
+    }
+
+    const sr = validation.structureReport || {};
+
+    // Reachable — check if detected type differs from current
+    if (validation.detectedType && validation.detectedType !== validation.currentType) {
+      return { strategy: 'type-mismatch', action: 'try-type', newType: validation.detectedType };
+    }
+
+    // Same type, but has structure signals → probably transient
+    const hasSignals = sr.eventSignals && sr.eventSignals.length > 0;
+    const hasContent = sr.hasTable || sr.hasEventSchema || sr.hasRssItems || sr.hasIcalEvents || sr.hasJsonArray;
+    if (hasSignals || hasContent) {
+      return { strategy: 'transient', action: 'retry' };
+    }
+
+    // No structure found — need AI analysis
+    return { strategy: 'structure-changed', action: 'ai-diagnose' };
+  }
+
+  async function attemptAutoRepair(brokenSources) {
+    if (state.repairInProgress) return;
+    if (brokenSources.length === 0) return;
+
+    state.repairInProgress = true;
+    let repairsAttempted = 0;
+    const results = [];
+
+    log(`Auto-repair: starting for ${brokenSources.length} source(s)`);
+
+    for (const healthRow of brokenSources) {
+      if (repairsAttempted >= MAX_REPAIRS_PER_SESSION) {
+        log(`Auto-repair: hit session limit (${MAX_REPAIRS_PER_SESSION})`);
+        break;
+      }
+
+      const sourceId = healthRow.source_id;
+
+      // Skip if already repaired this session
+      if (state.repairedThisSession.has(sourceId)) {
+        log(`Auto-repair: skipping "${sourceId}" — already attempted this session`);
+        continue;
+      }
+
+      // Skip if repair was attempted recently (read from health row)
+      if (healthRow.repair_attempted_at) {
+        const lastRepair = new Date(healthRow.repair_attempted_at).getTime();
+        if (Date.now() - lastRepair < REPAIR_COOLDOWN_MS) {
+          log(`Auto-repair: skipping "${sourceId}" — repaired ${Math.round((Date.now() - lastRepair) / 3600000)}h ago`);
+          continue;
+        }
+      }
+
+      const source = state.sources.find(s => s.id === sourceId);
+      if (!source || !source.url) {
+        log(`Auto-repair: skipping "${sourceId}" — source not found or no URL`);
+        continue;
+      }
+
+      state.repairedThisSession.add(sourceId);
+      repairsAttempted++;
+
+      // Show repair-in-progress UI
+      updateRepairBanner(source.name, 'probing');
+
+      // Step 1: Probe via validate-source
+      const validation = await callValidateSource(sourceId, source.url, source.type);
+      if (!validation) {
+        const result = { success: false, diagnosis: 'validate-source call failed', timestamp: new Date().toISOString() };
+        await reportRepairResult(sourceId, 'probe-failed', result);
+        results.push({ sourceId, ...result });
+        continue;
+      }
+
+      // Step 2: Select strategy
+      let decision = selectRepairStrategy({ ...validation, currentType: source.type });
+      log(`Auto-repair: "${source.name}" → strategy="${decision.strategy}" action="${decision.action}"`);
+
+      let repairResult = { success: false, oldType: source.type, newType: null, eventsFound: 0, diagnosis: null, timestamp: new Date().toISOString() };
+
+      // Step 3: Execute strategy
+      if (decision.action === 'try-type') {
+        updateRepairBanner(source.name, 'trying', decision.newType);
+        const tryResult = await tryAlternativeParser(source, decision.newType);
+        if (tryResult.success) {
+          repairResult.success = true;
+          repairResult.newType = decision.newType;
+          repairResult.eventsFound = tryResult.eventCount;
+          repairResult.diagnosis = `Switched from ${repairResult.oldType} to ${decision.newType}`;
+          // Merge new events into state
+          if (tryResult.events.length > 0) {
+            tryResult.events.forEach(ev => {
+              ev.contentType = getSourceCategory(ev.source);
+              ev.contentType = detectEventType(ev);
+            });
+            state.events = deduplicateAcrossSources([...state.events, ...tryResult.events]);
+            render();
+          }
+        }
+      } else if (decision.action === 'retry') {
+        updateRepairBanner(source.name, 'retrying');
+        try {
+          const events = await fetchSingleSource(source);
+          if (events && events.length > 0) {
+            repairResult.success = true;
+            repairResult.eventsFound = events.length;
+            repairResult.diagnosis = 'Transient failure — retry succeeded';
+            events.forEach(ev => {
+              ev.contentType = getSourceCategory(ev.source);
+              ev.contentType = detectEventType(ev);
+            });
+            state.events = deduplicateAcrossSources([...state.events, ...events]);
+            render();
+          } else {
+            repairResult.diagnosis = 'Retry returned 0 events — may be seasonal or structural';
+          }
+        } catch (e) {
+          repairResult.diagnosis = `Retry failed: ${e.message}`;
+        }
+      } else if (decision.action === 'ai-diagnose') {
+        updateRepairBanner(source.name, 'analyzing');
+        const aiValidation = await callValidateSource(sourceId, source.url, source.type, true);
+        if (aiValidation?.aiAnalysis) {
+          repairResult.diagnosis = aiValidation.aiAnalysis.diagnosis;
+          log(`Auto-repair: AI diagnosis for "${source.name}": ${aiValidation.aiAnalysis.diagnosis}`);
+
+          // If AI suggests a different type with decent confidence, try it
+          if (aiValidation.aiAnalysis.suggestedType &&
+              aiValidation.aiAnalysis.suggestedType !== source.type &&
+              aiValidation.aiAnalysis.confidence >= 0.5) {
+            updateRepairBanner(source.name, 'trying', aiValidation.aiAnalysis.suggestedType);
+            const tryResult = await tryAlternativeParser(source, aiValidation.aiAnalysis.suggestedType);
+            if (tryResult.success) {
+              repairResult.success = true;
+              repairResult.newType = aiValidation.aiAnalysis.suggestedType;
+              repairResult.eventsFound = tryResult.eventCount;
+              repairResult.diagnosis = `AI suggested ${aiValidation.aiAnalysis.suggestedType}: ${aiValidation.aiAnalysis.diagnosis}`;
+              if (tryResult.events.length > 0) {
+                tryResult.events.forEach(ev => {
+                  ev.contentType = getSourceCategory(ev.source);
+                  ev.contentType = detectEventType(ev);
+                });
+                state.events = deduplicateAcrossSources([...state.events, ...tryResult.events]);
+                render();
+              }
+            }
+          }
+        } else {
+          repairResult.diagnosis = 'AI analysis unavailable';
+        }
+      } else {
+        // action === 'none' — no repair possible
+        repairResult.diagnosis = `Source is ${decision.strategy} — no automatic repair available`;
+      }
+
+      await reportRepairResult(sourceId, decision.strategy, repairResult);
+      results.push({ sourceId, ...repairResult });
+
+      // Delay between sources to avoid hammering
+      if (brokenSources.indexOf(healthRow) < brokenSources.length - 1) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    state.repairInProgress = false;
+    showRepairResults(results);
+    // Reload health to get updated status after repairs
+    await loadSourceHealth();
+    log(`Auto-repair: complete — ${results.filter(r => r.success).length}/${results.length} succeeded`);
+  }
+
+  function updateRepairBanner(sourceName, phase, detail) {
+    let warn = document.getElementById('sourceHealthWarning');
+    if (!warn) {
+      warn = document.createElement('div');
+      warn.id = 'sourceHealthWarning';
+      warn.style.cssText = 'background:#0a0a1a;border:1px solid #334466;color:#6699cc;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;';
+      const container = document.querySelector('.container');
+      const chips = document.getElementById('sourceChips');
+      const cal = document.getElementById('calendarView');
+      const insertBefore = chips || cal || container?.firstChild;
+      if (insertBefore && container) container.insertBefore(warn, insertBefore);
+    }
+
+    const phases = {
+      probing: `Probing ${sourceName}...`,
+      trying: `Trying ${sourceName} with ${detail || 'alternative'} parser...`,
+      retrying: `Retrying ${sourceName}...`,
+      analyzing: `AI analyzing ${sourceName}...`,
+    };
+    const msg = phases[phase] || `Repairing ${sourceName}...`;
+    warn.style.background = '#0a0a1a';
+    warn.style.borderColor = '#334466';
+    warn.style.color = '#6699cc';
+    warn.innerHTML = `<span style="flex:1;min-width:0;"><span style="font-weight:600;">Auto-Repair</span> — ${msg} <span style="display:inline-block;animation:pulse 1s infinite;">⟳</span></span>`;
+  }
+
+  function showRepairResults(results) {
+    if (results.length === 0) return;
+    const warn = document.getElementById('sourceHealthWarning');
+    if (!warn) return;
+
+    const successes = results.filter(r => r.success);
+    const failures = results.filter(r => !r.success);
+
+    if (successes.length > 0 && failures.length === 0) {
+      // All succeeded
+      const names = successes.map(r => {
+        const src = state.sources.find(s => s.id === r.sourceId);
+        return src ? `${src.name} (${r.eventsFound} events)` : r.sourceId;
+      });
+      warn.style.background = '#0a1a0a';
+      warn.style.borderColor = '#336633';
+      warn.style.color = '#66cc66';
+      warn.innerHTML = `<span style="flex:1;min-width:0;"><span style="font-weight:600;">Repaired</span> — ${names.join(', ')}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#66cc66;cursor:pointer;font-size:16px;padding:0;flex-shrink:0;line-height:1;">&times;</button>`;
+      // Auto-dismiss after 10 seconds
+      setTimeout(() => { if (warn.parentElement) warn.remove(); }, 10000);
+    } else if (successes.length === 0) {
+      // All failed
+      const names = failures.map(r => {
+        const src = state.sources.find(s => s.id === r.sourceId);
+        return src ? src.name : r.sourceId;
+      });
+      warn.style.background = '#1a0a00';
+      warn.style.borderColor = '#663300';
+      warn.style.color = '#ff9944';
+      warn.innerHTML = `<span style="flex:1;min-width:0;"><span style="font-weight:600;">Repair Failed</span> — ${names.join(', ')}. ${failures[0].diagnosis || 'Unknown issue.'}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#ff9944;cursor:pointer;font-size:16px;padding:0;flex-shrink:0;line-height:1;">&times;</button>`;
+    } else {
+      // Mixed results
+      const successNames = successes.map(r => {
+        const src = state.sources.find(s => s.id === r.sourceId);
+        return src ? src.name : r.sourceId;
+      });
+      const failNames = failures.map(r => {
+        const src = state.sources.find(s => s.id === r.sourceId);
+        return src ? src.name : r.sourceId;
+      });
+      warn.style.background = '#0a0a1a';
+      warn.style.borderColor = '#334466';
+      warn.style.color = '#6699cc';
+      warn.innerHTML = `<span style="flex:1;min-width:0;"><span style="font-weight:600;">Partial Repair</span> — Fixed: ${successNames.join(', ')} · Still broken: ${failNames.join(', ')}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#6699cc;cursor:pointer;font-size:16px;padding:0;flex-shrink:0;line-height:1;">&times;</button>`;
     }
   }
 
@@ -4227,7 +4572,14 @@ body {
           broken: `Broken — ${health.consecutive_failures} failures`,
         };
         const lastOk = health.last_success_at ? new Date(health.last_success_at).toLocaleDateString() : 'never';
-        healthHtml = `<span style="font-size:10px;color:${colors[health.status]};margin-left:6px;" title="Last success: ${lastOk}">${labels[health.status]}</span>`;
+        let repairInfo = '';
+        if (health.repair_attempted_at) {
+          const repairDate = new Date(health.repair_attempted_at).toLocaleDateString();
+          let repairDetail = '';
+          try { repairDetail = health.repair_result ? JSON.parse(health.repair_result).success ? ' ✓' : ' ✗' : ''; } catch {}
+          repairInfo = ` · Repair: ${repairDate}${repairDetail}`;
+        }
+        healthHtml = `<span style="font-size:10px;color:${colors[health.status]};margin-left:6px;" title="Last success: ${lastOk}${repairInfo}">${labels[health.status]}</span>`;
       }
       return `<div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-bottom: var(--border-thin) solid var(--border-subtle);">
         <div style="flex: 1; min-width: 0;">
