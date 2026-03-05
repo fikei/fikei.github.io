@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.3.2';
-  console.log(`[events] v${VERSION} - responsive health status + degraded auto-repair`);
+  const VERSION = '1.3.3';
+  console.log(`[events] v${VERSION} - event count degradation detection`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2379,7 +2379,7 @@ body {
     try {
       const { data: healthRows } = await supabaseClient
         .from('source_health')
-        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes, repair_attempted_at, repair_strategy, repair_result')
+        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes, outcomes_seen, repair_attempted_at, repair_strategy, repair_result')
         .in('source_id', enabledIds);
 
       if (!healthRows) return;
@@ -2438,7 +2438,17 @@ body {
     }
     if (degraded.length > 0) {
       if (msg) msg += ' · ';
-      msg += `Degraded: ${degradedNames.join(', ')}`;
+      const degradedDetails = degraded.map(r => {
+        const src = state.sources.find(s => s.id === r.source_id);
+        const name = src ? src.name : r.source_id;
+        const peak = r.outcomes_seen?.peak_event_count;
+        const last = r.last_success_event_count;
+        if (peak && last && last < peak * 0.5) {
+          return `${name} (${last}/${peak} events)`;
+        }
+        return name;
+      });
+      msg += `Degraded: ${degradedDetails.join(', ')}`;
     }
 
     const warn = document.createElement('div');
