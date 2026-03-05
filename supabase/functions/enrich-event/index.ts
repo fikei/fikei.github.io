@@ -6,6 +6,9 @@
 // Body: { eventIds: string[] }   (batch up to 10)
 // Returns: { processed, succeeded, failed, results }
 
+const VERSION = '1.1.0'
+console.log(`[enrich-event] v${VERSION} - event enrichment with stuck-state recovery`)
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
@@ -362,6 +365,18 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // Recover events stuck in 'processing' for > 15 minutes (timed out)
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+    const { data: stuckEvents } = await supabase
+      .from('events')
+      .update({ enrichment_status: 'failed', enrichment_error: 'Timed out in processing state' })
+      .eq('enrichment_status', 'processing')
+      .lt('updated_at', fifteenMinAgo)
+      .select('id')
+    if (stuckEvents && stuckEvents.length > 0) {
+      console.log(`[enrich-event] Recovered ${stuckEvents.length} stuck events from processing → failed`)
+    }
 
     const { data: events, error: fetchErr } = await supabase
       .from('events')

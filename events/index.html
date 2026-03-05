@@ -81,6 +81,17 @@ body {
   border-color: var(--border-subtle);
 }
 
+.token--warning {
+  border-color: #663300;
+  color: #eab308;
+}
+
+.token--warning.token--active {
+  background: #1a0a00;
+  color: #eab308;
+  border-color: #663300;
+}
+
 .source-chip__error {
   margin-left: var(--space-1);
   font-size: var(--text-2xs);
@@ -1556,6 +1567,9 @@ body {
 (function() {
   'use strict';
 
+  const VERSION = '1.1.0';
+  console.log(`[events] v${VERSION} - source health tracking`);
+
   // ============================================
   // Stock Sources Catalog
   // ============================================
@@ -1663,6 +1677,7 @@ body {
     events: [],
     sources: [],
     sourceErrors: {},  // { sourceId: { reason: 'timeout'|'blocked'|'offline'|'empty'|'unknown', message: '...' } }
+    sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
     filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' },
     sort: { key: 'date', dir: 'asc' },
     view: 'table',
@@ -1990,10 +2005,9 @@ body {
     } catch (e) { log('L2 cache: error — ' + e.message); return null; }
   }
 
-  async function saveEventsToSupabase(events) {
-    if (!events || events.length === 0) return;
+  async function saveEventsToSupabase(events, sourceOutcomes = []) {
     try {
-      const all = events.map(ev => ({
+      const all = (events || []).map(ev => ({
         source: ev.source, date: ev.date, time: ev.time || '', name: ev.name,
         venue: ev.venue, address: ev.address || '', city: ev.city || '',
         genre: ev.genre || '', price: ev.price || '', ages: ev.ages || '',
@@ -2003,9 +2017,9 @@ body {
       const BATCH = 400;
       const batches = [];
       for (let i = 0; i < all.length; i += BATCH) batches.push(all.slice(i, i + BATCH));
-      log(`L2 cache: saving ${all.length} events in ${batches.length} batch(es)...`);
-      let totalCached = 0, totalUpdated = 0, totalEnriched = 0;
-      for (const batch of batches) {
+
+      // If no events but have outcomes, send health-only request
+      if (all.length === 0 && sourceOutcomes.length > 0) {
         const resp = await fetch(CACHE_EVENTS_URL, {
           method: 'POST',
           headers: {
@@ -2013,15 +2027,39 @@ body {
             'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
             'apikey': SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({ events: batch }),
+          body: JSON.stringify({ events: [], sourceOutcomes }),
+        });
+        if (resp.ok) {
+          const result = await resp.json();
+          log(`L2 cache: health-only — ${result.healthUpdated || 0} sources updated`);
+        }
+        return;
+      }
+
+      if (all.length === 0) return;
+      log(`L2 cache: saving ${all.length} events in ${batches.length} batch(es)...`);
+      let totalCached = 0, totalUpdated = 0, totalEnriched = 0, totalHealth = 0;
+      for (let i = 0; i < batches.length; i++) {
+        const body = { events: batches[i] };
+        // Attach sourceOutcomes to the first batch only
+        if (i === 0 && sourceOutcomes.length > 0) body.sourceOutcomes = sourceOutcomes;
+        const resp = await fetch(CACHE_EVENTS_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(body),
         });
         if (!resp.ok) { log('L2 cache: batch save failed — ' + resp.status); continue; }
         const result = await resp.json();
         totalCached += result.cached || 0;
         totalUpdated += result.updated || 0;
         totalEnriched += result.enrichQueued || 0;
+        totalHealth += result.healthUpdated || 0;
       }
-      log(`L2 cache: cached=${totalCached} updated=${totalUpdated} enrichQueued=${totalEnriched}`);
+      log(`L2 cache: cached=${totalCached} updated=${totalUpdated} enrichQueued=${totalEnriched} health=${totalHealth}`);
     } catch (e) { log('L2 cache: save error — ' + e.message); }
   }
 
@@ -2241,11 +2279,30 @@ body {
     });
 
     const results = await Promise.allSettled(promises);
+    const sourceOutcomes = [];
     results.forEach(r => {
       const res = r.status === 'fulfilled' ? r.value : { source: null, events: [], ok: false, error: r.reason?.message || String(r.reason) };
       if (res.events.length > 0) allEvents.push(...res.events);
       if (!res.ok && res.source) {
         state.sourceErrors[res.source.id] = classifySourceError(res.error);
+      }
+      // Collect outcome for health reporting (every source, not just failures)
+      if (res.source) {
+        const evCount = res.events ? res.events.length : 0;
+        const classified = !res.ok ? classifySourceError(res.error) : null;
+        sourceOutcomes.push({
+          sourceId: res.source.id,
+          sourceName: res.source.name,
+          sourceUrl: res.source.url || '',
+          sourceType: res.source.type || 'html',
+          eventCount: evCount,
+          ok: res.ok,
+          errorReason: classified ? classified.reason : (res.ok && evCount === 0 ? 'zero_results' : undefined),
+        });
+        // Log zero-result sources that didn't throw (previously silent)
+        if (res.ok && evCount === 0) {
+          log(`Source "${res.source.name}": 0 events returned (no error)`);
+        }
       }
     });
 
@@ -2269,9 +2326,10 @@ body {
     if (failedNames.length > 0) log(`Failed sources: ${failedNames.join(', ')}`);
     el.style.display = 'none';
     saveEventCache(); // L1
-    if (state.events.length > 0) {
-      saveEventsToSupabase(state.events).catch(e => log('L2 save failed: ' + e.message)); // L2 async
-    }
+    // L2 async — send events + health outcomes
+    saveEventsToSupabase(state.events, sourceOutcomes).catch(e => log('L2 save failed: ' + e.message));
+    // Reload health from DB after reporting (async, updates UI once loaded)
+    loadSourceHealth().catch(e => log('Health load failed: ' + e.message));
     calAutoNavigate();
     updateFilters();
     updateContentTypeFilter();
@@ -2295,6 +2353,85 @@ body {
     if (msg.includes('all fetch methods failed'))
       return { reason: 'unreachable', message: 'Couldn\'t connect to this source through any method. The site may be down or blocking automated access.' };
     return { reason: 'unknown', message: 'Something went wrong loading this source. Try refreshing the page.' };
+  }
+
+  // --- Source Health Loading ---
+  async function loadSourceHealth() {
+    if (!supabaseClient) return;
+    const enabledIds = state.sources.filter(s => s.enabled).map(s => s.id);
+    if (enabledIds.length === 0) return;
+
+    try {
+      const { data: healthRows } = await supabaseClient
+        .from('source_health')
+        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes')
+        .in('source_id', enabledIds);
+
+      if (!healthRows) return;
+
+      state.sourceHealth = {};
+      healthRows.forEach(row => {
+        state.sourceHealth[row.source_id] = row;
+      });
+
+      log(`Source health loaded: ${healthRows.length} sources — ` +
+        `${healthRows.filter(r => r.status === 'healthy').length} healthy, ` +
+        `${healthRows.filter(r => r.status === 'degraded').length} degraded, ` +
+        `${healthRows.filter(r => r.status === 'broken').length} broken`);
+
+      // Surface broken/degraded sources
+      const broken = healthRows.filter(r => r.status === 'broken');
+      const degraded = healthRows.filter(r => r.status === 'degraded');
+      if (broken.length > 0 || degraded.length > 0) {
+        showSourceHealthWarning(broken, degraded);
+      } else {
+        // Clear any existing warning
+        const existing = document.getElementById('sourceHealthWarning');
+        if (existing) existing.remove();
+      }
+
+      // Re-render source chips with health info
+      renderSourceChips();
+    } catch (e) {
+      log('Source health load error: ' + e.message);
+    }
+  }
+
+  function showSourceHealthWarning(broken, degraded) {
+    const existing = document.getElementById('sourceHealthWarning');
+    if (existing) existing.remove();
+    if (broken.length === 0 && degraded.length === 0) return;
+
+    const brokenNames = broken.map(r => {
+      const src = state.sources.find(s => s.id === r.source_id);
+      return src ? src.name : r.source_id;
+    });
+    const degradedNames = degraded.map(r => {
+      const src = state.sources.find(s => s.id === r.source_id);
+      return src ? src.name : r.source_id;
+    });
+
+    let msg = '';
+    if (broken.length > 0) {
+      msg += `Broken: ${brokenNames.join(', ')} (${broken[0].consecutive_failures}+ consecutive failures)`;
+    }
+    if (degraded.length > 0) {
+      if (msg) msg += ' · ';
+      msg += `Degraded: ${degradedNames.join(', ')}`;
+    }
+
+    const warn = document.createElement('div');
+    warn.id = 'sourceHealthWarning';
+    warn.style.cssText = 'background:#1a0a00;border:1px solid #663300;color:#ff9944;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    warn.innerHTML = `<span style="flex:1;min-width:0;"><span style="font-weight:600;">Source Health</span> — ${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#ff9944;cursor:pointer;font-size:16px;padding:0;flex-shrink:0;line-height:1;">&times;</button>`;
+
+    const container = document.querySelector('.container');
+    const cal = document.getElementById('calendarView');
+    const chips = document.getElementById('sourceChips');
+    const insertBefore = chips || cal || container?.firstChild;
+    if (insertBefore && container) {
+      container.insertBefore(warn, insertBefore);
+    }
   }
 
   // --- Cross-Source Deduplication ---
@@ -3962,6 +4099,19 @@ body {
     document.querySelectorAll('.calendar__cell--selected').forEach(c => c.classList.remove('calendar__cell--selected'));
   }
 
+  function getHealthDot(sourceId) {
+    const health = state.sourceHealth[sourceId];
+    if (!health || health.status === 'unknown') return '';
+    const symbols = { healthy: '●', degraded: '◐', broken: '✕' };
+    const colors = { healthy: '#22c55e', degraded: '#eab308', broken: '#ef4444' };
+    const titles = {
+      healthy: `Healthy (${Math.round(health.success_rate * 100)}% success)`,
+      degraded: `Degraded (${health.consecutive_failures} consecutive failures)`,
+      broken: `Broken (${health.consecutive_failures} consecutive failures)`,
+    };
+    return `<span style="color:${colors[health.status]};font-size:8px;margin-left:3px;vertical-align:middle;" title="${titles[health.status]}">${symbols[health.status]}</span>`;
+  }
+
   function renderSourceChips() {
     const container = document.getElementById('sourceChips');
     const activeSource = state.filters.source;
@@ -3973,9 +4123,13 @@ body {
       const count = state.events.filter(e => e.source === s.id || (e.sources && e.sources.includes(s.id))).length;
       const isActive = activeSource === s.id;
       const hasError = state.sourceErrors[s.id];
-      const errorClass = hasError ? ' token--error' : '';
+      const health = state.sourceHealth[s.id];
+      const isBroken = health && health.status === 'broken';
+      const isDegraded = health && health.status === 'degraded';
+      const errorClass = (hasError || isBroken) ? ' token--error' : (isDegraded ? ' token--warning' : '');
       const errorMark = hasError ? '<span class="source-chip__error" title="Couldn\'t load">!</span>' : '';
-      return `<button class="token ${isActive ? 'token--active' : ''}${errorClass}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span>${errorMark}</button>`;
+      const healthDot = getHealthDot(s.id);
+      return `<button class="token ${isActive ? 'token--active' : ''}${errorClass}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span>${errorMark}${healthDot}</button>`;
     }).join('');
     container.innerHTML = html;
 
@@ -4063,10 +4217,22 @@ body {
     }
     list.innerHTML = active.map(s => {
       const catLabel = CONTENT_TYPES[s.category] || s.category || '';
+      const health = state.sourceHealth[s.id];
+      let healthHtml = '';
+      if (health && health.status !== 'unknown') {
+        const colors = { healthy: '#22c55e', degraded: '#eab308', broken: '#ef4444' };
+        const labels = {
+          healthy: `${Math.round(health.success_rate * 100)}% success`,
+          degraded: `${health.consecutive_failures} failures`,
+          broken: `Broken — ${health.consecutive_failures} failures`,
+        };
+        const lastOk = health.last_success_at ? new Date(health.last_success_at).toLocaleDateString() : 'never';
+        healthHtml = `<span style="font-size:10px;color:${colors[health.status]};margin-left:6px;" title="Last success: ${lastOk}">${labels[health.status]}</span>`;
+      }
       return `<div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-bottom: var(--border-thin) solid var(--border-subtle);">
         <div style="flex: 1; min-width: 0;">
           <span style="font-size: var(--text-xs);">${escHtml(s.name)}</span>
-          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
+          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>${healthHtml}
         </div>
         <button class="btn btn--ghost btn--sm remove-source-btn" data-source-id="${escHtml(s.id)}" style="flex-shrink: 0; font-size: var(--text-2xs); color: var(--fg-subtle);">
           &times;
@@ -5002,6 +5168,8 @@ body {
       showOnboarding();
     } else {
       document.getElementById('eventsContent').style.display = '';
+      // Load health from DB first (non-blocking) so UI shows status immediately
+      loadSourceHealth().catch(e => log('Init health load: ' + e.message));
       fetchAllSources();
       // Load personalized recommendations (non-blocking)
       loadRecommendedEvents();
