@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.1.0'
-console.log(`[cache-events] v${VERSION} - event caching with source health tracking`)
+const VERSION = '1.2.0'
+console.log(`[cache-events] v${VERSION} - responsive status derivation`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -66,10 +66,18 @@ interface SourceOutcome {
 // --- Source Health Upsert (mirrors domain_profiles pattern from enrich-link) ---
 
 function deriveStatus(successRate: number, consecutiveFailures: number, totalScrapes: number): string {
-  if (totalScrapes < 3) return 'unknown'
-  if (consecutiveFailures >= 6 || (totalScrapes >= 5 && successRate < 0.3)) return 'broken'
-  if (consecutiveFailures >= 3 || (totalScrapes >= 5 && successRate < 0.65)) return 'degraded'
-  if (successRate >= 0.8 && consecutiveFailures < 3) return 'healthy'
+  if (totalScrapes === 0) return 'unknown'
+  // Broken: persistent failure pattern
+  if (consecutiveFailures >= 6) return 'broken'
+  if (totalScrapes >= 5 && successRate < 0.3) return 'broken'
+  if (totalScrapes >= 2 && successRate === 0) return 'broken' // never worked after 2+ scrapes
+  // Degraded: concerning failure pattern
+  if (consecutiveFailures >= 3) return 'degraded'
+  if (totalScrapes >= 3 && successRate < 0.65) return 'degraded'
+  if (consecutiveFailures >= 1 && successRate < 0.5) return 'degraded' // early warning
+  // Healthy: consistent success
+  if (successRate >= 0.8 && consecutiveFailures === 0) return 'healthy'
+  if (totalScrapes === 1 && successRate === 1.0) return 'healthy' // first scrape succeeded
   return 'unknown'
 }
 
