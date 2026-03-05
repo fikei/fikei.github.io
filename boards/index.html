@@ -6480,15 +6480,15 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.8.6';
-  console.log('[boards] v' + VERSION + ' - Echo v3: audio tags, disfluency, cross-talk for natural voices');
+  const VERSION = '2.8.7';
+  console.log('[boards] v' + VERSION + ' - BPM/key server-side + Camelot notation');
 
   // ============================================
   // Supabase Setup
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
-  const GETSONGBPM_API_KEY = '2309ca61f21b623b59ee2f734e67a456';
+  // BPM/key lookup moved server-side (enrich-link step 7) — GetSongBPM API blocks CORS
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       detectSessionInUrl: true,
@@ -9973,27 +9973,7 @@ Return JSON:
   //         releaseDate, contentFormat, platformId, isExplicit, key, label
   // musicTags: optional og:music tags already scraped by fetchMetadata (avoids re-fetching)
 
-  // Client-side BPM/Key lookup via GetSongBPM
-  // Called from browser to bypass Cloudflare bot protection that blocks server-side
-  async function queryGetSongBPM(artist, track) {
-    if (!GETSONGBPM_API_KEY) return null;
-    try {
-      const query = encodeURIComponent(artist + ' ' + track);
-      const url = 'https://api.getsongbpm.com/search/?api_key=' + GETSONGBPM_API_KEY + '&type=both&lookup=' + query;
-      const resp = await fetch(url);
-      if (!resp.ok) { console.warn('[getsongbpm] HTTP', resp.status); return null; }
-      const data = await resp.json();
-      if (!data.search || !data.search.length) { console.log('[getsongbpm] No results'); return null; }
-      const hit = data.search[0];
-      return {
-        bpm: hit.tempo ? parseInt(hit.tempo, 10) : null,
-        key: hit.key_of || hit.song_key || null
-      };
-    } catch (e) {
-      console.warn('[getsongbpm] Error:', e.message);
-      return null;
-    }
-  }
+  // BPM/key lookup is now server-side in enrich-link step 7 (GetSongBPM CORS blocks browser calls)
 
   async function extractMusicMetadata(url, title, description, musicTags) {
     const meta = {
@@ -10170,18 +10150,9 @@ Return JSON:
           }
         }
 
-        // 6b: Client-side BPM/key via GetSongBPM (browser bypasses Cloudflare bot protection)
-        if (!meta.bpm || !meta.key) {
-          try {
-            const bpmData = await queryGetSongBPM(meta.artist, meta.trackTitle);
-            if (bpmData) {
-              console.log('%c[music-meta] BPM data:', 'color: #1DB954', bpmData);
-              if (bpmData.bpm && !meta.bpm) meta.bpm = bpmData.bpm;
-              if (bpmData.key && !meta.key) meta.key = bpmData.key;
-            }
-          } catch (bpmErr) {
-            console.warn('[music-meta] BPM lookup failed:', bpmErr.message);
-          }
+        // 6b: BPM/key now resolved server-side in enrich-link step 7
+        if (meta.bpm || meta.key) {
+          console.log('%c[music-meta] BPM/key from server:', 'color: #1DB954', { bpm: meta.bpm, key: meta.key });
         }
       }
     } catch (e) {
@@ -12255,87 +12226,42 @@ Return JSON:
   // ============================================
   // Backfills .music property on listen links that were migrated
   // before extractMusicMetadata existed.
-  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v6';
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v7';
 
   async function enrichListenLinks() {
     if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
 
     const allLinks = getAllLinks();
-    // v3: re-enrich links missing artist OR missing BPM/key/genre/label
-    const needsEnrich = allLinks.filter(l => {
+    // v7: clear server_enriched_at on items missing BPM/key so backfill re-enriches via enrich-link
+    // (BPM/key lookup is now server-side in enrich-link step 7)
+    const needsReenrich = allLinks.filter(l => {
       if (l.category !== 'listen') return false;
-      if (!l.music || !l.music.artist) return true;  // Missing basic metadata
-      if (!l.music.trackTitle) return true;  // Has artist but no track title
-      if (!l.music.bpm || !l.music.key || !l.music.genre || !l.music.label) return true;  // Missing extended metadata
+      if (!l.music) return false;
+      if (!l.music.bpm || !l.music.key) return true;  // Missing BPM/key from server
       return false;
     });
-    if (needsEnrich.length === 0) {
-      console.log('%c[enrich-listen] v6: All listen links up to date', 'color: #1DB954');
+
+    if (needsReenrich.length === 0) {
+      console.log('%c[enrich-listen] v7: All listen links have BPM/key', 'color: #1DB954');
       localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
       return;
     }
 
-    console.log(`%c[enrich-listen] v6: Enriching ${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
+    console.log(`%c[enrich-listen] v7: Clearing server_enriched_at on ${needsReenrich.length} items to re-enrich with BPM/key`, 'color: #1DB954; font-weight: bold');
 
-    let enriched = 0;
-    for (const link of needsEnrich) {
-      try {
-        // Step 1: Re-extract basic metadata (artist, track) if missing
-        let music = link.music;
-        if (!music || !music.artist) {
-          music = await extractMusicMetadata(link.url, link.title, link.description || '', null);
-        }
-        if (!music || !music.artist || !music.trackTitle) continue;
-
-        // Step 2: Server enrichment for genre/label (MusicBrainz + Last.fm)
-        if (!music.genre || !music.label) {
-          try {
-            const resp = await fetch(`${SUPABASE_URL}/functions/v1/enrich-music`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ artist: music.artist, track: music.trackTitle, album: music.albumTitle })
-            });
-            if (resp.ok) {
-              const ed = await resp.json();
-              if (ed.genre && !music.genre) music.genre = ed.genre;
-              if (ed.genreTags) music.genreTags = ed.genreTags;
-              if (ed.label) music.label = ed.label;
-              if (ed.album && !music.albumTitle) music.albumTitle = ed.album;
-              if (ed.releaseDate && !music.releaseDate) music.releaseDate = ed.releaseDate;
-            }
-          } catch (e) {
-            console.warn(`[enrich-listen] Server enrichment failed for ${link.domain}:`, e.message);
-          }
-          await new Promise(r => setTimeout(r, 250));
-        }
-
-        // Step 3: Client-side BPM/key via GetSongBPM (browser bypasses Cloudflare)
-        if (!music.bpm || !music.key) {
-          try {
-            const bpmData = await queryGetSongBPM(music.artist, music.trackTitle);
-            if (bpmData) {
-              if (bpmData.bpm && !music.bpm) music.bpm = bpmData.bpm;
-              if (bpmData.key && !music.key) music.key = bpmData.key;
-            }
-          } catch (e) {
-            console.warn(`[enrich-listen] BPM lookup failed for ${link.domain}:`, e.message);
-          }
-          await new Promise(r => setTimeout(r, 250));
-        }
-
-        updateLink(link.id, { music });
-        enriched++;
-        console.log(`%c[enrich-listen] ✓ ${link.domain}:`, 'color: #1DB954',
-          `${music.artist} - ${music.trackTitle}`, music.bpm ? `${music.bpm}BPM` : '', music.key || '');
-      } catch (e) {
-        console.warn(`[enrich-listen] Failed for ${link.domain}:`, e.message);
+    let reset = 0;
+    for (const link of needsReenrich) {
+      if (link.music?.server_enriched_at) {
+        delete link.music.server_enriched_at;
+        updateLink(link.id, { music: link.music });
+        reset++;
       }
     }
 
     localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
 
-    if (enriched > 0) {
-      console.log(`%c[enrich-listen] Enriched ${enriched}/${needsEnrich.length} listen links`, 'color: #1DB954; font-weight: bold');
+    if (reset > 0) {
+      console.log(`%c[enrich-listen] v7: Reset ${reset} items — backfill will re-enrich with BPM/key on next cycle`, 'color: #1DB954; font-weight: bold');
       renderGrid();
     }
   }

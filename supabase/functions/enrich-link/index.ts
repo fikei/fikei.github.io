@@ -3,6 +3,8 @@
 //
 // POST /functions/v1/enrich-link
 // Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, enrichBook?, enrichListen?, category? }
+const VERSION = '1.1.0'
+console.log(`[enrich-link] v${VERSION} - BPM/key server-side + Camelot notation`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video?, book?, music? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -15,6 +17,25 @@ import { checkGateUrlPatterns, checkGateTechnical } from '../generate-widget/con
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Musical key → Camelot wheel notation (used by DJs for harmonic mixing)
+// Maps standard key names to Camelot codes (e.g. "Cm" → "5A", "G" → "9B")
+const CAMELOT_MAP: Record<string, string> = {
+  'C': '8B',  'Cm': '5A',  'C#': '3B', 'C#m': '12A', 'Db': '3B',  'Dbm': '12A',
+  'D': '10B', 'Dm': '7A',  'D#': '5B', 'D#m': '2A',  'Eb': '5B',  'Ebm': '2A',
+  'E': '12B', 'Em': '9A',
+  'F': '7B',  'Fm': '4A',  'F#': '2B', 'F#m': '11A', 'Gb': '2B',  'Gbm': '11A',
+  'G': '9B',  'Gm': '6A',  'G#': '4B', 'G#m': '1A',  'Ab': '4B',  'Abm': '1A',
+  'A': '11B', 'Am': '8A',  'A#': '6B', 'A#m': '3A',  'Bb': '6B',  'Bbm': '3A',
+  'B': '1B',  'Bm': '10A',
+}
+function toCamelotKey(key: string): string {
+  if (!key) return key
+  // Normalize: trim, handle "C minor" → "Cm", "C Major" → "C"
+  let k = key.trim()
+  k = k.replace(/\s*(minor|min)\s*$/i, 'm').replace(/\s*(major|maj)\s*$/i, '')
+  return CAMELOT_MAP[k] || key  // fallback to original if not found
 }
 
 // Content types and their image resolution strategies
@@ -736,8 +757,13 @@ serve(async (req) => {
             if (bpmData.search?.length) {
               const hit = bpmData.search[0]
               if (hit.tempo) musicResult.bpm = parseInt(hit.tempo, 10)
-              if (hit.key_of || hit.song_key) musicResult.key = hit.key_of || hit.song_key
-              console.log('[enrich-link] GetSongBPM result:', { bpm: musicResult.bpm, key: musicResult.key })
+              // Convert musical key to Camelot notation (e.g. "Cm" → "5A", "G" → "9B")
+              const rawKey = hit.key_of || hit.song_key || null
+              if (rawKey) {
+                musicResult.key = toCamelotKey(rawKey)
+                musicResult.musicalKey = rawKey  // preserve original for reference
+              }
+              console.log('[enrich-link] GetSongBPM result:', { bpm: musicResult.bpm, key: musicResult.key, musicalKey: rawKey })
             } else {
               console.log('[enrich-link] GetSongBPM: no results for', musicResult.artist, musicResult.trackTitle)
             }
