@@ -10,7 +10,7 @@
 // Returns: { sourceId, reachable, httpStatus, contentType, detectedType, structureReport, htmlSnippet?, aiAnalysis? }
 // aiAnalysis may include suggestedOverrides when parserContext is provided
 
-const VERSION = '1.1.0'
+const VERSION = '1.1.1'
 console.log(`[validate-source] v${VERSION} - parser-level diagnosis with parserContext + suggestedOverrides`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -474,6 +474,17 @@ serve(async (req: Request) => {
 
     if (!fetchResult.body || fetchResult.error) {
       console.log(`[validate-source] ${sourceId}: fetch failed — ${fetchResult.error || `HTTP ${fetchResult.status}`}`)
+      // Even if fetch failed, run AI analysis when parser diagnostics are available
+      let aiAnalysis: AiAnalysis | null = null
+      if (includeAiAnalysis && parserContext?.errors?.length) {
+        console.log(`[validate-source] ${sourceId}: fetch failed but parser context available — running AI diagnosis`)
+        const emptyReport: StructureReport = {
+          hasTable: false, tableRowCount: 0, hasEventSchema: false,
+          hasIcalEvents: false, hasRssItems: false, hasJsonArray: false,
+          hasDatePatterns: false, eventSignals: [],
+        }
+        aiAnalysis = await diagnoseWithAI(sourceId, url, currentType || 'unknown', '', emptyReport, parserContext)
+      }
       return jsonResponse({
         sourceId,
         reachable: false,
@@ -486,7 +497,7 @@ serve(async (req: Request) => {
           hasDatePatterns: false, eventSignals: [],
         },
         htmlSnippet: null,
-        aiAnalysis: null,
+        aiAnalysis,
         error: fetchResult.error || `HTTP ${fetchResult.status}`,
       })
     }
@@ -499,12 +510,13 @@ serve(async (req: Request) => {
     console.log(`[validate-source] ${sourceId}: reachable=${reachable} status=${fetchResult.status} detected=${detectedType} signals=[${structureReport.eventSignals.join(', ')}]`)
 
     // AI diagnosis (optional)
+    // Run AI when: (a) reachable + AI requested, OR (b) parser diagnostics provided (don't need reachability for parameter fixes)
     let aiAnalysis: AiAnalysis | null = null
-    if (includeAiAnalysis && reachable) {
+    if (includeAiAnalysis && (reachable || parserContext)) {
       if (parserContext) {
         console.log(`[validate-source] ${sourceId}: parser context provided — errors: ${parserContext.errors?.join('; ')}`)
       }
-      aiAnalysis = await diagnoseWithAI(sourceId, url, currentType || 'unknown', htmlSnippet, structureReport, parserContext)
+      aiAnalysis = await diagnoseWithAI(sourceId, url, currentType || 'unknown', htmlSnippet || '', structureReport, parserContext)
       if (aiAnalysis) {
         console.log(`[validate-source] AI: ${sourceId} → diagnosis="${aiAnalysis.diagnosis}" suggested="${aiAnalysis.suggestedType}" strategy="${aiAnalysis.suggestedStrategy}" confidence=${aiAnalysis.confidence}${aiAnalysis.suggestedOverrides ? ` overrides=${JSON.stringify(aiAnalysis.suggestedOverrides)}` : ''}`)
       }
