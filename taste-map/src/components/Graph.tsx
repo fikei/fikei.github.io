@@ -222,6 +222,9 @@ function GraphScene({
         const isSelected = selectedCluster === node.id;
         const isDimmed = highlightedMotif != null && !isMotifMatch(node.cluster, highlightedMotif);
         const isHighlighted = highlightedMotif != null && isMotifMatch(node.cluster, highlightedMotif);
+        const breakdown = node.cluster.sourceBreakdown;
+        const isYoutubeOnly = breakdown?.isYoutubeOnly ?? false;
+        const hasMixedSources = breakdown?.hasMixedSources ?? false;
 
         return (
           <Node3D
@@ -230,6 +233,8 @@ function GraphScene({
             isSelected={isSelected}
             isDimmed={isDimmed}
             isHighlighted={isHighlighted}
+            isYoutubeOnly={isYoutubeOnly}
+            hasMixedSources={hasMixedSources}
             onClick={() => onSelectCluster(isSelected ? null : node.id)}
             onDoubleClick={() => {
               if (node.cluster.drillable) {

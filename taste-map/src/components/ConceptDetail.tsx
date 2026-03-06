@@ -54,6 +54,24 @@ export function ConceptDetail({
         {cluster.pinCount} ITEMS &middot; {pct}% OF SAVES
       </div>
 
+      {/* Source breakdown — only shown for clusters with YouTube data */}
+      {cluster.sourceBreakdown && cluster.sourceBreakdown.youtube > 0 && (
+        <>
+          <div className="tg-detail__section-header">{'\u2500\u2500'} SOURCES</div>
+          <div className="tg-detail__source-row">
+            {cluster.sourceBreakdown.manual > 0 && (
+              <span className="tg-detail__source-label">
+                SAVED: <span className="tg-detail__source-count">{cluster.sourceBreakdown.manual}</span>
+              </span>
+            )}
+            <span className="tg-detail__source-label">
+              YOUTUBE: <span className="tg-detail__source-count">{cluster.sourceBreakdown.youtube}</span>
+              <span className="tg-detail__source-badge">IMPORTED</span>
+            </span>
+          </div>
+        </>
+      )}
+
       {/* Tokens */}
       {cluster.topTokens.length > 0 && (
         <>

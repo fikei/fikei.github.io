@@ -20,17 +20,19 @@ import { EdgeDetail } from './components/EdgeDetail';
 
 type AppState = 'loading' | 'unauthenticated' | 'empty' | 'clustering' | 'labeling' | 'ready';
 
-const CACHE_KEY_PREFIX = 'boards-taste-graph-v7-';
+const CACHE_KEY_PREFIX = 'boards-taste-graph-v8-';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function clusterFingerprint(clusters: Cluster[]): string {
+function clusterFingerprint(clusters: Cluster[], showYoutube: boolean): string {
   const tokens = clusters
     .map(c => c.topTokens.slice(0, 4).sort().join(','))
     .sort()
     .join('|');
+  const source = showYoutube ? '+yt' : '-yt';
+  const input = tokens + source;
   let hash = 0;
-  for (let i = 0; i < tokens.length; i++) {
-    hash = ((hash << 5) - hash + tokens.charCodeAt(i)) | 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
   }
   return Math.abs(hash).toString(36);
 }
@@ -72,6 +74,10 @@ export default function App() {
   const [highlightedMotif, setHighlightedMotif] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<GraphEdge | null>(null);
   const [edgeScreenPos, setEdgeScreenPos] = useState<{ x: number; y: number } | null>(null);
+
+  // YouTube toggle
+  const [showYoutube, setShowYoutube] = useState<boolean>(true);
+  const [hasYoutubePins, setHasYoutubePins] = useState<boolean>(false);
 
   // Drill stack
   const [drillStack, setDrillStack] = useState<DrillFrame[]>([]);
@@ -118,10 +124,11 @@ export default function App() {
       }
 
       setPins(pinData);
+      setHasYoutubePins(pinData.some(p => p.import_source === 'youtube'));
       setState('clustering');
 
       // Cluster
-      const rawClusters = buildClusters(pinData);
+      const rawClusters = buildClusters(pinData, 'c', undefined, showYoutube);
       const graphEdges = buildEdges(rawClusters);
 
       if (cancelled) return;
@@ -131,7 +138,7 @@ export default function App() {
       setDrillStack([rootFrame]);
 
       // Try cache
-      const fp = clusterFingerprint(rawClusters);
+      const fp = clusterFingerprint(rawClusters, showYoutube);
       const cached = loadCache(fp);
 
       if (cached) {
@@ -200,7 +207,7 @@ export default function App() {
 
     init();
     return () => { cancelled = true; };
-  }, [authTrigger]);
+  }, [authTrigger, showYoutube]);
 
   const handleSelectCluster = useCallback((id: string | null) => {
     setSelectedCluster(id);
@@ -229,14 +236,15 @@ export default function App() {
       drillStack.length,
       clusterId,
       cluster.label,
-      clusterPins
+      clusterPins,
+      showYoutube
     );
 
     setDrillStack(prev => [...prev, newFrame]);
     setSelectedCluster(null);
     setSelectedEdge(null);
     setEdgeScreenPos(null);
-  }, [currentClusters, pins, drillStack]);
+  }, [currentClusters, pins, drillStack, showYoutube]);
 
   const handleDrillTo = useCallback((depth: number) => {
     if (depth >= drillStack.length) return;
@@ -257,6 +265,15 @@ export default function App() {
       <header className="tg-header">
         <h1 className="tg-header__title">Taste Map</h1>
         <div className="tg-header__actions">
+          {hasYoutubePins && (
+            <button
+              className={`tg-btn ${showYoutube ? 'tg-btn--active' : ''}`}
+              onClick={() => setShowYoutube(prev => !prev)}
+              title={showYoutube ? 'Hide YouTube imports' : 'Show YouTube imports'}
+            >
+              {showYoutube ? 'YT ON' : 'YT OFF'}
+            </button>
+          )}
           <a href="/boards/" className="tg-btn">Boards</a>
         </div>
       </header>
