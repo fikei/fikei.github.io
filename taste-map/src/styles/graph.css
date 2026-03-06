@@ -113,12 +113,6 @@ html, body, #root {
   line-height: 1;
 }
 
-.tg-btn--active {
-  background: var(--fg);
-  color: var(--bg);
-  border-color: var(--fg);
-}
-
 .tg-btn--drill {
   display: block;
   width: 100%;
@@ -238,27 +232,6 @@ html, body, #root {
 
 .tg-3d-label--highlighted {
   border: 2px solid var(--fg);
-}
-
-/* YouTube second-class nodes */
-.tg-3d-label--youtube-only {
-  opacity: 0.55;
-  border-style: dashed;
-}
-
-.tg-3d-label--youtube-only:hover,
-.tg-3d-label--youtube-only.tg-3d-label--selected {
-  opacity: 1;
-  border-style: solid;
-}
-
-.tg-3d-label--mixed-sources {
-  opacity: 0.85;
-}
-
-.tg-3d-label--mixed-sources:hover,
-.tg-3d-label--mixed-sources.tg-3d-label--selected {
-  opacity: 1;
 }
 
 .tg-3d-label__name {
@@ -593,39 +566,6 @@ html, body, #root {
   margin-top: var(--space-1);
 }
 
-/* Source breakdown */
-
-.tg-detail__source-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-}
-
-.tg-detail__source-label {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.tg-detail__source-count {
-  color: var(--fg);
-}
-
-.tg-detail__source-badge {
-  font-size: 7px;
-  color: var(--muted);
-  border: 1px solid var(--subtle);
-  padding: 1px 4px;
-  letter-spacing: 0.08em;
-  margin-left: 2px;
-}
-
 /* Sample titles */
 
 .tg-detail__sample {
@@ -637,6 +577,39 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Pin links */
+
+.tg-detail__pin {
+  display: block;
+  text-decoration: none;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--subtle);
+  overflow: hidden;
+  transition: none;
+}
+
+.tg-detail__pin:hover {
+  color: var(--fg);
+}
+
+.tg-detail__pin-title {
+  display: block;
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-detail__pin-domain {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-top: 1px;
 }
 
 /* Close button */
