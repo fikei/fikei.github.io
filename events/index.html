@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.4.1';
-  console.log(`[events] v${VERSION} - fix RA GraphQL pageSize (100 max), add Audium source`);
+  const VERSION = '1.5.0';
+  console.log(`[events] v${VERSION} - parser-level auto-repair with AI config overrides`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2319,6 +2319,13 @@ body {
         // Log zero-result sources that didn't throw (previously silent)
         if (res.ok && evCount === 0) {
           log(`Source "${res.source.name}": 0 events returned (no error)`);
+          // Catch-all: record diagnostic if no parser-specific one was captured
+          if (!parserDiagnostics[res.source.id]) {
+            recordParserDiagnostic(res.source.id, {
+              errors: ['Parser returned 0 events with no error thrown'],
+              configUsed: { type: res.source.type },
+            });
+          }
         }
       }
     });
@@ -2389,6 +2396,20 @@ body {
       state.sourceHealth = {};
       healthRows.forEach(row => {
         state.sourceHealth[row.source_id] = row;
+      });
+
+      // Restore successful overrides from previous repair results
+      state.sources.forEach(source => {
+        const health = state.sourceHealth[source.id];
+        if (!health?.repair_result) return;
+        try {
+          const repairData = JSON.parse(health.repair_result);
+          const age = Date.now() - new Date(repairData.timestamp).getTime();
+          if (age < 30 * 86400000 && repairData.success && repairData.appliedOverrides) {
+            source.overrides = repairData.appliedOverrides;
+            log(`Restored overrides for "${source.name}": ${JSON.stringify(source.overrides)}`);
+          }
+        } catch (e) { /* ignore malformed repair_result */ }
       });
 
       log(`Source health loaded: ${healthRows.length} sources — ` +
@@ -2465,17 +2486,35 @@ body {
     }
   }
 
+  // --- Parser Diagnostics Store (session-scoped) ---
+  // Captures structured error context when parsers fail. Written by parsers
+  // at the point of failure. Read by auto-repair before calling validate-source.
+  const parserDiagnostics = {};  // { [sourceId]: { errors[], configUsed{}, responseSnippet, timestamp } }
+
+  function recordParserDiagnostic(sourceId, context) {
+    parserDiagnostics[sourceId] = {
+      errors: context.errors || [],
+      configUsed: context.configUsed || {},
+      responseSnippet: (context.responseSnippet || '').substring(0, 500),
+      timestamp: new Date().toISOString(),
+    };
+    log(`Parser diagnostic recorded for "${sourceId}": ${(context.errors || []).join('; ')}`);
+  }
+
   // --- Auto-Repair System ---
   // When broken/degraded sources are detected, attempt autonomous repair:
-  // 1. Probe via validate-source edge function (structural analysis)
-  // 2. Try alternative parser types if structure changed
-  // 3. Report results to source_health table
+  // 1. Check parser diagnostics from last scrape
+  // 2. If diagnostics exist: send errors + config to AI → get overrides → retry with overrides
+  // 3. If no diagnostics: probe URL via validate-source → try alternative parser types
+  // 4. Report results to source_health table
 
   const MAX_REPAIRS_PER_SESSION = 3;
   const REPAIR_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours between repair attempts per source
 
-  async function callValidateSource(sourceId, url, currentType, includeAiAnalysis = false) {
+  async function callValidateSource(sourceId, url, currentType, includeAiAnalysis = false, parserContext = null) {
     try {
+      const body = { sourceId, url, currentType, includeAiAnalysis };
+      if (parserContext) body.parserContext = parserContext;
       const resp = await fetch(VALIDATE_SOURCE_URL, {
         method: 'POST',
         headers: {
@@ -2483,7 +2522,7 @@ body {
           'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
           'apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ sourceId, url, currentType, includeAiAnalysis }),
+        body: JSON.stringify(body),
       });
       if (!resp.ok) {
         const errText = await resp.text();
@@ -2545,8 +2584,16 @@ body {
     }
   }
 
-  function selectRepairStrategy(validation) {
+  function selectRepairStrategy(validation, parserContext = null) {
     if (!validation) return { strategy: 'probe-failed', action: 'none' };
+
+    // NEW: Parser-level errors get ai-param-fix before URL-level strategies
+    // When the source is reachable but the parser captured specific errors,
+    // send those to AI for parameter override suggestions
+    if (validation.reachable && parserContext?.errors?.length > 0) {
+      return { strategy: 'parser-error', action: 'ai-param-fix' };
+    }
+
     if (!validation.reachable) {
       if (validation.httpStatus === 403 || validation.httpStatus === 429) {
         return { strategy: 'blocked', action: 'none' };
@@ -2629,14 +2676,57 @@ body {
         continue;
       }
 
-      // Step 2: Select strategy
-      let decision = selectRepairStrategy({ ...validation, currentType: source.type });
-      log(`Auto-repair: "${source.name}" → strategy="${decision.strategy}" action="${decision.action}"`);
+      // Step 2: Select strategy (include parser diagnostics if available)
+      const parserContext = parserDiagnostics[sourceId] || null;
+      let decision = selectRepairStrategy({ ...validation, currentType: source.type }, parserContext);
+      log(`Auto-repair: "${source.name}" → strategy="${decision.strategy}" action="${decision.action}"` +
+        (parserContext ? ` (parser errors: ${parserContext.errors.join('; ')})` : ''));
 
       let repairResult = { success: false, oldType: source.type, newType: null, eventsFound: 0, diagnosis: null, timestamp: new Date().toISOString() };
 
       // Step 3: Execute strategy
-      if (decision.action === 'try-type') {
+      if (decision.action === 'ai-param-fix') {
+        // Parser-level repair: send error diagnostics to AI for parameter override suggestions
+        updateRepairBanner(source.name, 'analyzing');
+        log(`Auto-repair: sending parser diagnostics to AI for "${source.name}"`);
+        const aiValidation = await callValidateSource(sourceId, source.url, source.type, true, parserContext);
+        if (aiValidation?.aiAnalysis?.suggestedOverrides) {
+          const overrides = aiValidation.aiAnalysis.suggestedOverrides;
+          log(`Auto-repair: AI suggests overrides for "${source.name}": ${JSON.stringify(overrides)}`);
+          // Apply overrides and retry
+          source.overrides = overrides;
+          updateRepairBanner(source.name, 'retrying');
+          try {
+            const events = await fetchSingleSource(source);
+            if (events && events.length > 0) {
+              repairResult.success = true;
+              repairResult.eventsFound = events.length;
+              repairResult.diagnosis = `AI parameter fix applied: ${JSON.stringify(overrides)}`;
+              repairResult.appliedOverrides = overrides;
+              events.forEach(ev => {
+                ev.contentType = getSourceCategory(ev.source);
+                ev.contentType = detectEventType(ev);
+              });
+              state.events = deduplicateAcrossSources([...state.events, ...events]);
+              render();
+              log(`Auto-repair: "${source.name}" fixed with overrides — ${events.length} events`);
+            } else {
+              // Override didn't help — revert
+              delete source.overrides;
+              repairResult.diagnosis = `AI suggested overrides ${JSON.stringify(overrides)} but still got 0 events`;
+              log(`Auto-repair: overrides didn't help for "${source.name}" — reverted`);
+            }
+          } catch (e) {
+            delete source.overrides;
+            repairResult.diagnosis = `AI override retry failed: ${e.message}`;
+            log(`Auto-repair: override retry failed for "${source.name}": ${e.message}`);
+          }
+        } else {
+          // AI didn't suggest overrides — fall through to regular diagnosis
+          repairResult.diagnosis = aiValidation?.aiAnalysis?.diagnosis || 'AI analysis returned no override suggestions';
+          log(`Auto-repair: no overrides suggested for "${source.name}" — ${repairResult.diagnosis}`);
+        }
+      } else if (decision.action === 'try-type') {
         updateRepairBanner(source.name, 'trying', decision.newType);
         const tryResult = await tryAlternativeParser(source, decision.newType);
         if (tryResult.success) {
@@ -2920,8 +3010,8 @@ body {
   async function fetchRA(source) {
     log('RA: fetching via GraphQL API');
     const today = new Date().toISOString().split('T')[0];
-    // Two weeks out
-    const endDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+    const daysAhead = source.overrides?.dateRangeDays || 14;
+    const endDate = new Date(Date.now() + daysAhead * 86400000).toISOString().split('T')[0];
 
     // Extract area slug from source URL (e.g. /events/us/sanfrancisco)
     const urlParts = source.url.replace(/\/$/, '').split('/');
@@ -2944,9 +3034,9 @@ body {
     }`;
 
     const variables = {
-      filters: { areas: { eq: areaId }, listingDate: { gte: today, lte: endDate } },
+      filters: { areas: { eq: source.overrides?.areaId || areaId }, listingDate: { gte: today, lte: endDate } },
       filterOptions: { eventType: true, genre: true },
-      page: 1, pageSize: 100,
+      page: 1, pageSize: source.overrides?.pageSize || 100,
     };
 
     // Strategy 1: GraphQL via edge function (server-side POST proxy)
@@ -2973,6 +3063,11 @@ body {
           const gqlData = JSON.parse(proxyResult.content);
           if (gqlData.errors) {
             log('RA: GraphQL errors: ' + JSON.stringify(gqlData.errors.map(e => e.message)));
+            recordParserDiagnostic(source.id, {
+              errors: gqlData.errors.map(e => e.message),
+              configUsed: { pageSize: variables.pageSize, areaId: variables.filters.areas.eq, dateRangeDays: 14 },
+              responseSnippet: JSON.stringify(gqlData.errors).substring(0, 500),
+            });
           }
           const listings = gqlData?.data?.eventListings?.data || [];
           const totalResults = gqlData?.data?.eventListings?.totalResults || 0;
@@ -3046,6 +3141,12 @@ body {
     } catch (e) { log('RA: __NEXT_DATA__ fallback failed: ' + e.message); }
 
     log('RA: no events found');
+    if (!parserDiagnostics[source.id]) {
+      recordParserDiagnostic(source.id, {
+        errors: ['Parser returned 0 events — both GraphQL and __NEXT_DATA__ strategies failed'],
+        configUsed: { pageSize: variables.pageSize, areaId: variables.filters.areas.eq, dateRangeDays: 14 },
+      });
+    }
     return [];
   }
 
@@ -3537,12 +3638,13 @@ body {
 
   async function fetchScreenSlate(source) {
     const baseUrl = 'https://www.screenslate.com';
-    const cityId = SCREENSLATE_CITY_IDS[source.region] || '';
+    const cityId = source.overrides?.cityId || SCREENSLATE_CITY_IDS[source.region] || '';
+    const dayRange = source.overrides?.dayRange || 7;
 
     // Phase 1: Fetch showtimes per day from the date API
     const allShowtimes = []; // { nid, time, note, timestamp, dateStr }
 
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    for (let dayOffset = 0; dayOffset < dayRange; dayOffset++) {
       const d = new Date(Date.now() + dayOffset * 86400000);
       const dateStr = d.toISOString().split('T')[0];
       const dateParam = dateStr.replace(/-/g, '');
@@ -3567,6 +3669,10 @@ body {
 
     if (allShowtimes.length === 0) {
       log('ScreenSlate: no showtimes found across all days');
+      recordParserDiagnostic(source.id, {
+        errors: ['No showtimes found across all days'],
+        configUsed: { cityId, dayRange },
+      });
       return [];
     }
 
@@ -3823,9 +3929,36 @@ body {
 
   // --- JSON Feed Parser ---
   async function fetchJson(source) {
-    const text = await proxyFetch(source.url);
-    const data = JSON.parse(text);
-    const items = Array.isArray(data) ? data : (data.events || data.items || data.results || []);
+    let text;
+    try {
+      text = await proxyFetch(source.url);
+    } catch (e) {
+      recordParserDiagnostic(source.id, {
+        errors: [`Fetch failed: ${e.message}`],
+        configUsed: { url: source.url },
+      });
+      throw e;
+    }
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      recordParserDiagnostic(source.id, {
+        errors: [`JSON parse failed: ${e.message}`],
+        configUsed: { url: source.url },
+        responseSnippet: (text || '').substring(0, 500),
+      });
+      throw e;
+    }
+    const keyPath = source.overrides?.topLevelKeyPath;
+    const items = keyPath ? (data[keyPath] || []) : (Array.isArray(data) ? data : (data.events || data.items || data.results || []));
+    if (items.length === 0) {
+      recordParserDiagnostic(source.id, {
+        errors: ['JSON parsed but 0 items found in response'],
+        configUsed: { url: source.url, topLevelKeyPath: keyPath || 'auto-detect' },
+        responseSnippet: JSON.stringify(Object.keys(data || {})).substring(0, 500),
+      });
+    }
     return items.map(item => {
       const loc = parseLocationString(item.location || item.venue || item.address || '');
       return {
