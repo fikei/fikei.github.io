@@ -6449,8 +6449,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.9.0';
-  console.log('[boards] v' + VERSION + ' - shared auth module + Google OAuth + username onboarding');
+  const VERSION = '2.9.1';
+  console.log('[boards] v' + VERSION + ' - Claude Haiku BPM/key');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -12198,28 +12198,27 @@ Return JSON:
   // ============================================
   // Backfills .music property on listen links that were migrated
   // before extractMusicMetadata existed.
-  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v7';
+  const LISTEN_ENRICH_KEY = 'boards-listen-enrich-v8';
 
   async function enrichListenLinks() {
     if (localStorage.getItem(LISTEN_ENRICH_KEY)) return;
 
     const allLinks = getAllLinks();
-    // v7: clear server_enriched_at on items missing BPM/key so backfill re-enriches via enrich-link
-    // (BPM/key lookup is now server-side in enrich-link step 7)
+    // v8: re-enrich items missing BPM/key (now using Claude Haiku instead of GetSongBPM)
     const needsReenrich = allLinks.filter(l => {
       if (l.category !== 'listen') return false;
       if (!l.music) return false;
-      if (!l.music.bpm || !l.music.key) return true;  // Missing BPM/key from server
+      if (!l.music.bpm || !l.music.key) return true;
       return false;
     });
 
     if (needsReenrich.length === 0) {
-      console.log('%c[enrich-listen] v7: All listen links have BPM/key', 'color: #1DB954');
+      console.log('%c[enrich-listen] v8: All listen links have BPM/key', 'color: #1DB954');
       localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
       return;
     }
 
-    console.log(`%c[enrich-listen] v7: Clearing server_enriched_at on ${needsReenrich.length} items to re-enrich with BPM/key`, 'color: #1DB954; font-weight: bold');
+    console.log(`%c[enrich-listen] v8: Clearing server_enriched_at on ${needsReenrich.length} items for Claude Haiku BPM/key`, 'color: #1DB954; font-weight: bold');
 
     let reset = 0;
     for (const link of needsReenrich) {
@@ -12233,7 +12232,7 @@ Return JSON:
     localStorage.setItem(LISTEN_ENRICH_KEY, Date.now().toString());
 
     if (reset > 0) {
-      console.log(`%c[enrich-listen] v7: Reset ${reset} items — backfill will re-enrich with BPM/key on next cycle`, 'color: #1DB954; font-weight: bold');
+      console.log(`%c[enrich-listen] v8: Reset ${reset} items — backfill will re-enrich with BPM/key`, 'color: #1DB954; font-weight: bold');
       renderGrid();
     }
   }
