@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.5.0';
-  console.log(`[events] v${VERSION} - parser-level auto-repair with AI config overrides`);
+  const VERSION = '1.5.1';
+  console.log(`[events] v${VERSION} - fix: parser-error strategy doesn't require reachable probe`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2588,9 +2588,10 @@ body {
     if (!validation) return { strategy: 'probe-failed', action: 'none' };
 
     // NEW: Parser-level errors get ai-param-fix before URL-level strategies
-    // When the source is reachable but the parser captured specific errors,
-    // send those to AI for parameter override suggestions
-    if (validation.reachable && parserContext?.errors?.length > 0) {
+    // When the parser captured specific errors, send those to AI for parameter
+    // override suggestions. Don't require validation.reachable — SPAs like RA
+    // return 403 to server-side probes but work fine through our fetch proxy.
+    if (parserContext?.errors?.length > 0) {
       return { strategy: 'parser-error', action: 'ai-param-fix' };
     }
 
