@@ -6449,8 +6449,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.9.1';
-  console.log('[boards] v' + VERSION + ' - Claude Haiku BPM/key');
+  const VERSION = '2.9.2';
+  console.log('[boards] v' + VERSION + ' - shared auth module');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -6463,7 +6463,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     supabaseUrl: SUPABASE_URL,
     supabaseAnonKey: SUPABASE_ANON_KEY,
     redirectTo: window.location.origin + '/boards/',
-    adminEmails: APP_CONFIG.adminEmails,
+    adminEmails: ['fike101@gmail.com'],
     mountTo: '#ctrl-auth-root'
   });
 
@@ -6474,17 +6474,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   let isOnline = true; // Track online status for offline support
 
   // ============================================
-  // App Configuration
-  // ============================================
-  const APP_CONFIG = {
-    adminEmails: ['fike101@gmail.com']
-  };
-
-  // ============================================
   // Admin System
   // ============================================
   function isAdmin() {
-    return currentUser && APP_CONFIG.adminEmails.includes(currentUser.email);
+    return currentUser && CtrlAuth.isAdmin();
   }
 
   // ============================================
