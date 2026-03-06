@@ -1576,7 +1576,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.5.2';
+  const VERSION = '1.5.3';
   console.log(`[events] v${VERSION} - move health banners to fetch log, revert pageSize to 200 for ai-param-fix test`);
 
   // ============================================
@@ -2628,15 +2628,14 @@ body {
         continue;
       }
 
-      state.repairedThisSession.add(sourceId);
-      repairsAttempted++;
-
       // Show repair-in-progress UI
       updateRepairBanner(source.name, 'probing');
 
       // Step 1: Probe via validate-source
       const validation = await callValidateSource(sourceId, source.url, source.type);
       if (!validation) {
+        state.repairedThisSession.add(sourceId);
+        repairsAttempted++;
         const result = { success: false, diagnosis: 'validate-source call failed', timestamp: new Date().toISOString() };
         await reportRepairResult(sourceId, 'probe-failed', result);
         results.push({ sourceId, ...result });
@@ -2648,6 +2647,15 @@ body {
       let decision = selectRepairStrategy({ ...validation, currentType: source.type }, parserContext);
       log(`Auto-repair: "${source.name}" → strategy="${decision.strategy}" action="${decision.action}"` +
         (parserContext ? ` (parser errors: ${parserContext.errors.join('; ')})` : ''));
+
+      // If no action possible, skip without recording — allows retry after scrape captures diagnostics
+      if (decision.action === 'none') {
+        log(`Auto-repair: "${source.name}" — nothing to try yet, will retry after scrape`);
+        continue;
+      }
+
+      state.repairedThisSession.add(sourceId);
+      repairsAttempted++;
 
       let repairResult = { success: false, oldType: source.type, newType: null, eventsFound: 0, diagnosis: null, timestamp: new Date().toISOString() };
 
@@ -2762,9 +2770,6 @@ body {
         } else {
           repairResult.diagnosis = 'AI analysis unavailable';
         }
-      } else {
-        // action === 'none' — no repair possible
-        repairResult.diagnosis = `Source is ${decision.strategy} — no automatic repair available`;
       }
 
       await reportRepairResult(sourceId, decision.strategy, repairResult);
