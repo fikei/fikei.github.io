@@ -29,6 +29,18 @@ export async function getUser() {
 }
 
 /**
+ * Sign in with Google OAuth.
+ * Redirects to Google, then back to /taste-map/ with session token.
+ */
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + '/taste-map/' },
+  });
+  if (error) console.error('[taste-map] Google sign-in failed:', error);
+}
+
+/**
  * Get the current access token for edge function calls.
  */
 export async function getAccessToken(): Promise<string | null> {

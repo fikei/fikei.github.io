@@ -4,8 +4,8 @@
 // Manages drill-down navigation stack
 // ============================================
 
-import { useEffect, useState, useCallback } from 'react';
-import { fetchPins, callTasteGraphFunction } from './lib/supabase';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { fetchPins, callTasteGraphFunction, getUser, signInWithGoogle, supabase } from './lib/supabase';
 import { buildClusters, buildEdges } from './lib/clustering';
 import { buildRootFrame, createDrillFrame } from './lib/drill';
 import type {
@@ -18,7 +18,7 @@ import { LoadingState } from './components/LoadingState';
 import { ConceptDetail } from './components/ConceptDetail';
 import { EdgeDetail } from './components/EdgeDetail';
 
-type AppState = 'loading' | 'empty' | 'clustering' | 'labeling' | 'ready';
+type AppState = 'loading' | 'unauthenticated' | 'empty' | 'clustering' | 'labeling' | 'ready';
 
 const CACHE_KEY_PREFIX = 'boards-taste-graph-v7-';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -81,11 +81,33 @@ export default function App() {
   const currentClusters = currentFrame?.clusters ?? [];
   const currentEdges = currentFrame?.edges ?? [];
 
+  // Track init trigger to allow re-running on auth change
+  const [authTrigger, setAuthTrigger] = useState(0);
+
+  // Listen for auth state changes (e.g., after Google OAuth redirect)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        setAuthTrigger(t => t + 1);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
       setState('loading');
+
+      // Check auth before fetching pins
+      const user = await getUser();
+      if (cancelled) return;
+      if (!user) {
+        setState('unauthenticated');
+        return;
+      }
+
       const pinData = await fetchPins();
 
       if (cancelled) return;
@@ -178,7 +200,7 @@ export default function App() {
 
     init();
     return () => { cancelled = true; };
-  }, []);
+  }, [authTrigger]);
 
   const handleSelectCluster = useCallback((id: string | null) => {
     setSelectedCluster(id);
@@ -271,6 +293,20 @@ export default function App() {
       )}
 
       <div className={`tg-stage ${showBreadcrumb ? 'tg-stage--with-breadcrumb' : ''}`}>
+        {state === 'unauthenticated' && (
+          <div className="tg-empty">
+            <p className="tg-empty__title">
+              Sign in to see your Taste Map
+            </p>
+            <button className="tg-empty__btn" onClick={signInWithGoogle}>
+              Continue with Google
+            </button>
+            <a href="/boards/" className="tg-empty__link">
+              Open Boards
+            </a>
+          </div>
+        )}
+
         {state === 'empty' && (
           <div className="tg-empty">
             <p className="tg-empty__title">
