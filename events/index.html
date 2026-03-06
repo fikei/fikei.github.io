@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.4.0';
-  console.log(`[events] v${VERSION} - add Audium source`);
+  const VERSION = '1.4.1';
+  console.log(`[events] v${VERSION} - fix RA GraphQL pageSize (100 max), add Audium source`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2946,7 +2946,7 @@ body {
     const variables = {
       filters: { areas: { eq: areaId }, listingDate: { gte: today, lte: endDate } },
       filterOptions: { eventType: true, genre: true },
-      page: 1, pageSize: 200,
+      page: 1, pageSize: 100,
     };
 
     // Strategy 1: GraphQL via edge function (server-side POST proxy)
