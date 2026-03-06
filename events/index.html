@@ -1612,7 +1612,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.5.6';
+  const VERSION = '1.5.7';
   console.log(`[events] v${VERSION} - repaired sources show green, AI runs for unreachable sources`);
 
   // ============================================
@@ -2855,7 +2855,7 @@ body {
     });
   }
 
-  async function resetRepairAttempts() {
+  window.resetRepairAttempts = async function resetRepairAttempts() {
     if (!supabaseClient) { log('Reset repairs: no Supabase client'); return; }
     try {
       const { error } = await supabaseClient.from('source_health')
