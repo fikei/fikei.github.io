@@ -1,0 +1,106 @@
+---
+layout: null
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Echo — Sign In</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      text-align: center;
+      padding: 32px;
+      max-width: 360px;
+    }
+    .logo {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .status {
+      font-size: 14px;
+      color: #999;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+    .open-btn {
+      display: inline-block;
+      padding: 12px 32px;
+      background: #fff;
+      color: #000;
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+    }
+    .open-btn:active { background: #ccc; }
+    .fallback {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #666;
+    }
+    .error {
+      color: #ff4444;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Echo</div>
+    <p class="status" id="status">Signing you in…</p>
+    <a class="open-btn" id="openBtn" style="display:none" href="#">Open Echo</a>
+    <p class="error" id="error" style="display:none"></p>
+    <p class="fallback" id="fallback" style="display:none">
+      If Echo didn't open, tap the button above.
+    </p>
+  </div>
+
+  <script>
+    (function() {
+      var hash = window.location.hash;
+      if (!hash || hash.length < 2) {
+        document.getElementById('status').textContent = 'No sign-in data found.';
+        document.getElementById('error').textContent = 'Try requesting a new magic link from the app.';
+        document.getElementById('error').style.display = '';
+        return;
+      }
+
+      // Build the deep link: echo://auth-callback#access_token=...
+      var deepLink = 'echo://auth-callback' + hash;
+
+      // Set the manual button href
+      var btn = document.getElementById('openBtn');
+      btn.href = deepLink;
+
+      // Try to open the app automatically
+      window.location.href = deepLink;
+
+      // After a short delay, show the manual button as fallback
+      setTimeout(function() {
+        document.getElementById('status').textContent = 'Sign-in verified!';
+        btn.style.display = 'inline-block';
+        document.getElementById('fallback').style.display = '';
+      }, 1500);
+    })();
+  </script>
+</body>
+</html>
