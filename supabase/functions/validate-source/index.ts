@@ -6,11 +6,12 @@
 // and suggest a repair strategy.
 //
 // POST /functions/v1/validate-source
-// Body: { sourceId, url, currentType, includeAiAnalysis? }
+// Body: { sourceId, url, currentType, includeAiAnalysis?, parserContext? }
 // Returns: { sourceId, reachable, httpStatus, contentType, detectedType, structureReport, htmlSnippet?, aiAnalysis? }
+// aiAnalysis may include suggestedOverrides when parserContext is provided
 
-const VERSION = '1.0.1'
-console.log(`[validate-source] v${VERSION} - add audium.org to allowlist`)
+const VERSION = '1.1.0'
+console.log(`[validate-source] v${VERSION} - parser-level diagnosis with parserContext + suggestedOverrides`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
@@ -253,11 +254,18 @@ function analyzeStructure(body: string, detectedType: SourceType): StructureRepo
 
 // --- AI Diagnosis (Claude Haiku) ---
 
+interface ParserContext {
+  errors: string[]
+  configUsed: Record<string, unknown>
+  responseSnippet?: string
+}
+
 interface AiAnalysis {
   diagnosis: string
   suggestedType: string
   suggestedStrategy: string
   confidence: number
+  suggestedOverrides?: Record<string, unknown>
 }
 
 async function diagnoseWithAI(
@@ -266,11 +274,32 @@ async function diagnoseWithAI(
   currentType: string,
   htmlSnippet: string,
   structureReport: StructureReport,
+  parserContext?: ParserContext | null,
 ): Promise<AiAnalysis | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     console.log('[validate-source] ANTHROPIC_API_KEY not set, skipping AI diagnosis')
     return null
+  }
+
+  // Build parser diagnostics section if available
+  let parserDiagnosticsSection = ''
+  if (parserContext?.errors?.length) {
+    parserDiagnosticsSection = `
+
+PARSER DIAGNOSTICS — The parser ran and produced these errors:
+${parserContext.errors.map(e => `- ${e}`).join('\n')}
+
+Parser config used:
+${JSON.stringify(parserContext.configUsed, null, 2)}
+
+${parserContext.responseSnippet ? `Response snippet: ${parserContext.responseSnippet}\n` : ''}
+Focus on diagnosing parameter issues. Available overrides per parser type:
+- ra: pageSize (int, max 100), dateRangeDays (int), areaId (int)
+- screenslate: cityId (string), dayRange (int)
+- json: topLevelKeyPath (string — key name in JSON response containing the events array)
+
+If the error suggests a parameter fix, include "suggestedOverrides" in your response with the corrected values.`
   }
 
   const prompt = `You are diagnosing a broken event source. This web page was being scraped for events using a "${currentType}" parser, but it's returning 0 results.
@@ -289,6 +318,7 @@ Has RSS items: ${structureReport.hasRssItems}
 Has iCal events: ${structureReport.hasIcalEvents}
 Has JSON array: ${structureReport.hasJsonArray}
 Has date patterns: ${structureReport.hasDatePatterns}
+${parserDiagnosticsSection}
 
 First 1500 chars of page content:
 ${htmlSnippet.substring(0, 1500)}
@@ -297,8 +327,9 @@ Analyze why parsing is failing and suggest a fix. Return JSON only:
 {
   "diagnosis": "brief explanation of what's wrong",
   "suggestedType": "the parser type that would work (html|rss|json|ical|ra|screenslate|garysguide|bonobo) or empty string if unknown",
-  "suggestedStrategy": "one of: retry (transient failure), switch-type (wrong parser), url-changed (page moved), structure-changed (DOM changed), seasonal-empty (no events right now), blocked (access denied), unknown",
-  "confidence": 0.0 to 1.0
+  "suggestedStrategy": "one of: retry (transient failure), switch-type (wrong parser), url-changed (page moved), structure-changed (DOM changed), seasonal-empty (no events right now), blocked (access denied), param-fix (parameter adjustment needed), unknown",
+  "confidence": 0.0 to 1.0,
+  "suggestedOverrides": { "paramName": "value" } or null if no parameter fix needed
 }`
 
   try {
@@ -311,7 +342,7 @@ Analyze why parsing is failing and suggest a fix. Return JSON only:
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 300,
+        max_tokens: 500,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
@@ -327,12 +358,18 @@ Analyze why parsing is failing and suggest a fix. Return JSON only:
 
     if (match) {
       const result = JSON.parse(match[0])
-      return {
+      const analysis: AiAnalysis = {
         diagnosis: typeof result.diagnosis === 'string' ? result.diagnosis : 'Unknown issue',
         suggestedType: typeof result.suggestedType === 'string' ? result.suggestedType : '',
         suggestedStrategy: typeof result.suggestedStrategy === 'string' ? result.suggestedStrategy : 'unknown',
         confidence: typeof result.confidence === 'number' ? Math.max(0, Math.min(1, result.confidence)) : 0.5,
       }
+      // Extract parameter overrides if AI suggested them
+      if (result.suggestedOverrides && typeof result.suggestedOverrides === 'object' && result.suggestedOverrides !== null) {
+        analysis.suggestedOverrides = result.suggestedOverrides
+        console.log(`[validate-source] AI suggested overrides: ${JSON.stringify(result.suggestedOverrides)}`)
+      }
+      return analysis
     }
   } catch (e) {
     console.error('[validate-source] AI diagnosis error:', e)
@@ -399,11 +436,12 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { sourceId, url, currentType, includeAiAnalysis } = await req.json() as {
+    const { sourceId, url, currentType, includeAiAnalysis, parserContext } = await req.json() as {
       sourceId: string
       url: string
       currentType: string
       includeAiAnalysis?: boolean
+      parserContext?: ParserContext
     }
 
     if (!sourceId || !url) {
@@ -463,9 +501,12 @@ serve(async (req: Request) => {
     // AI diagnosis (optional)
     let aiAnalysis: AiAnalysis | null = null
     if (includeAiAnalysis && reachable) {
-      aiAnalysis = await diagnoseWithAI(sourceId, url, currentType || 'unknown', htmlSnippet, structureReport)
+      if (parserContext) {
+        console.log(`[validate-source] ${sourceId}: parser context provided — errors: ${parserContext.errors?.join('; ')}`)
+      }
+      aiAnalysis = await diagnoseWithAI(sourceId, url, currentType || 'unknown', htmlSnippet, structureReport, parserContext)
       if (aiAnalysis) {
-        console.log(`[validate-source] AI: ${sourceId} → diagnosis="${aiAnalysis.diagnosis}" suggested="${aiAnalysis.suggestedType}" strategy="${aiAnalysis.suggestedStrategy}" confidence=${aiAnalysis.confidence}`)
+        console.log(`[validate-source] AI: ${sourceId} → diagnosis="${aiAnalysis.diagnosis}" suggested="${aiAnalysis.suggestedType}" strategy="${aiAnalysis.suggestedStrategy}" confidence=${aiAnalysis.confidence}${aiAnalysis.suggestedOverrides ? ` overrides=${JSON.stringify(aiAnalysis.suggestedOverrides)}` : ''}`)
       }
     }
 
