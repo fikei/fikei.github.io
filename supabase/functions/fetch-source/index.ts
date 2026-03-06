@@ -8,6 +8,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
+const VERSION = '1.1.0'
+console.log(`[fetch-source] v${VERSION} - add audium.org to allowlist`)
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -63,6 +66,9 @@ const ALLOWED_DOMAINS = [
   'www.sfpl.org',
   'commonwealthclub.org',
   'www.commonwealthclub.org',
+  // Sound Art
+  'audium.org',
+  'www.audium.org',
 ]
 
 function isDomainAllowed(url: string): boolean {
