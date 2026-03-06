@@ -1579,7 +1579,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.5.4';
+  const VERSION = '1.5.5';
   console.log(`[events] v${VERSION} - move health banners to fetch log, revert pageSize to 200 for ai-param-fix test`);
 
   // ============================================
@@ -2777,6 +2777,13 @@ body {
 
       await reportRepairResult(sourceId, decision.strategy, repairResult);
       results.push({ sourceId, ...repairResult });
+
+      // If repair succeeded, immediately update local health status to show green
+      if (repairResult.success && state.sourceHealth[sourceId]) {
+        state.sourceHealth[sourceId].status = 'healthy';
+        state.sourceHealth[sourceId].consecutive_failures = 0;
+        renderSourceChips();
+      }
 
       // Delay between sources to avoid hammering
       if (brokenSources.indexOf(healthRow) < brokenSources.length - 1) {
