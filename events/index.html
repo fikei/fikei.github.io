@@ -19,6 +19,7 @@
   <!-- CTRL Design System -->
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
 
   <style>
 /* ============================================
@@ -351,29 +352,7 @@ body {
 .type-filter__chip:hover { color: var(--fg); border-color: var(--border); }
 .type-filter__chip.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
-/* Auth button */
-.auth-btn {
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  color: var(--fg-muted);
-  background: transparent;
-  border: var(--border-thin) solid var(--border-subtle);
-  padding: var(--space-1) var(--space-3);
-  cursor: pointer;
-  font-family: var(--font-primary);
-  transition: all var(--duration-fast) var(--ease-default);
-}
-
-.auth-btn:hover { color: var(--fg); border-color: var(--border); }
-
-.auth-user {
-  font-size: var(--text-2xs);
-  color: var(--fg-muted);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
+/* Auth handled by /auth/ctrl-auth.css */
 
 /* Onboarding */
 .onboarding {
@@ -556,42 +535,6 @@ body {
   justify-content: flex-end;
   margin-top: var(--space-6);
 }
-
-/* Auth modal */
-.auth-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.auth-modal--visible { display: flex; }
-
-.auth-modal__content {
-  background: var(--bg);
-  border: var(--border-thin) solid var(--border-subtle);
-  padding: var(--space-6);
-  max-width: 360px;
-  width: 90%;
-}
-
-.auth-modal__title {
-  font-family: var(--font-primary);
-  font-size: var(--text-base);
-  font-weight: normal;
-  margin-bottom: var(--space-4);
-}
-
-.auth-modal__status {
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
-  margin-top: var(--space-3);
-}
-
-.auth-modal__status--error { color: #c44; }
 
 /* Footer */
 .footer {
@@ -1218,11 +1161,7 @@ body {
         <span class="breadcrumb__current">Events</span>
       </nav>
       <div class="page-header__actions">
-        <div class="auth-user" id="authUser" style="display:none">
-          <span id="authEmail"></span>
-          <button class="auth-btn" id="authLogout">Logout</button>
-        </div>
-        <button class="auth-btn" id="authLoginBtn">Login</button>
+        <div id="ctrl-auth-root"></div>
         <button class="toggle" id="themeToggle" aria-label="Toggle theme">
           <div class="toggle__knob"></div>
         </button>
@@ -1586,23 +1525,9 @@ body {
     </div>
   </div>
 
-  <!-- Auth Modal -->
-  <div class="auth-modal" id="authModal">
-    <div class="auth-modal__content">
-      <h2 class="auth-modal__title">Login with Email</h2>
-      <div class="form-group">
-        <input type="email" class="input" id="authEmailInput" placeholder="you@example.com" required>
-      </div>
-      <div class="modal__actions">
-        <button class="btn" id="authModalCancel">Cancel</button>
-        <button class="btn btn--filled" id="authModalSend">Send Magic Link</button>
-      </div>
-      <p class="auth-modal__status" id="authStatus"></p>
-    </div>
-  </div>
-
-  <!-- Supabase JS (shared with boards) -->
+  <!-- Supabase JS + Shared Auth Module -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/auth/ctrl-auth.js"></script>
 
   <script>
 // ============================================
@@ -1612,8 +1537,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.5.9';
-  console.log(`[events] v${VERSION} - permanent config_overrides for AI-suggested fixes`);
+  const VERSION = '1.6.0';
+  console.log(`[events] v${VERSION} - migrate to shared auth module (Google OAuth + username gate)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1685,36 +1610,57 @@ body {
   };
 
   // ============================================
-  // Supabase Auth (shared with ctrl.rodeo/boards)
+  // Auth — powered by /auth/ctrl-auth.js
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
-  const AUTH_STORAGE_KEY = 'sb-yfhudwakpgzswiylhfbh-auth-token';
 
-  let supabaseClient = null;
+  // Init shared auth module
+  CtrlAuth.init({
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY,
+    redirectTo: window.location.origin + '/events/',
+    adminEmails: ['fike101@gmail.com'],
+    mountTo: '#ctrl-auth-root'
+  });
+
+  const supabaseClient = CtrlAuth.getSupabaseClient();
   let currentUser = null;
 
-  function initSupabase() {
-    if (window.supabase) {
-      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { detectSessionInUrl: true, flowType: 'implicit', autoRefreshToken: true, persistSession: true }
-      });
-      log('Supabase client initialized');
-    } else {
-      log('Supabase JS not loaded — auth disabled');
-    }
+  // Fast-restore session
+  const _session = CtrlAuth.getSession();
+  if (_session?.user) {
+    currentUser = _session.user;
   }
 
-  function getStoredAuth() {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch (e) { return null; }
-  }
+  // Auth events from shared module
+  document.addEventListener('ctrl:auth:signedin', async (e) => {
+    const wasLoggedOut = !currentUser;
+    currentUser = e.detail.user;
+    if (wasLoggedOut) {
+      log('Logged in as ' + (currentUser.email || 'user'));
+      const cloudLoaded = await loadSourcesCloud();
+      if (cloudLoaded) {
+        log('Cloud sync: restored sources after login');
+        if (state.onboarded && state.sources.length > 0) {
+          document.getElementById('eventsContent').style.display = '';
+          document.getElementById('onboarding')?.remove();
+          fetchAllSources(true);
+        }
+      } else {
+        saveSourcesCloud();
+      }
+    }
+  });
+
+  document.addEventListener('ctrl:auth:signedout', () => {
+    currentUser = null;
+    log('Logged out');
+  });
 
   function getAccessToken() {
-    const auth = getStoredAuth();
-    return auth?.access_token || null;
+    const session = CtrlAuth.getSession();
+    return session?.access_token || null;
   }
 
   // ============================================
@@ -5201,29 +5147,6 @@ body {
       if (e.target.tagName === 'A') return;
     });
 
-    // Auth
-    const authModal = document.getElementById('authModal');
-    document.getElementById('authLoginBtn').addEventListener('click', () => {
-      authModal.classList.add('auth-modal--visible');
-      document.getElementById('authEmailInput').value = '';
-      document.getElementById('authStatus').textContent = '';
-      document.getElementById('authEmailInput').focus();
-    });
-    document.getElementById('authModalCancel').addEventListener('click', () => authModal.classList.remove('auth-modal--visible'));
-    authModal.addEventListener('click', (e) => { if (e.target === authModal) authModal.classList.remove('auth-modal--visible'); });
-    document.getElementById('authModalSend').addEventListener('click', () => {
-      const email = document.getElementById('authEmailInput').value.trim();
-      if (email) handleLogin(email);
-    });
-    document.getElementById('authEmailInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const email = e.target.value.trim();
-        if (email) handleLogin(email);
-      }
-    });
-    document.getElementById('authLogout').addEventListener('click', handleLogout);
-
     // Onboarding — 3-step flow
     document.getElementById('onboardingStart').addEventListener('click', completeOnboarding);
     document.getElementById('onboardingSkip').addEventListener('click', () => {
@@ -5480,94 +5403,7 @@ body {
     fetchAllSources();
   }
 
-  // --- Auth ---
-  function initAuth() {
-    initSupabase();
-
-    // Check existing session
-    const stored = getStoredAuth();
-    if (stored?.user) {
-      currentUser = stored.user;
-      log('Auth: found existing session for ' + currentUser.email);
-    }
-    updateAuthUI();
-
-    // Listen for auth state changes
-    if (supabaseClient) {
-      supabaseClient.auth.onAuthStateChange((event, session) => {
-        log('Auth state change: ' + event);
-        const wasLoggedOut = !currentUser;
-        currentUser = session?.user || null;
-        updateAuthUI();
-
-        if (currentUser && wasLoggedOut) {
-          document.getElementById('authModal').classList.remove('auth-modal--visible');
-          log('Logged in as ' + currentUser.email);
-          // Sync sources from cloud on login
-          loadSourcesCloud().then(loaded => {
-            if (loaded) {
-              log('Cloud sync: restored sources after login');
-              if (state.onboarded && state.sources.length > 0) {
-                document.getElementById('eventsContent').style.display = '';
-                document.getElementById('onboarding')?.remove();
-                fetchAllSources(true);
-              }
-            } else {
-              // First login: push current localStorage sources to cloud
-              saveSourcesCloud();
-            }
-          });
-          // Load personalized recommendations now that user is authenticated
-          loadRecommendedEvents();
-        }
-      });
-    }
-  }
-
-  function updateAuthUI() {
-    const loginBtn = document.getElementById('authLoginBtn');
-    const userEl = document.getElementById('authUser');
-    const emailEl = document.getElementById('authEmail');
-
-    if (currentUser) {
-      loginBtn.style.display = 'none';
-      userEl.style.display = 'flex';
-      emailEl.textContent = currentUser.email;
-    } else {
-      loginBtn.style.display = '';
-      userEl.style.display = 'none';
-    }
-  }
-
-  async function handleLogin(email) {
-    if (!supabaseClient) { log('Auth: Supabase not available'); return; }
-    const statusEl = document.getElementById('authStatus');
-    const sendBtn = document.getElementById('authModalSend');
-    sendBtn.disabled = true;
-    statusEl.textContent = 'Sending magic link...';
-    statusEl.className = 'auth-modal__status';
-
-    try {
-      const { error } = await supabaseClient.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + window.location.pathname }
-      });
-      if (error) throw error;
-      statusEl.textContent = 'Check your email for the magic link!';
-      sendBtn.disabled = false;
-    } catch (e) {
-      statusEl.textContent = e.message || 'Failed to send magic link';
-      statusEl.className = 'auth-modal__status auth-modal__status--error';
-      sendBtn.disabled = false;
-    }
-  }
-
-  async function handleLogout() {
-    if (supabaseClient) await supabaseClient.auth.signOut();
-    currentUser = null;
-    updateAuthUI();
-    log('Logged out');
-  }
+  // Auth is handled by /auth/ctrl-auth.js — see event listeners at top of file
 
   // --- Events For You (Boards integration) ---
   const BOARDS_STORAGE_KEY = 'things-i-like';
@@ -5794,7 +5630,9 @@ body {
     loadSettings();
     loadSources();
     bindEvents();
-    initAuth();
+
+    // Auth already initialized at top via CtrlAuth.init()
+    if (currentUser) log('Auth: found existing session for ' + (currentUser.email || 'user'));
 
     // If logged in, try loading sources from cloud (overrides localStorage)
     if (currentUser && supabaseClient) {

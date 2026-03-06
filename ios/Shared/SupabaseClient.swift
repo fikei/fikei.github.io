@@ -103,7 +103,7 @@ final class SupabaseClient {
         let body: [String: Any] = [
             "email": email,
             "options": [
-                "emailRedirectTo": "\(AppConstants.boardsURL)"
+                "emailRedirectTo": "\(AppConstants.urlScheme)://auth-callback"
             ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
