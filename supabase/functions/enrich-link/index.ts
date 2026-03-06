@@ -3,8 +3,8 @@
 //
 // POST /functions/v1/enrich-link
 // Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, enrichBook?, enrichListen?, category? }
-const VERSION = '1.1.0'
-console.log(`[enrich-link] v${VERSION} - BPM/key server-side + Camelot notation`)
+const VERSION = '1.2.0'
+console.log(`[enrich-link] v${VERSION} - Claude Haiku BPM/key lookup`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video?, book?, music? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -743,34 +743,43 @@ serve(async (req) => {
         } catch (e) { console.warn('[enrich-link] enrich-music call failed:', (e as Error).message) }
       }
 
-      // 7. GetSongBPM for BPM + musical key (server-side to avoid CORS)
+      // 7. BPM + musical key via Claude Haiku (replaces GetSongBPM — blocked by Cloudflare)
       if (musicResult.artist && musicResult.trackTitle) {
         try {
-          const bpmApiKey = Deno.env.get('GETSONGBPM_API_KEY') || '2309ca61f21b623b59ee2f734e67a456'
-          const query = encodeURIComponent(`${musicResult.artist} ${musicResult.trackTitle}`)
-          const bpmResp = await fetch(
-            `https://api.getsongbpm.com/search/?api_key=${bpmApiKey}&type=both&lookup=${query}`,
-            { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo/1.0)' } }
-          )
-          if (bpmResp.ok) {
-            const bpmData = await bpmResp.json()
-            if (bpmData.search?.length) {
-              const hit = bpmData.search[0]
-              if (hit.tempo) musicResult.bpm = parseInt(hit.tempo, 10)
-              // Convert musical key to Camelot notation (e.g. "Cm" → "5A", "G" → "9B")
-              const rawKey = hit.key_of || hit.song_key || null
-              if (rawKey) {
-                musicResult.key = toCamelotKey(rawKey)
-                musicResult.musicalKey = rawKey  // preserve original for reference
+          const bpmApiKey = Deno.env.get('ANTHROPIC_API_KEY')
+          if (bpmApiKey) {
+            const bpmPrompt = `What is the BPM (tempo) and musical key of "${musicResult.trackTitle}" by "${musicResult.artist}"? Reply ONLY with JSON, no explanation: {"bpm": <number or null>, "key": "<key like Cm, G, F#m or null>"}`
+            const bpmResp = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': bpmApiKey,
+                'anthropic-version': '2023-06-01'
+              },
+              body: JSON.stringify({
+                model: 'claude-3-haiku-20240307',
+                max_tokens: 100,
+                messages: [{ role: 'user', content: bpmPrompt }]
+              })
+            })
+            if (bpmResp.ok) {
+              const bpmData = await bpmResp.json()
+              const text = bpmData.content?.[0]?.text || ''
+              const match = text.match(/\{[\s\S]*\}/)
+              if (match) {
+                const parsed = JSON.parse(match[0])
+                if (parsed.bpm) musicResult.bpm = parseInt(parsed.bpm, 10)
+                if (parsed.key) {
+                  musicResult.key = toCamelotKey(parsed.key)
+                  musicResult.musicalKey = parsed.key
+                }
+                console.log('[enrich-link] Claude BPM/key:', { bpm: musicResult.bpm, key: musicResult.key, musicalKey: parsed.key })
               }
-              console.log('[enrich-link] GetSongBPM result:', { bpm: musicResult.bpm, key: musicResult.key, musicalKey: rawKey })
             } else {
-              console.log('[enrich-link] GetSongBPM: no results for', musicResult.artist, musicResult.trackTitle)
+              console.warn('[enrich-link] Claude BPM/key HTTP', bpmResp.status)
             }
-          } else {
-            console.warn('[enrich-link] GetSongBPM HTTP', bpmResp.status)
           }
-        } catch (e) { console.warn('[enrich-link] GetSongBPM failed:', (e as Error).message) }
+        } catch (e) { console.warn('[enrich-link] Claude BPM/key failed:', (e as Error).message) }
       }
 
       // Return if we got anything useful
