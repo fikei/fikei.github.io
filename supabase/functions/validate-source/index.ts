@@ -9,8 +9,8 @@
 // Body: { sourceId, url, currentType, includeAiAnalysis? }
 // Returns: { sourceId, reachable, httpStatus, contentType, detectedType, structureReport, htmlSnippet?, aiAnalysis? }
 
-const VERSION = '1.0.0'
-console.log(`[validate-source] v${VERSION} - source structural probe with AI diagnosis`)
+const VERSION = '1.0.1'
+console.log(`[validate-source] v${VERSION} - add audium.org to allowlist`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
@@ -47,6 +47,7 @@ const ALLOWED_DOMAINS = [
   'citylights.com', 'www.citylights.com',
   'sfpl.org', 'www.sfpl.org',
   'commonwealthclub.org', 'www.commonwealthclub.org',
+  'audium.org', 'www.audium.org',
   'dice.fm', 'www.dice.fm',
   'songkick.com', 'www.songkick.com',
 ]
