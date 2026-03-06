@@ -21,6 +21,7 @@
 		AD8C20FBC3481F5DA1734000 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D726CF484741663C8E44F3 /* ShareViewController.swift */; };
 		CAD640C5E7E7ED3DCFBED06D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9DDCA70DD729557ADB4922 /* SupabaseClient.swift */; };
 		D9D52660B6969013489C222E /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BA850935A1BD210899C8BE /* Theme.swift */; };
+		F7F75B4D770D4EEB98669250 /* UsernameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D38A0E95DA484CB27BA2FD /* UsernameView.swift */; };
 		F6FA76D0AD6549E2B174B376 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9DDCA70DD729557ADB4922 /* SupabaseClient.swift */; };
 		FBE1EBD7F388E35711BCAAE7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A6015C07711BF1587BCFBA10 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -54,6 +55,7 @@
 		31FBCBB85AA0707A741D4EFA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		66BDECABB0154E8E7FE1A2DF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		71BA850935A1BD210899C8BE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		94D38A0E95DA484CB27BA2FD /* UsernameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernameView.swift; sourceTree = "<group>"; };
 		728A6379CF1F0B47A362A0D1 /* CtrlRodeoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CtrlRodeoApp.swift; sourceTree = "<group>"; };
 		89405C4E8B1D627ACA6871F1 /* QueueService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueService.swift; sourceTree = "<group>"; };
 		94DDE541E441806054DBA9D4 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
@@ -102,6 +104,7 @@
 				94DDE541E441806054DBA9D4 /* DesignSystem.swift */,
 				9A112C46BE4BF03936FA33CE /* Info.plist */,
 				71BA850935A1BD210899C8BE /* Theme.swift */,
+				94D38A0E95DA484CB27BA2FD /* UsernameView.swift */,
 			);
 			path = CtrlRodeo;
 			sourceTree = "<group>";
@@ -241,6 +244,7 @@
 				AAFDFA1C77F0973A2BB1A75A /* QueueService.swift in Sources */,
 				F6FA76D0AD6549E2B174B376 /* SupabaseClient.swift in Sources */,
 				D9D52660B6969013489C222E /* Theme.swift in Sources */,
+				F7F75B4D770D4EEB98669250 /* UsernameView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
