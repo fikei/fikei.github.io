@@ -1454,7 +1454,10 @@ body {
 
     <!-- Debug log (visible) -->
     <details id="debugLog" style="margin-bottom: var(--space-4);">
-      <summary style="font-size: var(--text-2xs); color: var(--fg-subtle); text-transform: uppercase; letter-spacing: var(--tracking-wider); cursor: pointer;">Fetch Log</summary>
+      <summary style="font-size: var(--text-2xs); color: var(--fg-subtle); text-transform: uppercase; letter-spacing: var(--tracking-wider); cursor: pointer; display: flex; align-items: center; gap: var(--space-2);">
+        Fetch Log
+        <button id="resetRepairsBtn" onclick="event.stopPropagation(); resetRepairAttempts();" style="font-size: var(--text-2xs); color: var(--fg-subtle); background: transparent; border: var(--border-thin) solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1px 6px; cursor: pointer; margin-left: auto;">Reset Repairs</button>
+      </summary>
       <pre id="debugLogContent" style="font-size: var(--text-2xs); color: var(--fg-muted); background: var(--bg-surface); border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); max-height: 200px; overflow-y: auto; white-space: pre-wrap;"></pre>
     </details>
 
@@ -2843,6 +2846,24 @@ body {
       const src = state.sources.find(s => s.id === r.sourceId);
       log(`Auto-repair: FAILED "${src?.name || r.sourceId}" — ${r.diagnosis || 'Unknown issue'}`);
     });
+  }
+
+  async function resetRepairAttempts() {
+    if (!supabaseClient) { log('Reset repairs: no Supabase client'); return; }
+    try {
+      const { error } = await supabaseClient.from('source_health')
+        .update({ repair_attempted_at: null, repair_result: null, repair_strategy: null })
+        .not('repair_attempted_at', 'is', null);
+      if (error) throw error;
+      state.repairedThisSession.clear();
+      // Clear overrides from sources
+      state.sources.forEach(s => { delete s.overrides; });
+      log('Reset repairs: cleared all repair attempts, session cache, and overrides');
+      // Reload health to trigger fresh repair attempts
+      await loadSourceHealth();
+    } catch (e) {
+      log(`Reset repairs: error — ${e.message}`);
+    }
   }
 
   // --- Cross-Source Deduplication ---
