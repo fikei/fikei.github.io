@@ -6,10 +6,24 @@ import WebKit
 struct ContentView: View {
     @State private var isAuthenticated = SupabaseClient.shared.isAuthenticated
     @State private var didSkipAuth = false
+    @State private var needsUsername = false
+    @State private var isCheckingProfile = false
 
     var body: some View {
         Group {
-            if isAuthenticated || didSkipAuth {
+            if isCheckingProfile {
+                // Loading while checking profile
+                ZStack {
+                    Theme.background
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .tint(Theme.foreground)
+                }
+            } else if needsUsername {
+                UsernameView(onUsernameSet: {
+                    needsUsername = false
+                })
+            } else if isAuthenticated || didSkipAuth {
                 BoardsWebView(
                     isAuthenticated: $isAuthenticated
                 )
@@ -17,6 +31,7 @@ struct ContentView: View {
                 AuthView(
                     onAuthenticated: {
                         isAuthenticated = true
+                        checkProfileForUsername()
                     },
                     onSkip: {
                         didSkipAuth = true
@@ -31,44 +46,67 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthStateChanged"))) { _ in
             isAuthenticated = SupabaseClient.shared.isAuthenticated
         }
+        .onAppear {
+            // Check profile on app launch if already authenticated
+            if isAuthenticated {
+                checkProfileForUsername()
+            }
+        }
     }
+
+    // MARK: - Profile Check
+
+    private func checkProfileForUsername() {
+        guard let userId = SupabaseClient.shared.userId else { return }
+
+        isCheckingProfile = true
+        Task {
+            let hasUsername = await userHasUsername(userId: userId)
+            await MainActor.run {
+                isCheckingProfile = false
+                if !hasUsername {
+                    needsUsername = true
+                }
+            }
+        }
+    }
+
+    private func userHasUsername(userId: String) async -> Bool {
+        do {
+            let profile = try await SupabaseClient.shared.fetchProfile(userId: userId)
+            if let username = profile?.username, !username.isEmpty {
+                return true
+            }
+            return false
+        } catch {
+            // On error, don't block — let them through
+            print("[ContentView] Profile check failed: \(error). Skipping username gate.")
+            return true
+        }
+    }
+
+    // MARK: - Deep Link
 
     private func handleAuthDeepLink(_ url: URL) {
         print("[ContentView] handleAuthDeepLink: \(url)")
 
-        // Check if this is an auth callback (contains access_token in fragment)
-        let urlString = url.absoluteString
-        guard urlString.contains("access_token") else { return }
-
-        // Parse tokens directly from the URL fragment — no WKWebView round-trip needed.
-        // The fragment contains: "access_token=JWT&refresh_token=REFRESH&token_type=bearer"
-        let fragment = url.fragment ?? ""
-        var params: [String: String] = [:]
-        fragment.split(separator: "&").forEach { pair in
-            let kv = pair.split(separator: "=", maxSplits: 1)
-            if kv.count == 2 {
-                params[String(kv[0])] = String(kv[1])
-            }
-        }
-
-        guard let accessToken = params["access_token"], !accessToken.isEmpty else {
-            print("[ContentView] handleAuthDeepLink: No access_token in fragment")
+        // Use shared parser from SupabaseClient
+        guard let auth = SupabaseClient.shared.parseAuthFromCallback(url) else {
+            print("[ContentView] handleAuthDeepLink: No valid tokens in URL")
             return
         }
 
-        let refreshToken = params["refresh_token"]
-        print("[ContentView] handleAuthDeepLink: Parsed tokens directly, storing auth")
-
-        // Store auth immediately — eliminates the fragile WKWebView token round-trip
-        let auth = StoredAuth(accessToken: accessToken, refreshToken: refreshToken, user: nil)
+        print("[ContentView] handleAuthDeepLink: Parsed tokens, storing auth")
         SupabaseClient.shared.storeAuth(auth)
         isAuthenticated = true
 
         // Notify other views (including WebView coordinator) that auth state changed
         NotificationCenter.default.post(name: NSNotification.Name("AuthStateChanged"), object: nil)
 
-        // Transition to BoardsWebView if not already showing.
-        // WebView loads the base URL normally; injectStoredAuth() pushes tokens to web localStorage.
+        // Check profile for username
+        checkProfileForUsername()
+
+        // Transition to BoardsWebView if not already showing
         if !didSkipAuth {
             DispatchQueue.main.async {
                 didSkipAuth = true

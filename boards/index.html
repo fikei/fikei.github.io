@@ -5686,6 +5686,8 @@ body {
   #igEntities { max-height: 50vh; overflow-y: auto; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+  <script src="/auth/ctrl-auth.js"></script>
   <script src="../js/image-validation.js"></script>
 </head>
 <body>
@@ -5695,26 +5697,8 @@ body {
   </div>
   <div class="progress-status" id="progressStatus"></div>
 
-  <!-- Auth UI -->
-  <div class="auth-bar" id="authBar">
-    <!-- Logged out state -->
-    <button class="auth-bar__btn" id="authBtn">Login</button>
-    <!-- Logged in state -->
-    <div class="user-menu" id="userMenu" style="display:none;">
-      <button class="user-menu__trigger" id="userMenuTrigger">
-        <span class="user-menu__email" id="userMenuEmail"></span>
-      </button>
-      <div class="user-menu__dropdown" id="userMenuDropdown">
-        <div class="user-menu__header">
-          <div class="user-menu__header-email" id="userMenuHeaderEmail"></div>
-          <span class="user-menu__header-badge" id="userMenuBadge" style="display:none;">Admin</span>
-        </div>
-        <button class="user-menu__item" id="userMenuAccount">Account</button>
-        <button class="user-menu__item" id="userMenuSettings">Settings</button>
-        <button class="user-menu__item user-menu__item--danger" id="userMenuLogout">Logout</button>
-      </div>
-    </div>
-  </div>
+  <!-- Auth UI (managed by ctrl-auth.js module) -->
+  <div id="ctrl-auth-root"></div>
 
   <nav class="filters" id="filters" role="tablist">
     <input type="text" class="search-input" id="searchInput" placeholder="Search..." autocomplete="off">
@@ -6040,17 +6024,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
 
   <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- Auth Modal -->
-  <div class="auth-modal" id="authModal">
-    <div class="auth-modal__content">
-      <h2 class="auth-modal__title">Login with Email</h2>
-      <form id="authForm">
-        <input type="email" class="auth-modal__input" id="authEmail" placeholder="you@example.com" required>
-        <button type="submit" class="auth-modal__submit" id="authSubmit">Send Magic Link</button>
-      </form>
-      <p class="auth-modal__status" id="authStatus"></p>
-    </div>
-  </div>
+  <!-- Auth Modal managed by ctrl-auth.js -->
 
   <!-- Account Modal -->
   <div class="modal modal--small" id="accountModal">
@@ -6063,12 +6037,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       <div class="modal__body" style="padding: var(--space-4);">
         <div class="account-section">
           <label class="account-label">Username</label>
-          <div class="username-input-row">
-            <span class="username-prefix">@</span>
-            <input type="text" class="username-input" id="accountUsername" placeholder="username" maxlength="20">
-          </div>
-          <div class="username-status" id="usernameStatus"></div>
-          <button class="username-save-btn" id="usernameSaveBtn" style="display:none;">Save Username</button>
+          <div class="account-value account-value--mono" id="accountUsername">—</div>
         </div>
         <div class="account-section">
           <label class="account-label">Email</label>
@@ -6480,23 +6449,26 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.8.7';
-  console.log('[boards] v' + VERSION + ' - BPM/key server-side + Camelot notation');
+  const VERSION = '2.9.0';
+  console.log('[boards] v' + VERSION + ' - shared auth module + Google OAuth + username onboarding');
 
   // ============================================
-  // Supabase Setup
+  // Supabase Setup (shared auth module manages the client)
   // ============================================
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
-  // BPM/key lookup moved server-side (enrich-link step 7) — GetSongBPM API blocks CORS
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      detectSessionInUrl: true,
-      flowType: 'implicit',
-      autoRefreshToken: true,
-      persistSession: true
-    }
+
+  // Initialize shared auth module
+  CtrlAuth.init({
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY,
+    redirectTo: window.location.origin + '/boards/',
+    adminEmails: APP_CONFIG.adminEmails,
+    mountTo: '#ctrl-auth-root'
   });
+
+  // Use the shared Supabase client from auth module
+  const supabase = CtrlAuth.getSupabaseClient();
 
   let currentUser = null;
   let isOnline = true; // Track online status for offline support
@@ -18965,47 +18937,26 @@ Return JSON:
   // Auth Functions
   // ============================================
   function getDisplayName() {
-    // If username is set, show @username
-    if (currentUsername) {
-      return '@' + currentUsername;
-    }
-    // Otherwise show full email
-    if (currentUser?.email) {
-      return currentUser.email;
-    }
+    if (currentUsername) return '@' + currentUsername;
+    if (currentUser?.email) return currentUser.email;
     return 'User';
   }
 
+  // Update boards-specific UI (auth bar is managed by ctrl-auth.js module)
   function updateAuthUI() {
     const shareBtn = $('shareBtn');
     const adminBtn = $('devAdminPanel');
     if (currentUser) {
-      // Hide login button, show user menu
-      authBtn.style.display = 'none';
-      userMenu.style.display = '';
       shareBtn.style.display = '';
-      // Show FAB menu for logged in users
       fabMenu.style.display = '';
-
-      // Update user menu content - show @username or first name
-      userMenuEmail.textContent = getDisplayName();
-      userMenuHeaderEmail.textContent = currentUser.email;
-
-      // Show admin badge and button for admins
       if (isAdmin()) {
         adminBtn.style.display = '';
-        userMenuBadge.style.display = '';
       } else {
         adminBtn.style.display = 'none';
-        userMenuBadge.style.display = 'none';
       }
     } else {
-      // Show login button, hide user menu
-      authBtn.style.display = '';
-      userMenu.style.display = 'none';
       shareBtn.style.display = 'none';
       adminBtn.style.display = 'none';
-      // Hide FAB menu for logged out users
       fabMenu.style.display = 'none';
     }
   }
@@ -19514,78 +19465,7 @@ Return JSON:
     toast(`Synced: ${uploaded} ok, ${failed} failed`);
   }
 
-  let authCountdownInterval = null;
-
-  function clearAuthCountdown() {
-    if (authCountdownInterval) {
-      clearInterval(authCountdownInterval);
-      authCountdownInterval = null;
-    }
-  }
-
-  function startAuthCountdown(seconds) {
-    clearAuthCountdown();
-    authSubmit.disabled = true;
-
-    let remaining = seconds;
-    authStatus.textContent = `Wait ${remaining}s`;
-    authStatus.className = 'auth-modal__status auth-modal__status--error';
-
-    authCountdownInterval = setInterval(() => {
-      remaining--;
-      if (remaining > 0) {
-        authStatus.textContent = `Wait ${remaining}s`;
-      } else {
-        clearAuthCountdown();
-        authStatus.textContent = 'Try again';
-        authStatus.className = 'auth-modal__status';
-        authSubmit.disabled = false;
-      }
-    }, 1000);
-  }
-
-  async function handleLogin(email) {
-    clearAuthCountdown();
-    authSubmit.disabled = true;
-    authStatus.textContent = 'Sending magic link...';
-    authStatus.className = 'auth-modal__status';
-
-    try {
-      const redirectUrl = window.location.origin + window.location.pathname;
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: redirectUrl
-        }
-      });
-
-      if (error) throw error;
-
-      authStatus.textContent = 'Check your email for the magic link!';
-      authEmail.value = '';
-      authSubmit.disabled = false;
-    } catch (e) {
-      const msg = e.message || 'Failed to send magic link';
-
-      // Check for rate limit / security cooldown (e.g., "...after 45 seconds")
-      const secMatch = msg.match(/after\s+(\d+)\s+second/i);
-      if (secMatch) {
-        const waitSecs = parseInt(secMatch[1], 10);
-        startAuthCountdown(waitSecs);
-      } else {
-        authStatus.textContent = msg;
-        authStatus.className = 'auth-modal__status auth-modal__status--error';
-        authSubmit.disabled = false;
-      }
-    }
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    currentUser = null;
-    updateAuthUI();
-    toast('Logged out');
-  }
+  // Auth login/logout now handled by ctrl-auth.js module
 
   async function processPendingSaves() {
     const rawPending = localStorage.getItem(PENDING_SAVES_KEY);
@@ -19642,23 +19522,23 @@ Return JSON:
     }
   }
 
-  async function onAuthStateChange(event, session) {
-    console.log('[auth] onAuthStateChange:', event, session?.user?.email || 'no user');
+  // ============================================
+  // Auth Bridge (ctrl-auth.js module handles login/logout/username)
+  // ============================================
+  const USERNAME_KEY = 'boards-username';
+  let currentUsername = localStorage.getItem(USERNAME_KEY) || '';
+  let pendingShareAfterUsername = null;
+
+  // Bridge: ctrl-auth.js events → boards state
+  document.addEventListener('ctrl:auth:signedin', async (e) => {
+    const { user, username } = e.detail;
     const wasLoggedOut = !currentUser;
-    currentUser = session?.user || null;
+    currentUser = user;
+    currentUsername = username || '';
+    if (username) localStorage.setItem(USERNAME_KEY, username);
     updateAuthUI();
 
-    if (currentUser && wasLoggedOut) {
-      // Just logged in - close modal and sync
-      authModal.classList.remove('auth-modal--visible');
-
-      // Load username from Supabase user_metadata (persists across devices)
-      const metaUsername = currentUser.user_metadata?.username;
-      if (metaUsername) {
-        currentUsername = metaUsername;
-        localStorage.setItem(USERNAME_KEY, metaUsername);
-      }
-      updateAuthUI();
+    if (wasLoggedOut) {
       toast('Logged in as ' + (currentUsername ? '@' + currentUsername : currentUser.email));
 
       // Check for local data to migrate
@@ -19667,12 +19547,12 @@ Return JSON:
         await migrateLocalToSupabase();
       }
 
-      // Fetch from Supabase and merge with local (same logic as init)
+      // Fetch from Supabase and merge with local
       const cloudData = await fetchFromSupabase();
       if (cloudData) {
         const freshLocal = load();
 
-        // Push local-only pins to cloud before overwriting
+        // Push local-only pins to cloud
         const cloudIds = new Set(cloudData.links.map(l => l.id));
         const localOnly = freshLocal.links.filter(l => !cloudIds.has(l.id));
         if (localOnly.length > 0) {
@@ -19705,7 +19585,6 @@ Return JSON:
         }
 
         save({ links: cloudData.links, categories: cloudData.categories, linkOrder: cloudData.linkOrder });
-        // Validate expanded cards - remove orphaned entries
         const validLinkIds = new Set(cloudData.links.map(l => l.id));
         expandedCards = {};
         if (cloudData.expanded) {
@@ -19720,233 +19599,70 @@ Return JSON:
         renderGrid();
       }
 
-      // Process any links saved from shared boards while logged out
       await processPendingSaves();
-    }
-  }
-
-  // Auth event handlers
-  authBtn.onclick = () => {
-    authModal.classList.add('auth-modal--visible');
-    authEmail.focus();
-  };
-
-  authForm.onsubmit = (e) => {
-    e.preventDefault();
-    const email = authEmail.value.trim();
-    if (email) handleLogin(email);
-  };
-
-  authModal.onclick = (e) => {
-    if (e.target === authModal) {
-      authModal.classList.remove('auth-modal--visible');
-      clearAuthCountdown();
-      authStatus.textContent = '';
-      authStatus.className = 'auth-modal__status';
-      authSubmit.disabled = false;
-    }
-  };
-
-  // User menu handlers
-  userMenuTrigger.onclick = (e) => {
-    e.stopPropagation();
-    userMenuDropdown.classList.toggle('user-menu__dropdown--visible');
-  };
-
-  userMenuAccount.onclick = () => {
-    userMenuDropdown.classList.remove('user-menu__dropdown--visible');
-    openAccountModal();
-  };
-
-  userMenuLogout.onclick = () => {
-    userMenuDropdown.classList.remove('user-menu__dropdown--visible');
-    handleLogout();
-  };
-
-  userMenuSettings.onclick = () => {
-    userMenuDropdown.classList.remove('user-menu__dropdown--visible');
-    openModal(settingsModal);
-  };
-
-  // Close user menu when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!userMenu.contains(e.target)) {
-      userMenuDropdown.classList.remove('user-menu__dropdown--visible');
     }
   });
 
-  // Account modal handlers
-  // Username storage — persisted in Supabase user_metadata, cached in localStorage
-  const USERNAME_KEY = 'boards-username';
-  let currentUsername = localStorage.getItem(USERNAME_KEY) || '';
-  let pendingShareAfterUsername = null; // Track share intent when username not yet set
+  document.addEventListener('ctrl:auth:signedout', () => {
+    currentUser = null;
+    currentUsername = '';
+    updateAuthUI();
+    toast('Logged out');
+  });
+
+  document.addEventListener('ctrl:auth:usernameSet', (e) => {
+    currentUsername = e.detail.username;
+    localStorage.setItem(USERNAME_KEY, currentUsername);
+    updateAuthUI();
+
+    // If user was trying to share, auto-open share modal
+    if (pendingShareAfterUsername !== undefined && pendingShareAfterUsername !== null) {
+      const cat = pendingShareAfterUsername;
+      pendingShareAfterUsername = null;
+      setTimeout(() => openShareModal(cat === '__all__' ? null : cat), 300);
+    }
+  });
+
+  // Menu button clicks from auth module
+  document.addEventListener('ctrl:auth:accountclick', () => {
+    openAccountModal();
+  });
+
+  document.addEventListener('ctrl:auth:settingsclick', () => {
+    openModal(settingsModal);
+  });
 
   function getDeviceInfo() {
     const ua = navigator.userAgent;
     let browser = 'Unknown Browser';
     let os = 'Unknown OS';
-
-    // Detect browser
     if (ua.includes('Firefox')) browser = 'Firefox';
     else if (ua.includes('Edg')) browser = 'Edge';
     else if (ua.includes('Chrome')) browser = 'Chrome';
     else if (ua.includes('Safari')) browser = 'Safari';
-
-    // Detect OS
     if (ua.includes('Windows')) os = 'Windows';
     else if (ua.includes('Mac')) os = 'macOS';
     else if (ua.includes('Linux')) os = 'Linux';
     else if (ua.includes('Android')) os = 'Android';
     else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
-
     return `${browser} on ${os}`;
-  }
-
-  function validateUsername(username) {
-    if (!username) return { valid: false, error: '' };
-    if (username.length < 3) return { valid: false, error: 'At least 3 characters' };
-    if (username.length > 20) return { valid: false, error: 'Max 20 characters' };
-    if (!/^[a-z]/.test(username)) return { valid: false, error: 'Must start with a letter' };
-    if (!/^[a-z][a-z0-9_]*$/.test(username)) return { valid: false, error: 'Only lowercase letters, numbers, underscores' };
-    return { valid: true };
   }
 
   function openAccountModal() {
     if (!currentUser) return;
     accountEmail.textContent = currentUser.email;
     const createdAt = currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      year: 'numeric', month: 'long', day: 'numeric'
     }) : 'Unknown';
     accountCreatedAt.textContent = createdAt;
     accountDevice.textContent = getDeviceInfo();
-
-    // Load username — lock if already set (permanent)
-    accountUsername.value = currentUsername;
-    if (currentUsername) {
-      accountUsername.readOnly = true;
-      accountUsername.style.opacity = '0.6';
-      usernameStatus.textContent = 'Username is permanent';
-      usernameStatus.className = 'username-status';
-    } else {
-      accountUsername.readOnly = false;
-      accountUsername.style.opacity = '';
-      usernameStatus.textContent = '';
-      usernameStatus.className = 'username-status';
-    }
-    usernameSaveBtn.style.display = 'none';
-
+    accountUsername.textContent = currentUsername ? '@' + currentUsername : '—';
     openModal(accountModal);
   }
 
-  // Username input handling with debounced uniqueness check
-  let usernameCheckTimer = null;
-  accountUsername.oninput = () => {
-    const raw = accountUsername.value;
-    const username = raw.toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (username !== raw) accountUsername.value = username;
-
-    const validation = validateUsername(username);
-    if (username && !validation.valid) {
-      usernameStatus.textContent = validation.error;
-      usernameStatus.className = 'username-status username-status--error';
-      usernameSaveBtn.style.display = 'none';
-    } else if (username && username !== currentUsername) {
-      usernameStatus.textContent = 'Checking...';
-      usernameStatus.className = 'username-status';
-      usernameSaveBtn.style.display = 'none';
-      // Debounced uniqueness check
-      clearTimeout(usernameCheckTimer);
-      usernameCheckTimer = setTimeout(() => checkUsernameAvailable(username), 400);
-    } else {
-      usernameStatus.textContent = currentUsername ? '' : '';
-      usernameStatus.className = 'username-status';
-      usernameSaveBtn.style.display = 'none';
-    }
-  };
-
-  async function checkUsernameAvailable(username) {
-    try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/shared_boards?owner_username=eq.${encodeURIComponent(username)}&select=user_id&limit=1`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${getAccessToken()}`
-          }
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        // Available if no results, or only result is current user
-        const taken = data.length > 0 && data[0].user_id !== currentUser?.id;
-        if (accountUsername.value.toLowerCase() !== username) return; // Input changed
-        if (taken) {
-          usernameStatus.textContent = 'Username taken';
-          usernameStatus.className = 'username-status username-status--error';
-          usernameSaveBtn.style.display = 'none';
-        } else {
-          usernameStatus.textContent = 'Username available';
-          usernameStatus.className = 'username-status username-status--success';
-          usernameSaveBtn.style.display = '';
-        }
-      }
-    } catch (e) {
-      // On error, still allow saving (server will catch conflicts)
-      usernameStatus.textContent = 'Username available';
-      usernameStatus.className = 'username-status username-status--success';
-      usernameSaveBtn.style.display = '';
-    }
-  }
-
-  usernameSaveBtn.onclick = async () => {
-    const username = accountUsername.value.toLowerCase();
-    const validation = validateUsername(username);
-    if (!validation.valid) return;
-
-    usernameSaveBtn.disabled = true;
-    usernameSaveBtn.textContent = 'Saving...';
-
-    try {
-      // Persist username to Supabase auth user_metadata (syncs across devices)
-      const { error } = await supabase.auth.updateUser({
-        data: { username: username }
-      });
-      if (error) throw error;
-
-      currentUsername = username;
-      localStorage.setItem(USERNAME_KEY, username);
-      usernameStatus.textContent = 'Username saved!';
-      usernameStatus.className = 'username-status username-status--success';
-      usernameSaveBtn.style.display = 'none';
-      // Lock the input — username is permanent
-      accountUsername.readOnly = true;
-      accountUsername.style.opacity = '0.6';
-      updateAuthUI();
-      toast('Username saved');
-
-      // If user was trying to share, auto-open share modal
-      if (pendingShareAfterUsername !== undefined && pendingShareAfterUsername !== null) {
-        const cat = pendingShareAfterUsername;
-        pendingShareAfterUsername = null;
-        closeModal(accountModal);
-        // Small delay for modal transition
-        setTimeout(() => openShareModal(cat === '__all__' ? null : cat), 300);
-      }
-    } catch (e) {
-      console.error('[username] Save failed:', e);
-      usernameStatus.textContent = 'Failed to save';
-      usernameStatus.className = 'username-status username-status--error';
-    } finally {
-      usernameSaveBtn.disabled = false;
-      usernameSaveBtn.textContent = 'Save Username';
-    }
-  };
-
   accountLogout.onclick = () => {
     closeModal(accountModal);
-    handleLogout();
+    CtrlAuth.signOut();
   };
 
   accountModal.querySelector('[data-close]')?.addEventListener('click', () => closeModal(accountModal));
@@ -20027,33 +19743,16 @@ Return JSON:
       processLinks(addUrl);
     }
 
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange(onAuthStateChange);
+    // Auth is managed by ctrl-auth.js module — check if already signed in
+    const session = CtrlAuth.getSession();
+    console.log('[auth] session:', session ? session.user?.email : 'none');
 
-    // Check if this is a magic link callback (has tokens in hash)
-    const hash = window.location.hash;
-    console.log('[auth] hash:', hash ? 'present' : 'none');
-    if (hash.includes('access_token') || hash.includes('error')) {
-      console.log('[auth] Magic link callback detected, waiting for Supabase...');
-      // Don't clear hash - let Supabase handle it
-    }
-
-    // Revalidate: check session from localStorage (Supabase client hangs)
-    const t1 = performance.now();
-    const session = getStoredSession();
-    console.log(`[perf] getSession: ${(performance.now() - t1).toFixed(0)}ms`);
-    console.log('[auth] session:', session ? session.user.email : 'none');
-
-    if (session) {
+    if (session?.user) {
       currentUser = session.user;
-      // Load username from Supabase user_metadata (persists across devices)
-      const metaUsername = currentUser.user_metadata?.username;
-      if (metaUsername) {
-        currentUsername = metaUsername;
-        localStorage.setItem(USERNAME_KEY, metaUsername);
-      }
+      currentUsername = CtrlAuth.getUsername() || '';
+      if (currentUsername) localStorage.setItem(USERNAME_KEY, currentUsername);
       updateAuthUI();
-      loadAllShares(); // Load user's shared boards
+      loadAllShares();
 
       // Fetch from Supabase and update if different
       const t2 = performance.now();

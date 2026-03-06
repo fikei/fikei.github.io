@@ -19,6 +19,19 @@ struct AuthUser: Codable {
     let email: String?
 }
 
+struct ProfileResponse: Codable {
+    let id: String
+    let username: String?
+    let displayName: String?
+    let avatarUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, username
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+    }
+}
+
 // MARK: - Link
 
 struct LinkPayload: Codable {

@@ -114,6 +114,100 @@ final class SupabaseClient {
         }
     }
 
+    // MARK: - Google OAuth
+
+    /// Builds the Supabase Google OAuth URL for ASWebAuthenticationSession.
+    var googleOAuthURL: URL {
+        var components = URLComponents(string: "\(AppConstants.supabaseURL)/auth/v1/authorize")!
+        components.queryItems = [
+            URLQueryItem(name: "provider", value: "google"),
+            URLQueryItem(name: "redirect_to", value: "\(AppConstants.urlScheme)://auth-callback")
+        ]
+        return components.url!
+    }
+
+    /// Parses access_token and refresh_token from a callback URL fragment.
+    func parseAuthFromCallback(_ url: URL) -> StoredAuth? {
+        let fragment = url.fragment ?? ""
+        var params: [String: String] = [:]
+        fragment.split(separator: "&").forEach { pair in
+            let kv = pair.split(separator: "=", maxSplits: 1)
+            if kv.count == 2 {
+                params[String(kv[0])] = String(kv[1])
+            }
+        }
+
+        guard let accessToken = params["access_token"], !accessToken.isEmpty else {
+            return nil
+        }
+
+        return StoredAuth(
+            accessToken: accessToken,
+            refreshToken: params["refresh_token"],
+            user: nil
+        )
+    }
+
+    // MARK: - Profiles
+
+    /// Fetches the user's profile from the profiles table.
+    func fetchProfile(userId: String) async throws -> ProfileResponse? {
+        let encodedId = userId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? userId
+        var request = makeRequest(
+            path: "/rest/v1/profiles?id=eq.\(encodedId)&select=id,username,display_name,avatar_url",
+            method: "GET"
+        )
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw SupabaseError.requestFailed
+        }
+
+        let profiles = try JSONDecoder().decode([ProfileResponse].self, from: data)
+        return profiles.first
+    }
+
+    /// Checks if a username is available (returns true if available).
+    func checkUsernameAvailable(_ username: String) async throws -> Bool {
+        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
+        var request = makeRequest(
+            path: "/rest/v1/profiles?username=eq.\(encoded)&select=id",
+            method: "GET"
+        )
+        request.setValue("Bearer \(AppConstants.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw SupabaseError.requestFailed
+        }
+
+        let results = try JSONDecoder().decode([[String: String]].self, from: data)
+        return results.isEmpty
+    }
+
+    /// Sets the username in the user's profile row.
+    func setUsername(_ username: String, userId: String) async throws {
+        guard let token = accessToken else {
+            throw SupabaseError.notAuthenticated
+        }
+
+        let encodedId = userId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? userId
+        var request = makeRequest(
+            path: "/rest/v1/profiles?id=eq.\(encodedId)",
+            method: "PATCH"
+        )
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["username": username])
+
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw SupabaseError.usernameSaveFailed
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeRequest(path: String, method: String) -> URLRequest {
@@ -138,6 +232,8 @@ enum SupabaseError: LocalizedError {
     case requestFailed
     case enrichmentFailed
     case magicLinkFailed
+    case googleAuthFailed
+    case usernameSaveFailed
 
     var errorDescription: String? {
         switch self {
@@ -145,6 +241,8 @@ enum SupabaseError: LocalizedError {
         case .requestFailed: return "Failed to save link"
         case .enrichmentFailed: return "Failed to enrich link"
         case .magicLinkFailed: return "Failed to send magic link"
+        case .googleAuthFailed: return "Google sign-in failed"
+        case .usernameSaveFailed: return "Failed to save username"
         }
     }
 }
