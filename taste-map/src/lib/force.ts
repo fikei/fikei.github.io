@@ -1,5 +1,6 @@
 // ============================================
 // Force Simulation — 3D force-directed layout
+// Supports proximity mode for similarity-driven placement
 // ============================================
 
 import type { GraphNode, GraphEdge } from './types';
@@ -10,9 +11,17 @@ export interface Simulation {
   nodes: GraphNode[];
 }
 
-const K_REPEL = 6000;
-const K_SPRING = 0.08;
-const K_CENTER = 0.01;
+export interface SimulationOptions {
+  proximityMode?: boolean;
+}
+
+// Force configs — proximity mode tightens springs and weakens repulsion
+// so cosine similarity becomes the dominant positioning force
+const FORCE_CONFIG = {
+  default:   { repel: 6000, spring: 0.08, center: 0.01, restBase: 200, restScale: 120 },
+  proximity: { repel: 2500, spring: 0.15, center: 0.015, restBase: 120, restScale: 100 },
+} as const;
+
 const DAMPING = 0.85;
 const MIN_DISTANCE = 1;
 const SETTLED_THRESHOLD = 0.5;
@@ -40,12 +49,12 @@ function initialAngle(category: string, index: number, total: number): number {
   return index * 2.399963;
 }
 
-function placeNodes(nodes: GraphNode[], width: number, height: number): void {
+/** Default placement: category-sector arcs on XY plane */
+function placeNodesBySector(nodes: GraphNode[], width: number, height: number): void {
   const cx = width / 2;
   const cy = height / 2;
   const cz = 0;
 
-  // Count how many nodes per category for arc distribution
   const categoryCount: Record<string, number> = {};
   const categoryIndex: Record<string, number> = {};
   for (const node of nodes) {
@@ -54,7 +63,7 @@ function placeNodes(nodes: GraphNode[], width: number, height: number): void {
   }
 
   const radius = Math.min(width, height) * 0.35;
-  const zSpread = radius * 0.5; // flatter spread on z
+  const zSpread = radius * 0.5;
 
   for (const node of nodes) {
     const cat = node.cluster.dominantCategory ?? 'uncategorized';
@@ -73,14 +82,46 @@ function placeNodes(nodes: GraphNode[], width: number, height: number): void {
   }
 }
 
+/** Proximity placement: golden-angle spiral on a sphere — even distribution */
+function placeNodesOnSphere(nodes: GraphNode[], width: number, height: number): void {
+  const cx = width / 2;
+  const cy = height / 2;
+  const cz = 0;
+  const radius = Math.min(width, height) * 0.3;
+  const n = nodes.length;
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.399963 radians
+
+  for (let i = 0; i < n; i++) {
+    // Fibonacci sphere: even distribution on a sphere surface
+    const yNorm = 1 - (2 * i + 1) / n; // -1 to 1
+    const ringRadius = Math.sqrt(1 - yNorm * yNorm);
+    const theta = goldenAngle * i;
+
+    nodes[i].x = cx + Math.cos(theta) * ringRadius * radius;
+    nodes[i].y = cy + yNorm * radius;
+    nodes[i].z = cz + Math.sin(theta) * ringRadius * radius;
+    nodes[i].vx = 0;
+    nodes[i].vy = 0;
+    nodes[i].vz = 0;
+  }
+}
+
 export function createSimulation(
   nodes: GraphNode[],
   edges: GraphEdge[],
   width: number,
-  height: number
+  height: number,
+  options?: SimulationOptions
 ): Simulation {
+  const proximity = options?.proximityMode ?? false;
+  const cfg = proximity ? FORCE_CONFIG.proximity : FORCE_CONFIG.default;
+
   // Place nodes in initial 3D positions
-  placeNodes(nodes, width, height);
+  if (proximity) {
+    placeNodesOnSphere(nodes, width, height);
+  } else {
+    placeNodesBySector(nodes, width, height);
+  }
 
   const cx = width / 2;
   const cy = height / 2;
@@ -116,7 +157,7 @@ export function createSimulation(
         const dy = nodes[j].y - nodes[i].y;
         const dz = nodes[j].z - nodes[i].z;
         const dist = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), MIN_DISTANCE);
-        const force = K_REPEL / (dist * dist);
+        const force = cfg.repel / (dist * dist);
         const nx = (dx / dist) * force;
         const ny = (dy / dist) * force;
         const nz = (dz / dist) * force;
@@ -140,9 +181,9 @@ export function createSimulation(
         const dy = nodes[j].y - nodes[i].y;
         const dz = nodes[j].z - nodes[i].z;
         const dist = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), MIN_DISTANCE);
-        const targetLen = 200 - weight * 120;
+        const targetLen = cfg.restBase - weight * cfg.restScale;
         const displacement = dist - targetLen;
-        const force = K_SPRING * displacement;
+        const force = cfg.spring * displacement;
         const nx = (dx / dist) * force;
         const ny = (dy / dist) * force;
         const nz = (dz / dist) * force;
@@ -157,9 +198,9 @@ export function createSimulation(
 
     // 3. Centering force
     for (let i = 0; i < n; i++) {
-      fx[i] += (cx - nodes[i].x) * K_CENTER;
-      fy[i] += (cy - nodes[i].y) * K_CENTER;
-      fz[i] += (cz - nodes[i].z) * K_CENTER;
+      fx[i] += (cx - nodes[i].x) * cfg.center;
+      fy[i] += (cy - nodes[i].y) * cfg.center;
+      fz[i] += (cz - nodes[i].z) * cfg.center;
     }
 
     // 4. Integrate with damping

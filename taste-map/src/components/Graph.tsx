@@ -12,6 +12,7 @@ interface GraphProps {
   edges: GraphEdge[];
   pins: Pin[];
   insights: Insights;
+  proximityMode: boolean;
   onSelectCluster: (id: string | null) => void;
   selectedCluster: string | null;
   highlightedMotif: string | null;
@@ -44,6 +45,7 @@ function GraphScene({
   clusters,
   edges,
   insights: _insights,
+  proximityMode,
   onSelectCluster,
   selectedCluster,
   highlightedMotif,
@@ -65,7 +67,7 @@ function GraphScene({
     const width = 800;
     const height = 600;
     const graphNodes = clustersToNodes(clusters);
-    const sim = createSimulation(graphNodes, edges, width, height);
+    const sim = createSimulation(graphNodes, edges, width, height, { proximityMode });
     simRef.current = sim;
 
     // Center the sim around origin for Three.js (shift by -cx, -cy)
@@ -98,7 +100,7 @@ function GraphScene({
 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [clusters, edges]);
+  }, [clusters, edges, proximityMode]);
 
   // Fit camera to node cloud when simulation settles
   useEffect(() => {
@@ -262,6 +264,7 @@ export function Graph(props: GraphProps) {
         clusters={props.clusters}
         edges={props.edges}
         insights={props.insights}
+        proximityMode={props.proximityMode}
         onSelectCluster={props.onSelectCluster}
         selectedCluster={props.selectedCluster}
         highlightedMotif={props.highlightedMotif}
