@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const VERSION = '0.3.0'
-console.log(`[taste-graph] v${VERSION} - Sonnet 4, block brands/creators, uplevel to concepts`)
+const VERSION = '0.4.0'
+console.log(`[taste-graph] v${VERSION} - richer cluster objects, soft clustering, more granular labels`)
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
@@ -17,6 +17,9 @@ interface ClusterInput {
   representativeTitle: string
   dominantCategory: string
   pinCount: number
+  topDomains?: string[]
+  tags?: string[]
+  categoryBreakdown?: string
 }
 
 interface ClusterDescription {
@@ -96,14 +99,19 @@ serve(async (req) => {
     if (ANTHROPIC_API_KEY) {
       try {
         const clusterDesc = clusters
-          .map(c => [
-            `id: "${c.id}"`,
-            `tokens: [${c.topTokens.join(', ')}]`,
-            `representative: "${c.representativeTitle || c.sampleTitles[0] || ''}"`,
-            `samples: [${c.sampleTitles.slice(0, 8).join(' | ')}]`,
-            `category: ${c.dominantCategory}`,
-            `pins: ${c.pinCount}`,
-          ].join(', '))
+          .map(c => {
+            const lines = [
+              `id: "${c.id}"`,
+              `tokens: [${c.topTokens.join(', ')}]`,
+              `representative: "${c.representativeTitle || c.sampleTitles[0] || ''}"`,
+              `samples: [${c.sampleTitles.slice(0, 10).join(' | ')}]`,
+              `category: ${c.categoryBreakdown || c.dominantCategory}`,
+              `pins: ${c.pinCount}`,
+            ]
+            if (c.topDomains?.length) lines.push(`sources: [${c.topDomains.join(', ')}]`)
+            if (c.tags?.length) lines.push(`tags: [${c.tags.slice(0, 8).join(', ')}]`)
+            return lines.join(', ')
+          })
           .join('\n')
 
         const labelPrompt = `You are a taste profiler. A user saved hundreds of links over time. We clustered them by embedding similarity. Your job: name the CULTURAL SENSIBILITY behind each cluster.
@@ -112,6 +120,10 @@ HOW TO READ THE DATA:
 - tokens: TF-IDF terms from pin titles/tags. Proper nouns (brand names, artist names, domain names like "bandcamp", "pitchfork", "nike") are OBJECT ANCHORS — ignore them when choosing a label. Focus on descriptive tokens (adjectives, genres, aesthetic words) for the underlying sensibility.
 - representative: The single pin closest to the cluster center — highest-signal example.
 - samples: Literal pin titles. Use them to understand WHAT is saved, then ask: what sensibility connects ALL of these?
+- sources: Website domains where content was saved from. Useful context but NEVER reference these in labels.
+- tags: User-applied or AI-generated tags. Strong signal for the aesthetic/genre.
+- category: May show breakdown like "wear(5), home(3)" for cross-category clusters. These are especially interesting — find the sensibility that bridges the categories.
+- NOTE: Pins can appear in multiple clusters. Some clusters overlap intentionally. Each cluster should still have a distinct label.
 
 LABELING RULES:
 Think of how niche music genres work: "dark ambient", "lo-fi hip hop", "progressive house", "midwest emo". These are specific enough to search for and find more of, but abstract enough to capture a sensibility beyond any single track. Apply that same logic to every domain.
@@ -145,7 +157,7 @@ ${clusterDesc}
 Respond with ONLY valid JSON:
 {"clusters": [{"id": "c0", "reasoning": "brief note about the sensibility", "label": "Actionable Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
 
-        const labelText = await callAnthropic(labelPrompt, 2000)
+        const labelText = await callAnthropic(labelPrompt, 4000)
         const parsed = parseJSON(labelText) as { clusters: Array<LabeledCluster & { reasoning?: string }> }
         // Strip reasoning scratchpad before returning to client
         labeledClusters = (parsed.clusters || []).map(({ reasoning, ...rest }) => rest)

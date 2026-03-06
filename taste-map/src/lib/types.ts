@@ -79,6 +79,10 @@ export interface Cluster {
   domain: string;
   description?: ClusterDescription;
   drillable: boolean;
+  // Richer context (for LLM labeling)
+  topDomains?: string[];
+  tags?: string[];
+  categoryBreakdown?: string;
 }
 
 export interface GraphEdge {
@@ -125,6 +129,10 @@ export interface ClusterInput {
   representativeTitle: string;
   dominantCategory: string;
   pinCount: number;
+  // Richer context for LLM
+  topDomains?: string[];
+  tags?: string[];
+  categoryBreakdown?: string;
 }
 
 export interface LabeledCluster {
