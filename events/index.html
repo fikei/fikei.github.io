@@ -231,6 +231,39 @@ body {
   color: var(--fg-default);
 }
 
+/* Recommendation sign-in prompt (unauthenticated users) */
+.rec-signin-prompt {
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  max-width: 480px;
+}
+.rec-signin-prompt__text {
+  font-size: var(--text-xs);
+  color: var(--fg-default);
+  margin: 0 0 var(--space-2) 0;
+}
+.rec-signin-prompt__how {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.5;
+}
+.rec-signin-prompt__btn {
+  font-size: var(--text-2xs);
+  color: var(--fg-default);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rec-signin-prompt__btn:hover {
+  background: var(--bg-subtle);
+}
+
 /* Table overrides — column widths */
 .data-table-wrap { margin-bottom: var(--space-8); }
 .data-table th { font-size: var(--text-2xs); }
@@ -2337,7 +2370,7 @@ body {
     try {
       const { data: healthRows } = await supabaseClient
         .from('source_health')
-        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes, outcomes_seen, repair_attempted_at, repair_strategy, repair_result')
+        .select('source_id, status, consecutive_failures, success_rate, last_failure_reason, last_failure_at, last_success_at, last_success_event_count, zero_result_count, total_scrapes, outcomes_seen, repair_attempted_at, repair_strategy, repair_result, config_overrides')
         .in('source_id', enabledIds);
 
       if (!healthRows) return;
@@ -2347,18 +2380,13 @@ body {
         state.sourceHealth[row.source_id] = row;
       });
 
-      // Restore successful overrides from previous repair results
+      // Restore permanent config overrides from previous successful repairs
       state.sources.forEach(source => {
         const health = state.sourceHealth[source.id];
-        if (!health?.repair_result) return;
-        try {
-          const repairData = JSON.parse(health.repair_result);
-          const age = Date.now() - new Date(repairData.timestamp).getTime();
-          if (age < 30 * 86400000 && repairData.success && repairData.appliedOverrides) {
-            source.overrides = repairData.appliedOverrides;
-            log(`Restored overrides for "${source.name}": ${JSON.stringify(source.overrides)}`);
-          }
-        } catch (e) { /* ignore malformed repair_result */ }
+        if (health?.config_overrides && typeof health.config_overrides === 'object') {
+          source.overrides = health.config_overrides;
+          log(`Restored config overrides for "${source.name}": ${JSON.stringify(source.overrides)}`);
+        }
       });
 
       log(`Source health loaded: ${healthRows.length} sources — ` +
@@ -2488,11 +2516,17 @@ body {
   async function reportRepairResult(sourceId, strategy, result) {
     if (!supabaseClient) return;
     try {
-      await supabaseClient.from('source_health').update({
+      const updateData = {
         repair_attempted_at: new Date().toISOString(),
         repair_strategy: strategy,
         repair_result: JSON.stringify(result),
-      }).eq('source_id', sourceId);
+      };
+      // Persist successful overrides permanently in config_overrides
+      if (result.success && result.appliedOverrides) {
+        updateData.config_overrides = result.appliedOverrides;
+        log(`Auto-repair: saving config_overrides for "${sourceId}": ${JSON.stringify(result.appliedOverrides)}`);
+      }
+      await supabaseClient.from('source_health').update(updateData).eq('source_id', sourceId);
       log(`Auto-repair: reported result for "${sourceId}": strategy=${strategy} success=${result.success}`);
     } catch (e) {
       log(`Auto-repair: failed to report result: ${e.message}`);
@@ -2734,6 +2768,20 @@ body {
     showRepairResults(results);
     // Reload health to get updated status after repairs (skipRepair=true to avoid infinite loop)
     await loadSourceHealth(true);
+
+    // Override DB status for sources that were just repaired — DB hasn't processed
+    // the successful scrape yet, so it still says "broken". Apply green locally.
+    const repairedIds = results.filter(r => r.success).map(r => r.sourceId);
+    if (repairedIds.length > 0) {
+      repairedIds.forEach(id => {
+        if (state.sourceHealth[id]) {
+          state.sourceHealth[id].status = 'healthy';
+          state.sourceHealth[id].consecutive_failures = 0;
+        }
+      });
+      renderSourceChips();
+      log(`Auto-repair: marked ${repairedIds.length} repaired source(s) as healthy`);
+    }
     log(`Auto-repair: complete — ${results.filter(r => r.success).length}/${results.length} succeeded`);
   }
 
@@ -2761,11 +2809,11 @@ body {
     });
   }
 
-  async function resetRepairAttempts() {
+  window.resetRepairAttempts = async function resetRepairAttempts() {
     if (!supabaseClient) { log('Reset repairs: no Supabase client'); return; }
     try {
       const { error } = await supabaseClient.from('source_health')
-        .update({ repair_attempted_at: null, repair_result: null, repair_strategy: null })
+        .update({ repair_attempted_at: null, repair_result: null, repair_strategy: null, config_overrides: null })
         .not('repair_attempted_at', 'is', null);
       if (error) throw error;
       state.repairedThisSession.clear();
@@ -2929,7 +2977,7 @@ body {
     const variables = {
       filters: { areas: { eq: source.overrides?.areaId || areaId }, listingDate: { gte: today, lte: endDate } },
       filterOptions: { eventType: true, genre: true },
-      page: 1, pageSize: source.overrides?.pageSize || 200,
+      page: 1, pageSize: source.overrides?.pageSize || 100,
     };
 
     // Strategy 1: GraphQL via edge function (server-side POST proxy)
@@ -5478,6 +5526,21 @@ body {
 
   async function loadRecommendedEvents() {
     try {
+      const section = document.getElementById('recommendedSection');
+      const container = document.getElementById('recommendedCards');
+
+      // Recommendations require authentication
+      if (!currentUser) {
+        container.innerHTML =
+          '<div class="rec-signin-prompt">' +
+            '<p class="rec-signin-prompt__text">Sign in to get personalized event recommendations based on your Boards.</p>' +
+            '<p class="rec-signin-prompt__how">Recommendations analyze your saved links — artists, genres, categories, and keywords — then use AI to match upcoming events to your taste profile.</p>' +
+            '<button class="rec-signin-prompt__btn" onclick="document.getElementById(\'authLoginBtn\').click()">Sign in</button>' +
+          '</div>';
+        section.style.display = '';
+        return;
+      }
+
       const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
@@ -5541,8 +5604,6 @@ body {
       if (!result.events || result.events.length === 0) return;
 
       const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const container = document.getElementById('recommendedCards');
-      const section = document.getElementById('recommendedSection');
 
       container.innerHTML = result.events.map(function(evt) {
         const d = new Date(evt.date + 'T00:00:00');
