@@ -1,4 +1,4 @@
-// ConceptDetail — right-side panel with three-part Co-Star descriptions
+// ConceptDetail — right-side panel with story-length descriptions + pin links
 import type { Cluster, Pin } from '../lib/types';
 
 interface ConceptDetailProps {
@@ -16,27 +16,25 @@ export function ConceptDetail({
   cluster,
   pins,
   totalPins,
-  relatedClusters,
   drillDepth,
   onClose,
-  onSelectCluster,
   onDrillIn,
 }: ConceptDetailProps) {
   const pct = ((cluster.pinCount / totalPins) * 100).toFixed(0);
   const depthMarker = Array.from({ length: drillDepth + 1 }, () => '//').join('');
 
-  // Sample titles from cluster pins
-  const clusterPins = pins.filter(p => cluster.pinIds.includes(p.id));
-  const sampleTitles = cluster.sampleTitles.length > 0
-    ? cluster.sampleTitles
-    : clusterPins.slice(0, 5).map(p => p.title);
+  // Get actual pin objects for this cluster, sorted by title
+  const clusterPins = pins
+    .filter(p => cluster.pinIds.includes(p.id))
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .slice(0, 10);
 
   return (
     <div className="tg-detail tg-detail--visible">
       <div className="tg-detail__depth">{depthMarker}</div>
       <div className="tg-detail__label">{cluster.label.toUpperCase()}</div>
 
-      {/* Three-part Co-Star description */}
+      {/* Three-part description (story-length) */}
       {cluster.description && (
         <>
           <div className="tg-detail__section-header">{'\u2500\u2500'} WHAT IT IS</div>
@@ -54,61 +52,22 @@ export function ConceptDetail({
         {cluster.pinCount} ITEMS &middot; {pct}% OF SAVES
       </div>
 
-      {/* Source breakdown — only shown for clusters with YouTube data */}
-      {cluster.sourceBreakdown && cluster.sourceBreakdown.youtube > 0 && (
+      {/* Pins */}
+      {clusterPins.length > 0 && (
         <>
-          <div className="tg-detail__section-header">{'\u2500\u2500'} SOURCES</div>
-          <div className="tg-detail__source-row">
-            {cluster.sourceBreakdown.manual > 0 && (
-              <span className="tg-detail__source-label">
-                SAVED: <span className="tg-detail__source-count">{cluster.sourceBreakdown.manual}</span>
-              </span>
-            )}
-            <span className="tg-detail__source-label">
-              YOUTUBE: <span className="tg-detail__source-count">{cluster.sourceBreakdown.youtube}</span>
-              <span className="tg-detail__source-badge">IMPORTED</span>
-            </span>
-          </div>
-        </>
-      )}
-
-      {/* Tokens */}
-      {cluster.topTokens.length > 0 && (
-        <>
-          <div className="tg-detail__section-header">{'\u2500\u2500'} TOKENS</div>
-          <div className="tg-detail__chips">
-            {cluster.topTokens.slice(0, 8).map(token => (
-              <span key={token} className="tg-chip tg-chip--token">{token}</span>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Sample saves */}
-      {sampleTitles.length > 0 && (
-        <>
-          <div className="tg-detail__section-header">{'\u2500\u2500'} SAMPLE SAVES</div>
-          {sampleTitles.slice(0, 5).map((title, i) => (
-            <div key={i} className="tg-detail__sample">{title}</div>
+          <div className="tg-detail__section-header">{'\u2500\u2500'} PINS</div>
+          {clusterPins.map(pin => (
+            <a
+              key={pin.id}
+              href={pin.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tg-detail__pin"
+            >
+              <span className="tg-detail__pin-title">{pin.title}</span>
+              <span className="tg-detail__pin-domain">{pin.domain}</span>
+            </a>
           ))}
-        </>
-      )}
-
-      {/* Connected clusters */}
-      {relatedClusters.length > 0 && (
-        <>
-          <div className="tg-detail__section-header">{'\u2500\u2500'} CONNECTED</div>
-          <div className="tg-detail__chips">
-            {relatedClusters.map(rc => (
-              <button
-                key={rc.id}
-                className="tg-chip tg-chip--related"
-                onClick={() => onSelectCluster(rc.id)}
-              >
-                {rc.label.toUpperCase()}
-              </button>
-            ))}
-          </div>
         </>
       )}
 

@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const VERSION = '0.5.0'
-console.log(`[taste-graph] v${VERSION} - parallel API calls, haiku for insights, faster response`)
+const VERSION = '0.6.0'
+console.log(`[taste-graph] v${VERSION} - story-length descriptions, parallel calls`)
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
@@ -140,12 +140,13 @@ BAD (too abstract/poetic): "Archive Fever", "Patient Frame", "Slow Frequencies"
 GOOD (actionable taste identities): "Dark Industrial Techno", "Warm Scandinavian Minimalism", "Raw Concrete Interiors", "Methodical Italian Cooking", "Functional Techwear"
 
 DESCRIPTION RULES:
-Write like a knowledgeable friend — specific, concrete, grounded. Not poetic.
-CRITICAL: Each field must be ONE SHORT sentence, STRICTLY under 15 words. No exceptions. If your sentence is over 15 words, cut it shorter.
-- "whatItIs": lowercase, under 15 words. The shared aesthetic — name materials, moods, references.
-- "whyYou": lowercase, under 15 words, 2nd person "you". The instinct or values behind this taste.
-- "howItChanged": lowercase, under 15 words. How this taste deepens or evolves.
-Do NOT start with "you are drawn to" or "you gravitate toward". Be direct.
+Write like a knowledgeable friend telling a short story about this corner of someone's taste. Specific, concrete, grounded — not poetic or vague.
+Each field should be 2-3 sentences, roughly 30-50 words. Write in flowing lowercase prose.
+Speak with specificity — name materials, subgenres, eras, techniques, moods, textures. The reader should feel recognized.
+- "whatItIs": lowercase. Describe the shared aesthetic as a scene or sensibility. Name the materials, moods, references, and eras that tie these saves together.
+- "whyYou": lowercase, 2nd person "you". Tell the story of the instinct behind this taste — what drives the collecting, what need it fills, what it says about how you move through the world.
+- "howItChanged": lowercase. Describe how this taste deepens or evolves over time — what started as casual interest becomes something more specific, more refined, more personal.
+Do NOT start with "you are drawn to" or "you gravitate toward". Be direct and varied in your openings.
 Do NOT mention any brand, artist, creator, or platform by name. Use concepts instead.
 
 PROCESS: For each cluster, first write a brief "reasoning" field where you identify the core sensibility. Then derive the label and descriptions from that reasoning.
@@ -179,7 +180,7 @@ Respond with ONLY a JSON object:
 
       // Fire both in parallel — insights uses Haiku for speed
       const [labelResult, insightResult] = await Promise.allSettled([
-        callAnthropic(labelPrompt, 2000),
+        callAnthropic(labelPrompt, 3000),
         callAnthropic(insightPrompt, 500, 'claude-3-5-haiku-20241022'),
       ])
 
