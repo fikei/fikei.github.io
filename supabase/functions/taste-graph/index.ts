@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const VERSION = '0.2.0'
-console.log(`[taste-graph] v${VERSION} - genre-style labels, reasoning scratchpad, tighter descriptions`)
+const VERSION = '0.3.0'
+console.log(`[taste-graph] v${VERSION} - Sonnet 4, block brands/creators, uplevel to concepts`)
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
@@ -63,7 +63,7 @@ async function callAnthropic(prompt: string, maxTokens: number): Promise<string>
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -118,6 +118,10 @@ Think of how niche music genres work: "dark ambient", "lo-fi hip hop", "progress
 
 Labels should be 2-5 words, title case. They should be ACTIONABLE — someone could use the label to find more things that match this taste. They should describe the sensibility, not the object category.
 
+NEVER USE brand names, artist names, creator names, platform names, or proper nouns in labels or descriptions. Uplevel to the concept.
+BAD: "Nike Sneaker Culture", "Brian Eno Ambient", "Patagonia Outdoors", "A24 Cinema", "Rick Owens Aesthetic"
+GOOD: "Retro Hype Sneakers", "Generative Ambient Drift", "Technical Alpine Gear", "Slow Arthouse Cinema", "Monastic Drape Fashion"
+
 BAD (object categories): "Running Shoes", "Pasta Recipes", "Techno Music", "Modern Furniture"
 BAD (too abstract/poetic): "Archive Fever", "Patient Frame", "Slow Frequencies"
 GOOD (actionable taste identities): "Dark Industrial Techno", "Warm Scandinavian Minimalism", "Raw Concrete Interiors", "Methodical Italian Cooking", "Functional Techwear"
@@ -129,6 +133,7 @@ CRITICAL: Each field must be ONE SHORT sentence, STRICTLY under 15 words. No exc
 - "whyYou": lowercase, under 15 words, 2nd person "you". The instinct or values behind this taste.
 - "howItChanged": lowercase, under 15 words. How this taste deepens or evolves.
 Do NOT start with "you are drawn to" or "you gravitate toward". Be direct.
+Do NOT mention any brand, artist, creator, or platform by name. Use concepts instead.
 
 PROCESS: For each cluster, first write a brief "reasoning" field where you identify the core sensibility. Then derive the label and descriptions from that reasoning.
 
