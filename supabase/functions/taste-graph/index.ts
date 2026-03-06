@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const VERSION = '0.4.0'
-console.log(`[taste-graph] v${VERSION} - richer cluster objects, soft clustering, more granular labels`)
+const VERSION = '0.5.0'
+console.log(`[taste-graph] v${VERSION} - parallel API calls, haiku for insights, faster response`)
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
@@ -57,7 +57,7 @@ function parseJSON(text: string): unknown {
   return JSON.parse(cleaned)
 }
 
-async function callAnthropic(prompt: string, maxTokens: number): Promise<string> {
+async function callAnthropic(prompt: string, maxTokens: number, model = 'claude-sonnet-4-20250514'): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -66,7 +66,7 @@ async function callAnthropic(prompt: string, maxTokens: number): Promise<string>
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -93,28 +93,29 @@ serve(async (req) => {
       throw new Error('clusters array is required')
     }
 
-    // --- Call 1: Label clusters ---
+    // Build cluster description string (shared by both prompts)
+    const clusterDesc = clusters
+      .map(c => {
+        const lines = [
+          `id: "${c.id}"`,
+          `tokens: [${c.topTokens.join(', ')}]`,
+          `representative: "${c.representativeTitle || c.sampleTitles[0] || ''}"`,
+          `samples: [${c.sampleTitles.slice(0, 10).join(' | ')}]`,
+          `category: ${c.categoryBreakdown || c.dominantCategory}`,
+          `pins: ${c.pinCount}`,
+        ]
+        if (c.topDomains?.length) lines.push(`sources: [${c.topDomains.join(', ')}]`)
+        if (c.tags?.length) lines.push(`tags: [${c.tags.slice(0, 8).join(', ')}]`)
+        return lines.join(', ')
+      })
+      .join('\n')
+
+    // --- Run BOTH calls in parallel ---
     let labeledClusters: LabeledCluster[]
+    let insights: Insights = { motifs: [], bridges: [] }
 
     if (ANTHROPIC_API_KEY) {
-      try {
-        const clusterDesc = clusters
-          .map(c => {
-            const lines = [
-              `id: "${c.id}"`,
-              `tokens: [${c.topTokens.join(', ')}]`,
-              `representative: "${c.representativeTitle || c.sampleTitles[0] || ''}"`,
-              `samples: [${c.sampleTitles.slice(0, 10).join(' | ')}]`,
-              `category: ${c.categoryBreakdown || c.dominantCategory}`,
-              `pins: ${c.pinCount}`,
-            ]
-            if (c.topDomains?.length) lines.push(`sources: [${c.topDomains.join(', ')}]`)
-            if (c.tags?.length) lines.push(`tags: [${c.tags.slice(0, 8).join(', ')}]`)
-            return lines.join(', ')
-          })
-          .join('\n')
-
-        const labelPrompt = `You are a taste profiler. A user saved hundreds of links over time. We clustered them by embedding similarity. Your job: name the CULTURAL SENSIBILITY behind each cluster.
+      const labelPrompt = `You are a taste profiler. A user saved hundreds of links over time. We clustered them by embedding similarity. Your job: name the CULTURAL SENSIBILITY behind each cluster.
 
 HOW TO READ THE DATA:
 - tokens: TF-IDF terms from pin titles/tags. Proper nouns (brand names, artist names, domain names like "bandcamp", "pitchfork", "nike") are OBJECT ANCHORS — ignore them when choosing a label. Focus on descriptive tokens (adjectives, genres, aesthetic words) for the underlying sensibility.
@@ -157,13 +158,48 @@ ${clusterDesc}
 Respond with ONLY valid JSON:
 {"clusters": [{"id": "c0", "reasoning": "brief note about the sensibility", "label": "Actionable Label", "domain": "music", "description": {"whatItIs": "...", "whyYou": "...", "howItChanged": "..."}}, ...]}`
 
-        const labelText = await callAnthropic(labelPrompt, 4000)
-        const parsed = parseJSON(labelText) as { clusters: Array<LabeledCluster & { reasoning?: string }> }
-        // Strip reasoning scratchpad before returning to client
-        labeledClusters = (parsed.clusters || []).map(({ reasoning, ...rest }) => rest)
-      } catch (e) {
-        console.error('Label call failed:', e)
-        // Fallback: auto-labels from top tokens
+      // Insights prompt uses raw cluster data (doesn't need labels)
+      const insightDesc = clusters
+        .map(c => `- "${c.topTokens.slice(0, 3).join(' ')}" (${c.dominantCategory}, ${c.pinCount} pins, tokens: ${c.topTokens.slice(0, 5).join(', ')})`)
+        .join('\n')
+
+      const insightPrompt = `Given these clusters of a user's saved content, identify patterns:
+
+Clusters:
+${insightDesc}
+
+Identify:
+1. motifs: Top 3 themes that appear across 3+ clusters (single words or short phrases)
+2. bridges: Top 2 unexpected connections between clusters from different domains, with a short reason
+3. fastestGrowing: Which cluster seems most active (guess from pin count)
+4. mostDistinctive: Which cluster is most unique (fewest shared tokens with others)
+
+Respond with ONLY a JSON object:
+{"motifs": ["theme1", "theme2", "theme3"], "bridges": [{"clusterA": "cluster desc", "clusterB": "cluster desc", "reason": "short reason"}], "fastestGrowing": "cluster desc", "mostDistinctive": "cluster desc"}`
+
+      // Fire both in parallel — insights uses Haiku for speed
+      const [labelResult, insightResult] = await Promise.allSettled([
+        callAnthropic(labelPrompt, 2000),
+        callAnthropic(insightPrompt, 500, 'claude-3-5-haiku-20241022'),
+      ])
+
+      // Process labels
+      if (labelResult.status === 'fulfilled') {
+        try {
+          const parsed = parseJSON(labelResult.value) as { clusters: Array<LabeledCluster & { reasoning?: string }> }
+          labeledClusters = (parsed.clusters || []).map(({ reasoning, ...rest }) => rest)
+        } catch (e) {
+          console.error('Label parse failed:', e)
+          labeledClusters = clusters.map(c => ({
+            id: c.id,
+            label: c.topTokens.length > 0
+              ? c.topTokens.slice(0, 2).map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' ')
+              : `Cluster`,
+            domain: 'other',
+          }))
+        }
+      } else {
+        console.error('Label call failed:', labelResult.reason)
         labeledClusters = clusters.map(c => ({
           id: c.id,
           label: c.topTokens.length > 0
@@ -171,6 +207,19 @@ Respond with ONLY valid JSON:
             : `Cluster`,
           domain: 'other',
         }))
+      }
+
+      // Process insights
+      if (insightResult.status === 'fulfilled') {
+        try {
+          insights = parseJSON(insightResult.value) as Insights
+          insights.motifs = insights.motifs || []
+          insights.bridges = insights.bridges || []
+        } catch (e) {
+          console.error('Insight parse failed (non-fatal):', e)
+        }
+      } else {
+        console.error('Insight call failed (non-fatal):', insightResult.reason)
       }
     } else {
       // No API key — auto-labels
@@ -181,43 +230,6 @@ Respond with ONLY valid JSON:
           : `Cluster`,
         domain: 'other',
       }))
-    }
-
-    // --- Call 2: Insights (can fail gracefully) ---
-    let insights: Insights = { motifs: [], bridges: [] }
-
-    if (ANTHROPIC_API_KEY) {
-      try {
-        const labeledDesc = labeledClusters
-          .map(lc => {
-            const orig = clusters.find(c => c.id === lc.id)
-            return `- "${lc.label}" (${lc.domain}, ${orig?.pinCount || 0} pins, tokens: ${orig?.topTokens.slice(0, 5).join(', ') || 'none'})`
-          })
-          .join('\n')
-
-        const insightPrompt = `Given these labeled clusters of a user's saved content, identify patterns:
-
-Clusters:
-${labeledDesc}
-
-Identify:
-1. motifs: Top 3 themes that appear across 3+ clusters (single words or short phrases)
-2. bridges: Top 2 unexpected connections between clusters from different domains, with a short reason
-3. fastestGrowing: Which cluster label seems most active (guess from pin count)
-4. mostDistinctive: Which cluster is most unique (fewest shared tokens with others)
-
-Respond with ONLY a JSON object:
-{"motifs": ["theme1", "theme2", "theme3"], "bridges": [{"clusterA": "Label A", "clusterB": "Label B", "reason": "short reason"}], "fastestGrowing": "Label", "mostDistinctive": "Label"}`
-
-        const insightText = await callAnthropic(insightPrompt, 500)
-        insights = parseJSON(insightText) as Insights
-        // Ensure arrays exist
-        insights.motifs = insights.motifs || []
-        insights.bridges = insights.bridges || []
-      } catch (e) {
-        console.error('Insight call failed (non-fatal):', e)
-        insights = { motifs: [], bridges: [] }
-      }
     }
 
     return new Response(
