@@ -230,6 +230,39 @@ body {
   color: var(--fg-default);
 }
 
+/* Recommendation sign-in prompt (unauthenticated users) */
+.rec-signin-prompt {
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  max-width: 480px;
+}
+.rec-signin-prompt__text {
+  font-size: var(--text-xs);
+  color: var(--fg-default);
+  margin: 0 0 var(--space-2) 0;
+}
+.rec-signin-prompt__how {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.5;
+}
+.rec-signin-prompt__btn {
+  font-size: var(--text-2xs);
+  color: var(--fg-default);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rec-signin-prompt__btn:hover {
+  background: var(--bg-subtle);
+}
+
 /* Table overrides — column widths */
 .data-table-wrap { margin-bottom: var(--space-8); }
 .data-table th { font-size: var(--text-2xs); }
@@ -1576,8 +1609,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.5.3';
-  console.log(`[events] v${VERSION} - move health banners to fetch log, revert pageSize to 200 for ai-param-fix test`);
+  const VERSION = '1.5.4';
+  console.log(`[events] v${VERSION} - gate recommendations behind auth, add sign-in prompt with explanation`);
 
   // ============================================
   // Stock Sources Catalog
@@ -5448,6 +5481,8 @@ body {
               saveSourcesCloud();
             }
           });
+          // Load personalized recommendations now that user is authenticated
+          loadRecommendedEvents();
         }
       });
     }
@@ -5619,6 +5654,21 @@ body {
 
   async function loadRecommendedEvents() {
     try {
+      const section = document.getElementById('recommendedSection');
+      const container = document.getElementById('recommendedCards');
+
+      // Recommendations require authentication
+      if (!currentUser) {
+        container.innerHTML =
+          '<div class="rec-signin-prompt">' +
+            '<p class="rec-signin-prompt__text">Sign in to get personalized event recommendations based on your Boards.</p>' +
+            '<p class="rec-signin-prompt__how">Recommendations analyze your saved links — artists, genres, categories, and keywords — then use AI to match upcoming events to your taste profile.</p>' +
+            '<button class="rec-signin-prompt__btn" onclick="document.getElementById(\'authLoginBtn\').click()">Sign in</button>' +
+          '</div>';
+        section.style.display = '';
+        return;
+      }
+
       const raw = localStorage.getItem(BOARDS_STORAGE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
