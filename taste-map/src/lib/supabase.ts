@@ -18,8 +18,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
-export { SUPABASE_URL, SUPABASE_ANON_KEY };
-
 /**
  * Get current authenticated user, or null if not logged in.
  */
@@ -38,14 +36,6 @@ export async function signInWithGoogle() {
     options: { redirectTo: window.location.origin + '/taste-map/' },
   });
   if (error) console.error('[taste-map] Google sign-in failed:', error);
-}
-
-/**
- * Get the current access token for edge function calls.
- */
-export async function getAccessToken(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
 }
 
 /**
@@ -73,6 +63,7 @@ export async function fetchPins(): Promise<Pin[]> {
 
 /**
  * Call the taste-graph edge function for cluster labeling + insights.
+ * Uses supabase.functions.invoke() for automatic token refresh.
  */
 export async function callTasteGraphFunction(
   clusters: Array<{
@@ -83,25 +74,13 @@ export async function callTasteGraphFunction(
     pinCount: number;
   }>
 ) {
-  const token = await getAccessToken();
-  if (!token) throw new Error('Not authenticated');
+  const { data, error } = await supabase.functions.invoke('taste-graph', {
+    body: { clusters },
+  });
 
-  const response = await fetch(
-    `${SUPABASE_URL}/functions/v1/taste-graph`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ clusters }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Edge function failed: ${response.status}`);
+  if (error) {
+    throw new Error(`Edge function failed: ${error.message}`);
   }
 
-  return response.json();
+  return data;
 }
