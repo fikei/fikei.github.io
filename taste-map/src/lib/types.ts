@@ -56,6 +56,7 @@ export interface Pin {
   book?: BookMeta | null;
   notes?: string | null;
   is_merged?: boolean;
+  import_source?: string | null;
 }
 
 // --- Clustering ---
@@ -64,6 +65,14 @@ export interface ClusterDescription {
   whatItIs: string;
   whyYou: string;
   howItChanged: string;
+}
+
+export interface SourceBreakdown {
+  youtube: number;
+  manual: number;
+  total: number;
+  isYoutubeOnly: boolean;
+  hasMixedSources: boolean;
 }
 
 export interface Cluster {
@@ -83,6 +92,7 @@ export interface Cluster {
   topDomains?: string[];
   tags?: string[];
   categoryBreakdown?: string;
+  sourceBreakdown?: SourceBreakdown;
 }
 
 export interface GraphEdge {

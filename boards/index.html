@@ -375,6 +375,64 @@
   word-break: break-all;
 }
 
+/* YouTube import */
+.yt-import-section {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.yt-import-section__header {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+
+.yt-import-section__status {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  margin-bottom: var(--space-3);
+}
+
+.yt-import-section__note {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: var(--space-2);
+  line-height: 1.4;
+}
+
+.yt-import-section__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.yt-import-section__actions .auth-bar__btn {
+  width: 100%;
+  font-size: var(--font-size-xs);
+}
+
+.yt-import-section__progress {
+  margin-top: var(--space-2);
+}
+
+.yt-import-section__progress-bar {
+  height: 2px;
+  background: var(--border);
+  margin-top: var(--space-1);
+}
+
+.yt-import-section__progress-fill {
+  height: 100%;
+  background: var(--fg);
+  transition: width 0.3s ease;
+}
+
 /* Settings row */
 .settings-row {
   display: flex;
@@ -6051,6 +6109,31 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           <label class="account-label">Logged In From</label>
           <div class="account-value account-value--mono" id="accountDevice"></div>
         </div>
+        <!-- YouTube Import -->
+        <div class="yt-import-section" id="yt-import-section">
+          <div class="yt-import-section__header">YouTube</div>
+          <div class="yt-import-section__status" id="yt-import-status">Not connected</div>
+          <div id="yt-connect-controls">
+            <button class="auth-bar__btn" id="yt-connect-btn" style="width: 100%;">Connect YouTube</button>
+            <div class="yt-import-section__note">
+              Imports liked videos and playlists into your taste map.
+            </div>
+          </div>
+          <div id="yt-import-controls" style="display:none">
+            <div class="yt-import-section__actions">
+              <button class="auth-bar__btn" id="yt-import-liked-btn">Import Liked Videos</button>
+              <button class="auth-bar__btn" id="yt-import-playlists-btn">Import Playlists</button>
+              <button class="auth-bar__btn" id="yt-disconnect-btn" style="color: var(--muted);">Disconnect</button>
+            </div>
+          </div>
+          <div class="yt-import-section__progress" id="yt-import-progress" style="display:none">
+            <div class="yt-import-section__note" id="yt-progress-label">Importing...</div>
+            <div class="yt-import-section__progress-bar">
+              <div class="yt-import-section__progress-fill" id="yt-progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="account-section" style="margin-top: var(--space-6);">
           <button class="auth-bar__btn" id="accountLogout" style="width: 100%;">Logout</button>
         </div>
@@ -6449,8 +6532,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.9.2';
-  console.log('[boards] v' + VERSION + ' - shared auth module');
+  const VERSION = '2.10.0';
+  console.log('[boards] v' + VERSION + ' - youtube import integration');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -10548,6 +10631,151 @@ Return JSON:
       id: crypto.randomUUID(),
       addedAt: new Date().toISOString()
     };
+  }
+
+  // ============================================
+  // YouTube Import
+  // ============================================
+  const YOUTUBE_CLIENT_ID = ''; // Set via Google Cloud Console
+  const YOUTUBE_REDIRECT_URI = window.location.origin + '/boards/';
+
+  function connectYouTube() {
+    if (!YOUTUBE_CLIENT_ID) {
+      toast('YouTube OAuth not configured', { level: 'error' });
+      return;
+    }
+    const params = new URLSearchParams({
+      client_id: YOUTUBE_CLIENT_ID,
+      redirect_uri: YOUTUBE_REDIRECT_URI,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/youtube.readonly',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: 'youtube-connect',
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  }
+
+  async function handleYouTubeOAuthCallback() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    if (!code || state !== 'youtube-connect') return;
+
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+
+    toast('Connecting YouTube...', { level: 'info', id: 'yt-connect' });
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/youtube-import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'connect', code, redirect_uri: YOUTUBE_REDIRECT_URI })
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Connection failed');
+      toast(`Connected: ${result.channel_title}`, { level: 'success', id: 'yt-connect' });
+      updateYouTubeConnectionUI(true, result.channel_title);
+    } catch (err) {
+      toast('YouTube connection failed', { level: 'error', id: 'yt-connect' });
+      console.error('[youtube-connect]', err);
+    }
+  }
+
+  async function importYouTubeContent(importType) {
+    const progressEl = document.getElementById('yt-import-progress');
+    const labelEl = document.getElementById('yt-progress-label');
+    const fillEl = document.getElementById('yt-progress-fill');
+    progressEl.style.display = 'block';
+    labelEl.textContent = `Importing ${importType === 'liked' ? 'liked videos' : 'playlists'}...`;
+    fillEl.style.width = '30%';
+
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/youtube-import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'import', import_type: importType })
+      });
+      fillEl.style.width = '90%';
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Import failed');
+
+      fillEl.style.width = '100%';
+      toast(result.message || `Imported ${result.imported} videos`, { level: 'success' });
+
+      // Reload the board to show new pins
+      if (result.imported > 0) {
+        await loadLinks();
+        renderGrid();
+      }
+    } catch (err) {
+      toast('YouTube import failed', { level: 'error' });
+      console.error('[youtube-import]', err);
+    } finally {
+      setTimeout(() => { progressEl.style.display = 'none'; fillEl.style.width = '0%'; }, 1500);
+    }
+  }
+
+  async function disconnectYouTube() {
+    if (!confirm('Disconnect YouTube? Your imported videos will remain in your board.')) return;
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      await fetch(`${SUPABASE_URL}/functions/v1/youtube-import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'disconnect' })
+      });
+      updateYouTubeConnectionUI(false);
+      toast('YouTube disconnected');
+    } catch (err) {
+      console.error('[youtube-disconnect]', err);
+    }
+  }
+
+  function updateYouTubeConnectionUI(isConnected, channelTitle) {
+    const connectControls = document.getElementById('yt-connect-controls');
+    const importControls = document.getElementById('yt-import-controls');
+    const statusEl = document.getElementById('yt-import-status');
+    if (connectControls) connectControls.style.display = isConnected ? 'none' : 'block';
+    if (importControls) importControls.style.display = isConnected ? 'block' : 'none';
+    if (statusEl) statusEl.textContent = isConnected ? `Connected: ${channelTitle}` : 'Not connected';
+  }
+
+  async function initYouTubeSection() {
+    await handleYouTubeOAuthCallback();
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      if (!token) return;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/youtube-import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'status' })
+      });
+      const result = await resp.json();
+      if (result.connected) {
+        updateYouTubeConnectionUI(true, result.channel);
+      }
+    } catch (err) {
+      console.error('[youtube-init]', err);
+    }
   }
 
   // ============================================
@@ -19657,6 +19885,12 @@ Return JSON:
     CtrlAuth.signOut();
   };
 
+  // YouTube import button handlers
+  document.getElementById('yt-connect-btn')?.addEventListener('click', connectYouTube);
+  document.getElementById('yt-import-liked-btn')?.addEventListener('click', () => importYouTubeContent('liked'));
+  document.getElementById('yt-import-playlists-btn')?.addEventListener('click', () => importYouTubeContent('playlists'));
+  document.getElementById('yt-disconnect-btn')?.addEventListener('click', disconnectYouTube);
+
   accountModal.querySelector('[data-close]')?.addEventListener('click', () => closeModal(accountModal));
   accountModal.querySelector('.modal__backdrop')?.addEventListener('click', () => closeModal(accountModal));
 
@@ -19745,6 +19979,7 @@ Return JSON:
       if (currentUsername) localStorage.setItem(USERNAME_KEY, currentUsername);
       updateAuthUI();
       loadAllShares();
+      initYouTubeSection();
 
       // Fetch from Supabase and update if different
       const t2 = performance.now();

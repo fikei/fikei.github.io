@@ -3,7 +3,7 @@
 // Soft assignment: pins can appear in multiple clusters
 // ============================================
 
-import type { Pin, Cluster, GraphEdge } from './types';
+import type { Pin, Cluster, GraphEdge, SourceBreakdown } from './types';
 import { tokenize, buildPinDocument, computeIDF, tfidfVector, cosineSimilarity, cleanDomain } from './tfidf';
 
 const CATEGORY_DOMAIN_MAP: Record<string, string> = {
@@ -146,10 +146,15 @@ function collectTags(members: PinVector[], max: number): string[] {
     .map(([t]) => t);
 }
 
-export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): Cluster[] {
-  const idf = computeIDF(pins);
+export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number, includeYoutube = true): Cluster[] {
+  const activePins = includeYoutube
+    ? pins
+    : pins.filter(p => p.import_source !== 'youtube');
 
-  const pinVectors: PinVector[] = pins.map(p => {
+  if (activePins.length === 0) return [];
+  const idf = computeIDF(activePins);
+
+  const pinVectors: PinVector[] = activePins.map(p => {
     const doc = buildPinDocument(p);
     const tokens = tokenize(doc);
     return { pin: p, tokens, vector: tfidfVector(tokens, idf) };
@@ -292,6 +297,18 @@ export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): 
     // Deduplicate pinIds (a pin can appear via both hard and soft assignment)
     const uniquePinIds = [...new Set(members.map(m => m.pin.id))];
 
+    // Source breakdown for YouTube toggle visualization
+    const uniqueMembers = [...new Set(members.map(m => m.pin))];
+    const youtubeCount = uniqueMembers.filter(p => p.import_source === 'youtube').length;
+    const manualCount = uniqueMembers.length - youtubeCount;
+    const sourceBreakdown: SourceBreakdown = {
+      youtube: youtubeCount,
+      manual: manualCount,
+      total: uniqueMembers.length,
+      isYoutubeOnly: youtubeCount === uniqueMembers.length && youtubeCount > 0,
+      hasMixedSources: youtubeCount > 0 && manualCount > 0,
+    };
+
     clusters.push({
       id: `${idPrefix}${clusterIdx}`,
       pinIds: uniquePinIds,
@@ -308,6 +325,7 @@ export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): 
       topDomains: domains,
       tags,
       categoryBreakdown: catBreakdown,
+      sourceBreakdown,
     });
     clusterIdx++;
   }
@@ -315,10 +333,10 @@ export function buildClusters(pins: Pin[], idPrefix = 'c', kOverride?: number): 
   return clusters;
 }
 
-export function buildSubClusters(pins: Pin[], parentId: string): Cluster[] {
+export function buildSubClusters(pins: Pin[], parentId: string, includeYoutube = true): Cluster[] {
   if (pins.length < 4) return [];
   const K = Math.min(12, Math.max(3, Math.floor(pins.length / 3)));
-  return buildClusters(pins, `${parentId}-s`, K);
+  return buildClusters(pins, `${parentId}-s`, K, includeYoutube);
 }
 
 export function buildEdges(clusters: Cluster[]): GraphEdge[] {

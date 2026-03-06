@@ -7,6 +7,8 @@ interface Node3DProps {
   isSelected: boolean;
   isDimmed: boolean;
   isHighlighted: boolean;
+  isYoutubeOnly: boolean;
+  hasMixedSources: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
 }
@@ -16,6 +18,8 @@ export function Node3D({
   isSelected,
   isDimmed,
   isHighlighted,
+  isYoutubeOnly,
+  hasMixedSources,
   onClick,
   onDoubleClick,
 }: Node3DProps) {
@@ -24,9 +28,12 @@ export function Node3D({
     isSelected && 'tg-3d-label--selected',
     isDimmed && 'tg-3d-label--dimmed',
     isHighlighted && 'tg-3d-label--highlighted',
+    isYoutubeOnly && 'tg-3d-label--youtube-only',
+    hasMixedSources && 'tg-3d-label--mixed-sources',
   ].filter(Boolean).join(' ');
 
   const drillIndicator = node.cluster.drillable ? ' \u21B3' : '';
+  const sourceIndicator = isYoutubeOnly ? ' [YT]' : hasMixedSources ? ' [+YT]' : '';
 
   return (
     <group position={[node.x, node.y, node.z]}>
@@ -45,7 +52,7 @@ export function Node3D({
             {node.cluster.label.toUpperCase()}
           </span>
           <span className="tg-3d-label__count">
-            {'\u2500\u2500 '}{node.cluster.pinCount} ITEMS{drillIndicator}
+            {'\u2500\u2500 '}{node.cluster.pinCount} ITEMS{drillIndicator}{sourceIndicator}
           </span>
         </div>
       </Html>

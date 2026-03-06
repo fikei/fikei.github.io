@@ -24,9 +24,10 @@ export function createDrillFrame(
   depth: number,
   parentClusterId: string,
   parentLabel: string,
-  pins: Pin[]
+  pins: Pin[],
+  includeYoutube = true
 ): DrillFrame {
-  const subClusters = buildSubClusters(pins, parentClusterId);
+  const subClusters = buildSubClusters(pins, parentClusterId, includeYoutube);
   const subEdges = buildEdges(subClusters);
 
   return {
