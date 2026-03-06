@@ -106,6 +106,17 @@ html, body, #root {
   color: var(--bg);
 }
 
+.tg-btn--toggle {
+  font-size: 8px;
+  padding: 2px 6px;
+  letter-spacing: 0.08em;
+}
+
+.tg-btn--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
 .tg-btn--close {
   border: none;
   font-size: var(--font-size-lg);

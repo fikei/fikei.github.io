@@ -72,6 +72,7 @@ export default function App() {
   const [highlightedMotif, setHighlightedMotif] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<GraphEdge | null>(null);
   const [edgeScreenPos, setEdgeScreenPos] = useState<{ x: number; y: number } | null>(null);
+  const [proximityMode, setProximityMode] = useState(false);
 
   // Drill stack
   const [drillStack, setDrillStack] = useState<DrillFrame[]>([]);
@@ -257,6 +258,14 @@ export default function App() {
       <header className="tg-header">
         <h1 className="tg-header__title">Taste Map</h1>
         <div className="tg-header__actions">
+          {state === 'ready' && (
+            <button
+              className={`tg-btn tg-btn--toggle ${proximityMode ? 'tg-btn--active' : ''}`}
+              onClick={() => setProximityMode(p => !p)}
+            >
+              {proximityMode ? '\u2611' : '\u2610'} PROXIMITY
+            </button>
+          )}
           <a href="/boards/" className="tg-btn">Boards</a>
         </div>
       </header>
@@ -327,6 +336,7 @@ export default function App() {
             edges={currentEdges}
             pins={pins}
             insights={insights}
+            proximityMode={proximityMode}
             onSelectCluster={handleSelectCluster}
             selectedCluster={selectedCluster}
             highlightedMotif={highlightedMotif}
