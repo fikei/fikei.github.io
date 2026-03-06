@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.3.4';
-  console.log(`[events] v${VERSION} - fix health load race condition`);
+  const VERSION = '1.3.5';
+  console.log(`[events] v${VERSION} - fix DOM insertBefore for warning banners`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2456,12 +2456,9 @@ body {
     warn.style.cssText = 'background:#1a0a00;border:1px solid #663300;color:#ff9944;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;';
     warn.innerHTML = `<span style="flex:1;min-width:0;"><span style="font-weight:600;">Source Health</span> — ${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#ff9944;cursor:pointer;font-size:16px;padding:0;flex-shrink:0;line-height:1;">&times;</button>`;
 
-    const container = document.querySelector('.container');
-    const cal = document.getElementById('calendarView');
-    const chips = document.getElementById('sourceChips');
-    const insertBefore = chips || cal || container?.firstChild;
-    if (insertBefore && container) {
-      container.insertBefore(warn, insertBefore);
+    const eventsContent = document.getElementById('eventsContent');
+    if (eventsContent) {
+      eventsContent.insertBefore(warn, eventsContent.firstChild);
     }
   }
 
@@ -2732,11 +2729,8 @@ body {
       warn = document.createElement('div');
       warn.id = 'sourceHealthWarning';
       warn.style.cssText = 'background:#0a0a1a;border:1px solid #334466;color:#6699cc;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;';
-      const container = document.querySelector('.container');
-      const chips = document.getElementById('sourceChips');
-      const cal = document.getElementById('calendarView');
-      const insertBefore = chips || cal || container?.firstChild;
-      if (insertBefore && container) container.insertBefore(warn, insertBefore);
+      const eventsContent = document.getElementById('eventsContent');
+      if (eventsContent) eventsContent.insertBefore(warn, eventsContent.firstChild);
     }
 
     const phases = {
@@ -2905,9 +2899,8 @@ body {
     warn.id = 'sourceWarning';
     warn.style.cssText = 'background:#1a1a00;border:1px solid #665500;color:#ffcc00;padding:8px 12px;margin:0 0 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;justify-content:space-between;';
     warn.innerHTML = `<span>⚠ Could not load: ${failedSources.join(', ')}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#ffcc00;cursor:pointer;font-size:16px;padding:0 0 0 12px;">×</button>`;
-    const container = document.querySelector('.container');
-    const cal = document.getElementById('calendarView');
-    if (cal) container.insertBefore(warn, cal);
+    const eventsContent = document.getElementById('eventsContent');
+    if (eventsContent) eventsContent.insertBefore(warn, eventsContent.firstChild);
   }
 
   // --- HTML Table Scraper (works for 19hz and generic tables) ---
