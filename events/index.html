@@ -1576,8 +1576,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.3.3';
-  console.log(`[events] v${VERSION} - event count degradation detection`);
+  const VERSION = '1.3.4';
+  console.log(`[events] v${VERSION} - fix health load race condition`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2341,10 +2341,10 @@ body {
     if (failedNames.length > 0) log(`Failed sources: ${failedNames.join(', ')}`);
     el.style.display = 'none';
     saveEventCache(); // L1
-    // L2 async — send events + health outcomes
-    saveEventsToSupabase(state.events, sourceOutcomes).catch(e => log('L2 save failed: ' + e.message));
-    // Reload health from DB after reporting (async, updates UI once loaded)
-    loadSourceHealth().catch(e => log('Health load failed: ' + e.message));
+    // L2 async — send events + health outcomes, then reload health
+    saveEventsToSupabase(state.events, sourceOutcomes)
+      .then(() => loadSourceHealth())
+      .catch(e => log('L2 save/health error: ' + e.message));
     calAutoNavigate();
     updateFilters();
     updateContentTypeFilter();
