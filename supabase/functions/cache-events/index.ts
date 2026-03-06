@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.3.0'
-console.log(`[cache-events] v${VERSION} - event count degradation detection`)
+const VERSION = '1.3.1'
+console.log(`[cache-events] v${VERSION} - fix status recovery: consecutive_failures=0 should never be broken`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -67,6 +67,14 @@ interface SourceOutcome {
 
 function deriveStatus(successRate: number, consecutiveFailures: number, totalScrapes: number, countDegraded = false): string {
   if (totalScrapes === 0) return 'unknown'
+  // Most recent scrape succeeded — recovering or healthy
+  // This prevents a source from staying "broken" indefinitely after being fixed
+  if (consecutiveFailures === 0) {
+    if (countDegraded) return 'degraded'
+    if (successRate >= 0.8) return 'healthy'
+    // Low historical rate but currently working — recovering, not broken
+    return successRate >= 0.5 ? 'healthy' : 'degraded'
+  }
   // Broken: persistent failure pattern
   if (consecutiveFailures >= 6) return 'broken'
   if (totalScrapes >= 5 && successRate < 0.3) return 'broken'
@@ -77,9 +85,9 @@ function deriveStatus(successRate: number, consecutiveFailures: number, totalScr
   if (consecutiveFailures >= 1 && successRate < 0.5) return 'degraded' // early warning
   // Event count degradation: source works but returns far fewer events than peak
   if (countDegraded) return 'degraded'
-  // Healthy: consistent success
-  if (successRate >= 0.8 && consecutiveFailures === 0) return 'healthy'
-  if (totalScrapes === 1 && successRate === 1.0) return 'healthy' // first scrape succeeded
+  // Healthy
+  if (successRate >= 0.8) return 'healthy'
+  if (totalScrapes === 1 && successRate === 1.0) return 'healthy'
   return 'unknown'
 }
 
