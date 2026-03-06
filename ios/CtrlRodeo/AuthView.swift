@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct AuthView: View {
     let onAuthenticated: () -> Void
@@ -7,7 +8,9 @@ struct AuthView: View {
     @State private var email = ""
     @State private var isSending = false
     @State private var didSend = false
+    @State private var isGoogleLoading = false
     @State private var errorMessage: String?
+    @State private var showEmailInput = false
 
     var body: some View {
         ZStack {
@@ -30,8 +33,10 @@ struct AuthView: View {
 
                 if didSend {
                     successState
-                } else {
+                } else if showEmailInput {
                     emailInputState
+                } else {
+                    methodSelectState
                 }
 
                 Spacer()
@@ -51,6 +56,39 @@ struct AuthView: View {
                 .padding(.bottom, Theme.space12)
             }
         }
+    }
+
+    // MARK: - Method Select State
+
+    private var methodSelectState: some View {
+        VStack(spacing: Theme.space3) {
+            // Google button
+            DSButton(
+                title: "Continue with Google",
+                action: signInWithGoogle,
+                variant: .filled,
+                fullWidth: true,
+                loading: isGoogleLoading
+            )
+
+            DSDivider(label: "or")
+
+            // Email button
+            DSButton(
+                title: "Continue with Email",
+                action: { showEmailInput = true },
+                variant: .outlined,
+                fullWidth: true
+            )
+
+            if let error = errorMessage {
+                Text(error)
+                    .font(.system(size: Theme.textXS))
+                    .foregroundColor(Theme.error)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, Theme.space8)
     }
 
     // MARK: - Success State
@@ -73,6 +111,8 @@ struct AuthView: View {
                 size: .small
             )
             .padding(.top, Theme.space1)
+
+            backButton
         }
         .padding(.horizontal, Theme.space8)
     }
@@ -103,8 +143,26 @@ struct AuthView: View {
                     .foregroundColor(Theme.error)
                     .multilineTextAlignment(.center)
             }
+
+            backButton
         }
         .padding(.horizontal, Theme.space8)
+    }
+
+    // MARK: - Back Button
+
+    private var backButton: some View {
+        Button(action: {
+            showEmailInput = false
+            didSend = false
+            errorMessage = nil
+        }) {
+            Text("BACK")
+                .font(.system(size: Theme.text2XS))
+                .tracking(Theme.trackingWide)
+                .foregroundColor(Theme.muted)
+        }
+        .padding(.top, Theme.space2)
     }
 
     // MARK: - Helpers
@@ -140,5 +198,63 @@ struct AuthView: View {
                 }
             }
         }
+    }
+
+    private func signInWithGoogle() {
+        isGoogleLoading = true
+        errorMessage = nil
+
+        let url = SupabaseClient.shared.googleOAuthURL
+
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: AppConstants.urlScheme
+        ) { callbackURL, error in
+            DispatchQueue.main.async {
+                isGoogleLoading = false
+
+                if let error = error {
+                    // User cancelled — not an error
+                    if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                        return
+                    }
+                    errorMessage = "Google sign-in failed. Try again."
+                    return
+                }
+
+                guard let callbackURL = callbackURL,
+                      let auth = SupabaseClient.shared.parseAuthFromCallback(callbackURL) else {
+                    errorMessage = "Google sign-in failed. Try again."
+                    return
+                }
+
+                SupabaseClient.shared.storeAuth(auth)
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AuthStateChanged"),
+                    object: nil
+                )
+                onAuthenticated()
+            }
+        }
+
+        // Present in the app's main window
+        session.presentationContextProvider = AuthPresentationContext.shared
+        session.prefersEphemeralWebBrowserSession = false
+        session.start()
+    }
+}
+
+// MARK: - Auth Presentation Context
+
+/// Provides the window anchor for ASWebAuthenticationSession.
+final class AuthPresentationContext: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = AuthPresentationContext()
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = scene.windows.first else {
+            return ASPresentationAnchor()
+        }
+        return window
     }
 }
