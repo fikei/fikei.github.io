@@ -423,18 +423,54 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
   }
 
   // Try parsing directly, then try extracting JSON object if Claude appended text
+  let parsed: ExtractionResult
   try {
-    return JSON.parse(text) as ExtractionResult
+    parsed = JSON.parse(text) as ExtractionResult
   } catch (parseErr) {
     console.warn('[instagram-import] Claude returned non-clean JSON, attempting extraction:', (parseErr as Error).message)
     console.warn('[instagram-import] Raw text:', text.substring(0, 500))
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start !== -1 && end > start) {
-      return JSON.parse(text.substring(start, end + 1)) as ExtractionResult
+      parsed = JSON.parse(text.substring(start, end + 1)) as ExtractionResult
+    } else {
+      throw new Error(`Failed to parse entity extraction: ${(parseErr as Error).message}`)
     }
-    throw new Error(`Failed to parse entity extraction: ${(parseErr as Error).message}`)
   }
+
+  // Post-processing: match entities to @mentions by name similarity
+  // Claude Haiku may not reliably set mention_handle, so we do it deterministically
+  if (allMentions.length > 0) {
+    const usedHandles = new Set<string>()
+    for (const entity of parsed.entities) {
+      // Skip if Claude already set it
+      if (entity.mention_handle) {
+        usedHandles.add(entity.mention_handle)
+        continue
+      }
+      const entityNorm = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      for (const handle of allMentions) {
+        if (usedHandles.has(handle)) continue
+        const handleNorm = handle.toLowerCase().replace(/[^a-z0-9]/g, '')
+        // Match if entity name is contained in handle or vice versa
+        if (handleNorm.includes(entityNorm) || entityNorm.includes(handleNorm) ||
+            // Also check if handle words appear in entity name (e.g. "setmargins" matches "Set Margins")
+            entityNorm.replace(/\s/g, '') === handleNorm) {
+          entity.mention_handle = handle
+          usedHandles.add(handle)
+          console.log(`[instagram-import] Matched entity "${entity.name}" to @${handle}`)
+          break
+        }
+      }
+    }
+  }
+
+  // Ensure mention_handle is at least null for all entities
+  for (const entity of parsed.entities) {
+    if (!entity.mention_handle) entity.mention_handle = null
+  }
+
+  return parsed
 }
 
 // ---------------------------------------------------------------------------
