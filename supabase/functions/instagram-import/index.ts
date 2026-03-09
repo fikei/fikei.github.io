@@ -16,8 +16,8 @@
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
 
-const VERSION = '1.1.0'
-console.log(`[instagram-import] v${VERSION} - enhanced extraction + parallel resolution`)
+const VERSION = '1.2.0'
+console.log(`[instagram-import] v${VERSION} - fix DDG URL leaks, generic entity filter, better scoring`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -396,10 +396,15 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
 
 function unwrapDdgUrl(rawUrl: string): string | null {
   try {
-    const parsed = new URL(rawUrl)
+    // DDG HTML returns protocol-relative URLs like //duckduckgo.com/l/?uddg=...
+    // new URL() can't parse these without a base, so prepend https:
+    const normalized = rawUrl.startsWith('//') ? `https:${rawUrl}` : rawUrl
+    const parsed = new URL(normalized)
     const uddg = parsed.searchParams.get('uddg')
-    if (uddg) return uddg
+    if (uddg) return decodeURIComponent(uddg)
   } catch { /* not a redirect URL */ }
+  // If it's still a DDG redirect URL that we couldn't parse, discard it
+  if (rawUrl.includes('duckduckgo.com/l/')) return null
   return rawUrl
 }
 
@@ -536,51 +541,88 @@ async function selectBestUrls(
 function validateResolution(entity: Entity, resolvedUrl: string): number {
   if (!resolvedUrl) return 0
   try {
-    const urlDomain = new URL(resolvedUrl).hostname.replace('www.', '')
+    const parsed = new URL(resolvedUrl)
+    const urlDomain = parsed.hostname.replace('www.', '')
+    const entityNameNorm = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    // Check if entity name matches the domain itself (e.g., "Framer" → framer.com)
+    const domainBase = urlDomain.split('.')[0] // framer from framer.com
+    const domainMatchesName = entityNameNorm === domainBase ||
+      domainBase.includes(entityNameNorm) || entityNameNorm.includes(domainBase)
 
     // Domain authority for entity type
     let authorityScore = 0.5
     const type = entity.type
-    if (type === 'place' || type === 'food') {
+    if (type === 'place' || type === 'food' || type === 'restaurant') {
       if (urlDomain.includes('google.com') || urlDomain.includes('maps.google')) authorityScore = 1.0
       else if (urlDomain.includes('yelp.com') || urlDomain.includes('tripadvisor.com') || urlDomain.includes('opentable.com')) authorityScore = 0.85
       else if (urlDomain.includes('instagram.com') || urlDomain.includes('facebook.com')) authorityScore = 0.4
+      else if (domainMatchesName) authorityScore = 0.9 // restaurant's own site
     } else if (type === 'song') {
       if (urlDomain.includes('spotify.com') || urlDomain.includes('music.apple.com')) authorityScore = 1.0
-      else if (urlDomain.includes('soundcloud.com') || urlDomain.includes('youtube.com')) authorityScore = 0.8
-    } else if (type === 'product') {
-      // Brand's own domain is authoritative
-      const brandName = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
-      if (urlDomain.includes(brandName)) authorityScore = 0.9
+      else if (urlDomain.includes('soundcloud.com') || urlDomain.includes('bandcamp.com')) authorityScore = 0.9
+      else if (urlDomain.includes('youtube.com')) authorityScore = 0.8
+    } else if (type === 'product' || type === 'tool') {
+      if (domainMatchesName) authorityScore = 1.0 // product's own domain is best
       else if (urlDomain.includes('amazon.com') || urlDomain.includes('nordstrom.com')) authorityScore = 0.7
     } else if (type === 'book') {
       if (urlDomain.includes('openlibrary.org') || urlDomain.includes('goodreads.com')) authorityScore = 0.9
       else if (urlDomain.includes('amazon.com')) authorityScore = 0.7
     } else if (type === 'brand') {
-      const brandName = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
-      if (urlDomain.includes(brandName)) authorityScore = 1.0
+      if (domainMatchesName) authorityScore = 1.0
+    } else if (type === 'person') {
+      if (urlDomain.includes('imdb.com')) authorityScore = 0.85
+      else if (urlDomain.includes('wikipedia.org')) authorityScore = 0.75
+      else if (urlDomain.includes('instagram.com')) authorityScore = 0.7
+      else if (domainMatchesName) authorityScore = 0.9 // personal website
+    } else if (type === 'movie') {
+      if (urlDomain.includes('imdb.com') || urlDomain.includes('letterboxd.com')) authorityScore = 0.95
+      else if (urlDomain.includes('criterion.com')) authorityScore = 0.9
+      else if (urlDomain.includes('rottentomatoes.com')) authorityScore = 0.85
     }
 
-    // Name match: check if entity name appears in URL path
+    // Name match: check if entity name appears in URL domain or path
     const nameTokens = entity.name.toLowerCase().split(/\s+/).filter(t => t.length > 2)
-    const urlPath = new URL(resolvedUrl).pathname.toLowerCase()
-    const nameInUrl = nameTokens.filter(t => urlPath.includes(t)).length / Math.max(nameTokens.length, 1)
+    const urlFull = (urlDomain + parsed.pathname).toLowerCase()
+    const nameInUrl = nameTokens.filter(t => urlFull.includes(t)).length / Math.max(nameTokens.length, 1)
 
-    return 0.6 * authorityScore + 0.4 * nameInUrl
+    // Boost: if domain itself matches the entity name, that's a strong signal
+    const domainBonus = domainMatchesName ? 0.2 : 0
+
+    return Math.min(1.0, 0.5 * authorityScore + 0.3 * nameInUrl + domainBonus)
   } catch {
     return 0
   }
 }
 
+// Filter out overly generic entities that don't produce useful derived pins
+const GENERIC_ENTITY_BLOCKLIST = new Set([
+  'ai', 'artificial intelligence', 'github', 'instagram', 'tiktok', 'twitter', 'x',
+  'youtube', 'facebook', 'reddit', 'pinterest', 'linkedin', 'google', 'apple',
+  'amazon', 'spotify', 'music', 'art', 'design', 'fashion', 'food', 'travel',
+  'tech', 'technology', 'software', 'hardware', 'crypto', 'nft', 'web3',
+])
+
+function isGenericEntity(entity: Entity): boolean {
+  const name = entity.name.toLowerCase().trim()
+  if (GENERIC_ENTITY_BLOCKLIST.has(name)) return true
+  // Single-word generic/platform entities with no specific product
+  if (name.split(/\s+/).length <= 1 && (entity.type === 'generic' || entity.type === 'platform')) return true
+  return false
+}
+
 async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<Entity[]> {
-  // Phase 1: Classify entities
+  // Phase 1: Classify entities — discard low-confidence and overly generic
   const toResolve: Entity[] = []
   for (const entity of entities) {
-    if (entity.confidence < 0.35) {
+    if (entity.confidence < 0.35 || isGenericEntity(entity)) {
       entity.resolved_url = null
       entity.resolved_via = null
       entity.match_quality = 0
       entity.status = 'discarded'
+      if (isGenericEntity(entity)) {
+        console.log(`[instagram-import] Discarded generic entity: "${entity.name}" (type: ${entity.type})`)
+      }
     } else {
       entity.status = entity.confidence >= 0.7 ? 'auto' : 'review'
       toResolve.push(entity)
@@ -617,13 +659,21 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
     const results = searchResults.get(i) || []
     const selection = selections.get(i)
 
-    if (selection?.url) {
+    // Helper: reject any URL that is still a DDG redirect or non-primary source
+    const isValidPrimaryUrl = (url: string | null): boolean => {
+      if (!url) return false
+      if (url.includes('duckduckgo.com')) return false
+      if (url.startsWith('//')) return false
+      try { new URL(url); return true } catch { return false }
+    }
+
+    if (selection?.url && isValidPrimaryUrl(selection.url)) {
       entity.resolved_url = selection.url
       entity.resolved_via = 'duckduckgo+claude'
       // Two-dimensional confidence: match_quality from Claude, validated by domain authority
       const validationScore = validateResolution(entity, selection.url)
       entity.match_quality = Math.round(((selection.quality * 0.5 + validationScore * 0.5)) * 100) / 100
-    } else if (results.length > 0) {
+    } else if (results.length > 0 && isValidPrimaryUrl(results[0].url)) {
       entity.resolved_url = results[0].url
       entity.resolved_via = 'duckduckgo-first'
       entity.match_quality = Math.round(validateResolution(entity, results[0].url) * 0.5 * 100) / 100
