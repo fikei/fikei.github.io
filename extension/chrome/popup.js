@@ -112,9 +112,11 @@ async function handleSave() {
     return;
   }
 
-  showError(result.error === 'save_failed'
-    ? `Save failed (${result.status})`
-    : result.error || 'Unknown error');
+  if (result.error === 'save_failed') {
+    showError(result.detail || `Save failed (${result.status})`);
+  } else {
+    showError(result.error || 'Unknown error');
+  }
 }
 
 function showError(message) {
@@ -149,9 +151,15 @@ document.getElementById('btn-retry').addEventListener('click', () => {
 // ============================================
 // Messaging Helper
 // ============================================
-function sendMessage(msg) {
+function sendMessage(msg, timeoutMs = 15000) {
   return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      console.warn('[rodeo popup] message timed out:', msg.action);
+      resolve(null);
+    }, timeoutMs);
+
     chrome.runtime.sendMessage(msg, response => {
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         console.warn('[rodeo popup]', chrome.runtime.lastError.message);
         resolve(null);
