@@ -6536,8 +6536,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.11.0';
-  console.log('[boards] v' + VERSION + ' - two-step enrichment (analyze-content + create-pin)');
+  const VERSION = '2.11.1';
+  console.log('[boards] v' + VERSION + ' - rotating loader for Instagram import');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -19051,9 +19051,23 @@ Return JSON:
         try {
           // Instagram path: use the full import pipeline instead of generic metadata fetch
           if (isInstagramContent(url)) {
-            toast('Importing Instagram content...', { level: 'info', id: 'ig-import-' + id });
+            const igPhrases = [
+              'Scanning the reel', 'Reading the caption', 'Parsing the vibes',
+              'Extracting entities', 'Resolving links', 'Identifying the finds',
+              'Checking the sources', 'Cross-referencing', 'Mapping connections',
+              'Decoding the content', 'Following the trail', 'Piecing it together',
+              'Analyzing the post', 'Digging deeper', 'Almost there',
+            ];
+            let igPhraseIdx = 0;
+            const igToastId = 'ig-import-' + id;
+            toast(igPhrases[0] + '...', { level: 'info', id: igToastId });
+            const igPhraseInterval = setInterval(() => {
+              igPhraseIdx = (igPhraseIdx + 1) % igPhrases.length;
+              toast(igPhrases[igPhraseIdx] + '...', { level: 'info', id: igToastId });
+            }, 2200);
             try {
               const result = await importInstagramContent(url);
+              clearInterval(igPhraseInterval);
               const src = result.source_pin || {};
               updateLink(id, {
                 title: src.title || generateTitleFromUrl(url),
@@ -19073,7 +19087,7 @@ Return JSON:
               });
               renderFilters();
               renderGrid();
-              toast('Reel imported', { id: 'ig-import-' + id });
+              toast('Reel imported', { id: igToastId });
 
               if ((result.derived_pins && result.derived_pins.length > 0) ||
                   (result.unresolved_entities && result.unresolved_entities.length > 0)) {
@@ -19087,10 +19101,11 @@ Return JSON:
               const link3 = data3.links.find(l => l.id === id);
               if (link3) syncLinkToSupabase(link3);
             } catch (err) {
+              clearInterval(igPhraseInterval);
               console.error('[instagram-import] Auto-import failed:', err);
               updateLink(id, { loading: false, enrichment_failed: true });
               renderGrid();
-              toast('Instagram import failed — try refresh', { level: 'error', id: 'ig-import-' + id });
+              toast('Instagram import failed — try refresh', { level: 'error', id: igToastId });
             }
             return;
           }
