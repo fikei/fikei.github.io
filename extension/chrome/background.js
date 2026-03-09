@@ -1,7 +1,7 @@
 // Rodeo — Save & Discover
 // Service worker: context menus, message routing, pin save flow
 
-importScripts('lib/sanitize.js', 'lib/supabase.js', 'lib/auth.js');
+importScripts('lib/sanitize.js', 'lib/supabase.js', 'lib/auth.js', 'lib/privacy.js', 'lib/history.js');
 
 const BOARDS_URL = 'https://ctrl.rodeo/boards/';
 
@@ -63,6 +63,31 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     showBadge(tab.id, '!', '#c00');
   } else {
     showBadge(tab.id, 'ERR', '#c00');
+  }
+});
+
+// ============================================
+// History Capture (Phase 2+3)
+// ============================================
+initHistoryCapture();
+
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  // Main frame only
+  if (details.frameId !== 0) return;
+  // Skip chrome:// and extension pages
+  if (!details.url || !details.url.startsWith('http')) return;
+
+  try {
+    const tab = await chrome.tabs.get(details.tabId);
+    if (tab.incognito) return;
+    recordNavigation({
+      url: details.url,
+      title: tab.title || '',
+      referrerUrl: null,
+      tabId: details.tabId
+    });
+  } catch {
+    // Tab may have closed
   }
 });
 
@@ -154,6 +179,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'open_boards') {
     chrome.tabs.create({ url: BOARDS_URL });
     return false;
+  }
+
+  // --- History / Privacy handlers ---
+
+  if (msg.action === 'get_privacy_settings') {
+    getPrivacySettings()
+      .then(sendResponse)
+      .catch(() => sendResponse(null));
+    return true;
+  }
+
+  if (msg.action === 'save_privacy_settings') {
+    savePrivacySettings(msg.settings)
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  if (msg.action === 'start_backfill') {
+    runBackfill()
+      .then(sendResponse)
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  if (msg.action === 'delete_history') {
+    const handler = msg.window === 'all'
+      ? deleteAllHistory()
+      : deleteHistoryInWindow(msg.window);
+    handler
+      .then(sendResponse)
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  if (msg.action === 'flush_history') {
+    flushBuffer()
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
   }
 });
 

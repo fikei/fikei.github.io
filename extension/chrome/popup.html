@@ -35,6 +35,12 @@
     </div>
   </div>
 
+  <!-- Tab Bar (shown when authenticated) -->
+  <div id="tab-bar" class="tab-bar" hidden>
+    <button class="tab-btn active" data-tab="save">Save</button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+  </div>
+
   <!-- State: Ready to save -->
   <div id="state-save" class="state" hidden>
     <div class="save-header">
@@ -92,6 +98,36 @@
       <button id="btn-retry" class="btn btn--outline btn--block">
         Try Again
       </button>
+    </div>
+  </div>
+
+  <!-- State: Settings -->
+  <div id="state-settings" class="state" hidden>
+    <div class="settings-container">
+      <div class="settings-row">
+        <label class="settings-label" for="toggle-history">Capture browsing history</label>
+        <input type="checkbox" id="toggle-history" checked>
+      </div>
+
+      <div class="settings-section">
+        <label class="settings-label">Blocked domains</label>
+        <p class="settings-hint">One domain per line. These sites won't be tracked.</p>
+        <textarea id="blocklist-input" class="settings-textarea" rows="4" placeholder="example.com&#10;another-site.org"></textarea>
+      </div>
+
+      <button id="btn-save-settings" class="btn btn--filled btn--block">Save Settings</button>
+      <p id="settings-status" class="settings-status" hidden></p>
+
+      <div class="settings-section settings-danger">
+        <label class="settings-label">Import &amp; Delete</label>
+        <button id="btn-backfill" class="btn btn--outline btn--block">Import Last 30 Days</button>
+        <p id="backfill-status" class="settings-status" hidden></p>
+        <div class="settings-delete-row">
+          <button id="btn-delete-hour" class="btn btn--danger btn--sm">Delete Last Hour</button>
+          <button id="btn-delete-day" class="btn btn--danger btn--sm">Delete Last Day</button>
+          <button id="btn-delete-all" class="btn btn--danger btn--sm">Delete All</button>
+        </div>
+      </div>
     </div>
   </div>
 
