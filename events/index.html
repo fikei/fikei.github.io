@@ -1537,8 +1537,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.6.0';
-  console.log(`[events] v${VERSION} - migrate to shared auth module (Google OAuth + username gate)`);
+  const VERSION = '1.6.1';
+  console.log(`[events] v${VERSION} - fix dedup crash on WordPress JSON sources, remove Roxie`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1563,7 +1563,6 @@ body {
     { id: 'ra-bayarea', name: 'Resident Advisor SF', category: 'music', type: 'ra', url: 'https://ra.co/events/us/sanfrancisco', region: 'bay-area', description: 'Electronic music events' },
     { id: 'sf-punchline', name: 'Punchline SF', category: 'comedy', type: 'html', url: 'https://www.punchlinecomedyclub.com/events', region: 'bay-area', description: 'Stand-up comedy' },
     { id: 'cobbs-sf', name: "Cobb's Comedy Club", category: 'comedy', type: 'html', url: 'https://www.cobbscomedy.com/events', region: 'bay-area', description: 'Comedy & variety' },
-    { id: 'roxie-sf', name: 'Roxie Theater', category: 'film', type: 'rss', url: 'https://roxie.com/feed/', region: 'bay-area', description: 'Independent & arthouse cinema' },
     { id: 'screenslate-sf', name: 'Screen Slate', category: 'film', type: 'screenslate', url: 'https://www.screenslate.com/listings', region: 'bay-area', description: 'Repertory & arthouse cinema' },
     // Los Angeles
     { id: '19hz-losangeles', name: '19hz Los Angeles', category: 'music', type: 'html', url: 'https://19hz.info/eventlisting_LosAngeles.php', region: 'los-angeles', description: 'Electronic music & nightlife' },
@@ -2831,7 +2830,8 @@ body {
   // When the same event appears in multiple sources (e.g., 19hz AND Discord),
   // merge into one event with combined data and both source tags.
   function normalizeForDedup(str) {
-    return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (str && typeof str === 'object') str = str.rendered || str.name || JSON.stringify(str);
+    return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
   function levenshtein(a, b) {
@@ -3900,12 +3900,17 @@ body {
         responseSnippet: JSON.stringify(Object.keys(data || {})).substring(0, 500),
       });
     }
+    // Helper: unwrap WordPress {rendered: "..."} objects to plain strings
+    const unwrapWP = v => (v && typeof v === 'object' && v.rendered != null) ? v.rendered : v;
     return items.map(item => {
+      const title = unwrapWP(item.name) || unwrapWP(item.title) || unwrapWP(item.summary) || '';
+      const excerpt = unwrapWP(item.excerpt) || unwrapWP(item.description) || '';
       const loc = parseLocationString(item.location || item.venue || item.address || '');
       return {
         date: (item.date || item.start_date || item.startDate || item.start || '').substring(0, 10),
         time: item.time || '',
-        name: item.name || item.title || item.summary || '',
+        name: typeof title === 'string' ? title.replace(/<[^>]*>/g, '').trim() : String(title),
+        description: typeof excerpt === 'string' ? excerpt.replace(/<[^>]*>/g, '').trim() : '',
         venue: item.venue?.name || item.venue_name || loc.venue,
         address: item.venue?.address || item.address || loc.address,
         city: item.venue?.city || item.city || loc.city,
