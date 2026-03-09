@@ -5741,6 +5741,9 @@ body {
   .ig-entity--unresolved { border-color: var(--subtle); opacity: 0.85; cursor: default; }
   .ig-entity--unresolved:hover { border-color: var(--muted); background: none; }
   .ig-entity--unresolved-resolved { border-color: var(--fg) !important; opacity: 1; }
+  .ig-tag { display: inline-block; padding: 1px 6px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid var(--subtle); color: var(--muted); }
+  .ig-tag--structure { color: var(--fg); border-color: var(--muted); }
+  .ig-tag--taste { font-style: italic; }
   #igEntities { max-height: 50vh; overflow-y: auto; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
@@ -6508,6 +6511,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       <div style="padding: var(--space-4);">
         <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-serif); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
         <p id="igStats" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
+        <div id="igTagsRow" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:var(--space-3);"></div>
         <div id="igKeepSourceRow" style="display:none;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid var(--subtle);">
           <input type="checkbox" id="igKeepSource" checked style="width:16px;height:16px;accent-color:var(--fg);cursor:pointer;">
           <label for="igKeepSource" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);cursor:pointer;user-select:none;">Keep original Instagram post as a pin</label>
@@ -16590,6 +16594,10 @@ Return JSON:
               image: src.image || link.image,
               instagram: src.instagram || {},
               content_type: src.content_type || link.content_type,
+              entities: src.entities || null,
+              practical_tags: result.practical_tags || [],
+              taste_tags: result.taste_tags || [],
+              content_structure: result.content_structure || null,
               enrichment_failed: false
             });
             renderFilters();
@@ -18489,6 +18497,23 @@ Return JSON:
       + (unresolvedCount > 0 ? ` \u00b7 ${unresolvedCount} not found` : '')
       + ` \u00b7 ${stats.entities_review} need review \u00b7 ${stats.entities_discarded} skipped`;
 
+    // Show sense-making tags below stats
+    const tagsRow = $('igTagsRow');
+    if (tagsRow) {
+      const pTags = result.practical_tags || [];
+      const tTags = result.taste_tags || [];
+      const structure = result.content_structure || null;
+      if (pTags.length > 0 || tTags.length > 0 || structure) {
+        tagsRow.style.display = 'flex';
+        tagsRow.innerHTML =
+          (structure ? '<span class="ig-tag ig-tag--structure">' + escHtml(structure.replace(/_/g, ' ')) + '</span>' : '') +
+          pTags.map(t => '<span class="ig-tag ig-tag--practical">' + escHtml(t) + '</span>').join('') +
+          tTags.map(t => '<span class="ig-tag ig-tag--taste">' + escHtml(t) + '</span>').join('');
+      } else {
+        tagsRow.style.display = 'none';
+      }
+    }
+
     igEntities.innerHTML = '';
 
     if (!derived_pins || derived_pins.length === 0) {
@@ -18734,7 +18759,7 @@ Return JSON:
         added++;
         queueServerEnrichment(norm.id, norm.url, norm.title, norm.description, {
           category: norm.category,
-          skipClassification: true
+          content_type: norm.content_type || null
         });
         // Immediately extract music metadata for listen-category pins
         if ((norm.category === 'listen' || norm.content_type === 'music') && norm.url) {
@@ -19039,6 +19064,10 @@ Return JSON:
                 type_confidence: 1.0,
                 category: src.category || 'follow',
                 domain: 'instagram.com',
+                entities: src.entities || null,
+                practical_tags: result.practical_tags || [],
+                taste_tags: result.taste_tags || [],
+                content_structure: result.content_structure || null,
                 loading: false,
                 enrichment_failed: false,
               });
