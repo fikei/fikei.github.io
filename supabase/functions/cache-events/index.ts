@@ -63,7 +63,7 @@ interface SourceOutcome {
   durationMs?: number
 }
 
-// --- Source Health Upsert (mirrors domain_profiles pattern from enrich-link) ---
+// --- Source Health Upsert (mirrors domain_profiles pattern from create-pin) ---
 
 function deriveStatus(successRate: number, consecutiveFailures: number, totalScrapes: number, countDegraded = false): string {
   if (totalScrapes === 0) return 'unknown'

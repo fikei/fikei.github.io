@@ -16,6 +16,9 @@
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
 
+const VERSION = '1.1.0'
+console.log(`[instagram-import] v${VERSION} - enhanced extraction + parallel resolution`)
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
@@ -293,8 +296,16 @@ Return ONLY valid JSON, no markdown fences:
   "expected_count": 8,
   "entities": [...],
   "post_category": "eat|go|wear|watch|listen|use|follow|read",
-  "post_summary": "one sentence summary"
-}`
+  "post_summary": "one sentence summary",
+  "practical_tags": ["3-8 objective factual tags classifying the content, e.g. restaurant, fine_dining, italian, nyc"],
+  "taste_tags": ["3-8 subjective aesthetic/vibe tags, e.g. upscale, romantic, cozy, modern"],
+  "content_structure": "original_expression|curated_collection|summary|review|reference"
+}
+
+Tag guidelines:
+- practical_tags: objective, factual, searchable. What IS this content about. Use lowercase, underscores for multi-word.
+- taste_tags: subjective aesthetic/cultural/vibe. What does this FEEL like. Use lowercase, underscores for multi-word.
+- content_structure: how the content is organized — "summary" for top-N lists, "review" for opinions, "curated_collection" for aggregations, "original_expression" for creator's own work, "reference" for informational.`
 
 async function extractEntities(reel: ReelData, transcript: string | null): Promise<ExtractionResult> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
@@ -445,13 +456,28 @@ Pick the URL that is the OFFICIAL or CANONICAL source for this entity. Prefer:
 - brand: official brand website (not aggregators or review sites)
 - product: brand's own product page (not homepage) > specific retailer listing (not retailer homepage)
 - person/follow: if the entity is a specific piece of content by a person, prefer the direct URL for that content; if the entity is the person themselves, prefer Instagram profile > personal website > LinkedIn
+- book: Open Library > Goodreads > Amazon book page
+- event: Official event page > Eventbrite > venue website
 
-Specificity: when the entity refers to a specific piece of content, prefer the direct URL for that content over the creator's profile or channel page. Examples: specific YouTube video over channel, specific article over blog homepage, specific podcast episode over show page, specific product listing over brand homepage, specific recipe page over food blog. If the entity IS the creator/channel/brand itself (not a specific piece of their content), then the profile or homepage is correct.
+## Domain Authority Scoring
+Score each candidate URL's authority:
+- Authoritative (0.9+): google.com/maps, yelp.com, spotify.com, openlibrary.org, brand's own domain, official product pages
+- Good (0.7): well-known review sites, Wikipedia, major retailers with specific product pages
+- Weak (0.4): unknown blogs, aggregator sites, social media mentions, listicles
+- Bad (0.2): wrong entity type (e.g., a blog post when we need a place)
+
+## Primary Source Validation
+The URL must ACTUALLY BE the entity, not just mention it. For example:
+- A restaurant entity should resolve to the restaurant's Google Maps page or official website, NOT a blog post reviewing it
+- A product should resolve to where you can buy/view it, NOT an article about it
+- A song should resolve to where you can listen to it, NOT a review
+
+Specificity: when the entity refers to a specific piece of content, prefer the direct URL for that content over the creator's profile or channel page.
 
 If none of the URLs match the entity well, set selected_url to null.
 
 Return ONLY a valid JSON array, no markdown fences:
-[{"entity_index": 0, "selected_url": "https://...", "match_quality": 0.95}]`
+[{"entity_index": 0, "selected_url": "https://...", "match_quality": 0.95, "is_primary_source": true}]`
 
 async function selectBestUrls(
   entities: { index: number; name: string; type: string; category: string; location_hint: string | null; results: SearchResult[] }[]
@@ -506,6 +532,46 @@ async function selectBestUrls(
   }
 }
 
+// Match validation: score how well a resolved URL matches the entity
+function validateResolution(entity: Entity, resolvedUrl: string): number {
+  if (!resolvedUrl) return 0
+  try {
+    const urlDomain = new URL(resolvedUrl).hostname.replace('www.', '')
+
+    // Domain authority for entity type
+    let authorityScore = 0.5
+    const type = entity.type
+    if (type === 'place' || type === 'food') {
+      if (urlDomain.includes('google.com') || urlDomain.includes('maps.google')) authorityScore = 1.0
+      else if (urlDomain.includes('yelp.com') || urlDomain.includes('tripadvisor.com') || urlDomain.includes('opentable.com')) authorityScore = 0.85
+      else if (urlDomain.includes('instagram.com') || urlDomain.includes('facebook.com')) authorityScore = 0.4
+    } else if (type === 'song') {
+      if (urlDomain.includes('spotify.com') || urlDomain.includes('music.apple.com')) authorityScore = 1.0
+      else if (urlDomain.includes('soundcloud.com') || urlDomain.includes('youtube.com')) authorityScore = 0.8
+    } else if (type === 'product') {
+      // Brand's own domain is authoritative
+      const brandName = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      if (urlDomain.includes(brandName)) authorityScore = 0.9
+      else if (urlDomain.includes('amazon.com') || urlDomain.includes('nordstrom.com')) authorityScore = 0.7
+    } else if (type === 'book') {
+      if (urlDomain.includes('openlibrary.org') || urlDomain.includes('goodreads.com')) authorityScore = 0.9
+      else if (urlDomain.includes('amazon.com')) authorityScore = 0.7
+    } else if (type === 'brand') {
+      const brandName = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      if (urlDomain.includes(brandName)) authorityScore = 1.0
+    }
+
+    // Name match: check if entity name appears in URL path
+    const nameTokens = entity.name.toLowerCase().split(/\s+/).filter(t => t.length > 2)
+    const urlPath = new URL(resolvedUrl).pathname.toLowerCase()
+    const nameInUrl = nameTokens.filter(t => urlPath.includes(t)).length / Math.max(nameTokens.length, 1)
+
+    return 0.6 * authorityScore + 0.4 * nameInUrl
+  } catch {
+    return 0
+  }
+}
+
 async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<Entity[]> {
   // Phase 1: Classify entities
   const toResolve: Entity[] = []
@@ -521,14 +587,21 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
     }
   }
 
-  // Phase 2: Search DDG for each entity (serial, rate-limited)
+  // Phase 2: Search DDG for each entity (parallel, concurrency-limited to 3)
   const searchResults = new Map<number, SearchResult[]>()
-  for (let i = 0; i < toResolve.length; i++) {
-    const query = buildSearchQuery(toResolve[i])
-    const results = await searchDuckDuckGo(query)
-    searchResults.set(i, results)
-    console.log(`[instagram-import] DDG: ${toResolve[i].name} -> ${results.length} results`)
-    if (i < toResolve.length - 1) await new Promise(r => setTimeout(r, 500))
+  const CONCURRENCY = 3
+  for (let batch = 0; batch < toResolve.length; batch += CONCURRENCY) {
+    const chunk = toResolve.slice(batch, batch + CONCURRENCY)
+    const promises = chunk.map(async (entity, offset) => {
+      const i = batch + offset
+      const query = buildSearchQuery(entity)
+      const results = await searchDuckDuckGo(query)
+      searchResults.set(i, results)
+      console.log(`[instagram-import] DDG: ${entity.name} -> ${results.length} results`)
+    })
+    await Promise.allSettled(promises)
+    // Brief pause between batches to avoid rate limiting
+    if (batch + CONCURRENCY < toResolve.length) await new Promise(r => setTimeout(r, 300))
   }
 
   // Phase 3: Batch Claude call to pick best URL per entity
@@ -538,7 +611,7 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
 
   const selections = forSelection.length > 0 ? await selectBestUrls(forSelection) : new Map()
 
-  // Phase 4: Apply selections, fall back to first DDG result
+  // Phase 4: Apply selections with validation scoring
   for (let i = 0; i < toResolve.length; i++) {
     const entity = toResolve[i]
     const results = searchResults.get(i) || []
@@ -547,18 +620,26 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
     if (selection?.url) {
       entity.resolved_url = selection.url
       entity.resolved_via = 'duckduckgo+claude'
-      entity.match_quality = selection.quality
+      // Two-dimensional confidence: match_quality from Claude, validated by domain authority
+      const validationScore = validateResolution(entity, selection.url)
+      entity.match_quality = Math.round(((selection.quality * 0.5 + validationScore * 0.5)) * 100) / 100
     } else if (results.length > 0) {
       entity.resolved_url = results[0].url
       entity.resolved_via = 'duckduckgo-first'
-      entity.match_quality = 0
+      entity.match_quality = Math.round(validateResolution(entity, results[0].url) * 0.5 * 100) / 100
     } else {
       entity.resolved_url = null
       entity.resolved_via = null
       entity.match_quality = 0
     }
 
-    console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via})`)
+    // Update status based on two-dimensional confidence: min(extraction, resolution)
+    const overallConfidence = Math.min(entity.confidence, entity.match_quality || 0)
+    if (entity.resolved_url) {
+      entity.status = overallConfidence >= 0.7 ? 'auto' : 'review'
+    }
+
+    console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via}, quality: ${entity.match_quality})`)
   }
 
   // Phase 5: Enhanced music resolution (Spotify + AudD multi-track)
@@ -989,6 +1070,11 @@ function createPins(
     type_confidence: 1.0,
     source: 'social',
     source_id: 'instagram',
+    // Sense-making fields
+    entities: extraction.entities,
+    practical_tags: (extraction as any).practical_tags || [],
+    taste_tags: (extraction as any).taste_tags || [],
+    content_structure: (extraction as any).content_structure || 'summary',
     instagram: {
       shortcode: reel.shortcode,
       media_type: 'reel',
@@ -1081,13 +1167,29 @@ serve(async (req) => {
       // Step 2: Transcribe audio
       const transcript = await transcribeAudio(reel)
 
-      // Step 3: Extract entities
-      const extraction = await extractEntities(reel, transcript)
+      // Step 3: Extract entities (with verification retry)
+      let extraction = await extractEntities(reel, transcript)
       const expectedCount = (extraction as Record<string, unknown>).expected_count as number | undefined
-      if (expectedCount && extraction.entities.length < expectedCount) {
-        console.warn(`[instagram-import] Extraction gap: expected ${expectedCount}, found ${extraction.entities.length} entities`)
-      }
       console.log(`[instagram-import] Found ${extraction.entities.length} entities (expected: ${expectedCount ?? 'unknown'})`)
+
+      // Verification: retry once if significant count gap
+      if (expectedCount && expectedCount > 0 && extraction.entities.length < expectedCount * 0.7) {
+        console.warn(`[instagram-import] Extraction gap: expected ${expectedCount}, found ${extraction.entities.length}. Retrying...`)
+        try {
+          const retry = await extractEntities(reel, transcript)
+          // Merge new entities (dedup by name similarity)
+          const existingNames = new Set(extraction.entities.map(e => e.name.toLowerCase()))
+          for (const entity of retry.entities) {
+            if (!existingNames.has(entity.name.toLowerCase())) {
+              extraction.entities.push(entity)
+              existingNames.add(entity.name.toLowerCase())
+            }
+          }
+          console.log(`[instagram-import] After retry: ${extraction.entities.length} entities (was ${extraction.entities.length - retry.entities.filter(e => !existingNames.has(e.name.toLowerCase())).length})`)
+        } catch (retryErr) {
+          console.warn('[instagram-import] Retry failed:', (retryErr as Error).message)
+        }
+      }
 
       // Step 4: Resolve entities
       extraction.entities = await resolveAllEntities(extraction.entities, reel)
@@ -1111,6 +1213,9 @@ serve(async (req) => {
           unresolved_entities: unresolvedEntities,
           post_category: extraction.post_category,
           post_summary: extraction.post_summary,
+          practical_tags: (extraction as any).practical_tags || [],
+          taste_tags: (extraction as any).taste_tags || [],
+          content_structure: (extraction as any).content_structure || null,
           stats: {
             elapsed_seconds: parseFloat(elapsed),
             entities_found: extraction.entities.length,
