@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Rodeo — Save & Discover",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Save links, highlight text, and build your taste library",
   "icons": {
     "16": "icons/icon-16.png",

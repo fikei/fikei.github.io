@@ -90,13 +90,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.action === 'save') {
     // Popup requesting a save
-    savePin(msg.data).then(sendResponse);
+    savePin(msg.data)
+      .then(sendResponse)
+      .catch(e => {
+        console.error('[rodeo] save crashed:', e.message);
+        sendResponse({ error: 'save_failed', detail: e.message });
+      });
     return true; // async response
   }
 
   if (msg.action === 'get_session') {
     // Popup checking auth state
-    getSession().then(sendResponse);
+    getSession()
+      .then(sendResponse)
+      .catch(() => sendResponse(null));
     return true;
   }
 
@@ -113,7 +120,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           domain: extractDomain(tab.url)
         });
       }
-    });
+    }).catch(() => sendResponse({ error: 'unsupported_page' }));
     return true;
   }
 
@@ -205,25 +212,46 @@ async function savePin({ url, title, selectedText, source }) {
   };
 
   // Insert with merge-duplicates (same Prefer header as boards/index.html:12441)
-  const res = await supabasePost('/rest/v1/links', payload, accessToken, {
-    'Prefer': 'resolution=merge-duplicates'
-  });
+  let res;
+  try {
+    res = await supabasePost('/rest/v1/links', payload, accessToken, {
+      'Prefer': 'resolution=merge-duplicates'
+    });
+  } catch (e) {
+    console.error('[rodeo] save network error:', e.message);
+    return { error: 'save_failed', detail: e.message };
+  }
 
   if (!res.ok) {
     const errBody = await res.text();
     console.error('[rodeo] save failed:', res.status, errBody);
 
-    // If a column is unrecognized (schema cache), retry without it
+    // 401/403 = token expired — clear cached session so next attempt re-auths
+    if (res.status === 401 || res.status === 403) {
+      await clearCachedSession();
+      try { await chrome.storage.local.remove(SESSION_CACHE_KEY); } catch {}
+      return { error: 'not_authenticated' };
+    }
+
+    // If a column is unrecognized (schema cache), retry without it (up to 5)
+    let schemaRetries = 0;
     if (errBody.includes('schema cache')) {
-      const colMatch = errBody.match(/Could not find the '(\w+)' column/);
-      if (colMatch) {
+      while (schemaRetries < 5) {
+        const colMatch = errBody.match(/Could not find the '(\w+)' column/);
+        if (!colMatch) break;
         delete payload[colMatch[1]];
-        const retry = await supabasePost('/rest/v1/links', payload, accessToken, {
-          'Prefer': 'resolution=merge-duplicates'
-        });
-        if (retry.ok) {
-          triggerEnrichment({ url: canonical, title: pinTitle, linkId: pinId });
-          return { success: true, pinId };
+        schemaRetries++;
+        try {
+          const retry = await supabasePost('/rest/v1/links', payload, accessToken, {
+            'Prefer': 'resolution=merge-duplicates'
+          });
+          if (retry.ok) {
+            triggerEnrichment({ url: canonical, title: pinTitle, linkId: pinId });
+            return { success: true, pinId };
+          }
+        } catch (e) {
+          console.error('[rodeo] retry network error:', e.message);
+          return { error: 'save_failed', detail: e.message };
         }
       }
     }
