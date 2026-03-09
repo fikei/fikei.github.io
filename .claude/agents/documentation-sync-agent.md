@@ -63,7 +63,7 @@ Keeps Notion documentation synchronized with the git repository, ensuring conten
 | New PRD created | Create Notion page, add to PRDs section |
 | File deleted | Archive (not delete) corresponding Notion page |
 | Weekly schedule | Full structure audit |
-| Manual `/sync-docs` | Force full sync |
+| Manual `gh workflow run agent-automation.yml -f force_full_sync=true` | Force full sync |
 
 ## Workflow
 
@@ -113,25 +113,26 @@ Output: Validation report with action items
 ## File-to-Page Mapping
 
 ```
-Git Repository                    → Notion Page
-─────────────────────────────────────────────────
-docs/VISION-AND-ROADMAP.md       → Strategy/Vision & Roadmap
-docs/DECISION-LOG.md             → Strategy/Decision Log
-docs/PRD-*.md                    → Strategy/PRDs/*
-design-system/README.md          → User Experience/Design System/Overview
-design-system/FEATURES.md        → User Experience/Design System/Features
-boards/FEATURES.md               → User Experience/Boards/Features
-BACKLOG.md                       → Execution/Global Backlog
-docs/EXECUTION-SPRINT.md         → Execution/Current Sprint
-docs/EXECUTION-SHIPPED.md        → Execution/Recently Shipped
-docs/EXECUTION-BLOCKED.md        → Execution/Blocked/Waiting
-docs/PROJECT-PLAN-*.md           → Execution/Project Plans/*
-docs/INFRA-*.md                  → Infrastructure/Architecture/*
-docs/TECH-*.md                   → Infrastructure/Technical Design/*
-.claude/agents/*.md              → AI Agents/Agents/*
-soundscape/*.md                  → Playground/Soundscape/*
-systemic/*.md                    → Playground/Systemic/*
-COSTS.md                         → Operations/Costs
+Git Repository                                → Notion Page
+──────────────────────────────────────────────────────────────
+docs/strategy/vision-and-roadmap.md           → Strategy/Vision & Roadmap
+docs/strategy/decision-log.md                 → Strategy/Decision Log
+docs/strategy/prds/*.md                       → Strategy/PRDs/*
+docs/strategy/brand-positioning.md            → Strategy/Brand Positioning
+design-system/README.md                       → User Experience/Design System/Overview
+docs/ux/**/*.md                               → User Experience/*
+docs/execution/project-plan/index.md          → Execution/Project Plan
+docs/execution/project-plan/backlog.md        → Execution/Backlog
+docs/execution/project-plan/phase-*.md        → Execution/Project Plans/*
+docs/execution/BUGS.md                        → Execution/Bugs
+docs/infrastructure/architecture.md           → Infrastructure/Architecture
+docs/infrastructure/deployment.md             → Infrastructure/Deployment
+docs/infrastructure/security.md               → Infrastructure/Security
+docs/infrastructure/technical-design/*.md     → Infrastructure/Technical Design/*
+docs/infrastructure/NOTION-SYNC-GUIDE.md      → Infrastructure/Notion Sync Guide
+.claude/agents/*.md                           → AI Agents/Agents/*
+soundscape/*.md                               → Playground/Soundscape/*
+systemic/*.md                                 → Playground/Systemic/*
 ```
 
 ## Integration Points
