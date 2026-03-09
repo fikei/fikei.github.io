@@ -19,11 +19,14 @@ CREATE INDEX IF NOT EXISTS idx_taste_profiles_user ON taste_profiles(user_id);
 
 ALTER TABLE taste_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own taste profiles" ON taste_profiles;
 CREATE POLICY "Users can read own taste profiles"
   ON taste_profiles FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own taste profiles" ON taste_profiles;
 CREATE POLICY "Users can insert own taste profiles"
   ON taste_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own taste profiles" ON taste_profiles;
 CREATE POLICY "Users can delete own taste profiles"
   ON taste_profiles FOR DELETE USING (auth.uid() = user_id);
