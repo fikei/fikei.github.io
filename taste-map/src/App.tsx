@@ -4,7 +4,7 @@
 // Manages drill-down navigation stack
 // ============================================
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   fetchPins, callTasteGraphFunction, getUser, signInWithGoogle, supabase,
   pinSetHash, loadServerCache, saveServerCache,
@@ -88,10 +88,15 @@ export default function App() {
   // Track init trigger to allow re-running on auth change
   const [authTrigger, setAuthTrigger] = useState(0);
 
-  // Listen for auth state changes (e.g., after Google OAuth redirect)
+  // Ref to current state so auth listener can check without stale closure
+  const stateRef = useRef<AppState>('loading');
+  stateRef.current = state;
+
+  // Listen for auth state changes — only re-trigger init on actual sign-in
+  // (not on session restore, which fires SIGNED_IN on every page load)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' && stateRef.current === 'unauthenticated') {
         setAuthTrigger(t => t + 1);
       }
     });
@@ -131,14 +136,22 @@ export default function App() {
       if (cancelled) return;
 
       if (serverCached) {
-        console.log('[taste-map] Server cache hit — skipping clustering + LLM');
-        setDrillStack([buildRootFrame(pinData, serverCached.clusters, serverCached.edges)]);
-        setInsights(serverCached.insights);
-        setState('ready');
-        return;
+        // Only use server cache if it has AI-generated descriptions
+        const hasAiLabels = serverCached.clusters.some(
+          c => c.description && (c.description as ClusterDescription).whatItIs
+        );
+        if (hasAiLabels) {
+          console.log('[taste-map] Server cache hit — skipping clustering + LLM');
+          setDrillStack([buildRootFrame(pinData, serverCached.clusters, serverCached.edges)]);
+          setInsights(serverCached.insights);
+          setState('ready');
+          return;
+        }
+        console.log('[taste-map] Server cache has auto-labels only, regenerating...');
       }
 
-      // ---- Cache miss: cluster + label from scratch ----
+      // ---- Cache miss (or stale): cluster + label from scratch ----
+      setState('labeling');
 
       // Cluster
       const rawClusters = buildClusters(pinData);
@@ -146,11 +159,7 @@ export default function App() {
 
       if (cancelled) return;
 
-      // Push root frame with auto-labels
-      const rootFrame = buildRootFrame(pinData, rawClusters, graphEdges);
-      setDrillStack([rootFrame]);
-
-      // Try localStorage cache (fast fallback)
+      // Try localStorage cache for LLM labels
       const fp = clusterFingerprint(rawClusters);
       const cached = loadCache(fp);
 
@@ -165,15 +174,10 @@ export default function App() {
         setDrillStack([buildRootFrame(pinData, labeled, updatedEdges)]);
         setInsights(cached.insights);
         setState('ready');
-        // Backfill server cache from localStorage hit
-        saveServerCache(pHash, pinData.length, labeled, updatedEdges, cached.insights);
         return;
       }
 
-      // Show immediately with auto-labels
-      setState('ready');
-
-      // Background: fetch LLM labels + descriptions
+      // Fetch LLM labels — don't show graph until AI labels are ready
       try {
         const clusterInputs: ClusterInput[] = rawClusters.map(c => ({
           id: c.id,
@@ -211,14 +215,19 @@ export default function App() {
         setDrillStack([buildRootFrame(pinData, labeled, updatedEdges)]);
         setInsights(result.insights ?? { motifs: [], bridges: [] });
 
-        // Save to both caches
+        // Save to both caches — only after AI labels are ready
         saveCache(fp, {
           labels: labelMap,
           insights: result.insights ?? { motifs: [], bridges: [] },
         });
         saveServerCache(pHash, pinData.length, labeled, updatedEdges, result.insights ?? { motifs: [], bridges: [] });
+
+        setState('ready');
       } catch (err) {
-        console.warn('[taste-map] LLM labeling failed, using auto-labels:', err);
+        console.warn('[taste-map] LLM labeling failed, falling back to auto-labels:', err);
+        // Fallback: show graph with auto-labels if LLM fails
+        setDrillStack([buildRootFrame(pinData, rawClusters, graphEdges)]);
+        setState('ready');
       }
     }
 
