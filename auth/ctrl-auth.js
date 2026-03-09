@@ -85,10 +85,10 @@
             _currentUsername = profile.username;
             updateBarUI();
             dispatch('ctrl:auth:signedin', { user: _currentUser, username: _currentUsername, session: stored });
-          } else if (_currentUser) {
-            // No username yet — show onboarding
-            showUsernameModal();
           }
+          // Don't show username modal here — the token may be expired causing
+          // fetchProfile to return null. Let onAuthStateChange handle it with
+          // a fresh token instead.
         });
       }
     },
@@ -317,8 +317,8 @@
         updateBarUI();
         hideLoginModal();
         dispatch('ctrl:auth:signedin', { user: _currentUser, username: _currentUsername, session });
-      } else {
-        // No username — show onboarding
+      } else if (!_currentUsername) {
+        // No username in DB and not already set — show onboarding
         updateBarUI();
         hideLoginModal();
         showUsernameModal();
