@@ -43,7 +43,7 @@ async function supabaseDelete(path, accessToken) {
 // Uses anon key auth (matches boards/index.html:10477-10481)
 async function triggerEnrichment({ url, title, description, linkId }) {
   try {
-    await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
+    await fetch(`${SUPABASE_URL}/functions/v1/create-pin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

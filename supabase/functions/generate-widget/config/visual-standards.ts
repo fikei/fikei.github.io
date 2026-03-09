@@ -5,7 +5,7 @@
 //   Layer 2: Category Aesthetic — mood/palette per board category (home, wear, listen, etc.)
 //
 // Usage:
-//   - enrich-link: Gate rejects bad images, type + category scores rank candidates
+//   - create-pin: Gate rejects bad images, type + category scores rank candidates
 //   - generate-widget: Category context shapes AI prompt tone and recommendations
 
 // =============================================================================
