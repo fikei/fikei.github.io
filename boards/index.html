@@ -20057,17 +20057,18 @@ Return JSON:
     generateWidgets();
     console.log(`[perf] init: ${(performance.now() - initStart).toFixed(0)}ms`);
 
-    // Handle deep link: ?add=URL
+    // Handle deep links: ?add=URL or ?pin=ID
     const urlParams = new URLSearchParams(window.location.search);
     const addUrl = urlParams.get('add');
-    if (addUrl) {
+    const pinId = urlParams.get('pin');
+    if (addUrl || pinId) {
       // Mark this session as deep-link arrival (suppress bookmarklet promo)
       sessionStorage.setItem('boards_arrived_via_deeplink', '1');
       // Clean up the URL bar
       const cleanLocation = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanLocation);
-      // Process the link
-      processLinks(addUrl);
+      if (addUrl) processLinks(addUrl);
+      if (pinId) setTimeout(() => openDetail(pinId), 500);
     }
 
     // Auth is managed by ctrl-auth.js module — check if already signed in
