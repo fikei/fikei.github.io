@@ -452,10 +452,19 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
       for (const handle of allMentions) {
         if (usedHandles.has(handle)) continue
         const handleNorm = handle.toLowerCase().replace(/[^a-z0-9]/g, '')
-        // Match if entity name is contained in handle or vice versa
-        if (handleNorm.includes(entityNorm) || entityNorm.includes(handleNorm) ||
-            // Also check if handle words appear in entity name (e.g. "setmargins" matches "Set Margins")
-            entityNorm.replace(/\s/g, '') === handleNorm) {
+        // Match criteria: handle contains entity name or vice versa, with sufficient overlap.
+        // "Sublime" (7) in "wwwsublimeapp" (13): 7/13=0.54 ✓
+        // "twitter" (7) in "designtwitter" (13): would match but "twitter" is generic → excluded by blocklist
+        // We require the shorter string covers ≥40% of the longer AND ≥3 chars
+        const handleContainsEntity = handleNorm.includes(entityNorm) && entityNorm.length >= 3
+        const entityContainsHandle = entityNorm.includes(handleNorm) && handleNorm.length >= 3
+        const overlap = handleContainsEntity || entityContainsHandle
+        const minLen = Math.min(entityNorm.length, handleNorm.length)
+        const maxLen = Math.max(entityNorm.length, handleNorm.length)
+        const isSufficientOverlap = overlap && (minLen / maxLen) >= 0.4
+        // Exclude platform handles that are just common words
+        const platformHandles = new Set(['twitter', 'instagram', 'youtube', 'facebook', 'tiktok', 'spotify', 'reddit', 'pinterest'])
+        if ((isSufficientOverlap && !platformHandles.has(handleNorm)) || entityNorm === handleNorm) {
           entity.mention_handle = handle
           usedHandles.add(handle)
           console.log(`[instagram-import] Matched entity "${entity.name}" to @${handle}`)
