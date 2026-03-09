@@ -1,13 +1,6 @@
 # Claude Code Context System
 
-This directory contains configuration and context files for Claude Code and other AI development tools working with this repository.
-
-## Overview
-
-The context system provides:
-- **Project context** via `CLAUDE.md` (root directory)
-- **Agent definitions** for automated workflows
-- **Settings** for Claude Code configuration
+Configuration and context files for Claude Code and AI development tools.
 
 ## Directory Structure
 
@@ -16,77 +9,36 @@ The context system provides:
 ├── README.md           # This file
 ├── settings.json       # Claude Code configuration
 └── agents/             # AI agent definitions
-    ├── organizational-agent.md
-    ├── project-management-agent.md
-    ├── status-update-agent.md
-    ├── chief-of-staff-agent.md
-    ├── security-compliance-agent.md
-    └── continuous-improvement-agent.md
+    ├── AGENT-DEFINITION.md          # Consolidated agent identity + behavioral rules
+    ├── documentation-agent.md       # /plan /arch /capture /ux /branch /cleanup /pm
+    ├── documentation-sync-agent.md  # Notion sync rules
+    ├── organizational-agent.md      # Standards and audit
+    ├── project-management-agent.md  # Work breakdown
+    ├── status-update-agent.md       # Progress tracking
+    ├── chief-of-staff-agent.md      # Orchestration + decisions
+    ├── security-compliance-agent.md # Security scans
+    └── continuous-improvement-agent.md # Process optimization
 ```
 
-## Quick Reference
+## How It Works
 
-### Context File
-The main context file is `CLAUDE.md` in the repository root. This file provides:
-- Project overview and philosophy
-- Directory structure reference
-- Development guidelines
-- Application-specific context
+- `CLAUDE.md` (repo root) is loaded automatically every session — behavioral rules + essential context
+- Agent `.md` files are loaded on demand when their slash commands are invoked
+- `settings.json` configures agent enables, triggers, and preferences
 
-### Agent Commands
+## Agent Commands
+
 | Command | Agent | Description |
 |---------|-------|-------------|
-| `/audit` | Organizational | Documentation and standards audit |
-| `/plan` | Project Management | Task breakdown from PRD |
-| `/status` | Status Update | Current project status |
-| `/cos` | Chief of Staff | Synthesis and decision routing |
-| `/security` | Security & Compliance | Security scan |
-| `/improve` | Continuous Improvement | Process optimization analysis |
+| `/plan` | Documentation | Project plan management |
+| `/arch` | Documentation | Architecture doc sync |
+| `/capture` | Documentation | Log bugs, work, tech debt |
+| `/ux` | Documentation | UX documentation |
+| `/branch` | Documentation | Cross-branch doc diff |
+| `/cleanup` | Documentation | Documentation hygiene |
+| `/pm` | Documentation | Program management |
 
-## Agent Workforce
-
-### Core Agents (Always Active)
-1. **Organizational Agent** - Documentation standards, data integrity
-2. **Project Management Agent** - Task structuring, sprint planning
-3. **Status Update Agent** - Progress tracking, risk flagging
-4. **Chief of Staff Agent** - Global oversight, decision routing
-
-### Strategic Agents
-5. **Security & Compliance Agent** - Privacy, security audits
-6. **Continuous Improvement Agent** - Process optimization
-
-## Integration Points
-
-### Current Integrations
-- **GitHub**: Repository management (enabled)
-- **Supabase**: Backend services (enabled)
-
-### Planned Integrations
-- **Notion**: Documentation sync (not yet configured)
-
-## Usage
-
-### For Claude Code
-Claude Code automatically reads `CLAUDE.md` when working in this repository. The context file provides:
-- Project structure and conventions
-- Application-specific guidance
-- Links to detailed documentation
-
-### For Other AI Tools
-Other AI tools (ChatGPT, Gemini, etc.) can be provided with:
-1. The contents of `CLAUDE.md` for project context
-2. Relevant agent definitions for specific workflows
-3. PRD documents from `/docs/` for feature context
-
-## Configuration
-
-Edit `settings.json` to:
-- Enable/disable agents
-- Configure integration settings
-- Set workflow triggers
-- Customize preferences
-
-## Related Documents
-- [CLAUDE.md](../CLAUDE.md) - Main context file
-- [PRD-unified-corporate-management.md](../docs/PRD-unified-corporate-management.md) - System PRD
-- [BACKLOG.md](../BACKLOG.md) - Product roadmap
+## Related
+- [CLAUDE.md](../CLAUDE.md) — Main context file (behavioral rules)
+- [Agent Definition](./.claude/agents/AGENT-DEFINITION.md) — Consolidated agent identity
+- [Documentation Agent](./agents/documentation-agent.md) — Full command specs
