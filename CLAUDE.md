@@ -96,6 +96,8 @@ Slash commands (`/plan /arch /capture /ux /branch /cleanup /pm`): `.claude/agent
 
 ---
 
+**Docs layout:** `docs/strategy/prds/` (PRDs) | `docs/infrastructure/technical-design/` (tech specs) | `docs/execution/project-plan/` (plans) | `docs/ux/` (UX docs) | `*/archive/` (archived)
+
 ## Reference
 - [Brand Positioning](./docs/strategy/brand-positioning.md) | [Personas](./docs/ux/personas.md)
 - [Project Plan](./docs/execution/project-plan/index.md) | [Backlog](./docs/execution/project-plan/backlog.md) | [Bugs](./docs/execution/BUGS.md)
