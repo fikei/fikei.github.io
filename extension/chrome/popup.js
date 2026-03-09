@@ -19,6 +19,7 @@ const states = {
 // Current page data (set during init)
 let currentTab = null;
 let currentSelection = null;
+let lastPinId = null;
 
 // ============================================
 // State Management
@@ -102,11 +103,13 @@ async function handleSave() {
   }
 
   if (result.success) {
+    lastPinId = result.pinId;
     showState('saved');
     return;
   }
 
   if (result.error === 'duplicate') {
+    lastPinId = result.pinId;
     showState('duplicate');
     return;
   }
@@ -139,12 +142,14 @@ document.getElementById('btn-signin').addEventListener('click', () => {
 document.getElementById('btn-save').addEventListener('click', handleSave);
 
 document.getElementById('btn-view').addEventListener('click', () => {
-  chrome.tabs.create({ url: BOARDS_URL });
+  const url = lastPinId ? `${BOARDS_URL}?pin=${lastPinId}` : BOARDS_URL;
+  chrome.tabs.create({ url });
   window.close();
 });
 
 document.getElementById('btn-view-dup').addEventListener('click', () => {
-  chrome.tabs.create({ url: BOARDS_URL });
+  const url = lastPinId ? `${BOARDS_URL}?pin=${lastPinId}` : BOARDS_URL;
+  chrome.tabs.create({ url });
   window.close();
 });
 
