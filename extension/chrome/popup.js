@@ -12,7 +12,8 @@ const states = {
   saving: document.getElementById('state-saving'),
   saved: document.getElementById('state-saved'),
   duplicate: document.getElementById('state-duplicate'),
-  error: document.getElementById('state-error')
+  error: document.getElementById('state-error'),
+  settings: document.getElementById('state-settings')
 };
 
 // Current page data (set during init)
@@ -63,6 +64,9 @@ async function init() {
   if (selResult && selResult.text) {
     currentSelection = selResult.text;
   }
+
+  // Show tab bar (user is authenticated)
+  document.getElementById('tab-bar').hidden = false;
 
   // Populate save state
   document.getElementById('save-domain').textContent = tabInfo.domain;
@@ -169,6 +173,97 @@ function sendMessage(msg, timeoutMs = 15000) {
     });
   });
 }
+
+// ============================================
+// Tab Bar
+// ============================================
+let activeTab = 'save';
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    if (tab === activeTab) return;
+    activeTab = tab;
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (tab === 'settings') {
+      loadSettings();
+      showState('settings');
+    } else {
+      showState('save');
+    }
+  });
+});
+
+// ============================================
+// Settings Tab
+// ============================================
+async function loadSettings() {
+  const settings = await sendMessage({ action: 'get_privacy_settings' });
+  if (!settings) return;
+
+  document.getElementById('toggle-history').checked = settings.historyEnabled !== false;
+  document.getElementById('blocklist-input').value =
+    (settings.userBlocklist || []).join('\n');
+}
+
+document.getElementById('btn-save-settings').addEventListener('click', async () => {
+  const historyEnabled = document.getElementById('toggle-history').checked;
+  const raw = document.getElementById('blocklist-input').value;
+  const userBlocklist = raw.split('\n')
+    .map(d => d.trim().toLowerCase())
+    .filter(d => d.length > 0);
+
+  const result = await sendMessage({
+    action: 'save_privacy_settings',
+    settings: { historyEnabled, userBlocklist }
+  });
+
+  const status = document.getElementById('settings-status');
+  if (result && result.ok) {
+    status.textContent = 'Settings saved';
+    status.className = 'settings-status settings-status--ok';
+  } else {
+    status.textContent = 'Failed to save';
+    status.className = 'settings-status settings-status--err';
+  }
+  status.hidden = false;
+  setTimeout(() => { status.hidden = true; }, 3000);
+});
+
+document.getElementById('btn-backfill').addEventListener('click', async () => {
+  const status = document.getElementById('backfill-status');
+  status.textContent = 'Importing...';
+  status.className = 'settings-status';
+  status.hidden = false;
+
+  const result = await sendMessage({ action: 'start_backfill' }, 60000);
+  if (result && result.queued !== undefined) {
+    status.textContent = `Imported ${result.queued} of ${result.total} pages`;
+    status.className = 'settings-status settings-status--ok';
+  } else {
+    status.textContent = result?.error || 'Import failed';
+    status.className = 'settings-status settings-status--err';
+  }
+  setTimeout(() => { status.hidden = true; }, 5000);
+});
+
+document.getElementById('btn-delete-hour').addEventListener('click', async () => {
+  if (!confirm('Delete browsing history from the last hour?')) return;
+  await sendMessage({ action: 'delete_history', window: 60 * 60 * 1000 });
+});
+
+document.getElementById('btn-delete-day').addEventListener('click', async () => {
+  if (!confirm('Delete browsing history from the last 24 hours?')) return;
+  await sendMessage({ action: 'delete_history', window: 24 * 60 * 60 * 1000 });
+});
+
+document.getElementById('btn-delete-all').addEventListener('click', async () => {
+  if (!confirm('Delete ALL browsing history? This cannot be undone.')) return;
+  await sendMessage({ action: 'delete_history', window: 'all' });
+});
 
 // ============================================
 // Start
