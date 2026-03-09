@@ -4,8 +4,11 @@
 // Manages drill-down navigation stack
 // ============================================
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { fetchPins, callTasteGraphFunction, getUser, signInWithGoogle, supabase } from './lib/supabase';
+import { useEffect, useState, useCallback } from 'react';
+import {
+  fetchPins, callTasteGraphFunction, getUser, signInWithGoogle, supabase,
+  pinSetHash, loadServerCache, saveServerCache,
+} from './lib/supabase';
 import { buildClusters, buildEdges } from './lib/clustering';
 import { buildRootFrame, createDrillFrame } from './lib/drill';
 import type {
@@ -20,7 +23,7 @@ import { EdgeDetail } from './components/EdgeDetail';
 
 type AppState = 'loading' | 'unauthenticated' | 'empty' | 'clustering' | 'labeling' | 'ready';
 
-const CACHE_KEY_PREFIX = 'boards-taste-graph-v8-';
+const CACHE_KEY_PREFIX = 'boards-taste-graph-v9-';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function clusterFingerprint(clusters: Cluster[]): string {
@@ -121,17 +124,33 @@ export default function App() {
       setPins(pinData);
       setState('clustering');
 
+      // ---- Server-side cache check (before any clustering) ----
+      const pHash = pinSetHash(pinData);
+      const serverCached = await loadServerCache(pHash);
+
+      if (cancelled) return;
+
+      if (serverCached) {
+        console.log('[taste-map] Server cache hit — skipping clustering + LLM');
+        setDrillStack([buildRootFrame(pinData, serverCached.clusters, serverCached.edges)]);
+        setInsights(serverCached.insights);
+        setState('ready');
+        return;
+      }
+
+      // ---- Cache miss: cluster + label from scratch ----
+
       // Cluster
       const rawClusters = buildClusters(pinData);
       const graphEdges = buildEdges(rawClusters);
 
       if (cancelled) return;
 
-      // Push root frame
+      // Push root frame with auto-labels
       const rootFrame = buildRootFrame(pinData, rawClusters, graphEdges);
       setDrillStack([rootFrame]);
 
-      // Try cache
+      // Try localStorage cache (fast fallback)
       const fp = clusterFingerprint(rawClusters);
       const cached = loadCache(fp);
 
@@ -146,6 +165,8 @@ export default function App() {
         setDrillStack([buildRootFrame(pinData, labeled, updatedEdges)]);
         setInsights(cached.insights);
         setState('ready');
+        // Backfill server cache from localStorage hit
+        saveServerCache(pHash, pinData.length, labeled, updatedEdges, cached.insights);
         return;
       }
 
@@ -190,10 +211,12 @@ export default function App() {
         setDrillStack([buildRootFrame(pinData, labeled, updatedEdges)]);
         setInsights(result.insights ?? { motifs: [], bridges: [] });
 
+        // Save to both caches
         saveCache(fp, {
           labels: labelMap,
           insights: result.insights ?? { motifs: [], bridges: [] },
         });
+        saveServerCache(pHash, pinData.length, labeled, updatedEdges, result.insights ?? { motifs: [], bridges: [] });
       } catch (err) {
         console.warn('[taste-map] LLM labeling failed, using auto-labels:', err);
       }
