@@ -6842,7 +6842,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.13.0';
+  const VERSION = '2.13.1';
   console.log('[boards] v' + VERSION + ' - recipe viewer with scaling and unit conversion');
 
   // ============================================
@@ -17077,24 +17077,27 @@ Return JSON:
               const meta = await fetchMetadata(link.url);
               const cat = await smartCategorize(meta);
               const contentType = classifyByRules(link.url, meta.title, meta.description);
+              // Preserve existing category on refresh — don't recategorize
+              const keepCategory = link.category && link.category !== 'uncategorized';
+              const refreshCategory = keepCategory ? link.category : cat.category;
               let music = null;
-              if (cat.category === 'listen' || contentType.type === 'music') {
+              if (refreshCategory === 'listen' || contentType.type === 'music') {
                 music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
               }
               let video = null;
-              if (cat.category === 'watch' || contentType.type === 'video') {
+              if (refreshCategory === 'watch' || contentType.type === 'video') {
                 video = await extractVideoMetadata(link.url, meta.title, meta.description, meta.videoTags);
               }
               let book = null;
-              if (cat.category === 'read' || contentType.type === 'book') {
+              if (refreshCategory === 'read' || contentType.type === 'book') {
                 book = extractBookMetadata(link.url, meta.title, meta.description);
               }
               const linkUpdate = {
                 title: meta.title || link.title,
                 description: meta.description || link.description,
                 image: meta.image || link.image,
-                category: cat.category,
-                confidence: cat.confidence,
+                category: refreshCategory,
+                confidence: keepCategory ? (link.confidence || cat.confidence) : cat.confidence,
                 content_type: contentType.type,
                 type_confidence: contentType.confidence,
                 type_signals: contentType.signals,
@@ -17109,12 +17112,12 @@ Return JSON:
               renderFilters();
               renderGrid();
 
-              const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
-              const isBookRerun = cat.category === 'read' || contentType.type === 'book';
-              const isRecipeRerun = cat.category === 'eat' || contentType.type === 'recipe';
+              const isWatchRerun = refreshCategory === 'watch' || contentType.type === 'video';
+              const isBookRerun = refreshCategory === 'read' || contentType.type === 'book';
+              const isRecipeRerun = refreshCategory === 'eat' || contentType.type === 'recipe';
               if (isWatchRerun || isBookRerun || isRecipeRerun) {
                 queueServerEnrichment(id, link.url, meta.title, meta.description, {
-                  category: cat.category,
+                  category: refreshCategory,
                   enrichWatch: isWatchRerun,
                   enrichBook: isBookRerun,
                   enrichRecipe: isRecipeRerun
