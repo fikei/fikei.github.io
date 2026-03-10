@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect — ctrl.rodeo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 420px;
+      width: 100%;
+      padding: 2rem;
+    }
+    .logo {
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+    .subtitle {
+      color: #888;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+      line-height: 1.5;
+    }
+    .client-name {
+      color: #fff;
+      font-weight: 500;
+    }
+
+    /* Auth section */
+    .auth-section {
+      margin-bottom: 2rem;
+    }
+    .auth-section.hidden { display: none; }
+    .auth-btn {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin-bottom: 0.75rem;
+    }
+    .auth-btn:hover { border-color: #555; }
+    .auth-divider {
+      text-align: center;
+      color: #555;
+      font-size: 0.8rem;
+      margin: 0.75rem 0;
+    }
+    .email-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+    }
+    .email-input:focus { outline: none; border-color: #555; }
+
+    /* Tier selector */
+    .tier-section { margin-bottom: 2rem; }
+    .tier-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 0.75rem;
+    }
+    .tier-option {
+      padding: 0.75rem 1rem;
+      border: 1px solid #333;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .tier-option:hover { border-color: #555; }
+    .tier-option.selected {
+      border-color: #fff;
+      background: #1a1a1a;
+    }
+    .tier-option .tier-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #fff;
+      margin-bottom: 0.25rem;
+    }
+    .tier-option .tier-desc {
+      font-size: 0.8rem;
+      color: #888;
+      line-height: 1.4;
+    }
+
+    /* Allow button */
+    .allow-btn {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border: none;
+      border-radius: 8px;
+      background: #fff;
+      color: #000;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .allow-btn:hover { opacity: 0.9; }
+    .allow-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Status */
+    .status {
+      text-align: center;
+      padding: 2rem;
+      color: #888;
+      font-size: 0.9rem;
+    }
+    .status.error { color: #e55; }
+    .status.success { color: #5e5; }
+
+    .loading { display: none; }
+    .loading.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">ctrl.rodeo</div>
+
+    <!-- Step 1: Auth (shown if not logged in) -->
+    <div id="auth-section" class="auth-section">
+      <h1>Connect your library</h1>
+      <p class="subtitle">Sign in to share your curated collection with <span class="client-name" id="client-name">Claude</span>.</p>
+
+      <button class="auth-btn" id="google-btn" onclick="signInGoogle()">Continue with Google</button>
+      <div class="auth-divider">or</div>
+      <input class="email-input" id="email-input" type="email" placeholder="Email address" />
+      <button class="auth-btn" id="email-btn" onclick="signInEmail()">Send magic link</button>
+      <div id="auth-status" class="status"></div>
+    </div>
+
+    <!-- Step 2: Consent (shown after auth) -->
+    <div id="consent-section" class="auth-section hidden">
+      <h1>Share with <span class="client-name" id="client-name-2">Claude</span></h1>
+      <p class="subtitle">Choose how much of your library to share.</p>
+
+      <div class="tier-section">
+        <div class="tier-label">Privacy level</div>
+
+        <div class="tier-option" data-tier="taste_only" onclick="selectTier('taste_only')">
+          <div class="tier-name">Taste Only</div>
+          <div class="tier-desc">Categories, tags, and interests — no specific links or titles.</div>
+        </div>
+
+        <div class="tier-option selected" data-tier="library" onclick="selectTier('library')">
+          <div class="tier-name">Library</div>
+          <div class="tier-desc">Titles, categories, tags — no URLs or private notes.</div>
+        </div>
+
+        <div class="tier-option" data-tier="full_access" onclick="selectTier('full_access')">
+          <div class="tier-name">Full Access</div>
+          <div class="tier-desc">Everything including URLs, notes, and images.</div>
+        </div>
+      </div>
+
+      <button class="allow-btn" id="allow-btn" onclick="authorize()">Allow</button>
+      <div id="consent-status" class="status"></div>
+    </div>
+
+    <!-- Loading / result -->
+    <div id="result-section" class="auth-section hidden">
+      <div id="result-status" class="status"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co'
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgxOTQzMTgsImV4cCI6MjA1Mzc3MDMxOH0.VSwk27_TuN4WfbJ8gq9tp4FLOwtBN7BZDH-9i1CWBRI'
+    const OAUTH_BASE = `${SUPABASE_URL}/functions/v1/mcp-oauth`
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { flowType: 'pkce' }
+    })
+
+    // Parse OAuth params from URL
+    const params = new URLSearchParams(window.location.search)
+    const oauthParams = {
+      client_id: params.get('client_id'),
+      redirect_uri: params.get('redirect_uri'),
+      code_challenge: params.get('code_challenge'),
+      code_challenge_method: params.get('code_challenge_method') || 'S256',
+      scope: params.get('scope') || 'read',
+      state: params.get('state'),
+    }
+
+    let selectedTier = 'library'
+
+    // Set client name from params if available
+    document.getElementById('client-name').textContent = 'Claude'
+    document.getElementById('client-name-2').textContent = 'Claude'
+
+    // Check if already logged in
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        showConsent()
+      }
+    }
+
+    function showConsent() {
+      document.getElementById('auth-section').classList.add('hidden')
+      document.getElementById('consent-section').classList.remove('hidden')
+    }
+
+    function showResult(message, isError = false) {
+      document.getElementById('auth-section').classList.add('hidden')
+      document.getElementById('consent-section').classList.add('hidden')
+      document.getElementById('result-section').classList.remove('hidden')
+      const el = document.getElementById('result-status')
+      el.textContent = message
+      el.className = isError ? 'status error' : 'status success'
+    }
+
+    function selectTier(tier) {
+      selectedTier = tier
+      document.querySelectorAll('.tier-option').forEach(el => {
+        el.classList.toggle('selected', el.dataset.tier === tier)
+      })
+    }
+
+    async function signInGoogle() {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href }
+      })
+      if (error) {
+        document.getElementById('auth-status').textContent = error.message
+        document.getElementById('auth-status').className = 'status error'
+      }
+    }
+
+    async function signInEmail() {
+      const email = document.getElementById('email-input').value
+      if (!email) return
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.href }
+      })
+      if (error) {
+        document.getElementById('auth-status').textContent = error.message
+        document.getElementById('auth-status').className = 'status error'
+      } else {
+        document.getElementById('auth-status').textContent = 'Check your email for the magic link.'
+        document.getElementById('auth-status').className = 'status'
+      }
+    }
+
+    async function authorize() {
+      const btn = document.getElementById('allow-btn')
+      btn.disabled = true
+      btn.textContent = 'Connecting...'
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          document.getElementById('consent-status').textContent = 'Session expired. Please sign in again.'
+          document.getElementById('consent-status').className = 'status error'
+          btn.disabled = false
+          btn.textContent = 'Allow'
+          return
+        }
+
+        // Call our OAuth server to create an authorization code
+        const response = await fetch(`${OAUTH_BASE}/code`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            ...oauthParams,
+            privacy_tier: selectedTier,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok || !result.redirect_url) {
+          throw new Error(result.error_description || result.error || 'Authorization failed')
+        }
+
+        // Redirect back to Claude with the auth code
+        showResult('Connected! Redirecting...')
+        window.location.href = result.redirect_url
+
+      } catch (e) {
+        document.getElementById('consent-status').textContent = e.message
+        document.getElementById('consent-status').className = 'status error'
+        btn.disabled = false
+        btn.textContent = 'Allow'
+      }
+    }
+
+    // Listen for auth state changes (after Google redirect or magic link)
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        showConsent()
+      }
+    })
+
+    init()
+  </script>
+</body>
+</html>
