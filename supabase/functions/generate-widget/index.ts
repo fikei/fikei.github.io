@@ -1076,6 +1076,18 @@ interface ExtendedWidgetRequest extends WidgetRequest {
   category?: string
   userPrefs?: Record<string, any>
   skipEligibility?: boolean // For testing
+  tasteContext?: TasteContext | null // Taste Engine profile context
+}
+
+// Taste Engine context (passed from client, optional)
+interface TasteContext {
+  domains?: { label: string; summary: string; spanning_categories: string[]; confidence: number }[]
+  axes?: { axis: string; position: number; low_label: string; high_label: string }[]
+  sensibility?: string | null
+  // Legacy compat fields
+  clusters?: { label: string; domain: string; pinCount: number }[]
+  bridges?: any[]
+  motifs?: string[]
 }
 
 serve(async (req) => {
@@ -1172,7 +1184,7 @@ serve(async (req) => {
     // ========================================================================
     // Standard widget generation (existing flow)
     // ========================================================================
-    const { widgetId, prompt, items, category, userPrefs, skipEligibility } = requestBody as ExtendedWidgetRequest
+    const { widgetId, prompt, items, category, userPrefs, skipEligibility, tasteContext } = requestBody as ExtendedWidgetRequest
 
     if (!widgetId || !prompt || !items || items.length === 0) {
       return new Response(
@@ -1306,7 +1318,44 @@ Example: "confidence": 0.85`
     // ==========================================================================
     const categoryContext = category ? buildCategoryPrompt(category) : ''
 
-    const fullPrompt = `${prompt}${brandConstraint}${dsConstraint}${categoryContext}${confidenceInstruction}
+    // ==========================================================================
+    // TASTE ENGINE: USER PREFERENCE CONTEXT
+    // Inject taste profile so AI recommendations align with user's aesthetic
+    // ==========================================================================
+    let tasteConstraint = ''
+    if (tasteContext) {
+      const parts: string[] = []
+
+      if (tasteContext.sensibility) {
+        parts.push(`User's taste sensibility: ${tasteContext.sensibility}`)
+      }
+
+      if (tasteContext.domains && tasteContext.domains.length > 0) {
+        const domainText = tasteContext.domains
+          .slice(0, 5)
+          .map(d => `"${d.label}"${d.summary ? ` — ${d.summary}` : ''}`)
+          .join('; ')
+        parts.push(`Taste domains: ${domainText}`)
+      }
+
+      if (tasteContext.axes && tasteContext.axes.length > 0) {
+        const axisText = tasteContext.axes
+          .map(a => `${a.axis}: ${a.position < 0.4 ? a.low_label : a.position > 0.6 ? a.high_label : 'balanced'} (${a.position.toFixed(1)})`)
+          .join(', ')
+        parts.push(`Aesthetic axes: ${axisText}`)
+      }
+
+      if (parts.length > 0) {
+        tasteConstraint = `
+
+USER TASTE PROFILE (use to personalize recommendations):
+${parts.join('\n')}
+
+IMPORTANT: Lean into the user's aesthetic preferences when making suggestions. Match their taste domains and axis positions. A user who leans "minimal" should get cleaner, simpler suggestions. A user who leans "artisanal" should get craft-forward options.`
+      }
+    }
+
+    const fullPrompt = `${prompt}${brandConstraint}${dsConstraint}${categoryContext}${tasteConstraint}${confidenceInstruction}
 
 Here are the items to analyze:
 
