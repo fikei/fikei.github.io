@@ -6,7 +6,7 @@
 // Body: { url, title?, description?, linkId?, content_type?, category?,
 //         skipImage?, currentImage?, forceRefresh?,
 //         enrichWatch?, enrichBook?, enrichListen?, enrichRecipe? }
-const VERSION = '2.1.0'
+const VERSION = '2.1.1'
 console.log(`[create-pin] v${VERSION} - Pin Creation Agent (image + metadata + recipe)`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, hero_score, video?, book?, music?, recipe? }
 
@@ -76,10 +76,26 @@ serve(async (req) => {
       )
     }
 
+    // Normalize protocol-relative URLs and decode HTML entities
+    if (url.startsWith('//')) url = 'https:' + url
+    url = url.replace(/&amp;/g, '&')
+
+    // Validate URL is parseable
+    let parsedUrl: URL
+    try {
+      parsedUrl = new URL(url)
+    } catch (_e) {
+      console.warn('[create-pin] Invalid URL:', url)
+      return new Response(
+        JSON.stringify({ error: 'Invalid URL format', url }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     console.log('[create-pin] Processing:', url)
 
-    const domain = new URL(url).hostname.replace('www.', '')
-    const path = new URL(url).pathname
+    const domain = parsedUrl.hostname.replace('www.', '')
+    const path = parsedUrl.pathname
 
     // ========================================
     // STEP 0: Platform API metadata for sites that block scraping

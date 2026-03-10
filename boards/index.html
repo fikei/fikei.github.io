@@ -6842,7 +6842,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.13.1';
+  const VERSION = '2.13.2';
   console.log('[boards] v' + VERSION + ' - recipe viewer with scaling and unit conversion');
 
   // ============================================
@@ -11136,6 +11136,15 @@ Return JSON:
 
   // Call create-pin API with retry logic (image resolution + metadata enrichment)
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
+    // Normalize URL: fix protocol-relative and HTML entities before sending
+    let enrichUrl = item.url;
+    if (enrichUrl && enrichUrl.startsWith('//')) enrichUrl = 'https:' + enrichUrl;
+    if (enrichUrl) enrichUrl = enrichUrl.replace(/&amp;/g, '&');
+    try { new URL(enrichUrl); } catch (_e) {
+      console.warn('%c[ENRICH] Skipping invalid URL:', 'color: #e74c3c', enrichUrl);
+      return { success: false, error: new Error('Invalid URL: ' + enrichUrl) };
+    }
+
     let lastError = null;
 
     for (let attempt = 0; attempt <= ENRICHMENT_MAX_RETRIES; attempt++) {
@@ -11157,7 +11166,7 @@ Return JSON:
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            url: item.url,
+            url: enrichUrl,
             title: item.title,
             description: item.description,
             linkId: item.linkId,
