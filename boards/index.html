@@ -5741,6 +5741,9 @@ body {
   .ig-entity--unresolved { border-color: var(--subtle); opacity: 0.85; cursor: default; }
   .ig-entity--unresolved:hover { border-color: var(--muted); background: none; }
   .ig-entity--unresolved-resolved { border-color: var(--fg) !important; opacity: 1; }
+  .ig-tag { display: inline-block; padding: 1px 6px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid var(--subtle); color: var(--muted); }
+  .ig-tag--structure { color: var(--fg); border-color: var(--muted); }
+  .ig-tag--taste { font-style: italic; }
   #igEntities { max-height: 50vh; overflow-y: auto; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
@@ -6508,6 +6511,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       <div style="padding: var(--space-4);">
         <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-serif); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
         <p id="igStats" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
+        <div id="igTagsRow" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:var(--space-3);"></div>
         <div id="igKeepSourceRow" style="display:none;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid var(--subtle);">
           <input type="checkbox" id="igKeepSource" checked style="width:16px;height:16px;accent-color:var(--fg);cursor:pointer;">
           <label for="igKeepSource" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);cursor:pointer;user-select:none;">Keep original Instagram post as a pin</label>
@@ -6532,8 +6536,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.10.0';
-  console.log('[boards] v' + VERSION + ' - youtube import integration');
+  const VERSION = '2.11.1';
+  console.log('[boards] v' + VERSION + ' - rotating loader for Instagram import');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -9749,7 +9753,7 @@ Return JSON:
   // ============================================
   // Image Resolution System (server-first)
   // ============================================
-  // Strategy selection is now server-side in enrich-link.
+  // Strategy selection is now server-side in create-pin.
   // Client only handles: CORS proxy (fetchMetadata) and platform APIs (resolvePlatformImage).
   // Everything else delegates to the server via queueServerEnrichment().
 
@@ -10021,7 +10025,7 @@ Return JSON:
   //         releaseDate, contentFormat, platformId, isExplicit, key, label
   // musicTags: optional og:music tags already scraped by fetchMetadata (avoids re-fetching)
 
-  // BPM/key lookup is now server-side in enrich-link step 7 (GetSongBPM CORS blocks browser calls)
+  // BPM/key lookup is now server-side in create-pin step 7 (GetSongBPM CORS blocks browser calls)
 
   async function extractMusicMetadata(url, title, description, musicTags) {
     const meta = {
@@ -10198,7 +10202,7 @@ Return JSON:
           }
         }
 
-        // 6b: BPM/key now resolved server-side in enrich-link step 7
+        // 6b: BPM/key now resolved server-side in create-pin step 7
         if (meta.bpm || meta.key) {
           console.log('%c[music-meta] BPM/key from server:', 'color: #1DB954', { bpm: meta.bpm, key: meta.key });
         }
@@ -10572,9 +10576,9 @@ Return JSON:
   };
 
   // ============================================
-  // Tier 3: AI Vision Validation (now server-side in enrich-link)
+  // Tier 3: AI Vision Validation (now server-side in create-pin)
   // ============================================
-  // Tier 3 quality evaluation is now integrated into the server-side enrich-link pipeline.
+  // Tier 3 quality evaluation is now integrated into the server-side create-pin pipeline.
   // Images are validated BEFORE being returned to the client, so no async post-display queue is needed.
   // The server returns pre-validated images with full scores (accuracy, aesthetic_fit, distinctiveness, safety).
 
@@ -10799,7 +10803,31 @@ Return JSON:
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Call enrichment API with retry logic
+  // Call analyze-content API (sense-making: classification + tags + entities)
+  async function callAnalyzeContentAPI(url, title, description) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ url, title, description })
+      });
+
+      if (!response.ok) {
+        console.warn('%c[ANALYZE] analyze-content returned', 'color: #9b59b6', response.status);
+        return null;
+      }
+
+      return await response.json();
+    } catch (e) {
+      console.warn('%c[ANALYZE] analyze-content error:', 'color: #9b59b6', e.message);
+      return null;
+    }
+  }
+
+  // Call create-pin API with retry logic (image resolution + metadata enrichment)
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
     let lastError = null;
 
@@ -10815,7 +10843,7 @@ Return JSON:
         // supabase.functions.invoke() sent the user JWT which expires and
         // returns a generic "non-2xx status code" error that hid the real
         // HTTP status, causing 401s to be retried pointlessly.
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/enrich-link`, {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/create-pin`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -10828,7 +10856,7 @@ Return JSON:
             linkId: item.linkId,
             currentImage: currentImage,
             skipIfHasImage: !forceRefresh && !!currentImage,
-            skipClassification: item.skipClassification || false,
+            content_type: item.content_type || null,
             forceRefresh: forceRefresh,
             category: item.category || null,
             enrichWatch: item.enrichWatch || false,
@@ -10841,14 +10869,14 @@ Return JSON:
           const status = response.status;
           // 400/401/403/404 are not retryable — stop immediately
           if (status >= 400 && status < 500) {
-            throw new Error(`enrich-link returned ${status}`);
+            throw new Error(`create-pin returned ${status}`);
           }
           // 5xx are retryable
           if (attempt < ENRICHMENT_MAX_RETRIES) {
-            lastError = new Error(`enrich-link returned ${status}`);
+            lastError = new Error(`create-pin returned ${status}`);
             continue;
           }
-          throw new Error(`enrich-link returned ${status}`);
+          throw new Error(`create-pin returned ${status}`);
         }
 
         const result = await response.json();
@@ -10908,22 +10936,55 @@ Return JSON:
       const currentImage = currentLink?.image || null;
       const forceRefresh = item.forceRefresh || false;
 
-      // Check domain cache first - skip classification if high confidence cached
-      let skipClassification = false;
-      let cachedType = null;
-      try {
-        const domain = new URL(item.url).hostname.replace('www.', '');
-        const cached = domainProfileCache[domain];
-        if (cached && cached.confidence >= 0.85) {
-          console.log('%c[ENRICH] Domain cache hit:', 'color: #27ae60', domain, cached.primaryType, cached.confidence);
-          skipClassification = true;
-          cachedType = cached;
-        }
-      } catch {}
+      // Step 1: Sense-making via analyze-content (classification + tags + entities)
+      let analysisResult = null;
+      if (!item.skipAnalysis) {
+        console.log('%c[ANALYZE] Calling analyze-content for:', 'color: #9b59b6', item.url);
+        analysisResult = await callAnalyzeContentAPI(item.url, item.title, item.description);
 
-      // Call API with retry logic (skip classification if cached)
+        if (analysisResult) {
+          console.log('%c[ANALYZE] Result:', 'color: #9b59b6; font-weight: bold', {
+            content_type: analysisResult.content_type,
+            content_structure: analysisResult.content_structure,
+            practical_tags: analysisResult.practical_tags?.length,
+            taste_tags: analysisResult.taste_tags?.length,
+            entities: analysisResult.entities?.length
+          });
+
+          // Apply analysis results to link immediately
+          const analysisData = load();
+          const analysisLink = analysisData.links.find(l => l.id === item.linkId);
+          if (analysisLink) {
+            if (analysisResult.content_type && analysisResult.content_type !== 'unknown') {
+              analysisLink.content_type = analysisResult.content_type;
+              analysisLink.type_confidence = analysisResult.type_confidence;
+            }
+            if (analysisResult.content_structure) {
+              analysisLink.content_structure = analysisResult.content_structure;
+            }
+            if (analysisResult.entities?.length) {
+              analysisLink.entities = analysisResult.entities;
+            }
+            if (analysisResult.practical_tags?.length) {
+              analysisLink.practical_tags = analysisResult.practical_tags;
+            }
+            if (analysisResult.taste_tags?.length) {
+              analysisLink.taste_tags = analysisResult.taste_tags;
+            }
+            // Recompute tags with new data
+            analysisLink.tags = computeLinkTags(analysisLink);
+            // Update title if platform API resolved a better one
+            if (analysisResult.title && (!analysisLink.title || analysisLink.title.length < 5)) {
+              analysisLink.title = analysisResult.title;
+            }
+            save(analysisData);
+          }
+        }
+      }
+
+      // Step 2: Pin creation via create-pin (image resolution + metadata enrichment)
       const { success, result, error } = await callEnrichmentAPI(
-        { ...item, skipClassification },
+        { ...item, content_type: analysisResult?.content_type || item.content_type || null },
         currentImage,
         forceRefresh
       );
@@ -10969,25 +11030,22 @@ Return JSON:
         delete link.enrichment_failed;
         delete link.enrichment_failed_at;
 
-        // Update content type - prefer server result, fallback to client cache
-        if (result.content_type && result.content_type !== 'unknown') {
+        // Content type: prefer analyze-content result (already applied), then create-pin fallback
+        if (result.content_type && result.content_type !== 'unknown' && !link.content_type) {
           link.content_type = result.content_type;
           link.type_confidence = result.type_confidence;
-          // Update client cache with server result
+        }
+        // Update client domain cache with best available type
+        if (link.content_type && link.content_type !== 'unknown') {
           try {
             const domain = new URL(item.url).hostname.replace('www.', '');
             domainProfileCache[domain] = {
-              primaryType: result.content_type,
-              confidence: result.type_confidence,
+              primaryType: link.content_type,
+              confidence: link.type_confidence || 0.8,
               updatedAt: Date.now()
             };
             saveDomainCache();
           } catch {}
-        } else if (cachedType && cachedType.primaryType) {
-          // Use cached type if server returned unknown
-          link.content_type = cachedType.primaryType;
-          link.type_confidence = cachedType.confidence;
-          console.log('%c[ENRICH] Using cached type:', 'color: #f39c12', cachedType.primaryType);
         }
 
         // Only update image if:
@@ -12135,6 +12193,14 @@ Return JSON:
     // Content type
     if (link.content_type) tags.add(link.content_type);
 
+    // Sense-making tags (from analyze-content)
+    if (link.practical_tags) {
+      for (const t of link.practical_tags) tags.add(t);
+    }
+    if (link.taste_tags) {
+      for (const t of link.taste_tags) tags.add(t);
+    }
+
     // SUB_TAGS sub-category (previously runtime-only, now persisted)
     const subTags = detectTags(link);
     if (subTags) {
@@ -12747,6 +12813,16 @@ Return JSON:
         image_source: link.image_source || null,
         // image_scores intentionally omitted — client-only field, DB column exists but
         // PostgREST schema cache may be stale. Scores live in localStorage and are recomputed.
+        // Sense-making fields (from analyze-content)
+        entities: link.entities || null,
+        practical_tags: link.practical_tags || [],
+        taste_tags: link.taste_tags || [],
+        content_structure: link.content_structure || null,
+        hero_score: link.hero_score || null,
+        // Provenance fields
+        instagram: link.instagram || null,
+        extraction: link.extraction || null,
+        source_url: link.source_url || null,
         // Structured metadata (JSONB columns)
         video: link.video || null,
         music: link.music || null,
@@ -16518,6 +16594,10 @@ Return JSON:
               image: src.image || link.image,
               instagram: src.instagram || {},
               content_type: src.content_type || link.content_type,
+              entities: src.entities || null,
+              practical_tags: result.practical_tags || [],
+              taste_tags: result.taste_tags || [],
+              content_structure: result.content_structure || null,
               enrichment_failed: false
             });
             renderFilters();
@@ -18417,6 +18497,23 @@ Return JSON:
       + (unresolvedCount > 0 ? ` \u00b7 ${unresolvedCount} not found` : '')
       + ` \u00b7 ${stats.entities_review} need review \u00b7 ${stats.entities_discarded} skipped`;
 
+    // Show sense-making tags below stats
+    const tagsRow = $('igTagsRow');
+    if (tagsRow) {
+      const pTags = result.practical_tags || [];
+      const tTags = result.taste_tags || [];
+      const structure = result.content_structure || null;
+      if (pTags.length > 0 || tTags.length > 0 || structure) {
+        tagsRow.style.display = 'flex';
+        tagsRow.innerHTML =
+          (structure ? '<span class="ig-tag ig-tag--structure">' + escHtml(structure.replace(/_/g, ' ')) + '</span>' : '') +
+          pTags.map(t => '<span class="ig-tag ig-tag--practical">' + escHtml(t) + '</span>').join('') +
+          tTags.map(t => '<span class="ig-tag ig-tag--taste">' + escHtml(t) + '</span>').join('');
+      } else {
+        tagsRow.style.display = 'none';
+      }
+    }
+
     igEntities.innerHTML = '';
 
     if (!derived_pins || derived_pins.length === 0) {
@@ -18662,7 +18759,7 @@ Return JSON:
         added++;
         queueServerEnrichment(norm.id, norm.url, norm.title, norm.description, {
           category: norm.category,
-          skipClassification: true
+          content_type: norm.content_type || null
         });
         // Immediately extract music metadata for listen-category pins
         if ((norm.category === 'listen' || norm.content_type === 'music') && norm.url) {
@@ -18954,9 +19051,23 @@ Return JSON:
         try {
           // Instagram path: use the full import pipeline instead of generic metadata fetch
           if (isInstagramContent(url)) {
-            toast('Importing Instagram content...', { level: 'info', id: 'ig-import-' + id });
+            const igPhrases = [
+              'Scanning the reel', 'Reading the caption', 'Parsing the vibes',
+              'Extracting entities', 'Resolving links', 'Identifying the finds',
+              'Checking the sources', 'Cross-referencing', 'Mapping connections',
+              'Decoding the content', 'Following the trail', 'Piecing it together',
+              'Analyzing the post', 'Digging deeper', 'Almost there',
+            ];
+            let igPhraseIdx = 0;
+            const igToastId = 'ig-import-' + id;
+            toast(igPhrases[0] + '...', { level: 'info', id: igToastId });
+            const igPhraseInterval = setInterval(() => {
+              igPhraseIdx = (igPhraseIdx + 1) % igPhrases.length;
+              toast(igPhrases[igPhraseIdx] + '...', { level: 'info', id: igToastId });
+            }, 2200);
             try {
               const result = await importInstagramContent(url);
+              clearInterval(igPhraseInterval);
               const src = result.source_pin || {};
               updateLink(id, {
                 title: src.title || generateTitleFromUrl(url),
@@ -18967,12 +19078,16 @@ Return JSON:
                 type_confidence: 1.0,
                 category: src.category || 'follow',
                 domain: 'instagram.com',
+                entities: src.entities || null,
+                practical_tags: result.practical_tags || [],
+                taste_tags: result.taste_tags || [],
+                content_structure: result.content_structure || null,
                 loading: false,
                 enrichment_failed: false,
               });
               renderFilters();
               renderGrid();
-              toast('Reel imported', { id: 'ig-import-' + id });
+              toast('Reel imported', { id: igToastId });
 
               if ((result.derived_pins && result.derived_pins.length > 0) ||
                   (result.unresolved_entities && result.unresolved_entities.length > 0)) {
@@ -18986,10 +19101,11 @@ Return JSON:
               const link3 = data3.links.find(l => l.id === id);
               if (link3) syncLinkToSupabase(link3);
             } catch (err) {
+              clearInterval(igPhraseInterval);
               console.error('[instagram-import] Auto-import failed:', err);
               updateLink(id, { loading: false, enrichment_failed: true });
               renderGrid();
-              toast('Instagram import failed — try refresh', { level: 'error', id: 'ig-import-' + id });
+              toast('Instagram import failed — try refresh', { level: 'error', id: igToastId });
             }
             return;
           }
@@ -19956,17 +20072,19 @@ Return JSON:
     generateWidgets();
     console.log(`[perf] init: ${(performance.now() - initStart).toFixed(0)}ms`);
 
-    // Handle deep link: ?add=URL
+    // Handle deep links: ?add=URL or ?pin=ID
     const urlParams = new URLSearchParams(window.location.search);
     const addUrl = urlParams.get('add');
-    if (addUrl) {
+    const pendingPinId = urlParams.get('pin');
+    if (addUrl || pendingPinId) {
       // Mark this session as deep-link arrival (suppress bookmarklet promo)
       sessionStorage.setItem('boards_arrived_via_deeplink', '1');
       // Clean up the URL bar
       const cleanLocation = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanLocation);
-      // Process the link
-      processLinks(addUrl);
+      if (addUrl) processLinks(addUrl);
+      // Store pending pin — opened after cloud sync completes
+      if (pendingPinId) window._pendingPinDetail = pendingPinId;
     }
 
     // Auth is managed by ctrl-auth.js module — check if already signed in
@@ -20107,6 +20225,13 @@ Return JSON:
         console.log('[sync] Updated from cloud');
       } else {
         console.log('[sync] No cloud data returned');
+      }
+
+      // Open pending pin detail (from ?pin= deep link)
+      if (window._pendingPinDetail) {
+        const pid = window._pendingPinDetail;
+        delete window._pendingPinDetail;
+        openDetail(pid);
       }
 
       // Process any links saved from shared boards while logged out

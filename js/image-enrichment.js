@@ -4,7 +4,7 @@
    images based on content metadata.
 
    Strategies (in priority order):
-     1. enrich  — call enrich-link edge function (needs URL + API key)
+     1. enrich  — call create-pin edge function (needs URL + API key)
      2. unsplash — Unsplash search by keywords (needs API key)
      3. picsum  — picsum.photos seeded by content context (no key)
 
@@ -97,7 +97,7 @@
   function enrichResolve(context, size, config) {
     if (!context.url) return picsumResolve(context, size);
 
-    var endpoint = config.supabaseUrl + '/functions/v1/enrich-link';
+    var endpoint = config.supabaseUrl + '/functions/v1/create-pin';
     return fetch(endpoint, {
       method: 'POST',
       headers: {

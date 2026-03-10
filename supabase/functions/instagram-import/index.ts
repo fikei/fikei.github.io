@@ -3,10 +3,11 @@
 //
 // Pipeline:
 //   1. ScrapeCreators API → caption, video URL, thumbnail, audio track, location
-//   2. Transcription → Instagram auto-transcript, Supadata, or Deepgram Nova-2
-//   3. Claude Haiku → entity extraction from caption + transcript
-//   4. DuckDuckGo → resolve entities to stable primary-source URLs
-//   5. Return source pin + N derived pins
+//   2. Transcription → Instagram auto-transcript, ScrapeCreators, Supadata, or Deepgram
+//   3. Claude Haiku → entity extraction from caption + transcript (with @mention anchoring)
+//   4. Resolution → caption URLs > @mention bio websites > DuckDuckGo + Claude
+//   5. Music → Spotify search + AudD fingerprinting
+//   6. Return source pin + N derived pins
 //
 // POST /functions/v1/instagram-import
 // Body:
@@ -15,6 +16,9 @@
 //   Pre-parsed:  { posts: [{ shortcode, caption, video_url, ... }] }
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
+
+const VERSION = '1.3.0'
+console.log(`[instagram-import] v${VERSION} - @mention bio resolution, ScrapeCreators transcripts, caption URLs`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -51,6 +55,7 @@ interface Entity {
   confidence: number
   source: string
   search_query: string
+  mention_handle: string | null
   resolved_url: string | null
   resolved_via: string | null
   match_quality: number
@@ -164,8 +169,36 @@ async function extractReel(url: string): Promise<ReelData> {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Audio Transcription (Supadata → Deepgram fallback)
+// 2. Audio Transcription (ScrapeCreators → Supadata → Deepgram fallback)
 // ---------------------------------------------------------------------------
+
+async function transcribeViaScrapeCreators(reelUrl: string): Promise<string | null> {
+  const apiKey = Deno.env.get('SCRAPECREATORS_API_KEY')
+  if (!apiKey) return null
+
+  try {
+    const encodedUrl = encodeURIComponent(reelUrl)
+    const resp = await fetch(
+      `https://api.scrapecreators.com/v2/instagram/media/transcript?url=${encodedUrl}`,
+      {
+        headers: {
+          'x-api-key': apiKey,
+          'Accept': 'application/json',
+        },
+      }
+    )
+
+    if (!resp.ok) return null
+
+    const data = await resp.json()
+    if (data.success && data.transcripts && data.transcripts.length > 0) {
+      return data.transcripts.map((t: { text: string }) => t.text).join(' ')
+    }
+    return null
+  } catch {
+    return null
+  }
+}
 
 async function transcribeViaSupadata(url: string): Promise<string | null> {
   const apiKey = Deno.env.get('SUPADATA_API_KEY')
@@ -235,14 +268,21 @@ async function transcribeAudio(reel: ReelData): Promise<string | null> {
     return reel.auto_transcript
   }
 
-  // 2. Supadata (URL -> transcript in one call)
+  // 2. ScrapeCreators transcript endpoint (uses credits we already pay for)
+  const scrapeCreatorsResult = await transcribeViaScrapeCreators(reel.url)
+  if (scrapeCreatorsResult) {
+    console.log('[instagram-import] Got ScrapeCreators transcript')
+    return scrapeCreatorsResult
+  }
+
+  // 3. Supadata (URL -> transcript in one call)
   const supadataResult = await transcribeViaSupadata(reel.url)
   if (supadataResult) {
     console.log('[instagram-import] Got Supadata transcript')
     return supadataResult
   }
 
-  // 3. Deepgram (download video + transcribe)
+  // 4. Deepgram (download video + transcribe)
   if (reel.video_url) {
     const deepgramResult = await transcribeViaDeepgram(reel.video_url)
     if (deepgramResult) {
@@ -273,6 +313,7 @@ For each entity extract:
 - confidence: 0.0-1.0 (use 0.5+ for anything plausible, not just certain items)
 - source: which input it came from ("caption" | "transcript" | "audio_track" | "tagged_location" | "tagged_account" | "screen_text")
 - search_query: a search query to find this SPECIFIC entity — use the CORRECTED canonical name, not the misspelled transcript version. For places include city/neighborhood. For products include brand name. For songs include artist.
+- mention_handle: if this entity corresponds to one of the @mentions listed below, set this to the handle (without @). The @handle IS the entity's identity — use it to determine the canonical name. If no @mention matches, set to null.
 
 ## Step 3: Cross-check
 Compare your extracted list against the caption AND transcript independently:
@@ -291,16 +332,27 @@ If a thumbnail image is provided, extract any text visible on screen — overlai
 Return ONLY valid JSON, no markdown fences:
 {
   "expected_count": 8,
-  "entities": [...],
+  "entities": [{"type":"brand","name":"Sublime","mention_handle":"wwwsublimeapp","category":"use","confidence":0.9,"source":"caption","search_query":"Sublime app","location_hint":null}],
   "post_category": "eat|go|wear|watch|listen|use|follow|read",
-  "post_summary": "one sentence summary"
-}`
+  "post_summary": "one sentence summary",
+  "practical_tags": ["3-8 objective factual tags classifying the content, e.g. restaurant, fine_dining, italian, nyc"],
+  "taste_tags": ["3-8 subjective aesthetic/vibe tags, e.g. upscale, romantic, cozy, modern"],
+  "content_structure": "original_expression|curated_collection|summary|review|reference"
+}
+
+Tag guidelines:
+- practical_tags: objective, factual, searchable. What IS this content about. Use lowercase, underscores for multi-word.
+- taste_tags: subjective aesthetic/cultural/vibe. What does this FEEL like. Use lowercase, underscores for multi-word.
+- content_structure: how the content is organized — "summary" for top-N lists, "review" for opinions, "curated_collection" for aggregations, "original_expression" for creator's own work, "reference" for informational.`
 
 async function extractEntities(reel: ReelData, transcript: string | null): Promise<ExtractionResult> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
+
+  // Parse @mentions from caption before building context
+  const captionMentions = reel.caption ? parseCaptionMentions(reel.caption) : []
 
   // Build context
   const parts: string[] = []
@@ -311,6 +363,12 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
   if (reel.tagged_location) parts.push(`Tagged location: ${reel.tagged_location}`)
   if (reel.tagged_accounts.length > 0) {
     parts.push(`Tagged accounts: ${reel.tagged_accounts.map(a => '@' + a).join(', ')}`)
+  }
+  // Surface @mentions as a structured signal for entity mapping
+  const allMentions = [...new Set([...captionMentions, ...reel.tagged_accounts])]
+    .filter(h => h !== reel.author_username)
+  if (allMentions.length > 0) {
+    parts.push(`\nCaption @mentions detected: ${allMentions.map(h => '@' + h).join(', ')}\nIMPORTANT: When an entity corresponds to one of these @handles, set mention_handle to that handle (without @). The @handle IS the entity's identity — use it to determine the canonical name, NOT generic keywords.`)
   }
 
   const userMessage = parts.join('\n\n')
@@ -365,18 +423,63 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
   }
 
   // Try parsing directly, then try extracting JSON object if Claude appended text
+  let parsed: ExtractionResult
   try {
-    return JSON.parse(text) as ExtractionResult
+    parsed = JSON.parse(text) as ExtractionResult
   } catch (parseErr) {
     console.warn('[instagram-import] Claude returned non-clean JSON, attempting extraction:', (parseErr as Error).message)
     console.warn('[instagram-import] Raw text:', text.substring(0, 500))
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start !== -1 && end > start) {
-      return JSON.parse(text.substring(start, end + 1)) as ExtractionResult
+      parsed = JSON.parse(text.substring(start, end + 1)) as ExtractionResult
+    } else {
+      throw new Error(`Failed to parse entity extraction: ${(parseErr as Error).message}`)
     }
-    throw new Error(`Failed to parse entity extraction: ${(parseErr as Error).message}`)
   }
+
+  // Post-processing: match entities to @mentions by name similarity
+  // Claude Haiku may not reliably set mention_handle, so we do it deterministically
+  if (allMentions.length > 0) {
+    const usedHandles = new Set<string>()
+    for (const entity of parsed.entities) {
+      // Skip if Claude already set it
+      if (entity.mention_handle) {
+        usedHandles.add(entity.mention_handle)
+        continue
+      }
+      const entityNorm = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      for (const handle of allMentions) {
+        if (usedHandles.has(handle)) continue
+        const handleNorm = handle.toLowerCase().replace(/[^a-z0-9]/g, '')
+        // Match criteria: handle contains entity name or vice versa, with sufficient overlap.
+        // "Sublime" (7) in "wwwsublimeapp" (13): 7/13=0.54 ✓
+        // "twitter" (7) in "designtwitter" (13): would match but "twitter" is generic → excluded by blocklist
+        // We require the shorter string covers ≥40% of the longer AND ≥3 chars
+        const handleContainsEntity = handleNorm.includes(entityNorm) && entityNorm.length >= 3
+        const entityContainsHandle = entityNorm.includes(handleNorm) && handleNorm.length >= 3
+        const overlap = handleContainsEntity || entityContainsHandle
+        const minLen = Math.min(entityNorm.length, handleNorm.length)
+        const maxLen = Math.max(entityNorm.length, handleNorm.length)
+        const isSufficientOverlap = overlap && (minLen / maxLen) >= 0.4
+        // Exclude platform handles that are just common words
+        const platformHandles = new Set(['twitter', 'instagram', 'youtube', 'facebook', 'tiktok', 'spotify', 'reddit', 'pinterest'])
+        if ((isSufficientOverlap && !platformHandles.has(handleNorm)) || entityNorm === handleNorm) {
+          entity.mention_handle = handle
+          usedHandles.add(handle)
+          console.log(`[instagram-import] Matched entity "${entity.name}" to @${handle}`)
+          break
+        }
+      }
+    }
+  }
+
+  // Ensure mention_handle is at least null for all entities
+  for (const entity of parsed.entities) {
+    if (!entity.mention_handle) entity.mention_handle = null
+  }
+
+  return parsed
 }
 
 // ---------------------------------------------------------------------------
@@ -385,10 +488,15 @@ async function extractEntities(reel: ReelData, transcript: string | null): Promi
 
 function unwrapDdgUrl(rawUrl: string): string | null {
   try {
-    const parsed = new URL(rawUrl)
+    // DDG HTML returns protocol-relative URLs like //duckduckgo.com/l/?uddg=...
+    // new URL() can't parse these without a base, so prepend https:
+    const normalized = rawUrl.startsWith('//') ? `https:${rawUrl}` : rawUrl
+    const parsed = new URL(normalized)
     const uddg = parsed.searchParams.get('uddg')
-    if (uddg) return uddg
+    if (uddg) return decodeURIComponent(uddg)
   } catch { /* not a redirect URL */ }
+  // If it's still a DDG redirect URL that we couldn't parse, discard it
+  if (rawUrl.includes('duckduckgo.com/l/')) return null
   return rawUrl
 }
 
@@ -423,6 +531,10 @@ async function searchDuckDuckGo(query: string, maxResults = 5): Promise<SearchRe
 }
 
 function buildSearchQuery(entity: Entity): string {
+  // If entity has a mention_handle and wasn't resolved via bio, use handle as search anchor
+  if (entity.mention_handle && !entity.resolved_url) {
+    return `"${entity.mention_handle}" official website OR app`
+  }
   // Always prefer Claude's specific search_query first
   if (entity.search_query) return entity.search_query
   // Fallbacks — only used if Claude returned no search_query
@@ -445,13 +557,28 @@ Pick the URL that is the OFFICIAL or CANONICAL source for this entity. Prefer:
 - brand: official brand website (not aggregators or review sites)
 - product: brand's own product page (not homepage) > specific retailer listing (not retailer homepage)
 - person/follow: if the entity is a specific piece of content by a person, prefer the direct URL for that content; if the entity is the person themselves, prefer Instagram profile > personal website > LinkedIn
+- book: Open Library > Goodreads > Amazon book page
+- event: Official event page > Eventbrite > venue website
 
-Specificity: when the entity refers to a specific piece of content, prefer the direct URL for that content over the creator's profile or channel page. Examples: specific YouTube video over channel, specific article over blog homepage, specific podcast episode over show page, specific product listing over brand homepage, specific recipe page over food blog. If the entity IS the creator/channel/brand itself (not a specific piece of their content), then the profile or homepage is correct.
+## Domain Authority Scoring
+Score each candidate URL's authority:
+- Authoritative (0.9+): google.com/maps, yelp.com, spotify.com, openlibrary.org, brand's own domain, official product pages
+- Good (0.7): well-known review sites, Wikipedia, major retailers with specific product pages
+- Weak (0.4): unknown blogs, aggregator sites, social media mentions, listicles
+- Bad (0.2): wrong entity type (e.g., a blog post when we need a place)
+
+## Primary Source Validation
+The URL must ACTUALLY BE the entity, not just mention it. For example:
+- A restaurant entity should resolve to the restaurant's Google Maps page or official website, NOT a blog post reviewing it
+- A product should resolve to where you can buy/view it, NOT an article about it
+- A song should resolve to where you can listen to it, NOT a review
+
+Specificity: when the entity refers to a specific piece of content, prefer the direct URL for that content over the creator's profile or channel page.
 
 If none of the URLs match the entity well, set selected_url to null.
 
 Return ONLY a valid JSON array, no markdown fences:
-[{"entity_index": 0, "selected_url": "https://...", "match_quality": 0.95}]`
+[{"entity_index": 0, "selected_url": "https://...", "match_quality": 0.95, "is_primary_source": true}]`
 
 async function selectBestUrls(
   entities: { index: number; name: string; type: string; category: string; location_hint: string | null; results: SearchResult[] }[]
@@ -506,59 +633,267 @@ async function selectBestUrls(
   }
 }
 
+// Match validation: score how well a resolved URL matches the entity
+function validateResolution(entity: Entity, resolvedUrl: string): number {
+  if (!resolvedUrl) return 0
+  try {
+    const parsed = new URL(resolvedUrl)
+    const urlDomain = parsed.hostname.replace('www.', '')
+    const entityNameNorm = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    // Check if entity name matches the domain itself (e.g., "Framer" → framer.com)
+    const domainBase = urlDomain.split('.')[0] // framer from framer.com
+    const domainMatchesName = entityNameNorm === domainBase ||
+      domainBase.includes(entityNameNorm) || entityNameNorm.includes(domainBase)
+
+    // Domain authority for entity type
+    let authorityScore = 0.5
+    const type = entity.type
+    if (type === 'place' || type === 'food' || type === 'restaurant') {
+      if (urlDomain.includes('google.com') || urlDomain.includes('maps.google')) authorityScore = 1.0
+      else if (urlDomain.includes('yelp.com') || urlDomain.includes('tripadvisor.com') || urlDomain.includes('opentable.com')) authorityScore = 0.85
+      else if (urlDomain.includes('instagram.com') || urlDomain.includes('facebook.com')) authorityScore = 0.4
+      else if (domainMatchesName) authorityScore = 0.9 // restaurant's own site
+    } else if (type === 'song') {
+      if (urlDomain.includes('spotify.com') || urlDomain.includes('music.apple.com')) authorityScore = 1.0
+      else if (urlDomain.includes('soundcloud.com') || urlDomain.includes('bandcamp.com')) authorityScore = 0.9
+      else if (urlDomain.includes('youtube.com')) authorityScore = 0.8
+    } else if (type === 'product' || type === 'tool') {
+      if (domainMatchesName) authorityScore = 1.0 // product's own domain is best
+      else if (urlDomain.includes('amazon.com') || urlDomain.includes('nordstrom.com')) authorityScore = 0.7
+    } else if (type === 'book') {
+      if (urlDomain.includes('openlibrary.org') || urlDomain.includes('goodreads.com')) authorityScore = 0.9
+      else if (urlDomain.includes('amazon.com')) authorityScore = 0.7
+    } else if (type === 'brand') {
+      if (domainMatchesName) authorityScore = 1.0
+    } else if (type === 'person') {
+      if (urlDomain.includes('imdb.com')) authorityScore = 0.85
+      else if (urlDomain.includes('wikipedia.org')) authorityScore = 0.75
+      else if (urlDomain.includes('instagram.com')) authorityScore = 0.7
+      else if (domainMatchesName) authorityScore = 0.9 // personal website
+    } else if (type === 'movie') {
+      if (urlDomain.includes('imdb.com') || urlDomain.includes('letterboxd.com')) authorityScore = 0.95
+      else if (urlDomain.includes('criterion.com')) authorityScore = 0.9
+      else if (urlDomain.includes('rottentomatoes.com')) authorityScore = 0.85
+    }
+
+    // Name match: check if entity name appears in URL domain or path
+    const nameTokens = entity.name.toLowerCase().split(/\s+/).filter(t => t.length > 2)
+    const urlFull = (urlDomain + parsed.pathname).toLowerCase()
+    const nameInUrl = nameTokens.filter(t => urlFull.includes(t)).length / Math.max(nameTokens.length, 1)
+
+    // Boost: if domain itself matches the entity name, that's a strong signal
+    const domainBonus = domainMatchesName ? 0.2 : 0
+
+    return Math.min(1.0, 0.5 * authorityScore + 0.3 * nameInUrl + domainBonus)
+  } catch {
+    return 0
+  }
+}
+
+// Extract literal URLs from caption text
+function extractCaptionUrls(caption: string): Map<string, string> {
+  const urlMap = new Map<string, string>() // domain -> full URL
+  const urlRegex = /https?:\/\/[^\s,)}\]"']+/gi
+  const matches = caption.match(urlRegex)
+  if (!matches) return urlMap
+
+  for (const rawUrl of matches) {
+    try {
+      const parsed = new URL(rawUrl)
+      const domain = parsed.hostname.replace('www.', '')
+      urlMap.set(domain, rawUrl)
+    } catch { /* skip malformed URLs */ }
+  }
+  return urlMap
+}
+
+// Parse @mentions from caption text
+function parseCaptionMentions(caption: string): string[] {
+  const mentionRegex = /@([A-Za-z0-9._]+)/g
+  const mentions: string[] = []
+  let match
+  while ((match = mentionRegex.exec(caption)) !== null) {
+    const handle = match[1].replace(/\.+$/, '') // strip trailing dots
+    if (handle.length > 1) mentions.push(handle)
+  }
+  return [...new Set(mentions)] // deduplicate
+}
+
+// Filter out overly generic entities that don't produce useful derived pins
+const GENERIC_ENTITY_BLOCKLIST = new Set([
+  'ai', 'artificial intelligence', 'github', 'instagram', 'tiktok', 'twitter', 'x',
+  'youtube', 'facebook', 'reddit', 'pinterest', 'linkedin', 'google', 'apple',
+  'amazon', 'spotify', 'music', 'art', 'design', 'fashion', 'food', 'travel',
+  'tech', 'technology', 'software', 'hardware', 'crypto', 'nft', 'web3',
+])
+
+function isGenericEntity(entity: Entity): boolean {
+  const name = entity.name.toLowerCase().trim()
+  if (GENERIC_ENTITY_BLOCKLIST.has(name)) return true
+  // Single-word generic/platform entities with no specific product
+  if (name.split(/\s+/).length <= 1 && (entity.type === 'generic' || entity.type === 'platform')) return true
+  return false
+}
+
+// Resolve entity via Instagram profile bio website link
+async function resolveViaBio(handle: string): Promise<string | null> {
+  const apiKey = Deno.env.get('SCRAPECREATORS_API_KEY')
+  if (!apiKey) return null
+
+  try {
+    const resp = await fetch(
+      `https://api.scrapecreators.com/v1/instagram/profile?handle=${encodeURIComponent(handle)}`,
+      {
+        headers: {
+          'x-api-key': apiKey,
+          'Accept': 'application/json',
+        },
+      }
+    )
+
+    if (!resp.ok) return null
+
+    const data = await resp.json()
+    const profile = data.data || data
+    const externalUrl = profile.external_url || profile.bio_link || profile.website || null
+    if (externalUrl) {
+      console.log(`[instagram-import] Bio resolution: @${handle} -> ${externalUrl}`)
+    }
+    return externalUrl
+  } catch {
+    return null
+  }
+}
+
 async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<Entity[]> {
-  // Phase 1: Classify entities
+  // Phase 0a: Caption URL extraction — literal URLs from caption
+  const captionUrls = extractCaptionUrls(reel.caption || '')
+  if (captionUrls.size > 0) {
+    console.log(`[instagram-import] Phase 0a: Found ${captionUrls.size} caption URLs`)
+  }
+
+  // Phase 1: Classify entities — discard low-confidence and overly generic
   const toResolve: Entity[] = []
   for (const entity of entities) {
-    if (entity.confidence < 0.35) {
+    if (entity.confidence < 0.35 || isGenericEntity(entity)) {
       entity.resolved_url = null
       entity.resolved_via = null
       entity.match_quality = 0
       entity.status = 'discarded'
+      if (isGenericEntity(entity)) {
+        console.log(`[instagram-import] Discarded generic entity: "${entity.name}" (type: ${entity.type})`)
+      }
     } else {
       entity.status = entity.confidence >= 0.7 ? 'auto' : 'review'
-      toResolve.push(entity)
+
+      // Phase 0a: Check if entity name matches a caption URL domain
+      const entityNameNorm = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      let captionUrlResolved = false
+      for (const [domain, url] of captionUrls) {
+        const domainBase = domain.split('.')[0]
+        if (entityNameNorm === domainBase || domainBase.includes(entityNameNorm) || entityNameNorm.includes(domainBase)) {
+          entity.resolved_url = url
+          entity.resolved_via = 'caption-url'
+          entity.match_quality = 0.95
+          entity.status = 'auto'
+          captionUrlResolved = true
+          console.log(`[instagram-import] Caption URL match: ${entity.name} -> ${url}`)
+          break
+        }
+      }
+
+      if (!captionUrlResolved) {
+        toResolve.push(entity)
+      }
     }
   }
 
-  // Phase 2: Search DDG for each entity (serial, rate-limited)
+  // Phase 0b: Instagram bio resolution — @mention → profile → external_url
+  const mentionEntities = toResolve.filter(e => e.mention_handle)
+  if (mentionEntities.length > 0) {
+    console.log(`[instagram-import] Phase 0b: Resolving ${mentionEntities.length} entities via Instagram bio`)
+    const BIO_CONCURRENCY = 5
+    for (let batch = 0; batch < mentionEntities.length; batch += BIO_CONCURRENCY) {
+      const chunk = mentionEntities.slice(batch, batch + BIO_CONCURRENCY)
+      const results = await Promise.allSettled(
+        chunk.map(async (entity) => {
+          const bioUrl = await resolveViaBio(entity.mention_handle!)
+          if (bioUrl) {
+            entity.resolved_url = bioUrl
+            entity.resolved_via = 'instagram-bio'
+            entity.match_quality = 0.92
+            entity.status = entity.confidence >= 0.7 ? 'auto' : 'review'
+          }
+        })
+      )
+    }
+  }
+
+  // Remove bio-resolved entities from DDG search queue
+  const stillNeedSearch = toResolve.filter(e => !e.resolved_url)
+
+  // Phase 2: Search DDG for REMAINING unresolved entities (parallel, concurrency-limited to 3)
   const searchResults = new Map<number, SearchResult[]>()
-  for (let i = 0; i < toResolve.length; i++) {
-    const query = buildSearchQuery(toResolve[i])
-    const results = await searchDuckDuckGo(query)
-    searchResults.set(i, results)
-    console.log(`[instagram-import] DDG: ${toResolve[i].name} -> ${results.length} results`)
-    if (i < toResolve.length - 1) await new Promise(r => setTimeout(r, 500))
+  const CONCURRENCY = 3
+  for (let batch = 0; batch < stillNeedSearch.length; batch += CONCURRENCY) {
+    const chunk = stillNeedSearch.slice(batch, batch + CONCURRENCY)
+    const promises = chunk.map(async (entity, offset) => {
+      const i = batch + offset
+      const query = buildSearchQuery(entity)
+      const results = await searchDuckDuckGo(query)
+      searchResults.set(i, results)
+      console.log(`[instagram-import] DDG: ${entity.name} -> ${results.length} results`)
+    })
+    await Promise.allSettled(promises)
+    // Brief pause between batches to avoid rate limiting
+    if (batch + CONCURRENCY < stillNeedSearch.length) await new Promise(r => setTimeout(r, 300))
   }
 
   // Phase 3: Batch Claude call to pick best URL per entity
-  const forSelection = toResolve
+  const forSelection = stillNeedSearch
     .map((entity, i) => ({ index: i, name: entity.name, type: entity.type, category: entity.category, location_hint: entity.location_hint, results: searchResults.get(i) || [] }))
     .filter(e => e.results.length > 0)
 
   const selections = forSelection.length > 0 ? await selectBestUrls(forSelection) : new Map()
 
-  // Phase 4: Apply selections, fall back to first DDG result
-  for (let i = 0; i < toResolve.length; i++) {
-    const entity = toResolve[i]
+  // Phase 4: Apply selections with validation scoring
+  for (let i = 0; i < stillNeedSearch.length; i++) {
+    const entity = stillNeedSearch[i]
     const results = searchResults.get(i) || []
     const selection = selections.get(i)
 
-    if (selection?.url) {
+    // Helper: reject any URL that is still a DDG redirect or non-primary source
+    const isValidPrimaryUrl = (url: string | null): boolean => {
+      if (!url) return false
+      if (url.includes('duckduckgo.com')) return false
+      if (url.startsWith('//')) return false
+      try { new URL(url); return true } catch { return false }
+    }
+
+    if (selection?.url && isValidPrimaryUrl(selection.url)) {
       entity.resolved_url = selection.url
       entity.resolved_via = 'duckduckgo+claude'
-      entity.match_quality = selection.quality
-    } else if (results.length > 0) {
+      // Two-dimensional confidence: match_quality from Claude, validated by domain authority
+      const validationScore = validateResolution(entity, selection.url)
+      entity.match_quality = Math.round(((selection.quality * 0.5 + validationScore * 0.5)) * 100) / 100
+    } else if (results.length > 0 && isValidPrimaryUrl(results[0].url)) {
       entity.resolved_url = results[0].url
       entity.resolved_via = 'duckduckgo-first'
-      entity.match_quality = 0
+      entity.match_quality = Math.round(validateResolution(entity, results[0].url) * 0.5 * 100) / 100
     } else {
       entity.resolved_url = null
       entity.resolved_via = null
       entity.match_quality = 0
     }
 
-    console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via})`)
+    // Update status based on two-dimensional confidence: min(extraction, resolution)
+    const overallConfidence = Math.min(entity.confidence, entity.match_quality || 0)
+    if (entity.resolved_url) {
+      entity.status = overallConfidence >= 0.7 ? 'auto' : 'review'
+    }
+
+    console.log(`[instagram-import] Resolved: ${entity.name} -> ${entity.resolved_url || 'NOT FOUND'} (${entity.resolved_via}, quality: ${entity.match_quality})`)
   }
 
   // Phase 5: Enhanced music resolution (Spotify + AudD multi-track)
@@ -663,6 +998,7 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
         match_quality: 0.85,
         status: 'review',
         location_hint: null,
+        mention_handle: null,
         search_query: `${fp.artist} ${fp.track} Spotify`,
       })
     }
@@ -989,6 +1325,11 @@ function createPins(
     type_confidence: 1.0,
     source: 'social',
     source_id: 'instagram',
+    // Sense-making fields
+    entities: extraction.entities,
+    practical_tags: (extraction as any).practical_tags || [],
+    taste_tags: (extraction as any).taste_tags || [],
+    content_structure: (extraction as any).content_structure || 'summary',
     instagram: {
       shortcode: reel.shortcode,
       media_type: 'reel',
@@ -1081,13 +1422,29 @@ serve(async (req) => {
       // Step 2: Transcribe audio
       const transcript = await transcribeAudio(reel)
 
-      // Step 3: Extract entities
-      const extraction = await extractEntities(reel, transcript)
+      // Step 3: Extract entities (with verification retry)
+      let extraction = await extractEntities(reel, transcript)
       const expectedCount = (extraction as Record<string, unknown>).expected_count as number | undefined
-      if (expectedCount && extraction.entities.length < expectedCount) {
-        console.warn(`[instagram-import] Extraction gap: expected ${expectedCount}, found ${extraction.entities.length} entities`)
-      }
       console.log(`[instagram-import] Found ${extraction.entities.length} entities (expected: ${expectedCount ?? 'unknown'})`)
+
+      // Verification: retry once if significant count gap
+      if (expectedCount && expectedCount > 0 && extraction.entities.length < expectedCount * 0.7) {
+        console.warn(`[instagram-import] Extraction gap: expected ${expectedCount}, found ${extraction.entities.length}. Retrying...`)
+        try {
+          const retry = await extractEntities(reel, transcript)
+          // Merge new entities (dedup by name similarity)
+          const existingNames = new Set(extraction.entities.map(e => e.name.toLowerCase()))
+          for (const entity of retry.entities) {
+            if (!existingNames.has(entity.name.toLowerCase())) {
+              extraction.entities.push(entity)
+              existingNames.add(entity.name.toLowerCase())
+            }
+          }
+          console.log(`[instagram-import] After retry: ${extraction.entities.length} entities (was ${extraction.entities.length - retry.entities.filter(e => !existingNames.has(e.name.toLowerCase())).length})`)
+        } catch (retryErr) {
+          console.warn('[instagram-import] Retry failed:', (retryErr as Error).message)
+        }
+      }
 
       // Step 4: Resolve entities
       extraction.entities = await resolveAllEntities(extraction.entities, reel)
@@ -1111,6 +1468,9 @@ serve(async (req) => {
           unresolved_entities: unresolvedEntities,
           post_category: extraction.post_category,
           post_summary: extraction.post_summary,
+          practical_tags: (extraction as any).practical_tags || [],
+          taste_tags: (extraction as any).taste_tags || [],
+          content_structure: (extraction as any).content_structure || null,
           stats: {
             elapsed_seconds: parseFloat(elapsed),
             entities_found: extraction.entities.length,

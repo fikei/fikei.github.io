@@ -62,35 +62,72 @@ async function readSessionFromTab() {
   }
 }
 
-// Get a valid session — checks cache first, then tries tab injection
+// Try to refresh an expired session using the refresh_token
+async function tryRefreshToken(session) {
+  if (!session || !session.refresh_token) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token })
+    });
+    if (!res.ok) return null;
+    const refreshed = await res.json();
+    if (refreshed.access_token && refreshed.user) {
+      const newSession = { ...session, ...refreshed };
+      await cacheSession(newSession);
+      await chrome.storage.local.set({ [SESSION_CACHE_KEY]: newSession });
+      console.log('[rodeo] token refreshed successfully');
+      return newSession;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[rodeo] token refresh failed:', e.message);
+    return null;
+  }
+}
+
+// Get a valid session — checks cache first, then tries refresh, then tab injection
 async function getSession() {
-  // 1. Check cache
+  // 1. Check in-memory cache
   const cached = await getCachedSession();
-  if (cached) return cached;
+  if (cached && isTokenValid(cached.access_token)) return cached;
 
   // 2. Check chrome.storage.local (set by content script relay)
+  let localSession = null;
   try {
     const local = await chrome.storage.local.get(SESSION_CACHE_KEY);
     if (local[SESSION_CACHE_KEY]) {
-      const session = local[SESSION_CACHE_KEY];
-      // Validate token is not expired (JWT exp claim)
-      if (isTokenValid(session.access_token)) {
-        await cacheSession(session);
-        return session;
+      localSession = local[SESSION_CACHE_KEY];
+      if (isTokenValid(localSession.access_token)) {
+        await cacheSession(localSession);
+        return localSession;
       }
     }
   } catch {}
 
-  // 3. Try reading from an open ctrl.rodeo tab
+  // 3. Try refreshing the expired token
+  if (localSession && localSession.refresh_token) {
+    const refreshed = await tryRefreshToken(localSession);
+    if (refreshed) return refreshed;
+  }
+
+  // 4. Try reading from an open ctrl.rodeo tab
   const tabSession = await readSessionFromTab();
   if (tabSession) {
     await cacheSession(tabSession);
-    // Also persist to local storage for future use
     try {
       await chrome.storage.local.set({ [SESSION_CACHE_KEY]: tabSession });
     } catch {}
     return tabSession;
   }
+
+  // 5. No valid session — clear stale data
+  await clearCachedSession();
+  try { await chrome.storage.local.remove(SESSION_CACHE_KEY); } catch {}
 
   return null;
 }

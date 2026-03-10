@@ -1,7 +1,7 @@
 // Rodeo — Save & Discover
 // Service worker: context menus, message routing, pin save flow
 
-importScripts('lib/sanitize.js', 'lib/supabase.js', 'lib/auth.js');
+importScripts('lib/sanitize.js', 'lib/supabase.js', 'lib/auth.js', 'lib/privacy.js', 'lib/history.js');
 
 const BOARDS_URL = 'https://ctrl.rodeo/boards/';
 
@@ -67,6 +67,31 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // ============================================
+// History Capture (Phase 2+3)
+// ============================================
+initHistoryCapture();
+
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  // Main frame only
+  if (details.frameId !== 0) return;
+  // Skip chrome:// and extension pages
+  if (!details.url || !details.url.startsWith('http')) return;
+
+  try {
+    const tab = await chrome.tabs.get(details.tabId);
+    if (tab.incognito) return;
+    recordNavigation({
+      url: details.url,
+      title: tab.title || '',
+      referrerUrl: null,
+      tabId: details.tabId
+    });
+  } catch {
+    // Tab may have closed
+  }
+});
+
+// ============================================
 // Badge Feedback (context menu saves)
 // ============================================
 function showBadge(tabId, text, color) {
@@ -90,13 +115,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.action === 'save') {
     // Popup requesting a save
-    savePin(msg.data).then(sendResponse);
+    savePin(msg.data)
+      .then(sendResponse)
+      .catch(e => {
+        console.error('[rodeo] save crashed:', e.message);
+        sendResponse({ error: 'save_failed', detail: e.message });
+      });
     return true; // async response
   }
 
   if (msg.action === 'get_session') {
     // Popup checking auth state
-    getSession().then(sendResponse);
+    getSession()
+      .then(sendResponse)
+      .catch(() => sendResponse(null));
     return true;
   }
 
@@ -113,7 +145,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           domain: extractDomain(tab.url)
         });
       }
-    });
+    }).catch(() => sendResponse({ error: 'unsupported_page' }));
     return true;
   }
 
@@ -147,6 +179,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'open_boards') {
     chrome.tabs.create({ url: BOARDS_URL });
     return false;
+  }
+
+  // --- History / Privacy handlers ---
+
+  if (msg.action === 'get_privacy_settings') {
+    getPrivacySettings()
+      .then(sendResponse)
+      .catch(() => sendResponse(null));
+    return true;
+  }
+
+  if (msg.action === 'save_privacy_settings') {
+    savePrivacySettings(msg.settings)
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  if (msg.action === 'start_backfill') {
+    runBackfill()
+      .then(sendResponse)
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  if (msg.action === 'delete_history') {
+    const handler = msg.window === 'all'
+      ? deleteAllHistory()
+      : deleteHistoryInWindow(msg.window);
+    handler
+      .then(sendResponse)
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  if (msg.action === 'flush_history') {
+    flushBuffer()
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ error: e.message }));
+    return true;
   }
 });
 
@@ -205,25 +277,46 @@ async function savePin({ url, title, selectedText, source }) {
   };
 
   // Insert with merge-duplicates (same Prefer header as boards/index.html:12441)
-  const res = await supabasePost('/rest/v1/links', payload, accessToken, {
-    'Prefer': 'resolution=merge-duplicates'
-  });
+  let res;
+  try {
+    res = await supabasePost('/rest/v1/links', payload, accessToken, {
+      'Prefer': 'resolution=merge-duplicates'
+    });
+  } catch (e) {
+    console.error('[rodeo] save network error:', e.message);
+    return { error: 'save_failed', detail: e.message };
+  }
 
   if (!res.ok) {
     const errBody = await res.text();
     console.error('[rodeo] save failed:', res.status, errBody);
 
-    // If a column is unrecognized (schema cache), retry without it
+    // 401/403 = token expired — clear cached session so next attempt re-auths
+    if (res.status === 401 || res.status === 403) {
+      await clearCachedSession();
+      try { await chrome.storage.local.remove(SESSION_CACHE_KEY); } catch {}
+      return { error: 'not_authenticated' };
+    }
+
+    // If a column is unrecognized (schema cache), retry without it (up to 5)
+    let schemaRetries = 0;
     if (errBody.includes('schema cache')) {
-      const colMatch = errBody.match(/Could not find the '(\w+)' column/);
-      if (colMatch) {
+      while (schemaRetries < 5) {
+        const colMatch = errBody.match(/Could not find the '(\w+)' column/);
+        if (!colMatch) break;
         delete payload[colMatch[1]];
-        const retry = await supabasePost('/rest/v1/links', payload, accessToken, {
-          'Prefer': 'resolution=merge-duplicates'
-        });
-        if (retry.ok) {
-          triggerEnrichment({ url: canonical, title: pinTitle, linkId: pinId });
-          return { success: true, pinId };
+        schemaRetries++;
+        try {
+          const retry = await supabasePost('/rest/v1/links', payload, accessToken, {
+            'Prefer': 'resolution=merge-duplicates'
+          });
+          if (retry.ok) {
+            triggerEnrichment({ url: canonical, title: pinTitle, linkId: pinId });
+            return { success: true, pinId };
+          }
+        } catch (e) {
+          console.error('[rodeo] retry network error:', e.message);
+          return { error: 'save_failed', detail: e.message };
         }
       }
     }
