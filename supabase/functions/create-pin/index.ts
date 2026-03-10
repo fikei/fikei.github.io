@@ -5,10 +5,10 @@
 // POST /functions/v1/create-pin
 // Body: { url, title?, description?, linkId?, content_type?, category?,
 //         skipImage?, currentImage?, forceRefresh?,
-//         enrichWatch?, enrichBook?, enrichListen? }
-const VERSION = '2.0.0'
-console.log(`[create-pin] v${VERSION} - Pin Creation Agent (image + metadata)`)
-// Returns: { content_type, type_confidence, type_source, image_url, image_source, hero_score, video?, book?, music? }
+//         enrichWatch?, enrichBook?, enrichListen?, enrichRecipe? }
+const VERSION = '2.1.0'
+console.log(`[create-pin] v${VERSION} - Pin Creation Agent (image + metadata + recipe)`)
+// Returns: { content_type, type_confidence, type_source, image_url, image_source, hero_score, video?, book?, music?, recipe? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -52,6 +52,7 @@ const IMAGE_STRATEGIES: Record<string, string[]> = {
   social: ['platform', 'scrape', 'template'],              // platform images are best
   document: ['search', 'template'],
   tool: ['scrape', 'search', 'favicon', 'template'],
+  recipe: ['scrape', 'search', 'favicon', 'template'],
   unknown: ['scrape', 'search', 'favicon', 'template']
 }
 
@@ -63,7 +64,7 @@ serve(async (req) => {
 
   try {
     let { url, title, description, linkId, content_type, skipImage,
-            skipIfHasImage, currentImage, forceRefresh, enrichWatch, enrichBook, enrichListen, category } = await req.json()
+            skipIfHasImage, currentImage, forceRefresh, enrichWatch, enrichBook, enrichListen, enrichRecipe, category } = await req.json()
 
     // Support skipIfHasImage: skip image resolution if client already has a valid image
     const shouldSkipImage = skipImage || (skipIfHasImage && !!currentImage)
@@ -185,6 +186,40 @@ serve(async (req) => {
       typeConfidence = 1.0
       typeSource = 'rules'
       console.log('[create-pin] Music platform detected, forcing content_type=music:', domain)
+    }
+
+    // Recipe content signal detection (content-first, not domain-only)
+    // Known recipe domains boost confidence but don't gate detection.
+    // JSON-LD @type: "Recipe" is the primary signal (checked in Step 2.8).
+    const RECIPE_DOMAIN_BOOST = [
+      'allrecipes.com', 'seriouseats.com', 'food52.com', 'bonappetit.com',
+      'epicurious.com', 'thekitchn.com', 'smittenkitchen.com', 'cookingclassy.com',
+      'tasty.co', 'delish.com', 'foodnetwork.com', 'myrecipes.com',
+      'simplyrecipes.com', 'budgetbytes.com', 'recipetineats.com',
+      'damndelicious.net', 'halfbakedharvest.com', 'minimalistbaker.com',
+      'skinnytaste.com', 'therecipecritic.com', 'averiecooks.com',
+      'cookieandkate.com', 'loveandlemons.com', 'pinchofyum.com',
+      'kingarthurbaking.com', 'sallysbakingaddiction.com', 'justonecookbook.com',
+    ]
+    const hasRecipeDomainBoost = RECIPE_DOMAIN_BOOST.some(d => domain.includes(d))
+    const hasRecipeUrlPattern = /\/recipes?\//.test(path)
+    const recipeKeywords = /\b(recipe|ingredients|prep time|cook time|servings|preheat|tablespoon|teaspoon)\b/i
+    const hasRecipeContentSignal = recipeKeywords.test(title || '') || recipeKeywords.test(description || '')
+
+    // Set content_type to recipe if strong signals present (domain+content or domain+URL pattern)
+    if (contentType !== 'video' && contentType !== 'music') {
+      if (hasRecipeDomainBoost && (hasRecipeContentSignal || hasRecipeUrlPattern)) {
+        contentType = 'recipe'
+        typeConfidence = 0.95
+        typeSource = 'rules'
+        console.log('[create-pin] Recipe detected via domain + content signals:', domain)
+      } else if (hasRecipeContentSignal && hasRecipeUrlPattern) {
+        contentType = 'recipe'
+        typeConfidence = 0.85
+        typeSource = 'rules'
+        console.log('[create-pin] Recipe detected via URL pattern + content signals:', domain)
+      }
+      // Note: JSON-LD detection happens in Step 2.8 and can upgrade content_type to 'recipe'
     }
 
     // Initialize Supabase client
@@ -770,6 +805,75 @@ serve(async (req) => {
     }
 
     // ========================================
+    // STEP 2.8: Recipe Enrichment — JSON-LD first, AI fills gaps
+    // Triggered for eat category items, content_type=recipe, or enrichRecipe flag.
+    // JSON-LD @type: "Recipe" is the primary extraction path (works on ANY domain).
+    // AI fallback handles the long tail of sites without structured data.
+    // ========================================
+    let recipeMeta: Record<string, any> | null = null
+    if (enrichRecipe || category === 'eat' || contentType === 'recipe') {
+      console.log('[create-pin] Step 2.8: Recipe enrichment for:', url)
+
+      // 1. Try JSON-LD structured data first (most recipe sites implement schema.org/Recipe for SEO)
+      const jsonLdResult = await extractRecipeJsonLd(url)
+
+      // If JSON-LD found a recipe, upgrade content_type regardless of domain
+      if (jsonLdResult && contentType !== 'recipe') {
+        contentType = 'recipe'
+        typeConfidence = 1.0
+        typeSource = 'jsonld'
+        console.log('[create-pin] JSON-LD confirmed recipe, upgrading content_type')
+      }
+
+      // 2. Only call AI if JSON-LD left gaps or returned nothing
+      const needsAI = !jsonLdResult
+        || !jsonLdResult.ingredients?.length
+        || !jsonLdResult.instructions?.length
+      let aiResult: Record<string, any> | null = null
+      if (needsAI) {
+        console.log('[create-pin] Recipe JSON-LD incomplete or missing, calling AI for gaps')
+        aiResult = await enrichRecipeWithAI(url, title, description)
+      } else {
+        console.log('[create-pin] Recipe JSON-LD complete, skipping AI call')
+      }
+
+      // 3. Merge: JSON-LD is primary, AI fills gaps
+      if (jsonLdResult || aiResult) {
+        recipeMeta = {
+          title: jsonLdResult?.title || null,
+          description: aiResult?.description || (jsonLdResult?.description ? jsonLdResult.description.slice(0, 300) : null),
+          servings: jsonLdResult?.servings || aiResult?.servings || null,
+          servings_text: jsonLdResult?.servings_text || null,
+          prep_time: jsonLdResult?.prep_time || null,
+          cook_time: jsonLdResult?.cook_time || null,
+          total_time: jsonLdResult?.total_time || null,
+          ingredients: jsonLdResult?.ingredients?.length ? jsonLdResult.ingredients : (aiResult?.ingredients || []),
+          instructions: jsonLdResult?.instructions?.length ? jsonLdResult.instructions : (aiResult?.instructions || []),
+          cuisine: jsonLdResult?.cuisine || aiResult?.cuisine || null,
+          difficulty: aiResult?.difficulty || null,
+          source_name: jsonLdResult?.source_name || domain,
+          server_enriched_at: new Date().toISOString(),
+        }
+
+        // Use recipe's own image if no image resolved yet
+        if (jsonLdResult?.image_url && !imageUrl) {
+          imageUrl = jsonLdResult.image_url
+          imageSource = 'platform'
+          imageLog.push({ strategy: 'recipe_jsonld', result: 'accepted', url: imageUrl })
+          console.log('[create-pin] Using recipe JSON-LD image:', imageUrl)
+        }
+      }
+
+      console.log('[create-pin] Recipe enrichment result:', recipeMeta ? {
+        title: recipeMeta.title,
+        ingredients: recipeMeta.ingredients?.length,
+        instructions: recipeMeta.instructions?.length,
+        servings: recipeMeta.servings,
+        cuisine: recipeMeta.cuisine,
+      } : null)
+    }
+
+    // ========================================
     // STEP 3: Update link in database (if linkId provided)
     // ========================================
     if (linkId) {
@@ -806,6 +910,9 @@ serve(async (req) => {
       }
       if (musicMeta) {
         updatePayload.music = musicMeta
+      }
+      if (recipeMeta) {
+        updatePayload.recipe = recipeMeta
       }
       await supabase
         .from('links')
@@ -857,6 +964,9 @@ serve(async (req) => {
     }
     if (musicMeta) {
       response.music = musicMeta
+    }
+    if (recipeMeta) {
+      response.recipe = recipeMeta
     }
 
     console.log('[create-pin] Complete:', response)
@@ -1532,6 +1642,206 @@ Return JSON only:
     console.error('[create-pin] Book enrichment error:', e)
   }
 
+  return null
+}
+
+// ========================================
+// Recipe JSON-LD Extraction
+// Fetches the recipe page and parses schema.org Recipe structured data.
+// Works on ANY domain — not tied to an allowlist.
+// ========================================
+async function extractRecipeJsonLd(url: string): Promise<Record<string, any> | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      redirect: 'follow',
+    })
+    if (!response.ok) {
+      console.log('[recipe-jsonld] Fetch failed:', response.status)
+      return null
+    }
+
+    const html = await response.text()
+    const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+
+    for (const match of jsonLdMatches) {
+      try {
+        const ld = JSON.parse(match[1])
+        // JSON-LD can be a single object, an array, or have @graph
+        const candidates: any[] = []
+        if (Array.isArray(ld)) candidates.push(...ld)
+        else if (ld['@graph']) candidates.push(...ld['@graph'])
+        else candidates.push(ld)
+
+        for (const item of candidates) {
+          const itemType = item?.['@type']
+          // Handle @type as string or array
+          const isRecipe = itemType === 'Recipe'
+            || (Array.isArray(itemType) && itemType.includes('Recipe'))
+          if (!isRecipe) continue
+
+          // Extract ingredients (recipeIngredient is an array of strings)
+          const ingredients: string[] = Array.isArray(item.recipeIngredient)
+            ? item.recipeIngredient.filter((s: any) => typeof s === 'string').map((s: string) => s.trim())
+            : []
+
+          // Normalize instructions: HowToStep objects → string array
+          const rawInstructions = item.recipeInstructions || []
+          const instructions: string[] = []
+          if (Array.isArray(rawInstructions)) {
+            for (const step of rawInstructions) {
+              if (typeof step === 'string') {
+                instructions.push(step.trim())
+              } else if (step?.['@type'] === 'HowToStep' && step.text) {
+                instructions.push(step.text.trim())
+              } else if (step?.['@type'] === 'HowToSection' && Array.isArray(step.itemListElement)) {
+                for (const sub of step.itemListElement) {
+                  if (sub?.text) instructions.push(sub.text.trim())
+                }
+              }
+            }
+          }
+
+          // Parse ISO 8601 duration → seconds (reuse existing function)
+          const prepTime = parseISO8601Duration(item.prepTime)
+          const cookTime = parseISO8601Duration(item.cookTime)
+          const totalTime = parseISO8601Duration(item.totalTime)
+
+          // Normalize servings: recipeYield can be string "4 servings" or number or array
+          let servings: number | null = null
+          let servings_text: string | null = null
+          const rawYield = Array.isArray(item.recipeYield) ? item.recipeYield[0] : item.recipeYield
+          if (rawYield != null) {
+            servings_text = String(rawYield)
+            const numMatch = String(rawYield).match(/\d+/)
+            if (numMatch) servings = parseInt(numMatch[0], 10)
+          }
+
+          // Recipe image
+          let image_url: string | null = null
+          if (typeof item.image === 'string') image_url = item.image
+          else if (Array.isArray(item.image)) {
+            const first = item.image[0]
+            image_url = typeof first === 'string' ? first : first?.url || null
+          }
+          else if (item.image?.url) image_url = item.image.url
+
+          // Cuisine
+          const cuisine = typeof item.recipeCuisine === 'string'
+            ? item.recipeCuisine
+            : (Array.isArray(item.recipeCuisine) ? item.recipeCuisine[0] : null)
+
+          console.log('[recipe-jsonld] Extracted:', {
+            title: item.name,
+            ingredients: ingredients.length,
+            instructions: instructions.length,
+            servings,
+            prepTime,
+            cookTime,
+            totalTime,
+            cuisine,
+          })
+
+          return {
+            title: item.name || null,
+            description: item.description || null,
+            servings,
+            servings_text,
+            prep_time: prepTime,
+            cook_time: cookTime,
+            total_time: totalTime,
+            ingredients,
+            instructions,
+            cuisine,
+            image_url,
+            source_name: new URL(url).hostname.replace('www.', ''),
+          }
+        }
+      } catch (_e) { /* JSON parse error, skip this block */ }
+    }
+  } catch (e) {
+    console.log('[recipe-jsonld] Fetch failed:', (e as Error).message)
+  }
+  return null
+}
+
+// ========================================
+// Recipe Enrichment using AI (fallback for sites without JSON-LD)
+// ========================================
+async function enrichRecipeWithAI(url: string, title: string, description: string): Promise<Record<string, any> | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) {
+    console.log('[create-pin] No ANTHROPIC_API_KEY, skipping recipe AI enrichment')
+    return null
+  }
+
+  const prompt = `Given this recipe link, provide structured metadata. Be concise and accurate. If this is NOT a recipe (e.g. it's a restaurant listing, food article, or general cooking page), return {"not_recipe": true}.
+
+URL: ${url}
+Title: ${title || 'N/A'}
+Description: ${description?.slice(0, 500) || 'N/A'}
+
+Return JSON only:
+{
+  "description": "1-2 sentence description of the dish, max 40 words.",
+  "servings": servings as number or null,
+  "cuisine": "cuisine type (e.g. Italian, Mexican, Japanese, American) or null",
+  "difficulty": "easy|medium|hard or null",
+  "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity"],
+  "instructions": ["step 1", "step 2"]
+}`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (!response.ok) {
+      console.error('[create-pin] Recipe AI enrichment error:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+
+    if (match) {
+      const result = JSON.parse(match[0])
+      // AI determined this is not actually a recipe
+      if (result.not_recipe) {
+        console.log('[create-pin] AI determined URL is not a recipe')
+        return null
+      }
+      return {
+        description: typeof result.description === 'string' ? result.description.slice(0, 300) : null,
+        servings: typeof result.servings === 'number' ? result.servings : null,
+        cuisine: typeof result.cuisine === 'string' ? result.cuisine : null,
+        difficulty: ['easy', 'medium', 'hard'].includes(result.difficulty) ? result.difficulty : null,
+        ingredients: Array.isArray(result.ingredients)
+          ? result.ingredients.filter((s: any) => typeof s === 'string').slice(0, 50)
+          : [],
+        instructions: Array.isArray(result.instructions)
+          ? result.instructions.filter((s: any) => typeof s === 'string').slice(0, 30)
+          : [],
+      }
+    }
+  } catch (e) {
+    console.error('[create-pin] Recipe AI enrichment error:', e)
+  }
   return null
 }
 
