@@ -12,7 +12,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VERSION = '0.1.0'
+const VERSION = '0.1.1'
 console.log(`[mcp-oauth] v${VERSION} - MCP OAuth 2.1 authorization server`)
 
 const BASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth'
@@ -426,7 +426,7 @@ serve(async (req: Request) => {
   }
 
   const url = new URL(req.url)
-  const path = url.pathname.replace('/functions/v1/mcp-oauth', '')
+  const path = url.pathname.replace(/^\/?(?:functions\/v1\/)?mcp-oauth/, '')
 
   try {
     // Metadata discovery
