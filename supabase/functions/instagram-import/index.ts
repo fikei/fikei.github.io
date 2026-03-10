@@ -17,8 +17,8 @@
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
 
-const VERSION = '1.3.1'
-console.log(`[instagram-import] v${VERSION} - fix bio resolution response parsing`)
+const VERSION = '1.3.2'
+console.log(`[instagram-import] v${VERSION} - fix caption URL same-domain + URL-embedded mentions`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -693,7 +693,7 @@ function validateResolution(entity: Entity, resolvedUrl: string): number {
 
 // Extract literal URLs from caption text
 function extractCaptionUrls(caption: string): Map<string, string> {
-  const urlMap = new Map<string, string>() // domain -> full URL
+  const urlMap = new Map<string, string[]>() // domain -> full URLs (multiple per domain)
   const urlRegex = /https?:\/\/[^\s,)}\]"']+/gi
   const matches = caption.match(urlRegex)
   if (!matches) return urlMap
@@ -702,18 +702,22 @@ function extractCaptionUrls(caption: string): Map<string, string> {
     try {
       const parsed = new URL(rawUrl)
       const domain = parsed.hostname.replace('www.', '')
-      urlMap.set(domain, rawUrl)
+      const existing = urlMap.get(domain) || []
+      existing.push(rawUrl)
+      urlMap.set(domain, existing)
     } catch { /* skip malformed URLs */ }
   }
   return urlMap
 }
 
-// Parse @mentions from caption text
+// Parse @mentions from caption text (ignores @handles inside URLs)
 function parseCaptionMentions(caption: string): string[] {
+  // Strip URLs first to avoid parsing @handles embedded in URL paths
+  const captionNoUrls = caption.replace(/https?:\/\/[^\s,)}\]"']+/gi, '')
   const mentionRegex = /@([A-Za-z0-9._]+)/g
   const mentions: string[] = []
   let match
-  while ((match = mentionRegex.exec(caption)) !== null) {
+  while ((match = mentionRegex.exec(captionNoUrls)) !== null) {
     const handle = match[1].replace(/\.+$/, '') // strip trailing dots
     if (handle.length > 1) mentions.push(handle)
   }
@@ -788,18 +792,36 @@ async function resolveAllEntities(entities: Entity[], reel: ReelData): Promise<E
     } else {
       entity.status = entity.confidence >= 0.7 ? 'auto' : 'review'
 
-      // Phase 0a: Check if entity name matches a caption URL domain
+      // Phase 0a: Check if entity name matches a caption URL domain + path
       const entityNameNorm = entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const entityWords = entity.name.toLowerCase().split(/[\s:,\-()]+/).filter(w => w.length > 2)
       let captionUrlResolved = false
-      for (const [domain, url] of captionUrls) {
+      for (const [domain, urls] of captionUrls) {
         const domainBase = domain.split('.')[0]
         if (entityNameNorm === domainBase || domainBase.includes(entityNameNorm) || entityNameNorm.includes(domainBase)) {
-          entity.resolved_url = url
-          entity.resolved_via = 'caption-url'
-          entity.match_quality = 0.95
-          entity.status = 'auto'
-          captionUrlResolved = true
-          console.log(`[instagram-import] Caption URL match: ${entity.name} -> ${url}`)
+          if (urls.length === 1) {
+            // Single URL for this domain — use it directly
+            entity.resolved_url = urls[0]
+            entity.resolved_via = 'caption-url'
+            entity.match_quality = 0.95
+            entity.status = 'auto'
+            captionUrlResolved = true
+            console.log(`[instagram-import] Caption URL match: ${entity.name} -> ${urls[0]}`)
+          } else {
+            // Multiple URLs on same domain — match entity name words to URL path
+            const bestUrl = urls.find(u => {
+              const pathNorm = new URL(u).pathname.toLowerCase().replace(/[^a-z0-9]/g, '')
+              return entityWords.some(w => pathNorm.includes(w))
+            })
+            if (bestUrl) {
+              entity.resolved_url = bestUrl
+              entity.resolved_via = 'caption-url'
+              entity.match_quality = 0.93
+              entity.status = 'auto'
+              captionUrlResolved = true
+              console.log(`[instagram-import] Caption URL path match: ${entity.name} -> ${bestUrl}`)
+            }
+          }
           break
         }
       }
