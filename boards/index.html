@@ -3143,6 +3143,276 @@ body {
 }
 
 /* ============================================
+   Recipe Card Styles
+   ============================================ */
+.grid-item--recipe .grid-item__overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-2) var(--space-3);
+}
+.grid-item__recipe-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.2;
+}
+.grid-item__recipe-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+/* Full color food photography — no grayscale filter */
+.grid-item--recipe .grid-item__image {
+  filter: none;
+}
+.grid-item--recipe:hover .grid-item__image {
+  filter: none;
+}
+/* Expanded recipe cards */
+.grid-item--recipe.grid-item--expanded-medium .grid-item__overlay,
+.grid-item--recipe.grid-item--expanded-large .grid-item__overlay {
+  display: none;
+}
+
+/* ============================================
+   Recipe Drawer
+   Right-side panel for recipe viewer
+   ============================================ */
+.recipe-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.recipe-drawer:not([hidden]) {
+  pointer-events: all;
+  opacity: 1;
+}
+.recipe-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.recipe-drawer:not([hidden]) .recipe-drawer__backdrop {
+  opacity: 1;
+}
+.recipe-drawer__panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  background: var(--bg);
+  border-left: 2px solid var(--fg);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.25s ease-out;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.recipe-drawer:not([hidden]) .recipe-drawer__panel {
+  transform: translateX(0);
+}
+.recipe-drawer__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.recipe-drawer__title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.2;
+  flex: 1;
+  margin: 0;
+}
+.recipe-drawer__close {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--fg);
+  flex-shrink: 0;
+}
+.recipe-drawer__close:hover {
+  text-decoration: underline;
+}
+.recipe-drawer__meta-bar {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  border-top: 1px solid var(--subtle);
+  border-bottom: 1px solid var(--subtle);
+  padding: var(--space-2) 0;
+}
+.recipe-drawer__meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.recipe-drawer__meta-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.recipe-drawer__meta-value {
+  font-size: 10px;
+  color: var(--fg);
+}
+.recipe-drawer__description {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.recipe-drawer__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.recipe-drawer__scaler {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.recipe-drawer__scaler-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.recipe-drawer__scaler-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+.recipe-drawer__scaler-value {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+.recipe-drawer__scaler-label {
+  color: var(--muted);
+}
+.recipe-drawer__unit-toggle {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+.recipe-drawer__unit-toggle:hover,
+.recipe-drawer__unit-toggle--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+.recipe-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.recipe-drawer__section-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--subtle);
+  padding-bottom: var(--space-1);
+  margin: 0;
+}
+.recipe-drawer__ingredients {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.recipe-drawer__ingredient {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.recipe-drawer__ingredient:last-child {
+  border-bottom: none;
+}
+.recipe-drawer__instructions {
+  padding-left: var(--space-5);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.recipe-drawer__step {
+  font-size: 10px;
+  line-height: 1.6;
+  padding-left: var(--space-2);
+}
+.recipe-drawer__source-link {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-decoration: none;
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--subtle);
+}
+.recipe-drawer__source-link:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+@media (max-width: 600px) {
+  .recipe-drawer__panel {
+    max-width: 100%;
+    border-left: none;
+    border-top: 2px solid var(--fg);
+  }
+}
+
+/* ============================================
    Watch Grid Override
    ============================================ */
 .grid--watch {
@@ -5741,6 +6011,11 @@ body {
   .ig-entity--unresolved { border-color: var(--subtle); opacity: 0.85; cursor: default; }
   .ig-entity--unresolved:hover { border-color: var(--muted); background: none; }
   .ig-entity--unresolved-resolved { border-color: var(--fg) !important; opacity: 1; }
+  .ig-entity--provisional { border: 1px dashed var(--muted); opacity: 1; cursor: pointer; }
+  .ig-entity--provisional:hover { border-color: var(--fg); background: var(--surface); }
+  .ig-entity--provisional .ig-entity__url { font-style: italic; opacity: 0.5; }
+  .ig-manual-url.url-valid { border-color: #2ecc71 !important; }
+  .ig-manual-url.url-invalid { border-color: #e74c3c !important; }
   .ig-tag { display: inline-block; padding: 1px 6px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid var(--subtle); color: var(--muted); }
   .ig-tag--structure { color: var(--fg); border-color: var(--muted); }
   .ig-tag--taste { font-style: italic; }
@@ -6483,6 +6758,37 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
+  <!-- Recipe Drawer — right-side panel for recipe viewer -->
+  <div class="recipe-drawer" id="recipeDrawer" role="dialog" aria-modal="true" aria-labelledby="recipeDrawerTitle" hidden>
+    <div class="recipe-drawer__backdrop" id="recipeDrawerBackdrop"></div>
+    <div class="recipe-drawer__panel">
+      <div class="recipe-drawer__header">
+        <h2 class="recipe-drawer__title" id="recipeDrawerTitle"></h2>
+        <button class="recipe-drawer__close" id="recipeDrawerClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="recipe-drawer__meta-bar" id="recipeDrawerMeta"></div>
+      <div class="recipe-drawer__description" id="recipeDrawerDescription"></div>
+      <div class="recipe-drawer__controls">
+        <div class="recipe-drawer__scaler">
+          <button class="recipe-drawer__scaler-btn" id="recipeScaleMinus" aria-label="Decrease servings">&minus;</button>
+          <span class="recipe-drawer__scaler-value" id="recipeScaleValue">4</span>
+          <button class="recipe-drawer__scaler-btn" id="recipeScalePlus" aria-label="Increase servings">+</button>
+          <span class="recipe-drawer__scaler-label">servings</span>
+        </div>
+        <button class="recipe-drawer__unit-toggle" id="recipeUnitToggle">Imperial</button>
+      </div>
+      <section class="recipe-drawer__section">
+        <h3 class="recipe-drawer__section-title">Ingredients</h3>
+        <ul class="recipe-drawer__ingredients" id="recipeDrawerIngredients"></ul>
+      </section>
+      <section class="recipe-drawer__section">
+        <h3 class="recipe-drawer__section-title">Instructions</h3>
+        <ol class="recipe-drawer__instructions" id="recipeDrawerInstructions"></ol>
+      </section>
+      <a class="recipe-drawer__source-link" id="recipeDrawerSourceLink" target="_blank" rel="noopener">View original recipe</a>
+    </div>
+  </div>
+
   <!-- Confirm Modal -->
   <div class="modal modal--small" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal__backdrop"></div>
@@ -6536,7 +6842,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.12.0';
+  const VERSION = '2.14.0';
   console.log('[boards] v' + VERSION + ' - taste engine integration');
 
   // ============================================
@@ -6579,7 +6885,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     { name: 'repository', keywords: ['code', 'repo', 'commit', 'fork'], domains: ['github.com', 'gitlab.com', 'bitbucket.org'] },
     { name: 'social', keywords: ['tweet', 'post', 'profile'], domains: ['twitter.com', 'x.com', 'linkedin.com', 'instagram.com', 'threads.net'] },
     { name: 'document', keywords: ['document', 'pdf', 'doc'], patterns: ['.pdf', '.doc', '.xls', 'docs.google.com'] },
-    { name: 'tool', keywords: ['app', 'tool', 'dashboard', 'login'], patterns: ['app.', '/app/', '/dashboard'] }
+    { name: 'tool', keywords: ['app', 'tool', 'dashboard', 'login'], patterns: ['app.', '/app/', '/dashboard'] },
+    { name: 'recipe', keywords: ['recipe', 'ingredients', 'servings', 'prep time', 'cook time', 'preheat', 'tablespoon', 'teaspoon'], domains: [], patterns: ['/recipe/', '/recipes/'] }
   ];
 
   // Multi-topic domains: content varies per page, never cache at domain level
@@ -11021,6 +11328,15 @@ Return JSON:
 
   // Call create-pin API with retry logic (image resolution + metadata enrichment)
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
+    // Normalize URL: fix protocol-relative and HTML entities before sending
+    let enrichUrl = item.url;
+    if (enrichUrl && enrichUrl.startsWith('//')) enrichUrl = 'https:' + enrichUrl;
+    if (enrichUrl) enrichUrl = enrichUrl.replace(/&amp;/g, '&');
+    try { new URL(enrichUrl); } catch (_e) {
+      console.warn('%c[ENRICH] Skipping invalid URL:', 'color: #e74c3c', enrichUrl);
+      return { success: false, error: new Error('Invalid URL: ' + enrichUrl) };
+    }
+
     let lastError = null;
 
     for (let attempt = 0; attempt <= ENRICHMENT_MAX_RETRIES; attempt++) {
@@ -11042,7 +11358,7 @@ Return JSON:
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            url: item.url,
+            url: enrichUrl,
             title: item.title,
             description: item.description,
             linkId: item.linkId,
@@ -11053,7 +11369,8 @@ Return JSON:
             category: item.category || null,
             enrichWatch: item.enrichWatch || false,
             enrichBook: item.enrichBook || false,
-            enrichListen: item.enrichListen || false
+            enrichListen: item.enrichListen || false,
+            enrichRecipe: item.enrichRecipe || false
           })
         });
 
@@ -11403,6 +11720,29 @@ Return JSON:
           if (link.music.artist && link.music.trackTitle) {
             link.title = `${link.music.artist} – ${link.music.trackTitle}`;
           }
+        }
+
+        // Merge recipe metadata
+        if (result.recipe) {
+          const existing = link.recipe || {};
+          link.recipe = {
+            title: result.recipe.title || existing.title || null,
+            description: result.recipe.description || existing.description || null,
+            servings: result.recipe.servings || existing.servings || null,
+            servings_text: result.recipe.servings_text || existing.servings_text || null,
+            prep_time: result.recipe.prep_time || existing.prep_time || null,
+            cook_time: result.recipe.cook_time || existing.cook_time || null,
+            total_time: result.recipe.total_time || existing.total_time || null,
+            ingredients: result.recipe.ingredients?.length ? result.recipe.ingredients : (existing.ingredients || []),
+            instructions: result.recipe.instructions?.length ? result.recipe.instructions : (existing.instructions || []),
+            cuisine: result.recipe.cuisine || existing.cuisine || null,
+            difficulty: result.recipe.difficulty || existing.difficulty || null,
+            source_name: result.recipe.source_name || existing.source_name || null,
+            server_enriched_at: result.recipe.server_enriched_at || existing.server_enriched_at || null,
+          };
+          console.log('%c[ENRICH] Recipe metadata merged:', 'color: #e67e22', link.recipe);
+          delete link._tags;
+          link.tags = computeLinkTags(link);
         }
 
         // Update title/description from platform API if server resolved better data (e.g. YouTube)
@@ -12336,6 +12676,34 @@ Return JSON:
       enrichFlag: 'enrichListen',
       backfillCheck: (link) => link.music && !link.music.server_enriched_at,
     },
+    eat: {
+      category: 'eat',
+      metaField: 'recipe',
+      doneField: null,
+      doneLabel: null,
+      cssClass: 'recipe',
+      doneClass: null,
+      getPlatform: null,
+      overlay: {
+        titleField: 'title',
+        metaField: 'cuisine',
+        metaFallback: (meta) => meta.source_name || null,
+        titleClass: 'recipe-title',
+        metaClass: 'recipe-meta',
+      },
+      metaLine: [
+        { field: 'servings', format: (s) => s + ' servings' },
+        { field: 'prep_time', format: (t) => Math.round(t / 60) + 'm prep' },
+        { field: 'cook_time', format: (t) => Math.round(t / 60) + 'm cook' },
+        { field: 'total_time', format: formatDuration },
+      ],
+      badge: { typeField: 'cuisine', durationField: 'total_time' },
+      externalLink: null,
+      extras: () => '',
+      summaryField: 'description',
+      enrichFlag: 'enrichRecipe',
+      backfillCheck: (link) => !link.recipe || !link.recipe.server_enriched_at,
+    },
   };
 
   let currentFilters = {}; // Multi-dimension filter state: { format: 'movies', genre: 'action' }
@@ -12440,6 +12808,13 @@ Return JSON:
     if (link.book) {
       if (link.book.genre) tags.add(link.book.genre.toLowerCase());
       if (link.book.format) tags.add(link.book.format);
+    }
+
+    // Recipe: cuisine + difficulty
+    if (link.recipe) {
+      if (link.recipe.cuisine) tags.add(link.recipe.cuisine.toLowerCase());
+      if (link.recipe.difficulty) tags.add(link.recipe.difficulty);
+      tags.add('recipe');
     }
 
     return [...tags].filter(Boolean);
@@ -12741,8 +13116,8 @@ Return JSON:
       domains: ['github.com', 'gitlab.com', 'npmjs.com', 'producthunt.com']
     },
     eat: {
-      kw: ['restaurant', 'cafe', 'bar', 'food', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation', 'brunch', 'dinner', 'lunch'],
-      domains: ['yelp.com', 'tripadvisor.com', 'opentable.com', 'doordash.com', 'ubereats.com', 'resy.com']
+      kw: ['restaurant', 'cafe', 'bar', 'food', 'dining', 'menu', 'recipe', 'cook', 'cuisine', 'meal', 'dish', 'chef', 'reservation', 'brunch', 'dinner', 'lunch', 'ingredients', 'servings', 'bake', 'roast'],
+      domains: ['yelp.com', 'tripadvisor.com', 'opentable.com', 'doordash.com', 'ubereats.com', 'resy.com', 'allrecipes.com', 'seriouseats.com', 'food52.com', 'bonappetit.com', 'epicurious.com', 'foodnetwork.com', 'simplyrecipes.com', 'budgetbytes.com', 'minimalistbaker.com', 'tasty.co']
     },
     go: {
       kw: ['hotel', 'travel', 'map', 'city', 'venue', 'booking', 'destination', 'trip', 'flight', 'stay', 'vacation', 'visit', 'explore'],
@@ -15363,6 +15738,12 @@ Return JSON:
         }
       }
 
+      // Recipe viewer button (for eat pins with recipe data)
+      const hasRecipe = l.recipe && (l.recipe.ingredients?.length || l.recipe.instructions?.length);
+      if (hasRecipe) {
+        richActionsHtml += `<button class="grid-item__action" data-action="view-recipe">Recipe</button>`;
+      }
+
       // Truncate summary to ~60 words for display
       function truncateSummary(text, maxWords) {
         if (!text) return '';
@@ -15631,6 +16012,12 @@ Return JSON:
   // FAB Menu - Toggle open/close
   fabTrigger.onclick = () => {
     fabMenu.classList.toggle('fab-menu--open');
+    // On mobile, use the tap gesture to check clipboard (Safari requires a
+    // user activation for navigator.clipboard.readText — the visibility/focus
+    // polling never works there)
+    if (window.innerWidth <= 600) {
+      checkClipboardForUrls();
+    }
   };
 
   // Close FAB menu when clicking outside
@@ -15644,6 +16031,20 @@ Return JSON:
   fabShareLink.onclick = () => {
     fabMenu.classList.remove('fab-menu--open');
     openModal(addModal);
+    // Attempt clipboard read using the tap gesture (Safari requires user
+    // activation). Pre-fill the link input if there's a URL on the clipboard.
+    if (!linkInput.value) {
+      (async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          const urls = extractUrls(text);
+          const newUrls = urls.filter(u => !findByUrl(u));
+          if (newUrls.length > 0 && !linkInput.value) {
+            linkInput.value = newUrls.join('\n');
+          }
+        } catch (e) { /* clipboard permission denied — that's fine */ }
+      })();
+    }
   };
 
   fabPhotoUpload.onclick = () => {
@@ -16880,24 +17281,27 @@ Return JSON:
               const meta = await fetchMetadata(link.url);
               const cat = await smartCategorize(meta);
               const contentType = classifyByRules(link.url, meta.title, meta.description);
+              // Preserve existing category on refresh — don't recategorize
+              const keepCategory = link.category && link.category !== 'uncategorized';
+              const refreshCategory = keepCategory ? link.category : cat.category;
               let music = null;
-              if (cat.category === 'listen' || contentType.type === 'music') {
+              if (refreshCategory === 'listen' || contentType.type === 'music') {
                 music = await extractMusicMetadata(link.url, meta.title, meta.description, meta.musicTags);
               }
               let video = null;
-              if (cat.category === 'watch' || contentType.type === 'video') {
+              if (refreshCategory === 'watch' || contentType.type === 'video') {
                 video = await extractVideoMetadata(link.url, meta.title, meta.description, meta.videoTags);
               }
               let book = null;
-              if (cat.category === 'read' || contentType.type === 'book') {
+              if (refreshCategory === 'read' || contentType.type === 'book') {
                 book = extractBookMetadata(link.url, meta.title, meta.description);
               }
               const linkUpdate = {
                 title: meta.title || link.title,
                 description: meta.description || link.description,
                 image: meta.image || link.image,
-                category: cat.category,
-                confidence: cat.confidence,
+                category: refreshCategory,
+                confidence: keepCategory ? (link.confidence || cat.confidence) : cat.confidence,
                 content_type: contentType.type,
                 type_confidence: contentType.confidence,
                 type_signals: contentType.signals,
@@ -16912,13 +17316,15 @@ Return JSON:
               renderFilters();
               renderGrid();
 
-              const isWatchRerun = cat.category === 'watch' || contentType.type === 'video';
-              const isBookRerun = cat.category === 'read' || contentType.type === 'book';
-              if (isWatchRerun || isBookRerun) {
+              const isWatchRerun = refreshCategory === 'watch' || contentType.type === 'video';
+              const isBookRerun = refreshCategory === 'read' || contentType.type === 'book';
+              const isRecipeRerun = refreshCategory === 'eat' || contentType.type === 'recipe';
+              if (isWatchRerun || isBookRerun || isRecipeRerun) {
                 queueServerEnrichment(id, link.url, meta.title, meta.description, {
-                  category: cat.category,
+                  category: refreshCategory,
                   enrichWatch: isWatchRerun,
-                  enrichBook: isBookRerun
+                  enrichBook: isBookRerun,
+                  enrichRecipe: isRecipeRerun
                 });
               }
               toast('Refreshed', { id: 'refresh-' + id });
@@ -16974,6 +17380,12 @@ Return JSON:
           if (item) item.classList.toggle('grid-item--' + richConfig.doneClass, nowDone);
           if (currentUser) syncLinkToSupabase(link);
           toast(nowDone ? `Marked as ${richConfig.doneLabel.toLowerCase()}` : 'Unmarked');
+        }
+        return;
+      } else if (actionType === 'view-recipe') {
+        const link = getAllLinks().find(l => l.id === id);
+        if (link && link.recipe) {
+          openRecipeDrawer(link);
         }
         return;
       } else if (actionType === 'visit-imdb' || actionType === 'visit-wiki' || actionType === 'visit-ext') {
@@ -18037,7 +18449,219 @@ Return JSON:
     if (m._trapHandler) { m.removeEventListener('keydown', m._trapHandler); m._trapHandler = null; }
     if (m._previousFocus) { m._previousFocus.focus(); m._previousFocus = null; }
   }
-  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal, igReviewModal, createBoardModal].forEach(closeModal); }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal, igReviewModal, createBoardModal].forEach(closeModal); closeRecipeDrawer(); }
+
+  // ============================================
+  // Recipe Drawer
+  // ============================================
+  const recipeDrawer = $('recipeDrawer');
+  const recipeDrawerClose = $('recipeDrawerClose');
+  const recipeDrawerBackdrop = $('recipeDrawerBackdrop');
+  const recipeDrawerTitle = $('recipeDrawerTitle');
+  const recipeDrawerMeta = $('recipeDrawerMeta');
+  const recipeDrawerDescription = $('recipeDrawerDescription');
+  const recipeDrawerIngredients = $('recipeDrawerIngredients');
+  const recipeDrawerInstructions = $('recipeDrawerInstructions');
+  const recipeDrawerSourceLink = $('recipeDrawerSourceLink');
+  const recipeScaleMinus = $('recipeScaleMinus');
+  const recipeScalePlus = $('recipeScalePlus');
+  const recipeScaleValue = $('recipeScaleValue');
+  const recipeUnitToggle = $('recipeUnitToggle');
+
+  let recipeDrawerState = {
+    recipe: null,
+    linkUrl: null,
+    baseServings: 4,
+    currentServings: 4,
+    useMetric: !(navigator.language || '').startsWith('en-US'),
+  };
+
+  function openRecipeDrawer(link) {
+    const recipe = link.recipe;
+    if (!recipe) return;
+    recipeDrawerState.recipe = recipe;
+    recipeDrawerState.linkUrl = link.url;
+    recipeDrawerState.baseServings = recipe.servings || 4;
+    recipeDrawerState.currentServings = recipeDrawerState.baseServings;
+    recipeUnitToggle.textContent = recipeDrawerState.useMetric ? 'Metric' : 'Imperial';
+    recipeUnitToggle.classList.toggle('recipe-drawer__unit-toggle--active', recipeDrawerState.useMetric);
+    renderRecipeDrawer();
+    recipeDrawer.removeAttribute('hidden');
+    recipeDrawerSourceLink.href = link.url;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeRecipeDrawer() {
+    if (recipeDrawer.hasAttribute('hidden')) return;
+    recipeDrawer.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+
+  function renderRecipeDrawer() {
+    const { recipe, currentServings, baseServings, useMetric } = recipeDrawerState;
+    const scaleFactor = baseServings > 0 ? currentServings / baseServings : 1;
+
+    recipeDrawerTitle.textContent = recipe.title || 'Recipe';
+
+    // Meta bar
+    const metaItems = [];
+    if (currentServings) metaItems.push({ label: 'Servings', value: String(currentServings) });
+    if (recipe.prep_time) metaItems.push({ label: 'Prep', value: formatRecipeTime(recipe.prep_time) });
+    if (recipe.cook_time) metaItems.push({ label: 'Cook', value: formatRecipeTime(recipe.cook_time) });
+    if (recipe.total_time) metaItems.push({ label: 'Total', value: formatRecipeTime(recipe.total_time) });
+    if (recipe.cuisine) metaItems.push({ label: 'Cuisine', value: recipe.cuisine });
+    if (recipe.difficulty) metaItems.push({ label: 'Difficulty', value: cap(recipe.difficulty) });
+    recipeDrawerMeta.innerHTML = metaItems.map(function(item) {
+      return '<div class="recipe-drawer__meta-item"><span class="recipe-drawer__meta-label">' + esc(item.label) + '</span><span class="recipe-drawer__meta-value">' + esc(item.value) + '</span></div>';
+    }).join('');
+
+    // Description
+    recipeDrawerDescription.textContent = recipe.description || '';
+    recipeDrawerDescription.style.display = recipe.description ? '' : 'none';
+
+    // Scaler
+    recipeScaleValue.textContent = String(currentServings);
+
+    // Ingredients
+    var ingredients = recipe.ingredients || [];
+    recipeDrawerIngredients.innerHTML = ingredients.map(function(raw) {
+      return '<li class="recipe-drawer__ingredient">' + esc(scaleIngredient(raw, scaleFactor, useMetric)) + '</li>';
+    }).join('');
+
+    // Instructions
+    var instructions = recipe.instructions || [];
+    recipeDrawerInstructions.innerHTML = instructions.map(function(step) {
+      return '<li class="recipe-drawer__step">' + esc(step) + '</li>';
+    }).join('');
+  }
+
+  function formatRecipeTime(seconds) {
+    if (!seconds) return '';
+    var h = Math.floor(seconds / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+    if (h > 0) return h + 'h';
+    return m + 'm';
+  }
+
+  // ============================================
+  // Ingredient Scaling and Unit Conversion
+  // ============================================
+  var UNIT_TO_METRIC = {
+    'cup': { factor: 236.588, unit: 'ml' },
+    'cups': { factor: 236.588, unit: 'ml' },
+    'tbsp': { factor: 14.787, unit: 'ml' },
+    'tablespoon': { factor: 14.787, unit: 'ml' },
+    'tablespoons': { factor: 14.787, unit: 'ml' },
+    'tsp': { factor: 4.929, unit: 'ml' },
+    'teaspoon': { factor: 4.929, unit: 'ml' },
+    'teaspoons': { factor: 4.929, unit: 'ml' },
+    'oz': { factor: 28.3495, unit: 'g' },
+    'ounce': { factor: 28.3495, unit: 'g' },
+    'ounces': { factor: 28.3495, unit: 'g' },
+    'lb': { factor: 453.592, unit: 'g' },
+    'lbs': { factor: 453.592, unit: 'g' },
+    'pound': { factor: 453.592, unit: 'g' },
+    'pounds': { factor: 453.592, unit: 'g' },
+    'fl oz': { factor: 29.5735, unit: 'ml' },
+    'quart': { factor: 946.353, unit: 'ml' },
+    'quarts': { factor: 946.353, unit: 'ml' },
+    'pint': { factor: 473.176, unit: 'ml' },
+    'pints': { factor: 473.176, unit: 'ml' },
+    'gallon': { factor: 3785.41, unit: 'ml' },
+    'gallons': { factor: 3785.41, unit: 'ml' },
+  };
+
+  function parseFraction(str) {
+    str = str.trim();
+    var mixed = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+    if (mixed) return parseInt(mixed[1]) + parseInt(mixed[2]) / parseInt(mixed[3]);
+    var frac = str.match(/^(\d+)\/(\d+)$/);
+    if (frac) return parseInt(frac[1]) / parseInt(frac[2]);
+    var num = parseFloat(str);
+    return isNaN(num) ? null : num;
+  }
+
+  function formatFraction(num) {
+    if (num === Math.floor(num)) return String(Math.round(num));
+    var fracs = [[1,4],[1,3],[1,2],[2,3],[3,4]];
+    for (var i = 0; i < fracs.length; i++) {
+      if (Math.abs(num - fracs[i][0]/fracs[i][1]) < 0.05) return fracs[i][0] + '/' + fracs[i][1];
+    }
+    var whole = Math.floor(num);
+    var remainder = num - whole;
+    for (var j = 0; j < fracs.length; j++) {
+      if (Math.abs(remainder - fracs[j][0]/fracs[j][1]) < 0.05) {
+        return whole > 0 ? whole + ' ' + fracs[j][0] + '/' + fracs[j][1] : fracs[j][0] + '/' + fracs[j][1];
+      }
+    }
+    return num.toFixed(1).replace(/\.0$/, '');
+  }
+
+  function scaleIngredient(raw, scaleFactor, useMetric) {
+    if (scaleFactor === 1 && !useMetric) return raw;
+    // Match: optional number (int, decimal, fraction, mixed) + optional unit + rest
+    var match = raw.match(/^([\d\s\/\.]+)\s+([a-zA-Z]+\.?)\s+(.+)$/);
+    if (!match) {
+      // Try just number + rest (no unit), e.g. "2 eggs"
+      var match2 = raw.match(/^([\d\s\/\.]+)\s+(.+)$/);
+      if (match2) {
+        var amt2 = parseFraction(match2[1].trim());
+        if (amt2 !== null) {
+          var scaled2 = amt2 * scaleFactor;
+          return formatFraction(scaled2) + ' ' + match2[2];
+        }
+      }
+      return raw;
+    }
+    var numStr = match[1], unit = match[2], ingredient = match[3];
+    var amount = parseFraction(numStr.trim());
+    if (amount === null) return raw;
+
+    var scaledAmount = amount * scaleFactor;
+    var displayUnit = unit;
+
+    if (useMetric) {
+      var conv = UNIT_TO_METRIC[unit.toLowerCase()];
+      if (conv) {
+        var metricAmount = scaledAmount * conv.factor;
+        displayUnit = conv.unit;
+        if (metricAmount > 100) metricAmount = Math.round(metricAmount);
+        else if (metricAmount > 10) metricAmount = Math.round(metricAmount * 10) / 10;
+        else metricAmount = Math.round(metricAmount * 100) / 100;
+        if (displayUnit === 'ml' && metricAmount >= 1000) { metricAmount = metricAmount / 1000; displayUnit = 'L'; }
+        if (displayUnit === 'g' && metricAmount >= 1000) { metricAmount = metricAmount / 1000; displayUnit = 'kg'; }
+        return metricAmount + ' ' + displayUnit + ' ' + ingredient;
+      }
+    }
+
+    return formatFraction(scaledAmount) + ' ' + unit + ' ' + ingredient;
+  }
+
+  // Scaler button handlers
+  recipeScaleMinus.onclick = function() {
+    if (recipeDrawerState.currentServings <= 1) return;
+    recipeDrawerState.currentServings--;
+    renderRecipeDrawer();
+  };
+  recipeScalePlus.onclick = function() {
+    if (recipeDrawerState.currentServings >= 99) return;
+    recipeDrawerState.currentServings++;
+    renderRecipeDrawer();
+  };
+  recipeUnitToggle.onclick = function() {
+    recipeDrawerState.useMetric = !recipeDrawerState.useMetric;
+    recipeUnitToggle.textContent = recipeDrawerState.useMetric ? 'Metric' : 'Imperial';
+    recipeUnitToggle.classList.toggle('recipe-drawer__unit-toggle--active', recipeDrawerState.useMetric);
+    renderRecipeDrawer();
+  };
+  recipeDrawerClose.onclick = closeRecipeDrawer;
+  recipeDrawerBackdrop.onclick = closeRecipeDrawer;
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !recipeDrawer.hasAttribute('hidden')) {
+      closeRecipeDrawer();
+    }
+  });
 
   // Custom confirm dialog (native confirm() is blocked in some contexts)
   const confirmModal = $('confirmModal');
@@ -18775,15 +19399,128 @@ Return JSON:
       igEntities.appendChild(card);
     });
 
-    // --- "Mentioned but not found" section ---
+    // --- "Also mentioned" section (provisional + needs-link) ---
     const unresolvedEntities = result.unresolved_entities || [];
     if (unresolvedEntities.length > 0) {
-      const header = document.createElement('div');
-      header.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);margin:var(--space-3) 0 var(--space-2);text-transform:uppercase;letter-spacing:0.05em;';
-      header.textContent = 'Mentioned but not found';
-      igEntities.appendChild(header);
-
+      // Split: provisional (has @handle) vs needs-link (no handle)
+      // Also separate low-confidence (<0.5) into a collapsible group
+      const provisional = [];
+      const needsLink = [];
+      const lowConfidence = [];
       unresolvedEntities.forEach((entity, ui) => {
+        const conf = entity.confidence || 0;
+        const obj = { entity, idx: ui };
+        if (conf < 0.5) { lowConfidence.push(obj); return; }
+        if (entity.mention_handle) { provisional.push(obj); }
+        else { needsLink.push(obj); }
+      });
+
+      const hasVisible = provisional.length > 0 || needsLink.length > 0;
+      if (hasVisible || lowConfidence.length > 0) {
+        const header = document.createElement('div');
+        header.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);margin:var(--space-3) 0 var(--space-2);text-transform:uppercase;letter-spacing:0.05em;';
+        header.textContent = 'Also mentioned';
+        igEntities.appendChild(header);
+      }
+
+      // Helper: debounced input wiring for manual URL inputs
+      function wireUrlInput(urlInput, card, entity, ui) {
+        let debounceTimer = null;
+        urlInput.addEventListener('input', () => {
+          clearTimeout(debounceTimer);
+          const val = urlInput.value.trim();
+          if (!val) { urlInput.classList.remove('url-valid', 'url-invalid'); return; }
+          debounceTimer = setTimeout(() => {
+            let isValid = false;
+            try { if (val.startsWith('http')) { new URL(val); isValid = true; } } catch {}
+            urlInput.classList.toggle('url-valid', isValid);
+            urlInput.classList.toggle('url-invalid', !isValid);
+            if (isValid) handleUnresolvedUrlInput(card, entity, val, ui, SOURCE_LABELS);
+          }, 300);
+        });
+      }
+
+      // --- Provisional entities (have @handle → IG profile as fallback) ---
+      provisional.forEach(({ entity, idx: ui }) => {
+        const uConfidence = entity.confidence || 0;
+        const uConfClass = uConfidence >= 0.7 ? 'high' : uConfidence >= 0.5 ? 'mid' : 'low';
+        const uSource = entity.source || null;
+        const uSourceLabel = uSource ? (SOURCE_LABELS[uSource] || uSource) : null;
+        const uLocationHint = entity.location_hint || null;
+        const handle = entity.mention_handle;
+        const igProfileUrl = 'https://www.instagram.com/' + encodeURIComponent(handle) + '/';
+
+        const card = document.createElement('div');
+        card.className = 'ig-entity ig-entity--provisional ig-entity--selected';
+        card.dataset.unresolvedIdx = String(ui);
+
+        card.innerHTML =
+          '<div class="ig-entity__info" style="width:100%;">' +
+            '<div class="ig-entity__name">' + escHtml(entity.name) +
+              ' <span class="ig-conf ig-conf--' + uConfClass + '">' + Math.round(uConfidence * 100) + '%</span>' +
+              (uSourceLabel ? ' <span class="ig-entity__audio-tag">' + escHtml(uSourceLabel) + '</span>' : '') +
+            '</div>' +
+            '<div class="ig-entity__meta">' + escHtml(entity.category || '') +
+              (entity.type ? ' \u00b7 ' + escHtml(entity.type) : '') +
+              (uLocationHint ? ' \u00b7 ' + escHtml(uLocationHint) : '') +
+            '</div>' +
+            '<div class="ig-entity__unresolved-actions" style="display:flex;gap:var(--space-2);margin-top:var(--space-2);align-items:center;">' +
+              '<a href="' + escHtml(igProfileUrl) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);padding:2px 8px;text-decoration:none;white-space:nowrap;">@' + escHtml(handle) + ' \u2197</a>' +
+              '<input type="text" class="ig-manual-url" placeholder="Better link\u2026" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">' +
+            '</div>' +
+          '</div>';
+
+        // Pre-register IG profile as fallback pin
+        const resolvedPin = {
+          id: 'ig_provisional_' + Date.now() + '_' + ui,
+          url: igProfileUrl,
+          title: entity.name,
+          description: '',
+          image: null,
+          domain: 'instagram.com',
+          category: entity.category || 'uncategorized',
+          content_type: entity.type || 'generic',
+          type_confidence: entity.confidence,
+          source: 'social',
+          source_url: igReviewData?.source_pin?.url || '',
+          extraction: {
+            method: 'provisional',
+            source_platform: 'instagram',
+            entity_type: entity.type,
+            entity_source: entity.source,
+            confidence: entity.confidence,
+            mention_handle: handle,
+          },
+          addedAt: Math.floor(Date.now() / 1000),
+          _manual: true,
+          _unresolvedIdx: ui,
+        };
+        if (!igReviewData._manualPins) igReviewData._manualPins = [];
+        igReviewData._manualPins = igReviewData._manualPins.filter(p => p._unresolvedIdx !== ui);
+        igReviewData._manualPins.push(resolvedPin);
+
+        // Pre-checked checkbox
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.manualIdx = String(ui);
+        cb.style.cssText = 'width:18px;height:18px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:var(--fg);';
+        card.insertBefore(cb, card.firstChild);
+
+        cb.addEventListener('change', () => {
+          card.classList.toggle('ig-entity--selected', cb.checked);
+          updateIgCount();
+        });
+
+        // Wire URL input — if user pastes a better URL, replace the IG profile fallback
+        const urlInput = card.querySelector('.ig-manual-url');
+        wireUrlInput(urlInput, card, entity, ui);
+
+        igEntities.appendChild(card);
+      });
+
+      // --- Needs-link entities (no handle, need manual resolution) ---
+      needsLink.forEach(({ entity, idx: ui }) => {
         const uConfidence = entity.confidence || 0;
         const uConfClass = uConfidence >= 0.7 ? 'high' : uConfidence >= 0.5 ? 'mid' : 'low';
         const uSource = entity.source || null;
@@ -18813,12 +19550,53 @@ Return JSON:
           '</div>';
 
         const urlInput = card.querySelector('.ig-manual-url');
-        urlInput.addEventListener('change', () => {
-          handleUnresolvedUrlInput(card, entity, urlInput.value.trim(), ui, SOURCE_LABELS);
-        });
+        wireUrlInput(urlInput, card, entity, ui);
 
         igEntities.appendChild(card);
       });
+
+      // --- Low-confidence expander ---
+      if (lowConfidence.length > 0) {
+        const expander = document.createElement('details');
+        expander.style.cssText = 'margin-top:var(--space-2);';
+        const summary = document.createElement('summary');
+        summary.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);cursor:pointer;padding:var(--space-1) 0;';
+        summary.textContent = 'Show ' + lowConfidence.length + ' uncertain mention' + (lowConfidence.length > 1 ? 's' : '');
+        expander.appendChild(summary);
+
+        lowConfidence.forEach(({ entity, idx: ui }) => {
+          const uConfidence = entity.confidence || 0;
+          const uSource = entity.source || null;
+          const uSourceLabel = uSource ? (SOURCE_LABELS[uSource] || uSource) : null;
+          const searchQ = entity.search_query || entity.name;
+          const ddgUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(searchQ);
+
+          const card = document.createElement('div');
+          card.className = 'ig-entity ig-entity--unresolved';
+          card.dataset.unresolvedIdx = String(ui);
+          card.innerHTML =
+            '<div class="ig-entity__info" style="width:100%;">' +
+              '<div class="ig-entity__name">' + escHtml(entity.name) +
+                ' <span class="ig-conf ig-conf--low">' + Math.round(uConfidence * 100) + '%</span>' +
+                (uSourceLabel ? ' <span class="ig-entity__audio-tag">' + escHtml(uSourceLabel) + '</span>' : '') +
+              '</div>' +
+              '<div class="ig-entity__meta">' + escHtml(entity.category || '') +
+                (entity.type ? ' \u00b7 ' + escHtml(entity.type) : '') +
+              '</div>' +
+              '<div class="ig-entity__unresolved-actions" style="display:flex;gap:var(--space-2);margin-top:var(--space-2);align-items:center;">' +
+                '<a href="' + escHtml(ddgUrl) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);padding:2px 8px;text-decoration:none;white-space:nowrap;">Search \u2197</a>' +
+                '<input type="text" class="ig-manual-url" placeholder="Paste URL to add\u2026" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">' +
+              '</div>' +
+            '</div>';
+
+          const urlInput = card.querySelector('.ig-manual-url');
+          wireUrlInput(urlInput, card, entity, ui);
+
+          expander.appendChild(card);
+        });
+
+        igEntities.appendChild(expander);
+      }
     }
 
     updateIgCount();
@@ -18879,11 +19657,33 @@ Return JSON:
       updateIgCount();
     });
 
-    // Replace the actions area with confirmed URL display
+    // Replace the actions area with confirmed URL + Change button
     const actionsDiv = card.querySelector('.ig-entity__unresolved-actions');
     actionsDiv.innerHTML =
-      '<span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--fg);opacity:0.6;word-break:break-all;">' +
-      escHtml(pastedUrl) + '</span>';
+      '<span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--fg);opacity:0.6;word-break:break-all;flex:1;">' +
+      escHtml(pastedUrl) + '</span>' +
+      '<button type="button" class="ig-change-url" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);background:transparent;padding:2px 8px;cursor:pointer;white-space:nowrap;">Change</button>';
+
+    actionsDiv.querySelector('.ig-change-url').addEventListener('click', () => {
+      actionsDiv.innerHTML =
+        '<input type="text" class="ig-manual-url" value="' + escHtml(pastedUrl) + '" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">';
+      const newInput = actionsDiv.querySelector('.ig-manual-url');
+      newInput.focus();
+      newInput.select();
+      let debounceTimer = null;
+      newInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const val = newInput.value.trim();
+        if (!val) { newInput.classList.remove('url-valid', 'url-invalid'); return; }
+        debounceTimer = setTimeout(() => {
+          let isValid = false;
+          try { if (val.startsWith('http')) { new URL(val); isValid = true; } } catch {}
+          newInput.classList.toggle('url-valid', isValid);
+          newInput.classList.toggle('url-invalid', !isValid);
+          if (isValid) handleUnresolvedUrlInput(card, entity, val, unresolvedIdx, SOURCE_LABELS);
+        }, 300);
+      });
+    });
 
     updateIgCount();
   }
@@ -19399,13 +20199,15 @@ Return JSON:
           const isWatchItem2 = cat.category === 'watch' || contentType.type === 'video';
           const isBookItem2 = cat.category === 'read' || contentType.type === 'book';
           const isListenItem2 = cat.category === 'listen' || contentType.type === 'music';
-          const needsEnrichment2 = contentType.confidence < 0.7 || !meta.image || isWatchItem2 || isBookItem2 || isListenItem2;
+          const isRecipeItem2 = cat.category === 'eat' || contentType.type === 'recipe';
+          const needsEnrichment2 = contentType.confidence < 0.7 || !meta.image || isWatchItem2 || isBookItem2 || isListenItem2 || isRecipeItem2;
           if (needsEnrichment2) {
             queueServerEnrichment(id, url, meta.title, meta.description, {
               category: cat.category,
               enrichWatch: isWatchItem2,
               enrichBook: isBookItem2,
-              enrichListen: isListenItem2
+              enrichListen: isListenItem2,
+              enrichRecipe: isRecipeItem2
             });
           }
 
@@ -20270,15 +21072,16 @@ Return JSON:
     // Handle deep links: ?add=URL or ?pin=ID
     const urlParams = new URLSearchParams(window.location.search);
     const addUrl = urlParams.get('add');
-    const pinId = urlParams.get('pin');
-    if (addUrl || pinId) {
+    const pendingPinId = urlParams.get('pin');
+    if (addUrl || pendingPinId) {
       // Mark this session as deep-link arrival (suppress bookmarklet promo)
       sessionStorage.setItem('boards_arrived_via_deeplink', '1');
       // Clean up the URL bar
       const cleanLocation = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanLocation);
       if (addUrl) processLinks(addUrl);
-      if (pinId) setTimeout(() => openDetail(pinId), 500);
+      // Store pending pin — opened after cloud sync completes
+      if (pendingPinId) window._pendingPinDetail = pendingPinId;
     }
 
     // Auth is managed by ctrl-auth.js module — check if already signed in
@@ -20422,6 +21225,13 @@ Return JSON:
         console.log('[sync] Updated from cloud');
       } else {
         console.log('[sync] No cloud data returned');
+      }
+
+      // Open pending pin detail (from ?pin= deep link)
+      if (window._pendingPinDetail) {
+        const pid = window._pendingPinDetail;
+        delete window._pendingPinDetail;
+        openDetail(pid);
       }
 
       // Process any links saved from shared boards while logged out
