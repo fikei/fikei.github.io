@@ -10,8 +10,8 @@
 // Body: { profile: { categories, artists, genres, keywords, domains, contentTypes, tasteContext? }, filters? }
 // Returns: { events: [...], meta: { eventsScanned, profileSignals, algorithm } }
 
-const VERSION = '1.1.0'
-console.log(`[recommend-events] v${VERSION} — taste-graph context`)
+const VERSION = '1.2.0'
+console.log(`[recommend-events] v${VERSION} — taste-engine DB context`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -59,6 +59,7 @@ interface EventProfile {
   domains: Record<string, number>
   contentTypes: Record<string, number>
   tasteContext?: TasteContext
+  userId?: string // Optional: if provided, can load taste context from DB
 }
 
 interface EventFilters {
@@ -428,6 +429,56 @@ Respond with valid JSON only.`
   }
 }
 
+// --- Load taste context from taste_domains DB table ---
+
+async function loadTasteContextFromDB(userId: string): Promise<TasteContext | null> {
+  try {
+    const supabase = getSupabase()
+
+    const { data: domains, error } = await supabase
+      .from('taste_domains')
+      .select('label, spanning_categories, confidence, pin_ids')
+      .eq('user_id', userId)
+      .order('confidence', { ascending: false })
+      .limit(10)
+
+    if (error || !domains || domains.length === 0) return null
+
+    // Also load global summary if available
+    const { data: summaries } = await supabase
+      .from('taste_summaries')
+      .select('summary')
+      .eq('user_id', userId)
+      .eq('scope', 'global')
+      .limit(1)
+
+    const clusters: TasteCluster[] = domains.map(d => ({
+      label: d.label,
+      domain: (d.spanning_categories || [])[0] || 'general',
+      pinCount: (d.pin_ids || []).length,
+    }))
+
+    // Build motifs from summary keywords
+    const motifs: string[] = []
+    if (summaries?.[0]?.summary) {
+      // Extract key phrases from sensibility summary
+      const words = summaries[0].summary.split(/\s+/).filter((w: string) => w.length > 5)
+      motifs.push(...words.slice(0, 3))
+    }
+
+    console.log(`[recommend-events] Loaded ${clusters.length} taste domains from DB for user ${userId.slice(0, 8)}`)
+
+    return {
+      clusters,
+      bridges: [],
+      motifs,
+    }
+  } catch (err) {
+    console.warn('[recommend-events] Error loading taste from DB:', err)
+    return null
+  }
+}
+
 // --- Main handler ---
 
 serve(async (req) => {
@@ -451,6 +502,14 @@ serve(async (req) => {
 
     const maxResults = filters.maxResults || 5
     const startTime = Date.now()
+
+    // If client didn't supply tasteContext but provided userId, try loading from DB
+    if (!profile.tasteContext?.clusters?.length && profile.userId) {
+      const dbTaste = await loadTasteContextFromDB(profile.userId)
+      if (dbTaste) {
+        profile.tasteContext = dbTaste
+      }
+    }
 
     // Count profile signals
     const profileSignals =

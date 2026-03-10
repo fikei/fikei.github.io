@@ -6536,8 +6536,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.11.1';
-  console.log('[boards] v' + VERSION + ' - rotating loader for Instagram import');
+  const VERSION = '2.12.0';
+  console.log('[boards] v' + VERSION + ' - taste engine integration');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -8012,6 +8012,9 @@ Return JSON:
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+      // Include taste context if available (non-blocking on absence)
+      const tasteCtx = _tasteProfile ? buildTasteContextForPrompt(_tasteProfile) : null;
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
         headers: {
@@ -8023,7 +8026,8 @@ Return JSON:
           prompt: resolvedPrompt,
           items: itemsPayload,
           category: currentCategory,
-          userPrefs: userPrefs
+          userPrefs: userPrefs,
+          tasteContext: tasteCtx
         }),
         signal: controller.signal
       });
@@ -8957,6 +8961,21 @@ Return JSON:
   }
 
   async function loadTasteContext(links) {
+    // Try new taste engine first (provides richer context)
+    try {
+      var profile = await loadTasteProfile();
+      if (profile) {
+        var ctx = buildTasteContextForPrompt(profile);
+        if (ctx && ctx.clusters && ctx.clusters.length > 0) {
+          console.log('[taste-context] Using taste engine profile (' + ctx.clusters.length + ' domains)');
+          return ctx;
+        }
+      }
+    } catch (e) {
+      console.warn('[taste-context] Taste engine fallback:', e);
+    }
+
+    // Fallback: legacy taste-graph approach
     // Check cache
     try {
       var raw = localStorage.getItem(TASTE_CACHE_KEY);
@@ -8965,7 +8984,7 @@ Return JSON:
         var age = Date.now() - (cached.timestamp || 0);
         var pinDrift = Math.abs((cached.pinCount || 0) - links.length);
         if (age < TASTE_CACHE_TTL && pinDrift <= 5) {
-          console.log('[taste-context] Cache hit (' + cached.tasteContext.clusters.length + ' clusters)');
+          console.log('[taste-context] Legacy cache hit (' + cached.tasteContext.clusters.length + ' clusters)');
           return cached.tasteContext;
         }
       }
@@ -8978,7 +8997,7 @@ Return JSON:
       return null;
     }
 
-    // Call taste-graph
+    // Call taste-graph (legacy)
     try {
       var resp = await fetch(SUPABASE_URL + '/functions/v1/taste-graph', {
         method: 'POST',
@@ -9015,13 +9034,180 @@ Return JSON:
         }));
       } catch (e) { /* ignore storage errors */ }
 
-      console.log('[taste-context] Loaded ' + tasteContext.clusters.length + ' clusters, ' + tasteContext.bridges.length + ' bridges');
+      console.log('[taste-context] Legacy loaded ' + tasteContext.clusters.length + ' clusters');
       return tasteContext;
     } catch (err) {
       console.warn('[taste-context] Error:', err);
       return null;
     }
   }
+
+  // =============================================================================
+  // TASTE ENGINE CLIENT MODULE
+  // Manages the multi-level taste profile (affinities, domains, axes, sensibility)
+  // Calls the taste-engine edge function and caches results locally
+  // =============================================================================
+
+  const TASTE_ENGINE_CACHE_KEY = 'ctrl-rodeo-taste-engine';
+  const TASTE_ENGINE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  const TASTE_ENGINE_PIN_THRESHOLD = 5; // Recompute affinities every 5 new pins
+
+  // Cached taste profile (loaded from localStorage or edge function)
+  let _tasteProfile = null;
+  let _tasteProfileLoading = false;
+
+  async function loadTasteProfile(forceRefresh) {
+    if (_tasteProfileLoading) return _tasteProfile;
+    if (_tasteProfile && !forceRefresh) return _tasteProfile;
+
+    // Check localStorage cache
+    try {
+      var raw = localStorage.getItem(TASTE_ENGINE_CACHE_KEY);
+      if (raw && !forceRefresh) {
+        var cached = JSON.parse(raw);
+        var age = Date.now() - (cached.timestamp || 0);
+        var pinDrift = Math.abs((cached.pinCount || 0) - getAllLinks().length);
+        if (age < TASTE_ENGINE_CACHE_TTL && pinDrift < TASTE_ENGINE_PIN_THRESHOLD) {
+          console.log('[taste-engine] Cache hit — ' + (cached.profile.domains || []).length + ' domains');
+          _tasteProfile = cached.profile;
+          return _tasteProfile;
+        }
+      }
+    } catch (e) { /* ignore cache errors */ }
+
+    // Get user ID from auth
+    var user = CtrlAuth.getUser ? CtrlAuth.getUser() : null;
+    if (!user || !user.id) {
+      console.log('[taste-engine] No authenticated user, skipping');
+      return null;
+    }
+
+    _tasteProfileLoading = true;
+
+    try {
+      var resp = await fetch(SUPABASE_URL + '/functions/v1/taste-engine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: 'get-profile',
+          userId: user.id,
+        }),
+      });
+
+      if (!resp.ok) {
+        console.warn('[taste-engine] API error:', resp.status);
+        _tasteProfileLoading = false;
+        return null;
+      }
+
+      var data = await resp.json();
+      _tasteProfile = data.profile || null;
+
+      // Cache result
+      if (_tasteProfile) {
+        try {
+          localStorage.setItem(TASTE_ENGINE_CACHE_KEY, JSON.stringify({
+            profile: _tasteProfile,
+            timestamp: Date.now(),
+            pinCount: getAllLinks().length,
+          }));
+        } catch (e) { /* ignore storage errors */ }
+        console.log('[taste-engine] Loaded profile — ' + (_tasteProfile.domains || []).length + ' domains, ' + (_tasteProfile.axes || []).length + ' axes');
+      }
+    } catch (err) {
+      console.warn('[taste-engine] Error loading profile:', err);
+    }
+
+    _tasteProfileLoading = false;
+    return _tasteProfile;
+  }
+
+  async function triggerTasteComputation(action) {
+    var user = CtrlAuth.getUser ? CtrlAuth.getUser() : null;
+    if (!user || !user.id) return null;
+
+    action = action || 'full-pipeline';
+
+    try {
+      var resp = await fetch(SUPABASE_URL + '/functions/v1/taste-engine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: action,
+          userId: user.id,
+        }),
+      });
+
+      if (!resp.ok) {
+        console.warn('[taste-engine] Computation error:', resp.status);
+        return null;
+      }
+
+      var data = await resp.json();
+
+      // Invalidate cache so next load fetches fresh data
+      localStorage.removeItem(TASTE_ENGINE_CACHE_KEY);
+      _tasteProfile = data.profile || null;
+
+      console.log('[taste-engine] Computation complete (' + action + ')');
+      return data;
+    } catch (err) {
+      console.warn('[taste-engine] Computation error:', err);
+      return null;
+    }
+  }
+
+  // Build taste context for downstream consumers (generate-widget, recommend-events)
+  // Returns a lightweight object suitable for prompt injection
+  function buildTasteContextForPrompt(profile) {
+    if (!profile) return null;
+
+    var domains = (profile.domains || []).slice(0, 6);
+    var axes = (profile.axes || []).filter(function(a) { return a.confidence > 0.3; });
+    var globalSummary = (profile.summaries || []).find(function(s) { return s.scope === 'global'; });
+
+    if (domains.length === 0 && axes.length === 0) return null;
+
+    return {
+      domains: domains.map(function(d) {
+        return {
+          label: d.label,
+          summary: d.summary || '',
+          spanning_categories: d.spanning_categories || [],
+          confidence: d.confidence,
+        };
+      }),
+      axes: axes.map(function(a) {
+        return {
+          axis: a.axis,
+          position: a.position,
+          low_label: a.low_label,
+          high_label: a.high_label,
+        };
+      }),
+      sensibility: globalSummary ? globalSummary.summary : null,
+      // Legacy compat: also provide clusters/bridges/motifs shape
+      clusters: domains.map(function(d) {
+        return {
+          label: d.label,
+          domain: (d.spanning_categories || [])[0] || 'general',
+          pinCount: (d.pin_ids || []).length,
+        };
+      }),
+      bridges: [],
+      motifs: [],
+    };
+  }
+
+  // =============================================================================
+  // End Taste Engine Client Module
+  // =============================================================================
 
   function renderEventsWidget(events) {
     const footerSection = document.getElementById('widgetFooter');
@@ -9081,6 +9267,12 @@ Return JSON:
     var tasteContext = await loadTasteContext(items);
     if (tasteContext) {
       profile.tasteContext = tasteContext;
+    }
+
+    // Pass userId so recommend-events can load taste from DB as fallback
+    var user = CtrlAuth.getUser ? CtrlAuth.getUser() : null;
+    if (user && user.id) {
+      profile.userId = user.id;
     }
 
     // Region filter: only recommend events from user's region
@@ -14950,6 +15142,9 @@ Return JSON:
       (link.url && link.url.toLowerCase().includes(q)) ||
       (link.notes && link.notes.toLowerCase().includes(q))
     ) return true;
+    // Search taste_tags and practical_tags (taste engine data)
+    if (Array.isArray(link.taste_tags) && link.taste_tags.some(t => t.toLowerCase().includes(q))) return true;
+    if (Array.isArray(link.practical_tags) && link.practical_tags.some(t => t.toLowerCase().includes(q))) return true;
     // Also search inside merged pin sources
     if (link.is_merged && Array.isArray(link.sources)) {
       return link.sources.some(s =>
@@ -20097,6 +20292,9 @@ Return JSON:
       updateAuthUI();
       loadAllShares();
       initYouTubeSection();
+
+      // Preload taste profile (non-blocking, used by widgets and search)
+      loadTasteProfile().catch(function(e) { console.warn('[taste-engine] Preload error:', e); });
 
       // Fetch from Supabase and update if different
       const t2 = performance.now();
