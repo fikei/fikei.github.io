@@ -20075,15 +20075,16 @@ Return JSON:
     // Handle deep links: ?add=URL or ?pin=ID
     const urlParams = new URLSearchParams(window.location.search);
     const addUrl = urlParams.get('add');
-    const pinId = urlParams.get('pin');
-    if (addUrl || pinId) {
+    const pendingPinId = urlParams.get('pin');
+    if (addUrl || pendingPinId) {
       // Mark this session as deep-link arrival (suppress bookmarklet promo)
       sessionStorage.setItem('boards_arrived_via_deeplink', '1');
       // Clean up the URL bar
       const cleanLocation = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanLocation);
       if (addUrl) processLinks(addUrl);
-      if (pinId) setTimeout(() => openDetail(pinId), 500);
+      // Store pending pin — opened after cloud sync completes
+      if (pendingPinId) window._pendingPinDetail = pendingPinId;
     }
 
     // Auth is managed by ctrl-auth.js module — check if already signed in
@@ -20224,6 +20225,13 @@ Return JSON:
         console.log('[sync] Updated from cloud');
       } else {
         console.log('[sync] No cloud data returned');
+      }
+
+      // Open pending pin detail (from ?pin= deep link)
+      if (window._pendingPinDetail) {
+        const pid = window._pendingPinDetail;
+        delete window._pendingPinDetail;
+        openDetail(pid);
       }
 
       // Process any links saved from shared boards while logged out
