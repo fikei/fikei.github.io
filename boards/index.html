@@ -5741,6 +5741,11 @@ body {
   .ig-entity--unresolved { border-color: var(--subtle); opacity: 0.85; cursor: default; }
   .ig-entity--unresolved:hover { border-color: var(--muted); background: none; }
   .ig-entity--unresolved-resolved { border-color: var(--fg) !important; opacity: 1; }
+  .ig-entity--provisional { border: 1px dashed var(--muted); opacity: 1; cursor: pointer; }
+  .ig-entity--provisional:hover { border-color: var(--fg); background: var(--surface); }
+  .ig-entity--provisional .ig-entity__url { font-style: italic; opacity: 0.5; }
+  .ig-manual-url.url-valid { border-color: #2ecc71 !important; }
+  .ig-manual-url.url-invalid { border-color: #e74c3c !important; }
   .ig-tag { display: inline-block; padding: 1px 6px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid var(--subtle); color: var(--muted); }
   .ig-tag--structure { color: var(--fg); border-color: var(--muted); }
   .ig-tag--taste { font-style: italic; }
@@ -6536,8 +6541,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.11.2';
-  console.log('[boards] v' + VERSION + ' - fix mobile Safari auth, clipboard, FAB');
+  const VERSION = '2.12.0';
+  console.log('[boards] v' + VERSION + ' - provisional entity resolution UX');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -18600,15 +18605,128 @@ Return JSON:
       igEntities.appendChild(card);
     });
 
-    // --- "Mentioned but not found" section ---
+    // --- "Also mentioned" section (provisional + needs-link) ---
     const unresolvedEntities = result.unresolved_entities || [];
     if (unresolvedEntities.length > 0) {
-      const header = document.createElement('div');
-      header.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);margin:var(--space-3) 0 var(--space-2);text-transform:uppercase;letter-spacing:0.05em;';
-      header.textContent = 'Mentioned but not found';
-      igEntities.appendChild(header);
-
+      // Split: provisional (has @handle) vs needs-link (no handle)
+      // Also separate low-confidence (<0.5) into a collapsible group
+      const provisional = [];
+      const needsLink = [];
+      const lowConfidence = [];
       unresolvedEntities.forEach((entity, ui) => {
+        const conf = entity.confidence || 0;
+        const obj = { entity, idx: ui };
+        if (conf < 0.5) { lowConfidence.push(obj); return; }
+        if (entity.mention_handle) { provisional.push(obj); }
+        else { needsLink.push(obj); }
+      });
+
+      const hasVisible = provisional.length > 0 || needsLink.length > 0;
+      if (hasVisible || lowConfidence.length > 0) {
+        const header = document.createElement('div');
+        header.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);margin:var(--space-3) 0 var(--space-2);text-transform:uppercase;letter-spacing:0.05em;';
+        header.textContent = 'Also mentioned';
+        igEntities.appendChild(header);
+      }
+
+      // Helper: debounced input wiring for manual URL inputs
+      function wireUrlInput(urlInput, card, entity, ui) {
+        let debounceTimer = null;
+        urlInput.addEventListener('input', () => {
+          clearTimeout(debounceTimer);
+          const val = urlInput.value.trim();
+          if (!val) { urlInput.classList.remove('url-valid', 'url-invalid'); return; }
+          debounceTimer = setTimeout(() => {
+            let isValid = false;
+            try { if (val.startsWith('http')) { new URL(val); isValid = true; } } catch {}
+            urlInput.classList.toggle('url-valid', isValid);
+            urlInput.classList.toggle('url-invalid', !isValid);
+            if (isValid) handleUnresolvedUrlInput(card, entity, val, ui, SOURCE_LABELS);
+          }, 300);
+        });
+      }
+
+      // --- Provisional entities (have @handle → IG profile as fallback) ---
+      provisional.forEach(({ entity, idx: ui }) => {
+        const uConfidence = entity.confidence || 0;
+        const uConfClass = uConfidence >= 0.7 ? 'high' : uConfidence >= 0.5 ? 'mid' : 'low';
+        const uSource = entity.source || null;
+        const uSourceLabel = uSource ? (SOURCE_LABELS[uSource] || uSource) : null;
+        const uLocationHint = entity.location_hint || null;
+        const handle = entity.mention_handle;
+        const igProfileUrl = 'https://www.instagram.com/' + encodeURIComponent(handle) + '/';
+
+        const card = document.createElement('div');
+        card.className = 'ig-entity ig-entity--provisional ig-entity--selected';
+        card.dataset.unresolvedIdx = String(ui);
+
+        card.innerHTML =
+          '<div class="ig-entity__info" style="width:100%;">' +
+            '<div class="ig-entity__name">' + escHtml(entity.name) +
+              ' <span class="ig-conf ig-conf--' + uConfClass + '">' + Math.round(uConfidence * 100) + '%</span>' +
+              (uSourceLabel ? ' <span class="ig-entity__audio-tag">' + escHtml(uSourceLabel) + '</span>' : '') +
+            '</div>' +
+            '<div class="ig-entity__meta">' + escHtml(entity.category || '') +
+              (entity.type ? ' \u00b7 ' + escHtml(entity.type) : '') +
+              (uLocationHint ? ' \u00b7 ' + escHtml(uLocationHint) : '') +
+            '</div>' +
+            '<div class="ig-entity__unresolved-actions" style="display:flex;gap:var(--space-2);margin-top:var(--space-2);align-items:center;">' +
+              '<a href="' + escHtml(igProfileUrl) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);padding:2px 8px;text-decoration:none;white-space:nowrap;">@' + escHtml(handle) + ' \u2197</a>' +
+              '<input type="text" class="ig-manual-url" placeholder="Better link\u2026" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">' +
+            '</div>' +
+          '</div>';
+
+        // Pre-register IG profile as fallback pin
+        const resolvedPin = {
+          id: 'ig_provisional_' + Date.now() + '_' + ui,
+          url: igProfileUrl,
+          title: entity.name,
+          description: '',
+          image: null,
+          domain: 'instagram.com',
+          category: entity.category || 'uncategorized',
+          content_type: entity.type || 'generic',
+          type_confidence: entity.confidence,
+          source: 'social',
+          source_url: igReviewData?.source_pin?.url || '',
+          extraction: {
+            method: 'provisional',
+            source_platform: 'instagram',
+            entity_type: entity.type,
+            entity_source: entity.source,
+            confidence: entity.confidence,
+            mention_handle: handle,
+          },
+          addedAt: Math.floor(Date.now() / 1000),
+          _manual: true,
+          _unresolvedIdx: ui,
+        };
+        if (!igReviewData._manualPins) igReviewData._manualPins = [];
+        igReviewData._manualPins = igReviewData._manualPins.filter(p => p._unresolvedIdx !== ui);
+        igReviewData._manualPins.push(resolvedPin);
+
+        // Pre-checked checkbox
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.manualIdx = String(ui);
+        cb.style.cssText = 'width:18px;height:18px;flex-shrink:0;margin-top:2px;cursor:pointer;accent-color:var(--fg);';
+        card.insertBefore(cb, card.firstChild);
+
+        cb.addEventListener('change', () => {
+          card.classList.toggle('ig-entity--selected', cb.checked);
+          updateIgCount();
+        });
+
+        // Wire URL input — if user pastes a better URL, replace the IG profile fallback
+        const urlInput = card.querySelector('.ig-manual-url');
+        wireUrlInput(urlInput, card, entity, ui);
+
+        igEntities.appendChild(card);
+      });
+
+      // --- Needs-link entities (no handle, need manual resolution) ---
+      needsLink.forEach(({ entity, idx: ui }) => {
         const uConfidence = entity.confidence || 0;
         const uConfClass = uConfidence >= 0.7 ? 'high' : uConfidence >= 0.5 ? 'mid' : 'low';
         const uSource = entity.source || null;
@@ -18638,12 +18756,53 @@ Return JSON:
           '</div>';
 
         const urlInput = card.querySelector('.ig-manual-url');
-        urlInput.addEventListener('change', () => {
-          handleUnresolvedUrlInput(card, entity, urlInput.value.trim(), ui, SOURCE_LABELS);
-        });
+        wireUrlInput(urlInput, card, entity, ui);
 
         igEntities.appendChild(card);
       });
+
+      // --- Low-confidence expander ---
+      if (lowConfidence.length > 0) {
+        const expander = document.createElement('details');
+        expander.style.cssText = 'margin-top:var(--space-2);';
+        const summary = document.createElement('summary');
+        summary.style.cssText = 'font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);cursor:pointer;padding:var(--space-1) 0;';
+        summary.textContent = 'Show ' + lowConfidence.length + ' uncertain mention' + (lowConfidence.length > 1 ? 's' : '');
+        expander.appendChild(summary);
+
+        lowConfidence.forEach(({ entity, idx: ui }) => {
+          const uConfidence = entity.confidence || 0;
+          const uSource = entity.source || null;
+          const uSourceLabel = uSource ? (SOURCE_LABELS[uSource] || uSource) : null;
+          const searchQ = entity.search_query || entity.name;
+          const ddgUrl = 'https://duckduckgo.com/?q=' + encodeURIComponent(searchQ);
+
+          const card = document.createElement('div');
+          card.className = 'ig-entity ig-entity--unresolved';
+          card.dataset.unresolvedIdx = String(ui);
+          card.innerHTML =
+            '<div class="ig-entity__info" style="width:100%;">' +
+              '<div class="ig-entity__name">' + escHtml(entity.name) +
+                ' <span class="ig-conf ig-conf--low">' + Math.round(uConfidence * 100) + '%</span>' +
+                (uSourceLabel ? ' <span class="ig-entity__audio-tag">' + escHtml(uSourceLabel) + '</span>' : '') +
+              '</div>' +
+              '<div class="ig-entity__meta">' + escHtml(entity.category || '') +
+                (entity.type ? ' \u00b7 ' + escHtml(entity.type) : '') +
+              '</div>' +
+              '<div class="ig-entity__unresolved-actions" style="display:flex;gap:var(--space-2);margin-top:var(--space-2);align-items:center;">' +
+                '<a href="' + escHtml(ddgUrl) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);padding:2px 8px;text-decoration:none;white-space:nowrap;">Search \u2197</a>' +
+                '<input type="text" class="ig-manual-url" placeholder="Paste URL to add\u2026" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">' +
+              '</div>' +
+            '</div>';
+
+          const urlInput = card.querySelector('.ig-manual-url');
+          wireUrlInput(urlInput, card, entity, ui);
+
+          expander.appendChild(card);
+        });
+
+        igEntities.appendChild(expander);
+      }
     }
 
     updateIgCount();
@@ -18704,11 +18863,33 @@ Return JSON:
       updateIgCount();
     });
 
-    // Replace the actions area with confirmed URL display
+    // Replace the actions area with confirmed URL + Change button
     const actionsDiv = card.querySelector('.ig-entity__unresolved-actions');
     actionsDiv.innerHTML =
-      '<span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--fg);opacity:0.6;word-break:break-all;">' +
-      escHtml(pastedUrl) + '</span>';
+      '<span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--fg);opacity:0.6;word-break:break-all;flex:1;">' +
+      escHtml(pastedUrl) + '</span>' +
+      '<button type="button" class="ig-change-url" style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--muted);border:1px solid var(--muted);background:transparent;padding:2px 8px;cursor:pointer;white-space:nowrap;">Change</button>';
+
+    actionsDiv.querySelector('.ig-change-url').addEventListener('click', () => {
+      actionsDiv.innerHTML =
+        '<input type="text" class="ig-manual-url" value="' + escHtml(pastedUrl) + '" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);background:transparent;border:1px solid var(--subtle);color:var(--fg);padding:2px 6px;min-width:0;">';
+      const newInput = actionsDiv.querySelector('.ig-manual-url');
+      newInput.focus();
+      newInput.select();
+      let debounceTimer = null;
+      newInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const val = newInput.value.trim();
+        if (!val) { newInput.classList.remove('url-valid', 'url-invalid'); return; }
+        debounceTimer = setTimeout(() => {
+          let isValid = false;
+          try { if (val.startsWith('http')) { new URL(val); isValid = true; } } catch {}
+          newInput.classList.toggle('url-valid', isValid);
+          newInput.classList.toggle('url-invalid', !isValid);
+          if (isValid) handleUnresolvedUrlInput(card, entity, val, unresolvedIdx, SOURCE_LABELS);
+        }, 300);
+      });
+    });
 
     updateIgCount();
   }
