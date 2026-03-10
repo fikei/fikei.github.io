@@ -58,11 +58,18 @@
       const ref = config.supabaseUrl.match(/\/\/([^.]+)\./)?.[1] || '';
       _authStorageKey = `sb-${ref}-auth-token`;
 
+      // Detect mobile browsers where PKCE code-verifier can be lost during
+      // the OAuth redirect chain, causing silent auth failures on mobile Safari.
+      // Use implicit flow on mobile — tokens arrive in the URL hash which the
+      // iOS Auth Token Capture script in boards/index.html already handles.
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+
       // Create Supabase client
       _supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
         auth: {
           detectSessionInUrl: true,
-          flowType: 'pkce',
+          flowType: isMobile ? 'implicit' : 'pkce',
           autoRefreshToken: true,
           persistSession: true
         }

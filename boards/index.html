@@ -6536,8 +6536,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.11.1';
-  console.log('[boards] v' + VERSION + ' - rotating loader for Instagram import');
+  const VERSION = '2.11.2';
+  console.log('[boards] v' + VERSION + ' - fix mobile Safari auth, clipboard, FAB');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -15436,6 +15436,12 @@ Return JSON:
   // FAB Menu - Toggle open/close
   fabTrigger.onclick = () => {
     fabMenu.classList.toggle('fab-menu--open');
+    // On mobile, use the tap gesture to check clipboard (Safari requires a
+    // user activation for navigator.clipboard.readText — the visibility/focus
+    // polling never works there)
+    if (window.innerWidth <= 600) {
+      checkClipboardForUrls();
+    }
   };
 
   // Close FAB menu when clicking outside
@@ -15449,6 +15455,20 @@ Return JSON:
   fabShareLink.onclick = () => {
     fabMenu.classList.remove('fab-menu--open');
     openModal(addModal);
+    // Attempt clipboard read using the tap gesture (Safari requires user
+    // activation). Pre-fill the link input if there's a URL on the clipboard.
+    if (!linkInput.value) {
+      (async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          const urls = extractUrls(text);
+          const newUrls = urls.filter(u => !findByUrl(u));
+          if (newUrls.length > 0 && !linkInput.value) {
+            linkInput.value = newUrls.join('\n');
+          }
+        } catch (e) { /* clipboard permission denied — that's fine */ }
+      })();
+    }
   };
 
   fabPhotoUpload.onclick = () => {
