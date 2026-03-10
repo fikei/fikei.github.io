@@ -17,8 +17,8 @@
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
 
-const VERSION = '1.3.0'
-console.log(`[instagram-import] v${VERSION} - @mention bio resolution, ScrapeCreators transcripts, caption URLs`)
+const VERSION = '1.3.1'
+console.log(`[instagram-import] v${VERSION} - fix bio resolution response parsing`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -755,8 +755,9 @@ async function resolveViaBio(handle: string): Promise<string | null> {
     if (!resp.ok) return null
 
     const data = await resp.json()
-    const profile = data.data || data
-    const externalUrl = profile.external_url || profile.bio_link || profile.website || null
+    if (!data.success) return null
+    const profile = data.data?.user || data.data || data
+    const externalUrl = profile.external_url || profile.bio_links?.[0]?.url || profile.bio_link || profile.website || null
     if (externalUrl) {
       console.log(`[instagram-import] Bio resolution: @${handle} -> ${externalUrl}`)
     }
