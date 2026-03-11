@@ -6231,6 +6231,19 @@ a:hover { color: var(--accent-cyan); }
     </div>
   </div>
 
+  <!-- Source Connect Prompt — shown after first taste profile view -->
+  <div class="capture-promo" id="sourcePrompt" style="display:none">
+    <div class="capture-promo__inner">
+      <div class="capture-promo__icon">◎</div>
+      <div class="capture-promo__body">
+        <div class="capture-promo__text" id="sourcePromptText">Your taste map is building</div>
+        <div class="capture-promo__subtext" id="sourcePromptSub">Import Spotify or YouTube history to add depth</div>
+      </div>
+      <button class="capture-promo__cta" id="sourcePromptCta">Connect</button>
+      <button class="capture-promo__dismiss" id="sourcePromptDismiss" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+
   <!-- iOS App Redirect Overlay -->
   <div id="iosAppOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;color:#fff;font-family:var(--font-mono);flex-direction:column;align-items:center;justify-content:center;padding:var(--space-8);text-align:center;-webkit-font-smoothing:antialiased;">
     <div style="max-width:320px;width:100%;">
@@ -7057,8 +7070,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.19.0';
-  console.log('[boards] v' + VERSION + ' - secondary signal import (Spotify + YouTube Takeout)');
+  const VERSION = '2.20.0';
+  console.log('[boards] v' + VERSION + ' - source connect prompt');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -11644,6 +11657,7 @@ Return JSON:
       const signals = await importSecondarySignals('spotify', events);
       setImportStatus('spotify-import-status', 'Imported ' + signals + ' artist signals from ' + events.length.toLocaleString() + ' plays.');
       toast('Spotify history imported', { level: 'success' });
+      if (window._sourcePrompt) window._sourcePrompt.markImported();
     } catch (e) {
       setImportStatus('spotify-import-status', 'Import failed — try again.');
       toast('Spotify import failed', { level: 'error' });
@@ -11673,6 +11687,7 @@ Return JSON:
       const signals = await importSecondarySignals('youtube_takeout', events);
       setImportStatus('youtube-takeout-status', 'Imported ' + signals + ' channel signals from ' + events.length.toLocaleString() + ' watches.');
       toast('YouTube history imported', { level: 'success' });
+      if (window._sourcePrompt) window._sourcePrompt.markImported();
     } catch (e) {
       setImportStatus('youtube-takeout-status', 'Import failed — try again.');
       toast('YouTube Takeout import failed', { level: 'error' });
@@ -21741,6 +21756,9 @@ Return JSON:
 
       // Preload taste profile — if empty and user has enough pins, bootstrap the engine
       loadTasteProfile().then(function(profile) {
+        // Source connect prompt — nudge after first profile view
+        if (window._sourcePrompt) window._sourcePrompt.maybeShow(profile);
+
         var hasDomains = profile && profile.domains && profile.domains.length > 0;
         if (!hasDomains) {
           var pinCount = getAllLinks().length;
@@ -22777,6 +22795,105 @@ Return JSON:
       processLinks(text);
     }
   });
+
+})();
+  </script>
+
+  <!-- Source Connect Prompt Script -->
+  <script>
+(function() {
+  'use strict';
+
+  // ============================================
+  // Source Connect Prompt
+  // Nudges users to import Spotify / YouTube history
+  // after their taste profile first loads with domains.
+  // Reuses capture-promo CSS. Escalating dismiss: 14d → permanent.
+  // ============================================
+
+  const SOURCE_PROMPT_KEY = 'boards_source_prompt';
+  const sourcePrompt = document.getElementById('sourcePrompt');
+  const sourcePromptText = document.getElementById('sourcePromptText');
+  const sourcePromptSub = document.getElementById('sourcePromptSub');
+  const sourcePromptCta = document.getElementById('sourcePromptCta');
+  const sourcePromptDismiss = document.getElementById('sourcePromptDismiss');
+
+  function getSourcePromptState() {
+    try { return JSON.parse(localStorage.getItem(SOURCE_PROMPT_KEY)) || {}; } catch { return {}; }
+  }
+
+  function setSourcePromptState(updates) {
+    const state = { ...getSourcePromptState(), ...updates };
+    localStorage.setItem(SOURCE_PROMPT_KEY, JSON.stringify(state));
+    return state;
+  }
+
+  function shouldShowSourcePrompt(profile) {
+    // Must be logged in
+    if (!window.CtrlAuth || !CtrlAuth.getSession()?.user) return false;
+
+    // Must have domains in taste profile
+    if (!profile || !profile.domains || profile.domains.length === 0) return false;
+
+    const state = getSourcePromptState();
+
+    // Already imported — done forever
+    if (state.hasImported) return false;
+
+    // Permanently dismissed (2+ dismissals)
+    if ((state.dismissCount || 0) >= 2) return false;
+
+    // Cooldown: first dismiss → 14 days
+    if (state.dismissedAt) {
+      const daysSince = (Date.now() - state.dismissedAt) / 86400000;
+      if (daysSince < 14) return false;
+    }
+
+    return true;
+  }
+
+  function showSourcePrompt(profile) {
+    if (!sourcePrompt || !shouldShowSourcePrompt(profile)) return;
+    const domainCount = profile.domains.length;
+    if (sourcePromptText) {
+      sourcePromptText.textContent = 'Your taste map has ' + domainCount + ' domain' + (domainCount !== 1 ? 's' : '');
+    }
+    sourcePrompt.style.display = 'block';
+  }
+
+  function hideSourcePrompt() {
+    if (sourcePrompt) sourcePrompt.style.display = 'none';
+  }
+
+  // CTA: open Account modal, scroll to Taste History section
+  if (sourcePromptCta) {
+    sourcePromptCta.onclick = function() {
+      hideSourcePrompt();
+      setSourcePromptState({ ctaClicked: true });
+      // Dispatch the same custom event the auth module uses to open Account modal
+      document.dispatchEvent(new CustomEvent('ctrl:auth:accountclick'));
+      setTimeout(function() {
+        var importSection = document.getElementById('taste-import-section');
+        if (importSection) importSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    };
+  }
+
+  // Dismiss: escalating cooldown (14d → permanent)
+  if (sourcePromptDismiss) {
+    sourcePromptDismiss.onclick = function() {
+      hideSourcePrompt();
+      var state = getSourcePromptState();
+      var dismissCount = (state.dismissCount || 0) + 1;
+      setSourcePromptState({ dismissedAt: Date.now(), dismissCount: dismissCount });
+    };
+  }
+
+  // Expose for taste profile callback and import handlers
+  window._sourcePrompt = {
+    maybeShow: showSourcePrompt,
+    markImported: function() { setSourcePromptState({ hasImported: true }); hideSourcePrompt(); }
+  };
 
 })();
   </script>
