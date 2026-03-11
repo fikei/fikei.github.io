@@ -1304,3 +1304,55 @@ body {
 .transition-snap {
   transition-timing-function: steps(1) !important;
 }
+
+/* ============================================
+   Visual Effects
+   ============================================ */
+
+/* Hover-reveal — content hidden until hover/focus
+   Accessible: :focus-within for keyboard, @media (hover: none) shows by default on touch
+   Usage: <div class="hover-reveal"><div class="hover-reveal__content">...</div></div> */
+.hover-reveal__content {
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-default);
+}
+
+.hover-reveal:hover .hover-reveal__content,
+.hover-reveal:focus-within .hover-reveal__content {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .hover-reveal__content {
+    opacity: 1;
+  }
+}
+
+/* CRT scanline texture overlay — purely decorative
+   Usage: <div class="texture-scanline">content</div>
+   Low opacity (3%) — should not affect readability. */
+.texture-scanline {
+  position: relative;
+}
+
+.texture-scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Respect reduced transparency preference */
+@media (prefers-reduced-transparency: reduce) {
+  .texture-scanline::after {
+    display: none;
+  }
+}
