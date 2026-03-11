@@ -14,7 +14,7 @@ console.log(`[mcp-server] v${VERSION} - MCP Streamable HTTP server`)
 
 const MCP_PROTOCOL_VERSION = '2025-03-26'
 const MCP_SERVER_BASE = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-server'
-const OAUTH_SERVER_BASE = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth'
+const OAUTH_SERVER_BASE = 'https://ctrl.rodeo'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
