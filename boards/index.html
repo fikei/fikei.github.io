@@ -1655,17 +1655,17 @@ body {
   overflow: hidden;
   cursor: pointer;
   background: var(--subtle);
-  border: 1px solid var(--fg);
+  border: 0.25px solid var(--fg);
   transition: transform 0.1s, opacity 0.1s;
 }
 
 .grid-item:focus {
-  outline: 2px solid var(--fg);
+  outline: 0.5px solid var(--fg);
   outline-offset: 2px;
 }
 
 .grid-item--selected {
-  outline: 3px solid var(--fg);
+  outline: 0.75px solid var(--fg);
   outline-offset: 0;
 }
 
@@ -1676,12 +1676,12 @@ body {
 
 .grid-item.drag-before {
   transform: translateX(8px);
-  box-shadow: -4px 0 0 0 var(--fg);
+  box-shadow: -1px 0 0 0 var(--fg);
 }
 
 .grid-item.drag-after {
   transform: translateX(-8px);
-  box-shadow: 4px 0 0 0 var(--fg);
+  box-shadow: 1px 0 0 0 var(--fg);
 }
 
 /* Merge target visual feedback */
@@ -2158,7 +2158,6 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: grayscale(100%) contrast(1.1);
   transition: filter 0.2s, opacity 0.4s ease-in-out;
 }
 
@@ -2170,10 +2169,6 @@ body {
   opacity: 1;
 }
 
-.grid-item:hover .grid-item__image {
-  filter: grayscale(0%);
-}
-
 .grid-item__overlay {
   position: absolute;
   bottom: 0;
@@ -2181,7 +2176,7 @@ body {
   right: 0;
   padding: var(--space-3);
   background: var(--bg);
-  border-top: 1px solid var(--fg);
+  border-top: 0.25px solid var(--fg);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -2246,8 +2241,8 @@ body {
   letter-spacing: 0.1em;
   padding: 2px 6px;
   background: var(--bg);
-  border-right: 1px solid var(--fg);
-  border-bottom: 1px solid var(--fg);
+  border-right: 0.25px solid var(--fg);
+  border-bottom: 0.25px solid var(--fg);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -2342,10 +2337,6 @@ body {
   opacity: 1;
 }
 
-.grid-item--expanded-medium .grid-item__image,
-.grid-item--expanded-large .grid-item__image {
-  filter: grayscale(0%);
-}
 
 .grid-item--expanded-medium .grid-item__details,
 .grid-item--expanded-large .grid-item__details {
@@ -2827,15 +2818,6 @@ body {
   --color-audiomack: #FFA200;
 }
 
-/* Listen variant — no grayscale on album art */
-.grid-item--listen .grid-item__image {
-  filter: none;
-}
-
-.grid-item--listen:hover .grid-item__image {
-  filter: none;
-}
-
 /* Listen overlay: artist + track two-line layout */
 .grid-item--listen .grid-item__overlay {
   display: flex;
@@ -2885,8 +2867,8 @@ body {
   letter-spacing: 0.1em;
   color: var(--fg);
   background: var(--bg);
-  border-top: 1px solid var(--fg);
-  border-right: 1px solid var(--fg);
+  border-top: 0.25px solid var(--fg);
+  border-right: 0.25px solid var(--fg);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -2956,15 +2938,6 @@ body {
   --color-peacock: #000000;
   --color-paramount-plus: #0064FF;
   --color-crunchyroll: #F47521;
-}
-
-/* Watch variant — no grayscale on poster art */
-.grid-item--watch .grid-item__image {
-  filter: none;
-}
-
-.grid-item--watch:hover .grid-item__image {
-  filter: none;
 }
 
 /* Watch overlay: title + creator/year two-line layout */
@@ -3039,14 +3012,6 @@ body {
 .grid-item__platform-icon--open-library { background: #e2dcc5; }
 .grid-item__platform-icon--audible { background: #F8991C; }
 .grid-item__platform-icon--librarything { background: #251916; }
-
-/* Book variant — no grayscale on cover art */
-.grid-item--book .grid-item__image {
-  filter: none;
-}
-.grid-item--book:hover .grid-item__image {
-  filter: none;
-}
 
 /* Book overlay: title + author two-line layout */
 .grid-item--book .grid-item__overlay {
@@ -4694,8 +4659,7 @@ body {
   width: 100%;
   aspect-ratio: 16/9;
   object-fit: cover;
-  filter: grayscale(100%);
-  border-bottom: 1px solid var(--fg);
+  border-bottom: 0.25px solid var(--fg);
 }
 
 .overlay__details {
@@ -6842,8 +6806,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.14.0';
-  console.log('[boards] v' + VERSION + ' - taste engine integration');
+  const VERSION = '2.15.0';
+  console.log('[boards] v' + VERSION + ' - reduce line weight, full color images');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
