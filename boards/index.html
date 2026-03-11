@@ -2638,6 +2638,10 @@ a:hover { color: var(--accent-cyan); }
   transition: opacity 0.15s, background 0.15s;
 }
 
+.grid-item:hover .grid-item__menu-btn {
+  opacity: 1;
+}
+
 .grid-item__menu-btn:hover {
   background: rgba(0, 0, 0, 0.8);
 }
@@ -7158,7 +7162,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.21.0';
+  const VERSION = '2.21.1';
   console.log('[boards] v' + VERSION + ' - masonry grid + full-page detail overlay');
 
   // ============================================
