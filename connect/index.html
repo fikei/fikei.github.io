@@ -155,7 +155,7 @@
 
       <button class="auth-btn" id="google-btn" onclick="signInGoogle()">Continue with Google</button>
       <div class="auth-divider">or</div>
-      <input class="email-input" id="email-input" type="email" placeholder="Email address" />
+      <input class="email-input" id="email-input" type="email" placeholder="Email address" aria-label="Email address" />
       <button class="auth-btn" id="email-btn" onclick="signInEmail()">Send magic link</button>
       <div id="auth-status" class="status"></div>
     </div>
@@ -200,7 +200,7 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgxOTQzMTgsImV4cCI6MjA1Mzc3MDMxOH0.VSwk27_TuN4WfbJ8gq9tp4FLOwtBN7BZDH-9i1CWBRI'
     const OAUTH_BASE = `${SUPABASE_URL}/functions/v1/mcp-oauth`
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { flowType: 'pkce' }
     })
 
@@ -223,7 +223,7 @@
 
     // Check if already logged in
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await sb.auth.getSession()
       if (session) {
         showConsent()
       }
@@ -251,7 +251,7 @@
     }
 
     async function signInGoogle() {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error } = await sb.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.href }
       })
@@ -264,7 +264,7 @@
     async function signInEmail() {
       const email = document.getElementById('email-input').value
       if (!email) return
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await sb.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: window.location.href }
       })
@@ -283,7 +283,7 @@
       btn.textContent = 'Connecting...'
 
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await sb.auth.getSession()
         if (!session) {
           document.getElementById('consent-status').textContent = 'Session expired. Please sign in again.'
           document.getElementById('consent-status').className = 'status error'
@@ -324,7 +324,7 @@
     }
 
     // Listen for auth state changes (after Google redirect or magic link)
-    supabase.auth.onAuthStateChange((event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         showConsent()
       }
