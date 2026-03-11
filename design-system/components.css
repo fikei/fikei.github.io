@@ -1217,3 +1217,62 @@ body {
 .divider-ascii[data-label]::before {
   content: '──── ' attr(data-label) ' ────────────────────────────────────────────────────────────────';
 }
+
+/* ============================================
+   Terminal Interaction Components
+   ============================================ */
+
+/* Blinking cursor loading indicator
+   Usage: <span class="loading-cursor">loading</span> */
+.loading-cursor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  text-transform: lowercase;
+}
+
+.loading-cursor::after {
+  content: '█';
+  animation: cursor-blink 1s step-end infinite;
+  color: var(--fg);
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Prompt-style input — terminal > prefix
+   Usage: <div class="input-prompt"><span class="input-prompt__symbol">></span><input class="input" ...></div> */
+.input-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: var(--border-thin) solid var(--border);
+  padding-left: var(--space-3);
+  background: var(--bg);
+}
+
+.input-prompt__symbol {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.input-prompt .input {
+  border: none;
+  padding-left: 0;
+}
+
+.input-prompt .input:focus {
+  box-shadow: none;
+}
+
+.input-prompt:focus-within {
+  box-shadow: 0 0 0 1px var(--fg);
+}
