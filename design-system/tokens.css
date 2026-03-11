@@ -88,18 +88,19 @@
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-serif: Georgia, "Times New Roman", Times, serif;
 
-  /* Base font size - 10px standard */
-  --text-base: 10px;
+  /* Base font size */
+  --text-base: 14px;
 
-  /* Font sizes - scaled from 10px base */
+  /* Font sizes — unified scale (replaces both DS and Boards scales) */
   --text-2xs: 8px;
   --text-xs: 10px;
-  --text-sm: 10px;
-  --text-md: 10px;
-  --text-lg: 12px;
-  --text-xl: 14px;
-  --text-2xl: 18px;
-  --text-3xl: 24px;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 40px;
+  --text-4xl: 48px;
 
   /* Line heights */
   --leading-none: 1;
@@ -113,6 +114,8 @@
   --tracking-wide: 0.05em;
   --tracking-wider: 0.1em;
   --tracking-widest: 0.3em;
+  --tracking-mono: 0;
+  --tracking-display: -0.03em;
 }
 
 /* ============================================
