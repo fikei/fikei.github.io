@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — ctrl.rodeo Connector</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+    .logo {
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    .logo a { color: #666; text-decoration: none; }
+    .logo a:hover { color: #e0e0e0; }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+    }
+    .updated {
+      color: #666;
+      font-size: 0.75rem;
+      margin-bottom: 3rem;
+    }
+    h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #888;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #222;
+    }
+    p, li {
+      font-size: 0.85rem;
+      color: #ccc;
+      margin-bottom: 0.75rem;
+    }
+    ul { padding-left: 1.25rem; }
+    li { margin-bottom: 0.5rem; }
+    strong { color: #e0e0e0; }
+    a { color: #e0e0e0; }
+    a:hover { color: #fff; }
+    .footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #222;
+      font-size: 0.75rem;
+      color: #555;
+    }
+    .footer a { color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo"><a href="https://ctrl.rodeo">ctrl.rodeo</a></div>
+
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: March 11, 2026</p>
+
+    <p>This privacy policy describes how the ctrl.rodeo AI Connector ("Connector") handles your data when you connect your ctrl.rodeo account to Claude or other AI platforms.</p>
+
+    <h2>What Data is Shared</h2>
+    <p>You control exactly what the Connector shares through three privacy levels:</p>
+    <ul>
+      <li><strong>Taste Only</strong> — Categories, taste tags, practical tags, entities, and content types. No titles, URLs, or personal notes are shared.</li>
+      <li><strong>Library</strong> (default) — Titles, categories, tags, entities, images, and media metadata. URLs and personal notes are not shared.</li>
+      <li><strong>Full Access</strong> — All library data including URLs, descriptions, notes, and images.</li>
+    </ul>
+    <p>You can also control visibility per board and toggle auto-save behavior in your Boards settings.</p>
+
+    <h2>How Data Flows</h2>
+    <p>When you use the Connector:</p>
+    <ul>
+      <li>Claude sends tool requests to the ctrl.rodeo MCP server</li>
+      <li>The server authenticates your OAuth token, checks your privacy settings, and returns only the fields your privacy level allows</li>
+      <li>Data flows directly between your browser/Claude client and our server — we do not share your data with other third parties</li>
+      <li>When you save a pin through Claude, the URL is processed through our standard enrichment pipeline (image resolution, AI categorization, tag generation)</li>
+    </ul>
+
+    <h2>Data We Collect</h2>
+    <p>The Connector logs the following for each tool call:</p>
+    <ul>
+      <li>Tool name and input parameters</li>
+      <li>Result count, privacy tier, and response time</li>
+      <li>Session identifier and client type</li>
+      <li>Errors (if any)</li>
+    </ul>
+    <p>This usage data helps us improve the Connector and is not shared with third parties. It is associated with your user account and subject to the same data retention policies as your library data.</p>
+
+    <h2>Authentication</h2>
+    <p>The Connector uses OAuth 2.1 with PKCE. When you connect:</p>
+    <ul>
+      <li>You sign in with your existing ctrl.rodeo account (Google OAuth or magic link)</li>
+      <li>You choose your privacy level</li>
+      <li>An access token is issued that can be revoked at any time</li>
+    </ul>
+    <p>We do not store your Google credentials. OAuth tokens expire after 1 hour and are refreshed automatically. Refresh tokens expire after 30 days.</p>
+
+    <h2>Data Storage</h2>
+    <ul>
+      <li>Your library data is stored in Supabase (hosted on AWS, US region)</li>
+      <li>OAuth tokens are stored in our database with row-level security</li>
+      <li>Connector settings (privacy tier, board visibility) are stored per-user</li>
+      <li>We do not store copies of your data for AI training purposes</li>
+    </ul>
+
+    <h2>Your Rights</h2>
+    <ul>
+      <li><strong>Revoke access</strong> — Disconnect the Connector at any time from Claude settings or by clearing your tokens</li>
+      <li><strong>Change privacy level</strong> — Adjust what is shared in Boards settings (gear icon), effective immediately</li>
+      <li><strong>Delete data</strong> — Deleting your ctrl.rodeo account removes all associated data including OAuth tokens and connector settings</li>
+      <li><strong>Export</strong> — Your library data is yours; export is available through the Boards app</li>
+    </ul>
+
+    <h2>Third-Party AI Platforms</h2>
+    <p>When you use the Connector with Claude, your library data is sent to Anthropic's servers as part of your conversation. Anthropic's handling of this data is governed by <a href="https://www.anthropic.com/privacy">Anthropic's Privacy Policy</a>. We recommend reviewing their policies regarding data retention and model training.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>We may update this policy as the Connector evolves. Significant changes will be communicated through the Boards app. The "last updated" date at the top reflects the most recent revision.</p>
+
+    <h2>Contact</h2>
+    <p>For privacy questions or data requests: <a href="mailto:hello@ctrl.rodeo">hello@ctrl.rodeo</a></p>
+
+    <div class="footer">
+      <a href="https://ctrl.rodeo">ctrl.rodeo</a> &middot;
+      <a href="/connect/docs.html">Documentation</a> &middot;
+      <a href="mailto:hello@ctrl.rodeo">Contact</a>
+    </div>
+  </div>
+</body>
+</html>
