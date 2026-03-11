@@ -2,7 +2,7 @@
 // Change these values when the product name changes.
 // Both the MCP server and OAuth consent page reference this file.
 
-export const VERSION = '0.4.0'
+export const VERSION = '0.4.1'
 
 export const PRODUCT_CONFIG = {
   name: 'ctrl.rodeo',
@@ -118,6 +118,22 @@ export const TOOL_DEFINITIONS = [
     },
     annotations: {
       title: 'Get Taste Profile',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'get_intent_profile',
+    description: `Get the user's current intent profile — active journeys (multi-session goal arcs) and recent sessions (temporal pin clusters). Shows what the user is actively working toward based on their save patterns.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    annotations: {
+      title: 'Get Intent Profile',
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,

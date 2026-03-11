@@ -393,6 +393,57 @@ export async function toolGetTasteProfile(
   }
 }
 
+export async function toolGetIntentProfile(
+  userId: string, _settings: ConnectorSettings
+): Promise<unknown> {
+  const db = getServiceClient()
+
+  const [journeysRes, sessionsRes] = await Promise.all([
+    db.from('intent_journeys')
+      .select('id, topic_tags, state, hypothesis, confidence, first_pin_at, last_pin_at, pin_ids')
+      .eq('user_id', userId)
+      .not('state', 'in', '("done","abandoned")')
+      .order('last_pin_at', { ascending: false })
+      .limit(5),
+    db.from('intent_sessions')
+      .select('id, started_at, ended_at, category_mix, topic_tags, intent_mix, session_length_minutes, pin_ids')
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+      .limit(5),
+  ])
+
+  if (journeysRes.error) throw new Error(`Intent journeys failed: ${journeysRes.error.message}`)
+  if (sessionsRes.error) throw new Error(`Intent sessions failed: ${sessionsRes.error.message}`)
+
+  const journeys = (journeysRes.data || []).map((j: Record<string, unknown>) => ({
+    id: j.id,
+    topic_tags: j.topic_tags,
+    state: j.state,
+    hypothesis: j.hypothesis,
+    confidence: j.confidence,
+    first_pin_at: j.first_pin_at,
+    last_pin_at: j.last_pin_at,
+    pin_count: (j.pin_ids as string[])?.length || 0,
+  }))
+
+  const sessions = (sessionsRes.data || []).map((s: Record<string, unknown>) => ({
+    id: s.id,
+    started_at: s.started_at,
+    ended_at: s.ended_at,
+    category_mix: s.category_mix,
+    topic_tags: s.topic_tags,
+    intent_mix: s.intent_mix,
+    duration_minutes: s.session_length_minutes,
+    pin_count: (s.pin_ids as string[])?.length || 0,
+  }))
+
+  return {
+    active_journeys: journeys,
+    recent_sessions: sessions,
+    total_active: journeys.length,
+  }
+}
+
 export async function toolGetRecentSaves(
   userId: string, args: Record<string, unknown>, settings: ConnectorSettings
 ): Promise<unknown> {
@@ -1065,6 +1116,10 @@ export async function dispatchTool(
     case 'get_taste_profile':
       result = await toolGetTasteProfile(userId, settings)
       resultCount = (result as Record<string, unknown>).total_pins as number || 0
+      break
+    case 'get_intent_profile':
+      result = await toolGetIntentProfile(userId, settings)
+      resultCount = (result as Record<string, unknown>).total_active as number || 0
       break
     case 'get_recent_saves':
       result = await toolGetRecentSaves(userId, args, settings)

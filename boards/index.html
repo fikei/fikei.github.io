@@ -7162,8 +7162,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.22.0';
-  console.log('[boards] v' + VERSION + ' - YouTube playlists & likes as secondary signals');
+  const VERSION = '2.23.0';
+  console.log('[boards] v' + VERSION + ' - intent engine: sessions + journeys');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -8642,6 +8642,9 @@ Return JSON:
       // Include taste context if available (non-blocking on absence)
       const tasteCtx = _tasteProfile ? buildTasteContextForPrompt(_tasteProfile) : null;
 
+      // Include intent context if available (non-blocking on absence)
+      const intentCtx = _intentProfile ? buildIntentContextForPrompt(_intentProfile) : null;
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-widget`, {
         method: 'POST',
         headers: {
@@ -8654,7 +8657,8 @@ Return JSON:
           items: itemsPayload,
           category: currentCategory,
           userPrefs: userPrefs,
-          tasteContext: tasteCtx
+          tasteContext: tasteCtx,
+          intentContext: intentCtx
         }),
         signal: controller.signal
       });
@@ -9853,6 +9857,162 @@ Return JSON:
 
   // =============================================================================
   // End Taste Engine Client Module
+  // =============================================================================
+
+  // =============================================================================
+  // INTENT ENGINE CLIENT MODULE
+  // Manages the predictive intent profile (sessions, journeys, predictions)
+  // Calls the intent-engine edge function and caches results locally
+  // =============================================================================
+
+  const INTENT_ENGINE_CACHE_KEY = 'ctrl-rodeo-intent-engine';
+  const INTENT_ENGINE_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
+  const INTENT_ENGINE_PIN_THRESHOLD = 3;
+
+  let _intentProfile = null;
+  let _intentProfileLoading = false;
+
+  async function loadIntentProfile(forceRefresh) {
+    if (_intentProfileLoading) return _intentProfile;
+    if (_intentProfile && !forceRefresh) return _intentProfile;
+
+    try {
+      var raw = localStorage.getItem(INTENT_ENGINE_CACHE_KEY);
+      if (raw && !forceRefresh) {
+        var cached = JSON.parse(raw);
+        var age = Date.now() - (cached.timestamp || 0);
+        var pinDrift = Math.abs((cached.pinCount || 0) - getAllLinks().length);
+        if (age < INTENT_ENGINE_CACHE_TTL && pinDrift < INTENT_ENGINE_PIN_THRESHOLD) {
+          console.log('[intent-engine] Cache hit — ' + (cached.profile.journeys || []).length + ' journeys');
+          _intentProfile = cached.profile;
+          return _intentProfile;
+        }
+      }
+    } catch (e) { /* ignore cache errors */ }
+
+    var user = CtrlAuth.getUser ? CtrlAuth.getUser() : null;
+    if (!user || !user.id) return null;
+
+    _intentProfileLoading = true;
+
+    try {
+      var resp = await fetch(SUPABASE_URL + '/functions/v1/intent-engine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ action: 'get-profile', userId: user.id }),
+      });
+
+      if (!resp.ok) {
+        console.warn('[intent-engine] API error:', resp.status);
+        _intentProfileLoading = false;
+        return null;
+      }
+
+      var data = await resp.json();
+      _intentProfile = data.profile || null;
+
+      if (_intentProfile) {
+        try {
+          localStorage.setItem(INTENT_ENGINE_CACHE_KEY, JSON.stringify({
+            profile: _intentProfile,
+            timestamp: Date.now(),
+            pinCount: getAllLinks().length,
+          }));
+        } catch (e) { /* ignore storage errors */ }
+        console.log('[intent-engine] Loaded — ' + (_intentProfile.journeys || []).length + ' journeys, ' + (_intentProfile.sessions || []).length + ' sessions');
+      }
+    } catch (err) {
+      console.warn('[intent-engine] Error loading profile:', err);
+    }
+
+    _intentProfileLoading = false;
+    return _intentProfile;
+  }
+
+  async function triggerIntentDetection(action) {
+    var user = CtrlAuth.getUser ? CtrlAuth.getUser() : null;
+    if (!user || !user.id) return null;
+
+    action = action || 'full-pipeline';
+
+    try {
+      var resp = await fetch(SUPABASE_URL + '/functions/v1/intent-engine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ action: action, userId: user.id }),
+      });
+
+      if (!resp.ok) {
+        console.warn('[intent-engine] Detection error:', resp.status);
+        return null;
+      }
+
+      var data = await resp.json();
+      localStorage.removeItem(INTENT_ENGINE_CACHE_KEY);
+      _intentProfile = data.profile || null;
+      console.log('[intent-engine] Detection complete (' + action + ')');
+      return data;
+    } catch (err) {
+      console.warn('[intent-engine] Detection error:', err);
+      return null;
+    }
+  }
+
+  function buildIntentContextForPrompt(profile) {
+    if (!profile) return null;
+
+    var journeys = (profile.journeys || [])
+      .filter(function(j) { return j.state !== 'done' && j.state !== 'abandoned'; })
+      .slice(0, 3);
+    var sessions = (profile.sessions || []).slice(0, 3);
+
+    if (journeys.length === 0 && sessions.length === 0) return null;
+
+    return {
+      active_journeys: journeys.map(function(j) {
+        return {
+          topic_tags: j.topic_tags,
+          state: j.state,
+          hypothesis: j.hypothesis || null,
+          pin_count: (j.pin_ids || []).length,
+          days_active: Math.round((Date.now() - new Date(j.first_pin_at).getTime()) / 86400000),
+        };
+      }),
+      recent_sessions: sessions.map(function(s) {
+        return {
+          topic_tags: s.topic_tags,
+          category_mix: s.category_mix,
+          intent_mix: s.intent_mix,
+        };
+      }),
+    };
+  }
+
+  let _intentSessionTimer = null;
+  let _intentPendingPinCount = 0;
+
+  function scheduleIntentSessionUpdate() {
+    _intentPendingPinCount++;
+    if (_intentSessionTimer) clearTimeout(_intentSessionTimer);
+    _intentSessionTimer = setTimeout(function() {
+      var count = _intentPendingPinCount;
+      _intentPendingPinCount = 0;
+      _intentSessionTimer = null;
+      console.log('[intent-engine] ' + count + ' new pin(s) — detecting sessions');
+      triggerIntentDetection('detect-sessions').catch(function(e) {
+        console.warn('[intent-engine] Session detection error:', e);
+      });
+    }, 45000); // 45s debounce
+  }
+
+  // =============================================================================
+  // End Intent Engine Client Module
   // =============================================================================
 
   function renderEventsWidget(events) {
@@ -14543,6 +14703,7 @@ Return JSON:
     // Taste Engine: schedule affinity recomputation (debounced for bulk imports)
     if (CtrlAuth.getUser && CtrlAuth.getUser()) {
       scheduleTasteAffinityUpdate();
+      scheduleIntentSessionUpdate();
     }
 
     return { success: true };
@@ -22103,6 +22264,9 @@ Return JSON:
       updateAuthUI();
       loadAllShares();
       initYouTubeSection();
+
+      // Preload intent profile (non-blocking)
+      loadIntentProfile().catch(function(e) { console.warn('[intent-engine] Preload error:', e); });
 
       // Preload taste profile — if empty and user has enough pins, bootstrap the engine
       loadTasteProfile().then(function(profile) {
