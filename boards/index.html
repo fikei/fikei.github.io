@@ -297,7 +297,7 @@
 }
 
 .account-value {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
   color: var(--fg);
 }
@@ -613,7 +613,7 @@
 }
 
 .auth-modal__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-lg);
   margin-bottom: var(--space-4);
 }
@@ -722,12 +722,14 @@ html {
 }
 
 body {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   color: var(--fg);
   background: var(--bg);
   transition: background 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ============================================
@@ -1873,7 +1875,7 @@ body {
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 4px;
   color: var(--fg);
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
 }
 .merge-preview__field input[type="text"]:focus {
@@ -2264,7 +2266,7 @@ body {
 }
 
 .grid-item__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   font-weight: normal;
   line-height: var(--line-height-tight);
@@ -2364,7 +2366,7 @@ body {
 }
 
 .grid-item--placeholder .grid-item__initial {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-2xl);
   color: var(--bg);
 }
@@ -2512,7 +2514,7 @@ body {
 }
 
 .grid-item__details-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-lg);
   font-weight: normal;
   line-height: var(--line-height-tight);
@@ -3256,7 +3258,7 @@ body {
   gap: var(--space-3);
 }
 .recipe-drawer__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: 18px;
   line-height: 1.2;
   flex: 1;
@@ -4231,7 +4233,7 @@ body {
 }
 
 .modal__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
 }
 
@@ -4793,7 +4795,7 @@ body {
 }
 
 .overlay__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xl);
   font-weight: normal;
   line-height: var(--line-height-tight);
@@ -4811,7 +4813,7 @@ body {
 }
 
 .overlay__description {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   margin-bottom: var(--space-6);
@@ -4971,7 +4973,7 @@ body {
 }
 
 .share-modal__option-text small {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: 12px;
   opacity: 0.7;
 }
@@ -6089,7 +6091,7 @@ body {
   .ig-entity__desc { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted); margin-bottom: var(--space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ig-entity input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; accent-color: var(--fg); }
   .ig-entity__info { flex: 1; min-width: 0; }
-  .ig-entity__name { font-family: var(--font-serif); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .ig-entity__name { font-family: var(--font-mono); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .ig-entity__meta { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted); margin-bottom: var(--space-1); }
   .ig-entity__url { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--fg); opacity: 0.6; word-break: break-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ig-conf { display: inline-block; padding: 1px 5px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid currentColor; }
@@ -6208,7 +6210,7 @@ body {
   <!-- iOS App Redirect Overlay -->
   <div id="iosAppOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;color:#fff;font-family:var(--font-mono);flex-direction:column;align-items:center;justify-content:center;padding:var(--space-8);text-align:center;-webkit-font-smoothing:antialiased;">
     <div style="max-width:320px;width:100%;">
-      <div style="font-family:'Georgia',serif;font-size:40px;margin-bottom:var(--space-8);letter-spacing:-0.02em;">boards</div>
+      <div style="font-family:var(--font-mono);font-size:40px;margin-bottom:var(--space-8);letter-spacing:-0.05em;font-weight:400;text-transform:lowercase;">boards</div>
       <div style="font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:var(--space-3);">Open in the app</div>
       <div style="font-size:var(--font-size-xs);color:#666;margin-bottom:var(--space-8);line-height:1.6;" id="iosOverlaySubtext">Continue to the full Boards experience</div>
       <button id="iosOverlayOpen" style="display:block;width:100%;padding:var(--space-3) var(--space-6);background:#fff;color:#000;border:1px solid #fff;font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;cursor:pointer;margin-bottom:var(--space-4);">Open Boards App</button>
@@ -6952,7 +6954,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <h2 class="modal__title" id="confirmTitle">Confirm</h2>
       </div>
       <div style="padding: var(--space-4);">
-        <p id="confirmMessage" style="margin-bottom: var(--space-4); font-family: var(--font-serif);"></p>
+        <p id="confirmMessage" style="margin-bottom: var(--space-4); font-family: var(--font-mono);"></p>
         <div style="display: flex; gap: var(--space-2);">
           <button class="overlay__action" id="confirmCancel" style="flex: 1;">Cancel</button>
           <button class="overlay__action overlay__action--danger" id="confirmOk" style="flex: 1; background: var(--fg); color: var(--bg);">OK</button>
@@ -6970,7 +6972,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <button class="modal__close" id="igReviewClose">&times;</button>
       </div>
       <div style="padding: var(--space-4);">
-        <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-serif); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
+        <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
         <p id="igStats" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
         <div id="igTagsRow" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:var(--space-3);"></div>
         <div id="igKeepSourceRow" style="display:none;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid var(--subtle);">
