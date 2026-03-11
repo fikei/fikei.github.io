@@ -911,7 +911,7 @@ a:hover { color: var(--accent-cyan); }
 .filters {
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4);
   padding-top: 48px; /* Space for auth bar above */
   padding-right: 120px; /* Space for auth bar - clips filters before profile button */
@@ -936,8 +936,11 @@ a:hover { color: var(--accent-cyan); }
 /* Mobile adjustment for filter padding */
 @media (max-width: 600px) {
   .filters {
+    padding: var(--space-5);
     padding-top: calc(52px + var(--safe-top)); /* More space on mobile for auth bar */
     padding-right: 80px; /* Tighter on mobile but still clipped */
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .auth-bar {
@@ -948,15 +951,16 @@ a:hover { color: var(--accent-cyan); }
 
 .filter-token {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: var(--space-1) var(--space-3);
+  letter-spacing: var(--tracking-wider);
+  padding: var(--space-2) var(--space-4);
   background: var(--bg);
   color: var(--fg-muted);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background var(--duration-normal) var(--ease-default), color var(--duration-normal) var(--ease-default), border-color var(--duration-normal) var(--ease-default);
   flex-shrink: 0;
   min-height: 44px;
   display: inline-flex;
@@ -978,8 +982,8 @@ a:hover { color: var(--accent-cyan); }
 .sub-tags {
   display: none;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--subtle);
   background: var(--bg);
   position: sticky;
@@ -1013,19 +1017,21 @@ a:hover { color: var(--accent-cyan); }
 /* Base tag button */
 .sub-tag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 2px 6px;
+  letter-spacing: var(--tracking-wide);
+  padding: var(--space-1) var(--space-2);
   background: transparent;
   color: var(--fg-subtle);
   border: none;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color var(--duration-normal), background var(--duration-normal);
   flex-shrink: 0;
   white-space: nowrap;
-  line-height: 1.4;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
 }
 .sub-tag:hover { color: var(--fg); }
 .sub-tag--active { color: var(--fg); background: var(--subtle); }
@@ -1051,10 +1057,10 @@ a:hover { color: var(--accent-cyan); }
 .sub-tag--suggestion {
   border: 1px solid var(--subtle);
   color: var(--fg-subtle);
-  padding: 3px 10px;
+  padding: var(--space-1) var(--space-3);
   cursor: pointer;
-  font-size: 9px;
-  transition: all 0.15s;
+  font-size: var(--text-2xs);
+  transition: all var(--duration-normal);
 }
 .sub-tag--suggestion:hover { border-color: var(--fg); color: var(--fg); }
 
@@ -1238,17 +1244,18 @@ a:hover { color: var(--accent-cyan); }
 /* Search input */
 .search-input {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: var(--space-1) var(--space-3);
+  letter-spacing: var(--tracking-wider);
+  padding: var(--space-2) var(--space-4);
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   min-width: 120px;
   max-width: 200px;
   flex-shrink: 0;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-normal) var(--ease-default);
 }
 
 .search-input::placeholder {
@@ -1774,27 +1781,7 @@ a:hover { color: var(--accent-cyan); }
   box-shadow: 0 0 0 2px var(--fg);
 }
 
-/* Merged pin badge (stacked indicator) */
-.grid-item__merge-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 3;
-  display: flex;
-  gap: -4px;
-  align-items: center;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg);
-  pointer-events: none;
-}
-
-/* Merged pin sources list in expanded view */
+/* Merged pin sources list in overlay */
 .merge-sources {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
@@ -2627,15 +2614,17 @@ a:hover { color: var(--accent-cyan); }
 .grid-item__menu-btn {
   width: 28px;
   height: 28px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity var(--duration-normal), background var(--duration-normal), color var(--duration-normal);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .grid-item:hover .grid-item__menu-btn {
@@ -2643,15 +2632,14 @@ a:hover { color: var(--accent-cyan); }
 }
 
 .grid-item__menu-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .grid-item__menu-btn::before {
-  content: '•••';
-  color: var(--fg);
-  font-size: 12px;
-  letter-spacing: 1px;
-  transform: rotate(90deg);
+  content: '\22EE';
+  color: inherit;
+  font-size: var(--text-sm);
 }
 
 .grid-item__menu {
@@ -7162,8 +7150,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.23.0';
-  console.log('[boards] v' + VERSION + ' - intent engine: sessions + journeys');
+  const VERSION = '2.24.0';
+  console.log('[boards] v' + VERSION + ' - UI polish: filters, menu, merged badge');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -16457,11 +16445,9 @@ Return JSON:
           </div>
         </div>`;
 
-      // Merged pin badge and class
+      // Merged pin class (badge removed in v2.22.0 — shown only in overlay)
       const mergedClass = l.is_merged ? ' grid-item--merged' : '';
-      const mergeBadgeHtml = l.is_merged && l.sources
-        ? `<span class="grid-item__merge-badge">${l.sources.length} links</span>`
-        : '';
+      const mergeBadgeHtml = '';
 
       // Determine if this is a listen (music) card
       const isListen = l.category === 'listen';
@@ -16601,10 +16587,7 @@ Return JSON:
           const oMeta = richMeta[cfg.metaField] || cfg.metaFallback?.(richMeta) || l.domain;
           overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__${cfg.titleClass}">${esc(oTitle)}</span><span class="grid-item__${cfg.metaClass}">${esc(oMeta)}</span></div>`;
         } else {
-          const domainDisplay = l.is_merged && l.sources
-            ? `${l.sources.length} links · ${esc(l.sources.map(s => s.domain).filter((d, i, a) => a.indexOf(d) === i).slice(0, 3).join(', '))}${l.sources.length > 3 ? ' +' + (l.sources.length - 3) : ''}`
-            : esc(l.domain);
-          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${domainDisplay}</p></div>`;
+          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>`;
         }
 
         const categoryClass = listenClass || richClass;
