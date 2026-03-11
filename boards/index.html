@@ -62,6 +62,19 @@
   --surface: var(--bg-surface);
   --muted: var(--fg-muted);
   --subtle: var(--border-subtle);
+
+  /* === Legacy size tokens (126 refs in inline CSS) → DS unified scale === */
+  --font-size-xs: var(--text-xs);
+  --font-size-sm: var(--text-sm);
+  --font-size-base: var(--text-base);
+  --font-size-lg: var(--text-lg);
+  --font-size-xl: var(--text-xl);
+  --font-size-2xl: var(--text-2xl);
+  --line-height-tight: var(--leading-tight);
+  --line-height-normal: var(--leading-normal);
+
+  /* === Font override: --font-serif used 17x for display text in boards === */
+  --font-serif: var(--font-display);
 }
 
 :root.light {
