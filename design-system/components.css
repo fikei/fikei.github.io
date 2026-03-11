@@ -1356,3 +1356,117 @@ body {
     display: none;
   }
 }
+
+/* ============================================
+   Additional Components
+   ============================================ */
+
+/* Dense grid variant — 4px gap for data-heavy views */
+.grid--dense {
+  gap: var(--space-1);
+}
+
+/* Path-style breadcrumb — ~/boards/music/electronic >
+   Usage: <nav class="breadcrumb breadcrumb--path" aria-label="Breadcrumb">...</nav> */
+.breadcrumb--path .breadcrumb__sep {
+  color: var(--fg-subtle);
+}
+
+.breadcrumb--path .breadcrumb__sep::before {
+  content: '/';
+}
+
+.breadcrumb--path::before {
+  content: '~';
+  color: var(--fg-subtle);
+  font-weight: 400;
+  margin-right: var(--space-1);
+}
+
+.breadcrumb--path .breadcrumb__link {
+  text-transform: lowercase;
+  letter-spacing: var(--tracking-normal);
+  font-weight: 400;
+}
+
+.breadcrumb--path .breadcrumb__current {
+  text-transform: lowercase;
+  letter-spacing: var(--tracking-normal);
+}
+
+.breadcrumb--path::after {
+  content: '>';
+  color: var(--fg-muted);
+  margin-left: var(--space-1);
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* Badge counter — retro hit counter / view counter
+   Usage: <span class="badge-counter" aria-live="polite">0042</span> */
+.badge-counter {
+  display: inline-flex;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-thin) solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Platform text badges — accessible alternative to color-only dots
+   Usage: <span class="platform-badge platform-badge--spotify">[SP]</span> */
+.platform-badge {
+  display: inline-flex;
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 1px 3px;
+  border: var(--border-thin) solid currentColor;
+}
+
+.platform-badge--spotify { color: #1DB954; }
+.platform-badge--soundcloud { color: #FF5500; }
+.platform-badge--apple-music { color: #FC3C44; }
+.platform-badge--bandcamp { color: #1DA0C3; }
+.platform-badge--tidal { color: #00FFFF; }
+.platform-badge--youtube-music { color: #FF0000; }
+
+/* Timestamp component
+   Usage: <time class="timestamp" datetime="2024-12-01T10:00:00Z">3h ago</time> */
+.timestamp {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Status bar — persistent system info footer
+   Usage: <footer class="status-bar" role="status">...</footer> */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-1) var(--space-4);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  border-top: var(--border-thin) solid var(--border-subtle);
+  background: var(--bg);
+}
+
+.status-bar__section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.status-bar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
