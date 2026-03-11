@@ -7057,7 +7057,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.19.0';
+  const VERSION = '2.19.1';
   console.log('[boards] v' + VERSION + ' - secondary signal import (Spotify + YouTube Takeout)');
 
   // ============================================
@@ -11720,15 +11720,27 @@ Return JSON:
   }
 
   // Call analyze-content API (sense-making: classification + tags + entities)
-  async function callAnalyzeContentAPI(url, title, description) {
+  // Accepts optional context object with selected_text, notes, category, media metadata
+  async function callAnalyzeContentAPI(url, title, description, context) {
     try {
+      const payload = { url, title, description };
+      // Pass richer context when available (Gap 2: better signals)
+      if (context) {
+        if (context.selected_text) payload.selected_text = context.selected_text;
+        if (context.notes) payload.notes = context.notes;
+        if (context.category) payload.category = context.category;
+        if (context.video) payload.video = context.video;
+        if (context.music) payload.music = context.music;
+        if (context.book) payload.book = context.book;
+        if (context.recipe) payload.recipe = context.recipe;
+      }
       const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify({ url, title, description })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -11866,7 +11878,17 @@ Return JSON:
       let analysisResult = null;
       if (!item.skipAnalysis) {
         console.log('%c[ANALYZE] Calling analyze-content for:', 'color: #9b59b6', item.url);
-        analysisResult = await callAnalyzeContentAPI(item.url, item.title, item.description);
+        // Pass richer context from the link for better taste_tags extraction
+        const linkContext = currentLink ? {
+          selected_text: currentLink.selected_text,
+          notes: currentLink.notes,
+          category: currentLink.category,
+          video: currentLink.video,
+          music: currentLink.music,
+          book: currentLink.book,
+          recipe: currentLink.recipe,
+        } : null;
+        analysisResult = await callAnalyzeContentAPI(item.url, item.title, item.description, linkContext);
 
         if (analysisResult) {
           console.log('%c[ANALYZE] Result:', 'color: #9b59b6; font-weight: bold', {
