@@ -46,36 +46,36 @@
    ============================================ */
 :root {
   /* Dark mode (default) */
-  --bg: var(--gray-100);
-  --bg-surface: var(--gray-200);
-  --bg-elevated: var(--gray-300);
+  --bg: #111110;
+  --bg-surface: #1a1a18;
+  --bg-elevated: #22221f;
 
-  --fg: var(--color-white);
-  --fg-muted: var(--gray-600);
-  --fg-subtle: var(--gray-500);
+  --fg: #e8e6e3;
+  --fg-muted: #8a8885;
+  --fg-subtle: #666560;
 
-  --border: var(--color-white);
-  --border-subtle: var(--gray-400);
+  --border: #e8e6e3;
+  --border-subtle: #33332f;
 
-  --interactive: var(--color-white);
-  --interactive-hover: var(--color-black);
+  --interactive: #e8e6e3;
+  --interactive-hover: #111110;
 }
 
 :root.light {
   /* Light mode */
-  --bg: var(--color-white);
-  --bg-surface: var(--color-white);
-  --bg-elevated: var(--gray-900);
+  --bg: #faf9f7;
+  --bg-surface: #faf9f7;
+  --bg-elevated: #e8e6e3;
 
-  --fg: var(--color-black);
-  --fg-muted: var(--gray-600);
-  --fg-subtle: var(--gray-500);
+  --fg: #1a1a18;
+  --fg-muted: #8a8885;
+  --fg-subtle: #666560;
 
-  --border: var(--color-black);
-  --border-subtle: var(--gray-800);
+  --border: #1a1a18;
+  --border-subtle: #ccc8c0;
 
-  --interactive: var(--color-black);
-  --interactive-hover: var(--color-white);
+  --interactive: #1a1a18;
+  --interactive-hover: #faf9f7;
 }
 
 /* ============================================
