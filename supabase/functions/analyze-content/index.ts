@@ -11,7 +11,7 @@
 //   practical_tags[], taste_tags[],
 //   summary
 // }
-const VERSION = '1.1.0'
+const VERSION = '1.1.1'
 console.log(`[analyze-content] v${VERSION} - Sense-Making Agent + backfill`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -258,7 +258,7 @@ serve(async (req) => {
             'anthropic-version': '2023-06-01'
           },
           body: JSON.stringify({
-            model: 'claude-3-5-haiku-20241022',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 800,
             messages: [{ role: 'user', content: prompt }]
           })
@@ -567,7 +567,7 @@ async function handleBackfill(req: Request, body: any) {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-3-5-haiku-20241022',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 800,
           messages: [{ role: 'user', content: prompt }]
         })

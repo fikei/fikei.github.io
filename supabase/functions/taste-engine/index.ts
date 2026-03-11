@@ -14,7 +14,7 @@
 //   'full-pipeline'      — Run all levels in sequence
 //   'get-profile'        — Return current taste profile (read-only)
 
-const VERSION = '1.2.1'
+const VERSION = '1.2.2'
 console.log(`[taste-engine] v${VERSION} — multi-level preference pipeline + secondary signals`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -624,7 +624,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -792,7 +792,7 @@ async function saveDomains(
           pin_count_at_generation: row.pin_ids?.length || 0,
           generated_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          model_version: 'claude-3-haiku-20240307',
+          model_version: 'claude-haiku-4-5-20251001',
         }, { onConflict: 'user_id,scope' })
     }
   }
@@ -908,7 +908,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 256,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -1004,7 +1004,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 512,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -1147,7 +1147,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 512,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -1176,7 +1176,7 @@ Respond with valid JSON only.`
         },
         generated_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        model_version: 'claude-3-haiku-20240307',
+        model_version: 'claude-haiku-4-5-20251001',
       }, { onConflict: 'user_id,scope' })
 
     // Save snapshot
