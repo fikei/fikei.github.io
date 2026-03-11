@@ -13,6 +13,8 @@ import { VERSION, PRODUCT_CONFIG, TOOL_DEFINITIONS, BUILTIN_BOARDS, PRIVACY_TIER
 console.log(`[mcp-server] v${VERSION} - MCP Streamable HTTP server`)
 
 const MCP_PROTOCOL_VERSION = '2025-03-26'
+const MCP_SERVER_BASE = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-server'
+const OAUTH_SERVER_BASE = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -649,6 +651,21 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  // GET: OAuth Protected Resource Metadata (RFC 9728)
+  if (req.method === 'GET') {
+    const url = new URL(req.url)
+    const path = url.pathname.replace(/^\/?(?:functions\/v1\/)?mcp-server/, '')
+    if (path === '/.well-known/oauth-protected-resource' || path === '') {
+      return json({
+        resource: MCP_SERVER_BASE,
+        authorization_servers: [OAUTH_SERVER_BASE],
+        bearer_methods_supported: ['header'],
+        scopes_supported: ['read', 'write'],
+      })
+    }
+    return json(jsonRpcError(null, -32600, 'Not found'), 404)
+  }
+
   // POST: JSON-RPC requests
   if (req.method === 'POST') {
     const accept = req.headers.get('accept') || ''
@@ -664,7 +681,10 @@ serve(async (req: Request) => {
     if (!user) {
       return new Response(null, {
         status: 401,
-        headers: { ...corsHeaders, 'WWW-Authenticate': 'Bearer' },
+        headers: {
+          ...corsHeaders,
+          'WWW-Authenticate': `Bearer resource_metadata="${MCP_SERVER_BASE}/.well-known/oauth-protected-resource"`,
+        },
       })
     }
 
