@@ -15,7 +15,7 @@
 //   'get-profile'        — Return current taste profile (read-only)
 
 const VERSION = '1.1.0'
-console.log(`[taste-engine] v${VERSION} — multi-level preference pipeline`)
+console.log(`[taste-engine] v${VERSION} — multi-level preference pipeline + secondary signals`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -50,6 +50,7 @@ interface Pin {
   created_at: string
   watched?: boolean
   read?: boolean
+  source_weight?: number  // 1.0 for pins, < 1.0 for secondary signals
 }
 
 interface Affinity {
@@ -199,6 +200,7 @@ function extractAffinities(pins: Pin[]): Affinity[] {
     const genericTags = (pin.tags || []).filter(t => t.length > 0)
     const age = daysSince(pin.created_at)
     const recencyWeight = Math.exp(-0.005 * age) // half-life ~139 days
+    const pinWeight = pin.source_weight ?? 1.0    // 1.0 for pins, < 1.0 for secondary signals
     const hasTasteTags = tasteTags.length > 0
 
     if (hasTasteTags) {
@@ -207,18 +209,18 @@ function extractAffinities(pins: Pin[]): Affinity[] {
       for (const taste of tasteTags) {
         for (const practical of practicalTags) {
           const compound = `${normalizeDimension(taste)}_${normalizeDimension(practical)}`
-          upsertSignal(compound, recencyWeight, pin.category, taste, pin.created_at)
+          upsertSignal(compound, recencyWeight * pinWeight, pin.category, taste, pin.created_at)
         }
       }
 
       // Solo taste tags (lower weight — less specific)
       for (const taste of tasteTags) {
-        upsertSignal(taste, recencyWeight * 0.5, pin.category, taste, pin.created_at)
+        upsertSignal(taste, recencyWeight * 0.5 * pinWeight, pin.category, taste, pin.created_at)
       }
     } else {
       // FALLBACK PATH: use generic tags + category + title keywords
       // Lower weight (0.3x) — these are less semantically rich than taste_tags
-      const fallbackWeight = recencyWeight * 0.3
+      const fallbackWeight = recencyWeight * 0.3 * pinWeight
 
       // Generic tags (e.g. "product", "accessories", "video")
       for (const tag of genericTags) {
@@ -247,7 +249,7 @@ function extractAffinities(pins: Pin[]): Affinity[] {
 
     // Content type as a signal (both paths)
     if (pin.content_type && pin.content_type !== 'unknown') {
-      upsertSignal(`type:${pin.content_type}`, recencyWeight * 0.2, pin.category, `content_type:${pin.content_type}`, pin.created_at)
+      upsertSignal(`type:${pin.content_type}`, recencyWeight * 0.2 * pinWeight, pin.category, `content_type:${pin.content_type}`, pin.created_at)
     }
 
     // Entity-based dimensions (both paths)
@@ -255,7 +257,7 @@ function extractAffinities(pins: Pin[]): Affinity[] {
       for (const entity of pin.entities) {
         if (entity.confidence > 0.7) {
           const dim = `${entity.type}:${entity.name}`
-          upsertSignal(dim, recencyWeight * 0.8, pin.category, `${entity.type}:${entity.name}`, pin.created_at)
+          upsertSignal(dim, recencyWeight * 0.8 * pinWeight, pin.category, `${entity.type}:${entity.name}`, pin.created_at)
         }
       }
     }
@@ -1220,7 +1222,41 @@ serve(async (req) => {
       pins = (data || []) as Pin[]
     }
 
-    console.log(`[taste-engine] ${action} — ${pins.length} pins for user ${userId.slice(0, 8)}`)
+    // Fetch secondary signals and merge as Pin-shaped objects
+    let secondaryCount = 0
+    try {
+      const { data: signalData } = await supabase
+        .from('secondary_signals')
+        .select('id, user_id, category, taste_tags, practical_tags, entities, content_type, created_at, source_weight')
+        .eq('user_id', userId)
+
+      if (signalData && signalData.length > 0) {
+        // Only include signals that have taste tags
+        const secondaryPins: Pin[] = signalData
+          .filter((s: { taste_tags: string[] | null }) => s.taste_tags && s.taste_tags.length > 0)
+          .map((s: { id: string; user_id: string; category: string; taste_tags: string[]; practical_tags: string[]; entities: unknown; content_type: string; created_at: string; source_weight: number }) => ({
+            id: s.id,
+            user_id: s.user_id,
+            title: null,
+            category: s.category,
+            taste_tags: s.taste_tags,
+            practical_tags: s.practical_tags,
+            tags: null,
+            entities: s.entities as Pin['entities'],
+            content_type: s.content_type,
+            content_structure: null,
+            created_at: s.created_at,
+            source_weight: s.source_weight,
+          }))
+        secondaryCount = secondaryPins.length
+        pins = [...pins, ...secondaryPins]
+      }
+    } catch (e) {
+      // Non-fatal: secondary signals are additive, proceed without them
+      console.warn('[taste-engine] Failed to fetch secondary signals:', e)
+    }
+
+    console.log(`[taste-engine] ${action} — ${pins.length - secondaryCount} pins + ${secondaryCount} secondary signals for user ${userId.slice(0, 8)}`)
 
     if (pins.length === 0) {
       return new Response(
