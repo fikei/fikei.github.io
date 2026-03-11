@@ -13,7 +13,6 @@
 }
 
 body {
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -33,7 +32,6 @@ body {
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
@@ -119,7 +117,6 @@ body {
 .input {
   width: 100%;
   padding: var(--space-3);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-sm);
   background: var(--bg);
@@ -181,7 +178,6 @@ body {
   display: inline-flex;
   align-items: center;
   padding: var(--space-1) var(--space-3);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
@@ -270,7 +266,6 @@ body {
 
 .toast {
   padding: var(--space-3) var(--space-4);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-xs);
   background: var(--fg);
