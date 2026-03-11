@@ -31,11 +31,14 @@
   })();
   </script>
 
-  <!-- Space Grotesk Font -->
+  <!-- Space Grotesk + JetBrains Mono Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
+  <!-- Design System stylesheets -->
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
   <!-- Design System widget components (dev toggle: window.enableWidgetDS / disableWidgetDS) -->
   <link id="ds-widgets-css" rel="stylesheet" href="/design-system/widgets.css">
 
@@ -48,107 +51,37 @@
    ============================================ */
 
 :root {
-  /* Typography - Space Grotesk */
-  --font-primary: "Space Grotesk", sans-serif;
-  --font-serif: "Space Grotesk", sans-serif;
-  --font-mono: "Space Grotesk", sans-serif;
-  --font-size-xs: 11px;
-  --font-size-sm: 12px;
-  --font-size-base: 14px;
-  --font-size-lg: 18px;
-  --font-size-xl: 24px;
-  --font-size-2xl: 32px;
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.6;
-
-  /* Spacing */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-
-  /* Grid */
+  /* === Boards-specific tokens (not in DS) === */
   --grid-gap: 16px;
-
-  /* iOS Safe Area */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 
-  /* Dark mode (default) */
-  --bg: #111;
-  --fg: #fff;
-  --surface: #1a1a1a;
-  --border: #fff;
-  --muted: #999;
-  --subtle: #333;
+  /* === Boards legacy aliases (used in existing CSS below) === */
+  --surface: var(--bg-surface);
+  --muted: var(--fg-muted);
+  --subtle: var(--border-subtle);
 
-  /* Design System token bridge — maps DS token names to Boards values */
-  --text-2xs: 8px;
-  --text-xs: var(--font-size-xs);
-  --text-sm: var(--font-size-sm);
-  --text-md: var(--font-size-base);
-  --text-lg: var(--font-size-lg);
-  --text-xl: var(--font-size-xl);
-  --text-2xl: var(--font-size-2xl);
-  --text-3xl: 40px;
-  --text-base: var(--font-size-sm);
-  --leading-none: 1;
-  --leading-tight: var(--line-height-tight);
-  --leading-normal: var(--line-height-normal);
-  --leading-relaxed: 1.8;
-  --tracking-tight: -0.02em;
-  --tracking-normal: 0;
-  --tracking-wide: 0.05em;
-  --tracking-wider: 0.1em;
-  --tracking-widest: 0.3em;
-  --bg-surface: var(--surface);
-  --bg-elevated: #222;
-  --fg-muted: var(--muted);
-  --fg-subtle: #666;
-  --border-subtle: var(--subtle);
-  --interactive: var(--fg);
-  --interactive-hover: var(--bg);
-  --border-thin: 1px;
-  --border-medium: 2px;
-  --border-thick: 4px;
-  --duration-fast: 0.1s;
-  --duration-normal: 0.15s;
-  --duration-slow: 0.2s;
-  --duration-slower: 0.3s;
-  --duration-slowest: 0.5s;
-  --ease-default: ease;
-  --ease-linear: linear;
-  --ease-in: ease-in;
-  --ease-out: ease-out;
-  --ease-in-out: ease-in-out;
-  --color-white: #fff;
-  --color-black: #000;
-  --color-success: #0f0;
-  --color-error: #c00;
-  --color-warning: #f90;
-  --font-sans: var(--font-primary);
+  /* === Legacy size tokens (126 refs in inline CSS) → DS unified scale === */
+  --font-size-xs: var(--text-xs);
+  --font-size-sm: var(--text-sm);
+  --font-size-base: var(--text-base);
+  --font-size-lg: var(--text-lg);
+  --font-size-xl: var(--text-xl);
+  --font-size-2xl: var(--text-2xl);
+  --line-height-tight: var(--leading-tight);
+  --line-height-normal: var(--leading-normal);
+
+  /* === Font override: --font-serif used 17x for display text in boards === */
+  --font-serif: var(--font-display);
 }
 
 :root.light {
-  --bg: #fff;
-  --fg: #000;
-  --surface: #fff;
-  --border: #000;
-  --muted: #999;
-  --subtle: #e0e0e0;
-
-  /* DS bridge — light mode overrides */
-  --bg-surface: var(--surface);
-  --bg-elevated: #f5f5f5;
-  --fg-muted: var(--muted);
-  --fg-subtle: #aaa;
-  --border-subtle: var(--subtle);
-  --interactive: var(--fg);
-  --interactive-hover: var(--bg);
+  /* Boards legacy aliases — light mode */
+  --surface: var(--bg-surface);
+  --muted: var(--fg-muted);
+  --subtle: var(--border-subtle);
 }
 
 /* Progress bar */
@@ -217,22 +150,23 @@
 .auth-bar__btn {
   padding: var(--space-1) var(--space-3);
   background: transparent;
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border-subtle);
   color: var(--fg);
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
 }
 
 .auth-bar__btn:hover {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 /* User menu dropdown */
@@ -364,7 +298,7 @@
 }
 
 .account-value {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
   color: var(--fg);
 }
@@ -680,7 +614,7 @@
 }
 
 .auth-modal__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-lg);
   margin-bottom: var(--space-4);
 }
@@ -789,12 +723,22 @@ html {
 }
 
 body {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   color: var(--fg);
   background: var(--bg);
   transition: background 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Terminal-aesthetic global link + focus styles */
+a { color: var(--color-link); }
+a:hover { color: var(--accent-cyan); }
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* ============================================
@@ -841,13 +785,15 @@ body {
 }
 
 .bottom-nav__share-btn:hover {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 .bottom-nav__share-btn--active {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 /* Floating Button Base */
@@ -1006,24 +952,25 @@ body {
   letter-spacing: 0.1em;
   padding: var(--space-1) var(--space-3);
   background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg);
+  color: var(--fg-muted);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0; /* Prevent buttons from shrinking */
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
 }
 
 .filter-token:hover {
-  background: var(--fg);
-  color: var(--bg);
+  color: var(--fg);
+  border-color: var(--fg);
 }
 
 .filter-token--active {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 /* Sub-tag filter bar — single horizontal row, sticky below category tabs */
@@ -1296,20 +1243,22 @@ body {
   padding: var(--space-1) var(--space-3);
   background: var(--bg);
   color: var(--fg);
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border-subtle);
   min-width: 120px;
   max-width: 200px;
   flex-shrink: 0;
+  transition: border-color 0.15s;
 }
 
 .search-input::placeholder {
-  color: var(--muted);
+  color: var(--fg-subtle);
   text-transform: uppercase;
 }
 
 .search-input:focus {
   outline: none;
-  background: var(--surface);
+  border-color: var(--accent-cyan);
+  background: var(--bg-surface);
 }
 
 /* ============================================
@@ -1772,18 +1721,22 @@ body {
   aspect-ratio: 1;
   overflow: hidden;
   cursor: pointer;
-  background: var(--subtle);
-  border: 0.25px solid var(--fg);
-  transition: transform 0.1s, opacity 0.1s;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border-subtle);
+  transition: transform 0.1s, opacity 0.1s, border-color 0.15s;
+}
+
+.grid-item:hover {
+  border-color: var(--fg-muted);
 }
 
 .grid-item:focus {
-  outline: 0.5px solid var(--fg);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
 .grid-item--selected {
-  outline: 0.75px solid var(--fg);
+  outline: 1px solid var(--accent-amber);
   outline-offset: 0;
 }
 
@@ -1836,7 +1789,7 @@ body {
   border-radius: 10px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: #fff;
+  color: var(--fg);
   pointer-events: none;
 }
 
@@ -1940,7 +1893,7 @@ body {
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 4px;
   color: var(--fg);
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
 }
 .merge-preview__field input[type="text"]:focus {
@@ -2105,7 +2058,7 @@ body {
   animation: board-suggest-pulse 2s ease-in-out 1;
 }
 .filter-token--board-suggest:hover {
-  color: #fff;
+  color: var(--fg);
   border-color: #10b981;
   border-style: solid;
   background: rgba(16,185,129,0.15);
@@ -2294,7 +2247,7 @@ body {
   right: 0;
   padding: var(--space-3);
   background: var(--bg);
-  border-top: 0.25px solid var(--fg);
+  border-top: 0.5px solid var(--border-subtle);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -2331,7 +2284,7 @@ body {
 }
 
 .grid-item__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   font-weight: normal;
   line-height: var(--line-height-tight);
@@ -2344,9 +2297,13 @@ body {
 .grid-item__domain {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: var(--muted);
+  color: var(--fg-subtle);
   margin-top: 2px;
-  text-decoration: underline;
+  text-decoration: none;
+}
+.grid-item__domain::before {
+  content: "› ";
+  color: var(--accent-cyan);
 }
 
 .grid-item__category {
@@ -2359,6 +2316,7 @@ body {
   letter-spacing: 0.1em;
   padding: 2px 6px;
   background: var(--bg);
+  color: var(--accent-amber);
   border-right: 0.25px solid var(--fg);
   border-bottom: 0.25px solid var(--fg);
   opacity: 0;
@@ -2385,7 +2343,7 @@ body {
   width: 18px;
   height: 18px;
   background: #c00;
-  color: #fff;
+  color: var(--fg);
   border-radius: 50%;
   font-size: 12px;
   font-weight: bold;
@@ -2431,7 +2389,7 @@ body {
 }
 
 .grid-item--placeholder .grid-item__initial {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-2xl);
   color: var(--bg);
 }
@@ -2579,7 +2537,7 @@ body {
 }
 
 .grid-item__details-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-lg);
   font-weight: normal;
   line-height: var(--line-height-tight);
@@ -2646,16 +2604,17 @@ body {
   letter-spacing: 0.05em;
   padding: var(--space-2) var(--space-3);
   background: transparent;
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border-subtle);
   color: var(--fg);
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .grid-item__action:hover {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 .grid-item__action--danger {
@@ -2786,7 +2745,7 @@ body {
 
 .grid-item__action--danger:hover {
   background: #c00;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* Kebab Menu */
@@ -2822,7 +2781,7 @@ body {
 
 .grid-item__menu-btn::before {
   content: '•••';
-  color: #fff;
+  color: var(--fg);
   font-size: 12px;
   letter-spacing: 1px;
   transform: rotate(90deg);
@@ -3180,7 +3139,7 @@ body {
 }
 .grid-item__action--goodreads:hover {
   background: #553b08;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* Book format badge hover */
@@ -3323,7 +3282,7 @@ body {
   gap: var(--space-3);
 }
 .recipe-drawer__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: 18px;
   line-height: 1.2;
   flex: 1;
@@ -4298,7 +4257,7 @@ body {
 }
 
 .modal__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
 }
 
@@ -4860,7 +4819,7 @@ body {
 }
 
 .overlay__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xl);
   font-weight: normal;
   line-height: var(--line-height-tight);
@@ -4878,7 +4837,7 @@ body {
 }
 
 .overlay__description {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   margin-bottom: var(--space-6);
@@ -5038,7 +4997,7 @@ body {
 }
 
 .share-modal__option-text small {
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: 12px;
   opacity: 0.7;
 }
@@ -6156,7 +6115,7 @@ body {
   .ig-entity__desc { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted); margin-bottom: var(--space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ig-entity input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; accent-color: var(--fg); }
   .ig-entity__info { flex: 1; min-width: 0; }
-  .ig-entity__name { font-family: var(--font-serif); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .ig-entity__name { font-family: var(--font-mono); font-size: var(--font-size-base); margin-bottom: var(--space-1); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .ig-entity__meta { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted); margin-bottom: var(--space-1); }
   .ig-entity__url { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--fg); opacity: 0.6; word-break: break-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ig-conf { display: inline-block; padding: 1px 5px; font-size: var(--font-size-xs); font-family: var(--font-mono); border: 1px solid currentColor; }
@@ -6182,6 +6141,7 @@ body {
   <script src="../js/image-validation.js"></script>
 </head>
 <body>
+<a href="#main-content" class="skip-link">Skip to content</a>
   <!-- Progress Bar -->
   <div class="progress-bar" id="progressBar">
     <div class="progress-bar__fill" id="progressFill"></div>
@@ -6249,7 +6209,7 @@ body {
     <div class="widget-section__content" id="widgetContent"></div>
   </section>
 
-  <main class="grid" id="grid"></main>
+  <main class="grid" id="main-content" role="main"></main>
 
   <!-- AI Widget Section - Footer Zone -->
   <section class="widget-section widget-zone widget-zone--footer" id="widgetFooter" data-zone="footer">
@@ -6274,7 +6234,7 @@ body {
   <!-- iOS App Redirect Overlay -->
   <div id="iosAppOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;color:#fff;font-family:var(--font-mono);flex-direction:column;align-items:center;justify-content:center;padding:var(--space-8);text-align:center;-webkit-font-smoothing:antialiased;">
     <div style="max-width:320px;width:100%;">
-      <div style="font-family:'Georgia',serif;font-size:40px;margin-bottom:var(--space-8);letter-spacing:-0.02em;">boards</div>
+      <div style="font-family:var(--font-mono);font-size:40px;margin-bottom:var(--space-8);letter-spacing:-0.05em;font-weight:400;text-transform:lowercase;">boards</div>
       <div style="font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:var(--space-3);">Open in the app</div>
       <div style="font-size:var(--font-size-xs);color:#666;margin-bottom:var(--space-8);line-height:1.6;" id="iosOverlaySubtext">Continue to the full Boards experience</div>
       <button id="iosOverlayOpen" style="display:block;width:100%;padding:var(--space-3) var(--space-6);background:#fff;color:#000;border:1px solid #fff;font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;cursor:pointer;margin-bottom:var(--space-4);">Open Boards App</button>
@@ -7018,7 +6978,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <h2 class="modal__title" id="confirmTitle">Confirm</h2>
       </div>
       <div style="padding: var(--space-4);">
-        <p id="confirmMessage" style="margin-bottom: var(--space-4); font-family: var(--font-serif);"></p>
+        <p id="confirmMessage" style="margin-bottom: var(--space-4); font-family: var(--font-mono);"></p>
         <div style="display: flex; gap: var(--space-2);">
           <button class="overlay__action" id="confirmCancel" style="flex: 1;">Cancel</button>
           <button class="overlay__action overlay__action--danger" id="confirmOk" style="flex: 1; background: var(--fg); color: var(--bg);">OK</button>
@@ -7036,7 +6996,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <button class="modal__close" id="igReviewClose">&times;</button>
       </div>
       <div style="padding: var(--space-4);">
-        <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-serif); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
+        <p id="igSummary" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: var(--line-height-normal);"></p>
         <p id="igStats" style="margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--muted);"></p>
         <div id="igTagsRow" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:var(--space-3);"></div>
         <div id="igKeepSourceRow" style="display:none;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid var(--subtle);">
@@ -7064,7 +7024,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Version
   // ============================================
   const VERSION = '2.18.0';
-  console.log('[boards] v' + VERSION + ' - taste engine activation triggers');
+  console.log('[boards] v' + VERSION + ' - terminal aesthetic redesign');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
