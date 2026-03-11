@@ -23,9 +23,9 @@
   --gray-900: #e0e0e0;
 
   /* Status colors */
-  --color-success: #0f0;
-  --color-error: #c00;
-  --color-warning: #f90;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
 
   /* Terminal accent colors */
   --accent-amber: #ffb000;
