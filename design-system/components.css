@@ -1276,3 +1276,31 @@ body {
 .input-prompt:focus-within {
   box-shadow: 0 0 0 1px var(--fg);
 }
+
+/* ============================================
+   Motion Patterns
+   ============================================ */
+
+/* Typewriter text reveal
+   Set --tw-chars to the character count of the text.
+   Usage: <span class="typewriter" style="--tw-chars: 12">hello world_</span> */
+.typewriter {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid var(--fg);
+  width: 0;
+  animation:
+    typewriter-reveal 2s steps(var(--tw-chars, 20)) forwards,
+    cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes typewriter-reveal {
+  to { width: calc(var(--tw-chars, 20) * 1ch); }
+}
+
+/* Hard-snap transition — instant state change (terminal feel)
+   Use on elements where easing feels wrong: toggles, tab switches, filters */
+.transition-snap {
+  transition-timing-function: steps(1) !important;
+}
