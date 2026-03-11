@@ -785,13 +785,15 @@ a:hover { color: var(--accent-cyan); }
 }
 
 .bottom-nav__share-btn:hover {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 .bottom-nav__share-btn--active {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 /* Floating Button Base */
@@ -1719,18 +1721,22 @@ a:hover { color: var(--accent-cyan); }
   aspect-ratio: 1;
   overflow: hidden;
   cursor: pointer;
-  background: var(--subtle);
-  border: 0.25px solid var(--fg);
-  transition: transform 0.1s, opacity 0.1s;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border-subtle);
+  transition: transform 0.1s, opacity 0.1s, border-color 0.15s;
+}
+
+.grid-item:hover {
+  border-color: var(--fg-muted);
 }
 
 .grid-item:focus {
-  outline: 0.5px solid var(--fg);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
 .grid-item--selected {
-  outline: 0.75px solid var(--fg);
+  outline: 1px solid var(--accent-amber);
   outline-offset: 0;
 }
 
@@ -1783,7 +1789,7 @@ a:hover { color: var(--accent-cyan); }
   border-radius: 10px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: #fff;
+  color: var(--fg);
   pointer-events: none;
 }
 
@@ -2052,7 +2058,7 @@ a:hover { color: var(--accent-cyan); }
   animation: board-suggest-pulse 2s ease-in-out 1;
 }
 .filter-token--board-suggest:hover {
-  color: #fff;
+  color: var(--fg);
   border-color: #10b981;
   border-style: solid;
   background: rgba(16,185,129,0.15);
@@ -2241,7 +2247,7 @@ a:hover { color: var(--accent-cyan); }
   right: 0;
   padding: var(--space-3);
   background: var(--bg);
-  border-top: 0.25px solid var(--fg);
+  border-top: 0.5px solid var(--border-subtle);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -2291,9 +2297,13 @@ a:hover { color: var(--accent-cyan); }
 .grid-item__domain {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: var(--muted);
+  color: var(--fg-subtle);
   margin-top: 2px;
-  text-decoration: underline;
+  text-decoration: none;
+}
+.grid-item__domain::before {
+  content: "› ";
+  color: var(--accent-cyan);
 }
 
 .grid-item__category {
@@ -2306,6 +2316,7 @@ a:hover { color: var(--accent-cyan); }
   letter-spacing: 0.1em;
   padding: 2px 6px;
   background: var(--bg);
+  color: var(--accent-amber);
   border-right: 0.25px solid var(--fg);
   border-bottom: 0.25px solid var(--fg);
   opacity: 0;
@@ -2332,7 +2343,7 @@ a:hover { color: var(--accent-cyan); }
   width: 18px;
   height: 18px;
   background: #c00;
-  color: #fff;
+  color: var(--fg);
   border-radius: 50%;
   font-size: 12px;
   font-weight: bold;
@@ -2593,16 +2604,17 @@ a:hover { color: var(--accent-cyan); }
   letter-spacing: 0.05em;
   padding: var(--space-2) var(--space-3);
   background: transparent;
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border-subtle);
   color: var(--fg);
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .grid-item__action:hover {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 .grid-item__action--danger {
@@ -2733,7 +2745,7 @@ a:hover { color: var(--accent-cyan); }
 
 .grid-item__action--danger:hover {
   background: #c00;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* Kebab Menu */
@@ -2769,7 +2781,7 @@ a:hover { color: var(--accent-cyan); }
 
 .grid-item__menu-btn::before {
   content: '•••';
-  color: #fff;
+  color: var(--fg);
   font-size: 12px;
   letter-spacing: 1px;
   transform: rotate(90deg);
@@ -3127,7 +3139,7 @@ a:hover { color: var(--accent-cyan); }
 }
 .grid-item__action--goodreads:hover {
   background: #553b08;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* Book format badge hover */
