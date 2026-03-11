@@ -11,8 +11,8 @@
 //   practical_tags[], taste_tags[],
 //   summary
 // }
-const VERSION = '1.0.0'
-console.log(`[analyze-content] v${VERSION} - Sense-Making Agent`)
+const VERSION = '1.1.1'
+console.log(`[analyze-content] v${VERSION} - Sense-Making Agent + backfill`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -33,6 +33,31 @@ const CONTENT_STRUCTURES = [
   'original_expression', 'curated_collection', 'summary', 'review', 'reference'
 ]
 
+// Canonical taste vocabulary — guides LLM toward consistent terms without hard constraints
+const CANONICAL_TASTE_TERMS = [
+  // Style & era
+  'minimal', 'maximalist', 'vintage', 'retro', 'contemporary', 'modern', 'classic', 'futuristic',
+  'mid_century', 'art_deco', 'brutalist', 'postmodern', 'traditional', 'experimental',
+  // Temperature & mood
+  'warm', 'cool', 'cozy', 'stark', 'inviting', 'intimate', 'dramatic', 'serene',
+  'energetic', 'moody', 'playful', 'meditative', 'nostalgic', 'aspirational',
+  // Production & craft
+  'artisanal', 'handcrafted', 'industrial', 'refined', 'raw', 'polished', 'lo_fi',
+  'curated', 'diy', 'professional', 'bespoke',
+  // Complexity
+  'simple', 'intricate', 'ornate', 'sparse', 'dense', 'layered', 'streamlined', 'complex',
+  // Cultural positioning
+  'avant_garde', 'mainstream', 'underground', 'niche', 'indie', 'luxury', 'accessible',
+  'upscale', 'casual', 'sophisticated', 'eclectic', 'bohemian',
+  // Sensory
+  'bold', 'subtle', 'vibrant', 'muted', 'bright', 'dark', 'saturated', 'monochrome',
+  // Material / nature
+  'organic', 'synthetic', 'natural', 'tactile', 'textured', 'sleek', 'rustic',
+  // Intent / feeling
+  'practical', 'aspirational', 'educational', 'inspirational', 'provocative', 'comforting',
+  'thought_provoking', 'whimsical', 'utilitarian'
+]
+
 // JSON-LD types for title resolution (moved from enrich-link)
 const JSON_LD_TITLE_TYPES = new Set([
   'TVEpisode', 'VideoObject', 'Movie', 'TVSeries', 'Episode', 'Clip',
@@ -48,7 +73,24 @@ serve(async (req) => {
   }
 
   try {
-    let { url, title, description } = await req.json()
+    const body = await req.json()
+    const { action } = body
+
+    // --- BACKFILL ACTION ---
+    if (action === 'backfill') {
+      return await handleBackfill(req, body)
+    }
+
+    // --- SINGLE-URL ANALYSIS (default) ---
+    let { url, title, description } = body
+    // Additional context fields (Gap 2: richer signals)
+    const selectedText: string | null = body.selected_text || null
+    const notes: string | null = body.notes || null
+    const category: string | null = body.category || null
+    const videoMeta: Record<string, any> | null = body.video || null
+    const musicMeta: Record<string, any> | null = body.music || null
+    const bookMeta: Record<string, any> | null = body.book || null
+    const recipeMeta: Record<string, any> | null = body.recipe || null
 
     if (!url) {
       return new Response(
@@ -202,28 +244,10 @@ serve(async (req) => {
 "content_type": one of [${CONTENT_TYPES.join(', ')}],
 "type_confidence": 0.0-1.0,` : ''
 
-      const prompt = `Analyze this content and produce structured metadata.
-
-URL: ${url}
-Title: ${title || 'N/A'}
-Description: ${description?.slice(0, 500) || 'N/A'}
-${contentType !== 'unknown' ? `Known content_type: ${contentType}` : ''}
-
-Respond with JSON only:
-{${classificationBlock}
-  "content_structure": one of ["original_expression", "curated_collection", "summary", "review", "reference"],
-  "entities": [{"type": "restaurant|product|brand|song|album|person|place|food|event|book|tool|concept|generic", "name": "canonical name", "confidence": 0.0-1.0}],
-  "practical_tags": ["3-8 objective factual tags, e.g. restaurant, italian, monitor, electronics"],
-  "taste_tags": ["3-8 subjective aesthetic tags, e.g. minimalist, vintage, upscale, cozy"],
-  "summary": "one-sentence summary of the content"
-}
-
-Guidelines:
-- practical_tags: objective, factual, searchable classification. What IS this about.
-- taste_tags: subjective aesthetic/cultural/vibe tags. What does this FEEL like.
-- entities: the main real-world things referenced (top 3-5). Not generic concepts.
-- content_structure: how the content is organized (original work, list, review, etc.)
-- Keep tags lowercase, use underscores for multi-word tags.`
+      const prompt = buildAnalysisPrompt({
+        url, title, description, contentType, classificationBlock,
+        selectedText, notes, category, videoMeta, musicMeta, bookMeta, recipeMeta
+      })
 
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -234,7 +258,7 @@ Guidelines:
             'anthropic-version': '2023-06-01'
           },
           body: JSON.stringify({
-            model: 'claude-3-5-haiku-20241022',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 800,
             messages: [{ role: 'user', content: prompt }]
           })
@@ -360,6 +384,281 @@ Guidelines:
     )
   }
 })
+
+// ========================================
+// Build analysis prompt with richer context (Gap 2 + Gap 3)
+// ========================================
+function buildAnalysisPrompt(ctx: {
+  url: string
+  title: string | null
+  description: string | null
+  contentType: string
+  classificationBlock: string
+  selectedText?: string | null
+  notes?: string | null
+  category?: string | null
+  videoMeta?: Record<string, any> | null
+  musicMeta?: Record<string, any> | null
+  bookMeta?: Record<string, any> | null
+  recipeMeta?: Record<string, any> | null
+}): string {
+  // Build additional context section
+  const contextParts: string[] = []
+
+  if (ctx.selectedText) {
+    contextParts.push(`User-highlighted text: "${ctx.selectedText.slice(0, 300)}"`)
+  }
+  if (ctx.notes) {
+    contextParts.push(`User notes: "${ctx.notes.slice(0, 200)}"`)
+  }
+  if (ctx.category && ctx.category !== 'uncategorized') {
+    contextParts.push(`Board category: ${ctx.category}`)
+  }
+  if (ctx.videoMeta) {
+    const v = ctx.videoMeta
+    const parts = [v.genre, v.creator, v.type, v.year].filter(Boolean)
+    if (parts.length) contextParts.push(`Video: ${parts.join(', ')}`)
+  }
+  if (ctx.musicMeta) {
+    const m = ctx.musicMeta
+    const parts = [m.artist, m.genre, m.albumTitle].filter(Boolean)
+    if (parts.length) contextParts.push(`Music: ${parts.join(', ')}`)
+  }
+  if (ctx.bookMeta) {
+    const b = ctx.bookMeta
+    const parts = [b.author, b.genre, b.publisher].filter(Boolean)
+    if (parts.length) contextParts.push(`Book: ${parts.join(', ')}`)
+  }
+  if (ctx.recipeMeta) {
+    const r = ctx.recipeMeta
+    const parts = [r.cuisine, r.difficulty, r.title].filter(Boolean)
+    if (parts.length) contextParts.push(`Recipe: ${parts.join(', ')}`)
+  }
+
+  const additionalContext = contextParts.length > 0
+    ? `\nAdditional context:\n${contextParts.map(p => `- ${p}`).join('\n')}\n`
+    : ''
+
+  return `Analyze this content and produce structured metadata.
+
+URL: ${ctx.url}
+Title: ${ctx.title || 'N/A'}
+Description: ${ctx.description?.slice(0, 500) || 'N/A'}
+${ctx.contentType !== 'unknown' ? `Known content_type: ${ctx.contentType}` : ''}${additionalContext}
+Respond with JSON only:
+{${ctx.classificationBlock}
+  "content_structure": one of ["original_expression", "curated_collection", "summary", "review", "reference"],
+  "entities": [{"type": "restaurant|product|brand|song|album|person|place|food|event|book|tool|concept|generic", "name": "canonical name", "confidence": 0.0-1.0}],
+  "practical_tags": ["3-8 objective factual tags, e.g. restaurant, italian, monitor, electronics"],
+  "taste_tags": ["3-8 subjective aesthetic/vibe tags from or inspired by this vocabulary: ${CANONICAL_TASTE_TERMS.slice(0, 40).join(', ')}... You may add new terms if nothing fits, but prefer these when applicable."],
+  "summary": "one-sentence summary of the content"
+}
+
+Guidelines:
+- practical_tags: objective, factual, searchable classification. What IS this about.
+- taste_tags: subjective aesthetic/cultural/vibe tags. What does this FEEL like. Use the canonical vocabulary when possible for consistency, but add new terms when the content has a distinct vibe not covered.
+- entities: the main real-world things referenced (top 3-5). Not generic concepts.
+- content_structure: how the content is organized (original work, list, review, etc.)
+- If user-highlighted text or notes are provided, use them heavily — they represent what the user found meaningful.
+- Keep tags lowercase, use underscores for multi-word tags.`
+}
+
+// ========================================
+// Backfill handler — re-enrich existing pins missing taste_tags
+// ========================================
+async function handleBackfill(req: Request, body: any) {
+  const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '')
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: 'No ANTHROPIC_API_KEY configured' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  // Auth: get user from token
+  const userId = body.user_id
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: 'user_id required for backfill' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const batchSize = body.batch_size || 25
+  const forceAll = body.force_all || false  // re-enrich even if taste_tags exist
+
+  console.log(`[analyze-content] Backfill: user=${userId}, batch=${batchSize}, force=${forceAll}`)
+
+  // Fetch pins needing enrichment
+  let query = supabase
+    .from('links')
+    .select('id, url, title, description, category, content_type, selected_text, notes, video, music, book, recipe, taste_tags, practical_tags')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(batchSize)
+
+  if (!forceAll) {
+    // Only pins missing taste_tags
+    query = query.or('taste_tags.is.null,taste_tags.eq.{}')
+  }
+
+  const { data: pins, error: fetchErr } = await query
+
+  if (fetchErr) {
+    console.error('[analyze-content] Backfill fetch error:', fetchErr)
+    return new Response(
+      JSON.stringify({ error: 'Failed to fetch pins', detail: fetchErr.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  if (!pins || pins.length === 0) {
+    // Check total remaining
+    const { count } = await supabase
+      .from('links')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .or('taste_tags.is.null,taste_tags.eq.{}')
+
+    return new Response(
+      JSON.stringify({ processed: 0, remaining: count || 0, message: 'No pins to backfill' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  console.log(`[analyze-content] Backfill: ${pins.length} pins to process`)
+
+  const results: any[] = []
+
+  for (const pin of pins) {
+    const url = pin.url
+    const title = pin.title
+    const description = pin.description
+
+    const needsClassification = !pin.content_type || pin.content_type === 'unknown'
+    const classificationBlock = needsClassification ? `
+"content_type": one of [${CONTENT_TYPES.join(', ')}],
+"type_confidence": 0.0-1.0,` : ''
+
+    const prompt = buildAnalysisPrompt({
+      url, title, description,
+      contentType: pin.content_type || 'unknown',
+      classificationBlock,
+      selectedText: pin.selected_text,
+      notes: pin.notes,
+      category: pin.category,
+      videoMeta: pin.video,
+      musicMeta: pin.music,
+      bookMeta: pin.book,
+      recipeMeta: pin.recipe,
+    })
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 800,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      })
+
+      if (!response.ok) {
+        console.error(`[analyze-content] Backfill AI error for ${pin.id}:`, response.status)
+        results.push({ id: pin.id, status: 'error', error: `API ${response.status}` })
+        continue
+      }
+
+      const data = await response.json()
+      const text = data.content?.[0]?.text || ''
+      const match = text.match(/\{[\s\S]*\}/)
+
+      if (!match) {
+        results.push({ id: pin.id, status: 'error', error: 'No JSON in response' })
+        continue
+      }
+
+      const result = JSON.parse(match[0])
+
+      // Build update payload
+      const update: Record<string, any> = { updated_at: new Date().toISOString() }
+
+      if (Array.isArray(result.taste_tags) && result.taste_tags.length > 0) {
+        update.taste_tags = result.taste_tags
+          .filter((t: any) => typeof t === 'string')
+          .slice(0, 8)
+          .map((t: string) => t.toLowerCase().replace(/\s+/g, '_'))
+      }
+      if (Array.isArray(result.practical_tags) && result.practical_tags.length > 0) {
+        update.practical_tags = result.practical_tags
+          .filter((t: any) => typeof t === 'string')
+          .slice(0, 8)
+          .map((t: string) => t.toLowerCase().replace(/\s+/g, '_'))
+      }
+      if (Array.isArray(result.entities) && result.entities.length > 0) {
+        update.entities = result.entities
+          .filter((e: any) => e.name && e.type)
+          .slice(0, 5)
+      }
+      if (result.content_structure && CONTENT_STRUCTURES.includes(result.content_structure)) {
+        update.content_structure = result.content_structure
+      }
+      if (needsClassification && result.content_type && CONTENT_TYPES.includes(result.content_type)) {
+        update.content_type = result.content_type
+        update.type_confidence = result.type_confidence || 0.8
+      }
+
+      // Write to DB
+      const { error: updateErr } = await supabase
+        .from('links')
+        .update(update)
+        .eq('id', pin.id)
+
+      if (updateErr) {
+        console.error(`[analyze-content] Backfill DB error for ${pin.id}:`, updateErr)
+        results.push({ id: pin.id, status: 'db_error', error: updateErr.message })
+      } else {
+        results.push({
+          id: pin.id,
+          status: 'ok',
+          taste_tags: update.taste_tags?.length || 0,
+          practical_tags: update.practical_tags?.length || 0,
+          entities: update.entities?.length || 0
+        })
+      }
+    } catch (e) {
+      console.error(`[analyze-content] Backfill error for ${pin.id}:`, e)
+      results.push({ id: pin.id, status: 'error', error: (e as Error).message })
+    }
+  }
+
+  // Count remaining
+  const { count: remaining } = await supabase
+    .from('links')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .or('taste_tags.is.null,taste_tags.eq.{}')
+
+  const processed = results.filter(r => r.status === 'ok').length
+  const errors = results.filter(r => r.status !== 'ok').length
+
+  console.log(`[analyze-content] Backfill complete: ${processed} ok, ${errors} errors, ${remaining} remaining`)
+
+  return new Response(
+    JSON.stringify({ processed, errors, remaining: remaining || 0, results }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
+}
 
 // ========================================
 // oEmbed Metadata Resolution (Vimeo)

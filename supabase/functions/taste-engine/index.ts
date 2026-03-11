@@ -14,7 +14,7 @@
 //   'full-pipeline'      — Run all levels in sequence
 //   'get-profile'        — Return current taste profile (read-only)
 
-const VERSION = '1.1.0'
+const VERSION = '1.2.2'
 console.log(`[taste-engine] v${VERSION} — multi-level preference pipeline + secondary signals`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -328,7 +328,12 @@ async function saveAffinities(supabase: SupabaseClient, userId: string, affiniti
     }
   }
 
-  console.log(`[taste-engine] Saved ${rows.length} affinities for user ${userId.slice(0, 8)}`)
+  // Verify: count what actually persisted
+  const { count } = await supabase
+    .from('taste_affinities')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  console.log(`[taste-engine] Saved ${rows.length} affinities, verified ${count} in DB for user ${userId.slice(0, 8)}`)
 }
 
 // =====================================================================
@@ -469,7 +474,7 @@ function clusterAffinities(affinities: Affinity[], pins: Pin[]): DomainCluster[]
       }
     }
 
-    if (bestSim < 0.15 || bestI < 0) break
+    if (bestSim < 0.08 || bestI < 0) break   // Lower threshold for generic signals
 
     // Merge clusters
     const merged: DomainCluster = {
@@ -530,7 +535,13 @@ function clusterAffinities(affinities: Affinity[], pins: Pin[]): DomainCluster[]
       .map(([id]) => id)
   }
 
-  return clusters
+  // Filter weak singletons — keep only if they have enough signal
+  const multiMemberCount = clusters.filter(c => c.members.length >= 2).length
+  return clusters.filter(c => {
+    if (c.members.length >= 2) return true
+    // Keep singletons only if: strong signal AND pins assigned AND few multi-member clusters
+    return c.totalStrength >= 0.4 && c.pinIds.length >= 3 && multiMemberCount < 3
+  })
 }
 
 async function labelDomainsWithLLM(
@@ -540,12 +551,19 @@ async function labelDomainsWithLLM(
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     console.warn('[taste-engine] No ANTHROPIC_API_KEY, using fallback labels')
-    return clusters.map((c, i) => ({
-      label: c.members.slice(0, 3).join(' + '),
-      summary: `Cluster of ${c.members.length} related interests`,
-      confidence: 0.3,
-      groupIndex: i,
-    }))
+    const maxMembers = Math.max(...clusters.map(c => c.members.length), 1)
+    const maxStrength = Math.max(...clusters.map(c => c.totalStrength), 1)
+    return clusters.map((c, i) => {
+      const clusterScore = Math.max(0.2, Math.min(0.95,
+        ((c.members.length / maxMembers) + Math.min(1, c.pinIds.length / 10) + (c.totalStrength / maxStrength)) / 3
+      ))
+      return {
+        label: c.members.slice(0, 3).join(' + '),
+        summary: `Cluster of ${c.members.length} related interests`,
+        confidence: Math.round(clusterScore * 1000) / 1000,
+        groupIndex: i,
+      }
+    })
   }
 
   // Get sample titles for each cluster
@@ -606,7 +624,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -639,20 +657,47 @@ Respond with valid JSON only.`
       }
     }
 
-    return (parsed.domains || []).map((d: any) => ({
-      label: d.label || 'Unnamed Domain',
-      summary: d.summary || '',
-      confidence: d.confidence || 0.5,
-      groupIndex: (d.group || 1) - 1,
-    }))
+    // Compute hybrid confidence from cluster metrics + LLM confidence
+    const maxMembers = Math.max(...clusters.map(c => c.members.length), 1)
+    const maxStrength = Math.max(...clusters.map(c => c.totalStrength), 1)
+
+    return (parsed.domains || []).map((d: any) => {
+      const idx = (d.group || 1) - 1
+      const cluster = clusters[idx]
+      const llmConf = d.confidence || 0.5
+
+      if (!cluster) {
+        return { label: d.label || 'Unnamed Domain', summary: d.summary || '', confidence: llmConf, groupIndex: idx }
+      }
+
+      const memberScore = cluster.members.length / maxMembers
+      const pinScore = Math.min(1, cluster.pinIds.length / 10)
+      const strengthScore = cluster.totalStrength / maxStrength
+      const clusterScore = Math.max(0.2, Math.min(0.95, (memberScore + pinScore + strengthScore) / 3))
+      const hybridConf = Math.min(1.0, Math.round((0.4 * llmConf + 0.6 * clusterScore) * 1000) / 1000)
+
+      return {
+        label: d.label || 'Unnamed Domain',
+        summary: d.summary || '',
+        confidence: hybridConf,
+        groupIndex: idx,
+      }
+    })
   } catch (err) {
     console.error('[taste-engine] LLM labeling error:', err)
-    return clusters.map((c, i) => ({
-      label: c.members.slice(0, 3).join(' + '),
-      summary: `Cluster of ${c.members.length} related interests`,
-      confidence: 0.3,
-      groupIndex: i,
-    }))
+    const maxMembers = Math.max(...clusters.map(c => c.members.length), 1)
+    const maxStrength = Math.max(...clusters.map(c => c.totalStrength), 1)
+    return clusters.map((c, i) => {
+      const clusterScore = Math.max(0.2, Math.min(0.95,
+        ((c.members.length / maxMembers) + Math.min(1, c.pinIds.length / 10) + (c.totalStrength / maxStrength)) / 3
+      ))
+      return {
+        label: c.members.slice(0, 3).join(' + '),
+        summary: `Cluster of ${c.members.length} related interests`,
+        confidence: Math.min(1.0, Math.round(clusterScore * 1000) / 1000),
+        groupIndex: i,
+      }
+    })
   }
 }
 
@@ -660,7 +705,8 @@ async function saveDomains(
   supabase: SupabaseClient,
   userId: string,
   clusters: DomainCluster[],
-  labels: { label: string; summary: string; confidence: number; groupIndex: number }[]
+  labels: { label: string; summary: string; confidence: number; groupIndex: number }[],
+  log?: string[]
 ) {
   // Load existing domains for stability check
   const { data: existing } = await supabase
@@ -707,15 +753,33 @@ async function saveDomains(
     return row
   }).filter(Boolean)
 
-  // Delete old domains, insert new ones
-  await supabase.from('taste_domains').delete().eq('user_id', userId)
+  log?.push(`saveDomains: ${rows.length} rows to save, ${existingDomains.length} existing`)
 
-  if (rows.length > 0) {
-    const { error } = await supabase.from('taste_domains').insert(rows)
-    if (error) console.error('[taste-engine] Error saving domains:', error)
+  // Delete old domains, insert new ones
+  const { error: delErr } = await supabase.from('taste_domains').delete().eq('user_id', userId)
+  if (delErr) {
+    console.error('[taste-engine] Error deleting old domains:', delErr)
+    log?.push(`domain_delete_err: ${delErr.message}`)
   }
 
-  // Also generate per-domain summaries
+  if (rows.length > 0) {
+    const { error, data: inserted } = await supabase.from('taste_domains').insert(rows).select('id')
+    if (error) {
+      console.error('[taste-engine] Error inserting domains:', error)
+      log?.push(`domain_insert_err: ${JSON.stringify(error)}`)
+    } else {
+      log?.push(`domain_insert_ok: ${(inserted || []).length}`)
+    }
+  }
+
+  // Clean up stale domain summaries (keep 'global' scope for sensibility)
+  await supabase
+    .from('taste_summaries')
+    .delete()
+    .eq('user_id', userId)
+    .neq('scope', 'global')
+
+  // Generate per-domain summaries
   for (const row of rows) {
     if (row.summary) {
       await supabase
@@ -728,12 +792,17 @@ async function saveDomains(
           pin_count_at_generation: row.pin_ids?.length || 0,
           generated_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          model_version: 'claude-3-haiku-20240307',
+          model_version: 'claude-haiku-4-5-20251001',
         }, { onConflict: 'user_id,scope' })
     }
   }
 
-  console.log(`[taste-engine] Saved ${rows.length} domains for user ${userId.slice(0, 8)}`)
+  // Verify: count what actually persisted
+  const { count: domCount } = await supabase
+    .from('taste_domains')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  console.log(`[taste-engine] Saved ${rows.length} domains, verified ${domCount} in DB for user ${userId.slice(0, 8)}`)
 }
 
 // =====================================================================
@@ -839,7 +908,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 256,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -872,6 +941,100 @@ Respond with valid JSON only.`
   }
 }
 
+async function inferAxesFromDomains(
+  supabase: SupabaseClient,
+  userId: string,
+  affinities: Affinity[]
+): Promise<{
+  axis: string; position: number; confidence: number;
+  low_label: string; high_label: string;
+  contributing_tags: string[]; is_seed: boolean;
+}[]> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) return []
+
+  // Load saved domains (just written by compute-domains step)
+  const { data: domains } = await supabase
+    .from('taste_domains')
+    .select('label, summary, constituent_affinities, spanning_categories')
+    .eq('user_id', userId)
+    .order('confidence', { ascending: false })
+    .limit(10)
+
+  if (!domains || domains.length === 0) return []
+
+  const topAffinities = affinities
+    .filter(a => !a.dimension.startsWith('type:') && !a.dimension.startsWith('category:'))
+    .slice(0, 15)
+
+  const prompt = `You are a taste profiler. A user's saved collection has been analyzed into these taste domains and top interest signals.
+
+TASTE DOMAINS:
+${domains.map((d: any) => `- "${d.label}": ${d.summary || 'no description'} (categories: ${(d.spanning_categories || []).join(', ')})`).join('\n')}
+
+TOP INTEREST SIGNALS:
+${topAffinities.map(a => `- "${a.dimension}" (strength: ${a.strength}, across: ${a.source_categories.join(', ')})`).join('\n')}
+
+Based on what this person collects, position them on these aesthetic spectra. Only include axes where you have enough signal to make a reasonable inference.
+
+Axes:
+- density: minimal (sparse, clean, restrained) ↔ maximalist (layered, dense, ornate)
+- temperature: cool (stark, clinical, austere) ↔ warm (cozy, natural, inviting)
+- era: vintage (retro, classic, heritage) ↔ contemporary (modern, futuristic, cutting-edge)
+- formality: raw (lo-fi, rough, DIY, punk) ↔ polished (refined, precise, luxury, elegant)
+- complexity: simple (straightforward, utilitarian) ↔ intricate (complex, detailed, nuanced)
+- production: artisanal (handmade, craft, bespoke) ↔ industrial (mass-produced, commercial)
+
+Return JSON:
+{ "axes": [
+  { "axis": "era", "position": 0.7, "confidence": 0.4, "reasoning": "brief explanation" }
+]}
+
+position: 0.0 = fully low-end, 1.0 = fully high-end, 0.5 = balanced/no lean
+confidence: 0.0-1.0, only include axes with confidence > 0.3
+Skip axes where the collection gives no aesthetic signal.
+Respond with valid JSON only.`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+
+    if (!response.ok) return []
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const parsed = JSON.parse(cleaned.includes('{') ? cleaned.substring(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1) : cleaned)
+
+    const axisConfig = SEED_AXES
+    return (parsed.axes || [])
+      .filter((a: any) => a.confidence > 0.3 && axisConfig[a.axis])
+      .map((a: any) => ({
+        axis: a.axis,
+        position: Math.round(Math.max(0, Math.min(1, a.position)) * 1000) / 1000,
+        confidence: Math.round(Math.max(0, Math.min(1, a.confidence)) * 1000) / 1000,
+        low_label: axisConfig[a.axis].low.label,
+        high_label: axisConfig[a.axis].high.label,
+        contributing_tags: topAffinities.slice(0, 10).map(af => af.dimension),
+        is_seed: false,
+      }))
+  } catch (err) {
+    console.error('[taste-engine] Axis inference error:', err)
+    return []
+  }
+}
+
 async function saveAxes(supabase: SupabaseClient, userId: string, axes: any[]) {
   const rows = axes.map(a => ({
     user_id: userId,
@@ -891,18 +1054,25 @@ async function saveAxes(supabase: SupabaseClient, userId: string, axes: any[]) {
       .upsert(row, { onConflict: 'user_id,axis' })
   }
 
-  // Remove axes that no longer have signal (discovered only — seeds persist)
-  const currentAxes = axes.map(a => a.axis)
-  if (currentAxes.length > 0) {
-    await supabase
+  // Remove axes that no longer have signal (discovered/inferred only — true seeds persist)
+  const currentAxisNames = axes.map(a => a.axis)
+  if (currentAxisNames.length > 0) {
+    // Keep ALL axes in current computation (seed-named inferred axes included)
+    const { error: cleanErr } = await supabase
       .from('taste_axes')
       .delete()
       .eq('user_id', userId)
       .eq('is_seed', false)
-      .not('axis', 'in', `(${currentAxes.filter(a => !Object.keys(SEED_AXES).includes(a)).map(a => `"${a}"`).join(',') || '"__none__"'})`)
+      .not('axis', 'in', `(${currentAxisNames.map(a => `"${a}"`).join(',')})`)
+    if (cleanErr) console.error('[taste-engine] Error cleaning stale axes:', cleanErr)
   }
 
-  console.log(`[taste-engine] Saved ${rows.length} axes for user ${userId.slice(0, 8)}`)
+  // Verify: count what actually persisted
+  const { count: axCount } = await supabase
+    .from('taste_axes')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  console.log(`[taste-engine] Saved ${rows.length} axes, verified ${axCount} in DB for user ${userId.slice(0, 8)}`)
 }
 
 // =====================================================================
@@ -977,7 +1147,7 @@ Respond with valid JSON only.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 512,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -1006,7 +1176,7 @@ Respond with valid JSON only.`
         },
         generated_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        model_version: 'claude-3-haiku-20240307',
+        model_version: 'claude-haiku-4-5-20251001',
       }, { onConflict: 'user_id,scope' })
 
     // Save snapshot
@@ -1138,6 +1308,18 @@ async function getProfile(supabase: SupabaseClient, userId: string) {
     supabase.from('taste_snapshots').select('*').eq('user_id', userId).order('snapshot_date', { ascending: false }).limit(3),
   ])
 
+  // Debug: log errors and counts
+  const errors: string[] = []
+  if (affinities.error) errors.push(`affinities: ${affinities.error.message}`)
+  if (domains.error) errors.push(`domains: ${domains.error.message}`)
+  if (axes.error) errors.push(`axes: ${axes.error.message}`)
+  if (summaries.error) errors.push(`summaries: ${summaries.error.message}`)
+  if (snapshots.error) errors.push(`snapshots: ${snapshots.error.message}`)
+  if (errors.length > 0) {
+    console.error(`[taste-engine] getProfile errors: ${errors.join('; ')}`)
+  }
+  console.log(`[taste-engine] getProfile: aff=${(affinities.data || []).length} dom=${(domains.data || []).length} ax=${(axes.data || []).length} sum=${(summaries.data || []).length} snap=${(snapshots.data || []).length}`)
+
   return {
     affinities: affinities.data || [],
     domains: domains.data || [],
@@ -1256,6 +1438,7 @@ serve(async (req) => {
       console.warn('[taste-engine] Failed to fetch secondary signals:', e)
     }
 
+    const pipelineLog: string[] = []
     console.log(`[taste-engine] ${action} — ${pins.length - secondaryCount} pins + ${secondaryCount} secondary signals for user ${userId.slice(0, 8)}`)
 
     if (pins.length === 0) {
@@ -1304,10 +1487,19 @@ serve(async (req) => {
         affinities = (data || []) as Affinity[]
       }
 
-      if (affinities.length >= 2) {
-        const clusters = clusterAffinities(affinities, pins)
+      // Filter out purely organizational dimensions (category:* signals)
+      // Keep type:* — they indicate content preference (music, books, tools)
+      const clusterableAffinities = affinities.filter(a =>
+        !a.dimension.startsWith('category:')
+      )
+
+      pipelineLog.push(`clusterable_affinities: ${clusterableAffinities.length}`)
+      if (clusterableAffinities.length >= 2) {
+        const clusters = clusterAffinities(clusterableAffinities, pins)
+        pipelineLog.push(`clusters: ${clusters.length}`)
         const labels = await labelDomainsWithLLM(clusters, pins)
-        await saveDomains(supabase, userId, clusters, labels)
+        pipelineLog.push(`labels: ${labels.length}, confs: ${labels.map(l => l.confidence.toFixed(3)).join(',')}`)
+        await saveDomains(supabase, userId, clusters, labels, pipelineLog)
 
         if (action === 'compute-domains') {
           return new Response(
@@ -1347,7 +1539,11 @@ serve(async (req) => {
 
       const seedAxes = computeSeedAxes(affinities)
       const discoveredAxes = await discoverAxes(affinities)
-      const allAxes = [...seedAxes, ...discoveredAxes]
+      // When seed axes find nothing (no aesthetic tags), infer from domain context
+      const inferredAxes = (seedAxes.length === 0)
+        ? await inferAxesFromDomains(supabase, userId, affinities)
+        : []
+      const allAxes = [...seedAxes, ...discoveredAxes, ...inferredAxes]
 
       await saveAxes(supabase, userId, allAxes)
 
@@ -1355,7 +1551,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             axes: allAxes,
-            meta: { seed: seedAxes.length, discovered: discoveredAxes.length, elapsed: Date.now() - startTime }
+            meta: { seed: seedAxes.length, discovered: discoveredAxes.length, inferred: inferredAxes.length, elapsed: Date.now() - startTime }
           }),
           { headers: jsonHeaders }
         )
@@ -1419,7 +1615,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           profile,
-          meta: { pinCount: pins.length, elapsed: Date.now() - startTime, version: VERSION }
+          meta: { pinCount: pins.length, elapsed: Date.now() - startTime, version: VERSION },
+          debug: pipelineLog,
         }),
         { headers: jsonHeaders }
       )
