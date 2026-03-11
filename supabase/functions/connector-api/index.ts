@@ -33,7 +33,7 @@ import {
   logUsage,
 } from '../_shared/connector-core.ts'
 
-const VERSION = '0.1.0'
+const VERSION = '0.1.2'
 console.log(`[connector-api] v${VERSION} - REST API for multi-platform connectors`)
 
 const RATE_LIMIT_MAX = 60  // requests per minute per token
@@ -251,6 +251,11 @@ async function matchRoute(
   // GET /v1/taste-profile
   if (method === 'GET' && path === '/v1/taste-profile') {
     return { toolName: 'get_taste_profile', args: {} }
+  }
+
+  // GET /v1/intent-profile
+  if (method === 'GET' && path === '/v1/intent-profile') {
+    return { toolName: 'get_intent_profile', args: {} }
   }
 
   // GET /v1/context
