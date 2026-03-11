@@ -6336,6 +6336,8 @@ body {
   <input type="file" id="photoInput" class="hidden-input" accept="image/*" multiple>
   <input type="file" id="scanInput" class="hidden-input" accept="image/*">
   <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple>
+  <input type="file" id="spotifyImportInput" class="hidden-input" accept=".json,application/json">
+  <input type="file" id="youtubeImportInput" class="hidden-input" accept=".json,application/json">
 
   <!-- Add Modal -->
   <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
@@ -6563,6 +6565,38 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             <div class="yt-import-section__note" id="yt-progress-label">Importing...</div>
             <div class="yt-import-section__progress-bar">
               <div class="yt-import-section__progress-fill" id="yt-progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Taste History Import -->
+        <div class="yt-import-section" id="taste-import-section">
+          <div class="yt-import-section__header">Taste History</div>
+          <div class="yt-import-section__note" style="margin-bottom: var(--space-3);">
+            Upload listening or watch history to enrich your taste profile. These signals inform the taste engine but are never shown as pins.
+          </div>
+
+          <!-- Spotify -->
+          <div style="margin-bottom: var(--space-3);">
+            <button class="auth-bar__btn" id="spotify-import-btn" style="width: 100%;">Import Spotify History</button>
+            <div class="yt-import-section__note" id="spotify-import-status">
+              Upload your streaming history JSON from Spotify's privacy data export.
+            </div>
+          </div>
+
+          <!-- YouTube Takeout -->
+          <div style="margin-bottom: var(--space-3);">
+            <button class="auth-bar__btn" id="youtube-takeout-btn" style="width: 100%;">Import YouTube History</button>
+            <div class="yt-import-section__note" id="youtube-takeout-status">
+              Upload watch-history.json from Google Takeout.
+            </div>
+          </div>
+
+          <!-- Shared progress bar -->
+          <div class="yt-import-section__progress" id="taste-import-progress" style="display:none">
+            <div class="yt-import-section__note" id="taste-progress-label">Processing...</div>
+            <div class="yt-import-section__progress-bar">
+              <div class="yt-import-section__progress-fill" id="taste-progress-fill" style="width:0%"></div>
             </div>
           </div>
         </div>
@@ -7063,8 +7097,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.18.0';
-  console.log('[boards] v' + VERSION + ' - taste engine activation triggers');
+  const VERSION = '2.19.0';
+  console.log('[boards] v' + VERSION + ' - secondary signal import (Spotify + YouTube Takeout)');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -11520,6 +11554,189 @@ Return JSON:
       console.error('[youtube-init]', err);
     }
   }
+
+  // ============================================
+  // Secondary Signal Import (Spotify + YouTube Takeout)
+  // ============================================
+  const IMPORT_BATCH_SIZE = 500;
+
+  function showTasteImportProgress(label, percent) {
+    const el = document.getElementById('taste-import-progress');
+    const labelEl = document.getElementById('taste-progress-label');
+    const fillEl = document.getElementById('taste-progress-fill');
+    if (el) el.style.display = 'block';
+    if (labelEl) labelEl.textContent = label;
+    if (fillEl) fillEl.style.width = percent + '%';
+  }
+
+  function hideTasteImportProgress() {
+    setTimeout(() => {
+      const el = document.getElementById('taste-import-progress');
+      const fillEl = document.getElementById('taste-progress-fill');
+      if (el) el.style.display = 'none';
+      if (fillEl) fillEl.style.width = '0%';
+    }, 2000);
+  }
+
+  function setImportStatus(elementId, text) {
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = text;
+  }
+
+  async function readJsonFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try { resolve(JSON.parse(e.target.result)); }
+        catch (err) { reject(new Error('Invalid JSON file')); }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  }
+
+  async function importSecondarySignals(source, events) {
+    const session = await supabase.auth.getSession();
+    const token = session?.data?.session?.access_token;
+    if (!token) { toast('Please log in first', { level: 'error' }); return 0; }
+
+    const fnUrl = SUPABASE_URL + '/functions/v1/import-source';
+    const headers = {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    };
+
+    // 1. Create job
+    showTasteImportProgress('Starting import...', 5);
+    const jobResp = await fetch(fnUrl, {
+      method: 'POST', headers,
+      body: JSON.stringify({ action: 'create-job', source }),
+    });
+    const jobResult = await jobResp.json();
+    if (!jobResult.jobId) throw new Error(jobResult.error || 'Failed to create import job');
+    const jobId = jobResult.jobId;
+
+    // 2. Send batches sequentially
+    const totalBatches = Math.ceil(events.length / IMPORT_BATCH_SIZE);
+    let totalSignals = 0;
+
+    for (let i = 0; i < events.length; i += IMPORT_BATCH_SIZE) {
+      const batch = events.slice(i, i + IMPORT_BATCH_SIZE);
+      const batchNum = Math.floor(i / IMPORT_BATCH_SIZE) + 1;
+      const pct = 5 + Math.round((batchNum / totalBatches) * 80);
+      showTasteImportProgress('Processing batch ' + batchNum + ' of ' + totalBatches + '...', pct);
+
+      const resp = await fetch(fnUrl, {
+        method: 'POST', headers,
+        body: JSON.stringify({ action: 'ingest-batch', jobId, source, batch }),
+      });
+      if (!resp.ok) {
+        const errData = await resp.json();
+        throw new Error(errData.error || 'Batch failed');
+      }
+      const result = await resp.json();
+      totalSignals += result.signalsCreated || 0;
+    }
+
+    // 3. Complete job (triggers taste engine)
+    showTasteImportProgress('Updating taste profile...', 90);
+    await fetch(fnUrl, {
+      method: 'POST', headers,
+      body: JSON.stringify({ action: 'complete-job', jobId }),
+    });
+
+    showTasteImportProgress('Done!', 100);
+    hideTasteImportProgress();
+    return totalSignals;
+  }
+
+  // Spotify: normalize both format variants
+  function normalizeSpotifyEvents(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(e => ({
+      ts: e.ts || e.endTime || new Date().toISOString(),
+      artistName: e.master_metadata_album_artist_name || e.artistName || '',
+      trackName: e.master_metadata_track_name || e.trackName || '',
+      albumName: e.master_metadata_album_album_name || '',
+      msPlayed: e.ms_played ?? e.msPlayed ?? 0,
+    })).filter(e => e.artistName && e.msPlayed > 0);
+  }
+
+  async function handleSpotifyImport(file) {
+    setImportStatus('spotify-import-status', 'Reading file...');
+    let raw;
+    try {
+      raw = await readJsonFile(file);
+    } catch (e) {
+      setImportStatus('spotify-import-status', 'Invalid file format. Expected JSON.');
+      toast('Invalid Spotify file', { level: 'error' });
+      return;
+    }
+
+    const events = normalizeSpotifyEvents(raw);
+    if (events.length < 10) {
+      setImportStatus('spotify-import-status', events.length + ' events found — try your extended streaming history instead.');
+      return;
+    }
+
+    setImportStatus('spotify-import-status', events.length.toLocaleString() + ' events found, importing...');
+    try {
+      const signals = await importSecondarySignals('spotify', events);
+      setImportStatus('spotify-import-status', 'Imported ' + signals + ' artist signals from ' + events.length.toLocaleString() + ' plays.');
+      toast('Spotify history imported', { level: 'success' });
+    } catch (e) {
+      setImportStatus('spotify-import-status', 'Import failed — try again.');
+      toast('Spotify import failed', { level: 'error' });
+      console.error('[spotify-import]', e);
+    }
+  }
+
+  async function handleYouTubeTakeoutImport(file) {
+    setImportStatus('youtube-takeout-status', 'Reading file...');
+    let raw;
+    try {
+      raw = await readJsonFile(file);
+    } catch (e) {
+      setImportStatus('youtube-takeout-status', 'Invalid file format. Expected JSON.');
+      toast('Invalid YouTube Takeout file', { level: 'error' });
+      return;
+    }
+
+    const events = Array.isArray(raw) ? raw : [];
+    if (events.length < 5) {
+      setImportStatus('youtube-takeout-status', 'No watch events found in file.');
+      return;
+    }
+
+    setImportStatus('youtube-takeout-status', events.length.toLocaleString() + ' events found, importing...');
+    try {
+      const signals = await importSecondarySignals('youtube_takeout', events);
+      setImportStatus('youtube-takeout-status', 'Imported ' + signals + ' channel signals from ' + events.length.toLocaleString() + ' watches.');
+      toast('YouTube history imported', { level: 'success' });
+    } catch (e) {
+      setImportStatus('youtube-takeout-status', 'Import failed — try again.');
+      toast('YouTube Takeout import failed', { level: 'error' });
+      console.error('[youtube-takeout-import]', e);
+    }
+  }
+
+  // Wire up import buttons and file inputs
+  document.getElementById('spotify-import-btn')?.addEventListener('click', () => {
+    document.getElementById('spotifyImportInput').click();
+  });
+  document.getElementById('youtube-takeout-btn')?.addEventListener('click', () => {
+    document.getElementById('youtubeImportInput').click();
+  });
+  document.getElementById('spotifyImportInput')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleSpotifyImport(file);
+    e.target.value = '';
+  });
+  document.getElementById('youtubeImportInput')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleYouTubeTakeoutImport(file);
+    e.target.value = '';
+  });
 
   // ============================================
   // Server-Side Enrichment Queue
