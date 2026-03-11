@@ -33,7 +33,7 @@ import {
   logUsage,
 } from '../_shared/connector-core.ts'
 
-const VERSION = '0.1.0'
+const VERSION = '0.1.1'
 console.log(`[connector-api] v${VERSION} - REST API for multi-platform connectors`)
 
 const RATE_LIMIT_MAX = 60  // requests per minute per token
@@ -65,7 +65,8 @@ function parseQuery(url: URL): Record<string, unknown> {
   for (const [key, value] of url.searchParams) {
     // Parse integers for known numeric params
     if (['limit', 'offset', 'days'].includes(key)) {
-      args[key] = parseInt(value, 10)
+      const parsed = parseInt(value, 10)
+      if (!isNaN(parsed)) args[key] = parsed
     } else if (value === 'true') {
       args[key] = true
     } else if (value === 'false') {
@@ -245,7 +246,7 @@ async function matchRoute(
   // DELETE /v1/boards/:slug
   if (method === 'DELETE' && boardMatch) {
     const query = parseQuery(url)
-    return { toolName: 'delete_board', args: { board: boardMatch[1], confirm: true, ...query } }
+    return { toolName: 'delete_board', args: { board: boardMatch[1], ...query, confirm: true } }
   }
 
   // GET /v1/taste-profile
