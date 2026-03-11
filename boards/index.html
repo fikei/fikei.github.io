@@ -7162,8 +7162,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.21.1';
-  console.log('[boards] v' + VERSION + ' - masonry grid + full-page detail overlay');
+  const VERSION = '2.22.0';
+  console.log('[boards] v' + VERSION + ' - YouTube playlists & likes as secondary signals');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -11553,13 +11553,8 @@ Return JSON:
       if (!resp.ok) throw new Error(result.error || 'Import failed');
 
       fillEl.style.width = '100%';
-      toast(result.message || `Imported ${result.imported} videos`, { level: 'success' });
-
-      // Reload the board to show new pins
-      if (result.imported > 0) {
-        await loadLinks();
-        renderGrid();
-      }
+      toast(result.message || `Imported ${result.signals} channel signals`, { level: 'success' });
+      if (window._sourcePrompt) window._sourcePrompt.markImported();
     } catch (err) {
       toast('YouTube import failed', { level: 'error' });
       console.error('[youtube-import]', err);

@@ -1,6 +1,7 @@
 // Supabase Edge Function: youtube-import
 // Handles YouTube OAuth connection and imports liked videos + playlists
-// as second-class pins (import_source = 'youtube') for taste map visualization.
+// as secondary signals (source_weight = 0.6) for the taste engine.
+// Higher intent than watch history (0.35) but lower than user-saved pins (1.0).
 //
 // POST /functions/v1/youtube-import
 // Body:
@@ -10,10 +11,10 @@
 //   { action: 'status' }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VERSION = '1.0.0'
-console.log(`[youtube-import] v${VERSION} - liked videos and playlists`)
+const VERSION = '2.0.0'
+console.log(`[youtube-import] v${VERSION} - liked videos & playlists → secondary signals`)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,10 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const MAX_LIKED_VIDEOS = 500
 const MAX_PLAYLISTS = 50
 const PAGE_SIZE = 50
+const SOURCE_WEIGHT = 0.6             // higher than takeout (0.35) but lower than pins (1.0)
+const HAIKU_BATCH_SIZE = 10           // subjects per Haiku call
+const MAX_HAIKU_CALLS = 100           // per import operation
+const MIN_VIDEO_COUNT = 2             // channel must appear 2+ times
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +44,8 @@ interface YouTubePlaylistItem {
     resourceId: { videoId: string }
     thumbnails?: { high?: { url: string }; medium?: { url: string }; default?: { url: string } }
     position: number
+    videoOwnerChannelTitle?: string
+    videoOwnerChannelId?: string
   }
   contentDetails?: {
     videoId: string
@@ -75,6 +82,20 @@ interface ConnectedAccount {
   last_import_count: number
 }
 
+interface Bucket {
+  name: string
+  count: number
+  context: string[]       // representative video titles (up to 5)
+  mostRecent: string      // ISO timestamp of most recent event
+}
+
+interface Classification {
+  name: string
+  taste_tags: string[]
+  practical_tags: string[]
+  entities: Array<{ type: string; name: string; confidence: number }>
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -106,7 +127,7 @@ async function getUserId(req: Request): Promise<string | null> {
 }
 
 /** Get a service-role Supabase client for DB operations */
-function getServiceClient() {
+function getServiceClient(): SupabaseClient {
   return createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -126,7 +147,7 @@ async function ytFetch(path: string, accessToken: string): Promise<Response> {
 }
 
 /** Refresh an expired Google OAuth token */
-async function refreshToken(account: ConnectedAccount, db: ReturnType<typeof createClient>): Promise<string> {
+async function refreshToken(account: ConnectedAccount, db: SupabaseClient): Promise<string> {
   if (!account.refresh_token) {
     throw new Error('No refresh token available — user must reconnect')
   }
@@ -162,7 +183,7 @@ async function refreshToken(account: ConnectedAccount, db: ReturnType<typeof cre
 }
 
 /** Get a valid access token, refreshing if needed */
-async function getValidToken(account: ConnectedAccount, db: ReturnType<typeof createClient>): Promise<string> {
+async function getValidToken(account: ConnectedAccount, db: SupabaseClient): Promise<string> {
   if (account.token_expires_at) {
     const expiresAt = new Date(account.token_expires_at)
     const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000)
@@ -173,15 +194,155 @@ async function getValidToken(account: ConnectedAccount, db: ReturnType<typeof cr
   return account.access_token
 }
 
-/** Normalize a YouTube URL to a canonical form */
-function normalizeYouTubeUrl(videoId: string): string {
-  return `https://www.youtube.com/watch?v=${videoId}`
+// ---------------------------------------------------------------------------
+// Group fetched videos by channel → Buckets
+// ---------------------------------------------------------------------------
+
+function groupByChannel(items: YouTubePlaylistItem[]): Bucket[] {
+  const map = new Map<string, Bucket>()
+
+  for (const item of items) {
+    const channelName = item.snippet.videoOwnerChannelTitle || item.snippet.channelTitle
+    if (!channelName) continue
+
+    const title = item.snippet.title || ''
+    const ts = item.contentDetails?.videoPublishedAt || item.snippet.publishedAt || new Date().toISOString()
+    const key = channelName.toLowerCase().trim()
+
+    const existing = map.get(key)
+    if (existing) {
+      existing.count++
+      if (existing.context.length < 5 && title && !existing.context.includes(title)) {
+        existing.context.push(title)
+      }
+      if (ts > existing.mostRecent) existing.mostRecent = ts
+    } else {
+      map.set(key, {
+        name: channelName,
+        count: 1,
+        context: title ? [title] : [],
+        mostRecent: ts,
+      })
+    }
+  }
+
+  return [...map.values()]
+    .filter(b => b.count >= MIN_VIDEO_COUNT)
+    .sort((a, b) => b.count - a.count)
 }
 
-/** Get the best available thumbnail URL */
-function getBestThumbnail(thumbnails?: { high?: { url: string }; medium?: { url: string }; default?: { url: string } }): string | null {
-  if (!thumbnails) return null
-  return thumbnails.high?.url ?? thumbnails.medium?.url ?? thumbnails.default?.url ?? null
+// ---------------------------------------------------------------------------
+// Haiku classification (same pattern as import-source)
+// ---------------------------------------------------------------------------
+
+async function classifyBatch(
+  subjects: Array<{ name: string; context: string[] }>
+): Promise<Classification[]> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) {
+    console.warn('[youtube-import] No ANTHROPIC_API_KEY — skipping classification')
+    return fallbackClassifications(subjects)
+  }
+
+  const prompt = `Classify these YouTube channels for a personal taste profile.
+For each, produce taste_tags (aesthetic/cultural/emotional vibe) and practical_tags (genre/format/topic).
+
+${subjects.map((s, i) => `${i + 1}. ${s.name}${s.context.length ? ` — videos: ${s.context.slice(0, 3).join(', ')}` : ''}`).join('\n')}
+
+Return a JSON array with one entry per channel (same order):
+[{"name":"exact name","taste_tags":["3-6 tags"],"practical_tags":["3-5 tags"],"entities":[{"type":"brand","name":"Name","confidence":0.9}]}]
+
+Rules:
+- taste_tags: vibe/aesthetic/mood, lowercase, underscores for spaces (e.g. lo_fi, melancholic, experimental, cinematic)
+- practical_tags: factual genre/format/topic, lowercase (e.g. techno, ambient, cooking, documentary, indie_rock)
+- entities: the channel as brand or person, confidence >= 0.8
+- 3-6 taste_tags and 3-5 practical_tags per channel
+JSON array only, no other text.`
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+
+    if (!resp.ok) {
+      console.error('[youtube-import] Haiku API error:', resp.status)
+      return fallbackClassifications(subjects)
+    }
+
+    const data = await resp.json()
+    const text = data.content?.[0]?.text || ''
+    const match = text.match(/\[[\s\S]*\]/)
+    if (!match) return fallbackClassifications(subjects)
+
+    const parsed: Classification[] = JSON.parse(match[0])
+    if (parsed.length !== subjects.length) return fallbackClassifications(subjects)
+    return parsed
+  } catch (e) {
+    console.error('[youtube-import] Haiku classification error:', e)
+    return fallbackClassifications(subjects)
+  }
+}
+
+function fallbackClassifications(
+  subjects: Array<{ name: string; context: string[] }>
+): Classification[] {
+  return subjects.map(s => ({
+    name: s.name,
+    taste_tags: [],
+    practical_tags: [],
+    entities: [{ type: 'brand', name: s.name, confidence: 0.85 }],
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// Insert classified signals into secondary_signals
+// ---------------------------------------------------------------------------
+
+async function insertSignals(
+  db: SupabaseClient,
+  userId: string,
+  jobId: string,
+  classified: Array<Bucket & { classification: Classification }>
+): Promise<number> {
+  const rows = classified.map(b => ({
+    user_id: userId,
+    source: 'youtube_api',
+    import_job_id: jobId,
+    external_id: b.name.toLowerCase().trim().slice(0, 255),
+    category: 'watch',
+    content_type: 'video',
+    taste_tags: b.classification.taste_tags || [],
+    practical_tags: b.classification.practical_tags || [],
+    entities: b.classification.entities || [],
+    source_weight: SOURCE_WEIGHT,
+    created_at: b.mostRecent,
+  }))
+
+  let inserted = 0
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100)
+    const { error, count } = await db
+      .from('secondary_signals')
+      .upsert(chunk, { onConflict: 'user_id,source,external_id', count: 'exact' })
+
+    if (error) {
+      console.error('[youtube-import] Insert error:', error.message)
+    } else {
+      inserted += count ?? chunk.length
+    }
+  }
+
+  return inserted
 }
 
 // ---------------------------------------------------------------------------
@@ -272,23 +433,33 @@ async function handleImport(body: { import_type?: string }, userId: string) {
 
   const accessToken = await getValidToken(account as ConnectedAccount, db)
 
-  // Collect all video items to import
-  const items: Array<{
-    videoId: string
-    title: string
-    channelTitle: string
-    description: string
-    thumbnail: string | null
-    publishedAt: string
-    playlistId: string | null
-    playlistName: string | null
-  }> = []
+  // Create import job
+  const { data: jobData, error: jobErr } = await db
+    .from('import_jobs')
+    .insert({ user_id: userId, source: 'youtube_api', status: 'processing' })
+    .select('id')
+    .single()
+
+  if (jobErr) {
+    console.error('[youtube-import] Failed to create import job:', jobErr)
+    return err('Failed to create import job', 500)
+  }
+  const jobId = jobData.id
+
+  // Delete previous youtube_api signals (fresh import replaces old)
+  await db
+    .from('secondary_signals')
+    .delete()
+    .eq('user_id', userId)
+    .eq('source', 'youtube_api')
+
+  // Collect all video items
+  const allItems: YouTubePlaylistItem[] = []
 
   // --- Liked videos ---
   if (importType === 'liked' || importType === 'all') {
     console.log('[youtube-import] Fetching liked videos...')
 
-    // Get the likes playlist ID
     const channelResp = await ytFetch('/channels?part=contentDetails&mine=true', accessToken)
     const channelData = await channelResp.json()
     const likesPlaylistId = channelData.items?.[0]?.contentDetails?.relatedPlaylists?.likes
@@ -305,21 +476,7 @@ async function handleImport(body: { import_type?: string }, userId: string) {
         )
         const data = await resp.json()
         const pageItems: YouTubePlaylistItem[] = data.items ?? []
-
-        for (const item of pageItems) {
-          const videoId = item.snippet?.resourceId?.videoId ?? item.contentDetails?.videoId
-          if (!videoId) continue
-          items.push({
-            videoId,
-            title: item.snippet.title,
-            channelTitle: item.snippet.channelTitle,
-            description: (item.snippet.description ?? '').slice(0, 500),
-            thumbnail: getBestThumbnail(item.snippet.thumbnails),
-            publishedAt: item.contentDetails?.videoPublishedAt ?? item.snippet.publishedAt,
-            playlistId: null,
-            playlistName: null,
-          })
-        }
+        allItems.push(...pageItems)
 
         totalFetched += pageItems.length
         pageToken = data.nextPageToken
@@ -362,124 +519,109 @@ async function handleImport(body: { import_type?: string }, userId: string) {
         )
         const data = await resp.json()
         const pageItems: YouTubePlaylistItem[] = data.items ?? []
-
-        for (const item of pageItems) {
-          const videoId = item.snippet?.resourceId?.videoId ?? item.contentDetails?.videoId
-          if (!videoId) continue
-          items.push({
-            videoId,
-            title: item.snippet.title,
-            channelTitle: item.snippet.channelTitle,
-            description: (item.snippet.description ?? '').slice(0, 500),
-            thumbnail: getBestThumbnail(item.snippet.thumbnails),
-            publishedAt: item.contentDetails?.videoPublishedAt ?? item.snippet.publishedAt,
-            playlistId: playlist.id,
-            playlistName: playlist.snippet.title,
-          })
-        }
+        allItems.push(...pageItems)
 
         playlistItemCount += pageItems.length
         pageToken = data.nextPageToken
       } while (pageToken && playlistItemCount < maxPerPlaylist)
     }
 
-    console.log(`[youtube-import] Total items from playlists: ${items.length}`)
+    console.log(`[youtube-import] Total items from playlists: ${allItems.length}`)
   }
 
-  if (items.length === 0) {
-    return json({ imported: 0, skipped: 0, total: 0, message: 'No videos found to import' })
+  if (allItems.length === 0) {
+    await db.from('import_jobs').update({
+      status: 'complete', completed_at: new Date().toISOString(),
+      total_events: 0, signals_created: 0,
+    }).eq('id', jobId)
+    return json({ signals: 0, channels: 0, total_videos: 0, message: 'No videos found to import' })
   }
 
-  // Deduplicate within batch (same videoId can appear in liked + playlist)
-  const seen = new Map<string, typeof items[0]>()
-  for (const item of items) {
-    if (!seen.has(item.videoId)) {
-      seen.set(item.videoId, item)
+  // Group by channel
+  const buckets = groupByChannel(allItems)
+  console.log(`[youtube-import] ${allItems.length} videos → ${buckets.length} channels (min ${MIN_VIDEO_COUNT} videos)`)
+
+  // Classify via Haiku (batched, budget-capped)
+  const maxSubjects = MAX_HAIKU_CALLS * HAIKU_BATCH_SIZE
+  const toClassify = buckets.slice(0, maxSubjects)
+  const unclassified = buckets.slice(maxSubjects)
+
+  let haikuCallsMade = 0
+  const classified: Array<Bucket & { classification: Classification }> = []
+
+  for (let i = 0; i < toClassify.length; i += HAIKU_BATCH_SIZE) {
+    const subjectBatch = toClassify.slice(i, i + HAIKU_BATCH_SIZE)
+    const classifications = await classifyBatch(
+      subjectBatch.map(b => ({ name: b.name, context: b.context }))
+    )
+    haikuCallsMade++
+
+    for (let j = 0; j < subjectBatch.length; j++) {
+      classified.push({
+        ...subjectBatch[j],
+        classification: classifications[j] || {
+          name: subjectBatch[j].name, taste_tags: [], practical_tags: [], entities: [],
+        },
+      })
     }
   }
-  const uniqueItems = Array.from(seen.values())
 
-  // Check existing URLs to avoid duplicates
-  const urls = uniqueItems.map(i => normalizeYouTubeUrl(i.videoId))
-  const { data: existing } = await db
-    .from('links')
-    .select('url')
-    .eq('user_id', userId)
-    .in('url', urls)
-
-  const existingUrls = new Set((existing ?? []).map((r: { url: string }) => r.url))
-
-  // Build pin rows for new items
-  const newPins = uniqueItems
-    .filter(item => !existingUrls.has(normalizeYouTubeUrl(item.videoId)))
-    .map(item => ({
-      user_id: userId,
-      url: normalizeYouTubeUrl(item.videoId),
-      title: item.title,
-      description: `${item.channelTitle} — ${item.description.slice(0, 200)}`,
-      image: item.thumbnail ?? `https://img.youtube.com/vi/${item.videoId}/hqdefault.jpg`,
-      domain: 'youtube.com',
-      category: inferCategory(item.playlistName),
-      content_type: 'video',
-      import_source: 'youtube',
-      tags: item.playlistName ? [item.playlistName] : [],
-      video: {
-        title: item.title,
-        creator: item.channelTitle,
-        year: new Date(item.publishedAt).getFullYear(),
-        type: 'video',
-        platform: 'youtube',
-        platformId: item.videoId,
+  // Unclassified: entity only, no tags
+  for (const b of unclassified) {
+    classified.push({
+      ...b,
+      classification: {
+        name: b.name,
+        taste_tags: [],
+        practical_tags: [],
+        entities: [{ type: 'brand', name: b.name, confidence: 0.85 }],
       },
-    }))
-
-  // Bulk insert in batches of 100
-  let imported = 0
-  const batchSize = 100
-  for (let i = 0; i < newPins.length; i += batchSize) {
-    const batch = newPins.slice(i, i + batchSize)
-    const { error: insertErr, count } = await db
-      .from('links')
-      .insert(batch)
-
-    if (insertErr) {
-      console.error(`[youtube-import] Batch insert error at offset ${i}:`, insertErr)
-    } else {
-      imported += count ?? batch.length
-    }
+    })
   }
+
+  // Insert signals
+  const signalsCreated = await insertSignals(db, userId, jobId, classified)
+
+  // Update import job
+  await db.from('import_jobs').update({
+    status: 'complete',
+    completed_at: new Date().toISOString(),
+    total_events: allItems.length,
+    processed_events: allItems.length,
+    signals_created: signalsCreated,
+    haiku_calls_made: haikuCallsMade,
+  }).eq('id', jobId)
 
   // Update account stats
   await db.from('connected_accounts').update({
     last_import_at: new Date().toISOString(),
-    last_import_count: imported,
+    last_import_count: signalsCreated,
   }).eq('user_id', userId).eq('platform', 'youtube')
 
-  const skipped = existingUrls.size
-  console.log(`[youtube-import] Done: ${imported} imported, ${skipped} skipped (already saved)`)
+  // Fire-and-forget: trigger taste engine full pipeline
+  const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/taste-engine`
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  fetch(fnUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+    body: JSON.stringify({ action: 'full-pipeline', userId }),
+  }).catch(e => console.error('[youtube-import] taste-engine trigger error:', e))
+
+  console.log(`[youtube-import] Done: ${signalsCreated} signals from ${allItems.length} videos (${haikuCallsMade} Haiku calls)`)
 
   return json({
-    imported,
-    skipped,
-    total: uniqueItems.length,
-    message: `Imported ${imported} videos${skipped > 0 ? ` (${skipped} already in your library)` : ''}`,
+    signals: signalsCreated,
+    channels: buckets.length,
+    total_videos: allItems.length,
+    haiku_calls: haikuCallsMade,
+    message: `Imported ${signalsCreated} channel signals from ${allItems.length} videos`,
   })
-}
-
-/** Infer category from playlist name */
-function inferCategory(playlistName: string | null): string {
-  if (!playlistName) return 'watch'
-  const lower = playlistName.toLowerCase()
-  if (/music|songs?|playlist|mix|beats|tracks/i.test(lower)) return 'listen'
-  if (/cook|recipe|food|eat/i.test(lower)) return 'eat'
-  if (/learn|tutorial|course|how.?to|lecture/i.test(lower)) return 'read'
-  if (/style|fashion|outfit|wear/i.test(lower)) return 'wear'
-  if (/travel|places|visit/i.test(lower)) return 'go'
-  return 'watch'
 }
 
 async function handleDisconnect(userId: string) {
   const db = getServiceClient()
+
+  // Revoke account
   const { error } = await db
     .from('connected_accounts')
     .update({ status: 'revoked' })
@@ -491,7 +633,23 @@ async function handleDisconnect(userId: string) {
     return err('Failed to disconnect')
   }
 
-  return json({ success: true, message: 'YouTube disconnected. Imported videos remain in your library.' })
+  // Delete youtube_api signals
+  await db
+    .from('secondary_signals')
+    .delete()
+    .eq('user_id', userId)
+    .eq('source', 'youtube_api')
+
+  // Trigger taste engine recompute
+  const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/taste-engine`
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  fetch(fnUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+    body: JSON.stringify({ action: 'full-pipeline', userId }),
+  }).catch(e => console.error('[youtube-import] taste-engine trigger error:', e))
+
+  return json({ success: true, message: 'YouTube disconnected. Signals removed from taste profile.' })
 }
 
 async function handleStatus(userId: string) {

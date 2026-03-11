@@ -35,6 +35,7 @@ const MIN_PLAY_COUNT = 3             // artist/channel must appear 3+ times
 const SIGNAL_WEIGHTS: Record<string, number> = {
   spotify: 0.3,
   youtube_takeout: 0.35,
+  youtube_api: 0.6,         // playlists & likes — managed by youtube-import function
 }
 
 // ---------------------------------------------------------------------------
