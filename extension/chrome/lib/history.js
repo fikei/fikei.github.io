@@ -13,6 +13,12 @@ const FLUSH_BATCH_SIZE = 50;        // auto-flush threshold
 const SESSION_GAP_MS = 30 * 60_000; // 30 min inactivity → new session
 const INGEST_ENDPOINT = '/functions/v1/ingest-history';
 
+// Visit counting (per-page, local-only)
+const VISIT_COUNT_KEY = 'rodeo_visit_counts';  // keyed by url_hash
+const VISIT_URL_KEY = 'rodeo_visit_urls';      // keyed by canonical URL (for popup)
+const VISIT_COUNT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const VISIT_COUNT_MAX_ENTRIES = 2000;
+
 let _historyBuffer = [];
 let _flushTimer = null;
 let _sessionId = null;
@@ -101,6 +107,9 @@ async function recordNavigation({ url, title, referrerUrl, tabId }) {
 
   _historyBuffer.push(event);
   _persistBuffer();
+
+  // Update local visit counter (per-page, dual-keyed)
+  updateLocalVisitCount({ urlHash, canonicalUrl: canonical, title: title ? title.slice(0, 100) : '', domain });
 
   // Auto-flush at threshold
   if (_historyBuffer.length >= FLUSH_BATCH_SIZE) {
@@ -264,6 +273,67 @@ async function deleteAllHistory() {
   } catch (e) {
     console.error('[rodeo] delete all history error:', e.message);
     return { error: e.message };
+  }
+}
+
+// ============================================
+// Local Visit Counting (per-page, dual-keyed)
+// ============================================
+async function updateLocalVisitCount({ urlHash, canonicalUrl, title, domain }) {
+  const now = Date.now();
+  try {
+    // Hash-keyed map (for content script lookups via background)
+    const data = await chrome.storage.local.get(VISIT_COUNT_KEY);
+    const counts = data[VISIT_COUNT_KEY] || {};
+    const existing = counts[urlHash];
+
+    counts[urlHash] = {
+      count: (existing?.count || 0) + 1,
+      lastVisit: now,
+      title: title || (existing?.title || ''),
+      domain: domain || (existing?.domain || '')
+    };
+
+    // Prune if over limit
+    const keys = Object.keys(counts);
+    if (keys.length > VISIT_COUNT_MAX_ENTRIES) {
+      const cutoff = now - VISIT_COUNT_MAX_AGE_MS;
+      for (const k of keys) {
+        if (counts[k].lastVisit < cutoff) delete counts[k];
+      }
+      const remaining = Object.keys(counts);
+      if (remaining.length > VISIT_COUNT_MAX_ENTRIES) {
+        remaining
+          .sort((a, b) => counts[a].lastVisit - counts[b].lastVisit)
+          .slice(0, remaining.length - VISIT_COUNT_MAX_ENTRIES)
+          .forEach(k => delete counts[k]);
+      }
+    }
+
+    await chrome.storage.local.set({ [VISIT_COUNT_KEY]: counts });
+  } catch (e) {
+    console.warn('[rodeo] visit count update failed:', e.message);
+  }
+
+  // URL-keyed map (for popup lookups without crypto.subtle)
+  if (canonicalUrl) {
+    try {
+      const urlData = await chrome.storage.local.get(VISIT_URL_KEY);
+      const urlCounts = urlData[VISIT_URL_KEY] || {};
+      urlCounts[canonicalUrl] = {
+        count: (urlCounts[canonicalUrl]?.count || 0) + 1,
+        lastVisit: now,
+        urlHash
+      };
+      const urlKeys = Object.keys(urlCounts);
+      if (urlKeys.length > VISIT_COUNT_MAX_ENTRIES) {
+        urlKeys
+          .sort((a, b) => urlCounts[a].lastVisit - urlCounts[b].lastVisit)
+          .slice(0, urlKeys.length - VISIT_COUNT_MAX_ENTRIES)
+          .forEach(k => delete urlCounts[k]);
+      }
+      await chrome.storage.local.set({ [VISIT_URL_KEY]: urlCounts });
+    } catch {}
   }
 }
 

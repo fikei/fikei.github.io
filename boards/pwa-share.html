@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Saving to Boards...</title>
+  <title>Save to Rodeo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #111;
       color: #fff;
@@ -13,47 +17,269 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      margin: 0;
+      padding: 24px;
     }
-    .saving {
+    .card {
+      width: 100%;
+      max-width: 360px;
       text-align: center;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
     }
+    .logo {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      color: #999;
+      margin-bottom: 24px;
+    }
+    .state { display: none; }
+    .state.active { display: block; }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #333;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .message {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #999;
+    }
+    .url-preview {
+      font-size: 10px;
+      color: #666;
+      margin-top: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .check {
+      font-size: 18px;
+      color: #0f0;
+      margin-bottom: 8px;
+    }
+    .check--dup { color: #f90; }
+    .check--err { color: #c00; }
+    .btn {
+      display: inline-block;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      border: 1px solid #fff;
+      background: transparent;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    .btn:hover { background: #fff; color: #000; }
   </style>
 </head>
 <body>
-  <div class="saving">Saving to Boards...</div>
+  <div class="card">
+    <div class="logo">RODEO</div>
+
+    <!-- Saving -->
+    <div id="state-saving" class="state active">
+      <div class="spinner"></div>
+      <p class="message">Saving...</p>
+      <p class="url-preview" id="url-preview"></p>
+    </div>
+
+    <!-- Saved -->
+    <div id="state-saved" class="state">
+      <div class="check">&#10003;</div>
+      <p class="message">Saved</p>
+      <p class="url-preview" id="saved-url"></p>
+      <a id="btn-open" class="btn" href="/boards/">Open in Boards</a>
+    </div>
+
+    <!-- Duplicate -->
+    <div id="state-duplicate" class="state">
+      <div class="check check--dup">&#9679;</div>
+      <p class="message">Already saved</p>
+      <a id="btn-open-dup" class="btn" href="/boards/">Open in Boards</a>
+    </div>
+
+    <!-- Auth Error -->
+    <div id="state-auth" class="state">
+      <div class="check check--err">!</div>
+      <p class="message">Sign in first</p>
+      <a class="btn" href="/boards/">Open Boards</a>
+    </div>
+
+    <!-- Error -->
+    <div id="state-error" class="state">
+      <div class="check check--err">!</div>
+      <p class="message" id="error-msg">Something went wrong</p>
+      <a class="btn" href="/boards/">Open Boards</a>
+    </div>
+
+    <!-- No URL -->
+    <div id="state-no-url" class="state">
+      <p class="message">No link found</p>
+      <a class="btn" href="/boards/">Open Boards</a>
+    </div>
+  </div>
+
   <script>
-    // Extract shared data from query params
-    const params = new URLSearchParams(window.location.search);
-    const sharedUrl = params.get('url') || '';
-    const sharedText = params.get('text') || '';
-    const sharedTitle = params.get('title') || '';
+    const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+    const AUTH_STORAGE_KEY = 'sb-yfhudwakpgzswiylhfbh-auth-token';
 
-    // Try to find a URL in the shared data
-    // Priority: url param > URLs in text > text itself
-    let targetUrl = sharedUrl;
+    function show(id) {
+      document.querySelectorAll('.state').forEach(el => el.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
 
-    if (!targetUrl && sharedText) {
-      // Extract URL from shared text (common on Android where URL is in text field)
-      const urlMatch = sharedText.match(/https?:\/\/[^\s]+/);
-      if (urlMatch) {
-        targetUrl = urlMatch[0];
-      } else {
-        targetUrl = sharedText;
+    function extractDomain(url) {
+      try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
+    }
+
+    function normalizeUrl(raw) {
+      try {
+        const u = new URL(raw);
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+        u.hash = '';
+        return u.toString();
+      } catch { return null; }
+    }
+
+    (async function main() {
+      // Extract shared data from query params
+      const params = new URLSearchParams(window.location.search);
+      const sharedUrl = params.get('url') || '';
+      const sharedText = params.get('text') || '';
+      const sharedTitle = params.get('title') || '';
+
+      // Find a URL — priority: url param > URLs in text > text itself
+      let targetUrl = sharedUrl;
+      if (!targetUrl && sharedText) {
+        const urlMatch = sharedText.match(/https?:\/\/[^\s]+/);
+        targetUrl = urlMatch ? urlMatch[0] : sharedText;
       }
-    }
 
-    if (targetUrl) {
-      // Redirect to main Boards app with the URL to add
-      window.location.replace('/boards/?add=' + encodeURIComponent(targetUrl));
-    } else {
-      // No URL found — redirect to Boards anyway
-      document.querySelector('.saving').textContent = 'No link found. Opening Boards...';
-      setTimeout(() => window.location.replace('/boards/'), 1500);
-    }
+      const canonical = targetUrl ? normalizeUrl(targetUrl) : null;
+      if (!canonical) {
+        show('state-no-url');
+        return;
+      }
+
+      // Show URL preview
+      document.getElementById('url-preview').textContent = canonical;
+
+      // Get auth from localStorage (Supabase JS stores session here)
+      let session;
+      try {
+        const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+        session = raw ? JSON.parse(raw) : null;
+      } catch { session = null; }
+
+      if (!session || !session.access_token || !session.user) {
+        show('state-auth');
+        return;
+      }
+
+      const accessToken = session.access_token;
+      const userId = session.user.id;
+
+      // Check for duplicate
+      try {
+        const checkRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/links?url=eq.${encodeURIComponent(canonical)}&user_id=eq.${userId}&select=id`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`
+            }
+          }
+        );
+        if (checkRes.ok) {
+          const existing = await checkRes.json();
+          if (existing.length > 0) {
+            const pinId = existing[0].id;
+            document.getElementById('btn-open-dup').href = `/boards/?pin=${pinId}`;
+            show('state-duplicate');
+            setTimeout(() => history.back(), 2000);
+            return;
+          }
+        }
+      } catch {}
+
+      // Build payload
+      const pinId = crypto.randomUUID();
+      const domain = extractDomain(canonical);
+      const pinTitle = sharedTitle || canonical;
+
+      const payload = {
+        id: pinId,
+        user_id: userId,
+        url: canonical,
+        title: pinTitle,
+        description: '',
+        domain: domain,
+        category: 'uncategorized',
+        confidence: 0,
+        source: 'pwa_share',
+        selected_text: null,
+        created_at: new Date().toISOString()
+      };
+
+      // Save
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            show('state-auth');
+            return;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        }
+      } catch (e) {
+        document.getElementById('error-msg').textContent = e.message || 'Save failed';
+        show('state-error');
+        return;
+      }
+
+      // Fire-and-forget enrichment
+      fetch(`${SUPABASE_URL}/functions/v1/create-pin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ url: canonical, title: pinTitle, linkId: pinId })
+      }).catch(() => {});
+
+      // Show success
+      document.getElementById('saved-url').textContent = domain;
+      document.getElementById('btn-open').href = `/boards/?pin=${pinId}`;
+      show('state-saved');
+
+      // Auto-navigate back after 2s
+      setTimeout(() => history.back(), 2000);
+    })();
   </script>
 </body>
 </html>

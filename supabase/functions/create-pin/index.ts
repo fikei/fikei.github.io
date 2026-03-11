@@ -6,7 +6,7 @@
 // Body: { url, title?, description?, linkId?, content_type?, category?,
 //         skipImage?, currentImage?, forceRefresh?,
 //         enrichWatch?, enrichBook?, enrichListen?, enrichRecipe? }
-const VERSION = '2.1.1'
+const VERSION = '2.2.0'
 console.log(`[create-pin] v${VERSION} - Pin Creation Agent (image + metadata + recipe)`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, hero_score, video?, book?, music?, recipe? }
 
@@ -867,6 +867,7 @@ serve(async (req) => {
           instructions: jsonLdResult?.instructions?.length ? jsonLdResult.instructions : (aiResult?.instructions || []),
           cuisine: jsonLdResult?.cuisine || aiResult?.cuisine || null,
           difficulty: aiResult?.difficulty || null,
+          images: jsonLdResult?.images || [],
           source_name: jsonLdResult?.source_name || domain,
           server_enriched_at: new Date().toISOString(),
         }
@@ -1737,14 +1738,42 @@ async function extractRecipeJsonLd(url: string): Promise<Record<string, any> | n
             if (numMatch) servings = parseInt(numMatch[0], 10)
           }
 
-          // Recipe image
-          let image_url: string | null = null
-          if (typeof item.image === 'string') image_url = item.image
-          else if (Array.isArray(item.image)) {
-            const first = item.image[0]
-            image_url = typeof first === 'string' ? first : first?.url || null
+          // Recipe images — extract ALL from JSON-LD (hero + step photos)
+          function extractImgUrl(val: any): string | null {
+            if (typeof val === 'string' && val.startsWith('http')) return val
+            if (val?.url && typeof val.url === 'string') return val.url
+            return null
           }
-          else if (item.image?.url) image_url = item.image.url
+          const allImages: string[] = []
+          // 1. Primary image field: string | ImageObject | array
+          const rawImg = item.image
+          if (rawImg) {
+            const imgCandidates = Array.isArray(rawImg) ? rawImg : [rawImg]
+            for (const c of imgCandidates) {
+              const u = extractImgUrl(c)
+              if (u && !allImages.includes(u)) allImages.push(u)
+            }
+          }
+          // 2. Step-level images from HowToStep/HowToSection
+          const rawSteps = item.recipeInstructions || []
+          if (Array.isArray(rawSteps)) {
+            for (const step of rawSteps) {
+              if (step?.image) {
+                const u = extractImgUrl(step.image)
+                if (u && !allImages.includes(u)) allImages.push(u)
+              }
+              if (step?.['@type'] === 'HowToSection' && Array.isArray(step.itemListElement)) {
+                for (const sub of step.itemListElement) {
+                  if (sub?.image) {
+                    const u = extractImgUrl(sub.image)
+                    if (u && !allImages.includes(u)) allImages.push(u)
+                  }
+                }
+              }
+            }
+          }
+          const image_url: string | null = allImages[0] || null
+          const images: string[] = allImages.slice(0, 10) // cap to bound JSONB size
 
           // Cuisine
           const cuisine = typeof item.recipeCuisine === 'string'
@@ -1755,6 +1784,7 @@ async function extractRecipeJsonLd(url: string): Promise<Record<string, any> | n
             title: item.name,
             ingredients: ingredients.length,
             instructions: instructions.length,
+            images: images.length,
             servings,
             prepTime,
             cookTime,
@@ -1774,6 +1804,7 @@ async function extractRecipeJsonLd(url: string): Promise<Record<string, any> | n
             instructions,
             cuisine,
             image_url,
+            images,
             source_name: new URL(url).hostname.replace('www.', ''),
           }
         }

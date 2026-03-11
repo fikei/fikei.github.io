@@ -49,7 +49,8 @@ let _privacySettingsCache = null;
 const DEFAULT_PRIVACY_SETTINGS = {
   historyEnabled: true,
   userBlocklist: [],
-  backfillDays: 30
+  backfillDays: 30,
+  nudgeEnabled: true
 };
 
 async function getPrivacySettings() {

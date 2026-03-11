@@ -142,7 +142,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({
           url: tab.url,
           title: tab.title || '',
-          domain: extractDomain(tab.url)
+          domain: extractDomain(tab.url),
+          tabId: tab.id
         });
       }
     }).catch(() => sendResponse({ error: 'unsupported_page' }));
@@ -218,6 +219,139 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     flushBuffer()
       .then(() => sendResponse({ ok: true }))
       .catch(e => sendResponse({ error: e.message }));
+    return true;
+  }
+
+  // --- Tab lifecycle handlers ---
+
+  if (msg.action === 'close_tab') {
+    if (msg.tabId) {
+      chrome.tabs.remove(msg.tabId).catch(() => {});
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (msg.action === 'check_domain_blocked') {
+    getPrivacySettings().then(() => {
+      sendResponse({ blocked: isDomainBlocked(msg.domain) });
+    }).catch(() => sendResponse({ blocked: false }));
+    return true;
+  }
+
+  if (msg.action === 'get_nudge_settings') {
+    getPrivacySettings().then(settings => {
+      sendResponse({ nudgeEnabled: settings.nudgeEnabled !== false });
+    }).catch(() => sendResponse({ nudgeEnabled: true }));
+    return true;
+  }
+
+  if (msg.action === 'get_visit_data_for_url') {
+    (async () => {
+      try {
+        const canonical = canonicalizeForHash(msg.url);
+        if (!canonical) { sendResponse(null); return; }
+        const urlHash = await hashUrl(canonical);
+        const data = await chrome.storage.local.get(VISIT_COUNT_KEY);
+        const counts = data[VISIT_COUNT_KEY] || {};
+        sendResponse(counts[urlHash] || null);
+      } catch { sendResponse(null); }
+    })();
+    return true;
+  }
+
+  if (msg.action === 'get_all_visit_counts') {
+    chrome.storage.local.get(VISIT_URL_KEY).then(data => {
+      sendResponse(data[VISIT_URL_KEY] || {});
+    }).catch(() => sendResponse({}));
+    return true;
+  }
+
+  if (msg.action === 'get_all_tabs') {
+    (async () => {
+      try {
+        const allTabs = await chrome.tabs.query({ incognito: false });
+
+        // Get tab groups
+        let groups = {};
+        try {
+          const tabGroups = await chrome.tabGroups.query({});
+          for (const g of tabGroups) {
+            groups[g.id] = { title: g.title || '', color: g.color || 'grey', id: g.id };
+          }
+        } catch {
+          // tabGroups API not available — continue without groups
+        }
+
+        // Filter: keep only http/https tabs that aren't blocked
+        await getPrivacySettings();
+        const saveable = allTabs.filter(t => {
+          if (!t.url) return false;
+          if (!t.url.startsWith('http://') && !t.url.startsWith('https://')) return false;
+          const domain = extractDomain(t.url);
+          if (isDomainBlocked(domain)) return false;
+          if (t.url.startsWith('https://ctrl.rodeo/')) return false;
+          return true;
+        });
+
+        const TAB_GROUP_ID_NONE = -1;
+        const result = saveable.map(t => ({
+          id: t.id,
+          url: t.url,
+          title: t.title || t.url,
+          domain: extractDomain(t.url),
+          favIconUrl: t.favIconUrl || null,
+          groupId: (t.groupId !== undefined && t.groupId !== TAB_GROUP_ID_NONE) ? t.groupId : null,
+          groupInfo: (t.groupId !== undefined && t.groupId !== TAB_GROUP_ID_NONE && groups[t.groupId]) ? groups[t.groupId] : null,
+          windowId: t.windowId
+        }));
+
+        sendResponse({ tabs: result, groups });
+      } catch (e) {
+        sendResponse({ error: e.message, tabs: [], groups: {} });
+      }
+    })();
+    return true;
+  }
+
+  if (msg.action === 'bulk_save') {
+    (async () => {
+      const { tabData } = msg;
+      let saved = 0, duplicates = 0, failed = 0;
+      const closeable = [];
+
+      for (const t of tabData) {
+        try {
+          const result = await savePin({
+            url: t.url,
+            title: t.title,
+            selectedText: null,
+            source: 'triage'
+          });
+          if (result.success) {
+            saved++;
+            closeable.push(t.id);
+          } else if (result.error === 'duplicate') {
+            duplicates++;
+            closeable.push(t.id);
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+
+      if (closeable.length > 0) {
+        try {
+          await chrome.tabs.remove(closeable);
+        } catch (e) {
+          console.warn('[rodeo] triage: failed to close some tabs:', e.message);
+        }
+      }
+
+      sendResponse({ saved, duplicates, failed });
+    })();
     return true;
   }
 });

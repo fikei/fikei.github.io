@@ -38,6 +38,7 @@
   <!-- Tab Bar (shown when authenticated) -->
   <div id="tab-bar" class="tab-bar" hidden>
     <button class="tab-btn active" data-tab="save">Save</button>
+    <button class="tab-btn" data-tab="triage">Triage <span id="triage-tab-count" class="tab-count" hidden></span></button>
     <button class="tab-btn" data-tab="settings">Settings</button>
   </div>
 
@@ -56,9 +57,10 @@
       </div>
     </div>
 
-    <button id="btn-save" class="btn btn--filled btn--block">
-      Save to Rodeo
-    </button>
+    <div class="save-actions">
+      <button id="btn-save-close" class="btn btn--filled btn--block">Save &amp; Close Tab</button>
+      <button id="btn-save" class="btn btn--outline btn--block">Save</button>
+    </div>
   </div>
 
   <!-- State: Saving -->
@@ -74,6 +76,7 @@
     <div class="saved-container">
       <div class="saved-check">&#10003;</div>
       <p class="saved-message">Saved</p>
+      <button id="btn-close-after-save" class="btn btn--filled btn--block">Close Tab</button>
       <button id="btn-view" class="btn btn--outline btn--block">
         View in Library
       </button>
@@ -101,12 +104,32 @@
     </div>
   </div>
 
+  <!-- State: Tab Triage -->
+  <div id="state-triage" class="state state--triage" hidden>
+    <div class="triage-header">
+      <div class="triage-header__title">Open Tabs</div>
+      <div class="triage-header__actions">
+        <button id="triage-select-all" class="triage-toggle-all">Deselect all</button>
+      </div>
+    </div>
+    <div id="triage-list" class="triage-list"></div>
+    <div class="triage-footer">
+      <div id="triage-status" class="triage-status" hidden></div>
+      <button id="btn-triage-save" class="btn btn--filled btn--block" disabled>Save All &amp; Close</button>
+    </div>
+  </div>
+
   <!-- State: Settings -->
   <div id="state-settings" class="state" hidden>
     <div class="settings-container">
       <div class="settings-row">
         <label class="settings-label" for="toggle-history">Capture browsing history</label>
-        <input type="checkbox" id="toggle-history" checked>
+        <input type="checkbox" id="toggle-history" class="rodeo-toggle" checked>
+      </div>
+
+      <div class="settings-row">
+        <label class="settings-label" for="toggle-nudge">Show idle reading nudge</label>
+        <input type="checkbox" id="toggle-nudge" class="rodeo-toggle" checked>
       </div>
 
       <div class="settings-section">
