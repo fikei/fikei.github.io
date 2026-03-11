@@ -167,6 +167,72 @@ async function logUsage(
 }
 
 // ---------------------------------------------------------------------------
+// Write access guard
+// ---------------------------------------------------------------------------
+
+function canWrite(settings: ConnectorSettings): void {
+  if (settings.privacy_tier === 'taste_only') {
+    throw new Error(
+      'Write operations require at least "library" privacy tier. ' +
+      'Update your settings at ctrl.rodeo/boards (gear icon) to enable writes.'
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Board metadata helpers (read-modify-write on JSONB blob)
+// ---------------------------------------------------------------------------
+
+async function getBoardMetadata(userId: string): Promise<Record<string, Record<string, unknown>>> {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('board_metadata')
+    .select('metadata')
+    .eq('user_id', userId)
+    .single()
+  return (data?.metadata as Record<string, Record<string, unknown>>) || {}
+}
+
+async function saveBoardMetadata(userId: string, metadata: Record<string, Record<string, unknown>>): Promise<void> {
+  const db = getServiceClient()
+  const { error } = await db
+    .from('board_metadata')
+    .upsert({ user_id: userId, metadata, updated_at: new Date().toISOString() })
+  if (error) throw new Error(`Board metadata save failed: ${error.message}`)
+}
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+// ---------------------------------------------------------------------------
+// Batch pin ID resolver — supports pin_ids, board, or all-library scoping
+// ---------------------------------------------------------------------------
+
+async function resolvePinIds(
+  userId: string,
+  args: Record<string, unknown>,
+  maxLimit: number,
+  extraFilters?: (q: ReturnType<ReturnType<typeof getServiceClient>['from']>) => ReturnType<ReturnType<typeof getServiceClient>['from']>,
+): Promise<string[]> {
+  if (args.pin_ids && Array.isArray(args.pin_ids) && (args.pin_ids as string[]).length > 0) {
+    return (args.pin_ids as string[]).slice(0, maxLimit)
+  }
+
+  const db = getServiceClient()
+  const limit = Math.min((args.limit as number) || 100, maxLimit)
+  // deno-lint-ignore no-explicit-any
+  let query: any = db.from('links').select('id').eq('user_id', userId)
+  if (args.board) query = query.eq('category', args.board as string)
+  if (extraFilters) query = extraFilters(query)
+  query = query.limit(limit)
+
+  const { data, error } = await query
+  if (error) throw new Error(`Failed to resolve pins: ${error.message}`)
+  return (data || []).map((p: Record<string, unknown>) => p.id as string)
+}
+
+// ---------------------------------------------------------------------------
 // Tool implementations
 // ---------------------------------------------------------------------------
 
@@ -377,8 +443,9 @@ async function toolGetRecentSaves(
 }
 
 async function toolSavePin(
-  userId: string, args: Record<string, unknown>
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
 ): Promise<unknown> {
+  canWrite(settings)
   const url = args.url as string
   if (!url) throw new Error('url is required')
 
@@ -480,6 +547,550 @@ async function generatePinId(url: string): Promise<string> {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
 }
 
+// ---------------------------------------------------------------------------
+// Pin management tools
+// ---------------------------------------------------------------------------
+
+async function toolGetPin(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  const pinId = args.pin_id as string
+  if (!pinId) throw new Error('pin_id is required')
+
+  const db = getServiceClient()
+  const { data: pin, error } = await db
+    .from('links')
+    .select('*')
+    .eq('id', pinId)
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !pin) return { action: 'not_found', message: 'Pin not found or does not belong to this user.' }
+  return { pin: filterPin(pin, settings) }
+}
+
+async function toolUpdatePin(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const pinId = args.pin_id as string
+  if (!pinId) throw new Error('pin_id is required')
+
+  const db = getServiceClient()
+
+  // Verify pin exists and belongs to user
+  const { data: existing, error: fetchErr } = await db
+    .from('links')
+    .select('id')
+    .eq('id', pinId)
+    .eq('user_id', userId)
+    .single()
+
+  if (fetchErr || !existing) throw new Error('Pin not found or does not belong to this user.')
+
+  // Build update payload from provided args
+  const ALLOWED_FIELDS = ['title', 'description', 'notes', 'category', 'content_type', 'watched', 'read', 'tags']
+  const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  const fieldsUpdated: string[] = []
+
+  for (const field of ALLOWED_FIELDS) {
+    if (args[field] !== undefined) {
+      updatePayload[field] = args[field]
+      fieldsUpdated.push(field)
+    }
+  }
+
+  if (fieldsUpdated.length === 0) throw new Error('No fields to update. Provide at least one field (title, description, notes, category, content_type, watched, read, tags).')
+
+  const { data: updated, error: updateErr } = await db
+    .from('links')
+    .update(updatePayload)
+    .eq('id', pinId)
+    .eq('user_id', userId)
+    .select('*')
+    .single()
+
+  if (updateErr) throw new Error(`Update failed: ${updateErr.message}`)
+
+  return {
+    action: 'updated',
+    pin_id: pinId,
+    fields_updated: fieldsUpdated,
+    pin: filterPin(updated, settings),
+  }
+}
+
+async function toolDeletePin(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const pinId = args.pin_id as string
+  if (!pinId) throw new Error('pin_id is required')
+  if (args.confirm !== true) throw new Error('Deletion requires confirm: true. Ask the user to confirm before proceeding.')
+
+  const db = getServiceClient()
+
+  // Fetch pin to get title for confirmation message
+  const { data: pin, error: fetchErr } = await db
+    .from('links')
+    .select('id, title, category')
+    .eq('id', pinId)
+    .eq('user_id', userId)
+    .single()
+
+  if (fetchErr || !pin) return { action: 'not_found', message: 'Pin not found.' }
+
+  const { error: deleteErr } = await db
+    .from('links')
+    .delete()
+    .eq('id', pinId)
+    .eq('user_id', userId)
+
+  if (deleteErr) throw new Error(`Delete failed: ${deleteErr.message}`)
+
+  return {
+    action: 'deleted',
+    pin_id: pinId,
+    title: pin.title,
+    category: pin.category,
+    message: 'Pin permanently deleted.',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Board management tools
+// ---------------------------------------------------------------------------
+
+async function toolCreateBoard(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const name = args.name as string
+  if (!name) throw new Error('name is required')
+
+  const slug = slugify(name)
+  if (!slug) throw new Error('Invalid board name — must contain at least one letter or number.')
+  if (slug in BUILTIN_BOARDS) throw new Error(`Cannot create a board with slug "${slug}" — this is a built-in board.`)
+  if (['all', 'uncategorized', 'cleanup'].includes(slug)) throw new Error(`"${slug}" is a reserved name.`)
+
+  const metadata = await getBoardMetadata(userId)
+  if (metadata[slug]) throw new Error(`Board "${slug}" already exists.`)
+
+  // Also check if pins already use this category
+  const db = getServiceClient()
+  const { count } = await db
+    .from('links')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('category', slug)
+
+  if (count && count > 0) throw new Error(`Category "${slug}" already has ${count} pins. Use update_board instead.`)
+
+  metadata[slug] = {
+    isUserBoard: true,
+    displayName: name,
+    prompt: (args.prompt as string) || null,
+    createdAt: new Date().toISOString(),
+    pinned: (args.pinned as boolean) || false,
+  }
+
+  await saveBoardMetadata(userId, metadata)
+
+  return {
+    action: 'created',
+    slug,
+    display_name: name,
+    prompt: (args.prompt as string) || null,
+    pinned: (args.pinned as boolean) || false,
+    message: `Board '${name}' created with slug '${slug}'.`,
+  }
+}
+
+async function toolUpdateBoard(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const board = args.board as string
+  if (!board) throw new Error('board is required')
+
+  const isBuiltin = board in BUILTIN_BOARDS
+  const metadata = await getBoardMetadata(userId)
+  const existing = metadata[board]
+
+  // Verify board exists
+  if (!isBuiltin && !existing) {
+    const db = getServiceClient()
+    const { count } = await db
+      .from('links')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('category', board)
+    if (!count || count === 0) throw new Error('Board not found.')
+  }
+
+  if (isBuiltin && args.display_name) {
+    throw new Error(`Cannot rename built-in board "${board}". You can update its AI routing prompt and pinned state.`)
+  }
+
+  const fieldsUpdated: string[] = []
+
+  if (!metadata[board]) {
+    metadata[board] = isBuiltin ? {} : { isUserBoard: true, createdAt: new Date().toISOString() }
+  }
+
+  if (args.display_name !== undefined) {
+    metadata[board].displayName = args.display_name
+    fieldsUpdated.push('display_name')
+  }
+  if (args.prompt !== undefined) {
+    metadata[board].prompt = args.prompt
+    fieldsUpdated.push('prompt')
+  }
+  if (args.pinned !== undefined) {
+    metadata[board].pinned = args.pinned
+    fieldsUpdated.push('pinned')
+  }
+
+  if (fieldsUpdated.length === 0) throw new Error('No fields to update. Provide display_name, prompt, or pinned.')
+
+  await saveBoardMetadata(userId, metadata)
+
+  return {
+    action: 'updated',
+    slug: board,
+    fields_updated: fieldsUpdated,
+    board: {
+      slug: board,
+      display_name: metadata[board].displayName || board,
+      prompt: metadata[board].prompt || null,
+      pinned: metadata[board].pinned || false,
+      is_user_board: !isBuiltin,
+    },
+  }
+}
+
+async function toolDeleteBoard(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const board = args.board as string
+  if (!board) throw new Error('board is required')
+  if (args.confirm !== true) throw new Error('Board deletion requires confirm: true. Ask the user to confirm.')
+
+  if (board in BUILTIN_BOARDS) throw new Error(`Cannot delete built-in board "${board}".`)
+
+  const metadata = await getBoardMetadata(userId)
+  if (!metadata[board]?.isUserBoard) {
+    // Check if it exists via pins
+    const db = getServiceClient()
+    const { count } = await db
+      .from('links')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('category', board)
+    if (!count || count === 0) throw new Error(`Board "${board}" not found.`)
+  }
+
+  const reassignTo = (args.reassign_to as string) || 'uncategorized'
+
+  // Count and reassign pins
+  const db = getServiceClient()
+  const { data: affected, error: updateErr } = await db
+    .from('links')
+    .update({ category: reassignTo, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('category', board)
+    .select('id')
+
+  if (updateErr) throw new Error(`Failed to reassign pins: ${updateErr.message}`)
+  const pinsReassigned = affected?.length || 0
+
+  // Remove from metadata
+  delete metadata[board]
+  await saveBoardMetadata(userId, metadata)
+
+  return {
+    action: 'deleted',
+    slug: board,
+    pins_reassigned: pinsReassigned,
+    reassigned_to: reassignTo,
+    message: `Board '${board}' deleted. ${pinsReassigned} pin${pinsReassigned === 1 ? '' : 's'} moved to '${reassignTo}'.`,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Enrichment tools
+// ---------------------------------------------------------------------------
+
+async function toolReEnrichPin(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const pinId = args.pin_id as string
+  if (!pinId) throw new Error('pin_id is required')
+
+  const db = getServiceClient()
+  const { data: pin, error } = await db
+    .from('links')
+    .select('id, url, title, description, category, content_type')
+    .eq('id', pinId)
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !pin) throw new Error('Pin not found or does not belong to this user.')
+
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const baseUrl = Deno.env.get('SUPABASE_URL')!
+  const analyzeUrl = `${baseUrl}/functions/v1/analyze-content`
+  const createPinUrl = `${baseUrl}/functions/v1/create-pin`
+
+  // Step 1: Await analyze-content (fast, ~800ms) — writes tags/entities
+  try {
+    const analyzeResponse = await fetch(analyzeUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ url: pin.url, title: pin.title, description: pin.description, linkId: pin.id }),
+    })
+    if (analyzeResponse.ok) {
+      const analysis = await analyzeResponse.json()
+      const analyticsUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (analysis.content_type) analyticsUpdate.content_type = analysis.content_type
+      if (analysis.type_confidence) analyticsUpdate.type_confidence = analysis.type_confidence
+      if (analysis.entities) analyticsUpdate.entities = analysis.entities
+      if (Array.isArray(analysis.practical_tags)) analyticsUpdate.practical_tags = analysis.practical_tags
+      if (Array.isArray(analysis.taste_tags)) analyticsUpdate.taste_tags = analysis.taste_tags
+      if (analysis.content_structure) analyticsUpdate.content_structure = analysis.content_structure
+      await db.from('links').update(analyticsUpdate).eq('id', pin.id).eq('user_id', userId)
+    }
+  } catch (e) {
+    console.error('[mcp-server] analyze-content re-enrich failed:', e)
+  }
+
+  // Step 2: Fire-and-forget create-pin for image/media refresh
+  const cat = pin.category as string
+  fetch(createPinUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+    body: JSON.stringify({
+      url: pin.url,
+      linkId: pin.id,
+      forceRefresh: (args.force_image as boolean) || false,
+      content_type: pin.content_type || null,
+      category: cat || null,
+      enrichWatch: cat === 'watch',
+      enrichBook: cat === 'read',
+      enrichListen: cat === 'listen',
+      enrichRecipe: cat === 'eat',
+    }),
+  }).catch(e => console.error('[mcp-server] create-pin re-enrich failed:', e))
+
+  return {
+    action: 'enrich_triggered',
+    pin_id: pin.id,
+    url: pin.url,
+    message: 'Re-enrichment triggered. Tags updated. Image and media metadata will refresh within ~30 seconds.',
+  }
+}
+
+async function toolBatchReEnrich(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+
+  const maxLimit = 50
+  // deno-lint-ignore no-explicit-any
+  const extraFilters = (q: any) => {
+    if (args.missing_tags) q = q.or('taste_tags.is.null,taste_tags.eq.{}')
+    if (args.missing_image) q = q.is('image', null)
+    return q
+  }
+
+  const limit = Math.min((args.limit as number) || 20, maxLimit)
+  const db = getServiceClient()
+  // deno-lint-ignore no-explicit-any
+  let query: any = db.from('links').select('id, url, title, description, category, content_type').eq('user_id', userId)
+  if (args.pin_ids && Array.isArray(args.pin_ids)) {
+    query = query.in('id', (args.pin_ids as string[]).slice(0, maxLimit))
+  } else {
+    if (args.board) query = query.eq('category', args.board as string)
+    if (args.missing_tags) query = query.or('taste_tags.is.null,taste_tags.eq.{}')
+    if (args.missing_image) query = query.is('image', null)
+    query = query.limit(limit)
+  }
+
+  const { data: pins, error } = await query
+  if (error) throw new Error(`Failed to fetch pins for re-enrichment: ${error.message}`)
+  if (!pins || pins.length === 0) return { action: 'enrich_triggered', pins_queued: 0, message: 'No pins matched the filter.' }
+
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const baseUrl = Deno.env.get('SUPABASE_URL')!
+  const createPinUrl = `${baseUrl}/functions/v1/create-pin`
+
+  // Fire-and-forget create-pin for each (handles image + media enrichment)
+  for (const pin of pins) {
+    const cat = pin.category as string
+    fetch(createPinUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({
+        url: pin.url,
+        linkId: pin.id,
+        forceRefresh: true,
+        content_type: pin.content_type || null,
+        category: cat || null,
+        enrichWatch: cat === 'watch',
+        enrichBook: cat === 'read',
+        enrichListen: cat === 'listen',
+        enrichRecipe: cat === 'eat',
+      }),
+    }).catch(e => console.error('[mcp-server] batch re-enrich failed for', pin.id, e))
+  }
+
+  const filterUsed: Record<string, unknown> = {}
+  if (args.board) filterUsed.board = args.board
+  if (args.missing_tags) filterUsed.missing_tags = true
+  if (args.missing_image) filterUsed.missing_image = true
+
+  return {
+    action: 'enrich_triggered',
+    pins_queued: pins.length,
+    filter_used: filterUsed,
+    message: `Re-enrichment triggered for ${pins.length} pin${pins.length === 1 ? '' : 's'}. Results will appear within a few minutes.`,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Batch operation tools
+// ---------------------------------------------------------------------------
+
+async function toolBatchMovePins(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const toBoard = args.to_board as string
+  if (!toBoard) throw new Error('to_board is required')
+
+  const pinIds = await resolvePinIds(userId, args, 500)
+  if (pinIds.length === 0) return { action: 'moved', pins_moved: 0, message: 'No pins matched the criteria.' }
+
+  const db = getServiceClient()
+  const { data: updated, error } = await db
+    .from('links')
+    .update({ category: toBoard, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .in('id', pinIds)
+    .select('id')
+
+  if (error) throw new Error(`Batch move failed: ${error.message}`)
+  const moved = updated?.length || 0
+
+  return {
+    action: 'moved',
+    pins_moved: moved,
+    pins_not_found: pinIds.length - moved,
+    to_board: toBoard,
+    message: `${moved} pin${moved === 1 ? '' : 's'} moved to '${toBoard}'.${pinIds.length - moved > 0 ? ` ${pinIds.length - moved} not found.` : ''}`,
+  }
+}
+
+async function toolBatchTagPins(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const addTags = (args.add_tags as string[]) || []
+  const removeTags = (args.remove_tags as string[]) || []
+  if (addTags.length === 0 && removeTags.length === 0) throw new Error('Provide at least add_tags or remove_tags.')
+
+  const pinIds = await resolvePinIds(userId, args, 500)
+  if (pinIds.length === 0) return { action: 'tagged', pins_updated: 0, message: 'No pins matched the criteria.' }
+
+  const db = getServiceClient()
+
+  // Try RPC first (atomic), fall back to fetch-and-update
+  try {
+    const { data: count, error } = await db.rpc('append_tags_to_pins', {
+      p_user_id: userId,
+      p_pin_ids: pinIds,
+      p_add_tags: addTags.length > 0 ? addTags : null,
+      p_remove_tags: removeTags.length > 0 ? removeTags : null,
+    })
+    if (error) throw error
+    return {
+      action: 'tagged',
+      pins_updated: count || pinIds.length,
+      tags_added: addTags,
+      tags_removed: removeTags,
+      message: `Updated tags on ${count || pinIds.length} pin${(count || pinIds.length) === 1 ? '' : 's'}.`,
+    }
+  } catch {
+    // Fallback: fetch pins, compute tags in TypeScript, update individually
+    const { data: pins, error: fetchErr } = await db
+      .from('links')
+      .select('id, tags')
+      .eq('user_id', userId)
+      .in('id', pinIds)
+
+    if (fetchErr) throw new Error(`Failed to fetch pins: ${fetchErr.message}`)
+
+    let updated = 0
+    for (const pin of (pins || [])) {
+      const currentTags: string[] = Array.isArray(pin.tags) ? pin.tags : []
+      let newTags = [...new Set([...currentTags, ...addTags])]
+      if (removeTags.length > 0) {
+        const removeSet = new Set(removeTags)
+        newTags = newTags.filter(t => !removeSet.has(t))
+      }
+      await db.from('links').update({ tags: newTags, updated_at: new Date().toISOString() }).eq('id', pin.id).eq('user_id', userId)
+      updated++
+    }
+
+    return {
+      action: 'tagged',
+      pins_updated: updated,
+      tags_added: addTags,
+      tags_removed: removeTags,
+      message: `Updated tags on ${updated} pin${updated === 1 ? '' : 's'}.`,
+    }
+  }
+}
+
+async function toolBatchUpdatePins(
+  userId: string, args: Record<string, unknown>, settings: ConnectorSettings
+): Promise<unknown> {
+  canWrite(settings)
+  const field = args.field as string
+  const value = args.value
+
+  const ALLOWED = ['watched', 'read', 'notes', 'content_type', 'category']
+  if (!ALLOWED.includes(field)) throw new Error(`Field must be one of: ${ALLOWED.join(', ')}`)
+
+  const pinIds = await resolvePinIds(userId, args, 500)
+  if (pinIds.length === 0) return { action: 'updated', pins_updated: 0, message: 'No pins matched the criteria.' }
+
+  const db = getServiceClient()
+  const { data: updated, error } = await db
+    .from('links')
+    .update({ [field]: value, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .in('id', pinIds)
+    .select('id')
+
+  if (error) throw new Error(`Batch update failed: ${error.message}`)
+  const count = updated?.length || 0
+
+  return {
+    action: 'updated',
+    pins_updated: count,
+    field,
+    value,
+    message: `Updated '${field}' on ${count} pin${count === 1 ? '' : 's'}.`,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Connector context
+// ---------------------------------------------------------------------------
+
 function toolGetConnectorContext(settings: ConnectorSettings): unknown {
   return {
     product: PRODUCT_CONFIG.name,
@@ -507,6 +1118,10 @@ function toolGetConnectorContext(settings: ConnectorSettings): unknown {
       self_discovery: 'get_taste_profile + get_boards_list together give the full picture.',
       saving: 'save_pin alone — the platform handles categorization and tagging automatically.',
       auto_capture: 'When the user expresses a clear choice signal ("I\'ll get that", "that\'s the one", "perfect"), proactively call save_pin with source "claude_auto" and conversation context as notes.',
+      editing: 'Use get_pin to fetch full details, then update_pin to change fields. For bulk changes, use batch_update_pins with pin_ids, board filter, or no scope for entire library.',
+      board_management: 'Use get_boards_list to see all boards, then create_board/update_board/delete_board. Built-in boards (home, wear, watch, listen, use, eat, go, follow, read) can be updated but not created or deleted.',
+      bulk_operations: 'batch_move_pins, batch_tag_pins, and batch_update_pins all support three scoping modes: pin_ids (explicit list), board (all pins in a board), or no scope (entire library, up to limit). Always confirm with the user before large batch operations.',
+      enrichment: 're_enrich_pin refreshes AI analysis (tags, entities, content type) and images for a single pin. batch_re_enrich does the same in bulk — filter by missing_tags or missing_image to target pins that need it most.',
     },
   }
 }
@@ -578,8 +1193,52 @@ async function handleJsonRpc(
             resultCount = ((result as Record<string, unknown>).total as number) || 0
             break
           case 'save_pin':
-            result = await toolSavePin(userId, toolArgs)
+            result = await toolSavePin(userId, toolArgs, settings)
             resultCount = 1
+            break
+          case 'get_pin':
+            result = await toolGetPin(userId, toolArgs, settings)
+            resultCount = result ? 1 : 0
+            break
+          case 'update_pin':
+            result = await toolUpdatePin(userId, toolArgs, settings)
+            resultCount = 1
+            break
+          case 'delete_pin':
+            result = await toolDeletePin(userId, toolArgs, settings)
+            resultCount = 1
+            break
+          case 'create_board':
+            result = await toolCreateBoard(userId, toolArgs, settings)
+            resultCount = 1
+            break
+          case 'update_board':
+            result = await toolUpdateBoard(userId, toolArgs, settings)
+            resultCount = 1
+            break
+          case 'delete_board':
+            result = await toolDeleteBoard(userId, toolArgs, settings)
+            resultCount = 1
+            break
+          case 're_enrich_pin':
+            result = await toolReEnrichPin(userId, toolArgs, settings)
+            resultCount = 1
+            break
+          case 'batch_re_enrich':
+            result = await toolBatchReEnrich(userId, toolArgs, settings)
+            resultCount = (result as Record<string, unknown>).enriched as number || 0
+            break
+          case 'batch_move_pins':
+            result = await toolBatchMovePins(userId, toolArgs, settings)
+            resultCount = (result as Record<string, unknown>).moved as number || 0
+            break
+          case 'batch_tag_pins':
+            result = await toolBatchTagPins(userId, toolArgs, settings)
+            resultCount = (result as Record<string, unknown>).updated as number || 0
+            break
+          case 'batch_update_pins':
+            result = await toolBatchUpdatePins(userId, toolArgs, settings)
+            resultCount = (result as Record<string, unknown>).updated as number || 0
             break
           case 'get_connector_context':
             result = toolGetConnectorContext(settings)

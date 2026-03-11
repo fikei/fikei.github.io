@@ -39,9 +39,11 @@ function getSupabase(): SupabaseClient {
 interface Pin {
   id: string
   user_id: string
+  title: string | null
   category: string
   taste_tags: string[] | null
   practical_tags: string[] | null
+  tags: string[] | null           // generic tags (fallback when taste_tags empty)
   entities: { type: string; name: string; confidence: number }[] | null
   content_type: string | null
   content_structure: string | null
@@ -181,27 +183,76 @@ function extractAffinities(pins: Pin[]): Affinity[] {
     }
   }
 
+  // Stopwords for title keyword extraction
+  const TITLE_STOPWORDS = new Set([
+    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'have', 'has',
+    'are', 'was', 'were', 'been', 'will', 'would', 'could', 'not', 'but',
+    'its', 'our', 'your', 'his', 'her', 'their', 'which', 'what', 'when',
+    'how', 'who', 'all', 'any', 'more', 'some', 'than', 'too', 'very',
+    'just', 'about', 'also', 'into', 'over', 'only', 'then', 'them',
+    'new', 'one', 'two', 'first', 'last', 'free', 'full',
+    'http', 'https', 'www', 'com', 'org', 'net',
+  ])
+
   for (const pin of pins) {
-    const tasteTags = pin.taste_tags || []
-    const practicalTags = pin.practical_tags || []
+    const tasteTags = (pin.taste_tags || []).filter(t => t.length > 0)
+    const practicalTags = (pin.practical_tags || []).filter(t => t.length > 0)
+    const genericTags = (pin.tags || []).filter(t => t.length > 0)
     const age = daysSince(pin.created_at)
     const recencyWeight = Math.exp(-0.005 * age) // half-life ~139 days
     const pinWeight = pin.source_weight ?? 1.0    // 1.0 for pins, < 1.0 for secondary signals
+    const hasTasteTags = tasteTags.length > 0
 
-    // Compound dimensions: taste_tag × practical_tag
-    for (const taste of tasteTags) {
-      for (const practical of practicalTags) {
-        const compound = `${normalizeDimension(taste)}_${normalizeDimension(practical)}`
-        upsertSignal(compound, recencyWeight * pinWeight, pin.category, taste, pin.created_at)
+    if (hasTasteTags) {
+      // PRIMARY PATH: rich analyze-content data
+      // Compound dimensions: taste_tag × practical_tag
+      for (const taste of tasteTags) {
+        for (const practical of practicalTags) {
+          const compound = `${normalizeDimension(taste)}_${normalizeDimension(practical)}`
+          upsertSignal(compound, recencyWeight * pinWeight, pin.category, taste, pin.created_at)
+        }
       }
+
+      // Solo taste tags (lower weight — less specific)
+      for (const taste of tasteTags) {
+        upsertSignal(taste, recencyWeight * 0.5 * pinWeight, pin.category, taste, pin.created_at)
+      }
+    } else {
+      // FALLBACK PATH: use generic tags + category + title keywords
+      // Lower weight (0.3x) — these are less semantically rich than taste_tags
+      const fallbackWeight = recencyWeight * 0.3 * pinWeight
+
+      // Generic tags (e.g. "product", "accessories", "video")
+      for (const tag of genericTags) {
+        // Compound with category for specificity: "wear_product", "home_accessories"
+        if (tag !== pin.category) {
+          upsertSignal(`${pin.category}_${normalizeDimension(tag)}`, fallbackWeight, pin.category, tag, pin.created_at)
+        }
+        upsertSignal(tag, fallbackWeight * 0.5, pin.category, tag, pin.created_at)
+      }
+
+      // Title keywords — extract meaningful words as weak signals
+      if (pin.title && pin.title.length > 3) {
+        const words = pin.title.toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .split(/\s+/)
+          .filter(w => w.length > 3 && !TITLE_STOPWORDS.has(w))
+          .slice(0, 5) // max 5 keywords per title
+        for (const word of words) {
+          upsertSignal(word, fallbackWeight * 0.3, pin.category, `title:${word}`, pin.created_at)
+        }
+      }
+
+      // Category itself as a weak signal
+      upsertSignal(pin.category, fallbackWeight * 0.3, pin.category, `category:${pin.category}`, pin.created_at)
     }
 
-    // Solo taste tags (lower weight — less specific)
-    for (const taste of tasteTags) {
-      upsertSignal(taste, recencyWeight * 0.5 * pinWeight, pin.category, taste, pin.created_at)
+    // Content type as a signal (both paths)
+    if (pin.content_type && pin.content_type !== 'unknown') {
+      upsertSignal(`type:${pin.content_type}`, recencyWeight * 0.2 * pinWeight, pin.category, `content_type:${pin.content_type}`, pin.created_at)
     }
 
-    // Entity-based dimensions
+    // Entity-based dimensions (both paths)
     if (pin.entities) {
       for (const entity of pin.entities) {
         if (entity.confidence > 0.7) {
@@ -289,18 +340,36 @@ function buildCoOccurrenceMatrix(affinities: Affinity[], pins: Pin[]): Map<strin
   const pinAffinityMap = new Map<string, Set<string>>()
 
   for (const pin of pins) {
-    const tasteTags = (pin.taste_tags || []).map(t => normalizeDimension(t))
-    const practicalTags = (pin.practical_tags || []).map(t => normalizeDimension(t))
+    const tasteTags = (pin.taste_tags || []).filter(t => t.length > 0).map(t => normalizeDimension(t))
+    const practicalTags = (pin.practical_tags || []).filter(t => t.length > 0).map(t => normalizeDimension(t))
+    const genericTags = (pin.tags || []).filter(t => t.length > 0)
     const pinDimensions = new Set<string>()
 
-    // Compound
-    for (const taste of tasteTags) {
-      for (const practical of practicalTags) {
-        pinDimensions.add(`${taste}_${practical}`)
+    if (tasteTags.length > 0) {
+      // Primary path: taste_tags × practical_tags
+      for (const taste of tasteTags) {
+        for (const practical of practicalTags) {
+          pinDimensions.add(`${taste}_${practical}`)
+        }
+        pinDimensions.add(taste)
       }
-      pinDimensions.add(taste)
+    } else {
+      // Fallback path: mirror extractAffinities logic
+      for (const tag of genericTags) {
+        if (tag !== pin.category) {
+          pinDimensions.add(`${pin.category}_${normalizeDimension(tag)}`)
+        }
+        pinDimensions.add(normalizeDimension(tag))
+      }
+      pinDimensions.add(pin.category)
     }
-    // Entities
+
+    // Content type (both paths)
+    if (pin.content_type && pin.content_type !== 'unknown') {
+      pinDimensions.add(`type:${pin.content_type}`)
+    }
+
+    // Entities (both paths)
     if (pin.entities) {
       for (const e of pin.entities) {
         if (e.confidence > 0.7) pinDimensions.add(normalizeDimension(`${e.type}:${e.name}`))
@@ -419,19 +488,39 @@ function clusterAffinities(affinities: Affinity[], pins: Pin[]): DomainCluster[]
   }
 
   // Assign representative pin IDs to each cluster
-  const affinityMap = new Map(affinities.map(a => [a.dimension, a]))
+  // Reuse the pinAffinityMap from co-occurrence (same dimension logic)
+  const pinDimMap = new Map<string, Set<string>>()
+  for (const pin of pins) {
+    const tasteTags = (pin.taste_tags || []).filter(t => t.length > 0).map(t => normalizeDimension(t))
+    const genericTags = (pin.tags || []).filter(t => t.length > 0)
+    const dims = new Set<string>()
+
+    if (tasteTags.length > 0) {
+      for (const tag of tasteTags) dims.add(tag)
+    } else {
+      for (const tag of genericTags) {
+        if (tag !== pin.category) dims.add(`${pin.category}_${normalizeDimension(tag)}`)
+        dims.add(normalizeDimension(tag))
+      }
+      dims.add(pin.category)
+    }
+    if (pin.content_type && pin.content_type !== 'unknown') {
+      dims.add(`type:${pin.content_type}`)
+    }
+    pinDimMap.set(pin.id, dims)
+  }
+
   for (const cluster of clusters) {
     const clusterDims = new Set(cluster.members)
     const pinScores = new Map<string, number>()
 
-    for (const pin of pins) {
-      const tasteTags = (pin.taste_tags || []).map(t => normalizeDimension(t))
+    for (const [pinId, dims] of pinDimMap) {
       let score = 0
-      for (const tag of tasteTags) {
-        if (clusterDims.has(tag)) score++
+      for (const dim of dims) {
+        if (clusterDims.has(dim)) score++
       }
       if (score > 0) {
-        pinScores.set(pin.id, score)
+        pinScores.set(pinId, score)
       }
     }
 
@@ -1118,9 +1207,8 @@ serve(async (req) => {
     if (pins.length === 0) {
       const { data, error } = await supabase
         .from('links')
-        .select('id, user_id, category, taste_tags, practical_tags, entities, content_type, content_structure, created_at, watched, read')
+        .select('id, user_id, title, category, taste_tags, practical_tags, tags, entities, content_type, content_structure, created_at, watched, read')
         .eq('user_id', userId)
-        .not('taste_tags', 'is', null)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -1149,9 +1237,11 @@ serve(async (req) => {
           .map((s: { id: string; user_id: string; category: string; taste_tags: string[]; practical_tags: string[]; entities: unknown; content_type: string; created_at: string; source_weight: number }) => ({
             id: s.id,
             user_id: s.user_id,
+            title: null,
             category: s.category,
             taste_tags: s.taste_tags,
             practical_tags: s.practical_tags,
+            tags: null,
             entities: s.entities as Pin['entities'],
             content_type: s.content_type,
             content_structure: null,
@@ -1298,7 +1388,7 @@ serve(async (req) => {
       if (action === 'compute-intent') {
         const { data } = await supabase
           .from('links')
-          .select('id, user_id, category, taste_tags, practical_tags, entities, content_type, content_structure, created_at, watched, read')
+          .select('id, user_id, title, category, taste_tags, practical_tags, tags, entities, content_type, content_structure, created_at, watched, read')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
         allPins = (data || []) as Pin[]

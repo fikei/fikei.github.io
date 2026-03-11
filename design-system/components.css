@@ -13,7 +13,6 @@
 }
 
 body {
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -33,7 +32,6 @@ body {
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
@@ -119,7 +117,6 @@ body {
 .input {
   width: 100%;
   padding: var(--space-3);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-sm);
   background: var(--bg);
@@ -181,7 +178,6 @@ body {
   display: inline-flex;
   align-items: center;
   padding: var(--space-1) var(--space-3);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-xs);
   text-transform: uppercase;
@@ -270,7 +266,6 @@ body {
 
 .toast {
   padding: var(--space-3) var(--space-4);
-  font-family: var(--font-mono);
   font-family: var(--font-primary);
   font-size: var(--text-xs);
   background: var(--fg);
@@ -1113,4 +1108,433 @@ body {
    ============================================ */
 .grid--listen {
   gap: var(--space-2);
+}
+
+/* ============================================
+   Accessibility
+   ============================================ */
+
+/* Skip navigation link — visible only on focus */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  z-index: 9999;
+  transition: top var(--duration-fast) var(--ease-out);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
+
+/* Global focus ring — visible for keyboard navigation only */
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Remove default outline for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion — disable all transitions and animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   Terminal Layout Utilities
+   ============================================ */
+
+/* Box-drawing character border — wraps content in ASCII box
+   Usage: <div class="border-box">content</div>
+   Screen readers ignore pseudo-content; standard border is the fallback. */
+.border-box {
+  position: relative;
+  padding: var(--space-4);
+  border: var(--border-thin) solid var(--border-subtle);
+}
+
+.border-box::before {
+  content: '┌' attr(data-label) '┐';
+  position: absolute;
+  top: -0.7em;
+  left: var(--space-2);
+  padding: 0 var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  background: var(--bg);
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+/* Terminal container — 80-character max width */
+.container-terminal {
+  max-width: var(--container-terminal, 80ch);
+  margin-inline: auto;
+  padding-inline: var(--gutter-page, clamp(16px, 5vw, 64px));
+}
+
+/* ASCII horizontal divider */
+.divider-ascii {
+  border: none;
+  height: auto;
+  text-align: center;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow: hidden;
+  white-space: nowrap;
+  margin: var(--space-4) 0;
+}
+
+.divider-ascii::before {
+  content: '────────────────────────────────────────────────────────────────────────────────';
+  letter-spacing: 0;
+}
+
+/* Double-line emphasis divider */
+.divider-ascii--emphasis::before {
+  content: '════════════════════════════════════════════════════════════════════════════════';
+}
+
+/* Labeled divider: <hr class="divider-ascii" data-label="section"> */
+.divider-ascii[data-label]::before {
+  content: '──── ' attr(data-label) ' ────────────────────────────────────────────────────────────────';
+}
+
+/* ============================================
+   Terminal Interaction Components
+   ============================================ */
+
+/* Blinking cursor loading indicator
+   Usage: <span class="loading-cursor">loading</span> */
+.loading-cursor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  text-transform: lowercase;
+}
+
+.loading-cursor::after {
+  content: '█';
+  animation: cursor-blink 1s step-end infinite;
+  color: var(--fg);
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Prompt-style input — terminal > prefix
+   Usage: <div class="input-prompt"><span class="input-prompt__symbol">></span><input class="input" ...></div> */
+.input-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: var(--border-thin) solid var(--border);
+  padding-left: var(--space-3);
+  background: var(--bg);
+}
+
+.input-prompt__symbol {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.input-prompt .input {
+  border: none;
+  padding-left: 0;
+}
+
+.input-prompt .input:focus {
+  box-shadow: none;
+}
+
+.input-prompt:focus-within {
+  box-shadow: 0 0 0 1px var(--fg);
+}
+
+/* ============================================
+   Motion Patterns
+   ============================================ */
+
+/* Typewriter text reveal
+   Set --tw-chars to the character count of the text.
+   Usage: <span class="typewriter" style="--tw-chars: 12">hello world_</span> */
+.typewriter {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid var(--fg);
+  width: 0;
+  animation:
+    typewriter-reveal 2s steps(var(--tw-chars, 20)) forwards,
+    cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes typewriter-reveal {
+  to { width: calc(var(--tw-chars, 20) * 1ch); }
+}
+
+/* Hard-snap transition — instant state change (terminal feel)
+   Use on elements where easing feels wrong: toggles, tab switches, filters */
+.transition-snap {
+  transition-timing-function: steps(1) !important;
+}
+
+/* ============================================
+   Visual Effects
+   ============================================ */
+
+/* Hover-reveal — content hidden until hover/focus
+   Accessible: :focus-within for keyboard, @media (hover: none) shows by default on touch
+   Usage: <div class="hover-reveal"><div class="hover-reveal__content">...</div></div> */
+.hover-reveal__content {
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-default);
+}
+
+.hover-reveal:hover .hover-reveal__content,
+.hover-reveal:focus-within .hover-reveal__content {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .hover-reveal__content {
+    opacity: 1;
+  }
+}
+
+/* CRT scanline texture overlay — purely decorative
+   Usage: <div class="texture-scanline">content</div>
+   Low opacity (3%) — should not affect readability. */
+.texture-scanline {
+  position: relative;
+}
+
+.texture-scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Respect reduced transparency preference */
+@media (prefers-reduced-transparency: reduce) {
+  .texture-scanline::after {
+    display: none;
+  }
+}
+
+/* ============================================
+   Additional Components
+   ============================================ */
+
+/* Dense grid variant — 4px gap for data-heavy views */
+.grid--dense {
+  gap: var(--space-1);
+}
+
+/* Path-style breadcrumb — ~/boards/music/electronic >
+   Usage: <nav class="breadcrumb breadcrumb--path" aria-label="Breadcrumb">...</nav> */
+.breadcrumb--path .breadcrumb__sep {
+  color: var(--fg-subtle);
+}
+
+.breadcrumb--path .breadcrumb__sep::before {
+  content: '/';
+}
+
+.breadcrumb--path::before {
+  content: '~';
+  color: var(--fg-subtle);
+  font-weight: 400;
+  margin-right: var(--space-1);
+}
+
+.breadcrumb--path .breadcrumb__link {
+  text-transform: lowercase;
+  letter-spacing: var(--tracking-normal);
+  font-weight: 400;
+}
+
+.breadcrumb--path .breadcrumb__current {
+  text-transform: lowercase;
+  letter-spacing: var(--tracking-normal);
+}
+
+.breadcrumb--path::after {
+  content: '>';
+  color: var(--fg-muted);
+  margin-left: var(--space-1);
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* Badge counter — retro hit counter / view counter
+   Usage: <span class="badge-counter" aria-live="polite">0042</span> */
+.badge-counter {
+  display: inline-flex;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-thin) solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Platform text badges — accessible alternative to color-only dots
+   Usage: <span class="platform-badge platform-badge--spotify">[SP]</span> */
+.platform-badge {
+  display: inline-flex;
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 1px 3px;
+  border: var(--border-thin) solid currentColor;
+}
+
+.platform-badge--spotify { color: #1DB954; }
+.platform-badge--soundcloud { color: #FF5500; }
+.platform-badge--apple-music { color: #FC3C44; }
+.platform-badge--bandcamp { color: #1DA0C3; }
+.platform-badge--tidal { color: #00FFFF; }
+.platform-badge--youtube-music { color: #FF0000; }
+
+/* Timestamp component
+   Usage: <time class="timestamp" datetime="2024-12-01T10:00:00Z">3h ago</time> */
+.timestamp {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Status bar — persistent system info footer
+   Usage: <footer class="status-bar" role="status">...</footer> */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-1) var(--space-4);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  border-top: var(--border-thin) solid var(--border-subtle);
+  background: var(--bg);
+}
+
+.status-bar__section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.status-bar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ============================================
+   ASCII Decorative Components
+   ============================================ */
+
+/* ASCII card — card with box-drawing character decoration
+   Falls back to standard border in forced-colors mode.
+   Usage: <div class="card card--ascii" data-label="title">...</div> */
+.card--ascii {
+  border-color: var(--border-subtle);
+  position: relative;
+}
+
+.card--ascii::before {
+  content: '[ ' attr(data-label) ' ]';
+  position: absolute;
+  top: -0.6em;
+  left: var(--space-3);
+  padding: 0 var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
+  background: var(--bg);
+  line-height: 1;
+}
+
+@media (forced-colors: active) {
+  .card--ascii::before {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+/* ASCII empty state
+   Usage: <div class="empty-ascii" aria-label="No items found">
+            <pre class="empty-ascii__art" aria-hidden="true">...</pre>
+            <p class="empty-ascii__text">no items found.</p>
+          </div> */
+.empty-ascii {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.empty-ascii__art {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  color: var(--fg-subtle);
+  white-space: pre;
+  user-select: none;
+}
+
+.empty-ascii__text {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  max-width: 40ch;
+}
+
+.empty-ascii__action {
+  margin-top: var(--space-2);
 }
