@@ -2,7 +2,7 @@
 // Change these values when the product name changes.
 // Both the MCP server and OAuth consent page reference this file.
 
-export const VERSION = '0.2.0'
+export const VERSION = '0.3.0'
 
 export const PRODUCT_CONFIG = {
   name: 'ctrl.rodeo',
@@ -175,6 +175,250 @@ export const TOOL_DEFINITIONS = [
     annotations: {
       title: 'Connector Context',
       readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+
+  // --- Pin Management Tools ---
+  {
+    name: 'get_pin',
+    description: `Get full details for a single pin by ID. Use after updates to confirm state, or when you need complete metadata for a specific item.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_id: { type: 'string', description: 'The pin ID (from search_pins, get_board, or get_recent_saves)' },
+      },
+      required: ['pin_id'],
+    },
+    annotations: {
+      title: 'Get Pin',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'update_pin',
+    description: `Edit one or more fields on an existing pin. Use to fix titles, move between boards, add notes, mark as watched/read, change content type, or update tags. Only include fields you want to change — omitted fields are left unchanged.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_id: { type: 'string', description: 'The pin ID to update' },
+        title: { type: 'string', description: 'New title' },
+        description: { type: 'string', description: 'New description/summary' },
+        notes: { type: 'string', description: 'Personal notes (replaces existing)' },
+        category: { type: 'string', description: 'Board to move the pin to (e.g., "wear", "listen", or a custom slug)' },
+        content_type: {
+          type: 'string', description: 'Content type override',
+          enum: ['product', 'article', 'book', 'video', 'music', 'repository', 'social', 'document', 'tool', 'place', 'recipe', 'event', 'newsletter', 'dataset'],
+        },
+        watched: { type: 'boolean', description: 'Mark as watched (video content)' },
+        read: { type: 'boolean', description: 'Mark as read (articles/books)' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Replace user tags array (not AI-managed taste_tags/practical_tags)' },
+      },
+      required: ['pin_id'],
+    },
+    annotations: {
+      title: 'Update Pin',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'delete_pin',
+    description: `Permanently delete a pin from the library. This is irreversible. Always confirm with the user before calling with confirm: true.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_id: { type: 'string', description: 'The pin ID to permanently delete' },
+        confirm: { type: 'boolean', description: 'Must be true to confirm deletion. Always ask the user first.' },
+      },
+      required: ['pin_id', 'confirm'],
+    },
+    annotations: {
+      title: 'Delete Pin',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+
+  // --- Board Management Tools ---
+  {
+    name: 'create_board',
+    description: `Create a new user-defined board. Provide a display name and an optional AI routing prompt that tells the categorizer what belongs here (e.g., "Running shoes, workout clothes, fitness gear").`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Display name (e.g., "Running Gear", "SF Restaurants"). Auto-slugified.' },
+        prompt: { type: 'string', description: 'Optional AI routing prompt — describes what goes here so the categorizer routes future pins correctly' },
+        pinned: { type: 'boolean', description: 'Pin this board to the top of the list', default: false },
+      },
+      required: ['name'],
+    },
+    annotations: {
+      title: 'Create Board',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'update_board',
+    description: `Edit a board's metadata — rename, update AI routing prompt, or toggle pinned state. Built-in boards (home, wear, watch, etc.) can only have their prompt and pinned state changed, not their name.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        board: { type: 'string', description: 'Board slug to update' },
+        display_name: { type: 'string', description: 'New display name (user boards only)' },
+        prompt: { type: 'string', description: 'New AI routing prompt' },
+        pinned: { type: 'boolean', description: 'Pin/unpin this board' },
+      },
+      required: ['board'],
+    },
+    annotations: {
+      title: 'Update Board',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'delete_board',
+    description: `Delete a user-created board and reassign its pins. Built-in boards cannot be deleted. Always confirm with the user before calling with confirm: true.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        board: { type: 'string', description: 'Slug of the board to delete (must be user-created)' },
+        reassign_to: { type: 'string', description: 'Board to move pins to (default: "uncategorized")' },
+        confirm: { type: 'boolean', description: 'Must be true. Always ask the user first.' },
+      },
+      required: ['board', 'confirm'],
+    },
+    annotations: {
+      title: 'Delete Board',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+
+  // --- Enrichment Tools ---
+  {
+    name: 're_enrich_pin',
+    description: `Re-run the AI enrichment pipeline on an existing pin. Refreshes tags, entities, classification, and optionally the image. Use when a pin has missing tags, no image, or outdated metadata. Returns immediately — enrichment completes within ~30 seconds.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_id: { type: 'string', description: 'The pin ID to re-enrich' },
+        force_image: { type: 'boolean', description: 'Force image re-resolution even if pin has one (default: false)', default: false },
+      },
+      required: ['pin_id'],
+    },
+    annotations: {
+      title: 'Re-enrich Pin',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'batch_re_enrich',
+    description: `Trigger re-enrichment for multiple pins. Filter by board, missing tags, or missing image. Provide pin_ids for specific pins, board for a whole board, or neither for the entire library. Returns immediately — enrichment runs async.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_ids: { type: 'array', items: { type: 'string' }, description: 'Specific pin IDs to re-enrich (max 50)' },
+        board: { type: 'string', description: 'Re-enrich all pins in this board' },
+        missing_tags: { type: 'boolean', description: 'Only re-enrich pins with no taste_tags or practical_tags' },
+        missing_image: { type: 'boolean', description: 'Only re-enrich pins with no image' },
+        limit: { type: 'integer', description: 'Max pins to process (default: 20, max: 50)', default: 20 },
+      },
+      required: [],
+    },
+    annotations: {
+      title: 'Batch Re-enrich',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  },
+
+  // --- Batch Operations ---
+  {
+    name: 'batch_move_pins',
+    description: `Move multiple pins to a different board. Provide pin_ids for specific pins, board for all pins in a source board, or neither for the entire library. Always requires a to_board target.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_ids: { type: 'array', items: { type: 'string' }, description: 'Pin IDs to move (max 100)' },
+        board: { type: 'string', description: 'Move all pins from this source board' },
+        to_board: { type: 'string', description: 'Target board slug to move pins to' },
+        limit: { type: 'integer', description: 'Max pins to move (default: 100, max: 500)', default: 100 },
+      },
+      required: ['to_board'],
+    },
+    annotations: {
+      title: 'Batch Move Pins',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'batch_tag_pins',
+    description: `Add or remove tags from multiple pins. Operates on the user-editable tags column (not AI-managed taste_tags/practical_tags). Provide pin_ids, board, or neither (all library).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_ids: { type: 'array', items: { type: 'string' }, description: 'Pin IDs to tag (max 100)' },
+        board: { type: 'string', description: 'Tag all pins in this board' },
+        add_tags: { type: 'array', items: { type: 'string' }, description: 'Tags to add' },
+        remove_tags: { type: 'array', items: { type: 'string' }, description: 'Tags to remove' },
+        limit: { type: 'integer', description: 'Max pins to update (default: 100, max: 500)', default: 100 },
+      },
+      required: [],
+    },
+    annotations: {
+      title: 'Batch Tag Pins',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  {
+    name: 'batch_update_pins',
+    description: `Set a single field to the same value across multiple pins. Use for bulk status changes like "mark all as watched", "change content type", or "clear notes". Provide pin_ids, board, or neither (all library).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pin_ids: { type: 'array', items: { type: 'string' }, description: 'Pin IDs to update (max 100)' },
+        board: { type: 'string', description: 'Update all pins in this board' },
+        field: {
+          type: 'string', description: 'Field to update',
+          enum: ['watched', 'read', 'notes', 'content_type', 'category'],
+        },
+        value: { description: 'New value (boolean for watched/read, string for others, null to clear)' },
+        limit: { type: 'integer', description: 'Max pins to update (default: 100, max: 500)', default: 100 },
+      },
+      required: ['field', 'value'],
+    },
+    annotations: {
+      title: 'Batch Update Pins',
+      readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
