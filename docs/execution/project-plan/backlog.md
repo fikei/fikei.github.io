@@ -170,6 +170,18 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 
 ---
 
+## Taste Engine Signal Quality
+
+Improvements to per-pin metadata extraction and taste engine signal processing. Gaps 1-3 shipped (PR #381, #382). These two remain.
+
+| Story | Status |
+|-------|--------|
+| **Visual analysis for taste_tags (Gap 4)** — Add optional Claude Haiku vision pass on pin images (`hero_score > 0.5`) to extract visual aesthetic tags: color palette, style, material, mood. Enables axes like minimal↔maximalist and warm↔cool to have real visual signal. ~$0.01/pin. | Pending |
+| **Engagement-weighted signals (Gap 5)** — Weight taste signals by user engagement: pins with notes, revisits (`last_interacted_at`), read/watched=true, or shared (short_code used) contribute 2-3x the signal of untouched impulse saves. Data already exists in DB — taste-engine just needs to read it. | Pending |
+| **Model migration sweep** — Update all edge functions from retired `claude-3-haiku-20240307` / `claude-3-5-haiku-20241022` to `claude-haiku-4-5-20251001`. Currently only analyze-content and taste-engine are updated. | Pending |
+
+---
+
 ## Advanced AI Features
 
 | Story | Status |
