@@ -82,11 +82,11 @@
    Typography Tokens
    ============================================ */
 :root {
-  /* Font families - Space Grotesk is primary */
-  --font-primary: "Space Grotesk", sans-serif;
+  /* Font families */
+  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", "Cascadia Code", "Consolas", monospace;
+  --font-primary: var(--font-mono);
+  --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-serif: Georgia, "Times New Roman", Times, serif;
-  --font-mono: "Space Grotesk", sans-serif;
-  --font-sans: "Space Grotesk", sans-serif;
 
   /* Base font size - 10px standard */
   --text-base: 10px;
