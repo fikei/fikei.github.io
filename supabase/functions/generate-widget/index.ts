@@ -12,6 +12,7 @@
 // - Instrumentation (track success/failure for validation)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 // Phase 2: Config-driven widget system
 import {
@@ -1090,6 +1091,74 @@ interface TasteContext {
   motifs?: string[]
 }
 
+// --- Server-side taste profile loader (fallback when client doesn't send tasteContext) ---
+async function loadTasteFromDB(authHeader: string | null): Promise<TasteContext | null> {
+  if (!authHeader) return null
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    if (!supabaseUrl || !supabaseKey) return null
+
+    // Create client with user's JWT to respect RLS
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+
+    // Get user ID from token
+    const { data: { user } } = await supabase.auth.getUser(token)
+    if (!user?.id) return null
+
+    // Read taste_domains (top 6 by confidence)
+    const { data: domains } = await supabase
+      .from('taste_domains')
+      .select('label, summary, spanning_categories, confidence, pin_ids')
+      .eq('user_id', user.id)
+      .order('confidence', { ascending: false })
+      .limit(6)
+
+    if (!domains || domains.length === 0) return null
+
+    // Read taste_axes (confidence > 0.3)
+    const { data: axes } = await supabase
+      .from('taste_axes')
+      .select('axis, position, low_label, high_label, confidence')
+      .eq('user_id', user.id)
+      .gt('confidence', 0.3)
+
+    // Read global sensibility summary
+    const { data: summaries } = await supabase
+      .from('taste_summaries')
+      .select('summary')
+      .eq('user_id', user.id)
+      .eq('scope', 'global')
+      .limit(1)
+
+    console.log(`[generate-widget] Loaded taste from DB: ${domains.length} domains, ${(axes || []).length} axes`)
+
+    return {
+      domains: domains.map(d => ({
+        label: d.label,
+        summary: d.summary || '',
+        spanning_categories: d.spanning_categories || [],
+        confidence: d.confidence,
+      })),
+      axes: (axes || []).map(a => ({
+        axis: a.axis,
+        position: a.position,
+        low_label: a.low_label,
+        high_label: a.high_label,
+      })),
+      sensibility: summaries?.[0]?.summary || null,
+    }
+  } catch (err) {
+    console.warn('[generate-widget] Taste DB read error:', err)
+    return null
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -1184,7 +1253,7 @@ serve(async (req) => {
     // ========================================================================
     // Standard widget generation (existing flow)
     // ========================================================================
-    const { widgetId, prompt, items, category, userPrefs, skipEligibility, tasteContext } = requestBody as ExtendedWidgetRequest
+    const { widgetId, prompt, items, category, userPrefs, skipEligibility, tasteContext: clientTasteContext } = requestBody as ExtendedWidgetRequest
 
     if (!widgetId || !prompt || !items || items.length === 0) {
       return new Response(
@@ -1321,7 +1390,9 @@ Example: "confidence": 0.85`
     // ==========================================================================
     // TASTE ENGINE: USER PREFERENCE CONTEXT
     // Inject taste profile so AI recommendations align with user's aesthetic
+    // Client sends tasteContext if available; otherwise load from DB server-side
     // ==========================================================================
+    const tasteContext = clientTasteContext || await loadTasteFromDB(req.headers.get('Authorization'))
     let tasteConstraint = ''
     if (tasteContext) {
       const parts: string[] = []

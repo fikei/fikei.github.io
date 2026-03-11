@@ -7063,8 +7063,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.17.0';
-  console.log('[boards] v' + VERSION + ' - AI connector privacy settings');
+  const VERSION = '2.18.0';
+  console.log('[boards] v' + VERSION + ' - taste engine activation triggers');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -9731,6 +9731,25 @@ Return JSON:
       bridges: [],
       motifs: [],
     };
+  }
+
+  // Debounced affinity recomputation after pin saves
+  // Waits 30s after last pin add before firing, so bulk imports batch naturally
+  let _tasteAffinityTimer = null;
+  let _tastePendingPinCount = 0;
+
+  function scheduleTasteAffinityUpdate() {
+    _tastePendingPinCount++;
+    if (_tasteAffinityTimer) clearTimeout(_tasteAffinityTimer);
+    _tasteAffinityTimer = setTimeout(function() {
+      var count = _tastePendingPinCount;
+      _tastePendingPinCount = 0;
+      _tasteAffinityTimer = null;
+      console.log('[taste-engine] ' + count + ' new pin(s) — recomputing affinities');
+      triggerTasteComputation('compute-affinities').catch(function(e) {
+        console.warn('[taste-engine] Affinity recomputation error:', e);
+      });
+    }, 30000); // 30s debounce
   }
 
   // =============================================================================
@@ -14233,6 +14252,11 @@ Return JSON:
 
     // Onboarding: track first pin and show hints
     checkOnboardingMilestones(data.links.length);
+
+    // Taste Engine: schedule affinity recomputation (debounced for bulk imports)
+    if (CtrlAuth.getUser && CtrlAuth.getUser()) {
+      scheduleTasteAffinityUpdate();
+    }
 
     return { success: true };
   }
@@ -21538,8 +21562,23 @@ Return JSON:
       loadAllShares();
       initYouTubeSection();
 
-      // Preload taste profile (non-blocking, used by widgets and search)
-      loadTasteProfile().catch(function(e) { console.warn('[taste-engine] Preload error:', e); });
+      // Preload taste profile — if empty and user has enough pins, bootstrap the engine
+      loadTasteProfile().then(function(profile) {
+        var hasDomains = profile && profile.domains && profile.domains.length > 0;
+        if (!hasDomains) {
+          var pinCount = getAllLinks().length;
+          if (pinCount >= 10) {
+            console.log('[taste-engine] Empty profile with ' + pinCount + ' pins — bootstrapping full pipeline');
+            triggerTasteComputation('full-pipeline').then(function(result) {
+              if (result && result.profile) {
+                console.log('[taste-engine] Bootstrap complete — ' + (result.profile.domains || []).length + ' domains discovered');
+              }
+            }).catch(function(e) { console.warn('[taste-engine] Bootstrap error:', e); });
+          } else {
+            console.log('[taste-engine] Only ' + pinCount + ' pins (need 10+), skipping bootstrap');
+          }
+        }
+      }).catch(function(e) { console.warn('[taste-engine] Preload error:', e); });
 
       // Fetch from Supabase and update if different
       const t2 = performance.now();
