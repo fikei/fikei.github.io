@@ -12,7 +12,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VERSION = '0.2.0'
+const VERSION = '0.2.1'
 console.log(`[mcp-oauth] v${VERSION} - OAuth 2.1 authorization server (multi-platform)`)
 
 const BASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth'
@@ -147,7 +147,7 @@ async function handleRegister(req: Request): Promise<Response> {
 // Authorization endpoint
 // ---------------------------------------------------------------------------
 
-function handleAuthorize(url: URL): Response {
+async function handleAuthorize(url: URL): Promise<Response> {
   const clientId = url.searchParams.get('client_id')
   const redirectUri = url.searchParams.get('redirect_uri')
   const responseType = url.searchParams.get('response_type')
@@ -161,6 +161,22 @@ function handleAuthorize(url: URL): Response {
   if (!redirectUri) return err('invalid_request', 'Missing redirect_uri')
   if (!codeChallenge) return err('invalid_request', 'PKCE code_challenge is required')
   if (codeChallengeMethod !== 'S256') return err('invalid_request', 'Only S256 code_challenge_method is supported')
+
+  // Validate redirect_uri: must be in the allowlist OR registered for this client
+  const isAllowed = ALLOWED_REDIRECT_URIS.includes(redirectUri)
+  if (!isAllowed) {
+    const db = getServiceClient()
+    const { data: client } = await db
+      .from('connector_clients')
+      .select('redirect_uris')
+      .eq('client_id', clientId)
+      .single()
+    if (!client) return err('invalid_client', 'Unknown client_id')
+    const registeredUris = (client.redirect_uris as string[]) || []
+    if (!registeredUris.includes(redirectUri)) {
+      return err('invalid_redirect_uri', 'redirect_uri is not registered for this client')
+    }
+  }
 
   // Redirect to consent page with all params
   const consentParams = new URLSearchParams({
@@ -320,9 +336,12 @@ async function handleCodeExchange(body: URLSearchParams): Promise<Response> {
     return err('invalid_grant', 'client_id mismatch')
   }
 
-  // Verify redirect_uri matches
-  if (redirectUri && authCode.redirect_uri !== redirectUri) {
-    return err('invalid_grant', 'redirect_uri mismatch')
+  // Verify redirect_uri matches (required per OAuth 2.1 if present in auth request)
+  if (authCode.redirect_uri) {
+    if (!redirectUri) return err('invalid_request', 'redirect_uri is required')
+    if (authCode.redirect_uri !== redirectUri) {
+      return err('invalid_grant', 'redirect_uri mismatch')
+    }
   }
 
   // Verify PKCE code_verifier → code_challenge
@@ -455,7 +474,7 @@ serve(async (req: Request) => {
 
     // Authorization
     if (path === '/authorize' && req.method === 'GET') {
-      return handleAuthorize(url)
+      return await handleAuthorize(url)
     }
 
     // Authorization code creation (from consent page)
