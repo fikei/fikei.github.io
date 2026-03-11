@@ -188,3 +188,14 @@
   --focus-ring: 2px solid #00fff7;
   --focus-ring-offset: 2px;
 }
+
+/* ============================================
+   Breakpoint Tokens
+   ============================================ */
+:root {
+  --bp-sm: 600px;
+  --bp-md: 900px;
+  --bp-lg: 1200px;
+  --container-terminal: 80ch;
+  --gutter-page: clamp(16px, 5vw, 64px);
+}
