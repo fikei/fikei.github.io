@@ -4,135 +4,154 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ctrl.rodeo Connector — Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      background: #0a0a0a;
-      color: #e0e0e0;
+      font-family: 'Space Grotesk', sans-serif;
+      background: #111;
+      color: #fff;
       min-height: 100vh;
       line-height: 1.6;
     }
     .container {
       max-width: 680px;
       margin: 0 auto;
-      padding: 3rem 1.5rem;
+      padding: 48px 24px;
     }
     .logo {
-      font-size: 0.75rem;
+      font-size: 10px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: #666;
-      margin-bottom: 2rem;
+      color: #999;
+      margin-bottom: 32px;
     }
-    .logo a { color: #666; text-decoration: none; }
-    .logo a:hover { color: #e0e0e0; }
+    .logo a { color: #999; text-decoration: none; }
+    .logo a:hover { color: #fff; }
     h1 {
-      font-size: 1.5rem;
+      font-size: 24px;
       font-weight: 400;
-      margin-bottom: 0.5rem;
+      margin-bottom: 8px;
     }
     .subtitle {
-      color: #888;
-      font-size: 0.85rem;
-      margin-bottom: 3rem;
+      color: #999;
+      font-size: 12px;
+      margin-bottom: 48px;
+      line-height: 1.6;
     }
     h2 {
-      font-size: 0.75rem;
+      font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: #888;
-      margin-top: 2.5rem;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid #222;
+      color: #999;
+      margin-top: 40px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
     }
     h3 {
-      font-size: 0.85rem;
+      font-size: 12px;
       font-weight: 600;
-      margin-top: 1.5rem;
-      margin-bottom: 0.5rem;
+      margin-top: 24px;
+      margin-bottom: 8px;
     }
     p, li {
-      font-size: 0.85rem;
+      font-size: 12px;
       color: #ccc;
-      margin-bottom: 0.75rem;
+      margin-bottom: 12px;
     }
-    ul { padding-left: 1.25rem; }
-    li { margin-bottom: 0.5rem; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 8px; }
+    strong { color: #fff; }
     code {
+      font-family: 'Space Grotesk', sans-serif;
       background: #1a1a1a;
-      padding: 0.15em 0.4em;
-      font-size: 0.8rem;
+      padding: 2px 6px;
+      font-size: 10px;
       border: 1px solid #333;
     }
     pre {
-      background: #111;
+      background: #1a1a1a;
       border: 1px solid #333;
-      padding: 1rem;
+      padding: 16px;
       overflow-x: auto;
-      margin: 1rem 0;
-      font-size: 0.8rem;
-      line-height: 1.5;
+      margin: 16px 0;
+      font-size: 10px;
+      line-height: 1.6;
     }
     pre code {
       background: none;
       border: none;
       padding: 0;
     }
+
+    /* Tool cards */
     .tool-card {
-      border: 1px solid #222;
-      padding: 1rem;
-      margin: 0.75rem 0;
+      border: 1px solid #333;
+      padding: 16px;
+      margin: 12px 0;
+      transition: border-color 0.15s ease;
     }
+    .tool-card:hover { border-color: #666; }
     .tool-card__name {
-      font-size: 0.85rem;
+      font-size: 12px;
       font-weight: 600;
-      margin-bottom: 0.25rem;
+      margin-bottom: 4px;
     }
     .tool-card__desc {
-      font-size: 0.8rem;
+      font-size: 10px;
       color: #999;
+      line-height: 1.6;
     }
     .tool-card__badge {
       display: inline-block;
-      font-size: 0.65rem;
+      font-size: 8px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      padding: 0.1em 0.4em;
-      border: 1px solid #444;
-      color: #888;
-      margin-left: 0.5rem;
+      padding: 2px 6px;
+      border: 1px solid #fff;
+      color: #fff;
+      margin-left: 8px;
+      vertical-align: middle;
     }
     .tool-card__badge--write {
-      border-color: #664;
-      color: #aa8;
+      border-color: #999;
+      color: #999;
     }
+
+    /* Examples */
     .example {
-      background: #111;
-      border-left: 2px solid #444;
-      padding: 1rem;
-      margin: 1rem 0;
+      background: #1a1a1a;
+      border-left: 2px solid #fff;
+      padding: 16px;
+      margin: 16px 0;
     }
     .example__prompt {
-      font-size: 0.8rem;
-      color: #aaa;
-      margin-bottom: 0.5rem;
+      font-size: 12px;
+      color: #fff;
+      margin-bottom: 8px;
+      font-weight: 500;
     }
     .example__result {
-      font-size: 0.8rem;
-      color: #888;
+      font-size: 10px;
+      color: #999;
+      line-height: 1.6;
     }
-    a { color: #e0e0e0; }
-    a:hover { color: #fff; }
+
+    a { color: #fff; }
+    a:hover { text-decoration: none; }
+
     .footer {
-      margin-top: 3rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid #222;
-      font-size: 0.75rem;
-      color: #555;
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #333;
+      font-size: 10px;
+      color: #666;
     }
-    .footer a { color: #666; }
+    .footer a { color: #999; text-decoration: none; }
+    .footer a:hover { color: #fff; }
   </style>
 </head>
 <body>
@@ -197,7 +216,7 @@
     </div>
 
     <div class="tool-card">
-      <div class="tool-card__name">save_pin <span class="tool-card__badge--write tool-card__badge">write</span></div>
+      <div class="tool-card__name">save_pin <span class="tool-card__badge tool-card__badge--write">write</span></div>
       <div class="tool-card__desc">Save a URL to the library. Automatically enriched with images, categories, entities, and tags. Idempotent — saving the same URL twice returns the existing pin.</div>
     </div>
 
