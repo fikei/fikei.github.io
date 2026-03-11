@@ -2,7 +2,7 @@
 // Change these values when the product name changes.
 // Both the MCP server and OAuth consent page reference this file.
 
-export const VERSION = '0.3.0'
+export const VERSION = '0.4.0'
 
 export const PRODUCT_CONFIG = {
   name: 'ctrl.rodeo',

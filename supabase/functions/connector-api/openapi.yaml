@@ -1,0 +1,465 @@
+openapi: 3.1.0
+info:
+  title: ctrl.rodeo Connector API
+  description: >
+    Search, browse, and save to your curated library.
+    Same data as the MCP connector, exposed as REST for
+    OpenAI GPT Actions and Google Gemini Extensions.
+  version: 0.1.0
+  contact:
+    name: ctrl.rodeo
+    url: https://ctrl.rodeo
+
+servers:
+  - url: https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/connector-api
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth/authorize
+          tokenUrl: https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth/token
+          scopes:
+            read: Read library data
+            write: Save and modify pins
+
+  schemas:
+    Pin:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique pin ID (SHA-256 of URL)
+        title:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          description: Board slug
+        content_type:
+          type: string
+          enum: [product, article, book, video, music, repository, social, document, tool, place, recipe, event, newsletter, dataset]
+        taste_tags:
+          type: array
+          items: { type: string }
+        practical_tags:
+          type: array
+          items: { type: string }
+        entities:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              type: { type: string }
+        domain:
+          type: string
+        image:
+          type: string
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Board:
+      type: object
+      properties:
+        slug:
+          type: string
+        count:
+          type: integer
+        description:
+          type: string
+        is_builtin:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /v1/pins/search:
+    get:
+      operationId: searchPins
+      summary: Search saved items by keyword, board, content type, or tags
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+          description: Search query
+        - name: board
+          in: query
+          schema: { type: string }
+          description: Filter by board slug
+        - name: content_type
+          in: query
+          schema: { type: string }
+          description: Filter by content type
+        - name: tag
+          in: query
+          schema: { type: string }
+          description: Filter by tag
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 50 }
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pins:
+                    type: array
+                    items: { $ref: '#/components/schemas/Pin' }
+                  total: { type: integer }
+                  query: { type: string }
+                  board: { type: string }
+
+  /v1/pins/recent:
+    get:
+      operationId: getRecentSaves
+      summary: Get most recently saved items
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 50 }
+        - name: days
+          in: query
+          schema: { type: integer }
+          description: Only include saves from the last N days
+      responses:
+        '200':
+          description: Recent pins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pins:
+                    type: array
+                    items: { $ref: '#/components/schemas/Pin' }
+                  total: { type: integer }
+
+  /v1/pins:
+    post:
+      operationId: savePin
+      summary: Save a URL to the library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, description: URL to save }
+                notes: { type: string, description: Optional notes }
+                category: { type: string, description: Optional board override }
+                source: { type: string, default: connector }
+      responses:
+        '200':
+          description: Pin saved or already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action: { type: string, enum: [created, existing] }
+                  pin: { $ref: '#/components/schemas/Pin' }
+                  message: { type: string }
+
+  /v1/pins/{pin_id}:
+    get:
+      operationId: getPin
+      summary: Get full details for a single pin
+      parameters:
+        - name: pin_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Pin details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pin: { $ref: '#/components/schemas/Pin' }
+    put:
+      operationId: updatePin
+      summary: Edit fields on an existing pin
+      parameters:
+        - name: pin_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                notes: { type: string }
+                category: { type: string }
+                content_type: { type: string }
+                watched: { type: boolean }
+                read: { type: boolean }
+                tags: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: Pin updated
+    delete:
+      operationId: deletePin
+      summary: Permanently delete a pin
+      parameters:
+        - name: pin_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Pin deleted
+
+  /v1/boards:
+    get:
+      operationId: getBoardsList
+      summary: List all boards with item counts
+      responses:
+        '200':
+          description: Board listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  boards:
+                    type: array
+                    items: { $ref: '#/components/schemas/Board' }
+                  total_pins: { type: integer }
+    post:
+      operationId: createBoard
+      summary: Create a new user-defined board
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                prompt: { type: string }
+                pinned: { type: boolean }
+      responses:
+        '200':
+          description: Board created
+
+  /v1/boards/{slug}:
+    get:
+      operationId: getBoard
+      summary: Get all items in a board
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Board contents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pins:
+                    type: array
+                    items: { $ref: '#/components/schemas/Pin' }
+                  total: { type: integer }
+                  board: { type: string }
+                  description: { type: string }
+    put:
+      operationId: updateBoard
+      summary: Edit a board's metadata
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                prompt: { type: string }
+                pinned: { type: boolean }
+      responses:
+        '200':
+          description: Board updated
+    delete:
+      operationId: deleteBoard
+      summary: Delete a user-created board
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: reassign_to
+          in: query
+          schema: { type: string, default: uncategorized }
+      responses:
+        '200':
+          description: Board deleted
+
+  /v1/taste-profile:
+    get:
+      operationId: getTasteProfile
+      summary: Get the user's taste profile — aggregated tags, entities, patterns
+      responses:
+        '200':
+          description: Taste profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taste_tags: { type: array, items: { type: object } }
+                  practical_tags: { type: array, items: { type: object } }
+                  top_entities: { type: array, items: { type: object } }
+                  content_types: { type: object }
+                  total_pins: { type: integer }
+                  boards_analyzed: { type: integer }
+
+  /v1/context:
+    get:
+      operationId: getConnectorContext
+      summary: Get orientation context — board taxonomy, tag system, composition guidance
+      responses:
+        '200':
+          description: Connector context
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/pins/{pin_id}/enrich:
+    post:
+      operationId: reEnrichPin
+      summary: Re-run AI enrichment on a pin
+      parameters:
+        - name: pin_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force_image: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Enrichment triggered
+
+  /v1/pins/batch/enrich:
+    post:
+      operationId: batchReEnrich
+      summary: Batch re-enrich multiple pins
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pin_ids: { type: array, items: { type: string } }
+                board: { type: string }
+                missing_tags: { type: boolean }
+                missing_image: { type: boolean }
+                limit: { type: integer, default: 20, maximum: 50 }
+      responses:
+        '200':
+          description: Batch enrichment triggered
+
+  /v1/pins/batch/move:
+    post:
+      operationId: batchMovePins
+      summary: Move multiple pins to a different board
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to_board]
+              properties:
+                pin_ids: { type: array, items: { type: string } }
+                board: { type: string }
+                to_board: { type: string }
+                limit: { type: integer, default: 100, maximum: 500 }
+      responses:
+        '200':
+          description: Pins moved
+
+  /v1/pins/batch/tag:
+    post:
+      operationId: batchTagPins
+      summary: Add or remove tags from multiple pins
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pin_ids: { type: array, items: { type: string } }
+                board: { type: string }
+                add_tags: { type: array, items: { type: string } }
+                remove_tags: { type: array, items: { type: string } }
+                limit: { type: integer, default: 100, maximum: 500 }
+      responses:
+        '200':
+          description: Tags updated
+
+  /v1/pins/batch/update:
+    post:
+      operationId: batchUpdatePins
+      summary: Set a field to the same value across multiple pins
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field, value]
+              properties:
+                pin_ids: { type: array, items: { type: string } }
+                board: { type: string }
+                field: { type: string, enum: [watched, read, notes, content_type, category] }
+                value: {}
+                limit: { type: integer, default: 100, maximum: 500 }
+      responses:
+        '200':
+          description: Pins updated

@@ -12,18 +12,28 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VERSION = '0.1.1'
-console.log(`[mcp-oauth] v${VERSION} - MCP OAuth 2.1 authorization server`)
+const VERSION = '0.2.0'
+console.log(`[mcp-oauth] v${VERSION} - OAuth 2.1 authorization server (multi-platform)`)
 
 const BASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/mcp-oauth'
 const CONSENT_URL = 'https://ctrl.rodeo/connect/'
 
 const ALLOWED_REDIRECT_URIS = [
+  // Claude (MCP)
   'http://localhost:6274/oauth/callback',
   'http://localhost:6274/oauth/callback/debug',
   'https://claude.ai/api/mcp/auth_callback',
   'https://claude.com/api/mcp/auth_callback',
+  // OpenAI (GPT Actions)
+  'https://chat.openai.com/aip/g/oauth/callback',
+  'https://chatgpt.com/aip/g/oauth/callback',
 ]
+
+function detectPlatform(redirectUri: string): string {
+  if (redirectUri.includes('openai.com') || redirectUri.includes('chatgpt.com')) return 'openai'
+  if (redirectUri.includes('google.com') || redirectUri.includes('gemini')) return 'gemini'
+  return 'claude'
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -109,7 +119,7 @@ async function handleRegister(req: Request): Promise<Response> {
   const clientId = `mcp_${generateToken(16)}`
 
   const db = getServiceClient()
-  const { error: insertErr } = await db.from('mcp_clients').insert({
+  const { error: insertErr } = await db.from('connector_clients').insert({
     client_id: clientId,
     client_name: clientName,
     redirect_uris: redirectUris,
@@ -214,7 +224,7 @@ async function handleCreateCode(req: Request): Promise<Response> {
   const db = getServiceClient()
 
   // Store the code
-  const { error: insertErr } = await db.from('mcp_auth_codes').insert({
+  const { error: insertErr } = await db.from('connector_auth_codes').insert({
     code,
     user_id: user.id,
     client_id: clientId,
@@ -289,7 +299,7 @@ async function handleCodeExchange(body: URLSearchParams): Promise<Response> {
 
   // Look up the authorization code
   const { data: authCode, error: lookupErr } = await db
-    .from('mcp_auth_codes')
+    .from('connector_auth_codes')
     .select('*')
     .eq('code', code)
     .eq('used', false)
@@ -301,7 +311,7 @@ async function handleCodeExchange(body: URLSearchParams): Promise<Response> {
 
   // Check expiry
   if (new Date(authCode.expires_at) < new Date()) {
-    await db.from('mcp_auth_codes').update({ used: true }).eq('code', code)
+    await db.from('connector_auth_codes').update({ used: true }).eq('code', code)
     return err('invalid_grant', 'Authorization code has expired')
   }
 
@@ -322,7 +332,10 @@ async function handleCodeExchange(body: URLSearchParams): Promise<Response> {
   }
 
   // Mark code as used
-  await db.from('mcp_auth_codes').update({ used: true }).eq('code', code)
+  await db.from('connector_auth_codes').update({ used: true }).eq('code', code)
+
+  // Detect platform from redirect_uri
+  const platform = detectPlatform(authCode.redirect_uri)
 
   // Generate tokens
   const accessToken = generateToken(32)
@@ -330,7 +343,7 @@ async function handleCodeExchange(body: URLSearchParams): Promise<Response> {
   const accessExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour
   const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
 
-  const { error: tokenErr } = await db.from('mcp_tokens').insert({
+  const { error: tokenErr } = await db.from('connector_tokens').insert({
     user_id: authCode.user_id,
     client_id: clientId,
     access_token: accessToken,
@@ -338,6 +351,7 @@ async function handleCodeExchange(body: URLSearchParams): Promise<Response> {
     access_token_expires_at: accessExpiresAt,
     refresh_token_expires_at: refreshExpiresAt,
     scopes: authCode.scopes,
+    platform,
   })
 
   if (tokenErr) {
@@ -365,7 +379,7 @@ async function handleRefresh(body: URLSearchParams): Promise<Response> {
 
   // Look up refresh token
   const { data: existing, error: lookupErr } = await db
-    .from('mcp_tokens')
+    .from('connector_tokens')
     .select('*')
     .eq('refresh_token', refreshToken)
     .single()
@@ -376,7 +390,7 @@ async function handleRefresh(body: URLSearchParams): Promise<Response> {
 
   // Check refresh token expiry
   if (existing.refresh_token_expires_at && new Date(existing.refresh_token_expires_at) < new Date()) {
-    await db.from('mcp_tokens').delete().eq('id', existing.id)
+    await db.from('connector_tokens').delete().eq('id', existing.id)
     return err('invalid_grant', 'Refresh token has expired')
   }
 
@@ -392,7 +406,7 @@ async function handleRefresh(body: URLSearchParams): Promise<Response> {
   const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const { error: updateErr } = await db
-    .from('mcp_tokens')
+    .from('connector_tokens')
     .update({
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
