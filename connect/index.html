@@ -191,29 +191,29 @@
 
     <!-- Step 2: Consent (shown after auth) -->
     <div id="consent-section" class="auth-section hidden">
-      <h1>Share with <span class="client-name" id="client-name-2">Claude</span></h1>
-      <p class="subtitle">Choose how much of your library to share.</p>
+      <h1>What can Claude see?</h1>
+      <p class="subtitle">You can change this anytime in your Boards settings.</p>
 
       <div class="tier-section">
-        <div class="tier-label">Privacy level</div>
+        <div class="tier-label">Choose one</div>
 
         <div class="tier-option" data-tier="taste_only" onclick="selectTier('taste_only')">
-          <div class="tier-name">Taste Only</div>
-          <div class="tier-desc">Categories, tags, and interests — no specific links or titles.</div>
+          <div class="tier-name">Vibe only</div>
+          <div class="tier-desc">Claude learns your taste — categories, tags, patterns — but never sees what you actually saved. Good if you want recommendations without revealing specifics.</div>
         </div>
 
         <div class="tier-option selected" data-tier="library" onclick="selectTier('library')">
-          <div class="tier-name">Library</div>
-          <div class="tier-desc">Titles, categories, tags — no URLs or private notes.</div>
+          <div class="tier-name">My collection</div>
+          <div class="tier-desc">Claude sees titles, tags, and images but not URLs or private notes. Best balance — it can reference your actual saves without linking out. <span style="color:#fff">Recommended.</span></div>
         </div>
 
         <div class="tier-option" data-tier="full_access" onclick="selectTier('full_access')">
-          <div class="tier-name">Full Access</div>
-          <div class="tier-desc">Everything including URLs, notes, and images.</div>
+          <div class="tier-name">Everything</div>
+          <div class="tier-desc">Full access including URLs, notes, and images. Claude can open links, quote your notes, and work with your complete library.</div>
         </div>
       </div>
 
-      <button class="allow-btn" id="allow-btn" onclick="authorize()">Allow</button>
+      <button class="allow-btn" id="allow-btn" onclick="authorize()">Connect</button>
       <div id="consent-status" class="status"></div>
     </div>
 
