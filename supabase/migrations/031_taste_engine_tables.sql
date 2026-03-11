@@ -118,7 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_user ON taste_snapshots(user_id);
 CREATE TABLE IF NOT EXISTS pin_intent (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  link_id UUID NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+  link_id TEXT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
   intent TEXT NOT NULL DEFAULT 'appreciate' CHECK (intent IN ('acquire', 'reference', 'appreciate')),
   action_state TEXT NOT NULL DEFAULT 'unprocessed' CHECK (action_state IN ('unprocessed', 'active', 'done', 'archived')),
   horizon TEXT DEFAULT 'someday' CHECK (horizon IN ('now', 'soon', 'someday', 'ongoing')),
