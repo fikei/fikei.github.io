@@ -52,7 +52,8 @@
 
 :root {
   /* === Boards-specific tokens (not in DS) === */
-  --grid-gap: 16px;
+  --grid-gap: 12px;
+  --grid-cols: 2;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -1265,24 +1266,21 @@ a:hover { color: var(--accent-cyan); }
    Grid
    ============================================ */
 .grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-auto-flow: dense; /* Fill gaps when cards expand */
-  gap: var(--grid-gap);
+  position: relative;
   padding: var(--space-4);
   padding-bottom: calc(80px + var(--safe-bottom)); /* Space for bottom navigation */
 }
 
 @media (min-width: 600px) {
-  .grid { grid-template-columns: repeat(3, 1fr); }
+  .grid { --grid-cols: 3; padding-left: 24px; padding-right: 24px; }
 }
 
 @media (min-width: 900px) {
-  .grid { grid-template-columns: repeat(4, 1fr); }
+  .grid { --grid-cols: 4; }
 }
 
 @media (min-width: 1200px) {
-  .grid { grid-template-columns: repeat(5, 1fr); }
+  .grid { --grid-cols: 5; padding-left: 40px; padding-right: 40px; }
 }
 
 /* ============================================
@@ -1717,13 +1715,16 @@ a:hover { color: var(--accent-cyan); }
    Grid Item
    ============================================ */
 .grid-item {
-  position: relative;
-  aspect-ratio: 1;
+  position: absolute;
   overflow: hidden;
   cursor: pointer;
   background: var(--bg-surface);
   border: 0.5px solid var(--border-subtle);
-  transition: transform 0.1s, opacity 0.1s, border-color 0.15s;
+  transition: border-color 0.15s;
+}
+
+.grid-item--placeholder {
+  aspect-ratio: 1;
 }
 
 .grid-item:hover {
@@ -2226,9 +2227,9 @@ a:hover { color: var(--accent-cyan); }
 }
 
 .grid-item__image {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   transition: filter 0.2s, opacity 0.4s ease-in-out;
 }
 
@@ -2394,140 +2395,7 @@ a:hover { color: var(--accent-cyan); }
   color: var(--bg);
 }
 
-/* Expanded States - Shared */
-.grid-item--expanded-medium,
-.grid-item--expanded-large {
-  aspect-ratio: auto;
-  padding: var(--space-4);
-  background: var(--bg);
-  position: relative;
-}
-
-.grid-item--expanded-medium .grid-item__overlay,
-.grid-item--expanded-large .grid-item__overlay {
-  display: none;
-}
-
-.grid-item--expanded-medium .grid-item__category,
-.grid-item--expanded-large .grid-item__category {
-  opacity: 1;
-}
-
-
-.grid-item--expanded-medium .grid-item__details,
-.grid-item--expanded-large .grid-item__details {
-  display: flex;
-}
-
-/* Medium State: 2×2 */
-.grid-item--expanded-medium {
-  grid-column: span 2;
-  grid-row: span 2;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr auto;
-  gap: var(--space-3);
-}
-
-.grid-item--expanded-medium .grid-item__image {
-  grid-row: 1 / 2;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.grid-item--expanded-medium .grid-item__initial-wrap {
-  grid-row: 1 / 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--fg);
-}
-
-.grid-item--expanded-medium .grid-item__details {
-  grid-row: 1 / 2;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.grid-item--expanded-medium .grid-item__actions {
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
-
-.grid-item--expanded-medium .grid-item__details-description {
-  -webkit-line-clamp: 2;
-}
-
-/* Large State: 3×2 */
-.grid-item--expanded-large {
-  grid-column: span 3;
-  grid-row: span 2;
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  grid-template-rows: 1fr auto;
-  gap: var(--space-4);
-}
-
-.grid-item--expanded-large .grid-item__image {
-  grid-row: 1 / 3;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.grid-item--expanded-large .grid-item__initial-wrap {
-  grid-row: 1 / 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--fg);
-}
-
-.grid-item--expanded-large .grid-item__details {
-  grid-row: 1 / 2;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.grid-item--expanded-large .grid-item__actions {
-  grid-row: 2;
-}
-
-.grid-item--expanded-large .grid-item__details-description {
-  -webkit-line-clamp: 4;
-}
-
-/* Resize Handle */
-.grid-item__resize {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 24px;
-  height: 24px;
-  cursor: nwse-resize;
-  display: none;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 4px;
-}
-
-.grid-item--expanded-medium .grid-item__resize,
-.grid-item--expanded-large .grid-item__resize {
-  display: flex;
-}
-
-.grid-item__resize::before {
-  content: '';
-  width: 12px;
-  height: 12px;
-  border-right: 2px solid var(--muted);
-  border-bottom: 2px solid var(--muted);
-}
-
-.grid-item__resize:hover::before {
-  border-color: var(--fg);
-}
+/* Expanded states removed — detail now shown in full-page overlay (v2.20.0) */
 
 /* Shared detail styles */
 .grid-item__details {
@@ -2770,11 +2638,6 @@ a:hover { color: var(--accent-cyan); }
   transition: opacity 0.15s, background 0.15s;
 }
 
-.grid-item--expanded-medium .grid-item__menu-btn,
-.grid-item--expanded-large .grid-item__menu-btn {
-  opacity: 1;
-}
-
 .grid-item__menu-btn:hover {
   background: rgba(0, 0, 0, 0.8);
 }
@@ -2841,40 +2704,306 @@ a:hover { color: var(--accent-cyan); }
   margin: var(--space-1) 0;
 }
 
-/* Responsive: Mobile */
+/* Mobile expanded overrides removed — v2.20.0 */
+
+/* ============================================
+   Pin Detail Overlay (v2.20.0)
+   ============================================ */
+.pin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pin-overlay--visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pin-overlay__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg);
+}
+
+.pin-overlay__back,
+.pin-overlay__close {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pin-overlay__back:hover,
+.pin-overlay__close:hover {
+  border-color: var(--fg-muted);
+  background: var(--bg-surface);
+}
+
+.pin-overlay__body {
+  display: flex;
+  gap: 32px;
+  padding: 0 40px 40px;
+  min-height: calc(100vh - 80px);
+}
+
+.pin-overlay__media {
+  flex: 0 0 55%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--space-4);
+}
+
+.pin-overlay__media img {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  border: 0.5px solid var(--border-subtle);
+}
+
+.pin-overlay__media-initial {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 120px;
+  font-weight: 700;
+  color: var(--bg);
+}
+
+.pin-overlay__panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  overflow-y: auto;
+  max-height: calc(100vh - 80px);
+}
+
+.pin-overlay__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.pin-overlay__domain {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent-cyan);
+  text-decoration: none;
+}
+
+.pin-overlay__domain:hover {
+  text-decoration: underline;
+}
+
+.pin-overlay__description {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.pin-overlay__notes {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.pin-overlay__notes:focus {
+  outline: none;
+  border-color: var(--fg-muted);
+}
+
+.pin-overlay__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.pin-overlay__meta-item {
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.pin-overlay__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+.pin-overlay__action {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pin-overlay__action:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.pin-overlay__action--danger {
+  border-color: #c00;
+  color: #c00;
+}
+
+.pin-overlay__action--danger:hover {
+  background: #c00;
+  color: var(--fg);
+}
+
+.pin-overlay__action--done {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.pin-overlay__rich-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.pin-overlay__platform-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.pin-overlay__merge-sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+.pin-overlay__merge-source {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.pin-overlay__merge-source a {
+  color: var(--accent-cyan);
+}
+
+.pin-overlay__menu-container {
+  position: relative;
+}
+
+.pin-overlay__menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  min-width: 160px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.15s, visibility 0.15s, transform 0.15s;
+  z-index: 20;
+}
+
+.pin-overlay__menu--visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.pin-overlay__menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pin-overlay__menu-item:hover {
+  background: var(--bg-surface);
+}
+
+/* Mobile overlay: single column stacked */
 @media (max-width: 599px) {
-  /* On mobile, both states become full-width stacked */
-  .grid-item--expanded-medium,
-  .grid-item--expanded-large {
-    grid-column: 1 / -1;
-    grid-row: span 1;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
+  .pin-overlay__header {
+    padding: var(--space-3) var(--space-4);
   }
 
-  .grid-item--expanded-medium .grid-item__image,
-  .grid-item--expanded-large .grid-item__image,
-  .grid-item--expanded-medium .grid-item__initial-wrap,
-  .grid-item--expanded-large .grid-item__initial-wrap {
-    grid-row: 1;
-    aspect-ratio: 16/9;
-    height: auto;
+  .pin-overlay__body {
+    flex-direction: column;
+    padding: 0 var(--space-4) var(--space-4);
+    gap: var(--space-4);
   }
 
-  .grid-item--expanded-medium .grid-item__details,
-  .grid-item--expanded-large .grid-item__details {
-    grid-row: 2;
+  .pin-overlay__media {
+    flex: none;
   }
 
-  .grid-item--expanded-medium .grid-item__actions,
-  .grid-item--expanded-large .grid-item__actions {
-    grid-column: 1;
-    grid-row: 3;
+  .pin-overlay__media img {
+    max-height: 50vh;
   }
 
-  /* Hide resize on mobile - use tap to toggle */
-  .grid-item__resize {
-    display: none !important;
+  .pin-overlay__panel {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 899px) {
+  .pin-overlay__body {
+    padding: 0 24px 24px;
   }
 }
 
@@ -2978,22 +3107,6 @@ a:hover { color: var(--accent-cyan); }
 .grid-item__platform-icon--beatport { background: var(--color-beatport); }
 .grid-item__platform-icon--deezer { background: var(--color-deezer); }
 .grid-item__platform-icon--audiomack { background: var(--color-audiomack); }
-
-/* Expanded listen cards — show artist/track in details */
-.grid-item--listen.grid-item--expanded-medium .grid-item__overlay,
-.grid-item--listen.grid-item--expanded-large .grid-item__overlay {
-  display: none;
-}
-
-.grid-item--listen.grid-item--expanded-medium .grid-item__format-badge,
-.grid-item--listen.grid-item--expanded-large .grid-item__format-badge {
-  opacity: 1;
-  position: static;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  width: fit-content;
-}
 
 /* ============================================
    Watch Variant
@@ -3153,37 +3266,6 @@ a:hover { color: var(--accent-cyan); }
   }
 }
 
-/* Expanded book cards */
-.grid-item--book.grid-item--expanded-medium .grid-item__overlay,
-.grid-item--book.grid-item--expanded-large .grid-item__overlay {
-  display: none;
-}
-.grid-item--book.grid-item--expanded-medium .grid-item__format-badge,
-.grid-item--book.grid-item--expanded-large .grid-item__format-badge {
-  opacity: 1;
-  position: static;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  width: fit-content;
-}
-
-/* Expanded watch cards */
-.grid-item--watch.grid-item--expanded-medium .grid-item__overlay,
-.grid-item--watch.grid-item--expanded-large .grid-item__overlay {
-  display: none;
-}
-
-.grid-item--watch.grid-item--expanded-medium .grid-item__format-badge,
-.grid-item--watch.grid-item--expanded-large .grid-item__format-badge {
-  opacity: 1;
-  position: static;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  width: fit-content;
-}
-
 /* ============================================
    Recipe Card Styles
    ============================================ */
@@ -3223,12 +3305,6 @@ a:hover { color: var(--accent-cyan); }
 .grid-item--recipe:hover .grid-item__image {
   filter: none;
 }
-/* Expanded recipe cards */
-.grid-item--recipe.grid-item--expanded-medium .grid-item__overlay,
-.grid-item--recipe.grid-item--expanded-large .grid-item__overlay {
-  display: none;
-}
-
 /* ============================================
    Recipe Drawer
    Right-side panel for recipe viewer
@@ -6211,6 +6287,18 @@ a:hover { color: var(--accent-cyan); }
 
   <main class="grid" id="grid" role="main"></main>
 
+  <!-- Pin Detail Overlay (v2.20.0) -->
+  <div class="pin-overlay" id="pinOverlay">
+    <div class="pin-overlay__header">
+      <button class="pin-overlay__back" id="pinOverlayBack">&#8249; Back</button>
+      <button class="pin-overlay__close" id="pinOverlayClose">&times;</button>
+    </div>
+    <div class="pin-overlay__body">
+      <div class="pin-overlay__media" id="pinOverlayMedia"></div>
+      <div class="pin-overlay__panel" id="pinOverlayPanel"></div>
+    </div>
+  </div>
+
   <!-- AI Widget Section - Footer Zone -->
   <section class="widget-section widget-zone widget-zone--footer" id="widgetFooter" data-zone="footer">
     <div class="widget-section__content" id="widgetFooterContent"></div>
@@ -7057,8 +7145,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.19.0';
-  console.log('[boards] v' + VERSION + ' - secondary signal import (Spotify + YouTube Takeout)');
+  const VERSION = '2.20.0';
+  console.log('[boards] v' + VERSION + ' - masonry grid + full-page detail overlay');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -13652,24 +13740,10 @@ Return JSON:
     localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(entries));
   }
 
-  // Load/save expanded cards state (localStorage + Supabase sync)
-  function loadExpandedCards() {
-    try {
-      const d = localStorage.getItem(EXPANDED_KEY);
-      return d ? JSON.parse(d) : {};
-    } catch { return {}; }
-  }
-
-  function saveExpandedCards(cards) {
-    localStorage.setItem(EXPANDED_KEY, JSON.stringify(cards));
-    // Sync to Supabase if logged in
-    if (currentUser) {
-      supabase.from('expanded_cards').upsert({
-        user_id: currentUser.id,
-        cards: cards
-      }).then(() => {});
-    }
-  }
+  // Expanded cards removed in v2.20.0 — detail now shown in full-page overlay.
+  // Functions kept as no-ops to avoid breaking scattered references.
+  function loadExpandedCards() { return {}; }
+  function saveExpandedCards() {}
 
   // Persist board metadata (user-created boards) to Supabase
   // Extracts only user-board-relevant fields to keep payload small
@@ -16103,11 +16177,8 @@ Return JSON:
 
       const hasImg = l.image && l.image.length > 0;
       const initial = l.title ? l.title.charAt(0).toUpperCase() : '?';
-      const expansionState = expandedCards[l.id]; // 'medium', 'large', or undefined
-      const expandedClass = expansionState ? ` grid-item--expanded-${expansionState}` : '';
       const isNew = newIdSet.has(l.id);
       const newClass = isNew ? ' grid-item--new' : '';
-      const isExpanded = !!expansionState;
       const dateStr = new Date(l.addedAt).toLocaleDateString();
 
       const contentTypeDisplay = l.content_type && l.content_type !== 'unknown' ? cap(l.content_type) : '';
@@ -16174,6 +16245,8 @@ Return JSON:
         return words.slice(0, maxWords).join(' ') + '…';
       }
 
+      // v2.20.0: Details panel removed from card — now rendered in pin overlay.
+      // Only keep the kebab menu on the card for hover actions.
       const detailsHtml = `
         <div class="grid-item__menu-container">
           <button class="grid-item__menu-btn" data-action="menu" aria-label="More options"></button>
@@ -16185,39 +16258,7 @@ Return JSON:
             <div class="grid-item__menu-divider"></div>
             <button class="grid-item__menu-item" data-action="delete" style="color: #c00;">Delete</button>
           </div>
-        </div>
-        <div class="grid-item__details">
-          <h2 class="grid-item__details-title">${esc(richMeta?.[richConfig?.overlay?.titleField] || _music?.trackTitle || l.title)}</h2>
-          ${richConfig && richMeta ? `
-            ${richConfig.overlay?.metaField && richMeta[richConfig.overlay.metaField] ? `<p class="grid-item__details-domain">${esc(richMeta[richConfig.overlay.metaField])}</p>` : ''}
-            ${richDetailsHtml}
-            ${(richMeta[richConfig.summaryField] || l.description) ? `<p class="grid-item__details-description">${esc(truncateSummary(richMeta[richConfig.summaryField] || l.description, 60))}</p>` : ''}
-          ` : `
-            <p class="grid-item__details-domain">${esc(_music?.artist || l.domain)}</p>
-            ${l.description ? `<p class="grid-item__details-description">${esc(l.description)}</p>` : ''}
-            ${musicDetailsHtml}
-            <div class="grid-item__details-meta">
-              <span>${cap(l.category)}</span>
-              ${contentTypeDisplay ? `<span>${contentTypeDisplay}</span>` : ''}
-              <span>${dateStr}</span>
-            </div>
-          `}
-          <textarea class="pin-notes" placeholder="Add a note..." rows="2" data-link-id="${l.id}">${esc(l.notes || '')}</textarea>
-          ${l.is_merged && l.sources ? `
-          <div class="merge-sources">
-            <div class="merge-sources__label">${l.sources.length} sources</div>
-            ${l.sources.map(s => `<div class="merge-sources__item">
-              <a href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.title || s.url)}">${esc(s.domain)}/${esc(truncateStr(s.url.replace(/^https?:\/\/[^/]+\/?/, ''), 30))}</a>
-            </div>`).join('')}
-            <button class="merge-sources__unmerge" data-action="unmerge">Unmerge</button>
-          </div>` : ''}
-          <div class="grid-item__actions">
-            <a href="${l.url}" target="_blank" rel="noopener" class="grid-item__action" data-action="visit">Visit</a>
-            ${richActionsHtml}
-            ${richConfig?.doneField ? `<button class="grid-item__action grid-item__action--done${isDone ? ' grid-item__action--done-active' : ''}" data-action="toggle-done">${isDone ? '✓ ' + richConfig.doneLabel : richConfig.doneLabel + '?'}</button>` : ''}
-          </div>
-        </div>
-        <div class="grid-item__resize" data-action="resize"></div>`;
+        </div>`;
 
       // Merged pin badge and class
       const mergedClass = l.is_merged ? ' grid-item--merged' : '';
@@ -16371,7 +16412,7 @@ Return JSON:
 
         const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
+        html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
           ${mergeBadgeHtml}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy">
@@ -16386,10 +16427,10 @@ Return JSON:
           : l.category;
         const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${mergedClass}${expandedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
+        html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
           ${mergeBadgeHtml}
-          ${isExpanded ? `<div class="grid-item__initial-wrap"><span class="grid-item__initial">${initial}</span></div>` : `<span class="grid-item__initial">${initial}</span>`}
+          <span class="grid-item__initial">${initial}</span>
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
@@ -16412,6 +16453,17 @@ Return JSON:
 
     grid.innerHTML = html;
 
+    // Masonry layout (v2.20.0)
+    layoutMasonry();
+
+    // Attach image load handlers to re-layout when lazy images arrive
+    grid.querySelectorAll('.grid-item__image').forEach(img => {
+      if (!img.complete) {
+        img.addEventListener('load', layoutMasonry, { once: true });
+        img.addEventListener('error', layoutMasonry, { once: true });
+      }
+    });
+
     // --- Design Constraints: annotate rendered components ---
     if (window.DS_CONSTRAINTS && window.DS_CONSTRAINTS.ready) {
       window.DS_CONSTRAINTS.annotate(grid);
@@ -16426,6 +16478,340 @@ Return JSON:
       }, 600);
     }
   }
+
+  // ============================================
+  // Masonry Layout Engine (v2.20.0)
+  // ============================================
+
+  let _masonryRaf = null;
+  function layoutMasonry() {
+    if (_masonryRaf) cancelAnimationFrame(_masonryRaf);
+    _masonryRaf = requestAnimationFrame(_doMasonryLayout);
+  }
+
+  function _doMasonryLayout() {
+    _masonryRaf = null;
+    const items = grid.querySelectorAll('.grid-item, .lookback-card');
+    if (!items.length) { grid.style.height = ''; return; }
+
+    const style = getComputedStyle(grid);
+    const cols = parseInt(style.getPropertyValue('--grid-cols')) || 2;
+    const gap = parseInt(style.getPropertyValue('--grid-gap')) || 12;
+    const padLeft = parseFloat(style.paddingLeft) || 0;
+    const padRight = parseFloat(style.paddingRight) || 0;
+    const containerWidth = grid.clientWidth - padLeft - padRight;
+    const colWidth = (containerWidth - (cols - 1) * gap) / cols;
+    const colHeights = new Array(cols).fill(0);
+
+    items.forEach(item => {
+      // Lookback cards and widget cards span full width
+      if (item.classList.contains('lookback-card') || item.classList.contains('widget-card')) {
+        const maxH = Math.max(...colHeights);
+        // Align all columns before placing full-width item
+        colHeights.fill(maxH);
+        item.style.position = 'absolute';
+        item.style.width = containerWidth + 'px';
+        item.style.left = '0px';
+        item.style.top = maxH + 'px';
+        const h = item.offsetHeight;
+        colHeights.fill(maxH + h + gap);
+        return;
+      }
+
+      // Regular cards: place in shortest column
+      const shortest = colHeights.indexOf(Math.min(...colHeights));
+      item.style.position = 'absolute';
+      item.style.width = colWidth + 'px';
+      item.style.left = (shortest * (colWidth + gap)) + 'px';
+      item.style.top = colHeights[shortest] + 'px';
+      colHeights[shortest] += item.offsetHeight + gap;
+    });
+
+    grid.style.height = Math.max(...colHeights) + 'px';
+  }
+
+  // Re-layout on viewport resize
+  const _masonryRO = new ResizeObserver(() => layoutMasonry());
+  _masonryRO.observe(grid);
+
+  // ============================================
+  // Pin Detail Overlay (v2.20.0)
+  // ============================================
+
+  const pinOverlay = $('pinOverlay');
+  const pinOverlayMedia = $('pinOverlayMedia');
+  const pinOverlayPanel = $('pinOverlayPanel');
+  let _overlayScrollY = 0;
+  let _overlayCurrentId = null;
+
+  function openPinOverlay(id) {
+    const link = getAllLinks().find(l => l.id === id);
+    if (!link) return;
+
+    _overlayCurrentId = id;
+    _overlayScrollY = window.scrollY;
+
+    // Render media
+    if (link.image) {
+      pinOverlayMedia.innerHTML = `<img src="${secureImg(link.image)}" alt="${esc(link.title || '')}">`;
+    } else {
+      const initial = link.title ? link.title.charAt(0).toUpperCase() : '?';
+      pinOverlayMedia.innerHTML = `<div class="pin-overlay__media-initial">${initial}</div>`;
+    }
+
+    // Render panel
+    pinOverlayPanel.innerHTML = renderOverlayPanel(link);
+
+    // Show overlay
+    pinOverlay.classList.add('pin-overlay--visible');
+    document.body.style.overflow = 'hidden';
+
+    // Update URL hash
+    history.pushState({ pinOverlay: id }, '', '#pin/' + id);
+  }
+
+  function closePinOverlay() {
+    if (!pinOverlay.classList.contains('pin-overlay--visible')) return;
+    _overlayCurrentId = null;
+
+    pinOverlay.classList.remove('pin-overlay--visible');
+    document.body.style.overflow = '';
+
+    // Restore scroll
+    window.scrollTo(0, _overlayScrollY);
+
+    // Clear hash without triggering hashchange
+    if (location.hash.startsWith('#pin/')) {
+      history.pushState(null, '', location.pathname + location.search);
+    }
+  }
+
+  function navigateOverlay(direction) {
+    if (!_overlayCurrentId) return;
+    const links = getFilteredSortedLinks();
+    const idx = links.findIndex(l => l.id === _overlayCurrentId);
+    if (idx === -1) return;
+    const nextIdx = idx + direction;
+    if (nextIdx < 0 || nextIdx >= links.length) return;
+    openPinOverlay(links[nextIdx].id);
+  }
+
+  // Helper: get current filtered + sorted links (mirrors renderGrid logic)
+  function getFilteredSortedLinks() {
+    let links = getAllLinks();
+    if (currentFilter !== 'all') links = links.filter(l => l.category === currentFilter);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      links = links.filter(l =>
+        (l.title || '').toLowerCase().includes(q) ||
+        (l.domain || '').toLowerCase().includes(q) ||
+        (l.description || '').toLowerCase().includes(q) ||
+        (l.notes || '').toLowerCase().includes(q)
+      );
+    }
+    const data = load();
+    const order = data.linkOrder || [];
+    return [...links].sort((a, b) => {
+      const aIdx = order.indexOf(a.id);
+      const bIdx = order.indexOf(b.id);
+      if (aIdx === -1 && bIdx === -1) return new Date(b.addedAt) - new Date(a.addedAt);
+      if (aIdx === -1) return 1;
+      if (bIdx === -1) return -1;
+      return aIdx - bIdx;
+    });
+  }
+
+  function renderOverlayPanel(link) {
+    const dateStr = new Date(link.addedAt).toLocaleDateString();
+    const contentTypeDisplay = link.content_type && link.content_type !== 'unknown' ? cap(link.content_type) : '';
+    const richConfig = RICH_CONTENT[link.category] || null;
+    const richMeta = richConfig ? link[richConfig.metaField] : null;
+    const isDone = richConfig?.doneField ? link[richConfig.doneField] : false;
+    const music = link.category === 'listen' ? link.music : null;
+
+    // Title
+    let title = link.title;
+    if (richConfig && richMeta && richConfig.overlay?.titleField) {
+      title = richMeta[richConfig.overlay.titleField] || title;
+    } else if (music?.trackTitle) {
+      title = music.trackTitle;
+    }
+
+    // Subtitle (domain / artist / creator)
+    let subtitle = link.domain;
+    if (music?.artist) subtitle = music.artist;
+    else if (richConfig?.overlay?.metaField && richMeta?.[richConfig.overlay.metaField]) {
+      subtitle = richMeta[richConfig.overlay.metaField];
+    }
+
+    // Description
+    const desc = (richConfig && richMeta && richConfig.summaryField)
+      ? (richMeta[richConfig.summaryField] || link.description || '')
+      : (link.description || '');
+
+    // Rich metadata line
+    let richMetaHtml = '';
+    if (richConfig && richMeta) {
+      const parts = richConfig.metaLine
+        .map(m => { const v = richMeta[m.field]; return v != null ? `<span class="pin-overlay__meta-item">${esc(m.format ? m.format(v) : String(v))}</span>` : null; })
+        .filter(Boolean);
+      if (parts.length) richMetaHtml = `<div class="pin-overlay__rich-meta">${parts.join('')}</div>`;
+      richMetaHtml += richConfig.extras?.(richMeta) || '';
+    } else if (music) {
+      const parts = [];
+      if (music.albumTitle) parts.push(esc(music.albumTitle));
+      if (music.genre) parts.push(esc(music.genre));
+      if (music.bpm) parts.push(music.bpm + ' BPM');
+      if (music.key) parts.push(esc(music.key));
+      const dur = music.duration ? formatDuration(music.duration) : '';
+      if (dur) parts.push(dur);
+      if (parts.length) richMetaHtml = `<div class="pin-overlay__rich-meta">${parts.map(p => `<span class="pin-overlay__meta-item">${p}</span>`).join('')}</div>`;
+    }
+
+    // Actions
+    let actionsHtml = `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="pin-overlay__action" data-action="visit">Visit</a>`;
+    if (richConfig && richMeta) {
+      const extLink = richConfig.externalLink?.(richMeta);
+      if (extLink) {
+        actionsHtml += `<a href="${esc(extLink.url)}" target="_blank" rel="noopener" class="pin-overlay__action">${esc(extLink.label)}</a>`;
+      }
+    }
+    if (richConfig?.doneField) {
+      actionsHtml += `<button class="pin-overlay__action pin-overlay__action--done${isDone ? ' pin-overlay__action--done-active' : ''}" data-action="toggle-done" data-link-id="${link.id}">${isDone ? '&#10003; ' + richConfig.doneLabel : richConfig.doneLabel + '?'}</button>`;
+    }
+    const hasRecipe = link.recipe && (link.recipe.ingredients?.length || link.recipe.instructions?.length);
+    if (hasRecipe) {
+      actionsHtml += `<button class="pin-overlay__action" data-action="view-recipe" data-link-id="${link.id}">Recipe</button>`;
+    }
+
+    // Merged sources
+    let mergeHtml = '';
+    if (link.is_merged && link.sources) {
+      mergeHtml = `<div class="pin-overlay__merge-sources">
+        <div style="font-size: var(--text-xs); color: var(--fg-subtle); margin-bottom: var(--space-2);">${link.sources.length} merged sources</div>
+        ${link.sources.map(s => `<div class="pin-overlay__merge-source"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.domain)}</a> — ${esc(s.title || '')}</div>`).join('')}
+      </div>`;
+    }
+
+    return `
+      <h1 class="pin-overlay__title">${esc(title)}</h1>
+      <a href="${esc(link.url)}" target="_blank" rel="noopener" class="pin-overlay__domain">› ${esc(subtitle)}</a>
+      ${desc ? `<p class="pin-overlay__description">${esc(desc)}</p>` : ''}
+      ${richMetaHtml}
+      <textarea class="pin-overlay__notes" placeholder="Add a note..." data-link-id="${link.id}">${esc(link.notes || '')}</textarea>
+      <div class="pin-overlay__meta">
+        <span class="pin-overlay__meta-item">${cap(link.category)}</span>
+        ${contentTypeDisplay ? `<span class="pin-overlay__meta-item">${contentTypeDisplay}</span>` : ''}
+        <span class="pin-overlay__meta-item">${dateStr}</span>
+      </div>
+      <div class="pin-overlay__actions">${actionsHtml}</div>
+      ${mergeHtml}
+      <div class="pin-overlay__menu-container">
+        <button class="pin-overlay__action" data-action="overlay-menu">•••</button>
+        <div class="pin-overlay__menu" id="pinOverlayMenu">
+          <button class="pin-overlay__menu-item" data-action="share" data-link-id="${link.id}">Share</button>
+          <button class="pin-overlay__menu-item" data-action="refresh" data-link-id="${link.id}">Refresh</button>
+          <button class="pin-overlay__menu-item" data-action="organize" data-link-id="${link.id}">Organize</button>
+          <button class="pin-overlay__menu-item" data-action="delete" data-link-id="${link.id}" style="color: #c00;">Delete</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Overlay event handlers
+  $('pinOverlayBack').onclick = () => closePinOverlay();
+  $('pinOverlayClose').onclick = () => closePinOverlay();
+
+  // Overlay panel click delegation
+  pinOverlayPanel.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const linkId = btn.dataset.linkId || _overlayCurrentId;
+
+    if (action === 'overlay-menu') {
+      const menu = $('pinOverlayMenu');
+      menu.classList.toggle('pin-overlay__menu--visible');
+      return;
+    }
+
+    if (action === 'visit') return; // let <a> navigate
+
+    if (action === 'toggle-done') {
+      const link = getAllLinks().find(l => l.id === linkId);
+      const rc = RICH_CONTENT[link?.category];
+      if (link && rc?.doneField) {
+        const newVal = !link[rc.doneField];
+        updateLink(linkId, { [rc.doneField]: newVal });
+        openPinOverlay(linkId); // re-render
+        renderGrid();
+      }
+      return;
+    }
+
+    if (action === 'view-recipe') {
+      const link = getAllLinks().find(l => l.id === linkId);
+      if (link) openRecipeDrawer(link);
+      return;
+    }
+
+    if (action === 'share' || action === 'refresh' || action === 'organize' || action === 'delete') {
+      // Close overlay menu
+      const menu = $('pinOverlayMenu');
+      if (menu) menu.classList.remove('pin-overlay__menu--visible');
+      // Dispatch to existing grid action handlers via synthetic click
+      const cardEl = grid.querySelector(`[data-id="${linkId}"]`);
+      if (cardEl) {
+        const menuBtn = cardEl.querySelector(`[data-action="${action}"]`);
+        if (menuBtn) menuBtn.click();
+      }
+      if (action === 'delete') closePinOverlay();
+      return;
+    }
+  });
+
+  // Notes save on blur (overlay)
+  pinOverlayPanel.addEventListener('focusout', (e) => {
+    if (e.target.classList.contains('pin-overlay__notes')) {
+      const linkId = e.target.dataset.linkId;
+      const notes = e.target.value;
+      if (linkId) updateLink(linkId, { notes });
+    }
+  });
+
+  // Close overlay menu on outside click
+  document.addEventListener('click', (e) => {
+    const menu = $('pinOverlayMenu');
+    if (menu && !e.target.closest('.pin-overlay__menu-container')) {
+      menu.classList.remove('pin-overlay__menu--visible');
+    }
+  });
+
+  // Hash routing for overlay
+  window.addEventListener('popstate', () => {
+    const hash = location.hash;
+    if (hash.startsWith('#pin/')) {
+      const id = hash.slice(5);
+      if (id !== _overlayCurrentId) openPinOverlay(id);
+    } else {
+      closePinOverlay();
+    }
+  });
+
+  // On load: check hash
+  if (location.hash.startsWith('#pin/')) {
+    const id = location.hash.slice(5);
+    setTimeout(() => openPinOverlay(id), 100);
+  }
+
+  // Keyboard navigation for overlay
+  document.addEventListener('keydown', (e) => {
+    if (!pinOverlay.classList.contains('pin-overlay--visible')) return;
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    if (e.key === 'Escape') { closePinOverlay(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { navigateOverlay(-1); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { navigateOverlay(1); e.preventDefault(); }
+  });
 
   // ============================================
   // Events
@@ -17556,15 +17942,7 @@ Return JSON:
         // Let the link handle itself
         return;
       } else if (actionType === 'resize') {
-        // Toggle between medium and large
-        const currentState = expandedCards[id];
-        if (currentState === 'medium') {
-          expandedCards[id] = 'large';
-        } else {
-          expandedCards[id] = 'medium';
-        }
-        saveExpandedCards(expandedCards);
-        renderGrid();
+        // v2.20.0: Resize deferred to v1.1 — no-op
         return;
       } else if (actionType === 'share') {
         const link = getAllLinks().find(l => l.id === id);
@@ -17882,7 +18260,8 @@ Return JSON:
       cancelMergePick();
       return;
     }
-    console.log('[click] Toggle expansion:', id, expandedCards[id] ? 'collapse' : 'expand');
+    // v2.20.0: Open full-page overlay instead of inline expansion
+    console.log('[click] Open pin overlay:', id);
 
     // On touch devices, toggle tapped state for label visibility
     const isTouchDevice = window.matchMedia('(hover: none)').matches;
@@ -17890,18 +18269,10 @@ Return JSON:
       document.querySelectorAll('.grid-item--tapped').forEach(el => {
         if (el !== item) el.classList.remove('grid-item--tapped');
       });
-      item.classList.toggle('grid-item--tapped');
+      // Don't toggle tapped — open overlay directly
     }
 
-    if (expandedCards[id]) {
-      // Collapse
-      delete expandedCards[id];
-    } else {
-      // Expand to medium
-      expandedCards[id] = 'medium';
-    }
-    saveExpandedCards(expandedCards);
-    renderGrid();
+    openPinOverlay(id);
   };
 
   // Notes textarea blur handler - save notes
@@ -18207,50 +18578,8 @@ Return JSON:
     renderFilters();
   }, true); // capture phase
 
-  // Drag-to-resize functionality
-  let resizeState = null;
-  const RESIZE_THRESHOLD = 50; // pixels to trigger size change
-
-  grid.onmousedown = (e) => {
-    const handle = e.target.closest('.grid-item__resize');
-    if (!handle) return;
-    e.preventDefault();
-    const item = e.target.closest('.grid-item');
-    if (!item) return;
-    resizeState = {
-      id: item.dataset.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      currentState: expandedCards[item.dataset.id] || 'medium'
-    };
-    document.body.style.cursor = 'nwse-resize';
-  };
-
-  document.onmousemove = (e) => {
-    if (!resizeState) return;
-    const deltaX = e.clientX - resizeState.startX;
-    // Visual feedback could be added here
-  };
-
-  document.onmouseup = (e) => {
-    if (!resizeState) return;
-    const deltaX = e.clientX - resizeState.startX;
-    const id = resizeState.id;
-
-    // Determine new size based on drag distance
-    if (deltaX > RESIZE_THRESHOLD && resizeState.currentState === 'medium') {
-      expandedCards[id] = 'large';
-      saveExpandedCards(expandedCards);
-      renderGrid();
-    } else if (deltaX < -RESIZE_THRESHOLD && resizeState.currentState === 'large') {
-      expandedCards[id] = 'medium';
-      saveExpandedCards(expandedCards);
-      renderGrid();
-    }
-
-    resizeState = null;
-    document.body.style.cursor = '';
-  };
+  // Drag-to-resize — disabled in v2.20.0 (masonry layout, no multi-col resize yet)
+  // Will be re-enabled in v2.21.0 (FF-1: 2-col card resize)
 
   $('overlayRecategorize').onclick = () => { closeModal(overlay); openCategorySelect(); };
   $('overlayDelete').onclick = async (e) => {
