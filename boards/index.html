@@ -3342,6 +3342,79 @@ body {
 .recipe-drawer__close:hover {
   text-decoration: underline;
 }
+/* Image gallery — hero + thumbnail strip */
+.recipe-drawer__images {
+  margin: 0 calc(-1 * var(--space-6)); /* bleed edge-to-edge past panel padding */
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.recipe-drawer__images:empty {
+  display: none;
+}
+.recipe-drawer__hero-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: var(--subtle);
+}
+.recipe-drawer__hero-img[data-loaded="false"] {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.recipe-drawer__hero-img[data-loaded="true"] {
+  opacity: 1;
+}
+.recipe-drawer__thumbs {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding: var(--space-2) var(--space-6);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.recipe-drawer__thumbs::-webkit-scrollbar {
+  display: none;
+}
+.recipe-drawer__thumb {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--subtle);
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  border: 2px solid transparent;
+}
+.recipe-drawer__thumb:hover {
+  opacity: 0.85;
+}
+.recipe-drawer__thumb--active {
+  opacity: 1;
+  border-color: var(--fg);
+}
+@media (max-width: 600px) {
+  .recipe-drawer__hero-img {
+    aspect-ratio: 16 / 10;
+  }
+  .recipe-drawer__thumbs {
+    padding: var(--space-2) var(--space-4);
+    gap: var(--space-1);
+  }
+  .recipe-drawer__thumb {
+    width: 48px;
+    height: 48px;
+  }
+  .recipe-drawer__panel {
+    padding: var(--space-4);
+  }
+  .recipe-drawer__images {
+    margin: 0 calc(-1 * var(--space-4));
+  }
+}
 .recipe-drawer__meta-bar {
   display: flex;
   gap: var(--space-3);
@@ -6913,6 +6986,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
         <h2 class="recipe-drawer__title" id="recipeDrawerTitle"></h2>
         <button class="recipe-drawer__close" id="recipeDrawerClose" aria-label="Close">&times;</button>
       </div>
+      <div class="recipe-drawer__images" id="recipeDrawerImages"></div>
       <div class="recipe-drawer__meta-bar" id="recipeDrawerMeta"></div>
       <div class="recipe-drawer__description" id="recipeDrawerDescription"></div>
       <div class="recipe-drawer__controls">
@@ -6989,7 +7063,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.16.0';
+  const VERSION = '2.17.0';
   console.log('[boards] v' + VERSION + ' - AI connector privacy settings');
 
   // ============================================
@@ -18610,6 +18684,7 @@ Return JSON:
   const recipeDrawerIngredients = $('recipeDrawerIngredients');
   const recipeDrawerInstructions = $('recipeDrawerInstructions');
   const recipeDrawerSourceLink = $('recipeDrawerSourceLink');
+  const recipeDrawerImages = $('recipeDrawerImages');
   const recipeScaleMinus = $('recipeScaleMinus');
   const recipeScalePlus = $('recipeScalePlus');
   const recipeScaleValue = $('recipeScaleValue');
@@ -18618,6 +18693,8 @@ Return JSON:
   let recipeDrawerState = {
     recipe: null,
     linkUrl: null,
+    linkImage: null,
+    heroImageIndex: 0,
     baseServings: 4,
     currentServings: 4,
     useMetric: !(navigator.language || '').startsWith('en-US'),
@@ -18628,6 +18705,8 @@ Return JSON:
     if (!recipe) return;
     recipeDrawerState.recipe = recipe;
     recipeDrawerState.linkUrl = link.url;
+    recipeDrawerState.linkImage = link.image || null;
+    recipeDrawerState.heroImageIndex = 0;
     recipeDrawerState.baseServings = recipe.servings || 4;
     recipeDrawerState.currentServings = recipeDrawerState.baseServings;
     recipeUnitToggle.textContent = recipeDrawerState.useMetric ? 'Metric' : 'Imperial';
@@ -18644,10 +18723,65 @@ Return JSON:
     document.body.style.overflow = '';
   }
 
+  function renderRecipeImages() {
+    var recipe = recipeDrawerState.recipe;
+    var linkImage = recipeDrawerState.linkImage;
+
+    // Build ordered image list: recipe.images[] first, fallback to link.image
+    var images = [];
+    if (Array.isArray(recipe.images) && recipe.images.length) {
+      images = recipe.images.slice();
+    }
+    if (!images.length && linkImage) {
+      images = [linkImage];
+    }
+
+    if (!images.length) {
+      recipeDrawerImages.innerHTML = '';
+      return;
+    }
+
+    var idx = recipeDrawerState.heroImageIndex || 0;
+    if (idx >= images.length) idx = 0;
+    var heroUrl = images[idx];
+
+    // Hero image
+    var html = '<img class="recipe-drawer__hero-img" src="' + esc(heroUrl) + '" alt="" loading="lazy" decoding="async" data-loaded="false">';
+
+    // Thumbnail strip (only if multiple images)
+    if (images.length > 1) {
+      html += '<div class="recipe-drawer__thumbs">';
+      for (var i = 0; i < images.length; i++) {
+        var cls = 'recipe-drawer__thumb' + (i === idx ? ' recipe-drawer__thumb--active' : '');
+        html += '<img class="' + cls + '" src="' + esc(images[i]) + '" alt="" loading="lazy" decoding="async" data-idx="' + i + '">';
+      }
+      html += '</div>';
+    }
+
+    recipeDrawerImages.innerHTML = html;
+
+    // Hero load/error handlers
+    var heroEl = recipeDrawerImages.querySelector('.recipe-drawer__hero-img');
+    if (heroEl) {
+      heroEl.onload = function() { heroEl.setAttribute('data-loaded', 'true'); };
+      heroEl.onerror = function() { heroEl.style.display = 'none'; };
+    }
+
+    // Thumbnail click → swap hero
+    recipeDrawerImages.querySelectorAll('.recipe-drawer__thumb').forEach(function(thumb) {
+      thumb.onclick = function() {
+        var newIdx = parseInt(thumb.getAttribute('data-idx'), 10);
+        recipeDrawerState.heroImageIndex = newIdx;
+        renderRecipeImages();
+      };
+    });
+  }
+
   function renderRecipeDrawer() {
     const { recipe, currentServings, baseServings, useMetric } = recipeDrawerState;
     const scaleFactor = baseServings > 0 ? currentServings / baseServings : 1;
 
+    renderRecipeImages();
     recipeDrawerTitle.textContent = recipe.title || 'Recipe';
 
     // Meta bar
