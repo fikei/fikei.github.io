@@ -1155,3 +1155,65 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================
+   Terminal Layout Utilities
+   ============================================ */
+
+/* Box-drawing character border — wraps content in ASCII box
+   Usage: <div class="border-box">content</div>
+   Screen readers ignore pseudo-content; standard border is the fallback. */
+.border-box {
+  position: relative;
+  padding: var(--space-4);
+  border: var(--border-thin) solid var(--border-subtle);
+}
+
+.border-box::before {
+  content: '┌' attr(data-label) '┐';
+  position: absolute;
+  top: -0.7em;
+  left: var(--space-2);
+  padding: 0 var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  background: var(--bg);
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+/* Terminal container — 80-character max width */
+.container-terminal {
+  max-width: var(--container-terminal, 80ch);
+  margin-inline: auto;
+  padding-inline: var(--gutter-page, clamp(16px, 5vw, 64px));
+}
+
+/* ASCII horizontal divider */
+.divider-ascii {
+  border: none;
+  height: auto;
+  text-align: center;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow: hidden;
+  white-space: nowrap;
+  margin: var(--space-4) 0;
+}
+
+.divider-ascii::before {
+  content: '────────────────────────────────────────────────────────────────────────────────';
+  letter-spacing: 0;
+}
+
+/* Double-line emphasis divider */
+.divider-ascii--emphasis::before {
+  content: '════════════════════════════════════════════════════════════════════════════════';
+}
+
+/* Labeled divider: <hr class="divider-ascii" data-label="section"> */
+.divider-ascii[data-label]::before {
+  content: '──── ' attr(data-label) ' ────────────────────────────────────────────────────────────────';
+}
