@@ -70,7 +70,24 @@
       "Bash(git -C /Users/ian/.claude-worktrees/fikei.github.io/interesting-cannon add:*)",
       "Bash(git -C /Users/ian/.claude-worktrees/fikei.github.io/interesting-cannon commit -m \"$\\(cat <<''EOF''\nfix: enrich-music improvements + client-side BPM lookup\n\nEdge function fixes:\n- Remove GetSongBPM from server-side \\(blocked by Cloudflare bot protection\\)\n- Fix MusicBrainz: filter results by artist name match, prefer original\n  album releases over compilations\n- Fix Last.fm: fall back to artist.getTopTags when track tags are empty,\n  also try track.getTopTags as intermediate step\n\nClient-side BPM \\(boards/index.html\\):\n- Add queryGetSongBPM\\(\\) at module scope — calls GetSongBPM API directly\n  from browser, bypassing Cloudflare bot protection\n- Step 6 split: 6a server enrichment \\(genre/label\\), 6b client BPM/key\n- Backfill v4: re-enriches links missing BPM/key/genre/label\n- Backfill Step 2 \\(server\\) + Step 3 \\(client BPM\\) with rate limiting\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git -C /Users/ian/.claude-worktrees/fikei.github.io/interesting-cannon push -u origin claude/fix-enrich-music-0dc05)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(grep -n \"CREATE TABLE.*links\\\\b\\\\|CREATE TABLE IF NOT EXISTS links\" /Users/ian/Documents/GitHub/fikei.github.io/supabase/migrations/*.sql)",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:claude.ai)",
+      "Bash(# Check the supabase config.toml cat /Users/ian/Documents/GitHub/fikei.github.io/supabase/config.toml)",
+      "WebFetch(domain:www.explorium.ai)",
+      "WebFetch(domain:pluginsforcowork.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:sunpeak.ai)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:help.raindrop.io)",
+      "WebFetch(domain:almcorp.com)",
+      "WebFetch(domain:mcpize.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.docusign.com)",
+      "WebFetch(domain:docs.readwise.io)",
+      "WebFetch(domain:www.moesif.com)"
     ]
   }
 }

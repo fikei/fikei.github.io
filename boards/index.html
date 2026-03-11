@@ -465,6 +465,124 @@
   margin-top: 2px;
 }
 
+/* Connector settings */
+.settings-section {
+  padding-top: var(--space-3);
+}
+
+.settings-section__title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--subtle);
+  margin-bottom: var(--space-1);
+}
+
+.settings-tier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.settings-tier__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--subtle);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.settings-tier__option:hover {
+  border-color: var(--fg);
+}
+
+.settings-tier__option:has(input:checked) {
+  border-color: var(--fg);
+  background: var(--subtle);
+}
+
+.settings-tier__option input {
+  margin-top: 2px;
+  accent-color: var(--fg);
+}
+
+.settings-tier__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-tier__text strong {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-tier__text small {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.settings-boards {
+  padding: var(--space-2) 0;
+}
+
+.settings-boards__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) 0;
+}
+
+.settings-boards__name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: capitalize;
+}
+
+.settings-boards__count {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  margin-left: var(--space-1);
+}
+
+.connector-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.connector-status__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.connector-status__dot--active {
+  background: #0a0;
+}
+
+.toggle--on {
+  background: var(--fg);
+}
+
+.toggle--on .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
+}
+
 /* Username input */
 .username-input-row {
   display: flex;
@@ -6384,7 +6502,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   </div>
 
   <!-- Settings Modal -->
-  <div class="modal modal--small" id="settingsModal">
+  <div class="modal" id="settingsModal">
     <div class="modal__backdrop" data-close></div>
     <div class="modal__content">
       <div class="modal__header">
@@ -6400,6 +6518,71 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
           <button class="theme-toggle" id="themeToggle">
             <div class="theme-toggle__knob"></div>
           </button>
+        </div>
+
+        <!-- AI Connector Settings -->
+        <div class="settings-section" id="connectorSettingsSection" style="display:none;">
+          <div class="settings-section__title">AI Connector</div>
+
+          <div class="settings-row">
+            <div class="settings-row__label">
+              <span class="settings-row__title">Connection</span>
+              <span class="settings-row__description" id="connectorStatusText">Not connected</span>
+            </div>
+            <div class="connector-status">
+              <span class="connector-status__dot" id="connectorStatusDot"></span>
+            </div>
+          </div>
+
+          <div class="settings-row" style="flex-direction:column;align-items:stretch;">
+            <div class="settings-row__label" style="margin-bottom:var(--space-2);">
+              <span class="settings-row__title">Privacy Level</span>
+              <span class="settings-row__description">What Claude can see from your library</span>
+            </div>
+            <div class="settings-tier" id="privacyTierPicker">
+              <label class="settings-tier__option">
+                <input type="radio" name="privacyTier" value="taste_only">
+                <span class="settings-tier__text">
+                  <strong>Taste Only</strong>
+                  <small>Categories, tags, interests — no titles or links</small>
+                </span>
+              </label>
+              <label class="settings-tier__option">
+                <input type="radio" name="privacyTier" value="library" checked>
+                <span class="settings-tier__text">
+                  <strong>Library</strong>
+                  <small>Titles, categories, tags, media info — no URLs or notes</small>
+                </span>
+              </label>
+              <label class="settings-tier__option">
+                <input type="radio" name="privacyTier" value="full_access">
+                <span class="settings-tier__text">
+                  <strong>Full Access</strong>
+                  <small>Everything including URLs, notes, and images</small>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row__label">
+              <span class="settings-row__title">Auto-Save</span>
+              <span class="settings-row__description">Claude saves pins when you express a choice</span>
+            </div>
+            <button class="theme-toggle" id="autoSaveToggle">
+              <div class="theme-toggle__knob"></div>
+            </button>
+          </div>
+
+          <div class="settings-row" style="flex-direction:column;align-items:stretch;">
+            <div class="settings-row__label" style="margin-bottom:var(--space-2);">
+              <span class="settings-row__title">Board Visibility</span>
+              <span class="settings-row__description">Toggle which boards Claude can access</span>
+            </div>
+            <div class="settings-boards" id="boardVisibilityList">
+              <!-- Populated by JS -->
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -6806,8 +6989,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.15.0';
-  console.log('[boards] v' + VERSION + ' - reduce line weight, full color images');
+  const VERSION = '2.16.0';
+  console.log('[boards] v' + VERSION + ' - AI connector privacy settings');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -20231,6 +20414,166 @@ Return JSON:
   };
 
   // ============================================
+  // Connector Settings (AI privacy controls)
+  // ============================================
+  const connectorSection = $('connectorSettingsSection');
+  const connectorStatusDot = $('connectorStatusDot');
+  const connectorStatusText = $('connectorStatusText');
+  const privacyTierPicker = $('privacyTierPicker');
+  const autoSaveToggle = $('autoSaveToggle');
+  const boardVisibilityList = $('boardVisibilityList');
+  let connectorSettings = null;
+
+  async function loadConnectorSettings() {
+    if (!currentUser) {
+      connectorSection.style.display = 'none';
+      return;
+    }
+    connectorSection.style.display = '';
+    const token = getAccessToken();
+    try {
+      // Check if user has an active MCP token
+      const { data: tokens } = await supabase
+        .from('mcp_tokens')
+        .select('id, access_token_expires_at')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const hasActiveToken = tokens && tokens.length > 0 &&
+        new Date(tokens[0].access_token_expires_at) > new Date();
+
+      if (hasActiveToken) {
+        connectorStatusDot.classList.add('connector-status__dot--active');
+        connectorStatusText.textContent = 'Connected to Claude';
+      } else if (tokens && tokens.length > 0) {
+        connectorStatusDot.classList.remove('connector-status__dot--active');
+        connectorStatusText.textContent = 'Token expired — reconnect in Claude';
+      } else {
+        connectorStatusDot.classList.remove('connector-status__dot--active');
+        connectorStatusText.textContent = 'Not connected';
+      }
+
+      // Load or create settings
+      const { data: settings } = await supabase
+        .from('connector_settings')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (settings) {
+        connectorSettings = settings;
+      } else {
+        // Create default settings
+        const { data: newSettings } = await supabase
+          .from('connector_settings')
+          .insert({ user_id: currentUser.id })
+          .select()
+          .single();
+        connectorSettings = newSettings || {
+          privacy_tier: 'library',
+          board_visibility: {},
+          auto_save_enabled: true,
+        };
+      }
+
+      // Apply to UI
+      const tierRadio = privacyTierPicker.querySelector(`input[value="${connectorSettings.privacy_tier}"]`);
+      if (tierRadio) tierRadio.checked = true;
+
+      if (connectorSettings.auto_save_enabled) {
+        autoSaveToggle.classList.add('toggle--on');
+      } else {
+        autoSaveToggle.classList.remove('toggle--on');
+      }
+
+      renderBoardVisibility();
+    } catch (err) {
+      console.log('[connector] Failed to load settings:', err);
+    }
+  }
+
+  function renderBoardVisibility() {
+    const cats = getCategories();
+    const links = getAllLinks();
+    // Count pins per board
+    const counts = {};
+    links.forEach(l => {
+      const c = (l.category || 'uncategorized').toLowerCase();
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    // Combine built-in + any categories with pins
+    const allBoards = new Set([
+      'home', 'wear', 'watch', 'listen', 'use', 'eat', 'go', 'follow', 'read',
+      ...Object.keys(cats),
+      ...Object.keys(counts),
+    ]);
+
+    const boardVis = connectorSettings?.board_visibility || {};
+    boardVisibilityList.innerHTML = '';
+
+    Array.from(allBoards).sort().forEach(board => {
+      const count = counts[board] || 0;
+      // Default: visible (true) unless explicitly set to false
+      const isVisible = boardVis[board] !== false;
+      const item = document.createElement('div');
+      item.className = 'settings-boards__item';
+      item.innerHTML = `
+        <span>
+          <span class="settings-boards__name">${board}</span>
+          <span class="settings-boards__count">${count}</span>
+        </span>
+        <input type="checkbox" ${isVisible ? 'checked' : ''} data-board="${board}" style="accent-color:var(--fg);">
+      `;
+      boardVisibilityList.appendChild(item);
+    });
+
+    // Wire up checkbox changes
+    boardVisibilityList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const board = cb.dataset.board;
+        if (!connectorSettings.board_visibility) connectorSettings.board_visibility = {};
+        connectorSettings.board_visibility[board] = cb.checked;
+        saveConnectorSettings();
+      });
+    });
+  }
+
+  async function saveConnectorSettings() {
+    if (!currentUser || !connectorSettings) return;
+    try {
+      await supabase
+        .from('connector_settings')
+        .update({
+          privacy_tier: connectorSettings.privacy_tier,
+          board_visibility: connectorSettings.board_visibility || {},
+          auto_save_enabled: connectorSettings.auto_save_enabled,
+        })
+        .eq('user_id', currentUser.id);
+    } catch (err) {
+      console.log('[connector] Failed to save settings:', err);
+    }
+  }
+
+  // Privacy tier change
+  privacyTierPicker.querySelectorAll('input[name="privacyTier"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (connectorSettings) {
+        connectorSettings.privacy_tier = radio.value;
+        saveConnectorSettings();
+      }
+    });
+  });
+
+  // Auto-save toggle
+  autoSaveToggle.addEventListener('click', () => {
+    if (!connectorSettings) return;
+    connectorSettings.auto_save_enabled = !connectorSettings.auto_save_enabled;
+    autoSaveToggle.classList.toggle('toggle--on', connectorSettings.auto_save_enabled);
+    saveConnectorSettings();
+  });
+
+  // ============================================
   // Auth Functions
   // ============================================
   function getDisplayName() {
@@ -20927,6 +21270,7 @@ Return JSON:
 
   document.addEventListener('ctrl:auth:settingsclick', () => {
     openModal(settingsModal);
+    loadConnectorSettings();
   });
 
   function getDeviceInfo() {
