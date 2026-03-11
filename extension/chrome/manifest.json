@@ -37,8 +37,6 @@
       "js": ["content-nudge.js"],
       "run_at": "document_idle",
       "exclude_matches": [
-        "chrome://*/*",
-        "chrome-extension://*/*",
         "https://ctrl.rodeo/*"
       ]
     }
