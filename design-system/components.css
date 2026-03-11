@@ -1470,3 +1470,71 @@ body {
   align-items: center;
   gap: var(--space-1);
 }
+
+/* ============================================
+   ASCII Decorative Components
+   ============================================ */
+
+/* ASCII card — card with box-drawing character decoration
+   Falls back to standard border in forced-colors mode.
+   Usage: <div class="card card--ascii" data-label="title">...</div> */
+.card--ascii {
+  border-color: var(--border-subtle);
+  position: relative;
+}
+
+.card--ascii::before {
+  content: '[ ' attr(data-label) ' ]';
+  position: absolute;
+  top: -0.6em;
+  left: var(--space-3);
+  padding: 0 var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
+  background: var(--bg);
+  line-height: 1;
+}
+
+@media (forced-colors: active) {
+  .card--ascii::before {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+/* ASCII empty state
+   Usage: <div class="empty-ascii" aria-label="No items found">
+            <pre class="empty-ascii__art" aria-hidden="true">...</pre>
+            <p class="empty-ascii__text">no items found.</p>
+          </div> */
+.empty-ascii {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.empty-ascii__art {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  color: var(--fg-subtle);
+  white-space: pre;
+  user-select: none;
+}
+
+.empty-ascii__text {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  max-width: 40ch;
+}
+
+.empty-ascii__action {
+  margin-top: var(--space-2);
+}
