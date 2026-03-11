@@ -433,7 +433,205 @@ body {
   flex: 1;
 }
 
-/* Toggle checkbox (simple) */
+/* ============================================
+   Save Actions (dual buttons)
+   ============================================ */
+.save-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ============================================
+   Tab Count Badge
+   ============================================ */
+.tab-count {
+  font-size: 8px;
+  background: var(--fg);
+  color: var(--bg);
+  border-radius: 2px;
+  padding: 1px 4px;
+  margin-left: var(--space-1);
+  vertical-align: middle;
+}
+
+/* ============================================
+   Triage State
+   ============================================ */
+body.triage-open {
+  max-height: 560px;
+}
+
+.state--triage {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.state--triage.state[hidden] {
+  display: none !important;
+}
+
+.triage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.triage-header__title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.triage-toggle-all {
+  background: none;
+  border: none;
+  color: var(--fg-subtle);
+  font-family: var(--font-primary);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  padding: 0;
+}
+
+.triage-toggle-all:hover {
+  color: var(--fg);
+}
+
+.triage-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 120px;
+  max-height: 340px;
+}
+
+.triage-group {
+  padding: var(--space-2) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  cursor: pointer;
+  user-select: none;
+}
+
+.triage-group__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.triage-group__name {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  flex: 1;
+}
+
+.triage-group__count {
+  font-size: 9px;
+  color: var(--fg-subtle);
+}
+
+.triage-group__checkbox {
+  flex-shrink: 0;
+}
+
+.triage-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--gray-300);
+  cursor: pointer;
+}
+
+.triage-row:hover {
+  background: var(--bg-surface);
+}
+
+.triage-row__checkbox {
+  flex-shrink: 0;
+}
+
+.triage-row__favicon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--gray-400);
+}
+
+.triage-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.triage-row__title {
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.triage-row__domain {
+  font-size: 9px;
+  color: var(--fg-muted);
+}
+
+.triage-row__badge {
+  font-size: 8px;
+  color: var(--fg-subtle);
+  background: var(--gray-300);
+  border-radius: 2px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.triage-footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.triage-status {
+  font-size: 9px;
+  text-align: center;
+  color: var(--fg-muted);
+  letter-spacing: 0.05em;
+}
+
+/* Tab group colors (Chrome tabGroups API) */
+.triage-group--grey .triage-group__dot { background: #5f6368; }
+.triage-group--blue .triage-group__dot { background: #1a73e8; }
+.triage-group--red .triage-group__dot { background: #ea4335; }
+.triage-group--yellow .triage-group__dot { background: #fbbc04; }
+.triage-group--green .triage-group__dot { background: #34a853; }
+.triage-group--pink .triage-group__dot { background: #f538a0; }
+.triage-group--purple .triage-group__dot { background: #a142f4; }
+.triage-group--cyan .triage-group__dot { background: #24c1e0; }
+.triage-group--orange .triage-group__dot { background: #ff7537; }
+
+/* ============================================
+   Toggle Checkbox (shared)
+   ============================================ */
+.rodeo-toggle,
 #toggle-history {
   appearance: none;
   width: 32px;
@@ -445,6 +643,7 @@ body {
   transition: background var(--duration-fast);
 }
 
+.rodeo-toggle::after,
 #toggle-history::after {
   content: '';
   position: absolute;
@@ -457,10 +656,12 @@ body {
   transition: transform var(--duration-fast);
 }
 
+.rodeo-toggle:checked,
 #toggle-history:checked {
   background: var(--color-success);
 }
 
+.rodeo-toggle:checked::after,
 #toggle-history:checked::after {
   transform: translateX(16px);
 }
