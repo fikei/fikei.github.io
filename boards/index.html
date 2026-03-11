@@ -150,22 +150,23 @@
 .auth-bar__btn {
   padding: var(--space-1) var(--space-3);
   background: transparent;
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border-subtle);
   color: var(--fg);
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
 }
 
 .auth-bar__btn:hover {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 /* User menu dropdown */
@@ -732,6 +733,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Terminal-aesthetic global link + focus styles */
+a { color: var(--color-link); }
+a:hover { color: var(--accent-cyan); }
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
 /* ============================================
    Bottom Navigation - Unified Floating Structure
    ============================================ */
@@ -941,24 +950,25 @@ body {
   letter-spacing: 0.1em;
   padding: var(--space-1) var(--space-3);
   background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg);
+  color: var(--fg-muted);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0; /* Prevent buttons from shrinking */
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
 }
 
 .filter-token:hover {
-  background: var(--fg);
-  color: var(--bg);
+  color: var(--fg);
+  border-color: var(--fg);
 }
 
 .filter-token--active {
-  background: var(--fg);
+  background: var(--accent-amber);
   color: var(--bg);
+  border-color: var(--accent-amber);
 }
 
 /* Sub-tag filter bar — single horizontal row, sticky below category tabs */
@@ -1231,20 +1241,22 @@ body {
   padding: var(--space-1) var(--space-3);
   background: var(--bg);
   color: var(--fg);
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border-subtle);
   min-width: 120px;
   max-width: 200px;
   flex-shrink: 0;
+  transition: border-color 0.15s;
 }
 
 .search-input::placeholder {
-  color: var(--muted);
+  color: var(--fg-subtle);
   text-transform: uppercase;
 }
 
 .search-input:focus {
   outline: none;
-  background: var(--surface);
+  border-color: var(--accent-cyan);
+  background: var(--bg-surface);
 }
 
 /* ============================================
