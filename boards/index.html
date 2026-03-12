@@ -2447,9 +2447,18 @@ a:hover { color: var(--accent-cyan); }
 }
 
 .grid-item__actions {
+  position: absolute;
+  bottom: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
   display: flex;
   gap: var(--space-2);
-  margin-top: auto;
+  opacity: 0;
+  transition: opacity var(--duration-normal);
+  z-index: 10;
+}
+.grid-item:hover .grid-item__actions {
+  opacity: 1;
 }
 
 .grid-item__action {
@@ -2458,12 +2467,14 @@ a:hover { color: var(--accent-cyan); }
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: var(--space-2) var(--space-3);
-  background: transparent;
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   color: var(--fg);
   cursor: pointer;
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .grid-item__action:hover {
@@ -7150,7 +7161,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.24.0';
+  const VERSION = '2.24.1';
   console.log('[boards] v' + VERSION + ' - UI polish: filters, menu, merged badge');
 
   // ============================================
@@ -16445,9 +16456,8 @@ Return JSON:
           </div>
         </div>`;
 
-      // Merged pin class (badge removed in v2.22.0 — shown only in overlay)
+      // Merged pin class (badge shown only in overlay since v2.22.0)
       const mergedClass = l.is_merged ? ' grid-item--merged' : '';
-      const mergeBadgeHtml = '';
 
       // Determine if this is a listen (music) card
       const isListen = l.category === 'listen';
@@ -16594,11 +16604,11 @@ Return JSON:
 
         html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          ${mergeBadgeHtml}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy">
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
+          ${richActionsHtml ? `<div class="grid-item__actions">${richActionsHtml}</div>` : ''}
           ${detailsHtml}
         </article>`;
       } else {
@@ -16609,11 +16619,11 @@ Return JSON:
 
         html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          ${mergeBadgeHtml}
           <span class="grid-item__initial">${initial}</span>
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
+          ${richActionsHtml ? `<div class="grid-item__actions">${richActionsHtml}</div>` : ''}
           ${detailsHtml}
         </article>`;
       }
