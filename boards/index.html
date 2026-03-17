@@ -6402,6 +6402,7 @@ a:hover { color: var(--accent-cyan); }
   <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple>
   <input type="file" id="spotifyImportInput" class="hidden-input" accept=".json,application/json">
   <input type="file" id="youtubeImportInput" class="hidden-input" accept=".json,application/json">
+  <input type="file" id="instagramImportInput" class="hidden-input" accept=".json,application/json">
 
   <!-- Add Modal -->
   <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
@@ -6653,6 +6654,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             <button class="auth-bar__btn" id="youtube-takeout-btn" style="width: 100%;">Import YouTube History</button>
             <div class="yt-import-section__note" id="youtube-takeout-status">
               Upload watch-history.json from Google Takeout.
+            </div>
+          </div>
+
+          <!-- Instagram Takeout -->
+          <div style="margin-bottom: var(--space-3);">
+            <button class="auth-bar__btn" id="instagram-import-btn" style="width: 100%;">Import Instagram Saves</button>
+            <div class="yt-import-section__note" id="instagram-import-status">
+              Upload saved_posts.json or liked_posts.json from Instagram's data export.
             </div>
           </div>
 
@@ -7161,8 +7170,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.24.1';
-  console.log('[boards] v' + VERSION + ' - UI polish: filters, menu, merged badge');
+  const VERSION = '2.25.0';
+  console.log('[boards] v' + VERSION + ' - Instagram takeout import');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -11911,6 +11920,61 @@ Return JSON:
     }
   }
 
+  // Instagram: normalize saved/liked posts from both format variants
+  // New format (2024+): { saved_saved_media: [...] } or { likes_media_likes: [...] }
+  // Old format: array of { title, string_list_data: [...] }
+  function normalizeInstagramEvents(raw) {
+    let items = [];
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else if (raw && typeof raw === 'object') {
+      const knownKeys = [
+        'saved_saved_media',
+        'likes_media_likes',
+        'saved_collections',
+      ];
+      for (const key of knownKeys) {
+        if (Array.isArray(raw[key])) {
+          items = items.concat(raw[key]);
+        }
+      }
+    }
+    return items.filter(item => {
+      const title = item?.title?.trim();
+      return title && title.length > 0;
+    });
+  }
+
+  async function handleInstagramImport(file) {
+    setImportStatus('instagram-import-status', 'Reading file...');
+    let raw;
+    try {
+      raw = await readJsonFile(file);
+    } catch (e) {
+      setImportStatus('instagram-import-status', 'Invalid file format. Expected JSON.');
+      toast('Invalid Instagram file', { level: 'error' });
+      return;
+    }
+
+    const events = normalizeInstagramEvents(raw);
+    if (events.length === 0) {
+      setImportStatus('instagram-import-status', 'No saved posts found. Try saved_posts.json or liked_posts.json from your Instagram data export.');
+      return;
+    }
+
+    setImportStatus('instagram-import-status', events.length.toLocaleString() + ' saves found, importing...');
+    try {
+      const signals = await importSecondarySignals('instagram_takeout', events);
+      setImportStatus('instagram-import-status', 'Imported ' + signals + ' creator signals from ' + events.length.toLocaleString() + ' saves.');
+      toast('Instagram history imported', { level: 'success' });
+      if (window._sourcePrompt) window._sourcePrompt.markImported();
+    } catch (e) {
+      setImportStatus('instagram-import-status', 'Import failed — try again.');
+      toast('Instagram import failed', { level: 'error' });
+      console.error('[instagram-import]', e);
+    }
+  }
+
   async function handleYouTubeTakeoutImport(file) {
     setImportStatus('youtube-takeout-status', 'Reading file...');
     let raw;
@@ -11956,6 +12020,14 @@ Return JSON:
   document.getElementById('youtubeImportInput')?.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (file) handleYouTubeTakeoutImport(file);
+    e.target.value = '';
+  });
+  document.getElementById('instagram-import-btn')?.addEventListener('click', () => {
+    document.getElementById('instagramImportInput').click();
+  });
+  document.getElementById('instagramImportInput')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleInstagramImport(file);
     e.target.value = '';
   });
 
