@@ -3,8 +3,8 @@
 //
 // POST /functions/v1/enrich-link
 // Body: { url, title?, description?, linkId?, skipClassification?, skipImage?, enrichWatch?, enrichBook?, enrichListen?, category? }
-const VERSION = '1.2.0'
-console.log(`[enrich-link] v${VERSION} - Claude Haiku BPM/key lookup`)
+const VERSION = '1.3.0'
+console.log(`[enrich-link] v${VERSION} - image proxy to Supabase Storage`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, cached, video?, book?, music? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -802,6 +802,26 @@ serve(async (req) => {
     }
 
     // ========================================
+    // STEP 2.5: Proxy validated image to Supabase Storage
+    // ========================================
+    let imageOriginalUrl: string | null = null
+    let imageProxied = false
+
+    if (imageUrl && linkId) {
+      const t2ContentType = imageScores?.content_type_header || undefined
+      const t2FileSize = imageScores?.file_size || undefined
+      const { storageUrl, originalUrl } = await uploadImageToStorage(
+        imageUrl, linkId, supabase, t2ContentType, t2FileSize
+      )
+      if (storageUrl) {
+        imageOriginalUrl = originalUrl
+        imageUrl = storageUrl
+        imageProxied = true
+        console.log('[enrich-link] Image proxied to storage:', storageUrl)
+      }
+    }
+
+    // ========================================
     // STEP 3: Update link in database (if linkId provided)
     // ========================================
     if (linkId) {
@@ -812,7 +832,9 @@ serve(async (req) => {
         type_confidence: typeConfidence,
         image: imageUrl,
         image_source: imageSource,
-        image_resolved_at: new Date().toISOString()
+        image_resolved_at: new Date().toISOString(),
+        image_original_url: imageOriginalUrl,
+        image_proxied: imageProxied
       }
       // Save platform-resolved title to DB (overrides generic "YouTube" etc.)
       // Only save if we actually resolved a meaningful title
@@ -2632,4 +2654,93 @@ async function hashImageUrl(url: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+const PROXY_SIZE_LIMIT = 5 * 1024 * 1024 // 5 MB
+const EXT_MAP: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+  'image/gif': 'gif', 'image/avif': 'avif'
+}
+
+async function uploadImageToStorage(
+  imageUrl: string,
+  linkId: string,
+  supabase: ReturnType<typeof createClient>,
+  knownContentType?: string,
+  knownFileSize?: number
+): Promise<{ storageUrl: string | null; originalUrl: string }> {
+  try {
+    // Skip oversized images
+    if (knownFileSize && knownFileSize > PROXY_SIZE_LIMIT) {
+      console.log('[image-storage] Skipping oversized image:', knownFileSize, 'bytes')
+      return { storageUrl: null, originalUrl: imageUrl }
+    }
+
+    // Skip SVGs (can embed scripts, not transformable)
+    if (knownContentType?.includes('svg')) {
+      console.log('[image-storage] Skipping SVG')
+      return { storageUrl: null, originalUrl: imageUrl }
+    }
+
+    // Fetch full image with timeout
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo image proxy)',
+        'Accept': 'image/*'
+      },
+      signal: controller.signal
+    })
+    clearTimeout(timeout)
+
+    if (!response.ok) {
+      console.log('[image-storage] Fetch failed:', response.status)
+      return { storageUrl: null, originalUrl: imageUrl }
+    }
+
+    const contentType = knownContentType || response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg'
+    const ext = EXT_MAP[contentType] || 'jpg'
+    const filePath = `${linkId}.${ext}`
+
+    // Stream with size guard
+    const reader = response.body!.getReader()
+    const chunks: Uint8Array[] = []
+    let totalBytes = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      totalBytes += value.byteLength
+      if (totalBytes > PROXY_SIZE_LIMIT) {
+        console.log('[image-storage] Stream exceeded 5 MB limit, aborting')
+        return { storageUrl: null, originalUrl: imageUrl }
+      }
+      chunks.push(value)
+    }
+
+    // Combine chunks
+    const buffer = new Uint8Array(totalBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+      buffer.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('link-images')
+      .upload(filePath, buffer, { contentType, upsert: true })
+
+    if (uploadError) {
+      console.error('[image-storage] Upload failed:', JSON.stringify(uploadError))
+      return { storageUrl: null, originalUrl: imageUrl }
+    }
+
+    const { data: urlData } = supabase.storage.from('link-images').getPublicUrl(filePath)
+    console.log('[image-storage] Uploaded:', filePath, `(${totalBytes} bytes)`)
+    return { storageUrl: urlData.publicUrl, originalUrl: imageUrl }
+
+  } catch (err) {
+    console.error('[image-storage] Error:', (err as Error).message)
+    return { storageUrl: null, originalUrl: imageUrl }
+  }
 }

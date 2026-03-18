@@ -7162,8 +7162,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.23.0';
-  console.log('[boards] v' + VERSION + ' - intent engine: sessions + journeys');
+  const VERSION = '2.24.0';
+  console.log('[boards] v' + VERSION + ' - image proxy + onerror fallback');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -11462,6 +11462,7 @@ Return JSON:
           const img = card.querySelector('.grid-item__image');
           if (img) {
             img.classList.add('grid-item__image--loading');
+            img.onerror = () => { img.style.opacity = '0'; };
             img.src = secureImg(imageUrl);
             img.onload = () => {
               img.classList.remove('grid-item__image--loading');
@@ -16483,7 +16484,7 @@ Return JSON:
         const typ = video?.type ? cap(video.type.replace('-', ' ')) : '';
 
         const posterHtml = hasImg
-          ? `<img class="watch-row__poster" src="${secureImg(l.image)}" alt="" loading="lazy">`
+          ? `<img class="watch-row__poster" src="${secureImg(l.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`
           : `<div class="watch-row__poster watch-row__poster--placeholder">${initial}</div>`;
 
         html += `<a class="watch-row" href="${l.url}" target="_blank" rel="noopener" data-id="${l.id}">
@@ -16510,7 +16511,7 @@ Return JSON:
         const fmt = music?.contentFormat ? cap(music.contentFormat.replace('-', ' ')) : '';
 
         const artHtml = hasImg
-          ? `<img class="listen-row__art" src="${secureImg(l.image)}" alt="" loading="lazy">`
+          ? `<img class="listen-row__art" src="${secureImg(l.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`
           : `<div class="listen-row__art listen-row__art--placeholder">${initial}</div>`;
         const isPlaying = currentPlayer.linkId === l.id;
         const explicitBadge = music?.isExplicit ? '<span class="listen-row__explicit">E</span>' : '';
@@ -16612,7 +16613,7 @@ Return JSON:
         html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
           ${mergeBadgeHtml}
-          <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy">
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy" onerror="this.style.opacity='0'">
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
