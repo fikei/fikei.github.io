@@ -3309,6 +3309,214 @@ a:hover { color: var(--accent-cyan); }
   filter: none;
 }
 /* ============================================
+   Intent Action Buttons (on pin cards)
+   ============================================ */
+.grid-item__action--intent {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.grid-item__action--intent:hover { opacity: 0.85; }
+.grid-item__action--intent-secondary {
+  background: rgba(255,255,255,0.15);
+  color: var(--fg);
+  border: 1px solid rgba(255,255,255,0.2);
+  font-size: 0.65rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: opacity 0.15s;
+}
+.grid-item__action--intent-secondary:hover { opacity: 0.85; }
+.grid-item__intent-price {
+  font-size: 0.65rem;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ============================================
+   Commerce Modal
+   ============================================ */
+.commerce-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.commerce-modal[hidden] { display: none; }
+.commerce-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+}
+.commerce-modal__panel {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: var(--space-6);
+  max-width: 420px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.commerce-modal__image {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-bottom: var(--space-4);
+  background: var(--bg);
+}
+.commerce-modal__name {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+.commerce-modal__price {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.commerce-modal__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.commerce-modal__btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+.commerce-modal__btn:hover { opacity: 0.85; }
+.commerce-modal__btn--primary {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+.commerce-modal__btn--secondary {
+  background: rgba(255,255,255,0.1);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.commerce-modal__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* ============================================
+   AI Tool Plan Modal (Terminal Viewer)
+   ============================================ */
+.terminal-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.terminal-modal[hidden] { display: none; }
+.terminal-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+}
+.terminal-modal__panel {
+  position: relative;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 680px;
+  width: 95%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.terminal-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.terminal-modal__title {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.terminal-modal__controls {
+  display: flex;
+  gap: var(--space-2);
+}
+.terminal-modal__btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+  color: var(--fg-muted);
+  transition: opacity 0.15s;
+}
+.terminal-modal__btn:hover { opacity: 0.85; color: var(--fg); }
+.terminal-modal__output {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #c9d1d9;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  min-height: 200px;
+}
+.terminal-modal__cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background: var(--accent);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.terminal-modal__status {
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+}
+
+/* ============================================
    Recipe Drawer
    Right-side panel for recipe viewer
    ============================================ */
@@ -7117,6 +7325,38 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
     </div>
   </div>
 
+  <!-- Commerce Modal -->
+  <div class="commerce-modal" id="commerceModal" role="dialog" aria-modal="true" hidden>
+    <div class="commerce-modal__backdrop" id="commerceModalBackdrop"></div>
+    <div class="commerce-modal__panel">
+      <button class="commerce-modal__close" id="commerceModalClose" aria-label="Close">&times;</button>
+      <img class="commerce-modal__image" id="commerceModalImage" alt="" />
+      <div class="commerce-modal__name" id="commerceModalName"></div>
+      <div class="commerce-modal__price" id="commerceModalPrice"></div>
+      <div class="commerce-modal__actions">
+        <button class="commerce-modal__btn commerce-modal__btn--primary" id="commerceModalBuy">Go to Product</button>
+        <button class="commerce-modal__btn commerce-modal__btn--secondary" id="commerceModalSave">Save for Later</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Tool Plan Modal (Terminal Viewer) -->
+  <div class="terminal-modal" id="terminalModal" role="dialog" aria-modal="true" hidden>
+    <div class="terminal-modal__backdrop" id="terminalModalBackdrop"></div>
+    <div class="terminal-modal__panel">
+      <div class="terminal-modal__header">
+        <span class="terminal-modal__title" id="terminalModalTitle"></span>
+        <div class="terminal-modal__controls">
+          <button class="terminal-modal__btn" id="terminalModalCopy">Copy</button>
+          <button class="terminal-modal__btn" id="terminalModalAbort">Stop</button>
+          <button class="terminal-modal__btn" id="terminalModalClose">&times;</button>
+        </div>
+      </div>
+      <pre class="terminal-modal__output" id="terminalModalOutput"></pre>
+      <div class="terminal-modal__status" id="terminalModalStatus"></div>
+    </div>
+  </div>
+
   <!-- Confirm Modal -->
   <div class="modal modal--small" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal__backdrop"></div>
@@ -7170,8 +7410,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.26.0';
-  console.log('[boards] v' + VERSION + ' - image proxy + onerror fallback');
+  const VERSION = '2.27.0';
+  console.log('[boards] v' + VERSION + ' - intent-driven pin actions');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -12089,6 +12329,194 @@ Return JSON:
     }
   }
 
+  // ============================================
+  // Intent Classification API (Pass 1)
+  // ============================================
+  async function callIntentClassifyAPI(link, analysisResult) {
+    try {
+      const payload = {
+        action: 'classify',
+        url: link.url,
+        title: link.title || '',
+        description: link.description || '',
+        domain: link.domain || '',
+        content_type: analysisResult?.content_type || link.content_type || 'unknown',
+        practical_tags: analysisResult?.practical_tags || link.practical_tags || [],
+        taste_tags: analysisResult?.taste_tags || link.taste_tags || [],
+        entities: analysisResult?.entities || link.entities || [],
+        og_type: link.og_type || null,
+        og_price_amount: link.og_price_amount || null,
+        og_price_currency: link.og_price_currency || null,
+        structured_data_types: link.structured_data_types || [],
+        source: link.source || 'explicit',
+        userId: currentUser?.id,
+        linkId: link.id
+      };
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/classify-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        console.warn('%c[INTENT] classify-intent returned', 'color: #e67e22', response.status);
+        return null;
+      }
+
+      const result = await response.json();
+      if (result.intent_type === 'none') {
+        console.log('%c[INTENT] No intent detected (confidence: ' + result.confidence + ')', 'color: #e67e22');
+        return null;
+      }
+
+      console.log('%c[INTENT] Classified:', 'color: #e67e22; font-weight: bold', result.intent_type, '@', result.confidence);
+      return result;
+    } catch (e) {
+      console.warn('%c[INTENT] classify-intent error:', 'color: #e67e22', e.message);
+      return null;
+    }
+  }
+
+  // Intent Hypothesis API (Pass 2 — fire-and-forget)
+  function fireIntentHypothesis(link, allLinks) {
+    if (!currentUser) return;
+    const recentPins = allLinks
+      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
+      .slice(0, 50)
+      .map(l => ({
+        id: l.id,
+        title: l.title || '',
+        domain: l.domain || '',
+        content_type: l.content_type || 'unknown',
+        intent_type: l.intent_type || null,
+        action_state: l.intent_action_state || null
+      }));
+
+    if (recentPins.length < 10) return;
+
+    // Fire and forget — no await
+    fetch(`${SUPABASE_URL}/functions/v1/classify-intent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        action: 'hypothesize',
+        userId: currentUser.id,
+        linkId: link.id,
+        current_pin: {
+          url: link.url,
+          title: link.title || '',
+          domain: link.domain || '',
+          content_type: link.content_type || 'unknown',
+          practical_tags: link.practical_tags || [],
+          intent_type: link.intent_type || null
+        },
+        recent_pins: recentPins
+      })
+    }).then(r => {
+      if (r.ok) console.log('%c[INTENT] Hypothesis fired', 'color: #e67e22');
+      else console.warn('%c[INTENT] Hypothesis failed:', 'color: #e67e22', r.status);
+    }).catch(e => console.warn('%c[INTENT] Hypothesis error:', 'color: #e67e22', e.message));
+  }
+
+  // Stream integration plan from generate-intent-plan
+  let _intentPlanAbortController = null;
+  async function streamIntentPlan(link) {
+    const meta = link.intent_metadata || {};
+    const output = $('terminalModalOutput');
+    const status = $('terminalModalStatus');
+    const abortBtn = $('terminalModalAbort');
+    const title = $('terminalModalTitle');
+
+    if (!output || !status || !title) return;
+
+    title.textContent = (meta.tool_name || link.title || 'Tool') + ' — Integration Plan';
+    output.textContent = '';
+    status.textContent = 'Generating...';
+    $('terminalModal').hidden = false;
+    abortBtn.style.display = '';
+
+    _intentPlanAbortController = new AbortController();
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-intent-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          tool_name: meta.tool_name || link.title || '',
+          tagline: meta.tagline || link.description || '',
+          url: link.url,
+          domain: link.domain || '',
+          docs_url: meta.docs_url || null,
+          github_url: meta.github_url || null,
+          practical_tags: link.practical_tags || [],
+          entities: link.entities || [],
+          recent_pins: getAllLinks().slice(0, 10).map(l => ({
+            title: l.title, domain: l.domain, content_type: l.content_type
+          }))
+        }),
+        signal: _intentPlanAbortController.signal
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        status.textContent = 'Failed — ' + (errData.error || response.status);
+        abortBtn.style.display = 'none';
+        return;
+      }
+
+      // Parse SSE stream from Anthropic (forwarded by edge function)
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(data);
+            // Anthropic streaming: content_block_delta with text delta
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+              output.textContent += event.delta.text;
+              output.scrollTop = output.scrollHeight;
+            }
+          } catch (_) {
+            // Ignore parse errors on partial chunks
+          }
+        }
+      }
+
+      status.textContent = 'Done';
+      abortBtn.style.display = 'none';
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        status.textContent = 'Stopped';
+      } else {
+        status.textContent = 'Error — ' + err.message;
+      }
+      abortBtn.style.display = 'none';
+    }
+  }
+
   // Call create-pin API with retry logic (image resolution + metadata enrichment)
   async function callEnrichmentAPI(item, currentImage, forceRefresh) {
     // Normalize URL: fix protocol-relative and HTML entities before sending
@@ -12261,6 +12689,33 @@ Return JSON:
             }
             save(analysisData);
           }
+        }
+      }
+
+      // Step 1.5: Intent classification via classify-intent
+      if (!item.skipAnalysis) {
+        console.log('%c[INTENT] Calling classify-intent for:', 'color: #e67e22', item.url);
+        const currentDataForIntent = load();
+        const currentLinkForIntent = currentDataForIntent.links.find(l => l.id === item.linkId);
+        if (currentLinkForIntent) {
+          const intentResult = await callIntentClassifyAPI(currentLinkForIntent, analysisResult);
+          if (intentResult && intentResult.intent_type !== 'none') {
+            const intentData = load();
+            const intentLink = intentData.links.find(l => l.id === item.linkId);
+            if (intentLink) {
+              intentLink.intent_type = intentResult.intent_type;
+              intentLink.intent_confidence = intentResult.confidence;
+              intentLink.intent_metadata = intentResult.extracted_metadata;
+              intentLink.intent_classified_at = new Date().toISOString();
+              save(intentData);
+              syncLinkToSupabase(intentLink);
+              renderGrid();
+              console.log('%c[INTENT] Applied:', 'color: #e67e22; font-weight: bold', intentResult.intent_type);
+            }
+          }
+
+          // Step 1.5b: Fire hypothesis (Pass 2) — fire-and-forget
+          fireIntentHypothesis(currentLinkForIntent, currentDataForIntent.links);
         }
       }
 
@@ -14164,7 +14619,12 @@ Return JSON:
         // User-generated content
         notes: link.notes || null,
         // Unified tags (computed from scattered genre/sub-category/content-type fields)
-        tags: link.tags || computeLinkTags(link)
+        tags: link.tags || computeLinkTags(link),
+        // Intent classification
+        intent_type: link.intent_type || null,
+        intent_confidence: link.intent_confidence || null,
+        intent_metadata: link.intent_metadata || null,
+        intent_classified_at: link.intent_classified_at || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -14383,7 +14843,12 @@ Return JSON:
         // User-generated content
         notes: l.notes || null,
         // Unified tags
-        tags: l.tags || []
+        tags: l.tags || [],
+        // Intent classification
+        intent_type: l.intent_type || null,
+        intent_confidence: l.intent_confidence || null,
+        intent_metadata: l.intent_metadata || null,
+        intent_classified_at: l.intent_classified_at || null
       }));
 
       const categories = { uncategorized: { pinned: true } };
@@ -16035,6 +16500,105 @@ Return JSON:
     } catch {}
   }
 
+  // ============================================
+  // Intent Registry — drives intent action cards on pins
+  // Add a new entry here to support a new intent type
+  // ============================================
+  const INTENT_CONFIDENCE_THRESHOLD = 0.75;
+
+  const INTENT_REGISTRY = {
+    commerce: {
+      id: 'commerce',
+      label: 'Product',
+      renderActions(link, meta) {
+        const price = meta?.price ? `<span class="grid-item__intent-price">${esc(meta.currency || '$')}${esc(String(meta.price))}</span> ` : '';
+        return `${price}<button class="grid-item__action grid-item__action--intent" data-action="intent:commerce:buy" data-id="${link.id}">View Product</button>` +
+          `<button class="grid-item__action grid-item__action--intent-secondary" data-action="intent:commerce:save" data-id="${link.id}">Save</button>`;
+      },
+      handleAction(action, link) {
+        if (action === 'buy') {
+          openCommerceModal(link);
+        } else if (action === 'save') {
+          saveToCart(link, 'saved');
+          toast('Saved for later');
+        }
+      }
+    },
+    ai_tool: {
+      id: 'ai_tool',
+      label: 'AI Tool',
+      renderActions(link, meta) {
+        let html = `<button class="grid-item__action grid-item__action--intent" data-action="intent:ai_tool:plan" data-id="${link.id}">Integration Plan</button>`;
+        if (meta?.docs_url) {
+          html += `<button class="grid-item__action grid-item__action--intent-secondary" data-action="intent:ai_tool:docs" data-id="${link.id}">Docs</button>`;
+        }
+        return html;
+      },
+      handleAction(action, link) {
+        if (action === 'plan') {
+          streamIntentPlan(link);
+        } else if (action === 'docs') {
+          const docsUrl = link.intent_metadata?.docs_url;
+          if (docsUrl) window.open(docsUrl, '_blank', 'noopener');
+        }
+      }
+    },
+    // V2 stubs
+    recipe: { id: 'recipe', label: 'Recipe', renderActions() { return ''; }, handleAction() {} },
+    design_inspiration: { id: 'design_inspiration', label: 'Design', renderActions() { return ''; }, handleAction() {} },
+    article: { id: 'article', label: 'Article', renderActions() { return ''; }, handleAction() {} },
+    person: { id: 'person', label: 'Person', renderActions() { return ''; }, handleAction() {} },
+    event: { id: 'event', label: 'Event', renderActions() { return ''; }, handleAction() {} },
+  };
+
+  // Commerce modal helpers
+  let _commerceModalLink = null;
+
+  function openCommerceModal(link) {
+    _commerceModalLink = link;
+    const meta = link.intent_metadata || {};
+    const modal = $('commerceModal');
+    const img = $('commerceModalImage');
+    const name = $('commerceModalName');
+    const price = $('commerceModalPrice');
+
+    name.textContent = meta.product_name || link.title || '';
+    price.textContent = meta.price ? `${meta.currency || '$'}${meta.price}` : 'See site for price';
+    img.src = link.image || '';
+    img.style.display = link.image ? '' : 'none';
+    modal.hidden = false;
+  }
+
+  function closeCommerceModal() {
+    $('commerceModal').hidden = true;
+    _commerceModalLink = null;
+  }
+
+  // Cart state (localStorage)
+  function getCart() {
+    try { return JSON.parse(localStorage.getItem('ctrl_rodeo_cart') || '[]'); } catch { return []; }
+  }
+
+  function saveToCart(link, status) {
+    const cart = getCart();
+    const meta = link.intent_metadata || {};
+    const existing = cart.findIndex(c => c.linkId === link.id);
+    const item = {
+      linkId: link.id,
+      url: link.url,
+      product_name: meta.product_name || link.title,
+      price: meta.price || null,
+      currency: meta.currency || null,
+      image: link.image || null,
+      retailer: meta.retailer || link.domain,
+      status: status || 'saved',
+      savedAt: new Date().toISOString()
+    };
+    if (existing >= 0) cart[existing] = item;
+    else cart.push(item);
+    localStorage.setItem('ctrl_rodeo_cart', JSON.stringify(cart));
+  }
+
   // Get first prompt dimension tag for card overlay display
   function getPromptSubTag(link) {
     const dims = loadPromptDimensions(link.category);
@@ -16504,6 +17068,13 @@ Return JSON:
       const hasRecipe = l.recipe && (l.recipe.ingredients?.length || l.recipe.instructions?.length);
       if (hasRecipe) {
         richActionsHtml += `<button class="grid-item__action" data-action="view-recipe">Recipe</button>`;
+      }
+
+      // Intent action cards (commerce, ai_tool, etc.)
+      if (l.intent_type && l.intent_confidence >= INTENT_CONFIDENCE_THRESHOLD && INTENT_REGISTRY[l.intent_type] && !l.loading) {
+        const intentReg = INTENT_REGISTRY[l.intent_type];
+        const intentHtml = intentReg.renderActions(l, l.intent_metadata);
+        if (intentHtml) richActionsHtml += intentHtml;
       }
 
       // Truncate summary to ~60 words for display
@@ -18451,6 +19022,15 @@ Return JSON:
           openRecipeDrawer(link);
         }
         return;
+      } else if (actionType && actionType.startsWith('intent:')) {
+        // Intent action dispatch: intent:{type}:{action}
+        const [, intentType, intentAction] = actionType.split(':');
+        const link = getAllLinks().find(l => l.id === id);
+        const reg = INTENT_REGISTRY[intentType];
+        if (link && reg) {
+          reg.handleAction(intentAction, link);
+        }
+        return;
       } else if (actionType === 'visit-imdb' || actionType === 'visit-wiki' || actionType === 'visit-ext') {
         // Let the <a> tag handle navigation, just stop propagation
         return;
@@ -19463,7 +20043,7 @@ Return JSON:
     if (m._trapHandler) { m.removeEventListener('keydown', m._trapHandler); m._trapHandler = null; }
     if (m._previousFocus) { m._previousFocus.focus(); m._previousFocus = null; }
   }
-  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal, igReviewModal, createBoardModal].forEach(closeModal); closeRecipeDrawer(); }
+  function closeAll() { [addModal, scanModal, toolsModal, overlay, categoryModal, contentTypeModal, organizeModal, mergeModal, confirmModal, adminModal, widgetPrdModal, igReviewModal, createBoardModal].forEach(closeModal); closeRecipeDrawer(); closeCommerceModal(); $('terminalModal').hidden = true; }
 
   // ============================================
   // Recipe Drawer
@@ -19734,6 +20314,41 @@ Return JSON:
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && !recipeDrawer.hasAttribute('hidden')) {
       closeRecipeDrawer();
+    }
+  });
+
+  // Commerce Modal event wiring
+  $('commerceModalClose').onclick = closeCommerceModal;
+  $('commerceModalBackdrop').onclick = closeCommerceModal;
+  $('commerceModalBuy').onclick = function() {
+    if (_commerceModalLink) {
+      window.open(_commerceModalLink.url, '_blank', 'noopener');
+      saveToCart(_commerceModalLink, 'visited');
+    }
+    closeCommerceModal();
+  };
+  $('commerceModalSave').onclick = function() {
+    if (_commerceModalLink) {
+      saveToCart(_commerceModalLink, 'saved');
+      toast('Saved for later');
+    }
+    closeCommerceModal();
+  };
+
+  // Terminal Modal event wiring
+  $('terminalModalClose').onclick = function() { $('terminalModal').hidden = true; };
+  $('terminalModalBackdrop').onclick = function() { $('terminalModal').hidden = true; };
+  $('terminalModalAbort').onclick = function() {
+    if (_intentPlanAbortController) _intentPlanAbortController.abort();
+  };
+  $('terminalModalCopy').onclick = function() {
+    const text = $('terminalModalOutput').textContent;
+    navigator.clipboard.writeText(text).then(() => toast('Copied')).catch(() => {});
+  };
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      if (!$('commerceModal').hidden) closeCommerceModal();
+      if (!$('terminalModal').hidden) $('terminalModal').hidden = true;
     }
   });
 
