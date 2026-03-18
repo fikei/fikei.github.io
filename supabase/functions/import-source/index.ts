@@ -1,20 +1,20 @@
 // Supabase Edge Function: import-source
-// Ingests secondary taste signals from file exports (Spotify, YouTube Takeout).
+// Ingests secondary taste signals from file exports (Spotify, YouTube Takeout, Instagram Takeout).
 // Client-side parses files → batches events → POSTs to this function.
-// Signals are grouped by artist/channel, classified via Haiku, and stored in
+// Signals are grouped by artist/channel/account, classified via Haiku, and stored in
 // secondary_signals table. These feed the taste engine but are never shown as pins.
 //
 // POST /functions/v1/import-source
 // Authorization: Bearer <user_access_token>
 // Actions:
-//   { action: 'create-job', source: 'spotify'|'youtube_takeout' }
+//   { action: 'create-job', source: 'spotify'|'youtube_takeout'|'instagram_takeout' }
 //   { action: 'ingest-batch', jobId: string, source: string, batch: Event[] }
 //   { action: 'complete-job', jobId: string }
 //   { action: 'job-status', jobId: string }
 //   { action: 'delete-source', source: string }
 
-const VERSION = '1.0.0'
-console.log(`[import-source] v${VERSION} - secondary signal ingestion`)
+const VERSION = '1.1.0'
+console.log(`[import-source] v${VERSION} - added instagram_takeout source`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -36,6 +36,7 @@ const SIGNAL_WEIGHTS: Record<string, number> = {
   spotify: 0.3,
   youtube_takeout: 0.35,
   youtube_api: 0.6,         // playlists & likes — managed by youtube-import function
+  instagram_takeout: 0.25,  // saves = intent, not repeated consumption
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,16 @@ interface YouTubeTakeoutEvent {
   subtitles?: Array<{ name: string; url?: string }>
   time?: string
   snippet?: { title: string; channelTitle: string; publishedAt?: string }
+}
+
+interface InstagramTakeoutEvent {
+  title?: string                          // creator username
+  string_list_data?: Array<{
+    href?: string
+    value?: string
+    timestamp?: number
+  }>
+  string_map_data?: Record<string, { timestamp?: number; value?: string }>
 }
 
 interface Bucket {
@@ -184,24 +195,76 @@ function groupYouTubeByChannel(events: YouTubeTakeoutEvent[]): Bucket[] {
 }
 
 // ---------------------------------------------------------------------------
+// Instagram Takeout: group raw events by creator account
+// ---------------------------------------------------------------------------
+
+function groupInstagramByAccount(events: InstagramTakeoutEvent[]): Bucket[] {
+  const map = new Map<string, Bucket>()
+
+  for (const e of events) {
+    const accountName = e.title?.trim()
+    if (!accountName) continue
+
+    // Extract timestamp: prefer string_list_data[0].timestamp, fall back to string_map_data
+    let tsEpoch: number | undefined
+    if (e.string_list_data?.[0]?.timestamp) {
+      tsEpoch = e.string_list_data[0].timestamp
+    } else if (e.string_map_data) {
+      const savedOn = e.string_map_data['Saved on'] || e.string_map_data['Liked on']
+      tsEpoch = savedOn?.timestamp
+    }
+    const ts = tsEpoch
+      ? new Date(tsEpoch * 1000).toISOString()
+      : new Date().toISOString()
+
+    // Extract caption/value as context
+    const caption = e.string_list_data?.[0]?.value?.trim() || ''
+
+    const key = accountName.toLowerCase()
+    const existing = map.get(key)
+    if (existing) {
+      existing.count++
+      if (existing.context.length < 5 && caption && !existing.context.includes(caption)) {
+        existing.context.push(caption)
+      }
+      if (ts > existing.mostRecent) existing.mostRecent = ts
+    } else {
+      map.set(key, {
+        name: accountName,
+        count: 1,
+        context: caption ? [caption] : [],
+        mostRecent: ts,
+      })
+    }
+  }
+
+  // Min count = 1: any save is intentional (unlike passive plays)
+  return [...map.values()].sort((a, b) => b.count - a.count)
+}
+
+// ---------------------------------------------------------------------------
 // Haiku classification: batch subjects for taste/practical tag extraction
 // ---------------------------------------------------------------------------
 
 async function classifyBatch(
   subjects: Array<{ name: string; context: string[] }>,
-  mediaType: 'music' | 'video'
+  mediaType: 'music' | 'video' | 'social'
 ): Promise<Classification[]> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     console.warn('[import-source] No ANTHROPIC_API_KEY — skipping classification')
     return subjects.map(s => ({
       name: s.name, taste_tags: [], practical_tags: [],
-      entities: [{ type: mediaType === 'music' ? 'person' : 'brand', name: s.name, confidence: 0.85 }],
+      entities: [{ type: mediaType === 'video' ? 'brand' : 'person', name: s.name, confidence: 0.85 }],
     }))
   }
 
-  const subjectType = mediaType === 'music' ? 'artists' : 'YouTube channels'
-  const contextLabel = mediaType === 'music' ? 'tracks' : 'videos'
+  const subjectType = mediaType === 'music' ? 'artists'
+    : mediaType === 'social' ? 'Instagram accounts'
+    : 'YouTube channels'
+  const contextLabel = mediaType === 'music' ? 'tracks'
+    : mediaType === 'social' ? 'saved captions'
+    : 'videos'
 
   const prompt = `Classify these ${subjectType} for a personal taste profile.
 For each, produce taste_tags (aesthetic/cultural/emotional vibe) and practical_tags (genre/format/topic).
@@ -214,7 +277,7 @@ Return a JSON array with one entry per subject (same order):
 Rules:
 - taste_tags: vibe/aesthetic/mood, lowercase, underscores for spaces (e.g. lo_fi, melancholic, experimental, cinematic)
 - practical_tags: factual genre/format/topic, lowercase (e.g. techno, ambient, cooking, documentary, indie_rock)
-- entities: the ${mediaType === 'music' ? 'artist' : 'channel'} as person or brand, confidence >= 0.8
+- entities: the ${mediaType === 'music' ? 'artist' : mediaType === 'social' ? 'account' : 'channel'} as person or brand, confidence >= 0.8
 - 3-6 taste_tags and 3-5 practical_tags per subject
 JSON array only, no other text.`
 
@@ -255,13 +318,13 @@ JSON array only, no other text.`
 
 function fallbackClassifications(
   subjects: Array<{ name: string; context: string[] }>,
-  mediaType: 'music' | 'video'
+  mediaType: 'music' | 'video' | 'social'
 ): Classification[] {
   return subjects.map(s => ({
     name: s.name,
     taste_tags: [],
     practical_tags: [],
-    entities: [{ type: mediaType === 'music' ? 'person' : 'brand', name: s.name, confidence: 0.85 }],
+    entities: [{ type: mediaType === 'video' ? 'brand' : 'person', name: s.name, confidence: 0.85 }],
   }))
 }
 
@@ -277,8 +340,12 @@ async function insertSignals(
   classified: Array<Bucket & { classification: Classification }>
 ): Promise<number> {
   const sourceWeight = SIGNAL_WEIGHTS[source] ?? 0.3
-  const category = source === 'spotify' ? 'listen' : 'watch'
-  const contentType = source === 'spotify' ? 'music' : 'video'
+  const category = source === 'spotify' ? 'listen'
+    : source === 'instagram_takeout' ? 'follow'
+    : 'watch'
+  const contentType = source === 'spotify' ? 'music'
+    : source === 'instagram_takeout' ? 'social'
+    : 'video'
 
   const rows = classified.map(b => ({
     user_id: userId,
@@ -375,14 +442,18 @@ async function handleIngestBatch(
     await db.from('import_jobs').update({ status: 'processing' }).eq('id', jobId)
   }
 
-  // Group events by artist/channel
+  // Group events by artist/channel/account
   let buckets: Bucket[]
-  const mediaType = source === 'spotify' ? 'music' : 'video'
+  const mediaType: 'music' | 'video' | 'social' = source === 'spotify' ? 'music'
+    : source === 'instagram_takeout' ? 'social'
+    : 'video'
 
   if (source === 'spotify') {
     buckets = groupSpotifyByArtist(batch as SpotifyEvent[])
   } else if (source === 'youtube_takeout') {
     buckets = groupYouTubeByChannel(batch as YouTubeTakeoutEvent[])
+  } else if (source === 'instagram_takeout') {
+    buckets = groupInstagramByAccount(batch as InstagramTakeoutEvent[])
   } else {
     return err(`Unknown source: ${source}`)
   }
@@ -401,7 +472,7 @@ async function handleIngestBatch(
     const subjectBatch = toClassify.slice(i, i + HAIKU_BATCH_SIZE)
     const classifications = await classifyBatch(
       subjectBatch.map(b => ({ name: b.name, context: b.context })),
-      mediaType as 'music' | 'video'
+      mediaType
     )
     haikuCallsMade++
 
@@ -421,7 +492,7 @@ async function handleIngestBatch(
         name: b.name,
         taste_tags: [],
         practical_tags: [],
-        entities: [{ type: mediaType === 'music' ? 'person' : 'brand', name: b.name, confidence: 0.85 }],
+        entities: [{ type: mediaType === 'video' ? 'brand' : 'person', name: b.name, confidence: 0.85 }],
       },
     })
   }

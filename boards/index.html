@@ -911,7 +911,7 @@ a:hover { color: var(--accent-cyan); }
 .filters {
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4);
   padding-top: 48px; /* Space for auth bar above */
   padding-right: 120px; /* Space for auth bar - clips filters before profile button */
@@ -936,8 +936,11 @@ a:hover { color: var(--accent-cyan); }
 /* Mobile adjustment for filter padding */
 @media (max-width: 600px) {
   .filters {
+    padding: var(--space-5);
     padding-top: calc(52px + var(--safe-top)); /* More space on mobile for auth bar */
     padding-right: 80px; /* Tighter on mobile but still clipped */
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .auth-bar {
@@ -948,15 +951,16 @@ a:hover { color: var(--accent-cyan); }
 
 .filter-token {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: var(--space-1) var(--space-3);
+  letter-spacing: var(--tracking-wider);
+  padding: var(--space-2) var(--space-4);
   background: var(--bg);
   color: var(--fg-muted);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background var(--duration-normal) var(--ease-default), color var(--duration-normal) var(--ease-default), border-color var(--duration-normal) var(--ease-default);
   flex-shrink: 0;
   min-height: 44px;
   display: inline-flex;
@@ -978,8 +982,8 @@ a:hover { color: var(--accent-cyan); }
 .sub-tags {
   display: none;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--subtle);
   background: var(--bg);
   position: sticky;
@@ -1013,19 +1017,21 @@ a:hover { color: var(--accent-cyan); }
 /* Base tag button */
 .sub-tag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 2px 6px;
+  letter-spacing: var(--tracking-wide);
+  padding: var(--space-1) var(--space-2);
   background: transparent;
   color: var(--fg-subtle);
   border: none;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color var(--duration-normal), background var(--duration-normal);
   flex-shrink: 0;
   white-space: nowrap;
-  line-height: 1.4;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
 }
 .sub-tag:hover { color: var(--fg); }
 .sub-tag--active { color: var(--fg); background: var(--subtle); }
@@ -1051,10 +1057,10 @@ a:hover { color: var(--accent-cyan); }
 .sub-tag--suggestion {
   border: 1px solid var(--subtle);
   color: var(--fg-subtle);
-  padding: 3px 10px;
+  padding: var(--space-1) var(--space-3);
   cursor: pointer;
-  font-size: 9px;
-  transition: all 0.15s;
+  font-size: var(--text-2xs);
+  transition: all var(--duration-normal);
 }
 .sub-tag--suggestion:hover { border-color: var(--fg); color: var(--fg); }
 
@@ -1238,17 +1244,18 @@ a:hover { color: var(--accent-cyan); }
 /* Search input */
 .search-input {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: var(--space-1) var(--space-3);
+  letter-spacing: var(--tracking-wider);
+  padding: var(--space-2) var(--space-4);
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   min-width: 120px;
   max-width: 200px;
   flex-shrink: 0;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-normal) var(--ease-default);
 }
 
 .search-input::placeholder {
@@ -1774,27 +1781,7 @@ a:hover { color: var(--accent-cyan); }
   box-shadow: 0 0 0 2px var(--fg);
 }
 
-/* Merged pin badge (stacked indicator) */
-.grid-item__merge-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 3;
-  display: flex;
-  gap: -4px;
-  align-items: center;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg);
-  pointer-events: none;
-}
-
-/* Merged pin sources list in expanded view */
+/* Merged pin sources list in overlay */
 .merge-sources {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
@@ -2460,9 +2447,18 @@ a:hover { color: var(--accent-cyan); }
 }
 
 .grid-item__actions {
+  position: absolute;
+  bottom: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
   display: flex;
   gap: var(--space-2);
-  margin-top: auto;
+  opacity: 0;
+  transition: opacity var(--duration-normal);
+  z-index: 10;
+}
+.grid-item:hover .grid-item__actions {
+  opacity: 1;
 }
 
 .grid-item__action {
@@ -2471,12 +2467,14 @@ a:hover { color: var(--accent-cyan); }
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: var(--space-2) var(--space-3);
-  background: transparent;
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   color: var(--fg);
   cursor: pointer;
   text-decoration: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .grid-item__action:hover {
@@ -2627,15 +2625,17 @@ a:hover { color: var(--accent-cyan); }
 .grid-item__menu-btn {
   width: 28px;
   height: 28px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity var(--duration-normal), background var(--duration-normal), color var(--duration-normal);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .grid-item:hover .grid-item__menu-btn {
@@ -2643,15 +2643,14 @@ a:hover { color: var(--accent-cyan); }
 }
 
 .grid-item__menu-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .grid-item__menu-btn::before {
-  content: '•••';
-  color: var(--fg);
-  font-size: 12px;
-  letter-spacing: 1px;
-  transform: rotate(90deg);
+  content: '\22EE';
+  color: inherit;
+  font-size: var(--text-sm);
 }
 
 .grid-item__menu {
@@ -6403,6 +6402,7 @@ a:hover { color: var(--accent-cyan); }
   <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple>
   <input type="file" id="spotifyImportInput" class="hidden-input" accept=".json,application/json">
   <input type="file" id="youtubeImportInput" class="hidden-input" accept=".json,application/json">
+  <input type="file" id="instagramImportInput" class="hidden-input" accept=".json,application/json">
 
   <!-- Add Modal -->
   <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
@@ -6654,6 +6654,14 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
             <button class="auth-bar__btn" id="youtube-takeout-btn" style="width: 100%;">Import YouTube History</button>
             <div class="yt-import-section__note" id="youtube-takeout-status">
               Upload watch-history.json from Google Takeout.
+            </div>
+          </div>
+
+          <!-- Instagram Takeout -->
+          <div style="margin-bottom: var(--space-3);">
+            <button class="auth-bar__btn" id="instagram-import-btn" style="width: 100%;">Import Instagram Saves</button>
+            <div class="yt-import-section__note" id="instagram-import-status">
+              Upload saved_posts.json or liked_posts.json from Instagram's data export.
             </div>
           </div>
 
@@ -7162,7 +7170,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.24.0';
+  const VERSION = '2.26.0';
   console.log('[boards] v' + VERSION + ' - image proxy + onerror fallback');
 
   // ============================================
@@ -11913,6 +11921,61 @@ Return JSON:
     }
   }
 
+  // Instagram: normalize saved/liked posts from both format variants
+  // New format (2024+): { saved_saved_media: [...] } or { likes_media_likes: [...] }
+  // Old format: array of { title, string_list_data: [...] }
+  function normalizeInstagramEvents(raw) {
+    let items = [];
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else if (raw && typeof raw === 'object') {
+      const knownKeys = [
+        'saved_saved_media',
+        'likes_media_likes',
+        'saved_collections',
+      ];
+      for (const key of knownKeys) {
+        if (Array.isArray(raw[key])) {
+          items = items.concat(raw[key]);
+        }
+      }
+    }
+    return items.filter(item => {
+      const title = item?.title?.trim();
+      return title && title.length > 0;
+    });
+  }
+
+  async function handleInstagramImport(file) {
+    setImportStatus('instagram-import-status', 'Reading file...');
+    let raw;
+    try {
+      raw = await readJsonFile(file);
+    } catch (e) {
+      setImportStatus('instagram-import-status', 'Invalid file format. Expected JSON.');
+      toast('Invalid Instagram file', { level: 'error' });
+      return;
+    }
+
+    const events = normalizeInstagramEvents(raw);
+    if (events.length === 0) {
+      setImportStatus('instagram-import-status', 'No saved posts found. Try saved_posts.json or liked_posts.json from your Instagram data export.');
+      return;
+    }
+
+    setImportStatus('instagram-import-status', events.length.toLocaleString() + ' saves found, importing...');
+    try {
+      const signals = await importSecondarySignals('instagram_takeout', events);
+      setImportStatus('instagram-import-status', 'Imported ' + signals + ' creator signals from ' + events.length.toLocaleString() + ' saves.');
+      toast('Instagram history imported', { level: 'success' });
+      if (window._sourcePrompt) window._sourcePrompt.markImported();
+    } catch (e) {
+      setImportStatus('instagram-import-status', 'Import failed — try again.');
+      toast('Instagram import failed', { level: 'error' });
+      console.error('[instagram-import]', e);
+    }
+  }
+
   async function handleYouTubeTakeoutImport(file) {
     setImportStatus('youtube-takeout-status', 'Reading file...');
     let raw;
@@ -11958,6 +12021,14 @@ Return JSON:
   document.getElementById('youtubeImportInput')?.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (file) handleYouTubeTakeoutImport(file);
+    e.target.value = '';
+  });
+  document.getElementById('instagram-import-btn')?.addEventListener('click', () => {
+    document.getElementById('instagramImportInput').click();
+  });
+  document.getElementById('instagramImportInput')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleInstagramImport(file);
     e.target.value = '';
   });
 
@@ -16458,11 +16529,8 @@ Return JSON:
           </div>
         </div>`;
 
-      // Merged pin badge and class
+      // Merged pin class (badge shown only in overlay since v2.22.0)
       const mergedClass = l.is_merged ? ' grid-item--merged' : '';
-      const mergeBadgeHtml = l.is_merged && l.sources
-        ? `<span class="grid-item__merge-badge">${l.sources.length} links</span>`
-        : '';
 
       // Determine if this is a listen (music) card
       const isListen = l.category === 'listen';
@@ -16602,21 +16670,18 @@ Return JSON:
           const oMeta = richMeta[cfg.metaField] || cfg.metaFallback?.(richMeta) || l.domain;
           overlayHtml = `<div class="grid-item__overlay"><span class="grid-item__${cfg.titleClass}">${esc(oTitle)}</span><span class="grid-item__${cfg.metaClass}">${esc(oMeta)}</span></div>`;
         } else {
-          const domainDisplay = l.is_merged && l.sources
-            ? `${l.sources.length} links · ${esc(l.sources.map(s => s.domain).filter((d, i, a) => a.indexOf(d) === i).slice(0, 3).join(', '))}${l.sources.length > 3 ? ' +' + (l.sources.length - 3) : ''}`
-            : esc(l.domain);
-          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${domainDisplay}</p></div>`;
+          overlayHtml = `<div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>`;
         }
 
         const categoryClass = listenClass || richClass;
 
         html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          ${mergeBadgeHtml}
           <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy" onerror="this.style.opacity='0'">
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
+          ${richActionsHtml ? `<div class="grid-item__actions">${richActionsHtml}</div>` : ''}
           ${detailsHtml}
         </article>`;
       } else {
@@ -16627,11 +16692,11 @@ Return JSON:
 
         html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          ${mergeBadgeHtml}
           <span class="grid-item__initial">${initial}</span>
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
+          ${richActionsHtml ? `<div class="grid-item__actions">${richActionsHtml}</div>` : ''}
           ${detailsHtml}
         </article>`;
       }
