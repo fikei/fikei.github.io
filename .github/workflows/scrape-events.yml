@@ -1,0 +1,58 @@
+name: Scrape Events Cache
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: 'Specific source ID to scrape (blank = all)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scrape event sources
+        run: |
+          if [ -n "${{ inputs.source_id }}" ]; then
+            ACTION="refresh"
+            BODY="{\"action\": \"refresh\", \"sourceId\": \"${{ inputs.source_id }}\"}"
+          else
+            ACTION="refresh-all"
+            BODY="{\"action\": \"refresh-all\"}"
+          fi
+
+          echo "Action: $ACTION"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_BOARDS_URL }}/functions/v1/scrape-events" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_BOARDS_SERVICE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Scrape failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          # Summary stats
+          SUCCEEDED=$(echo "$BODY" | jq -r '.sourcesSucceeded // 0')
+          FAILED=$(echo "$BODY" | jq -r '.sourcesFailed // 0')
+          EVENTS=$(echo "$BODY" | jq -r '.eventsTotal // 0')
+          echo "Sources: $SUCCEEDED succeeded, $FAILED failed | Events: $EVENTS total"
+
+          # Log errors
+          ERRORS=$(echo "$BODY" | jq -r '.errorLog[]? | "\(.sourceId): \(.error)"')
+          if [ -n "$ERRORS" ]; then
+            echo "::warning::Some sources had errors:"
+            echo "$ERRORS"
+          fi
