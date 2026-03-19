@@ -3505,7 +3505,8 @@ a:hover { color: var(--accent-cyan); }
   transition: opacity 0.15s;
 }
 .grid-item__action--intent-secondary:hover { opacity: 0.85; }
-.grid-item__intent-price {
+.grid-item__intent-price,
+.pin-overlay__intent-price {
   font-size: 0.65rem;
   color: var(--accent);
   font-family: var(--font-mono);
@@ -7578,7 +7579,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.28.5';
+  const VERSION = '2.29.0';
   console.log('[boards] v' + VERSION + ' - intent actions to overlay + CORS fix');
 
   // ============================================
@@ -16969,7 +16970,8 @@ Return JSON:
         localStorage.setItem(cacheKey, JSON.stringify({
           suggestions: [],
           pinCount: pins.length,
-          ts: Date.now() - 86400000 + 300000 // expires in 5 minutes
+          ts: Date.now() - 86400000 + 300000, // expires in 5 minutes
+          version: VERSION
         }));
         return [];
       }
@@ -16987,7 +16989,7 @@ Return JSON:
       localStorage.setItem(cacheKey, JSON.stringify({
         suggestions: [],
         pinCount: pins.length,
-        ts: Date.now() - 86400000 + 300000,
+        ts: Date.now() - 86400000 + 300000, // expires in 5 minutes
         version: VERSION
       }));
       return [];
@@ -17077,9 +17079,9 @@ Return JSON:
       id: 'commerce',
       label: 'Product',
       renderActions(link, meta) {
-        const price = meta?.price ? `<span class="grid-item__intent-price">${esc(meta.currency || '$')}${esc(String(meta.price))}</span> ` : '';
-        return `${price}<button class="grid-item__action grid-item__action--intent" data-action="intent:commerce:buy" data-id="${link.id}">View Product</button>` +
-          `<button class="grid-item__action grid-item__action--intent-secondary" data-action="intent:commerce:save" data-id="${link.id}">Save</button>`;
+        const price = meta?.price ? `<span class="pin-overlay__intent-price">${esc(meta.currency || '$')}${esc(String(meta.price))}</span> ` : '';
+        return `${price}<button class="pin-overlay__action" data-action="intent:commerce:buy" data-link-id="${link.id}">View Product</button>` +
+          `<button class="pin-overlay__action" data-action="intent:commerce:save" data-link-id="${link.id}">Save</button>`;
       },
       handleAction(action, link) {
         if (action === 'buy') {
@@ -17094,9 +17096,9 @@ Return JSON:
       id: 'ai_tool',
       label: 'AI Tool',
       renderActions(link, meta) {
-        let html = `<button class="grid-item__action grid-item__action--intent" data-action="intent:ai_tool:plan" data-id="${link.id}">Integration Plan</button>`;
+        let html = `<button class="pin-overlay__action" data-action="intent:ai_tool:plan" data-link-id="${link.id}">Integration Plan</button>`;
         if (meta?.docs_url) {
-          html += `<button class="grid-item__action grid-item__action--intent-secondary" data-action="intent:ai_tool:docs" data-id="${link.id}">Docs</button>`;
+          html += `<a href="${esc(meta.docs_url)}" target="_blank" rel="noopener" class="pin-overlay__action" data-action="intent:ai_tool:docs" data-link-id="${link.id}">Docs</a>`;
         }
         return html;
       },
@@ -17220,16 +17222,17 @@ Return JSON:
     }
 
     // No suggestions yet — trigger fetch or show loading
-    if (suggestions.length === 0) {
+    // Check if we already have a cached (possibly empty) result to avoid infinite retry
+    const hasCachedResult = !!localStorage.getItem(`dim-suggestions-${currentFilter}`);
+    if (suggestions.length === 0 && !hasCachedResult) {
       if (!suggestingCategories.has(currentFilter)) {
         suggestingCategories.add(currentFilter);
         const cat = currentFilter;
-        suggestDimensions(cat).then(() => {
+        suggestDimensions(cat).then((result) => {
           suggestingCategories.delete(cat);
-          if (currentFilter === cat) renderSubTags();
+          if (currentFilter === cat && result && result.length > 0) renderSubTags();
         }).catch(() => {
           suggestingCategories.delete(cat);
-          if (currentFilter === cat) renderSubTags();
         });
       }
       if (suggestingCategories.has(currentFilter)) {
