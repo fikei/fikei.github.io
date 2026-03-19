@@ -3215,6 +3215,21 @@ a:hover { color: var(--accent-cyan); }
 }
 
 /* Format + duration badge (bottom-left) */
+.grid-item__intent-tag {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 2px 5px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-cyan);
+  background: var(--bg);
+  border-top: 0.25px solid var(--accent-cyan);
+  border-left: 0.25px solid var(--accent-cyan);
+  opacity: 0.6;
+}
 .grid-item__format-badge {
   position: absolute;
   bottom: 0;
@@ -7563,7 +7578,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.28.4';
+  const VERSION = '2.28.5';
   console.log('[boards] v' + VERSION + ' - intent actions to overlay + CORS fix');
 
   // ============================================
@@ -17615,6 +17630,15 @@ Return JSON:
         }
       }
 
+      // Minimal intent tag on grid cards (actions live in overlay)
+      let intentTagHtml = '';
+      if (l.intent_type && l.intent_confidence >= INTENT_CONFIDENCE_THRESHOLD && INTENT_REGISTRY[l.intent_type]) {
+        const reg = INTENT_REGISTRY[l.intent_type];
+        if (reg.renderActions(l, l.intent_metadata)) {
+          intentTagHtml = `<span class="grid-item__intent-tag">${esc(reg.label)}</span>`;
+        }
+      }
+
       // Truncate summary to ~60 words for display
       function truncateSummary(text, maxWords) {
         if (!text) return '';
@@ -17790,6 +17814,7 @@ Return JSON:
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
+          ${intentTagHtml}
           ${richActionsHtml ? `<div class="grid-item__actions">${richActionsHtml}</div>` : ''}
           ${detailsHtml}
         </article>`;
@@ -17805,6 +17830,7 @@ Return JSON:
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
+          ${intentTagHtml}
           ${richActionsHtml ? `<div class="grid-item__actions">${richActionsHtml}</div>` : ''}
           ${detailsHtml}
         </article>`;
