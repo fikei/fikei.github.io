@@ -2228,6 +2228,22 @@ a:hover { color: var(--accent-cyan); }
   opacity: 1;
 }
 
+.grid-item__embed {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border: 0;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+  pointer-events: none;
+}
+.grid-item--embed .grid-item__overlay {
+  display: none;
+}
+.grid-item--embed .grid-item__initial {
+  display: none;
+}
+
 .grid-item__overlay {
   position: absolute;
   bottom: 0;
@@ -7563,8 +7579,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.28.2';
-  console.log('[boards] v' + VERSION + ' - cleanup garbage pins + recache expired images');
+  const VERSION = '2.29.0';
+  console.log('[boards] v' + VERSION + ' - Instagram reel embed fallback');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -7641,6 +7657,11 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // Instagram reel/post detection
   function isInstagramContent(url) {
     return /instagram\.com\/(reels?|p|tv)\//i.test(url || '');
+  }
+
+  function getInstagramShortcode(url) {
+    const m = (url || '').match(/instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/);
+    return m ? m[1] : null;
   }
 
   // Classify content type using rules (fast, free)
@@ -17761,9 +17782,15 @@ Return JSON:
 
         const categoryClass = listenClass || richClass;
 
+        // For Instagram reels: if image fails, swap in embed iframe
+        const reelSC = isInstagramContent(l.url) ? getInstagramShortcode(l.url) : null;
+        const imgOnerror = reelSC
+          ? `this.style.display='none';var f=document.createElement('iframe');f.className='grid-item__embed';f.src='https://www.instagram.com/reel/${reelSC}/embed/';f.loading='lazy';f.allowTransparency=true;this.parentNode.classList.add('grid-item--embed');this.parentNode.insertBefore(f,this)`
+          : "this.style.opacity='0'";
+
         html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy" onerror="this.style.opacity='0'">
+          <img class="grid-item__image" src="${secureImg(l.image)}" alt="${esc(l.title || l.domain || '')}" loading="lazy" onerror="${imgOnerror}">
           ${overlayHtml}
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
@@ -17776,9 +17803,16 @@ Return JSON:
           : l.category;
         const categoryClass = listenClass || richClass;
 
-        html += `<article class="grid-item grid-item--placeholder${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
+        // Instagram reel embed fallback — show the reel inline when no thumbnail
+        const reelShortcode = isInstagramContent(l.url) ? getInstagramShortcode(l.url) : null;
+        const embedClass = reelShortcode ? ' grid-item--embed' : '';
+        const embedHtml = reelShortcode
+          ? `<iframe class="grid-item__embed" src="https://www.instagram.com/reel/${reelShortcode}/embed/" loading="lazy" allowtransparency="true"></iframe>`
+          : '';
+
+        html += `<article class="grid-item grid-item--placeholder${embedClass}${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
           ${errorBadge}
-          <span class="grid-item__initial">${initial}</span>
+          ${embedHtml || `<span class="grid-item__initial">${initial}</span>`}
           <div class="grid-item__overlay"><h3 class="grid-item__title">${esc(l.title)}</h3><p class="grid-item__domain">${esc(l.domain)}</p></div>
           <span class="grid-item__category">${cap(displayTag)}</span>
           ${formatBadgeHtml}
