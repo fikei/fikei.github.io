@@ -366,7 +366,8 @@
   <header class="page-header">
     <div class="page-header__inner">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="/boards/" class="breadcrumb__link">ctrl</a>
+        <a href="/boards/" class="breadcrumb__link" id="backLink" title="Back">&larr;</a>
+        <a href="/boards/" class="breadcrumb__link" id="backLinkLabel">ctrl</a>
         <span class="breadcrumb__sep">/</span>
         <span class="breadcrumb__current">account</span>
       </nav>
@@ -578,6 +579,45 @@
     });
 
     const supabase = CtrlAuth.getSupabaseClient();
+
+    // ============================================
+    // Back Navigation — detect referrer and set back link
+    // ============================================
+    (function setupBackLink() {
+      const backLink = document.getElementById('backLink');
+      const backLinkLabel = document.getElementById('backLinkLabel');
+      const referrer = document.referrer;
+      const origin = window.location.origin;
+
+      // Map known ctrl.rodeo paths to friendly names
+      const appMap = {
+        '/boards/': 'boards',
+        '/events/': 'events',
+        '/calendar/': 'calendar',
+        '/taste-map/': 'taste map',
+        '/soundscape/': 'soundscape',
+        '/systemic/': 'systemic'
+      };
+
+      let backUrl = '/boards/'; // default
+      let backLabel = 'ctrl';
+
+      if (referrer && referrer.startsWith(origin)) {
+        const refPath = new URL(referrer).pathname;
+        // Find the matching app
+        for (const [path, name] of Object.entries(appMap)) {
+          if (refPath.startsWith(path)) {
+            backUrl = path;
+            backLabel = name;
+            break;
+          }
+        }
+      }
+
+      backLink.href = backUrl;
+      backLinkLabel.href = backUrl;
+      backLinkLabel.textContent = backLabel;
+    })();
 
     // ============================================
     // DOM Refs
