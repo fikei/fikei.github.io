@@ -2871,14 +2871,16 @@ a:hover { color: var(--accent-cyan); }
 
 .pin-overlay__action {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--fg);
   background: none;
   color: var(--fg);
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--duration-normal), color var(--duration-normal);
 }
 
 .pin-overlay__action:hover {
@@ -3511,6 +3513,13 @@ a:hover { color: var(--accent-cyan); }
   color: var(--accent);
   font-family: var(--font-mono);
   font-weight: 600;
+}
+.pin-overlay__price {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  color: var(--fg);
+  font-weight: 700;
+  margin: var(--space-1) 0;
 }
 
 /* ============================================
@@ -7613,7 +7622,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.29.1';
+  const VERSION = '2.29.2';
   console.log('[boards] v' + VERSION + ' - intent actions to overlay + CORS fix');
 
   // ============================================
@@ -17124,14 +17133,16 @@ Return JSON:
       id: 'commerce',
       label: 'Product',
       renderActions(link, meta) {
-        const price = meta?.price ? `<span class="pin-overlay__intent-price">${esc(meta.currency || '$')}${esc(String(meta.price))}</span> ` : '';
-        return `${price}<button class="pin-overlay__action" data-action="intent:commerce:buy" data-link-id="${link.id}">View Product</button>` +
-          `<button class="pin-overlay__action" data-action="intent:commerce:save" data-link-id="${link.id}">Save</button>`;
+        return `<button class="pin-overlay__action" data-action="intent:commerce:save" data-link-id="${link.id}">Save</button>`;
+      },
+      renderPrice(meta) {
+        if (!meta?.price) return '';
+        const currency = meta.currency || '$';
+        const symbol = currency.length <= 1 ? currency : currency + ' ';
+        return `<div class="pin-overlay__price">${esc(symbol)}${esc(String(meta.price))}</div>`;
       },
       handleAction(action, link) {
-        if (action === 'buy') {
-          openCommerceModal(link);
-        } else if (action === 'save') {
+        if (action === 'save') {
           saveToCart(link, 'saved');
           toast('Saved for later');
         }
@@ -17683,7 +17694,13 @@ Return JSON:
       if (l.intent_type && l.intent_confidence >= INTENT_CONFIDENCE_THRESHOLD && INTENT_REGISTRY[l.intent_type]) {
         const reg = INTENT_REGISTRY[l.intent_type];
         if (reg.renderActions(l, l.intent_metadata)) {
-          intentTagHtml = `<span class="grid-item__intent-tag">${esc(reg.label)}</span>`;
+          let tagLabel = reg.label;
+          if (l.intent_type === 'commerce' && l.intent_metadata?.price) {
+            const cur = l.intent_metadata.currency || '$';
+            const sym = cur.length <= 1 ? cur : cur + ' ';
+            tagLabel = sym + l.intent_metadata.price;
+          }
+          intentTagHtml = `<span class="grid-item__intent-tag">${esc(tagLabel)}</span>`;
         }
       }
 
@@ -18211,6 +18228,7 @@ Return JSON:
     return `
       <h1 class="pin-overlay__title">${esc(title)}</h1>
       <a href="${esc(link.url)}" target="_blank" rel="noopener" class="pin-overlay__domain">› ${esc(subtitle)}</a>
+      ${link.intent_type === 'commerce' && INTENT_REGISTRY.commerce.renderPrice ? INTENT_REGISTRY.commerce.renderPrice(link.intent_metadata) : ''}
       ${desc ? `<p class="pin-overlay__description">${esc(desc)}</p>` : ''}
       ${richMetaHtml}
       <textarea class="pin-overlay__notes" placeholder="Add a note..." data-link-id="${link.id}">${esc(link.notes || '')}</textarea>
