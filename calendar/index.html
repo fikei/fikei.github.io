@@ -374,6 +374,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .cal-day-label {
@@ -620,6 +621,15 @@ body {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  .cal-day-col {
+    min-width: 80px;
+  }
+
+  .cal-slot {
+    font-size: var(--text-2xs);
+    padding: var(--space-1);
+  }
 }
   </style>
 </head>
@@ -778,7 +788,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.8.0';
+  const VERSION = '2.8.1';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -929,12 +939,22 @@ body {
     });
   }
 
-  function getAdminAccessToken() {
+  function getAdminAccessToken(retries) {
+    retries = retries || 0;
     var sb = CtrlAuth.getSupabaseClient();
     if (!sb) return Promise.resolve(null);
     return sb.auth.getSession().then(function (result) {
       var session = result.data.session;
-      return session ? session.access_token : null;
+      if (session) return session.access_token;
+      // Session may not be ready yet on first auth event — retry once
+      if (retries < 2) {
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve(getAdminAccessToken(retries + 1));
+          }, 500);
+        });
+      }
+      return null;
     });
   }
 
@@ -1721,7 +1741,7 @@ body {
         '<div class="cal-day-empty" style="grid-column:1/-1;padding:var(--space-8) 0;">No availability this week</div>';
     } else {
       var grid = document.getElementById('daysGrid');
-      grid.style.gridTemplateColumns = 'repeat(' + visibleDates.length + ', 1fr)';
+      grid.style.gridTemplateColumns = 'repeat(' + visibleDates.length + ', minmax(0, 1fr))';
       grid.innerHTML = '';
 
       // Determine which events to show as hints
