@@ -431,7 +431,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.0.1';
+  const VERSION = '2.1.0';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -504,15 +504,41 @@ body {
   // ============================================
   var _supabase = null;
   var _adminSession = null;
+  // Intercept Google Calendar OAuth code BEFORE Supabase SDK loads.
+  // Google Calendar returns ?code=X&state=USER_ID.
+  // Supabase PKCE returns ?code=X (no state, or state without user ID pattern).
+  // We must extract the Google code first so Supabase doesn't try to process it.
+  var _pendingGCalCode = null;
+  (function interceptGCalCode() {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code');
+    var gstate = params.get('state');
+    // Google Calendar OAuth always has state=userId (UUID format)
+    if (code && gstate && /^[0-9a-f]{8}-/.test(gstate)) {
+      _pendingGCalCode = code;
+      console.log('[calendar] Intercepted Google Calendar OAuth code, stripping from URL');
+      // Strip code+state from URL so Supabase SDK doesn't see it
+      params.delete('code');
+      params.delete('state');
+      params.delete('scope');
+      var clean = window.location.pathname;
+      var remaining = params.toString();
+      if (remaining) clean += '?' + remaining;
+      clean += window.location.hash;
+      window.history.replaceState({}, '', clean);
+    }
+  })();
 
   function initAdmin() {
     // Load Supabase SDK dynamically — only needed for admin
     var script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0';
     script.onload = function () {
+      // detectSessionInUrl: true — lets Supabase process its own OAuth callbacks.
+      // Google Calendar codes are already stripped above so they won't collide.
       _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
-          detectSessionInUrl: false,
+          detectSessionInUrl: true,
           autoRefreshToken: true,
           persistSession: true,
         }
@@ -528,7 +554,7 @@ body {
           console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
           showAdminBar();
           checkGCalStatus();
-          // Handle pending Google Calendar OAuth callback
+          // Process any pending Google Calendar OAuth code
           handleGCalCallback();
           // Reload slots with busy data
           loadAndRenderSlots();
@@ -541,7 +567,18 @@ body {
           _adminSession = session;
           OWNER_USER_ID = session.user.id;
           state.isAdmin = true;
-          console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
+          console.log('[calendar] Admin signed in via auth change, owner ID:', OWNER_USER_ID);
+          // Clean ?admin=1 and any leftover params from URL
+          var cleanParams = new URLSearchParams(window.location.search);
+          if (cleanParams.has('admin') || cleanParams.has('code')) {
+            cleanParams.delete('admin');
+            cleanParams.delete('code');
+            var cleanUrl = window.location.pathname;
+            var remaining = cleanParams.toString();
+            if (remaining) cleanUrl += '?' + remaining;
+            cleanUrl += window.location.hash;
+            window.history.replaceState({}, '', cleanUrl);
+          }
           showAdminBar();
           checkGCalStatus();
           handleGCalCallback();
@@ -598,8 +635,12 @@ body {
   // ============================================
   // GOOGLE CALENDAR API
   // ============================================
+  // Admin-authed API call (for auth-url, connect, status)
   function callCalendarAPI(body) {
     return getAdminAccessToken().then(function (token) {
+      if (!token) {
+        console.warn('[calendar] No admin token for action:', body.action);
+      }
       return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
         method: 'POST',
         headers: {
@@ -610,6 +651,19 @@ body {
         body: JSON.stringify(body),
       }).then(function (r) { return r.json(); });
     });
+  }
+
+  // Public API call — no admin auth needed (for free-busy, book)
+  function callPublicCalendarAPI(body) {
+    return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json(); });
   }
 
   function checkGCalStatus() {
@@ -638,18 +692,16 @@ body {
   }
 
   function handleGCalCallback() {
-    var params = new URLSearchParams(window.location.search);
-    var code = params.get('code');
-    var gstate = params.get('state');
-    // Google Calendar OAuth has both code and state; admin login has code but no state
-    if (!code || !gstate) return;
+    // Use the code intercepted before Supabase SDK loaded
+    if (!_pendingGCalCode) return;
+    var code = _pendingGCalCode;
+    _pendingGCalCode = null; // Only process once
 
-    // Clean URL
-    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-
+    console.log('[calendar] Processing Google Calendar OAuth code...');
     callCalendarAPI({ action: 'connect', code: code }).then(function (data) {
       if (data.connected) {
         state.gcalConnected = true;
+        console.log('[calendar] Google Calendar connected successfully');
         checkGCalStatus();
         loadAndRenderSlots();
       } else {
@@ -663,7 +715,7 @@ body {
       return Promise.resolve([]);
     }
 
-    return callCalendarAPI({
+    return callPublicCalendarAPI({
       action: 'free-busy',
       ownerUserId: OWNER_USER_ID,
       timeMin: timeMin,
@@ -687,7 +739,7 @@ body {
     if (booking.notes) desc += '\nNotes: ' + booking.notes;
     desc += '\nBooked via ctrl.rodeo/calendar';
 
-    return callCalendarAPI({
+    return callPublicCalendarAPI({
       action: 'book',
       ownerUserId: OWNER_USER_ID,
       summary: profile.meetingTitle + ' - ' + booking.name,
