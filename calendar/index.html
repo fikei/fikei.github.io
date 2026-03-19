@@ -72,6 +72,141 @@ body {
   color: var(--color-success);
 }
 
+/* --- Admin Panel --- */
+.cal-admin-panel {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.cal-admin-panel__toggle {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-subtle);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cal-admin-panel__toggle:hover {
+  color: var(--fg);
+}
+
+.cal-admin-panel__body {
+  margin-top: var(--space-3);
+}
+
+.cal-admin-section {
+  margin-bottom: var(--space-4);
+}
+
+.cal-admin-section__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+  color: var(--fg-subtle);
+  margin-bottom: var(--space-2);
+}
+
+.cal-config-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-thin) solid var(--border-subtle);
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.cal-config-card input[type="text"] {
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border-subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: var(--space-1) var(--space-2);
+  width: 120px;
+}
+
+.cal-config-card input[type="text"]:focus {
+  border-color: var(--accent-cyan);
+  outline: none;
+}
+
+.cal-dur-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+/* --- Blocks Admin --- */
+.cal-blocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.cal-block-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.cal-block-item__delete {
+  background: none;
+  border: none;
+  color: var(--color-error);
+  cursor: pointer;
+  font-size: var(--text-2xs);
+  padding: 0;
+}
+
+.cal-block-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+.cal-block-form input {
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border-subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: var(--space-1) var(--space-2);
+}
+
+.cal-block-form select {
+  background: var(--bg);
+  border: var(--border-thin) solid var(--border-subtle);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: var(--space-1) var(--space-2);
+}
+
 /* --- Sidebar --- */
 .cal-sidebar {
   border: var(--border-thin) solid var(--border-subtle);
@@ -128,22 +263,105 @@ body {
   flex-wrap: wrap;
 }
 
-/* --- Week Navigation --- */
-.cal-week-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* --- Date Strip (scroll navigation) --- */
+.cal-date-strip-wrapper {
+  position: relative;
   margin-bottom: var(--space-4);
   padding-bottom: var(--space-3);
   border-bottom: var(--border-thin) solid var(--border-subtle);
 }
 
-.cal-week-label {
+.cal-date-strip {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: var(--space-1) 0;
+}
+
+.cal-date-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.cal-date-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  background: transparent;
+  border: var(--border-thin) solid transparent;
+  cursor: pointer;
+  text-align: center;
+  line-height: var(--leading-relaxed);
+  min-width: 54px;
+  transition: background var(--duration-normal), color var(--duration-normal), border-color var(--duration-normal);
+}
+
+.cal-date-chip:hover {
+  color: var(--fg);
+  border-color: var(--border-subtle);
+}
+
+.cal-date-chip--active {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.cal-date-chip--today {
+  color: var(--accent-cyan);
+}
+
+.cal-date-chip--today.cal-date-chip--active {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+
+.cal-date-chip--past {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.cal-date-chip--disabled {
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.cal-date-strip__arrows {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--space-3);
+  pointer-events: none;
+}
+
+.cal-date-strip__arrow {
+  pointer-events: auto;
+  background: linear-gradient(to right, var(--bg) 60%, transparent);
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+}
+
+.cal-date-strip__arrow--next {
+  background: linear-gradient(to left, var(--bg) 60%, transparent);
+}
+
+.cal-date-strip__arrow:hover {
+  color: var(--fg);
 }
 
 /* --- Day Grid --- */
@@ -213,6 +431,77 @@ body {
 
 .cal-slot--busy {
   text-decoration: line-through;
+}
+
+.cal-slot--optimal {
+  border-left: 3px solid var(--accent-cyan);
+}
+
+.cal-slot--visitor-busy {
+  position: relative;
+}
+
+.cal-slot--visitor-busy::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+
+/* --- Event Hints --- */
+.cal-event-hint {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  border-left: 2px solid var(--fg-subtle);
+  background: color-mix(in srgb, var(--fg-subtle) 8%, transparent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.cal-event-hint__time {
+  white-space: nowrap;
+}
+
+.cal-event-hint__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Visitor GCal Bar --- */
+.cal-visitor-gcal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  border: var(--border-thin) solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+}
+
+.cal-visitor-gcal__privacy {
+  font-size: 9px;
+  color: var(--fg-subtle);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.cal-visitor-gcal--connected {
+  border-color: var(--color-success);
 }
 
 /* --- Loading --- */
@@ -357,6 +646,48 @@ body {
     <button class="btn btn--ghost btn--sm" id="gcalConnectBtn" style="font-size:var(--text-2xs);">Connect</button>
   </div>
 
+  <!-- Admin Panel (only visible when admin is signed in) -->
+  <div id="adminPanel" class="cal-admin-panel hidden">
+    <button class="cal-admin-panel__toggle" id="adminPanelToggle">Admin Config &#9660;</button>
+    <div class="cal-admin-panel__body hidden" id="adminPanelBody">
+
+      <!-- Meeting Type Config -->
+      <div class="cal-admin-section">
+        <div class="cal-admin-section__title">Meeting Types</div>
+        <div id="configCards"></div>
+        <button class="btn btn--ghost btn--sm" id="saveConfigBtn" style="margin-top:var(--space-2);">Save Config</button>
+      </div>
+
+      <!-- Singleton Profile -->
+      <div class="cal-admin-section">
+        <div class="cal-admin-section__title">Visible Profile</div>
+        <div class="cal-block-form">
+          <select id="singletonSelect">
+            <option value="">All Profiles</option>
+          </select>
+          <button class="btn btn--ghost btn--sm" id="saveSingletonBtn">Apply</button>
+        </div>
+      </div>
+
+      <!-- Blocks -->
+      <div class="cal-admin-section">
+        <div class="cal-admin-section__title">Block Time</div>
+        <div class="cal-block-form" id="blockForm">
+          <input type="date" id="blockDate">
+          <select id="blockType">
+            <option value="full-day">Full Day</option>
+            <option value="time-range">Time Range</option>
+          </select>
+          <input type="time" id="blockStart" class="hidden" value="09:00">
+          <input type="time" id="blockEnd" class="hidden" value="17:00">
+          <button class="btn btn--ghost btn--sm" id="addBlockBtn">Block</button>
+        </div>
+        <div class="cal-blocks-list" id="blocksList"></div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Main Layout (always visible — no auth gate) -->
   <main class="cal-layout" id="calMain">
 
@@ -370,7 +701,7 @@ body {
       </div>
 
       <!-- Profile Selector -->
-      <div class="cal-section-label">Profile</div>
+      <div class="cal-section-label" id="profileSectionLabel">Profile</div>
       <div class="cal-token-row" id="profileTokens"></div>
 
       <!-- Duration Selector -->
@@ -383,11 +714,22 @@ body {
 
       <!-- VIEW: Slot Picker -->
       <div id="viewSlots">
-        <div class="cal-week-nav">
-          <button class="btn btn--ghost btn--sm" id="prevWeek">&larr; Prev</button>
-          <span class="cal-week-label" id="weekLabel"></span>
-          <button class="btn btn--ghost btn--sm" id="nextWeek">Next &rarr;</button>
+        <!-- Visitor Google Calendar Connect -->
+        <div class="cal-visitor-gcal hidden" id="visitorGcalBar">
+          <span>See your availability</span>
+          <button class="btn btn--ghost btn--sm" id="visitorConnectBtn" style="font-size:var(--text-2xs);">Connect Google Calendar</button>
+          <span class="cal-visitor-gcal__privacy">We only read your calendar to suggest times.</span>
         </div>
+
+        <!-- Date Strip (scroll navigation) -->
+        <div class="cal-date-strip-wrapper">
+          <div class="cal-date-strip" id="dateStrip"></div>
+          <div class="cal-date-strip__arrows">
+            <button class="cal-date-strip__arrow" id="stripPrev">&#8592;</button>
+            <button class="cal-date-strip__arrow cal-date-strip__arrow--next" id="stripNext">&#8594;</button>
+          </div>
+        </div>
+
         <div class="cal-days-grid" id="daysGrid"></div>
       </div>
 
@@ -436,7 +778,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.2.1';
+  const VERSION = '2.8.0';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -446,10 +788,6 @@ body {
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
   const ADMIN_EMAIL = 'fike101@gmail.com';
 
-  // Hardcoded owner user ID — the Supabase user ID for the admin account.
-  // This is used for free-busy lookups and event creation without requiring
-  // the visitor to sign in. Set this after your first admin login by checking
-  // the console log or Supabase dashboard.
   var OWNER_USER_ID = '0c55209d-05d8-430f-b072-07406de9f4bd';
 
   const CONFIG = {
@@ -461,7 +799,8 @@ body {
     slotInterval: 30,
   };
 
-  const PROFILES = [
+  // Default profiles — overridden by DB config when available
+  var PROFILES = [
     {
       id: 'work',
       label: 'Work',
@@ -501,38 +840,65 @@ body {
     isAdmin: false,
     gcalConnected: false,
     busyPeriods: [],
+    blocks: [],
     loadingSlots: false,
+    singletonProfileId: null,
+    // Visitor calendar state
+    visitorSessionToken: null,
+    visitorGcalConnected: false,
+    visitorBusyPeriods: [],
+    visitorEvents: [],
+    adminEvents: [],
+    adminPanelOpen: false,
   };
 
   // ============================================
-  // AUTH (CtrlAuth — standard ctrl.rodeo login)
+  // AUTH
   // ============================================
-  // Intercept Google Calendar OAuth code BEFORE CtrlAuth/Supabase processes URL.
-  // Google Calendar returns ?code=X&state=USER_ID (UUID).
-  // Supabase PKCE returns ?code=X (no state, or different state format).
-  // We extract the Google code first so Supabase doesn't try to consume it.
   var _pendingGCalCode = null;
+  var _pendingGCalType = null; // 'admin' or 'visitor'
+  var _pendingGCalId = null;   // userId or sessionToken
+
   (function interceptGCalCode() {
     var params = new URLSearchParams(window.location.search);
     var code = params.get('code');
     var gstate = params.get('state');
-    // Google Calendar OAuth always has state=userId (UUID format)
-    if (code && gstate && /^[0-9a-f]{8}-/.test(gstate)) {
-      _pendingGCalCode = code;
-      console.log('[calendar] Intercepted Google Calendar OAuth code, stripping from URL');
-      params.delete('code');
-      params.delete('state');
-      params.delete('scope');
-      var clean = window.location.pathname;
-      var remaining = params.toString();
-      if (remaining) clean += '?' + remaining;
-      clean += window.location.hash;
-      window.history.replaceState({}, '', clean);
+    if (code && gstate) {
+      // admin:UUID or visitor:UUID format
+      var adminMatch = gstate.match(/^admin:(.+)$/);
+      var visitorMatch = gstate.match(/^visitor:(.+)$/);
+      // Legacy format: bare UUID
+      var legacyMatch = !adminMatch && !visitorMatch && /^[0-9a-f]{8}-/.test(gstate);
+
+      if (adminMatch) {
+        _pendingGCalCode = code;
+        _pendingGCalType = 'admin';
+        _pendingGCalId = adminMatch[1];
+      } else if (visitorMatch) {
+        _pendingGCalCode = code;
+        _pendingGCalType = 'visitor';
+        _pendingGCalId = visitorMatch[1];
+      } else if (legacyMatch) {
+        _pendingGCalCode = code;
+        _pendingGCalType = 'admin';
+        _pendingGCalId = gstate;
+      }
+
+      if (_pendingGCalCode) {
+        console.log('[calendar] Intercepted Google Calendar OAuth code (type: ' + _pendingGCalType + ')');
+        params.delete('code');
+        params.delete('state');
+        params.delete('scope');
+        var clean = window.location.pathname;
+        var remaining = params.toString();
+        if (remaining) clean += '?' + remaining;
+        clean += window.location.hash;
+        window.history.replaceState({}, '', clean);
+      }
     }
   })();
 
   function initAuth() {
-    // CtrlAuth handles login modal, session, and the account dropdown
     CtrlAuth.init({
       supabaseUrl: SUPABASE_URL,
       supabaseAnonKey: SUPABASE_ANON_KEY,
@@ -542,7 +908,6 @@ body {
       skipUsername: true,
     });
 
-    // When user signs in, check if they're admin
     document.addEventListener('ctrl:auth:signedin', function (e) {
       var user = e.detail.user;
       if (user && user.email === ADMIN_EMAIL) {
@@ -550,6 +915,7 @@ body {
         OWNER_USER_ID = user.id;
         console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
         document.getElementById('adminBar').classList.remove('hidden');
+        document.getElementById('adminPanel').classList.remove('hidden');
         checkGCalStatus();
         handleGCalCallback();
         loadAndRenderSlots();
@@ -559,6 +925,7 @@ body {
     document.addEventListener('ctrl:auth:signedout', function () {
       state.isAdmin = false;
       document.getElementById('adminBar').classList.add('hidden');
+      document.getElementById('adminPanel').classList.add('hidden');
     });
   }
 
@@ -572,14 +939,60 @@ body {
   }
 
   // ============================================
+  // VISITOR SESSION
+  // ============================================
+  function getVisitorSessionToken() {
+    if (state.visitorSessionToken) return state.visitorSessionToken;
+    var token = sessionStorage.getItem('cal_visitor_session');
+    if (!token) {
+      token = crypto.randomUUID();
+      sessionStorage.setItem('cal_visitor_session', token);
+    }
+    state.visitorSessionToken = token;
+    return token;
+  }
+
+  function checkVisitorGcalStatus() {
+    // If there's a session token stored, try a free-busy call to verify it's valid
+    var token = sessionStorage.getItem('cal_visitor_session');
+    if (!token) return;
+    state.visitorSessionToken = token;
+
+    var now = new Date();
+    var later = new Date(now.getTime() + 60 * 60 * 1000);
+    callPublicCalendarAPI({
+      action: 'visitor-free-busy',
+      sessionToken: token,
+      timeMin: now.toISOString(),
+      timeMax: later.toISOString(),
+    }).then(function (data) {
+      if (!data.disconnected && !data.error) {
+        state.visitorGcalConnected = true;
+        updateVisitorGcalUI();
+      }
+    }).catch(function () {});
+  }
+
+  function updateVisitorGcalUI() {
+    var bar = document.getElementById('visitorGcalBar');
+    var btn = document.getElementById('visitorConnectBtn');
+    if (state.isAdmin) {
+      bar.classList.add('hidden');
+      return;
+    }
+    bar.classList.remove('hidden');
+    if (state.visitorGcalConnected) {
+      bar.classList.add('cal-visitor-gcal--connected');
+      btn.textContent = 'Connected';
+      btn.disabled = true;
+    }
+  }
+
+  // ============================================
   // GOOGLE CALENDAR API
   // ============================================
-  // Admin-authed API call (for auth-url, connect, status)
   function callCalendarAPI(body) {
     return getAdminAccessToken().then(function (token) {
-      if (!token) {
-        console.warn('[calendar] No admin token for action:', body.action);
-      }
       return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
         method: 'POST',
         headers: {
@@ -592,7 +1005,6 @@ body {
     });
   }
 
-  // Public API call — no admin auth needed (for free-busy, book)
   function callPublicCalendarAPI(body) {
     return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
       method: 'POST',
@@ -608,6 +1020,7 @@ body {
   function checkGCalStatus() {
     callCalendarAPI({ action: 'status' }).then(function (data) {
       state.gcalConnected = data.connected;
+      state.singletonProfileId = data.singletonProfileId || null;
       var statusEl = document.getElementById('gcalStatus');
       var btnEl = document.getElementById('gcalConnectBtn');
       if (data.connected) {
@@ -619,40 +1032,56 @@ body {
         statusEl.className = 'cal-admin-bar__status';
         btnEl.textContent = 'Connect';
       }
+      // Apply singleton after status loads
+      applySingletonProfile();
+      renderSidebar();
     });
   }
 
   function connectGCal() {
     callCalendarAPI({ action: 'auth-url' }).then(function (data) {
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      if (data.url) window.location.href = data.url;
     });
   }
 
   function handleGCalCallback() {
-    // Use the code intercepted before Supabase SDK loaded
     if (!_pendingGCalCode) return;
     var code = _pendingGCalCode;
-    _pendingGCalCode = null; // Only process once
+    var type = _pendingGCalType;
+    _pendingGCalCode = null;
+    _pendingGCalType = null;
+    _pendingGCalId = null;
 
-    console.log('[calendar] Processing Google Calendar OAuth code...');
-    callCalendarAPI({ action: 'connect', code: code }).then(function (data) {
-      if (data.connected) {
-        state.gcalConnected = true;
-        console.log('[calendar] Google Calendar connected successfully');
-        checkGCalStatus();
-        loadAndRenderSlots();
-      } else {
-        console.error('[calendar] OAuth connect failed:', data.error);
-      }
-    });
+    if (type === 'admin') {
+      console.log('[calendar] Processing admin Google Calendar OAuth code...');
+      callCalendarAPI({ action: 'connect', code: code }).then(function (data) {
+        if (data.connected) {
+          state.gcalConnected = true;
+          console.log('[calendar] Google Calendar connected successfully');
+          checkGCalStatus();
+          loadAndRenderSlots();
+        } else {
+          console.error('[calendar] OAuth connect failed:', data.error);
+        }
+      });
+    } else if (type === 'visitor') {
+      console.log('[calendar] Processing visitor Google Calendar OAuth code...');
+      var sessionToken = getVisitorSessionToken();
+      callPublicCalendarAPI({ action: 'visitor-connect', code: code, sessionToken: sessionToken }).then(function (data) {
+        if (data.connected) {
+          state.visitorGcalConnected = true;
+          console.log('[calendar] Visitor Google Calendar connected');
+          updateVisitorGcalUI();
+          loadAndRenderSlots();
+        } else {
+          console.error('[calendar] Visitor OAuth connect failed:', data.error);
+        }
+      });
+    }
   }
 
   function fetchBusyPeriods(timeMin, timeMax) {
-    if (!OWNER_USER_ID) {
-      return Promise.resolve([]);
-    }
+    if (!OWNER_USER_ID) return Promise.resolve([]);
 
     return callPublicCalendarAPI({
       action: 'free-busy',
@@ -661,6 +1090,71 @@ body {
       timeMax: timeMax,
     }).then(function (data) {
       return data.busy || [];
+    }).catch(function () {
+      return [];
+    });
+  }
+
+  function fetchBlocks(dateMin, dateMax) {
+    if (!OWNER_USER_ID) return Promise.resolve([]);
+
+    return callPublicCalendarAPI({
+      action: 'get-blocks',
+      ownerUserId: OWNER_USER_ID,
+      dateMin: dateMin,
+      dateMax: dateMax,
+    }).then(function (data) {
+      return data.blocks || [];
+    }).catch(function () {
+      return [];
+    });
+  }
+
+  function fetchVisitorBusyPeriods(timeMin, timeMax) {
+    if (!state.visitorGcalConnected || !state.visitorSessionToken) return Promise.resolve([]);
+
+    return callPublicCalendarAPI({
+      action: 'visitor-free-busy',
+      sessionToken: state.visitorSessionToken,
+      timeMin: timeMin,
+      timeMax: timeMax,
+    }).then(function (data) {
+      if (data.disconnected) {
+        state.visitorGcalConnected = false;
+        updateVisitorGcalUI();
+        return [];
+      }
+      return data.busy || [];
+    }).catch(function () {
+      return [];
+    });
+  }
+
+  function fetchVisitorEvents(timeMin, timeMax) {
+    if (!state.visitorGcalConnected || !state.visitorSessionToken) return Promise.resolve([]);
+
+    return callPublicCalendarAPI({
+      action: 'visitor-events',
+      sessionToken: state.visitorSessionToken,
+      timeMin: timeMin,
+      timeMax: timeMax,
+    }).then(function (data) {
+      if (data.disconnected) return [];
+      return data.events || [];
+    }).catch(function () {
+      return [];
+    });
+  }
+
+  function fetchAdminEvents(timeMin, timeMax) {
+    if (!state.isAdmin || !state.gcalConnected) return Promise.resolve([]);
+
+    return callCalendarAPI({
+      action: 'admin-events',
+      timeMin: timeMin,
+      timeMax: timeMax,
+    }).then(function (data) {
+      return data.events || [];
     }).catch(function () {
       return [];
     });
@@ -688,6 +1182,214 @@ body {
       timezone: CONFIG.timezone,
       attendeeEmail: booking.email,
       attendeeName: booking.name,
+    });
+  }
+
+  // ============================================
+  // CONFIG MANAGEMENT (Story 1)
+  // ============================================
+  function loadConfig() {
+    // Check sessionStorage cache first
+    var cached = sessionStorage.getItem('cal_config');
+    var cachedAt = sessionStorage.getItem('cal_config_at');
+    if (cached && cachedAt && (Date.now() - parseInt(cachedAt, 10)) < 5 * 60 * 1000) {
+      applyConfig(JSON.parse(cached));
+      return Promise.resolve();
+    }
+
+    return callPublicCalendarAPI({
+      action: 'get-config',
+      ownerUserId: OWNER_USER_ID,
+    }).then(function (data) {
+      if (data.profiles && data.profiles.length > 0) {
+        sessionStorage.setItem('cal_config', JSON.stringify(data.profiles));
+        sessionStorage.setItem('cal_config_at', String(Date.now()));
+        applyConfig(data.profiles);
+      }
+    }).catch(function () {
+      // Use defaults on error
+    });
+  }
+
+  function applyConfig(profiles) {
+    PROFILES = profiles.map(function (p) {
+      return {
+        id: p.profile_id || p.id,
+        label: p.label,
+        meetingTitle: p.meeting_title || p.meetingTitle,
+        durations: p.durations,
+        schedule: p.schedule,
+      };
+    });
+  }
+
+  function applySingletonProfile() {
+    if (state.singletonProfileId) {
+      var idx = PROFILES.findIndex(function (p) { return p.id === state.singletonProfileId; });
+      if (idx !== -1) {
+        state.profileIndex = idx;
+        state.selectedDuration = PROFILES[idx].durations[0];
+      }
+    }
+  }
+
+  function renderAdminConfigCards() {
+    var container = document.getElementById('configCards');
+    container.innerHTML = '';
+
+    PROFILES.forEach(function (p) {
+      var card = document.createElement('div');
+      card.className = 'cal-config-card';
+      card.dataset.profileId = p.id;
+
+      var labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.value = p.label;
+      labelInput.dataset.field = 'label';
+      labelInput.placeholder = 'Label';
+      labelInput.style.width = '80px';
+
+      var titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.value = p.meetingTitle;
+      titleInput.dataset.field = 'meetingTitle';
+      titleInput.placeholder = 'Meeting title';
+      titleInput.style.width = '140px';
+
+      card.appendChild(labelInput);
+      card.appendChild(titleInput);
+
+      var allDurations = [15, 30, 45, 60, 90, 120];
+      allDurations.forEach(function (d) {
+        var wrap = document.createElement('label');
+        wrap.className = 'cal-dur-check';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = d;
+        cb.checked = p.durations.indexOf(d) !== -1;
+        wrap.appendChild(cb);
+        wrap.appendChild(document.createTextNode(d + 'm'));
+        card.appendChild(wrap);
+      });
+
+      container.appendChild(card);
+    });
+
+    // Populate singleton select
+    var select = document.getElementById('singletonSelect');
+    select.innerHTML = '<option value="">All Profiles</option>';
+    PROFILES.forEach(function (p) {
+      var opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.label;
+      if (state.singletonProfileId === p.id) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function saveConfig() {
+    var cards = document.querySelectorAll('.cal-config-card');
+    var profiles = [];
+    cards.forEach(function (card) {
+      var profileId = card.dataset.profileId;
+      var original = PROFILES.find(function (p) { return p.id === profileId; });
+      var label = card.querySelector('[data-field="label"]').value.trim();
+      var meetingTitle = card.querySelector('[data-field="meetingTitle"]').value.trim();
+      var durations = [];
+      card.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+        durations.push(parseInt(cb.value, 10));
+      });
+      if (durations.length === 0) durations = [30];
+
+      profiles.push({
+        profile_id: profileId,
+        label: label || original.label,
+        meeting_title: meetingTitle || original.meetingTitle,
+        durations: durations,
+        schedule: original.schedule,
+        is_active: true,
+      });
+    });
+
+    callCalendarAPI({ action: 'save-config', profiles: profiles }).then(function (data) {
+      if (data.saved) {
+        sessionStorage.removeItem('cal_config');
+        sessionStorage.removeItem('cal_config_at');
+        loadConfig().then(function () {
+          renderSidebar();
+          loadAndRenderSlots();
+          renderAdminConfigCards();
+        });
+      }
+    });
+  }
+
+  // ============================================
+  // BLOCKS MANAGEMENT (Story 2)
+  // ============================================
+  function renderBlocksList() {
+    var container = document.getElementById('blocksList');
+    container.innerHTML = '';
+    state.blocks.forEach(function (b) {
+      var item = document.createElement('div');
+      item.className = 'cal-block-item';
+      var text = b.block_date;
+      if (b.block_type === 'time-range') {
+        text += ' ' + b.start_time + '-' + b.end_time;
+      } else {
+        text += ' (all day)';
+      }
+      if (b.profile_id) text += ' [' + b.profile_id + ']';
+      item.textContent = text;
+
+      var del = document.createElement('button');
+      del.className = 'cal-block-item__delete';
+      del.textContent = '\u2715';
+      del.addEventListener('click', function () {
+        callCalendarAPI({ action: 'delete-block', blockId: b.id }).then(function () {
+          loadAndRenderSlots();
+        });
+      });
+      item.appendChild(del);
+      container.appendChild(item);
+    });
+  }
+
+  function addBlock() {
+    var blockDate = document.getElementById('blockDate').value;
+    if (!blockDate) return;
+    var blockType = document.getElementById('blockType').value;
+    var payload = { action: 'save-block', blockType: blockType, blockDate: blockDate };
+    if (blockType === 'time-range') {
+      payload.startTime = document.getElementById('blockStart').value;
+      payload.endTime = document.getElementById('blockEnd').value;
+    }
+    callCalendarAPI(payload).then(function (data) {
+      if (data.saved) loadAndRenderSlots();
+    });
+  }
+
+  function isSlotBlocked(slotDate, startTime, endTime, profileId) {
+    var dateStr = buildISODate(slotDate);
+    return state.blocks.some(function (b) {
+      if (b.block_date !== dateStr) return false;
+      if (b.profile_id && b.profile_id !== profileId) return false;
+      if (b.block_type === 'full-day') return true;
+      // time-range block
+      var bStart = timeToMinutes(b.start_time.substring(0, 5));
+      var bEnd = timeToMinutes(b.end_time.substring(0, 5));
+      var sStart = timeToMinutes(startTime);
+      var sEnd = timeToMinutes(endTime);
+      return sStart < bEnd && sEnd > bStart;
+    });
+  }
+
+  function isDayFullyBlocked(date, profileId) {
+    var dateStr = buildISODate(date);
+    return state.blocks.some(function (b) {
+      if (b.block_date !== dateStr) return false;
+      if (b.profile_id && b.profile_id !== profileId) return false;
+      return b.block_type === 'full-day';
     });
   }
 
@@ -778,6 +1480,19 @@ body {
     });
   }
 
+  function isVisitorSlotBusy(slotDate, startTime, endTime) {
+    if (state.visitorBusyPeriods.length === 0) return false;
+    var dateStr = buildISODate(slotDate);
+    var slotStart = new Date(dateStr + 'T' + startTime + ':00');
+    var slotEnd = new Date(dateStr + 'T' + endTime + ':00');
+
+    return state.visitorBusyPeriods.some(function (busy) {
+      var busyStart = new Date(busy.start);
+      var busyEnd = new Date(busy.end);
+      return slotStart < busyEnd && slotEnd > busyStart;
+    });
+  }
+
   function getSlotsForDay(date, durationMin) {
     var profile = activeProfile();
     var dayOfWeek = date.getDay();
@@ -805,6 +1520,8 @@ body {
         }
 
         var isBusy = isSlotBusy(date, timeStr, endTimeStr);
+        var isBlocked = isSlotBlocked(date, timeStr, endTimeStr, profile.id);
+        var visitorBusy = isVisitorSlotBusy(date, timeStr, endTimeStr);
 
         slots.push({
           time: timeStr,
@@ -813,7 +1530,8 @@ body {
           date: new Date(date),
           durationMin: durationMin,
           isPast: isPast,
-          isBusy: isBusy,
+          isBusy: isBusy || isBlocked,
+          visitorBusy: visitorBusy,
         });
       }
     });
@@ -826,6 +1544,13 @@ body {
     var m = (date.getMonth() + 1 < 10 ? '0' : '') + (date.getMonth() + 1);
     var d = (date.getDate() < 10 ? '0' : '') + date.getDate();
     return y + '-' + m + '-' + d;
+  }
+
+  function getEventsForDay(date, events) {
+    var dateStr = buildISODate(date);
+    return events.filter(function (e) {
+      return e.start.substring(0, 10) === dateStr;
+    });
   }
 
   // ============================================
@@ -844,6 +1569,11 @@ body {
     document.getElementById('meetingTitle').textContent = profile.meetingTitle;
     document.getElementById('durationDisplay').textContent = state.selectedDuration + ' min';
     document.getElementById('tzDisplay').textContent = CONFIG.timezoneLabel;
+
+    // Hide profile selector in singleton mode
+    var isSingleton = state.singletonProfileId && PROFILES.length > 1;
+    document.getElementById('profileSectionLabel').classList.toggle('hidden', isSingleton);
+    document.getElementById('profileTokens').classList.toggle('hidden', isSingleton);
 
     // Profile tokens
     var profileContainer = document.getElementById('profileTokens');
@@ -881,26 +1611,97 @@ body {
     });
   }
 
+  // ============================================
+  // DATE STRIP (Story 4 — scroll navigation)
+  // ============================================
+  function renderDateStrip() {
+    var strip = document.getElementById('dateStrip');
+    strip.innerHTML = '';
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var profile = activeProfile();
+    var scheduledDays = Object.keys(profile.schedule).map(Number);
+
+    var monday = getMonday(today);
+
+    for (var w = 0; w <= CONFIG.weeksAhead; w++) {
+      for (var d = 0; d < 7; d++) {
+        var date = addDays(monday, w * 7 + d);
+        var chip = document.createElement('button');
+        chip.className = 'cal-date-chip';
+
+        var isPast = date < today;
+        var isScheduled = scheduledDays.indexOf(date.getDay()) !== -1;
+
+        if (isPast) chip.className += ' cal-date-chip--past';
+        else if (!isScheduled) chip.className += ' cal-date-chip--disabled';
+
+        if (isToday(date)) chip.className += ' cal-date-chip--today';
+
+        // Highlight chips in the active week
+        var activeMonday = addDays(monday, state.weekOffset * 7);
+        var activeSunday = addDays(activeMonday, 6);
+        if (date >= activeMonday && date <= activeSunday && !isPast && isScheduled) {
+          chip.className += ' cal-date-chip--active';
+        }
+
+        var label = formatDayLabel(date);
+        chip.innerHTML = '<div>' + label.day + '</div><div>' + label.date + '</div>';
+
+        (function (weekIdx) {
+          chip.addEventListener('click', function () {
+            state.weekOffset = weekIdx;
+            loadAndRenderSlots();
+          });
+        })(w);
+
+        strip.appendChild(chip);
+      }
+    }
+
+    // Auto-scroll to active week
+    var activeChips = strip.querySelectorAll('.cal-date-chip--active');
+    if (activeChips.length > 0) {
+      var firstActive = activeChips[0];
+      var stripRect = strip.getBoundingClientRect();
+      var chipRect = firstActive.getBoundingClientRect();
+      var scrollLeft = chipRect.left - stripRect.left + strip.scrollLeft - 8;
+      strip.scrollLeft = scrollLeft;
+    }
+  }
+
   function loadAndRenderSlots() {
     var dates = getWeekDates();
     var timeMin = dates[0].toISOString();
     var timeMax = addDays(dates[6], 1).toISOString();
+    var dateMin = buildISODate(dates[0]);
+    var dateMax = buildISODate(dates[6]);
 
     state.loadingSlots = true;
     document.getElementById('daysGrid').innerHTML =
       '<div class="cal-loading" style="grid-column:1/-1;">Loading availability...</div>';
 
-    // Update week label while loading
-    var firstDay = dates[0];
-    var lastDay = dates[6];
-    document.getElementById('weekLabel').textContent =
-      formatDate(firstDay) + ' \u2014 ' + formatDate(lastDay);
-    document.getElementById('prevWeek').disabled = state.weekOffset <= 0;
+    renderDateStrip();
 
-    fetchBusyPeriods(timeMin, timeMax).then(function (busy) {
-      state.busyPeriods = busy;
+    // Fetch all data in parallel
+    var fetches = [
+      fetchBusyPeriods(timeMin, timeMax),
+      fetchBlocks(dateMin, dateMax),
+      fetchVisitorBusyPeriods(timeMin, timeMax),
+      fetchVisitorEvents(timeMin, timeMax),
+      fetchAdminEvents(timeMin, timeMax),
+    ];
+
+    Promise.all(fetches).then(function (results) {
+      state.busyPeriods = results[0];
+      state.blocks = results[1];
+      state.visitorBusyPeriods = results[2];
+      state.visitorEvents = results[3];
+      state.adminEvents = results[4];
       state.loadingSlots = false;
       renderSlotView();
+      if (state.isAdmin) renderBlocksList();
     });
   }
 
@@ -908,9 +1709,11 @@ body {
     var profile = activeProfile();
     var dates = getWeekDates();
 
+    // Story 3: filter out past days
     var scheduledDays = Object.keys(profile.schedule).map(Number);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
     var visibleDates = dates.filter(function (d) {
-      return scheduledDays.indexOf(d.getDay()) !== -1;
+      return scheduledDays.indexOf(d.getDay()) !== -1 && d >= today;
     });
 
     if (visibleDates.length === 0) {
@@ -921,6 +1724,9 @@ body {
       grid.style.gridTemplateColumns = 'repeat(' + visibleDates.length + ', 1fr)';
       grid.innerHTML = '';
 
+      // Determine which events to show as hints
+      var hintEvents = state.isAdmin ? state.adminEvents : state.visitorEvents;
+
       visibleDates.forEach(function (date) {
         var col = document.createElement('div');
         col.className = 'cal-day-col';
@@ -930,6 +1736,20 @@ body {
         labelEl.className = 'cal-day-label' + (isToday(date) ? ' cal-day-label--today' : '');
         labelEl.innerHTML = label.day + '<br>' + label.date;
         col.appendChild(labelEl);
+
+        // Event hints for this day (Story 6)
+        var dayEvents = getEventsForDay(date, hintEvents);
+        dayEvents.forEach(function (ev) {
+          var hint = document.createElement('div');
+          hint.className = 'cal-event-hint';
+          var evStart = new Date(ev.start);
+          var evEnd = new Date(ev.end);
+          var timeLabel = formatTimeDisplay(minutesToTime(evStart.getHours() * 60 + evStart.getMinutes()))
+            + '-' + formatTimeDisplay(minutesToTime(evEnd.getHours() * 60 + evEnd.getMinutes()));
+          hint.innerHTML = '<span class="cal-event-hint__time">' + timeLabel + '</span>' +
+            '<span class="cal-event-hint__title">' + ev.summary + '</span>';
+          col.appendChild(hint);
+        });
 
         var slots = getSlotsForDay(date, state.selectedDuration);
         if (slots.length === 0) {
@@ -943,6 +1763,15 @@ body {
             var cls = 'cal-slot';
             if (slot.isPast) cls += ' cal-slot--past';
             else if (slot.isBusy) cls += ' cal-slot--busy';
+            else {
+              // Story 5: optimal slot highlighting
+              if (state.visitorGcalConnected && !slot.visitorBusy) {
+                cls += ' cal-slot--optimal';
+              }
+              if (slot.visitorBusy) {
+                cls += ' cal-slot--visitor-busy';
+              }
+            }
             btn.className = cls;
             btn.textContent = slot.label;
             if (!slot.isPast && !slot.isBusy) {
@@ -959,14 +1788,6 @@ body {
         grid.appendChild(col);
       });
     }
-
-    var allDates = getWeekDates();
-    var firstDay = allDates[0];
-    var lastDay = allDates[6];
-    document.getElementById('weekLabel').textContent =
-      formatDate(firstDay) + ' \u2014 ' + formatDate(lastDay);
-
-    document.getElementById('prevWeek').disabled = state.weekOffset <= 0;
   }
 
   function renderFormView() {
@@ -1042,7 +1863,6 @@ body {
       slot: state.selectedSlot,
     };
 
-    // Create event on Google Calendar
     createCalendarEvent(bookingData).then(function (result) {
       bookingData.eventLink = result.htmlLink || '';
       state.booking = bookingData;
@@ -1050,7 +1870,6 @@ body {
       renderConfirmView();
     }).catch(function (err) {
       console.error('[calendar] Booking error:', err);
-      // Still show confirmation even if gcal fails
       state.booking = bookingData;
       setView('confirm');
       renderConfirmView();
@@ -1082,33 +1901,114 @@ body {
 
     state.selectedDuration = activeProfile().durations[0];
 
-    // Render immediately — no auth required for visitors
-    renderSidebar();
-    loadAndRenderSlots();
+    // Show loading state while config loads
+    document.getElementById('daysGrid').innerHTML =
+      '<div class="cal-loading" style="grid-column:1/-1;">Loading...</div>';
 
-    // Init auth (CtrlAuth — standard ctrl.rodeo login dropdown)
+    // Load config then render
+    loadConfig().then(function () {
+      // Re-resolve profile from hash after config loads (profile IDs may have changed)
+      if (hash) {
+        PROFILES.forEach(function (p, i) {
+          if (p.id === hash) state.profileIndex = i;
+        });
+      }
+      state.selectedDuration = activeProfile().durations[0];
+      renderSidebar();
+      loadAndRenderSlots();
+    });
+
+    // Init auth
     initAuth();
 
-    // Event listeners
-    document.getElementById('prevWeek').addEventListener('click', function () {
-      state.weekOffset = Math.max(0, state.weekOffset - 1);
-      loadAndRenderSlots();
+    // Check if visitor has existing Google Calendar connection
+    checkVisitorGcalStatus();
+    // Show visitor gcal bar for non-admin users
+    setTimeout(function () {
+      if (!state.isAdmin) updateVisitorGcalUI();
+    }, 500);
+
+    // Handle visitor OAuth callback if pending
+    if (_pendingGCalType === 'visitor' && _pendingGCalCode) {
+      var sessionToken = getVisitorSessionToken();
+      var code = _pendingGCalCode;
+      _pendingGCalCode = null;
+      _pendingGCalType = null;
+      callPublicCalendarAPI({ action: 'visitor-connect', code: code, sessionToken: sessionToken }).then(function (data) {
+        if (data.connected) {
+          state.visitorGcalConnected = true;
+          console.log('[calendar] Visitor Google Calendar connected');
+          updateVisitorGcalUI();
+          loadAndRenderSlots();
+        }
+      });
+    }
+
+    // Date strip arrows
+    document.getElementById('stripPrev').addEventListener('click', function () {
+      var strip = document.getElementById('dateStrip');
+      strip.scrollLeft -= 200;
     });
 
-    document.getElementById('nextWeek').addEventListener('click', function () {
-      state.weekOffset = Math.min(CONFIG.weeksAhead, state.weekOffset + 1);
-      loadAndRenderSlots();
+    document.getElementById('stripNext').addEventListener('click', function () {
+      var strip = document.getElementById('dateStrip');
+      strip.scrollLeft += 200;
     });
 
+    // Admin panel toggle
+    document.getElementById('adminPanelToggle').addEventListener('click', function () {
+      state.adminPanelOpen = !state.adminPanelOpen;
+      document.getElementById('adminPanelBody').classList.toggle('hidden', !state.adminPanelOpen);
+      this.innerHTML = 'Admin Config ' + (state.adminPanelOpen ? '&#9650;' : '&#9660;');
+      if (state.adminPanelOpen) renderAdminConfigCards();
+    });
+
+    // Save config button
+    document.getElementById('saveConfigBtn').addEventListener('click', saveConfig);
+
+    // Singleton profile selector
+    document.getElementById('saveSingletonBtn').addEventListener('click', function () {
+      var val = document.getElementById('singletonSelect').value || null;
+      callCalendarAPI({ action: 'update-singleton', singletonProfileId: val }).then(function (data) {
+        if (data.updated) {
+          state.singletonProfileId = val;
+          applySingletonProfile();
+          renderSidebar();
+          loadAndRenderSlots();
+        }
+      });
+    });
+
+    // Block type toggle for time inputs
+    document.getElementById('blockType').addEventListener('change', function () {
+      var isRange = this.value === 'time-range';
+      document.getElementById('blockStart').classList.toggle('hidden', !isRange);
+      document.getElementById('blockEnd').classList.toggle('hidden', !isRange);
+    });
+
+    // Add block button
+    document.getElementById('addBlockBtn').addEventListener('click', addBlock);
+
+    // Back to slots
     document.getElementById('backToSlots').addEventListener('click', function () {
       setView('slots');
       renderSlotView();
     });
 
+    // Booking form
     document.getElementById('bookingForm').addEventListener('submit', handleFormSubmit);
     document.getElementById('bookAnother').addEventListener('click', handleBookAnother);
 
+    // Admin GCal connect
     document.getElementById('gcalConnectBtn').addEventListener('click', connectGCal);
+
+    // Visitor GCal connect
+    document.getElementById('visitorConnectBtn').addEventListener('click', function () {
+      var sessionToken = getVisitorSessionToken();
+      callPublicCalendarAPI({ action: 'visitor-auth-url', sessionToken: sessionToken }).then(function (data) {
+        if (data.url) window.location.href = data.url;
+      });
+    });
 
     // Handle hash changes
     window.addEventListener('hashchange', function () {
@@ -1125,6 +2025,9 @@ body {
         }
       });
     });
+
+    // Set default block date to today
+    document.getElementById('blockDate').value = buildISODate(new Date());
   }
 
   document.addEventListener('DOMContentLoaded', init);
