@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account — ctrl.rodeo</title>
+  <meta name="description" content="Manage your ctrl.rodeo account, connected services, and preferences.">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
+  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
+
+  <!-- Space Grotesk Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- CTRL Design System -->
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+
+  <style>
+/* ============================================
+   Account Page — page-specific styles
+   ============================================ */
+.account-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--gutter-page);
+  padding-bottom: var(--space-16);
+}
+
+.account-page__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: normal;
+  margin-bottom: var(--space-8);
+}
+
+/* Auth gate — shown when not signed in */
+.auth-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: var(--space-4);
+}
+
+.auth-gate__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: normal;
+}
+
+.auth-gate__text {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  max-width: 40ch;
+}
+
+/* Section cards */
+.account-card {
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.account-card__header {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+/* Settings row */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row__title {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.settings-row__description {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+/* Theme toggle (same as boards) */
+.theme-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: transparent;
+  border: var(--border-thin) solid var(--fg-muted);
+  cursor: pointer;
+  padding: 2px;
+  transition: background var(--duration-slow) var(--ease-default);
+  flex-shrink: 0;
+}
+
+.theme-toggle__knob {
+  width: 14px;
+  height: 14px;
+  background: var(--fg-muted);
+  transition: transform var(--duration-slow) var(--ease-default),
+              background var(--duration-slow) var(--ease-default);
+}
+
+.theme-toggle.active {
+  background: var(--fg);
+  border-color: var(--fg);
+}
+
+.theme-toggle.active .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(16px);
+}
+
+/* Auth method badge */
+.auth-method {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-thin) solid var(--border-subtle);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.auth-method__icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Import button */
+.import-btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  background: transparent;
+  color: var(--fg);
+  border: var(--border-thin) solid var(--border-subtle);
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+  text-align: left;
+  transition: background var(--duration-normal) var(--ease-default),
+              color var(--duration-normal) var(--ease-default);
+}
+
+.import-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.import-btn__hint {
+  display: block;
+  font-size: var(--text-2xs);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+
+.import-btn:hover .import-btn__hint {
+  color: var(--bg);
+  opacity: 0.7;
+}
+
+/* Import progress */
+.import-progress {
+  display: none;
+  margin-bottom: var(--space-3);
+}
+
+.import-progress.visible {
+  display: block;
+}
+
+.import-progress__label {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-1);
+}
+
+.import-progress__bar {
+  height: 3px;
+  background: var(--border-subtle);
+}
+
+.import-progress__fill {
+  height: 100%;
+  background: var(--fg);
+  width: 0%;
+  transition: width var(--duration-slow) var(--ease-default);
+}
+
+/* YouTube status */
+.yt-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.yt-status__text {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+/* Danger zone */
+.danger-zone {
+  border-color: var(--color-error);
+  opacity: 0.8;
+}
+
+.danger-zone .account-card__header {
+  color: var(--color-error);
+  border-bottom-color: var(--color-error);
+  opacity: 0.6;
+}
+
+/* Nav back link */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-muted);
+  text-decoration: none;
+  margin-bottom: var(--space-4);
+  transition: color var(--duration-normal) var(--ease-default);
+}
+
+.back-link:hover {
+  color: var(--fg);
+}
+
+/* Connector settings */
+.connector-status__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--fg-subtle);
+}
+
+.connector-status__dot--active {
+  background: var(--color-success);
+}
+
+.settings-tier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-tier__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-thin) solid var(--border-subtle);
+  cursor: pointer;
+  transition: border-color var(--duration-normal) var(--ease-default);
+}
+
+.settings-tier__option:hover {
+  border-color: var(--fg-muted);
+}
+
+.settings-tier__option input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--fg);
+}
+
+.settings-tier__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-tier__text strong {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.settings-tier__text small {
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.settings-boards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-boards__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+}
+
+.settings-boards__item input[type="checkbox"] {
+  accent-color: var(--fg);
+}
+
+/* Hidden file inputs */
+.hidden-input {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .account-page {
+    padding: var(--space-4) var(--space-3);
+  }
+}
+  </style>
+</head>
+<body>
+  <!-- Auth mount point -->
+  <div id="ctrl-auth-root"></div>
+
+  <!-- Header -->
+  <header class="page-header">
+    <div class="page-header__inner">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/boards/" class="breadcrumb__link">ctrl</a>
+        <span class="breadcrumb__sep">/</span>
+        <span class="breadcrumb__current">account</span>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Auth gate (shown when not logged in) -->
+  <div class="auth-gate" id="authGate">
+    <div class="auth-gate__title">Sign in to manage your account</div>
+    <p class="auth-gate__text">Log in with Google or email to view your account settings.</p>
+    <button class="btn" id="authGateLogin">Sign In</button>
+  </div>
+
+  <!-- Account content (shown when logged in) -->
+  <main class="account-page" id="accountContent" style="display:none;">
+    <h1 class="account-page__title">Account</h1>
+
+    <!-- Profile -->
+    <div class="account-card">
+      <div class="account-card__header">Profile</div>
+      <div class="account-section">
+        <label class="account-label">Username</label>
+        <div class="account-value account-value--mono" id="accountUsername">--</div>
+      </div>
+      <div class="account-section">
+        <label class="account-label">Email</label>
+        <div class="account-value" id="accountEmail"></div>
+      </div>
+      <div class="account-section">
+        <label class="account-label">Member Since</label>
+        <div class="account-value" id="accountCreatedAt"></div>
+      </div>
+      <div class="account-section">
+        <label class="account-label">Signed In Via</label>
+        <div id="accountAuthMethod"></div>
+      </div>
+      <div class="account-section">
+        <label class="account-label">Device</label>
+        <div class="account-value account-value--mono" id="accountDevice"></div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="account-card" id="settingsSection">
+      <div class="account-card__header">Settings</div>
+      <div class="settings-row">
+        <div class="settings-row__label">
+          <span class="settings-row__title">Light Mode</span>
+          <span class="settings-row__description">Switch to light theme</span>
+        </div>
+        <button class="theme-toggle" id="themeToggle">
+          <div class="theme-toggle__knob"></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Connected Services -->
+    <div class="account-card" id="ytSection">
+      <div class="account-card__header">YouTube</div>
+      <div class="yt-status">
+        <span class="yt-status__text" id="ytStatus">Not connected</span>
+      </div>
+      <div id="ytConnectControls">
+        <button class="import-btn" id="ytConnectBtn">
+          Connect YouTube
+          <span class="import-btn__hint">Imports liked videos and playlists into your taste map.</span>
+        </button>
+      </div>
+      <div id="ytImportControls" style="display:none;">
+        <button class="import-btn" id="ytImportLikedBtn">Import Liked Videos</button>
+        <button class="import-btn" id="ytImportPlaylistsBtn">Import Playlists</button>
+        <button class="import-btn" id="ytDisconnectBtn" style="color: var(--fg-muted);">Disconnect YouTube</button>
+      </div>
+      <div class="import-progress" id="ytProgress">
+        <div class="import-progress__label" id="ytProgressLabel">Importing...</div>
+        <div class="import-progress__bar">
+          <div class="import-progress__fill" id="ytProgressFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Taste History Imports -->
+    <div class="account-card">
+      <div class="account-card__header">Taste History Imports</div>
+      <p style="font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-3);">
+        Upload listening or watch history to enrich your taste profile. These signals inform the taste engine but are never shown as pins.
+      </p>
+
+      <button class="import-btn" id="spotifyImportBtn">
+        Import Spotify History
+        <span class="import-btn__hint">Upload streaming history JSON from Spotify's privacy data export.</span>
+      </button>
+
+      <button class="import-btn" id="youtubeTakeoutBtn">
+        Import YouTube History
+        <span class="import-btn__hint">Upload watch-history.json from Google Takeout.</span>
+      </button>
+
+      <button class="import-btn" id="instagramImportBtn">
+        Import Instagram Saves
+        <span class="import-btn__hint">Upload saved_posts.json or liked_posts.json from Instagram's data export.</span>
+      </button>
+
+      <div class="import-progress" id="tasteImportProgress">
+        <div class="import-progress__label" id="tasteProgressLabel">Processing...</div>
+        <div class="import-progress__bar">
+          <div class="import-progress__fill" id="tasteProgressFill"></div>
+        </div>
+      </div>
+
+      <!-- Hidden file inputs -->
+      <input type="file" class="hidden-input" id="spotifyFileInput" accept=".json">
+      <input type="file" class="hidden-input" id="youtubeTakeoutFileInput" accept=".json">
+      <input type="file" class="hidden-input" id="instagramFileInput" accept=".json">
+    </div>
+
+    <!-- AI Connector Settings (only shown when connected) -->
+    <div class="account-card" id="connectorSettingsSection" style="display:none;">
+      <div class="account-card__header">AI Connector</div>
+
+      <div class="settings-row">
+        <div class="settings-row__label">
+          <span class="settings-row__title">Connection</span>
+          <span class="settings-row__description" id="connectorStatusText">Not connected</span>
+        </div>
+        <div>
+          <span class="connector-status__dot" id="connectorStatusDot"></span>
+        </div>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;">
+        <div class="settings-row__label" style="margin-bottom:var(--space-2);">
+          <span class="settings-row__title">Privacy Level</span>
+          <span class="settings-row__description">What Claude can see from your library</span>
+        </div>
+        <div class="settings-tier" id="privacyTierPicker">
+          <label class="settings-tier__option">
+            <input type="radio" name="privacyTier" value="taste_only">
+            <span class="settings-tier__text">
+              <strong>Taste Only</strong>
+              <small>Categories, tags, interests — no titles or links</small>
+            </span>
+          </label>
+          <label class="settings-tier__option">
+            <input type="radio" name="privacyTier" value="library" checked>
+            <span class="settings-tier__text">
+              <strong>Library</strong>
+              <small>Titles, categories, tags, media info — no URLs or notes</small>
+            </span>
+          </label>
+          <label class="settings-tier__option">
+            <input type="radio" name="privacyTier" value="full_access">
+            <span class="settings-tier__text">
+              <strong>Full Access</strong>
+              <small>Everything including URLs, notes, and images</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row__label">
+          <span class="settings-row__title">Auto-Save</span>
+          <span class="settings-row__description">Claude saves pins when you express a choice</span>
+        </div>
+        <button class="theme-toggle" id="autoSaveToggle">
+          <div class="theme-toggle__knob"></div>
+        </button>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;">
+        <div class="settings-row__label" style="margin-bottom:var(--space-2);">
+          <span class="settings-row__title">Board Visibility</span>
+          <span class="settings-row__description">Toggle which boards Claude can access</span>
+        </div>
+        <div class="settings-boards" id="boardVisibilityList"></div>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="account-card danger-zone">
+      <div class="account-card__header">Session</div>
+      <button class="btn btn--danger btn--block" id="logoutBtn">Logout</button>
+    </div>
+  </main>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Shared Auth -->
+  <script src="/auth/ctrl-auth.js"></script>
+
+  <script>
+  (function() {
+    'use strict';
+
+    // ============================================
+    // Supabase Setup
+    // ============================================
+    const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+    const ADMIN_EMAIL = 'fike101@gmail.com';
+
+    CtrlAuth.init({
+      supabaseUrl: SUPABASE_URL,
+      supabaseAnonKey: SUPABASE_ANON_KEY,
+      redirectTo: window.location.origin + '/account/',
+      adminEmails: [ADMIN_EMAIL],
+      mountTo: '#ctrl-auth-root'
+    });
+
+    const supabase = CtrlAuth.getSupabaseClient();
+
+    // ============================================
+    // DOM Refs
+    // ============================================
+    const $ = id => document.getElementById(id);
+    const authGate = $('authGate');
+    const accountContent = $('accountContent');
+    const authGateLogin = $('authGateLogin');
+
+    // Profile
+    const accountUsername = $('accountUsername');
+    const accountEmail = $('accountEmail');
+    const accountCreatedAt = $('accountCreatedAt');
+    const accountAuthMethod = $('accountAuthMethod');
+    const accountDevice = $('accountDevice');
+
+    // Settings
+    const themeToggle = $('themeToggle');
+
+    // YouTube
+    const ytStatus = $('ytStatus');
+    const ytConnectControls = $('ytConnectControls');
+    const ytImportControls = $('ytImportControls');
+    const ytConnectBtn = $('ytConnectBtn');
+    const ytImportLikedBtn = $('ytImportLikedBtn');
+    const ytImportPlaylistsBtn = $('ytImportPlaylistsBtn');
+    const ytDisconnectBtn = $('ytDisconnectBtn');
+    const ytProgress = $('ytProgress');
+    const ytProgressLabel = $('ytProgressLabel');
+    const ytProgressFill = $('ytProgressFill');
+
+    // Taste imports
+    const spotifyImportBtn = $('spotifyImportBtn');
+    const youtubeTakeoutBtn = $('youtubeTakeoutBtn');
+    const instagramImportBtn = $('instagramImportBtn');
+    const spotifyFileInput = $('spotifyFileInput');
+    const youtubeTakeoutFileInput = $('youtubeTakeoutFileInput');
+    const instagramFileInput = $('instagramFileInput');
+    const tasteImportProgress = $('tasteImportProgress');
+    const tasteProgressLabel = $('tasteProgressLabel');
+    const tasteProgressFill = $('tasteProgressFill');
+
+    // Connector settings
+    const connectorSection = $('connectorSettingsSection');
+    const connectorStatusDot = $('connectorStatusDot');
+    const connectorStatusText = $('connectorStatusText');
+    const privacyTierPicker = $('privacyTierPicker');
+    const autoSaveToggle = $('autoSaveToggle');
+    const boardVisibilityList = $('boardVisibilityList');
+
+    const logoutBtn = $('logoutBtn');
+
+    let currentUser = null;
+    let currentUsername = null;
+    let connectorSettings = null;
+
+    // ============================================
+    // Auth Gate
+    // ============================================
+    authGateLogin.addEventListener('click', () => CtrlAuth.openLoginModal());
+
+    // Fast restore
+    const _session = CtrlAuth.getSession();
+    if (_session?.user) {
+      currentUser = _session.user;
+      currentUsername = CtrlAuth.getUsername();
+      showAccountUI();
+    }
+
+    document.addEventListener('ctrl:auth:signedin', (e) => {
+      currentUser = e.detail.user;
+      currentUsername = e.detail.username;
+      showAccountUI();
+    });
+
+    document.addEventListener('ctrl:auth:signedout', () => {
+      currentUser = null;
+      currentUsername = null;
+      authGate.style.display = '';
+      accountContent.style.display = 'none';
+    });
+
+    // ============================================
+    // Show Account UI
+    // ============================================
+    function showAccountUI() {
+      if (!currentUser) return;
+      authGate.style.display = 'none';
+      accountContent.style.display = '';
+
+      // Profile info
+      accountUsername.textContent = currentUsername ? '@' + currentUsername : '--';
+      accountEmail.textContent = currentUser.email || '';
+
+      const createdAt = currentUser.created_at
+        ? new Date(currentUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'Unknown';
+      accountCreatedAt.textContent = createdAt;
+      accountDevice.textContent = getDeviceInfo();
+
+      // Auth method
+      const provider = currentUser.app_metadata?.provider || 'email';
+      if (provider === 'google') {
+        accountAuthMethod.innerHTML = '<span class="auth-method"><svg class="auth-method__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Google</span>';
+      } else {
+        accountAuthMethod.innerHTML = '<span class="auth-method">Email (Magic Link)</span>';
+      }
+
+      // Scroll to settings section if hash is #settings
+      if (window.location.hash === '#settings') {
+        const settingsSection = $('settingsSection');
+        if (settingsSection) {
+          setTimeout(() => settingsSection.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+      }
+
+      // Load connector settings in background
+      loadConnectorSettings();
+    }
+
+    // ============================================
+    // Theme Toggle
+    // ============================================
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light');
+      themeToggle.classList.add('active');
+    }
+
+    themeToggle.onclick = () => {
+      const isLight = document.documentElement.classList.toggle('light');
+      themeToggle.classList.toggle('active', isLight);
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    };
+
+    // ============================================
+    // YouTube Integration
+    // ============================================
+    async function checkYouTubeConnection() {
+      if (!currentUser) return;
+      try {
+        const { data } = await supabase
+          .from('youtube_tokens')
+          .select('id')
+          .eq('user_id', currentUser.id)
+          .limit(1);
+        if (data && data.length > 0) {
+          ytStatus.textContent = 'Connected';
+          ytConnectControls.style.display = 'none';
+          ytImportControls.style.display = '';
+        }
+      } catch { /* ignore */ }
+    }
+
+    ytConnectBtn?.addEventListener('click', () => {
+      // YouTube OAuth — redirect to boards which handles the YouTube connect flow
+      window.location.href = '/boards/?youtube_connect=1';
+    });
+
+    ytImportLikedBtn?.addEventListener('click', () => {
+      window.location.href = '/boards/?youtube_import=liked';
+    });
+
+    ytImportPlaylistsBtn?.addEventListener('click', () => {
+      window.location.href = '/boards/?youtube_import=playlists';
+    });
+
+    ytDisconnectBtn?.addEventListener('click', async () => {
+      if (!currentUser) return;
+      if (!confirm('Disconnect YouTube? This will not remove already-imported content.')) return;
+      try {
+        await supabase
+          .from('youtube_tokens')
+          .delete()
+          .eq('user_id', currentUser.id);
+        ytStatus.textContent = 'Not connected';
+        ytConnectControls.style.display = '';
+        ytImportControls.style.display = 'none';
+      } catch { /* ignore */ }
+    });
+
+    // ============================================
+    // Taste History Imports
+    // ============================================
+    spotifyImportBtn?.addEventListener('click', () => spotifyFileInput.click());
+    youtubeTakeoutBtn?.addEventListener('click', () => youtubeTakeoutFileInput.click());
+    instagramImportBtn?.addEventListener('click', () => instagramFileInput.click());
+
+    spotifyFileInput?.addEventListener('change', (e) => handleTasteImport(e, 'spotify'));
+    youtubeTakeoutFileInput?.addEventListener('change', (e) => handleTasteImport(e, 'youtube_takeout'));
+    instagramFileInput?.addEventListener('change', (e) => handleTasteImport(e, 'instagram'));
+
+    async function handleTasteImport(e, source) {
+      const file = e.target.files[0];
+      if (!file || !currentUser) return;
+
+      tasteImportProgress.classList.add('visible');
+      tasteProgressLabel.textContent = `Processing ${source} data...`;
+      tasteProgressFill.style.width = '10%';
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        tasteProgressFill.style.width = '30%';
+
+        const token = CtrlAuth.getSession()?.access_token;
+        if (!token) throw new Error('Not authenticated');
+
+        tasteProgressLabel.textContent = `Uploading ${source} data...`;
+        tasteProgressFill.style.width = '50%';
+
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/taste-import`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ source, data })
+        });
+
+        if (!resp.ok) throw new Error('Import failed');
+
+        const result = await resp.json();
+        tasteProgressFill.style.width = '100%';
+        tasteProgressLabel.textContent = `Imported ${result.count || 0} items from ${source}`;
+
+        setTimeout(() => {
+          tasteImportProgress.classList.remove('visible');
+          tasteProgressFill.style.width = '0%';
+        }, 3000);
+      } catch (err) {
+        tasteProgressLabel.textContent = `Error: ${err.message}`;
+        tasteProgressFill.style.width = '0%';
+        setTimeout(() => tasteImportProgress.classList.remove('visible'), 4000);
+      }
+
+      // Reset file input
+      e.target.value = '';
+    }
+
+    // ============================================
+    // AI Connector Settings
+    // ============================================
+    async function loadConnectorSettings() {
+      if (!currentUser) {
+        connectorSection.style.display = 'none';
+        return;
+      }
+
+      try {
+        // Check for active MCP token
+        const { data: tokens } = await supabase
+          .from('mcp_tokens')
+          .select('id, access_token_expires_at')
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const hasActiveToken = tokens && tokens.length > 0 &&
+          new Date(tokens[0].access_token_expires_at) > new Date();
+
+        if (hasActiveToken) {
+          connectorSection.style.display = '';
+          connectorStatusDot.classList.add('connector-status__dot--active');
+          connectorStatusText.textContent = 'Connected to Claude';
+        } else if (tokens && tokens.length > 0) {
+          connectorSection.style.display = '';
+          connectorStatusDot.classList.remove('connector-status__dot--active');
+          connectorStatusText.textContent = 'Token expired — reconnect in Claude';
+        } else {
+          connectorSection.style.display = 'none';
+          return;
+        }
+
+        // Load or create settings
+        const { data: settings } = await supabase
+          .from('connector_settings')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (settings) {
+          connectorSettings = settings;
+        } else {
+          const { data: newSettings } = await supabase
+            .from('connector_settings')
+            .insert({ user_id: currentUser.id })
+            .select()
+            .single();
+          connectorSettings = newSettings || {
+            privacy_tier: 'library',
+            board_visibility: {},
+            auto_save_enabled: true,
+          };
+        }
+
+        // Apply to UI
+        const tierRadio = privacyTierPicker.querySelector(`input[value="${connectorSettings.privacy_tier}"]`);
+        if (tierRadio) tierRadio.checked = true;
+
+        if (connectorSettings.auto_save_enabled) {
+          autoSaveToggle.classList.add('active');
+        } else {
+          autoSaveToggle.classList.remove('active');
+        }
+
+        // Load boards for visibility toggles
+        loadBoardVisibility();
+      } catch {
+        connectorSection.style.display = 'none';
+      }
+    }
+
+    async function loadBoardVisibility() {
+      try {
+        const { data: boards } = await supabase
+          .from('boards')
+          .select('id, name')
+          .eq('user_id', currentUser.id)
+          .order('name');
+
+        if (!boards || boards.length === 0) return;
+
+        boardVisibilityList.innerHTML = '';
+        const vis = connectorSettings?.board_visibility || {};
+
+        boards.forEach(board => {
+          const isVisible = vis[board.id] !== false; // default visible
+          const item = document.createElement('label');
+          item.className = 'settings-boards__item';
+          item.innerHTML = `<input type="checkbox" ${isVisible ? 'checked' : ''} data-board-id="${board.id}"> ${board.name}`;
+          boardVisibilityList.appendChild(item);
+        });
+
+        boardVisibilityList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          cb.addEventListener('change', () => {
+            const boardId = cb.dataset.boardId;
+            if (!connectorSettings.board_visibility) connectorSettings.board_visibility = {};
+            connectorSettings.board_visibility[boardId] = cb.checked;
+            saveConnectorSettings();
+          });
+        });
+      } catch { /* ignore */ }
+    }
+
+    // Privacy tier change
+    privacyTierPicker.querySelectorAll('input[name="privacyTier"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (!connectorSettings) return;
+        connectorSettings.privacy_tier = radio.value;
+        saveConnectorSettings();
+      });
+    });
+
+    // Auto-save toggle
+    autoSaveToggle.addEventListener('click', () => {
+      if (!connectorSettings) return;
+      connectorSettings.auto_save_enabled = !connectorSettings.auto_save_enabled;
+      autoSaveToggle.classList.toggle('active', connectorSettings.auto_save_enabled);
+      saveConnectorSettings();
+    });
+
+    async function saveConnectorSettings() {
+      if (!currentUser || !connectorSettings) return;
+      try {
+        await supabase
+          .from('connector_settings')
+          .update({
+            privacy_tier: connectorSettings.privacy_tier,
+            board_visibility: connectorSettings.board_visibility,
+            auto_save_enabled: connectorSettings.auto_save_enabled
+          })
+          .eq('user_id', currentUser.id);
+      } catch { /* ignore */ }
+    }
+
+    // ============================================
+    // Logout
+    // ============================================
+    logoutBtn.addEventListener('click', () => {
+      CtrlAuth.signOut();
+    });
+
+    // ============================================
+    // Helpers
+    // ============================================
+    function getDeviceInfo() {
+      const ua = navigator.userAgent;
+      let browser = 'Unknown Browser';
+      let os = 'Unknown OS';
+      if (ua.includes('Firefox')) browser = 'Firefox';
+      else if (ua.includes('Edg')) browser = 'Edge';
+      else if (ua.includes('Chrome')) browser = 'Chrome';
+      else if (ua.includes('Safari')) browser = 'Safari';
+      if (ua.includes('Windows')) os = 'Windows';
+      else if (ua.includes('Mac')) os = 'macOS';
+      else if (ua.includes('Linux')) os = 'Linux';
+      else if (ua.includes('Android')) os = 'Android';
+      else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+      return `${browser} on ${os}`;
+    }
+
+    // Check YouTube on load
+    checkYouTubeConnection();
+  })();
+  </script>
+</body>
+</html>
