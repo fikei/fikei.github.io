@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule — ctrl.rodeo</title>
+  <meta name="description" content="Book a time slot — simple scheduling powered by ctrl.rodeo">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
+  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- CTRL Design System -->
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Auth Module -->
+  <script src="/auth/ctrl-auth.js"></script>
+  <!-- Add to Calendar Button -->
+  <script src="https://cdn.jsdelivr.net/npm/add-to-calendar-button@2" defer></script>
+
+  <style>
+/* ============================================
+   Calendar Booking — page-specific styles
+   DS handles: page-header, breadcrumb, btn,
+   form-group, form-label, input, textarea,
+   token, token--active
+   ============================================ */
+
+body {
+  min-height: 100vh;
+}
+
+.cal-layout {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+/* --- Auth Gate --- */
+.cal-auth-gate {
+  max-width: 400px;
+  margin: var(--space-16) auto;
+  padding: var(--space-6);
+  border: var(--border-thin) solid var(--border-subtle);
+  text-align: center;
+}
+
+.cal-auth-gate__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+  margin-bottom: var(--space-4);
+}
+
+.cal-auth-gate__desc {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-6);
+}
+
+/* --- Admin Panel --- */
+.cal-admin {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--border-subtle);
+}
+
+.cal-admin__status {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-2);
+}
+
+.cal-admin__status--connected {
+  color: var(--color-success);
+}
+
+.cal-admin__status--disconnected {
+  color: var(--color-error);
+}
+
+/* --- Sidebar --- */
+.cal-sidebar {
+  border: var(--border-thin) solid var(--border-subtle);
+  padding: var(--space-4);
+  position: sticky;
+  top: calc(var(--space-12) + var(--space-4));
+}
+
+.cal-host__name {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-1);
+}
+
+.cal-host__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-3);
+}
+
+.cal-host__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.cal-section-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--border-subtle);
+}
+
+.cal-token-row {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+/* --- Week Navigation --- */
+.cal-week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.cal-week-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+/* --- Day Grid --- */
+.cal-days-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cal-day-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cal-day-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  margin-bottom: var(--space-2);
+  text-align: center;
+  line-height: var(--leading-relaxed);
+}
+
+.cal-day-label--today {
+  color: var(--accent-cyan);
+}
+
+.cal-day-empty {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  text-align: center;
+  padding: var(--space-2) 0;
+}
+
+/* --- Time Slot Buttons --- */
+.cal-slot {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  text-align: center;
+  background: transparent;
+  color: var(--fg);
+  border: var(--border-thin) solid var(--border-subtle);
+  cursor: pointer;
+  transition: background var(--duration-normal), color var(--duration-normal), border-color var(--duration-normal);
+}
+
+.cal-slot:hover {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.cal-slot--past,
+.cal-slot--busy {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cal-slot--busy {
+  text-decoration: line-through;
+}
+
+/* --- Loading --- */
+.cal-loading {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  text-align: center;
+  padding: var(--space-8) 0;
+}
+
+/* --- Selected Slot Display --- */
+.cal-selected-slot {
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-thin) solid var(--border-subtle);
+  margin-bottom: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.cal-selected-slot strong {
+  color: var(--accent-cyan);
+  font-weight: 500;
+}
+
+/* --- Form Layout --- */
+.cal-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* --- Confirmation --- */
+.cal-confirm {
+  padding: var(--space-6);
+  border: var(--border-thin) solid var(--border-subtle);
+}
+
+.cal-confirm__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
+}
+
+.cal-confirm__icon {
+  font-size: var(--text-xl);
+  color: var(--color-success);
+}
+
+.cal-confirm__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-widest);
+  color: var(--fg);
+}
+
+.cal-confirm__details {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  line-height: var(--leading-relaxed);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-bottom: var(--space-4);
+}
+
+.cal-confirm__details div {
+  margin-bottom: var(--space-1);
+}
+
+.cal-confirm__details strong {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.cal-confirm__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* --- Add to Calendar Button Override --- */
+#atcContainer {
+  margin: var(--space-4) 0;
+}
+
+/* --- Hidden utility --- */
+.hidden {
+  display: none !important;
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+  .cal-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .cal-sidebar {
+    position: static;
+  }
+
+  .cal-days-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+  </style>
+</head>
+<body>
+
+  <!-- Auth mount point -->
+  <div id="ctrl-auth-root"></div>
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div style="max-width:960px;margin:0 auto;padding:0 var(--space-4);display:flex;align-items:center;justify-content:space-between;height:var(--space-12);">
+      <nav style="display:flex;align-items:center;gap:var(--space-2);">
+        <a href="/" class="breadcrumb__link" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg-muted);text-transform:uppercase;letter-spacing:var(--tracking-wider);text-decoration:none;">ctrl.rodeo</a>
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg-subtle);">/</span>
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg);text-transform:uppercase;letter-spacing:var(--tracking-widest);font-weight:700;">Schedule</span>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Auth Gate (shown when not logged in) -->
+  <div id="authGate" class="cal-auth-gate">
+    <div class="cal-auth-gate__title">Schedule</div>
+    <div class="cal-auth-gate__desc">Sign in to book a time</div>
+    <button class="btn btn--filled" id="authLoginBtn">Sign In</button>
+  </div>
+
+  <!-- Main Layout (shown when logged in) -->
+  <main class="cal-layout hidden" id="calMain">
+
+    <!-- Sidebar -->
+    <aside class="cal-sidebar">
+      <div class="cal-host__name" id="hostName"></div>
+      <div class="cal-host__title" id="meetingTitle"></div>
+      <div class="cal-host__meta">
+        <span id="durationDisplay"></span>
+        <span id="tzDisplay"></span>
+      </div>
+
+      <!-- Profile Selector -->
+      <div class="cal-section-label">Profile</div>
+      <div class="cal-token-row" id="profileTokens"></div>
+
+      <!-- Duration Selector -->
+      <div class="cal-section-label">Duration</div>
+      <div class="cal-token-row" id="durationTokens"></div>
+
+      <!-- Admin Panel (only for admin user) -->
+      <div id="adminPanel" class="cal-admin hidden">
+        <div class="cal-section-label">Google Calendar</div>
+        <div class="cal-admin__status" id="gcalStatus"></div>
+        <button class="btn btn--ghost btn--sm" id="gcalConnectBtn">Connect</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <section>
+
+      <!-- VIEW: Slot Picker -->
+      <div id="viewSlots">
+        <div class="cal-week-nav">
+          <button class="btn btn--ghost btn--sm" id="prevWeek">&larr; Prev</button>
+          <span class="cal-week-label" id="weekLabel"></span>
+          <button class="btn btn--ghost btn--sm" id="nextWeek">Next &rarr;</button>
+        </div>
+        <div class="cal-days-grid" id="daysGrid"></div>
+      </div>
+
+      <!-- VIEW: Booking Form -->
+      <div id="viewForm" class="hidden">
+        <div class="cal-selected-slot" id="selectedSlotDisplay"></div>
+        <form id="bookingForm" autocomplete="off">
+          <div class="form-group">
+            <label class="form-label" for="fieldName">Name</label>
+            <input id="fieldName" type="text" class="input" required placeholder="Your name">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fieldEmail">Email</label>
+            <input id="fieldEmail" type="email" class="input" required placeholder="you@example.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fieldNotes">Notes <span class="form-hint">(optional)</span></label>
+            <textarea id="fieldNotes" class="input textarea" rows="3" placeholder="Anything you'd like to discuss"></textarea>
+          </div>
+          <div class="cal-form-actions">
+            <button type="button" class="btn btn--ghost btn--sm" id="backToSlots">&larr; Change time</button>
+            <button type="submit" class="btn btn--filled" id="confirmBtn">Confirm &rarr;</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- VIEW: Confirmation -->
+      <div id="viewConfirm" class="hidden">
+        <div class="cal-confirm">
+          <div class="cal-confirm__header">
+            <span class="cal-confirm__icon">&#10003;</span>
+            <div class="cal-confirm__title">Confirmed</div>
+          </div>
+          <div class="cal-confirm__details" id="confirmDetails"></div>
+          <div id="atcContainer"></div>
+          <div class="cal-confirm__actions">
+            <button class="btn btn--ghost btn--sm" id="bookAnother">Book another</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+
+  const VERSION = '1.1.0';
+  console.log('[calendar] v' + VERSION + ' - booking page with gcal integration');
+
+  // ============================================
+  // CONFIG
+  // ============================================
+  const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjc2MTAsImV4cCI6MjA1Mzk0MzYxMH0.gVAYsMniDFpm0JRgrI8JMIYFIbpYq9w7Ll9s0mj40Qs';
+  const ADMIN_EMAIL = 'fike101@gmail.com';
+  // Owner user ID — set after first admin login, used for free-busy lookups
+  var OWNER_USER_ID = null;
+
+  const CONFIG = {
+    hostName: 'Ian F.',
+    hostEmail: 'ian@ctrl.rodeo',
+    timezone: 'America/Los_Angeles',
+    timezoneLabel: 'PT',
+    weeksAhead: 4,
+    slotInterval: 30,
+  };
+
+  const PROFILES = [
+    {
+      id: 'work',
+      label: 'Work',
+      meetingTitle: 'Intro Call',
+      durations: [15, 30, 60],
+      schedule: {
+        1: [{ start: '09:00', end: '17:00' }],
+        2: [{ start: '09:00', end: '17:00' }],
+        3: [{ start: '09:00', end: '17:00' }],
+        4: [{ start: '09:00', end: '17:00' }],
+        5: [{ start: '09:00', end: '17:00' }],
+      },
+    },
+    {
+      id: 'social',
+      label: 'Social',
+      meetingTitle: 'Hangout',
+      durations: [30, 60],
+      schedule: {
+        5: [{ start: '18:00', end: '21:00' }],
+        6: [{ start: '10:00', end: '20:00' }],
+        0: [{ start: '10:00', end: '18:00' }],
+      },
+    },
+  ];
+
+  // ============================================
+  // STATE
+  // ============================================
+  var state = {
+    profileIndex: 0,
+    weekOffset: 0,
+    selectedDuration: null,
+    selectedSlot: null,
+    view: 'slots',
+    booking: null,
+    currentUser: null,
+    isAdmin: false,
+    gcalConnected: false,
+    busyPeriods: [],
+    loadingSlots: false,
+  };
+
+  // ============================================
+  // AUTH
+  // ============================================
+  function initAuth() {
+    CtrlAuth.init({
+      supabaseUrl: SUPABASE_URL,
+      supabaseAnonKey: SUPABASE_ANON_KEY,
+      redirectTo: window.location.origin + '/calendar/',
+      adminEmails: [ADMIN_EMAIL],
+      mountTo: '#ctrl-auth-root',
+      skipUsername: true,
+    });
+
+    document.getElementById('authLoginBtn').addEventListener('click', function () {
+      CtrlAuth.openLoginModal();
+    });
+
+    document.addEventListener('ctrl:auth:signedin', function (e) {
+      state.currentUser = e.detail.user;
+      state.isAdmin = (state.currentUser.email === ADMIN_EMAIL);
+      if (state.isAdmin) {
+        OWNER_USER_ID = state.currentUser.id;
+      }
+      showApp();
+    });
+
+    document.addEventListener('ctrl:auth:signedout', function () {
+      state.currentUser = null;
+      state.isAdmin = false;
+      hideApp();
+    });
+  }
+
+  function showApp() {
+    document.getElementById('authGate').classList.add('hidden');
+    document.getElementById('calMain').classList.remove('hidden');
+
+    // Pre-fill name/email from auth profile
+    if (state.currentUser) {
+      var name = state.currentUser.user_metadata?.full_name || '';
+      var email = state.currentUser.email || '';
+      if (name) document.getElementById('fieldName').value = name;
+      if (email) document.getElementById('fieldEmail').value = email;
+    }
+
+    // Admin: show Google Calendar panel, check connection status
+    if (state.isAdmin) {
+      document.getElementById('adminPanel').classList.remove('hidden');
+      checkGCalStatus();
+    }
+
+    // Handle OAuth callback code from Google
+    handleOAuthCallback();
+
+    renderSidebar();
+    loadAndRenderSlots();
+  }
+
+  function hideApp() {
+    document.getElementById('authGate').classList.remove('hidden');
+    document.getElementById('calMain').classList.add('hidden');
+  }
+
+  function getAccessToken() {
+    var stored = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
+    if (!stored) return null;
+    try { return JSON.parse(stored).access_token; } catch (e) { return null; }
+  }
+
+  // ============================================
+  // GOOGLE CALENDAR API
+  // ============================================
+  function callCalendarAPI(body) {
+    var token = getAccessToken();
+    return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json(); });
+  }
+
+  function checkGCalStatus() {
+    callCalendarAPI({ action: 'status' }).then(function (data) {
+      state.gcalConnected = data.connected;
+      var statusEl = document.getElementById('gcalStatus');
+      var btnEl = document.getElementById('gcalConnectBtn');
+      if (data.connected) {
+        statusEl.textContent = 'Connected';
+        statusEl.className = 'cal-admin__status cal-admin__status--connected';
+        btnEl.textContent = 'Reconnect';
+      } else {
+        statusEl.textContent = 'Not connected';
+        statusEl.className = 'cal-admin__status cal-admin__status--disconnected';
+        btnEl.textContent = 'Connect Google Calendar';
+      }
+    });
+  }
+
+  function connectGCal() {
+    callCalendarAPI({ action: 'auth-url' }).then(function (data) {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    });
+  }
+
+  function handleOAuthCallback() {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code');
+    if (!code) return;
+
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+
+    callCalendarAPI({ action: 'connect', code: code }).then(function (data) {
+      if (data.connected) {
+        state.gcalConnected = true;
+        if (state.isAdmin) checkGCalStatus();
+        loadAndRenderSlots();
+      } else {
+        console.error('[calendar] OAuth connect failed:', data.error);
+      }
+    });
+  }
+
+  function fetchBusyPeriods(timeMin, timeMax) {
+    if (!OWNER_USER_ID) {
+      // Try to find owner by looking up admin via profiles
+      // For now, use the hardcoded schedule without busy filtering
+      return Promise.resolve([]);
+    }
+
+    return callCalendarAPI({
+      action: 'free-busy',
+      ownerUserId: OWNER_USER_ID,
+      timeMin: timeMin,
+      timeMax: timeMax,
+    }).then(function (data) {
+      return data.busy || [];
+    }).catch(function () {
+      return [];
+    });
+  }
+
+  function createCalendarEvent(booking) {
+    if (!OWNER_USER_ID) return Promise.resolve({ booked: false });
+
+    var slot = booking.slot;
+    var profile = activeProfile();
+    var startISO = buildISODate(slot.date) + 'T' + slot.time + ':00';
+    var endISO = buildISODate(slot.date) + 'T' + slot.endTime + ':00';
+
+    var desc = profile.meetingTitle + ' with ' + booking.name;
+    if (booking.notes) desc += '\nNotes: ' + booking.notes;
+    desc += '\nBooked via ctrl.rodeo/calendar';
+
+    return callCalendarAPI({
+      action: 'book',
+      ownerUserId: OWNER_USER_ID,
+      summary: profile.meetingTitle + ' - ' + booking.name,
+      description: desc,
+      startTime: startISO,
+      endTime: endISO,
+      timezone: CONFIG.timezone,
+      attendeeEmail: booking.email,
+      attendeeName: booking.name,
+    });
+  }
+
+  // ============================================
+  // HELPERS
+  // ============================================
+  function activeProfile() {
+    return PROFILES[state.profileIndex];
+  }
+
+  function getMonday(date) {
+    var d = new Date(date);
+    var day = d.getDay();
+    var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function addDays(date, n) {
+    var d = new Date(date);
+    d.setDate(d.getDate() + n);
+    return d;
+  }
+
+  function formatDate(date) {
+    var opts = { weekday: 'short', month: 'short', day: 'numeric', timeZone: CONFIG.timezone };
+    return date.toLocaleDateString('en-US', opts);
+  }
+
+  function formatDayLabel(date) {
+    var dayOpts = { weekday: 'short', timeZone: CONFIG.timezone };
+    var dateOpts = { month: 'short', day: 'numeric', timeZone: CONFIG.timezone };
+    return {
+      day: date.toLocaleDateString('en-US', dayOpts),
+      date: date.toLocaleDateString('en-US', dateOpts),
+    };
+  }
+
+  function isToday(date) {
+    var now = new Date();
+    return date.getFullYear() === now.getFullYear() &&
+           date.getMonth() === now.getMonth() &&
+           date.getDate() === now.getDate();
+  }
+
+  function timeToMinutes(timeStr) {
+    var parts = timeStr.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  function minutesToTime(mins) {
+    var h = Math.floor(mins / 60);
+    var m = mins % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  function formatTimeDisplay(timeStr) {
+    var parts = timeStr.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12 || 12;
+    return h12 + ':' + m + ' ' + ampm;
+  }
+
+  function getWeekDates() {
+    var today = new Date();
+    var monday = getMonday(today);
+    monday = addDays(monday, state.weekOffset * 7);
+    var dates = [];
+    for (var i = 0; i < 7; i++) {
+      dates.push(addDays(monday, i));
+    }
+    return dates;
+  }
+
+  function isSlotBusy(slotDate, startTime, endTime) {
+    if (state.busyPeriods.length === 0) return false;
+    var dateStr = buildISODate(slotDate);
+    var slotStart = new Date(dateStr + 'T' + startTime + ':00');
+    var slotEnd = new Date(dateStr + 'T' + endTime + ':00');
+
+    return state.busyPeriods.some(function (busy) {
+      var busyStart = new Date(busy.start);
+      var busyEnd = new Date(busy.end);
+      return slotStart < busyEnd && slotEnd > busyStart;
+    });
+  }
+
+  function getSlotsForDay(date, durationMin) {
+    var profile = activeProfile();
+    var dayOfWeek = date.getDay();
+    var windows = profile.schedule[dayOfWeek];
+    if (!windows || windows.length === 0) return [];
+
+    var slots = [];
+    var now = new Date();
+    var interval = CONFIG.slotInterval;
+
+    windows.forEach(function (win) {
+      var startMins = timeToMinutes(win.start);
+      var endMins = timeToMinutes(win.end);
+      for (var m = startMins; m + durationMin <= endMins; m += interval) {
+        var timeStr = minutesToTime(m);
+        var endTimeStr = minutesToTime(m + durationMin);
+
+        var isPast = false;
+        if (isToday(date)) {
+          var slotDate = new Date(date);
+          slotDate.setHours(Math.floor(m / 60), m % 60, 0, 0);
+          isPast = slotDate.getTime() < now.getTime() + 15 * 60 * 1000;
+        } else if (date < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+          isPast = true;
+        }
+
+        var isBusy = isSlotBusy(date, timeStr, endTimeStr);
+
+        slots.push({
+          time: timeStr,
+          endTime: endTimeStr,
+          label: formatTimeDisplay(timeStr),
+          date: new Date(date),
+          durationMin: durationMin,
+          isPast: isPast,
+          isBusy: isBusy,
+        });
+      }
+    });
+
+    return slots;
+  }
+
+  function buildISODate(date) {
+    var y = date.getFullYear();
+    var m = (date.getMonth() + 1 < 10 ? '0' : '') + (date.getMonth() + 1);
+    var d = (date.getDate() < 10 ? '0' : '') + date.getDate();
+    return y + '-' + m + '-' + d;
+  }
+
+  // ============================================
+  // RENDER
+  // ============================================
+  function setView(name) {
+    state.view = name;
+    document.getElementById('viewSlots').classList.toggle('hidden', name !== 'slots');
+    document.getElementById('viewForm').classList.toggle('hidden', name !== 'form');
+    document.getElementById('viewConfirm').classList.toggle('hidden', name !== 'confirm');
+  }
+
+  function renderSidebar() {
+    var profile = activeProfile();
+    document.getElementById('hostName').textContent = CONFIG.hostName;
+    document.getElementById('meetingTitle').textContent = profile.meetingTitle;
+    document.getElementById('durationDisplay').textContent = state.selectedDuration + ' min';
+    document.getElementById('tzDisplay').textContent = CONFIG.timezoneLabel;
+
+    // Profile tokens
+    var profileContainer = document.getElementById('profileTokens');
+    profileContainer.innerHTML = '';
+    PROFILES.forEach(function (p, i) {
+      var btn = document.createElement('button');
+      btn.className = 'token' + (i === state.profileIndex ? ' token--active' : '');
+      btn.textContent = p.label;
+      btn.addEventListener('click', function () {
+        state.profileIndex = i;
+        state.selectedDuration = PROFILES[i].durations[0];
+        state.weekOffset = 0;
+        state.selectedSlot = null;
+        window.location.hash = p.id;
+        renderSidebar();
+        loadAndRenderSlots();
+        setView('slots');
+      });
+      profileContainer.appendChild(btn);
+    });
+
+    // Duration tokens
+    var durContainer = document.getElementById('durationTokens');
+    durContainer.innerHTML = '';
+    profile.durations.forEach(function (d) {
+      var btn = document.createElement('button');
+      btn.className = 'token' + (d === state.selectedDuration ? ' token--active' : '');
+      btn.textContent = d + ' min';
+      btn.addEventListener('click', function () {
+        state.selectedDuration = d;
+        renderSidebar();
+        renderSlotView();
+      });
+      durContainer.appendChild(btn);
+    });
+  }
+
+  function loadAndRenderSlots() {
+    var dates = getWeekDates();
+    var timeMin = dates[0].toISOString();
+    var timeMax = addDays(dates[6], 1).toISOString();
+
+    state.loadingSlots = true;
+    document.getElementById('daysGrid').innerHTML =
+      '<div class="cal-loading" style="grid-column:1/-1;">Loading availability...</div>';
+
+    // Update week label while loading
+    var firstDay = dates[0];
+    var lastDay = dates[6];
+    document.getElementById('weekLabel').textContent =
+      formatDate(firstDay) + ' \u2014 ' + formatDate(lastDay);
+    document.getElementById('prevWeek').disabled = state.weekOffset <= 0;
+
+    fetchBusyPeriods(timeMin, timeMax).then(function (busy) {
+      state.busyPeriods = busy;
+      state.loadingSlots = false;
+      renderSlotView();
+    });
+  }
+
+  function renderSlotView() {
+    var profile = activeProfile();
+    var dates = getWeekDates();
+
+    var scheduledDays = Object.keys(profile.schedule).map(Number);
+    var visibleDates = dates.filter(function (d) {
+      return scheduledDays.indexOf(d.getDay()) !== -1;
+    });
+
+    if (visibleDates.length === 0) {
+      document.getElementById('daysGrid').innerHTML =
+        '<div class="cal-day-empty" style="grid-column:1/-1;padding:var(--space-8) 0;">No availability this week</div>';
+    } else {
+      var grid = document.getElementById('daysGrid');
+      grid.style.gridTemplateColumns = 'repeat(' + visibleDates.length + ', 1fr)';
+      grid.innerHTML = '';
+
+      visibleDates.forEach(function (date) {
+        var col = document.createElement('div');
+        col.className = 'cal-day-col';
+
+        var label = formatDayLabel(date);
+        var labelEl = document.createElement('div');
+        labelEl.className = 'cal-day-label' + (isToday(date) ? ' cal-day-label--today' : '');
+        labelEl.innerHTML = label.day + '<br>' + label.date;
+        col.appendChild(labelEl);
+
+        var slots = getSlotsForDay(date, state.selectedDuration);
+        if (slots.length === 0) {
+          var empty = document.createElement('div');
+          empty.className = 'cal-day-empty';
+          empty.textContent = '\u2014';
+          col.appendChild(empty);
+        } else {
+          slots.forEach(function (slot) {
+            var btn = document.createElement('button');
+            var cls = 'cal-slot';
+            if (slot.isPast) cls += ' cal-slot--past';
+            else if (slot.isBusy) cls += ' cal-slot--busy';
+            btn.className = cls;
+            btn.textContent = slot.label;
+            if (!slot.isPast && !slot.isBusy) {
+              btn.addEventListener('click', function () {
+                state.selectedSlot = slot;
+                setView('form');
+                renderFormView();
+              });
+            }
+            col.appendChild(btn);
+          });
+        }
+
+        grid.appendChild(col);
+      });
+    }
+
+    var allDates = getWeekDates();
+    var firstDay = allDates[0];
+    var lastDay = allDates[6];
+    document.getElementById('weekLabel').textContent =
+      formatDate(firstDay) + ' \u2014 ' + formatDate(lastDay);
+
+    document.getElementById('prevWeek').disabled = state.weekOffset <= 0;
+  }
+
+  function renderFormView() {
+    if (!state.selectedSlot) return;
+    var slot = state.selectedSlot;
+    var profile = activeProfile();
+    document.getElementById('selectedSlotDisplay').innerHTML =
+      '<strong>' + formatDate(slot.date) + '</strong> \u00B7 ' +
+      formatTimeDisplay(slot.time) + ' \u2013 ' + formatTimeDisplay(slot.endTime) + ' ' + CONFIG.timezoneLabel +
+      ' \u00B7 ' + slot.durationMin + ' min' +
+      ' \u00B7 ' + profile.meetingTitle;
+  }
+
+  function renderConfirmView() {
+    if (!state.booking) return;
+    var b = state.booking;
+    var slot = b.slot;
+    var profile = activeProfile();
+    var details = document.getElementById('confirmDetails');
+    details.innerHTML =
+      '<div><strong>' + profile.meetingTitle + '</strong> with ' + CONFIG.hostName + '</div>' +
+      '<div>' + formatDate(slot.date) + ' \u00B7 ' + formatTimeDisplay(slot.time) + ' \u2013 ' + formatTimeDisplay(slot.endTime) + ' ' + CONFIG.timezoneLabel + '</div>' +
+      '<div>' + slot.durationMin + ' min</div>' +
+      '<div>Guest: ' + b.name + ' (' + b.email + ')</div>' +
+      (b.notes ? '<div>Notes: ' + b.notes + '</div>' : '') +
+      (b.eventLink ? '<div><a href="' + b.eventLink + '" target="_blank" style="color:var(--accent-cyan);">View in Google Calendar</a></div>' : '');
+
+    injectCalendarButton(b);
+  }
+
+  function injectCalendarButton(booking) {
+    var container = document.getElementById('atcContainer');
+    container.innerHTML = '';
+
+    var slot = booking.slot;
+    var profile = activeProfile();
+    var startDate = buildISODate(slot.date);
+
+    var desc = profile.meetingTitle + ' with ' + CONFIG.hostName;
+    if (booking.notes) {
+      desc += '\\nNotes: ' + booking.notes;
+    }
+    desc += '\\nBooked via ctrl.rodeo/calendar';
+
+    var btn = document.createElement('add-to-calendar-button');
+    btn.setAttribute('name', profile.meetingTitle + ' with ' + CONFIG.hostName);
+    btn.setAttribute('startDate', startDate);
+    btn.setAttribute('startTime', slot.time);
+    btn.setAttribute('endTime', slot.endTime);
+    btn.setAttribute('timeZone', CONFIG.timezone);
+    btn.setAttribute('description', desc);
+    btn.setAttribute('organizer', CONFIG.hostName + '|' + CONFIG.hostEmail);
+    btn.setAttribute('options', "'Google'");
+    btn.setAttribute('buttonStyle', 'text');
+    btn.setAttribute('lightMode', 'dark');
+    container.appendChild(btn);
+  }
+
+  // ============================================
+  // EVENT HANDLERS
+  // ============================================
+  function handleFormSubmit(e) {
+    e.preventDefault();
+
+    var confirmBtn = document.getElementById('confirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Booking...';
+
+    var bookingData = {
+      name: document.getElementById('fieldName').value.trim(),
+      email: document.getElementById('fieldEmail').value.trim(),
+      notes: document.getElementById('fieldNotes').value.trim(),
+      slot: state.selectedSlot,
+    };
+
+    // Create event on Google Calendar
+    createCalendarEvent(bookingData).then(function (result) {
+      bookingData.eventLink = result.htmlLink || '';
+      state.booking = bookingData;
+      setView('confirm');
+      renderConfirmView();
+    }).catch(function (err) {
+      console.error('[calendar] Booking error:', err);
+      // Still show confirmation even if gcal fails
+      state.booking = bookingData;
+      setView('confirm');
+      renderConfirmView();
+    }).finally(function () {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm \u2192';
+    });
+  }
+
+  function handleBookAnother() {
+    state.selectedSlot = null;
+    state.booking = null;
+    document.getElementById('bookingForm').reset();
+    // Re-fill name/email from auth
+    if (state.currentUser) {
+      var name = state.currentUser.user_metadata?.full_name || '';
+      var email = state.currentUser.email || '';
+      if (name) document.getElementById('fieldName').value = name;
+      if (email) document.getElementById('fieldEmail').value = email;
+    }
+    setView('slots');
+    loadAndRenderSlots();
+  }
+
+  // ============================================
+  // INIT
+  // ============================================
+  function init() {
+    // Resolve profile from hash
+    var hash = window.location.hash.replace('#', '').toLowerCase();
+    if (hash) {
+      PROFILES.forEach(function (p, i) {
+        if (p.id === hash) state.profileIndex = i;
+      });
+    }
+
+    state.selectedDuration = activeProfile().durations[0];
+
+    // Init auth
+    initAuth();
+
+    // Event listeners
+    document.getElementById('prevWeek').addEventListener('click', function () {
+      state.weekOffset = Math.max(0, state.weekOffset - 1);
+      loadAndRenderSlots();
+    });
+
+    document.getElementById('nextWeek').addEventListener('click', function () {
+      state.weekOffset = Math.min(CONFIG.weeksAhead, state.weekOffset + 1);
+      loadAndRenderSlots();
+    });
+
+    document.getElementById('backToSlots').addEventListener('click', function () {
+      setView('slots');
+      renderSlotView();
+    });
+
+    document.getElementById('bookingForm').addEventListener('submit', handleFormSubmit);
+    document.getElementById('bookAnother').addEventListener('click', handleBookAnother);
+
+    document.getElementById('gcalConnectBtn').addEventListener('click', connectGCal);
+
+    // Handle hash changes
+    window.addEventListener('hashchange', function () {
+      var h = window.location.hash.replace('#', '').toLowerCase();
+      PROFILES.forEach(function (p, i) {
+        if (p.id === h) {
+          state.profileIndex = i;
+          state.selectedDuration = PROFILES[i].durations[0];
+          state.weekOffset = 0;
+          state.selectedSlot = null;
+          renderSidebar();
+          loadAndRenderSlots();
+          setView('slots');
+        }
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+
+</body>
+</html>
