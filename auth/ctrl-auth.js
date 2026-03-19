@@ -48,6 +48,7 @@
      * @param {string} [config.redirectTo] - URL to return to after auth (default: current page)
      * @param {string[]} [config.adminEmails] - admin email addresses
      * @param {string} [config.mountTo] - CSS selector for mount point (default: 'body')
+     * @param {boolean} [config.skipUsername] - skip username onboarding modal (default: false)
      */
     init(config) {
       if (_initialized) return;
@@ -324,11 +325,16 @@
         updateBarUI();
         hideLoginModal();
         dispatch('ctrl:auth:signedin', { user: _currentUser, username: _currentUsername, session });
-      } else if (!_currentUsername) {
+      } else if (!_currentUsername && !_config.skipUsername) {
         // No username in DB and not already set — show onboarding
         updateBarUI();
         hideLoginModal();
         showUsernameModal();
+      } else if (!_currentUsername && _config.skipUsername) {
+        // Username not required — sign in without it
+        updateBarUI();
+        hideLoginModal();
+        dispatch('ctrl:auth:signedin', { user: _currentUser, username: null, session });
       }
 
       _wasSignedIn = true;
