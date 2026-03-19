@@ -17,10 +17,11 @@
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
 
-const VERSION = '1.3.2'
-console.log(`[instagram-import] v${VERSION} - fix caption URL same-domain + URL-embedded mentions`)
+const VERSION = '1.3.3'
+console.log(`[instagram-import] v${VERSION} - proxy thumbnails to Supabase Storage (CDN URLs expire)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1328,6 +1329,61 @@ function generateId(): string {
   return `link_${ts}_${rand}`
 }
 
+// Proxy an image to Supabase Storage so it doesn't expire (Instagram CDN URLs are temporary)
+async function proxyImageToStorage(imageUrl: string, pinId: string): Promise<string | null> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('[instagram-import] Missing Supabase credentials for image proxy')
+      return null
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ctrl.rodeo image proxy)',
+        'Accept': 'image/*'
+      },
+      signal: controller.signal
+    })
+    clearTimeout(timeout)
+
+    if (!response.ok) {
+      console.warn('[instagram-import] Image fetch failed:', response.status)
+      return null
+    }
+
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg'
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+    const filePath = `${pinId}.${ext}`
+
+    const buffer = new Uint8Array(await response.arrayBuffer())
+    if (buffer.byteLength > 5 * 1024 * 1024) {
+      console.warn('[instagram-import] Image too large:', buffer.byteLength)
+      return null
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const { error } = await supabase.storage
+      .from('link-images')
+      .upload(filePath, buffer, { contentType, upsert: true })
+
+    if (error) {
+      console.error('[instagram-import] Storage upload failed:', JSON.stringify(error))
+      return null
+    }
+
+    const { data } = supabase.storage.from('link-images').getPublicUrl(filePath)
+    console.log(`[instagram-import] Image proxied: ${filePath} (${buffer.byteLength} bytes)`)
+    return data.publicUrl
+  } catch (err) {
+    console.warn('[instagram-import] Image proxy error:', (err as Error).message)
+    return null
+  }
+}
+
 function createPins(
   reel: ReelData,
   extraction: ExtractionResult,
@@ -1475,6 +1531,12 @@ serve(async (req) => {
       // Step 5: Create pins
       const { source_pin, derived_pins } = createPins(reel, extraction, transcript)
 
+      // Step 5.5: Proxy thumbnail to Supabase Storage (Instagram CDN URLs expire)
+      if (source_pin.image) {
+        const proxiedUrl = await proxyImageToStorage(source_pin.image, source_pin.id)
+        if (proxiedUrl) source_pin.image = proxiedUrl
+      }
+
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       console.log(`[instagram-import] Done in ${elapsed}s: 1 source + ${derived_pins.length} derived pins`)
 
@@ -1518,6 +1580,11 @@ serve(async (req) => {
           extraction.entities = await resolveAllEntities(extraction.entities, reel)
 
           const pins = createPins(reel, extraction, transcript)
+          // Proxy thumbnail to Supabase Storage (CDN URLs expire)
+          if (pins.source_pin.image) {
+            const proxiedUrl = await proxyImageToStorage(pins.source_pin.image, pins.source_pin.id)
+            if (proxiedUrl) pins.source_pin.image = proxiedUrl
+          }
           results.push({ url: u, ...pins, entities: extraction.entities, status: 'ok' })
         } catch (err) {
           results.push({ url: u, status: 'error', error: String(err) })
@@ -1557,6 +1624,11 @@ serve(async (req) => {
           extraction.entities = await resolveAllEntities(extraction.entities, reel)
 
           const pins = createPins(reel, extraction, transcript)
+          // Proxy thumbnail to Supabase Storage (CDN URLs expire)
+          if (pins.source_pin.image) {
+            const proxiedUrl = await proxyImageToStorage(pins.source_pin.image, pins.source_pin.id)
+            if (proxiedUrl) pins.source_pin.image = proxiedUrl
+          }
           results.push({ url: reel.url, ...pins, entities: extraction.entities, status: 'ok' })
         } catch (err) {
           results.push({ url: post.url || post.shortcode, status: 'error', error: String(err) })
