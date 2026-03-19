@@ -1228,9 +1228,7 @@ body {
       </nav>
       <div class="page-header__actions">
         <div id="ctrl-auth-root"></div>
-        <button class="toggle" id="themeToggle" aria-label="Toggle theme">
-          <div class="toggle__knob"></div>
-        </button>
+        <!-- Theme toggle moved to /account/ settings -->
       </div>
     </div>
   </header>
@@ -3171,14 +3169,8 @@ body {
 
   // --- Event Binding ---
   function bindEvents() {
-    // Theme toggle
-    const toggle = document.getElementById('themeToggle');
-    const root = document.documentElement;
-    if (localStorage.getItem('theme') === 'light') { root.classList.add('light'); toggle.classList.add('toggle--active'); }
-    toggle.addEventListener('click', () => {
-      root.classList.toggle('light'); toggle.classList.toggle('toggle--active');
-      localStorage.setItem('theme', root.classList.contains('light') ? 'light' : 'dark');
-    });
+    // Theme — read preference from localStorage (toggle lives on /account/)
+    if (localStorage.getItem('theme') === 'light') { document.documentElement.classList.add('light'); }
 
     // Filter toggle button
     const filterToggleBtn = document.getElementById('filterToggleBtn');
