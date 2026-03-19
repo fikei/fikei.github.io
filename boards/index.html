@@ -7563,8 +7563,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.28.3';
-  console.log('[boards] v' + VERSION + ' - sync all missing fields to Supabase');
+  const VERSION = '2.28.4';
+  console.log('[boards] v' + VERSION + ' - intent actions to overlay + CORS fix');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -17615,13 +17615,6 @@ Return JSON:
         }
       }
 
-      // Intent action cards (commerce, ai_tool, etc.)
-      if (l.intent_type && l.intent_confidence >= INTENT_CONFIDENCE_THRESHOLD && INTENT_REGISTRY[l.intent_type] && !l.loading) {
-        const intentReg = INTENT_REGISTRY[l.intent_type];
-        const intentHtml = intentReg.renderActions(l, l.intent_metadata);
-        if (intentHtml) richActionsHtml += intentHtml;
-      }
-
       // Truncate summary to ~60 words for display
       function truncateSummary(text, maxWords) {
         if (!text) return '';
@@ -18064,6 +18057,12 @@ Return JSON:
     if (richConfig?.doneField) {
       actionsHtml += `<button class="pin-overlay__action pin-overlay__action--done${isDone ? ' pin-overlay__action--done-active' : ''}" data-action="toggle-done" data-link-id="${link.id}">${isDone ? '&#10003; ' + richConfig.doneLabel : richConfig.doneLabel + '?'}</button>`;
     }
+    // Intent actions (commerce, ai_tool, etc.) — overlay only
+    if (link.intent_type && link.intent_confidence >= INTENT_CONFIDENCE_THRESHOLD && INTENT_REGISTRY[link.intent_type] && !link.loading) {
+      const intentReg = INTENT_REGISTRY[link.intent_type];
+      const intentHtml = intentReg.renderActions(link, link.intent_metadata);
+      if (intentHtml) actionsHtml += intentHtml;
+    }
     const hasRecipe = link.recipe && (link.recipe.ingredients?.length || link.recipe.instructions?.length);
 
     // Inline recipe section
@@ -18223,6 +18222,14 @@ Return JSON:
         if (menuBtn) menuBtn.click();
       }
       if (action === 'delete') closePinOverlay();
+      return;
+    }
+
+    if (action.startsWith('intent:')) {
+      const [, intentType, intentAction] = action.split(':');
+      const link = getAllLinks().find(l => l.id === linkId);
+      const reg = INTENT_REGISTRY[intentType];
+      if (link && reg) reg.handleAction(intentAction, link);
       return;
     }
   });
