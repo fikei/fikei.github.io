@@ -322,6 +322,12 @@ body {
   border-color: var(--accent-cyan);
 }
 
+.cal-date-chip--focused {
+  background: color-mix(in srgb, var(--accent-cyan) 15%, transparent);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
 .cal-date-chip--past {
   opacity: 0.25;
   pointer-events: none;
@@ -368,6 +374,9 @@ body {
 .cal-days-grid {
   display: grid;
   gap: var(--space-2);
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .cal-day-col {
@@ -378,12 +387,17 @@ body {
 }
 
 .cal-day-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
   color: var(--fg-muted);
   margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
   text-align: center;
   line-height: var(--leading-relaxed);
 }
@@ -788,7 +802,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.8.2';
+  const VERSION = '2.8.3';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -1666,6 +1680,7 @@ body {
           chip.className += ' cal-date-chip--active';
         }
 
+        chip.dataset.date = buildISODate(date);
         var label = formatDayLabel(date);
         chip.innerHTML = '<div>' + label.day + '</div><div>' + label.date + '</div>';
 
@@ -1750,6 +1765,7 @@ body {
       visibleDates.forEach(function (date) {
         var col = document.createElement('div');
         col.className = 'cal-day-col';
+        col.dataset.date = buildISODate(date);
 
         var label = formatDayLabel(date);
         var labelEl = document.createElement('div');
@@ -1973,6 +1989,46 @@ body {
     document.getElementById('stripNext').addEventListener('click', function () {
       var strip = document.getElementById('dateStrip');
       strip.scrollLeft += 200;
+    });
+
+    // Sync date strip focus when scrolling the slot grid vertically
+    var _scrollTimer = null;
+    document.getElementById('daysGrid').addEventListener('scroll', function () {
+      clearTimeout(_scrollTimer);
+      _scrollTimer = setTimeout(function () {
+        var grid = document.getElementById('daysGrid');
+        var cols = grid.querySelectorAll('.cal-day-col');
+        if (cols.length === 0) return;
+
+        // Find which column is most visible (by checking scroll position vs column offset)
+        var gridRect = grid.getBoundingClientRect();
+        var focusedDate = null;
+        cols.forEach(function (col) {
+          var rect = col.getBoundingClientRect();
+          // Column is visible if its top is within the grid viewport
+          if (rect.left >= gridRect.left && rect.left < gridRect.right) {
+            if (!focusedDate) focusedDate = col.dataset.date;
+          }
+        });
+
+        if (!focusedDate) return;
+
+        // Update the date strip — add focused class to matching chip
+        var strip = document.getElementById('dateStrip');
+        var chips = strip.querySelectorAll('.cal-date-chip');
+        chips.forEach(function (chip) {
+          chip.classList.remove('cal-date-chip--focused');
+          if (chip.dataset.date === focusedDate) {
+            chip.classList.add('cal-date-chip--focused');
+            // Scroll chip into view
+            var stripRect = strip.getBoundingClientRect();
+            var chipRect = chip.getBoundingClientRect();
+            if (chipRect.left < stripRect.left || chipRect.right > stripRect.right) {
+              chip.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        });
+      }, 100);
     });
 
     // Admin panel toggle
