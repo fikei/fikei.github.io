@@ -788,7 +788,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.8.1';
+  const VERSION = '2.8.2';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -1779,10 +1779,10 @@ body {
           col.appendChild(empty);
         } else {
           slots.forEach(function (slot) {
+            if (slot.isPast) return; // Hide past time slots
             var btn = document.createElement('button');
             var cls = 'cal-slot';
-            if (slot.isPast) cls += ' cal-slot--past';
-            else if (slot.isBusy) cls += ' cal-slot--busy';
+            if (slot.isBusy) cls += ' cal-slot--busy';
             else {
               // Story 5: optimal slot highlighting
               if (state.visitorGcalConnected && !slot.visitorBusy) {
