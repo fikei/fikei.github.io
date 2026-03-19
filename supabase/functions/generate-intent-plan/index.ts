@@ -5,7 +5,7 @@
 // POST /functions/v1/generate-intent-plan
 // Body: { tool_name, tagline, url, domain, docs_url, practical_tags, entities, recent_pins }
 
-const VERSION = '1.0.0'
+const VERSION = '1.0.2'
 console.log(`[generate-intent-plan] v${VERSION} — streaming integration plan generator`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -13,6 +13,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface PlanRequest {
@@ -101,7 +102,7 @@ Be specific and actionable. Use code snippets where helpful (shell commands, con
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -113,7 +114,7 @@ Be specific and actionable. Use code snippets where helpful (shell commands, con
       console.error('[generate-intent-plan] Claude API error:', anthropicResponse.status, errText)
       return new Response(
         JSON.stringify({ error: 'Plan generation failed', detail: errText }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 

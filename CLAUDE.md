@@ -59,6 +59,9 @@ Personal curation platform — collect, organize, and build on everything that m
 - **Run database migrations** when migration files are in merged PR
 - Deploy commands and project refs: `docs/infrastructure/deployment.md`
 
+### Permissions
+- **Switch to bypass permissions after plan is accepted** — once a plan has been approved, switch to bypass permissions mode to avoid unnecessary confirmation prompts during implementation.
+
 ### Guardrails (require human approval)
 - Force pushes
 - Deleting branches with open PRs

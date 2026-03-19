@@ -1,12 +1,12 @@
 // Supabase Edge Function: calendar-api
 // Google Calendar integration for the scheduling page.
-// Handles OAuth connect, free/busy lookup, and event creation.
+// Handles OAuth connect, free/busy lookup, event creation,
+// config management, blocking, and visitor calendar support.
 //
 // POST /functions/v1/calendar-api
 // Body: { action, ... }
-// Actions: auth-url, connect, free-busy, book
 
-const VERSION = '1.0.0'
+const VERSION = '1.4.0'
 console.log(`[calendar-api] v${VERSION} - google calendar integration`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -20,6 +20,38 @@ const corsHeaders = {
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID')!
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET')!
 const GOOGLE_REDIRECT_URI = Deno.env.get('GOOGLE_CALENDAR_REDIRECT_URI') || 'https://ctrl.rodeo/calendar/'
+
+// Default profiles — used when no DB config exists yet
+const DEFAULT_PROFILES = [
+  {
+    profile_id: 'work',
+    label: 'Work',
+    meeting_title: 'Intro Call',
+    durations: [15, 30, 60],
+    schedule: {
+      1: [{ start: '09:00', end: '17:00' }],
+      2: [{ start: '09:00', end: '17:00' }],
+      3: [{ start: '09:00', end: '17:00' }],
+      4: [{ start: '09:00', end: '17:00' }],
+      5: [{ start: '09:00', end: '17:00' }],
+    },
+    sort_order: 0,
+    is_active: true,
+  },
+  {
+    profile_id: 'social',
+    label: 'Social',
+    meeting_title: 'Hangout',
+    durations: [30, 60],
+    schedule: {
+      5: [{ start: '18:00', end: '21:00' }],
+      6: [{ start: '10:00', end: '20:00' }],
+      0: [{ start: '10:00', end: '18:00' }],
+    },
+    sort_order: 1,
+    is_active: true,
+  },
+]
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -97,6 +129,60 @@ async function getAccessToken(db: ReturnType<typeof createClient>, userId: strin
   return data.access_token
 }
 
+// Get visitor access token from visitor_calendar_tokens
+async function getVisitorAccessToken(db: ReturnType<typeof createClient>, sessionToken: string): Promise<string | null> {
+  const { data: token } = await db.from('visitor_calendar_tokens')
+    .select('google_refresh_token, google_access_token, token_expires_at, expires_at')
+    .eq('session_token', sessionToken)
+    .single()
+
+  if (!token) return null
+
+  // Check if visitor session has expired
+  if (token.expires_at && new Date(token.expires_at) < new Date()) {
+    await db.from('visitor_calendar_tokens').delete().eq('session_token', sessionToken)
+    return null
+  }
+
+  // If access token is still valid (with 5 min buffer)
+  if (token.google_access_token && token.token_expires_at) {
+    const expires = new Date(token.token_expires_at)
+    if (expires.getTime() > Date.now() + 5 * 60 * 1000) {
+      return token.google_access_token
+    }
+  }
+
+  // Refresh the token
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      refresh_token: token.google_refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  })
+
+  if (!resp.ok) {
+    console.error('[calendar-api] Visitor token refresh failed:', await resp.text())
+    return null
+  }
+
+  const data = await resp.json()
+  const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
+
+  await db.from('visitor_calendar_tokens')
+    .update({
+      google_access_token: data.access_token,
+      token_expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('session_token', sessionToken)
+
+  return data.access_token
+}
+
 // Get calendar IDs configured for the user
 async function getCalendarIds(db: ReturnType<typeof createClient>, userId: string): Promise<string[]> {
   const { data } = await db.from('calendar_tokens')
@@ -122,7 +208,7 @@ serve(async (req) => {
 
     const db = getServiceClient()
 
-    // ── auth-url: generate Google OAuth URL ──
+    // ── auth-url: generate Google OAuth URL (admin) ──
     if (action === 'auth-url') {
       const userId = await getUserId(req)
       if (!userId) return json({ error: 'Unauthorized' }, 401)
@@ -134,13 +220,13 @@ serve(async (req) => {
         scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events',
         access_type: 'offline',
         prompt: 'consent',
-        state: userId,
+        state: `admin:${userId}`,
       })
 
       return json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` })
     }
 
-    // ── connect: exchange OAuth code for tokens ──
+    // ── connect: exchange OAuth code for tokens (admin) ──
     if (action === 'connect') {
       const userId = await getUserId(req)
       if (!userId) return json({ error: 'Unauthorized' }, 401)
@@ -199,11 +285,15 @@ serve(async (req) => {
       if (!userId) return json({ error: 'Unauthorized' }, 401)
 
       const { data: token } = await db.from('calendar_tokens')
-        .select('calendar_ids, updated_at')
+        .select('calendar_ids, updated_at, singleton_profile_id')
         .eq('user_id', userId)
         .single()
 
-      return json({ connected: !!token, calendarIds: token?.calendar_ids || [] })
+      return json({
+        connected: !!token,
+        calendarIds: token?.calendar_ids || [],
+        singletonProfileId: token?.singleton_profile_id || null,
+      })
     }
 
     // ── update-calendars: set which calendars to check ──
@@ -219,6 +309,140 @@ serve(async (req) => {
         .eq('user_id', userId)
 
       return json({ updated: true })
+    }
+
+    // ── update-singleton: set singleton profile mode ──
+    if (action === 'update-singleton') {
+      const userId = await getUserId(req)
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+
+      const { singletonProfileId } = body // null to show all
+
+      await db.from('calendar_tokens')
+        .update({ singleton_profile_id: singletonProfileId || null, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+
+      return json({ updated: true })
+    }
+
+    // ── get-config: fetch meeting type profiles ──
+    if (action === 'get-config') {
+      const { ownerUserId } = body
+      if (!ownerUserId) return json({ error: 'ownerUserId is required' }, 400)
+
+      const { data: rows } = await db.from('calendar_config')
+        .select('profile_id, label, meeting_title, durations, schedule, sort_order, is_active')
+        .eq('owner_user_id', ownerUserId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      // Fall back to defaults if no config exists yet
+      if (!rows || rows.length === 0) {
+        return json({ profiles: DEFAULT_PROFILES, isDefault: true })
+      }
+
+      return json({ profiles: rows, isDefault: false })
+    }
+
+    // ── save-config: upsert meeting type profiles (admin) ──
+    if (action === 'save-config') {
+      const userId = await getUserId(req)
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+
+      const { profiles } = body
+      if (!profiles || !Array.isArray(profiles)) return json({ error: 'profiles array is required' }, 400)
+
+      for (const p of profiles) {
+        if (!p.profile_id || !p.label || !p.meeting_title) {
+          return json({ error: 'Each profile needs profile_id, label, and meeting_title' }, 400)
+        }
+        if (p.label.length > 40) return json({ error: 'label max 40 chars' }, 400)
+        if (p.meeting_title.length > 60) return json({ error: 'meeting_title max 60 chars' }, 400)
+        if (!Array.isArray(p.durations) || p.durations.length === 0 || p.durations.length > 4) {
+          return json({ error: 'durations must be 1-4 items' }, 400)
+        }
+        for (const d of p.durations) {
+          if (d < 5 || d > 180) return json({ error: 'duration must be 5-180 min' }, 400)
+        }
+      }
+
+      // Upsert each profile
+      for (let i = 0; i < profiles.length; i++) {
+        const p = profiles[i]
+        await db.from('calendar_config').upsert({
+          owner_user_id: userId,
+          profile_id: p.profile_id,
+          label: p.label,
+          meeting_title: p.meeting_title,
+          durations: p.durations,
+          schedule: p.schedule || {},
+          sort_order: i,
+          is_active: p.is_active !== false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'owner_user_id,profile_id' })
+      }
+
+      return json({ saved: true })
+    }
+
+    // ── get-blocks: fetch manual blocks for date range ──
+    if (action === 'get-blocks') {
+      const { ownerUserId, dateMin, dateMax } = body
+      if (!ownerUserId || !dateMin || !dateMax) {
+        return json({ error: 'ownerUserId, dateMin, dateMax are required' }, 400)
+      }
+
+      const { data: blocks } = await db.from('calendar_blocks')
+        .select('id, block_type, profile_id, block_date, start_time, end_time, note')
+        .eq('owner_user_id', ownerUserId)
+        .gte('block_date', dateMin)
+        .lte('block_date', dateMax)
+        .order('block_date', { ascending: true })
+
+      return json({ blocks: blocks || [] })
+    }
+
+    // ── save-block: add a manual block (admin) ──
+    if (action === 'save-block') {
+      const userId = await getUserId(req)
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+
+      const { blockType, profileId, blockDate, startTime, endTime, note } = body
+      if (!blockType || !blockDate) return json({ error: 'blockType and blockDate are required' }, 400)
+      if (blockType !== 'time-range' && blockType !== 'full-day') {
+        return json({ error: 'blockType must be time-range or full-day' }, 400)
+      }
+      if (blockType === 'time-range' && (!startTime || !endTime)) {
+        return json({ error: 'startTime and endTime are required for time-range blocks' }, 400)
+      }
+
+      const { data: block } = await db.from('calendar_blocks').insert({
+        owner_user_id: userId,
+        block_type: blockType,
+        profile_id: profileId || null,
+        block_date: blockDate,
+        start_time: blockType === 'time-range' ? startTime : null,
+        end_time: blockType === 'time-range' ? endTime : null,
+        note: note || null,
+      }).select('id').single()
+
+      return json({ saved: true, blockId: block?.id })
+    }
+
+    // ── delete-block: remove a manual block (admin) ──
+    if (action === 'delete-block') {
+      const userId = await getUserId(req)
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+
+      const { blockId } = body
+      if (!blockId) return json({ error: 'blockId is required' }, 400)
+
+      await db.from('calendar_blocks')
+        .delete()
+        .eq('id', blockId)
+        .eq('owner_user_id', userId)
+
+      return json({ deleted: true })
     }
 
     // ── free-busy: check availability ──
@@ -315,6 +539,180 @@ serve(async (req) => {
         eventId: created.id,
         htmlLink: created.htmlLink,
       })
+    }
+
+    // ── visitor-auth-url: generate Google OAuth URL for visitor ──
+    if (action === 'visitor-auth-url') {
+      const { sessionToken } = body
+      if (!sessionToken) return json({ error: 'sessionToken is required' }, 400)
+
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: GOOGLE_REDIRECT_URI,
+        response_type: 'code',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly',
+        access_type: 'offline',
+        prompt: 'consent',
+        state: `visitor:${sessionToken}`,
+      })
+
+      return json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` })
+    }
+
+    // ── visitor-connect: exchange visitor OAuth code for tokens ──
+    if (action === 'visitor-connect') {
+      const { code, sessionToken } = body
+      if (!code || !sessionToken) return json({ error: 'code and sessionToken are required' }, 400)
+
+      const resp = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: GOOGLE_REDIRECT_URI,
+        }),
+      })
+
+      if (!resp.ok) {
+        const error = await resp.text()
+        console.error('[calendar-api] Visitor OAuth exchange failed:', error)
+        return json({ error: 'OAuth exchange failed' }, 400)
+      }
+
+      const tokens = await resp.json()
+      const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+
+      await db.from('visitor_calendar_tokens').upsert({
+        session_token: sessionToken,
+        google_refresh_token: tokens.refresh_token,
+        google_access_token: tokens.access_token,
+        token_expires_at: expiresAt,
+        calendar_ids: ['primary'],
+        updated_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      }, { onConflict: 'session_token' })
+
+      return json({ connected: true })
+    }
+
+    // ── visitor-free-busy: fetch visitor's busy periods ──
+    if (action === 'visitor-free-busy') {
+      const { sessionToken, timeMin, timeMax } = body
+      if (!sessionToken || !timeMin || !timeMax) {
+        return json({ error: 'sessionToken, timeMin, timeMax are required' }, 400)
+      }
+
+      const accessToken = await getVisitorAccessToken(db, sessionToken)
+      if (!accessToken) {
+        return json({ error: 'Visitor Google Calendar not connected', disconnected: true }, 400)
+      }
+
+      const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          timeMin,
+          timeMax,
+          items: [{ id: 'primary' }],
+        }),
+      })
+
+      if (!resp.ok) {
+        console.error('[calendar-api] Visitor FreeBusy error:', await resp.text())
+        return json({ error: 'Failed to fetch visitor availability' }, 500)
+      }
+
+      const data = await resp.json()
+      const busy = data.calendars?.primary?.busy || []
+
+      return json({ busy })
+    }
+
+    // ── visitor-events: fetch visitor's event hints ──
+    if (action === 'visitor-events') {
+      const { sessionToken, timeMin, timeMax } = body
+      if (!sessionToken || !timeMin || !timeMax) {
+        return json({ error: 'sessionToken, timeMin, timeMax are required' }, 400)
+      }
+
+      const accessToken = await getVisitorAccessToken(db, sessionToken)
+      if (!accessToken) {
+        return json({ error: 'Visitor Google Calendar not connected', disconnected: true }, 400)
+      }
+
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '50',
+      })
+
+      const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      if (!resp.ok) {
+        console.error('[calendar-api] Visitor events error:', await resp.text())
+        return json({ error: 'Failed to fetch visitor events' }, 500)
+      }
+
+      const data = await resp.json()
+      const events = (data.items || [])
+        .filter((e: { start?: { dateTime?: string } }) => e.start?.dateTime)
+        .map((e: { summary?: string; start: { dateTime: string }; end: { dateTime: string } }) => ({
+          summary: (e.summary || 'Busy').substring(0, 20),
+          start: e.start.dateTime,
+          end: e.end.dateTime,
+        }))
+
+      return json({ events })
+    }
+
+    // ── admin-events: fetch admin's event hints ──
+    if (action === 'admin-events') {
+      const userId = await getUserId(req)
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+
+      const { timeMin, timeMax } = body
+      if (!timeMin || !timeMax) return json({ error: 'timeMin, timeMax are required' }, 400)
+
+      const accessToken = await getAccessToken(db, userId)
+      if (!accessToken) return json({ error: 'Google Calendar not connected' }, 400)
+
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '50',
+      })
+
+      const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      if (!resp.ok) {
+        console.error('[calendar-api] Admin events error:', await resp.text())
+        return json({ error: 'Failed to fetch admin events' }, 500)
+      }
+
+      const data = await resp.json()
+      const events = (data.items || [])
+        .filter((e: { start?: { dateTime?: string } }) => e.start?.dateTime)
+        .map((e: { summary?: string; start: { dateTime: string }; end: { dateTime: string } }) => ({
+          summary: (e.summary || 'Busy').substring(0, 20),
+          start: e.start.dateTime,
+          end: e.end.dateTime,
+        }))
+
+      return json({ events })
     }
 
     return json({ error: `Unknown action: ${action}` }, 400)
