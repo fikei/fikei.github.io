@@ -469,8 +469,28 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   console.log('[calendar] v' + VERSION + ' - booking page with gcal integration');
+
+  // ============================================
+  // GOOGLE OAUTH CODE INTERCEPTION
+  // ============================================
+  // Google Calendar OAuth returns ?code=xxx&state=userId to this page.
+  // Supabase PKCE auth also returns ?code=xxx but with no state param.
+  // We must strip Google's code from the URL BEFORE Supabase initializes,
+  // otherwise Supabase tries to exchange it as a PKCE code and gets 401.
+  var _pendingGCalCode = null;
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code');
+    var gstate = params.get('state');
+    // Google OAuth codes have a state param (user ID); Supabase PKCE does not
+    if (code && gstate) {
+      _pendingGCalCode = code;
+      // Strip the Google code from URL so Supabase doesn't see it
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+    }
+  })();
 
   // ============================================
   // CONFIG
@@ -545,7 +565,6 @@ body {
       adminEmails: [ADMIN_EMAIL],
       mountTo: '#ctrl-auth-root',
       skipUsername: true,
-      flowType: 'implicit',
     });
 
     document.getElementById('authLoginBtn').addEventListener('click', function () {
@@ -646,12 +665,9 @@ body {
   }
 
   function handleOAuthCallback() {
-    var params = new URLSearchParams(window.location.search);
-    var code = params.get('code');
+    var code = _pendingGCalCode;
     if (!code) return;
-
-    // Clean URL
-    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+    _pendingGCalCode = null;
 
     callCalendarAPI({ action: 'connect', code: code }).then(function (data) {
       if (data.connected) {
