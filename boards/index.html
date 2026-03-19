@@ -7563,8 +7563,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.28.1';
-  console.log('[boards] v' + VERSION + ' - YouTube Shorts + Reels fallback');
+  const VERSION = '2.28.2';
+  console.log('[boards] v' + VERSION + ' - cleanup garbage pins + recache expired images');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -13440,6 +13440,94 @@ Return JSON:
 
     if (ytFixed > 0) renderGrid();
   }
+
+  // One-time cleanup: remove garbage pins from clipboard paste + null expired Instagram CDN URLs
+  const CLEANUP_GARBAGE_KEY = 'ctrl_cleanup_garbage_v1';
+  function cleanupGarbagePins() {
+    if (!currentUser) return;
+    if (localStorage.getItem(CLEANUP_GARBAGE_KEY)) return;
+
+    const allLinks = getAllLinks();
+    const GARBAGE_DOMAINS = [
+      'window.enablewidgetds()', 'beforeinstallpromptevent.preventdefault()',
+      'beforeinstallpromptevent.prompt()', 'grid.onclick', 'design-constraints.js',
+    ];
+
+    // Identify garbage pins: bogus domains, .jpg:1 filenames, IP-like confidence values
+    const garbageIds = [];
+    const expiredImageIds = [];
+
+    for (const link of allLinks) {
+      if (!link.url) continue;
+      try {
+        const u = new URL(link.url);
+        const domain = u.hostname;
+
+        // Garbage: known bogus domains from console log paste
+        if (GARBAGE_DOMAINS.includes(domain) ||
+            domain.endsWith('.jpg') || domain.endsWith('.png') ||
+            /^\d+_\d+/.test(domain) ||
+            domain === 'ctrl.rodeo' ||
+            (domain.match(/^\d+\.\d+\.\d+\.\d+$/) && !link.title)) {
+          garbageIds.push(link.id);
+          continue;
+        }
+
+        // Expired Instagram CDN images: scontent-*.cdninstagram.com URLs as pin URLs
+        if (domain.includes('cdninstagram.com') && !link.url.includes('/reel')) {
+          garbageIds.push(link.id);
+          continue;
+        }
+
+        // Fix expired Instagram CDN thumbnail images on real pins
+        if (link.image && link.image.includes('cdninstagram.com') &&
+            !link.image.includes('supabase.co')) {
+          expiredImageIds.push(link.id);
+        }
+      } catch {
+        // Can't parse URL — likely garbage
+        if (link.url.includes('(') || link.url.includes(')')) {
+          garbageIds.push(link.id);
+        }
+      }
+    }
+
+    if (garbageIds.length === 0 && expiredImageIds.length === 0) {
+      console.log('%c[CLEANUP] No garbage pins or expired images found', 'color: #e91e63');
+      localStorage.setItem(CLEANUP_GARBAGE_KEY, Date.now().toString());
+      return;
+    }
+
+    console.log('%c[CLEANUP] Deleting ' + garbageIds.length + ' garbage pins, fixing ' + expiredImageIds.length + ' expired CDN images', 'color: #e91e63; font-weight: bold');
+
+    // Delete garbage pins
+    for (const id of garbageIds) {
+      const data = load();
+      const link = data.links.find(l => l.id === id);
+      console.log('%c[CLEANUP] Deleting garbage:', 'color: #e91e63', link?.url?.substring(0, 60));
+      deleteLink(id);
+    }
+
+    // Null out expired CDN images and queue for re-enrichment with forceRefresh
+    for (const id of expiredImageIds) {
+      const data = load();
+      const link = data.links.find(l => l.id === id);
+      if (link) {
+        console.log('%c[CLEANUP] Nulling expired CDN image:', 'color: #e91e63', link.url?.substring(0, 60));
+        updateLink(id, { image: null, image_source: null });
+        // Queue server enrichment — create-pin will try to find and proxy a new image
+        queueServerEnrichment(id, link.url, link.title, link.description, {
+          category: link.category,
+          forceRefresh: true
+        });
+      }
+    }
+
+    localStorage.setItem(CLEANUP_GARBAGE_KEY, Date.now().toString());
+    console.log('%c[CLEANUP] Complete', 'color: #e91e63; font-weight: bold');
+    if (garbageIds.length > 0) renderGrid();
+  }
+
 
   // ============================================
   // URL Parser
@@ -23666,6 +23754,10 @@ Return JSON:
 
     // One-time backfill: fix Reels + Shorts missing images/titles
     backfillReelsAndShorts();
+
+    // One-time cleanup: remove garbage pins + fix expired CDN images
+    cleanupGarbagePins();
+
 
     // Check clipboard for URLs
     checkClipboardForUrls();
