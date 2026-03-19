@@ -431,7 +431,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.0.1';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -445,7 +445,7 @@ body {
   // This is used for free-busy lookups and event creation without requiring
   // the visitor to sign in. Set this after your first admin login by checking
   // the console log or Supabase dashboard.
-  var OWNER_USER_ID = null;
+  var OWNER_USER_ID = '0c55209d-05d8-430f-b072-07406de9f4bd';
 
   const CONFIG = {
     hostName: 'Ian F.',
@@ -584,24 +584,32 @@ body {
   }
 
   function getAdminAccessToken() {
-    if (!_adminSession) return null;
-    return _adminSession.access_token;
+    if (!_supabase) return Promise.resolve(null);
+    return _supabase.auth.getSession().then(function (result) {
+      var session = result.data.session;
+      if (session) {
+        _adminSession = session;
+        return session.access_token;
+      }
+      return null;
+    });
   }
 
   // ============================================
   // GOOGLE CALENDAR API
   // ============================================
   function callCalendarAPI(body) {
-    var token = getAdminAccessToken();
-    return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),
-        'apikey': SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(body),
-    }).then(function (r) { return r.json(); });
+    return getAdminAccessToken().then(function (token) {
+      return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify(body),
+      }).then(function (r) { return r.json(); });
+    });
   }
 
   function checkGCalStatus() {
