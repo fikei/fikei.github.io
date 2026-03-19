@@ -2937,6 +2937,159 @@ a:hover { color: var(--accent-cyan); }
   color: var(--accent-cyan);
 }
 
+/* Inline recipe section in pin overlay */
+.pin-overlay__recipe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-4);
+}
+.pin-overlay__recipe-meta {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  border-top: 1px solid var(--subtle);
+  border-bottom: 1px solid var(--subtle);
+  padding: var(--space-2) 0;
+}
+.pin-overlay__recipe-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pin-overlay__recipe-meta-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.pin-overlay__recipe-meta-value {
+  font-size: 10px;
+  color: var(--fg);
+}
+.pin-overlay__recipe-description {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.pin-overlay__recipe-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.pin-overlay__recipe-scaler {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.pin-overlay__recipe-scaler-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pin-overlay__recipe-scaler-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+.pin-overlay__recipe-scaler-value {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+.pin-overlay__recipe-scaler-label {
+  color: var(--muted);
+}
+.pin-overlay__recipe-unit-toggle {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+.pin-overlay__recipe-unit-toggle:hover,
+.pin-overlay__recipe-unit-toggle--active {
+  background: var(--fg);
+  color: var(--bg);
+}
+.pin-overlay__recipe-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pin-overlay__recipe-section-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--subtle);
+  padding-bottom: var(--space-1);
+  margin: 0;
+}
+.pin-overlay__recipe-ingredients {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.pin-overlay__recipe-ingredient {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.pin-overlay__recipe-ingredient:last-child {
+  border-bottom: none;
+}
+.pin-overlay__recipe-instructions {
+  padding-left: var(--space-5);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.pin-overlay__recipe-step {
+  font-size: 10px;
+  line-height: 1.6;
+  padding-left: var(--space-2);
+}
+.pin-overlay__recipe-source {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-decoration: none;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--subtle);
+}
+.pin-overlay__recipe-source:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
 .pin-overlay__menu-container {
   position: relative;
 }
@@ -7410,7 +7563,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.27.2';
+  const VERSION = '2.28.0';
   console.log('[boards] v' + VERSION + ' - reliable pin deletion');
 
   // ============================================
@@ -17260,12 +17413,6 @@ Return JSON:
         }
       }
 
-      // Recipe viewer button (for eat pins with recipe data)
-      const hasRecipe = l.recipe && (l.recipe.ingredients?.length || l.recipe.instructions?.length);
-      if (hasRecipe) {
-        richActionsHtml += `<button class="grid-item__action" data-action="view-recipe">Recipe</button>`;
-      }
-
       // Intent action cards (commerce, ai_tool, etc.)
       if (l.intent_type && l.intent_confidence >= INTENT_CONFIDENCE_THRESHOLD && INTENT_REGISTRY[l.intent_type] && !l.loading) {
         const intentReg = INTENT_REGISTRY[l.intent_type];
@@ -17573,6 +17720,12 @@ Return JSON:
   const pinOverlayPanel = $('pinOverlayPanel');
   let _overlayScrollY = 0;
   let _overlayCurrentId = null;
+  let _overlayRecipeState = {
+    linkId: null,
+    currentServings: 4,
+    baseServings: 4,
+    useMetric: !(navigator.language || '').startsWith('en-US'),
+  };
 
   function openPinOverlay(id) {
     const link = getAllLinks().find(l => l.id === id);
@@ -17710,8 +17863,65 @@ Return JSON:
       actionsHtml += `<button class="pin-overlay__action pin-overlay__action--done${isDone ? ' pin-overlay__action--done-active' : ''}" data-action="toggle-done" data-link-id="${link.id}">${isDone ? '&#10003; ' + richConfig.doneLabel : richConfig.doneLabel + '?'}</button>`;
     }
     const hasRecipe = link.recipe && (link.recipe.ingredients?.length || link.recipe.instructions?.length);
+
+    // Inline recipe section
+    let recipeHtml = '';
     if (hasRecipe) {
-      actionsHtml += `<button class="pin-overlay__action" data-action="view-recipe" data-link-id="${link.id}">Recipe</button>`;
+      const recipe = link.recipe;
+      const useMetric = _overlayRecipeState.useMetric;
+      const baseServings = recipe.servings || 4;
+      const currentServings = _overlayRecipeState.currentServings || baseServings;
+      const scaleFactor = baseServings > 0 ? currentServings / baseServings : 1;
+
+      // Initialize state if this is a new recipe
+      if (_overlayRecipeState.linkId !== link.id) {
+        _overlayRecipeState.linkId = link.id;
+        _overlayRecipeState.currentServings = baseServings;
+        _overlayRecipeState.baseServings = baseServings;
+      }
+
+      const metaItems = [];
+      if (currentServings) metaItems.push({ label: 'Servings', value: String(currentServings) });
+      if (recipe.prep_time) metaItems.push({ label: 'Prep', value: formatRecipeTime(recipe.prep_time) });
+      if (recipe.cook_time) metaItems.push({ label: 'Cook', value: formatRecipeTime(recipe.cook_time) });
+      if (recipe.total_time) metaItems.push({ label: 'Total', value: formatRecipeTime(recipe.total_time) });
+      if (recipe.cuisine) metaItems.push({ label: 'Cuisine', value: recipe.cuisine });
+      if (recipe.difficulty) metaItems.push({ label: 'Difficulty', value: cap(recipe.difficulty) });
+
+      const metaBarHtml = metaItems.map(item =>
+        `<div class="pin-overlay__recipe-meta-item"><span class="pin-overlay__recipe-meta-label">${esc(item.label)}</span><span class="pin-overlay__recipe-meta-value">${esc(item.value)}</span></div>`
+      ).join('');
+
+      const ingredients = recipe.ingredients || [];
+      const ingredientsHtml = ingredients.map(raw =>
+        `<li class="pin-overlay__recipe-ingredient">${esc(scaleIngredient(raw, scaleFactor, useMetric))}</li>`
+      ).join('');
+
+      const instructions = recipe.instructions || [];
+      const instructionsHtml = instructions.map(step =>
+        `<li class="pin-overlay__recipe-step">${esc(step)}</li>`
+      ).join('');
+
+      const unitLabel = useMetric ? 'Metric' : 'Imperial';
+      const unitActiveClass = useMetric ? ' pin-overlay__recipe-unit-toggle--active' : '';
+
+      recipeHtml = `
+        <div class="pin-overlay__recipe">
+          ${metaBarHtml ? `<div class="pin-overlay__recipe-meta">${metaBarHtml}</div>` : ''}
+          ${recipe.description ? `<div class="pin-overlay__recipe-description">${esc(recipe.description)}</div>` : ''}
+          <div class="pin-overlay__recipe-controls">
+            <div class="pin-overlay__recipe-scaler">
+              <button class="pin-overlay__recipe-scaler-btn" data-action="recipe-scale-minus">&minus;</button>
+              <span class="pin-overlay__recipe-scaler-value">${currentServings}</span>
+              <button class="pin-overlay__recipe-scaler-btn" data-action="recipe-scale-plus">+</button>
+              <span class="pin-overlay__recipe-scaler-label">servings</span>
+            </div>
+            <button class="pin-overlay__recipe-unit-toggle${unitActiveClass}" data-action="recipe-unit-toggle">${unitLabel}</button>
+          </div>
+          ${ingredients.length ? `<section class="pin-overlay__recipe-section"><h3 class="pin-overlay__recipe-section-title">Ingredients</h3><ul class="pin-overlay__recipe-ingredients">${ingredientsHtml}</ul></section>` : ''}
+          ${instructions.length ? `<section class="pin-overlay__recipe-section"><h3 class="pin-overlay__recipe-section-title">Instructions</h3><ol class="pin-overlay__recipe-instructions">${instructionsHtml}</ol></section>` : ''}
+          <a class="pin-overlay__recipe-source" href="${esc(link.url)}" target="_blank" rel="noopener">View original recipe</a>
+        </div>`;
     }
 
     // Merged sources
@@ -17735,6 +17945,7 @@ Return JSON:
         <span class="pin-overlay__meta-item">${dateStr}</span>
       </div>
       <div class="pin-overlay__actions">${actionsHtml}</div>
+      ${recipeHtml}
       ${mergeHtml}
       <div class="pin-overlay__menu-container">
         <button class="pin-overlay__action" data-action="overlay-menu">•••</button>
@@ -17779,9 +17990,23 @@ Return JSON:
       return;
     }
 
-    if (action === 'view-recipe') {
-      const link = getAllLinks().find(l => l.id === linkId);
-      if (link) openRecipeDrawer(link);
+    if (action === 'recipe-scale-minus') {
+      if (_overlayRecipeState.currentServings > 1) {
+        _overlayRecipeState.currentServings--;
+        pinOverlayPanel.innerHTML = renderOverlayPanel(getAllLinks().find(l => l.id === _overlayCurrentId));
+      }
+      return;
+    }
+    if (action === 'recipe-scale-plus') {
+      if (_overlayRecipeState.currentServings < 99) {
+        _overlayRecipeState.currentServings++;
+        pinOverlayPanel.innerHTML = renderOverlayPanel(getAllLinks().find(l => l.id === _overlayCurrentId));
+      }
+      return;
+    }
+    if (action === 'recipe-unit-toggle') {
+      _overlayRecipeState.useMetric = !_overlayRecipeState.useMetric;
+      pinOverlayPanel.innerHTML = renderOverlayPanel(getAllLinks().find(l => l.id === _overlayCurrentId));
       return;
     }
 
@@ -19210,12 +19435,6 @@ Return JSON:
           if (item) item.classList.toggle('grid-item--' + richConfig.doneClass, nowDone);
           if (currentUser) syncLinkToSupabase(link);
           toast(nowDone ? `Marked as ${richConfig.doneLabel.toLowerCase()}` : 'Unmarked');
-        }
-        return;
-      } else if (actionType === 'view-recipe') {
-        const link = getAllLinks().find(l => l.id === id);
-        if (link && link.recipe) {
-          openRecipeDrawer(link);
         }
         return;
       } else if (actionType && actionType.startsWith('intent:')) {
