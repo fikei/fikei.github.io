@@ -7410,8 +7410,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.27.1';
-  console.log('[boards] v' + VERSION + ' - intent-driven pin actions');
+  const VERSION = '2.27.2';
+  console.log('[boards] v' + VERSION + ' - reliable pin deletion');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -14507,8 +14507,8 @@ Return JSON:
   const DELETED_IDS_KEY = 'boards-deleted-ids';
 
   // Tombstone tracking: remember deleted pin IDs so polling doesn't resurrect them.
-  // Tombstones expire after 7 days to avoid unbounded growth.
-  const TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  // Tombstones expire after 30 days to avoid unbounded growth.
+  const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
   function getDeletedIds() {
     try {
@@ -14538,6 +14538,109 @@ Return JSON:
     const entries = getDeletedIds();
     delete entries[id];
     localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(entries));
+  }
+
+  // Pending-deletes queue: persist failed deletes so they retry on next login.
+  const PENDING_DELETES_KEY = 'boards-pending-deletes';
+
+  function getPendingDeletes() {
+    try { return JSON.parse(localStorage.getItem(PENDING_DELETES_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function addPendingDelete(id) {
+    const pending = getPendingDeletes();
+    if (!pending.includes(id)) {
+      pending.push(id);
+      localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(pending));
+    }
+  }
+
+  function removePendingDelete(id) {
+    const pending = getPendingDeletes().filter(i => i !== id);
+    localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(pending));
+  }
+
+  async function processPendingDeletes() {
+    if (!currentUser) return;
+    const pending = getPendingDeletes();
+    if (!pending.length) return;
+    console.log('[sync] Processing', pending.length, 'pending deletes');
+    const token = getAccessToken();
+    if (!token) return;
+    for (const id of pending) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
+          method: 'DELETE',
+          headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok || res.status === 404) {
+          removePendingDelete(id);
+          console.log('[sync] Pending delete succeeded:', id);
+        } else {
+          console.warn('[sync] Pending delete failed (status', res.status + '), will retry next login:', id);
+        }
+      } catch (e) {
+        console.warn('[sync] Pending delete error, will retry next login:', id, e);
+      }
+    }
+  }
+
+  // Pending-uploads queue: persist IDs of pins whose sync failed so they retry on next login.
+  const PENDING_UPLOADS_KEY = 'boards-pending-uploads';
+
+  function getPendingUploads() {
+    try { return new Set(JSON.parse(localStorage.getItem(PENDING_UPLOADS_KEY) || '[]')); }
+    catch { return new Set(); }
+  }
+
+  function addPendingUpload(id) {
+    const pending = getPendingUploads();
+    pending.add(id);
+    localStorage.setItem(PENDING_UPLOADS_KEY, JSON.stringify([...pending]));
+  }
+
+  function removePendingUpload(id) {
+    const pending = getPendingUploads();
+    pending.delete(id);
+    localStorage.setItem(PENDING_UPLOADS_KEY, JSON.stringify([...pending]));
+  }
+
+  async function processPendingUploads() {
+    if (!currentUser) return;
+    const pendingIds = getPendingUploads();
+    if (!pendingIds.size) return;
+    console.log('[sync] Processing', pendingIds.size, 'pending uploads');
+    const data = load();
+    const tombstones = getDeletedIds();
+    for (const id of pendingIds) {
+      // Skip if pin was deleted since it was queued
+      if (tombstones[id]) {
+        removePendingUpload(id);
+        continue;
+      }
+      const link = data.links.find(l => l.id === id);
+      if (!link) {
+        removePendingUpload(id);
+        continue;
+      }
+      await syncLinkToSupabase(link);
+      // syncLinkToSupabase will re-add to pending if it fails again
+    }
+  }
+
+  // Cloud ID tracking: remember which pin IDs exist in the cloud so we can
+  // distinguish "never synced" (new) from "deleted remotely" (was in cloud, now gone).
+  const CLOUD_IDS_KEY = 'boards-cloud-ids';
+
+  function saveCloudIds(ids) {
+    try { localStorage.setItem(CLOUD_IDS_KEY, JSON.stringify([...ids])); }
+    catch { /* localStorage full — non-critical */ }
+  }
+
+  function getLastKnownCloudIds() {
+    try { return new Set(JSON.parse(localStorage.getItem(CLOUD_IDS_KEY) || '[]')); }
+    catch { return new Set(); }
   }
 
   // Expanded cards removed in v2.20.0 — detail now shown in full-page overlay.
@@ -14643,12 +14746,14 @@ Return JSON:
 
   async function syncLinkToSupabase(link) {
     if (!currentUser) {
-      console.log('[sync] Skipped - not logged in');
+      addPendingUpload(link.id);
+      console.log('[sync] Upload queued (not logged in):', link.url);
       return;
     }
     const accessToken = getAccessToken();
     if (!accessToken) {
-      console.log('[sync] Skipped - no access token');
+      addPendingUpload(link.id);
+      console.log('[sync] Upload queued (no token):', link.url);
       return;
     }
     try {
@@ -14737,6 +14842,7 @@ Return JSON:
           if (retry.ok) {
             console.log('[sync] Uploaded (after dropping', schemaRetries, 'columns):', link.url);
             syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
+            removePendingUpload(link.id);
             return;
           }
           errBody = await retry.text();
@@ -14752,10 +14858,12 @@ Return JSON:
         if (!syncRetryQueue.find(l => l.id === link.id)) {
           syncRetryQueue.push(link);
         }
+        addPendingUpload(link.id);
       } else {
         console.log('[sync] Uploaded:', link.url);
-        // Remove from retry queue if present
+        // Remove from retry queues if present
         syncRetryQueue = syncRetryQueue.filter(l => l.id !== link.id);
+        removePendingUpload(link.id);
       }
     } catch (e) {
       console.error('[sync] Error:', e);
@@ -14768,6 +14876,7 @@ Return JSON:
       if (!syncRetryQueue.find(l => l.id === link.id)) {
         syncRetryQueue.push(link);
       }
+      addPendingUpload(link.id);
     }
   }
 
@@ -14791,9 +14900,17 @@ Return JSON:
   }
 
   async function deleteLinkFromSupabase(id, retries = 3) {
-    if (!currentUser) return;
+    if (!currentUser) {
+      addPendingDelete(id);
+      console.log('[sync] Delete queued (not logged in):', id);
+      return;
+    }
     const accessToken = getAccessToken();
-    if (!accessToken) return;
+    if (!accessToken) {
+      addPendingDelete(id);
+      console.log('[sync] Delete queued (no token):', id);
+      return;
+    }
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
@@ -14805,7 +14922,8 @@ Return JSON:
         });
         if (res.ok) {
           console.log('[sync] Deleted:', id);
-          return; // Success — tombstone stays until TTL to guard against race conditions
+          removePendingDelete(id);
+          return;
         }
         console.error(`[sync] Delete failed (attempt ${attempt}/${retries}):`, res.status);
       } catch (e) {
@@ -14813,7 +14931,8 @@ Return JSON:
       }
       if (attempt < retries) await new Promise(r => setTimeout(r, 1000 * attempt));
     }
-    console.error('[sync] Delete exhausted retries for:', id, '— tombstone will prevent resurrection');
+    addPendingDelete(id);
+    console.error('[sync] Delete exhausted retries for:', id, '— queued for next login');
   }
 
   // Sync all local data to Supabase
@@ -22739,12 +22858,19 @@ Return JSON:
 
     const existingLinks = getAllLinks();
     const existingUrls = new Set(existingLinks.map(l => l.url));
+    const tombstones = getDeletedIds();
+    const pendingDeletes = new Set(getPendingDeletes());
     let added = 0;
 
     for (const link of pending) {
       // Skip duplicates
       if (existingUrls.has(link.url)) {
         console.log('[pending] Skipping duplicate:', link.url);
+        continue;
+      }
+      // Skip tombstoned or pending-delete pins
+      if ((link.id && tombstones[link.id]) || (link.id && pendingDeletes.has(link.id))) {
+        console.log('[pending] Skipping deleted pin:', link.url);
         continue;
       }
 
@@ -23047,6 +23173,10 @@ Return JSON:
         }
       }).catch(function(e) { console.warn('[taste-engine] Preload error:', e); });
 
+      // Process queued deletes and uploads before fetching cloud state
+      await processPendingDeletes();
+      await processPendingUploads();
+
       // Fetch from Supabase and update if different
       const t2 = performance.now();
       const cloudData = await fetchFromSupabase();
@@ -23102,11 +23232,18 @@ Return JSON:
           cloudData.linkOrder = cloudData.linkOrder.filter(id => dedupedIds.has(id));
         }
 
-        // Merge: push local-only pins to cloud before overwriting
+        // Merge: push genuinely new local-only pins to cloud before overwriting.
+        // Use lastKnownCloudIds to distinguish "never synced" (new) from "deleted remotely."
         const cloudIds = new Set(cloudData.links.map(l => l.id));
-        const localOnly = localData.links.filter(l => !cloudIds.has(l.id) && !tombstones[l.id]);
+        const lastKnownCloud = getLastKnownCloudIds();
+        const pendingUploads = getPendingUploads();
+        const localOnly = localData.links.filter(l =>
+          !cloudIds.has(l.id) &&         // not currently in cloud
+          !tombstones[l.id] &&           // not locally deleted
+          (!lastKnownCloud.has(l.id) || pendingUploads.has(l.id))  // never seen in cloud before OR has a pending upload
+        );
         if (localOnly.length > 0) {
-          console.log('[sync] Found', localOnly.length, 'local-only pins — pushing to cloud');
+          console.log('[sync] Found', localOnly.length, 'genuinely new local-only pins — pushing to cloud');
           for (const link of localOnly) {
             await syncLinkToSupabase(link);
           }
@@ -23118,6 +23255,10 @@ Return JSON:
           await syncOrderToSupabase(cloudData.linkOrder);
           console.log('[sync] Merged', localOnly.length, 'local-only pins to cloud');
         }
+
+        // Save current cloud IDs for future "was it ever in cloud?" checks
+        const allCloudIds = new Set(cloudData.links.map(l => l.id));
+        saveCloudIds(allCloudIds);
 
         // Also push local pins that have newer data than cloud (enrichment updates)
         const cloudMap = new Map(cloudData.links.map(l => [l.id, l]));
@@ -23251,11 +23392,17 @@ Return JSON:
     const localIds = new Set(localData.links.map(l => l.id));
     const cloudIds = new Set(cloudData.links.map(l => l.id));
 
-    // Protect local-only pins: push them to cloud before overwriting
-    // (mirrors the same merge logic used in init())
-    const localOnly = localData.links.filter(l => !cloudIds.has(l.id) && !tombstones[l.id]);
+    // Protect genuinely new local-only pins: push them to cloud before overwriting.
+    // Use lastKnownCloudIds to avoid re-uploading remotely-deleted pins.
+    const lastKnownCloud = getLastKnownCloudIds();
+    const pendingUploads = getPendingUploads();
+    const localOnly = localData.links.filter(l =>
+      !cloudIds.has(l.id) &&
+      !tombstones[l.id] &&
+      (!lastKnownCloud.has(l.id) || pendingUploads.has(l.id))
+    );
     if (localOnly.length > 0) {
-      console.log('[poll] Found', localOnly.length, 'local-only pins — pushing to cloud before merge');
+      console.log('[poll] Found', localOnly.length, 'genuinely new local-only pins — pushing to cloud before merge');
       for (const link of localOnly) {
         await syncLinkToSupabase(link);
       }
@@ -23265,6 +23412,10 @@ Return JSON:
       cloudData.linkOrder = [...localOnlyIds, ...cloudData.linkOrder];
       await syncOrderToSupabase(cloudData.linkOrder);
     }
+
+    // Update cloud ID tracking
+    const allCloudIds = new Set(cloudData.links.map(l => l.id));
+    saveCloudIds(allCloudIds);
 
     // Protect locally-updated pins: push newer data to cloud
     const cloudMap = new Map(cloudData.links.map(l => [l.id, l]));
