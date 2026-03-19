@@ -2185,6 +2185,23 @@ body {
 
 
 
+  function stripVenueFromTitle(name, venue) {
+    if (!name || !venue) return name || '';
+    // Remove " @ Venue", " at Venue", " - Venue", " | Venue" suffixes
+    const patterns = [` @ ${venue}`, ` at ${venue}`, ` - ${venue}`, ` | ${venue}`];
+    for (const p of patterns) {
+      if (name.endsWith(p)) return name.slice(0, -p.length);
+    }
+    // Remove venue name if it appears as a suffix after common separators
+    const lower = name.toLowerCase();
+    const vLower = venue.toLowerCase();
+    if (lower.endsWith(vLower) && lower.length > vLower.length) {
+      const prefix = name.slice(0, -venue.length).replace(/[\s\-@|]+$/, '');
+      if (prefix.length > 0) return prefix;
+    }
+    return name;
+  }
+
   function formatDate(dateStr) {
     if (!dateStr) return '\u2014';
     try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
