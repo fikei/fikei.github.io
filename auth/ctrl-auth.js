@@ -50,6 +50,7 @@
      * @param {string} [config.mountTo] - CSS selector for mount point (default: 'body')
      * @param {boolean} [config.skipUsername] - skip username onboarding modal (default: false)
      * @param {string} [config.accountUrl] - URL for the account page (default: '/account/')
+     * @param {string} [config.flowType] - auth flow type: 'pkce' (default on desktop) or 'implicit'
      */
     init(config) {
       if (_initialized) return;
@@ -71,7 +72,7 @@
       _supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
         auth: {
           detectSessionInUrl: true,
-          flowType: isMobile ? 'implicit' : 'pkce',
+          flowType: config.flowType || (isMobile ? 'implicit' : 'pkce'),
           autoRefreshToken: true,
           persistSession: true
         }
