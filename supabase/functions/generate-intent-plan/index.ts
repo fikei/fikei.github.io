@@ -5,7 +5,7 @@
 // POST /functions/v1/generate-intent-plan
 // Body: { tool_name, tagline, url, domain, docs_url, practical_tags, entities, recent_pins }
 
-const VERSION = '1.0.0'
+const VERSION = '1.0.1'
 console.log(`[generate-intent-plan] v${VERSION} — streaming integration plan generator`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -13,6 +13,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface PlanRequest {
