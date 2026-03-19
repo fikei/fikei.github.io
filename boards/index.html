@@ -3185,6 +3185,18 @@ a:hover { color: var(--accent-cyan); }
   text-decoration: line-through;
   opacity: 0.4;
 }
+.pin-overlay__recipe-sub {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+  padding-left: 26px;
+  margin-top: 2px;
+}
+.pin-overlay__recipe-ingredient[data-checked="true"] .pin-overlay__recipe-sub {
+  opacity: 0.3;
+}
 .pin-overlay__recipe-instructions {
   padding-left: var(--space-5);
   margin: 0;
@@ -7788,8 +7800,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.31.1';
-  console.log('[boards] v' + VERSION + ' - save integration plan to pin metadata');
+  const VERSION = '2.32.0';
+  console.log('[boards] v' + VERSION + ' - ingredient substitutions for obscure items');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -13483,6 +13495,9 @@ Return JSON:
             images: result.recipe.images?.length ? result.recipe.images : (existing.images || []),
             cuisine: result.recipe.cuisine || existing.cuisine || null,
             difficulty: result.recipe.difficulty || existing.difficulty || null,
+            substitutions: result.recipe.substitutions && typeof result.recipe.substitutions === 'object'
+              ? { ...(existing.substitutions || {}), ...result.recipe.substitutions }
+              : (existing.substitutions || null),
             source_name: result.recipe.source_name || existing.source_name || null,
             server_enriched_at: result.recipe.server_enriched_at || existing.server_enriched_at || null,
           };
@@ -18490,9 +18505,15 @@ Return JSON:
       ).join('')}</div>` : '';
 
       const ingredients = recipe.ingredients || [];
-      const ingredientsHtml = ingredients.map((raw, i) =>
-        `<li class="pin-overlay__recipe-ingredient" data-checked="false"><input type="checkbox" class="pin-overlay__recipe-check" data-idx="${i}"><span>${esc(scaleIngredient(raw, scaleFactor, useMetric))}</span></li>`
-      ).join('');
+      const subs = recipe.substitutions || {};
+      const subKeys = Object.keys(subs);
+      const ingredientsHtml = ingredients.map((raw, i) => {
+        const scaled = esc(scaleIngredient(raw, scaleFactor, useMetric));
+        const rawLower = raw.toLowerCase();
+        const matchKey = subKeys.find(k => rawLower.includes(k.toLowerCase()));
+        const subHint = matchKey ? `<span class="pin-overlay__recipe-sub">or use: ${esc(subs[matchKey])}</span>` : '';
+        return `<li class="pin-overlay__recipe-ingredient" data-checked="false"><input type="checkbox" class="pin-overlay__recipe-check" data-idx="${i}"><span>${scaled}</span>${subHint}</li>`;
+      }).join('');
 
       const instructions = recipe.instructions || [];
       const instructionsHtml = instructions.map(step =>
