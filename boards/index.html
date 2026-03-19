@@ -7410,7 +7410,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.27.1';
+  const VERSION = '2.27.2';
   console.log('[boards] v' + VERSION + ' - intent-driven pin actions');
 
   // ============================================
@@ -11026,7 +11026,7 @@ Return JSON:
 
       // YouTube
       if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-        const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?]+)/)?.[1];
+        const videoId = url.match(/(?:v=|youtu\.be\/|\/(?:shorts|live|embed)\/)([^&\?#]+)/)?.[1];
         console.log('%c[PLATFORM] YouTube detected, videoId:', 'color: #e67e22', videoId);
         if (videoId) {
           const imageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
@@ -13313,7 +13313,7 @@ Return JSON:
       // construct a minimal response with thumbnail — never fall through to CORS proxy
       // because YouTube blocks all CORS proxies and returns generic "YouTube" page data
       if (isYouTubeUrl) {
-        const videoId = url.match(/(?:v=|youtu\.be\/)([^&\?#]+)/)?.[1];
+        const videoId = url.match(/(?:v=|youtu\.be\/|\/(?:shorts|live|embed)\/)([^&\?#]+)/)?.[1];
         if (videoId) {
           console.log('%c[METADATA] YouTube oEmbed failed, using thumbnail fallback for:', 'color: #e67e22', videoId);
           meta.image = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
@@ -21863,10 +21863,38 @@ Return JSON:
               if (link3) syncLinkToSupabase(link3);
             } catch (err) {
               clearInterval(igPhraseInterval);
-              console.error('[instagram-import] Auto-import failed:', err);
-              updateLink(id, { loading: false, enrichment_failed: true });
-              renderGrid();
-              toast('Instagram import failed — try refresh', { level: 'error', id: igToastId });
+              console.error('[instagram-import] Auto-import failed, falling back to generic metadata:', err);
+              // Graceful degradation: try generic metadata fetch instead of giving up
+              try {
+                const meta = await fetchMetadata(url);
+                const cat = await smartCategorize(meta);
+                const contentType = classifyByRules(url, meta.title, meta.description);
+                updateLink(id, {
+                  title: meta.title || 'Instagram Reel',
+                  description: meta.description || '',
+                  image: meta.image || null,
+                  content_type: contentType.type || 'social',
+                  type_confidence: contentType.confidence || 0.5,
+                  category: cat.category || 'follow',
+                  loading: false,
+                  enrichment_failed: false,
+                });
+                renderFilters();
+                renderGrid();
+                toast('Imported (limited metadata)', { id: igToastId });
+                // Queue server enrichment for better data
+                queueServerEnrichment(id, url, meta.title, meta.description, {
+                  category: cat.category
+                });
+                const data3f = load();
+                const link3f = data3f.links.find(l => l.id === id);
+                if (link3f) syncLinkToSupabase(link3f);
+              } catch (fallbackErr) {
+                console.error('[instagram-import] Fallback also failed:', fallbackErr);
+                updateLink(id, { loading: false, enrichment_failed: true });
+                renderGrid();
+                toast('Instagram import failed', { level: 'error', id: igToastId });
+              }
             }
             return;
           }
