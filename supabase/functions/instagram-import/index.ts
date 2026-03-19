@@ -17,8 +17,8 @@
 //
 // Returns: { source_pin, derived_pins[], transcript?, entities[], cost_estimate }
 
-const VERSION = '1.3.3'
-console.log(`[instagram-import] v${VERSION} - proxy thumbnails to Supabase Storage (CDN URLs expire)`)
+const VERSION = '1.4.0'
+console.log(`[instagram-import] v${VERSION} - Apify fallback when ScrapeCreators fails`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
@@ -102,11 +102,9 @@ function parseShortcode(url: string): string | null {
   return match ? match[1] : null
 }
 
-async function extractReel(url: string): Promise<ReelData> {
+async function extractReelViaScrapeCreators(url: string): Promise<ReelData> {
   const apiKey = Deno.env.get('SCRAPECREATORS_API_KEY')
-  if (!apiKey) {
-    throw new Error('SCRAPECREATORS_API_KEY not configured')
-  }
+  if (!apiKey) throw new Error('SCRAPECREATORS_API_KEY not configured')
 
   const encodedUrl = encodeURIComponent(url)
   const apiUrl = `https://api.scrapecreators.com/v2/instagram/post?url=${encodedUrl}`
@@ -132,40 +130,126 @@ async function extractReel(url: string): Promise<ReelData> {
   }
   const post = raw.shortcode ? raw : (raw.data || raw)
 
+  return parseScrapeCreatorsPost(url, post)
+}
+
+function parseScrapeCreatorsPost(url: string, post: Record<string, unknown>): ReelData {
   // Extract audio track from music metadata
   let audioTrack: string | null = null
-  const music = post.music_info || post.clips_metadata?.music_info
+  const music = (post.music_info || (post.clips_metadata as Record<string, unknown>)?.music_info) as Record<string, unknown> | undefined
   if (music) {
-    const asset = music.music_asset_info || music
+    const asset = (music.music_asset_info || music) as Record<string, unknown>
     const trackName = asset.title || asset.track_name
     const artist = asset.display_artist || asset.artist_name
     if (trackName) {
-      audioTrack = artist ? `${artist} - ${trackName}` : trackName
+      audioTrack = artist ? `${artist} - ${trackName}` : String(trackName)
     }
   }
 
   // Extract tagged location
   let taggedLocation: string | null = null
   if (post.location && typeof post.location === 'object') {
-    taggedLocation = post.location.name || null
+    taggedLocation = (post.location as Record<string, unknown>).name as string || null
   } else if (typeof post.location === 'string') {
     taggedLocation = post.location
   }
 
   return {
     url,
-    shortcode: post.shortcode || parseShortcode(url) || 'unknown',
-    caption: post.caption || post.description || '',
-    author_username: post.author_username || post.owner_username || '',
-    thumbnail_url: post.thumbnail_url || post.display_url || null,
-    video_url: post.video_url || null,
-    duration: post.duration || post.video_duration || null,
+    shortcode: (post.shortcode as string) || parseShortcode(url) || 'unknown',
+    caption: (post.caption || post.description || '') as string,
+    author_username: (post.author_username || post.owner_username || '') as string,
+    thumbnail_url: (post.thumbnail_url || post.display_url || null) as string | null,
+    video_url: (post.video_url || null) as string | null,
+    duration: (post.duration || post.video_duration || null) as number | null,
     audio_track: audioTrack,
     tagged_location: taggedLocation,
-    tagged_accounts: post.tagged_users || [],
-    auto_transcript: post.transcript || post.accessibility_caption || null,
-    view_count: post.video_view_count || post.view_count || null,
-    like_count: post.like_count || null,
+    tagged_accounts: (post.tagged_users || []) as string[],
+    auto_transcript: (post.transcript || post.accessibility_caption || null) as string | null,
+    view_count: (post.video_view_count || post.view_count || null) as number | null,
+    like_count: (post.like_count || null) as number | null,
+  }
+}
+
+async function extractReelViaApify(url: string): Promise<ReelData> {
+  const apiToken = Deno.env.get('APIFY_API_TOKEN')
+  if (!apiToken) throw new Error('APIFY_API_TOKEN not configured')
+
+  console.log('[instagram-import] Falling back to Apify for:', url)
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60000) // Apify can be slow
+
+  const resp = await fetch(
+    `https://api.apify.com/v2/acts/apify~instagram-reel-scraper/run-sync-get-dataset-items?token=${apiToken}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        directUrls: [url],
+        resultsLimit: 1,
+      }),
+      signal: controller.signal,
+    }
+  )
+  clearTimeout(timeout)
+
+  if (!resp.ok) {
+    const text = await resp.text()
+    throw new Error(`Apify API error ${resp.status}: ${text.substring(0, 200)}`)
+  }
+
+  const items = await resp.json() as Record<string, unknown>[]
+  if (!items || items.length === 0) {
+    throw new Error('Apify returned no results')
+  }
+
+  const item = items[0]
+  console.log('[instagram-import] Apify returned reel data, keys:', Object.keys(item).join(', '))
+
+  // Map Apify fields to ReelData
+  // Apify returns: shortCode, caption, videoUrl, displayUrl, ownerUsername,
+  //   videoDuration, musicInfo, locationName, taggedUsers, videoViewCount, likesCount
+  let audioTrack: string | null = null
+  const musicInfo = item.musicInfo as Record<string, unknown> | undefined
+  if (musicInfo) {
+    const trackName = musicInfo.song_name || musicInfo.title
+    const artist = musicInfo.artist_name || musicInfo.display_artist
+    if (trackName) {
+      audioTrack = artist ? `${artist} - ${trackName}` : String(trackName)
+    }
+  }
+
+  return {
+    url,
+    shortcode: (item.shortCode || item.shortcode || parseShortcode(url) || 'unknown') as string,
+    caption: (item.caption || item.text || '') as string,
+    author_username: (item.ownerUsername || item.owner_username || '') as string,
+    thumbnail_url: (item.displayUrl || item.thumbnailUrl || item.thumbnail_url || null) as string | null,
+    video_url: (item.videoUrl || item.video_url || null) as string | null,
+    duration: (item.videoDuration || item.duration || null) as number | null,
+    audio_track: audioTrack,
+    tagged_location: (item.locationName || item.location_name || null) as string | null,
+    tagged_accounts: (item.taggedUsers || item.tagged_users || []) as string[],
+    auto_transcript: (item.transcript || item.accessibilityCaption || null) as string | null,
+    view_count: (item.videoViewCount || item.video_view_count || null) as number | null,
+    like_count: (item.likesCount || item.like_count || null) as number | null,
+  }
+}
+
+async function extractReel(url: string): Promise<ReelData> {
+  // Try ScrapeCreators first, fall back to Apify
+  try {
+    return await extractReelViaScrapeCreators(url)
+  } catch (scErr) {
+    console.warn('[instagram-import] ScrapeCreators failed:', (scErr as Error).message)
+  }
+
+  try {
+    return await extractReelViaApify(url)
+  } catch (apifyErr) {
+    console.warn('[instagram-import] Apify failed:', (apifyErr as Error).message)
+    throw new Error(`All Instagram scrapers failed. ScrapeCreators and Apify both unavailable.`)
   }
 }
 
