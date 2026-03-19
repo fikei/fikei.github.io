@@ -22882,15 +22882,7 @@ Return JSON:
     }
   });
 
-  // Menu button clicks from auth module
-  document.addEventListener('ctrl:auth:accountclick', () => {
-    openAccountModal();
-  });
-
-  document.addEventListener('ctrl:auth:settingsclick', () => {
-    openModal(settingsModal);
-    loadConnectorSettings();
-  });
+  // Account & Settings now handled by /account/ page via ctrl-auth.js navigation
 
   function getDeviceInfo() {
     const ua = navigator.userAgent;

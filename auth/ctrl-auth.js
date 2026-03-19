@@ -49,6 +49,7 @@
      * @param {string[]} [config.adminEmails] - admin email addresses
      * @param {string} [config.mountTo] - CSS selector for mount point (default: 'body')
      * @param {boolean} [config.skipUsername] - skip username onboarding modal (default: false)
+     * @param {string} [config.accountUrl] - URL for the account page (default: '/account/')
      */
     init(config) {
       if (_initialized) return;
@@ -275,16 +276,22 @@
       }
     });
 
-    // Account button dispatches event for the app to handle
+    // Account button — navigate to /account/ (apps can override via config.accountUrl)
     _els.ctrlAuthMenuAccount.addEventListener('click', () => {
       _els.ctrlAuthMenuDropdown.classList.remove('ctrl-auth-menu__dropdown--visible');
       dispatch('ctrl:auth:accountclick', { user: _currentUser, username: _currentUsername });
+      const accountUrl = _config.accountUrl || '/account/';
+      if (window.location.pathname !== accountUrl) {
+        window.location.href = accountUrl;
+      }
     });
 
-    // Settings button dispatches event for the app to handle
+    // Settings button — navigate to /account/#settings
     _els.ctrlAuthMenuSettings.addEventListener('click', () => {
       _els.ctrlAuthMenuDropdown.classList.remove('ctrl-auth-menu__dropdown--visible');
       dispatch('ctrl:auth:settingsclick', {});
+      const accountUrl = _config.accountUrl || '/account/';
+      window.location.href = accountUrl + '#settings';
     });
 
     // Logout
