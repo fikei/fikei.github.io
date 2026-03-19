@@ -15427,6 +15427,12 @@ Return JSON:
   let syncRetryQueue = [];
 
   async function syncLinkToSupabase(link) {
+    // Never re-upload a tombstoned pin — this prevents zombie resurrection
+    const tombstones = getDeletedIds();
+    if (tombstones[link.id]) {
+      console.log('[sync] Skipping upload for tombstoned pin:', link.id);
+      return;
+    }
     if (!currentUser) {
       addPendingUpload(link.id);
       console.log('[sync] Upload queued (not logged in):', link.url);
