@@ -415,6 +415,9 @@ function classifyError(msg: string): string {
 }
 
 // --- Auth: service-role only ---
+// Verifies the caller has service_role privileges via:
+// 1. Direct match against SUPABASE_SERVICE_ROLE_KEY
+// 2. JWT payload role === 'service_role'
 
 function requireServiceRole(req: Request): Response | null {
   const authHeader = req.headers.get('authorization')
@@ -426,15 +429,24 @@ function requireServiceRole(req: Request): Response | null {
   }
 
   const token = authHeader.replace('Bearer ', '')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!serviceKey || token !== serviceKey) {
-    return new Response(JSON.stringify({ error: 'Forbidden — service role key required' }), {
-      status: 403,
-      headers: jsonHeaders,
-    })
-  }
 
-  return null // auth passed
+  // Direct match against service role key
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (serviceKey && token === serviceKey) return null
+
+  // Check if it's a JWT with service_role claim
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]))
+      if (payload.role === 'service_role') return null
+    }
+  } catch (_e) { /* not a valid JWT */ }
+
+  return new Response(JSON.stringify({ error: 'Forbidden — service role key required' }), {
+    status: 403,
+    headers: jsonHeaders,
+  })
 }
 
 // --- Handler ---
