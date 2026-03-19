@@ -9,7 +9,7 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 console.log(`[scrape-events] v${VERSION} - server-side event scraper`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -408,6 +408,29 @@ function classifyError(msg: string): string {
   return 'unknown'
 }
 
+// --- Auth: service-role only ---
+
+function requireServiceRole(req: Request): Response | null {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+      status: 401,
+      headers: jsonHeaders,
+    })
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!serviceKey || token !== serviceKey) {
+    return new Response(JSON.stringify({ error: 'Forbidden — service role key required' }), {
+      status: 403,
+      headers: jsonHeaders,
+    })
+  }
+
+  return null // auth passed
+}
+
 // --- Handler ---
 
 serve(async (req: Request) => {
@@ -421,6 +444,10 @@ serve(async (req: Request) => {
       headers: jsonHeaders,
     })
   }
+
+  // Require service role key for all actions
+  const authError = requireServiceRole(req)
+  if (authError) return authError
 
   try {
     const body = await req.json() as { action?: string; sourceId?: string }
