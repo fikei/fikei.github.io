@@ -7563,8 +7563,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.28.2';
-  console.log('[boards] v' + VERSION + ' - cleanup garbage pins + recache expired images');
+  const VERSION = '2.28.3';
+  console.log('[boards] v' + VERSION + ' - sync all missing fields to Supabase');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -15115,6 +15115,7 @@ Return JSON:
         video: link.video || null,
         music: link.music || null,
         book: link.book || null,
+        recipe: link.recipe || null,
         watched: link.watched || false,
         read: link.read || false,
         // Merge fields
@@ -15131,7 +15132,16 @@ Return JSON:
         intent_type: link.intent_type || null,
         intent_confidence: link.intent_confidence || null,
         intent_metadata: link.intent_metadata || null,
-        intent_classified_at: link.intent_classified_at || null
+        intent_classified_at: link.intent_classified_at || null,
+        // Capture & enrichment lifecycle
+        selected_text: link.selected_text || null,
+        image_resolution_log: link.image_resolution_log || null,
+        image_resolved_at: link.image_resolved_at || null,
+        enrichment_failed: link.enrichment_failed || false,
+        enrichment_failed_at: link.enrichment_failed_at || null,
+        source: link.source || null,
+        // Widget reference
+        widgetId: link.widgetId || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -15349,10 +15359,21 @@ Return JSON:
         type_signals: l.type_signals || null,
         image_source: l.image_source || null,
         image_scores: l.image_scores || null,
+        // Sense-making fields (from analyze-content)
+        entities: l.entities || null,
+        practical_tags: l.practical_tags || [],
+        taste_tags: l.taste_tags || [],
+        content_structure: l.content_structure || null,
+        hero_score: l.hero_score || null,
+        // Provenance fields
+        instagram: l.instagram || null,
+        extraction: l.extraction || null,
+        source_url: l.source_url || null,
         // Structured metadata (JSONB)
         video: l.video || null,
         music: l.music || null,
         book: l.book || null,
+        recipe: l.recipe || null,
         watched: l.watched || false,
         read: l.read || false,
         // Merge fields
@@ -15369,7 +15390,16 @@ Return JSON:
         intent_type: l.intent_type || null,
         intent_confidence: l.intent_confidence || null,
         intent_metadata: l.intent_metadata || null,
-        intent_classified_at: l.intent_classified_at || null
+        intent_classified_at: l.intent_classified_at || null,
+        // Capture & enrichment lifecycle
+        selected_text: l.selected_text || null,
+        image_resolution_log: l.image_resolution_log || null,
+        image_resolved_at: l.image_resolved_at || null,
+        enrichment_failed: l.enrichment_failed || false,
+        enrichment_failed_at: l.enrichment_failed_at || null,
+        source: l.source || null,
+        // Widget reference
+        widgetId: l.widgetId || null
       }));
 
       const categories = { uncategorized: { pinned: true } };
