@@ -17,6 +17,11 @@
   <!-- CTRL Design System -->
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+
+  <!-- Supabase SDK + Auth Module -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
+  <script src="/auth/ctrl-auth.js"></script>
 
   <!-- Add to Calendar Button -->
   <script src="https://cdn.jsdelivr.net/npm/add-to-calendar-button@2" defer></script>
@@ -331,6 +336,9 @@ body {
 </head>
 <body>
 
+  <!-- CtrlAuth mount point (renders login button / account dropdown in top-right) -->
+  <div id="ctrl-auth-root"></div>
+
   <!-- Page Header -->
   <header class="page-header">
     <div style="max-width:960px;margin:0 auto;padding:0 var(--space-4);display:flex;align-items:center;justify-content:space-between;height:var(--space-12);">
@@ -339,7 +347,6 @@ body {
         <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg-subtle);">/</span>
         <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg);text-transform:uppercase;letter-spacing:var(--tracking-widest);font-weight:700;">Schedule</span>
       </nav>
-      <button class="btn btn--ghost btn--sm hidden" id="adminLoginBtn" style="font-size:var(--text-2xs);">Admin</button>
     </div>
   </header>
 
@@ -348,8 +355,6 @@ body {
     <span>Google Calendar:</span>
     <span class="cal-admin-bar__status" id="gcalStatus">checking...</span>
     <button class="btn btn--ghost btn--sm" id="gcalConnectBtn" style="font-size:var(--text-2xs);">Connect</button>
-    <span style="flex:1;"></span>
-    <button class="btn btn--ghost btn--sm" id="adminSignOutBtn" style="font-size:var(--text-2xs);">Sign Out</button>
   </div>
 
   <!-- Main Layout (always visible — no auth gate) -->
@@ -431,7 +436,7 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
@@ -500,14 +505,12 @@ body {
   };
 
   // ============================================
-  // ADMIN AUTH (only for Google Calendar setup)
+  // AUTH (CtrlAuth — standard ctrl.rodeo login)
   // ============================================
-  var _supabase = null;
-  var _adminSession = null;
-  // Intercept Google Calendar OAuth code BEFORE Supabase SDK loads.
-  // Google Calendar returns ?code=X&state=USER_ID.
-  // Supabase PKCE returns ?code=X (no state, or state without user ID pattern).
-  // We must extract the Google code first so Supabase doesn't try to process it.
+  // Intercept Google Calendar OAuth code BEFORE CtrlAuth/Supabase processes URL.
+  // Google Calendar returns ?code=X&state=USER_ID (UUID).
+  // Supabase PKCE returns ?code=X (no state, or different state format).
+  // We extract the Google code first so Supabase doesn't try to consume it.
   var _pendingGCalCode = null;
   (function interceptGCalCode() {
     var params = new URLSearchParams(window.location.search);
@@ -517,7 +520,6 @@ body {
     if (code && gstate && /^[0-9a-f]{8}-/.test(gstate)) {
       _pendingGCalCode = code;
       console.log('[calendar] Intercepted Google Calendar OAuth code, stripping from URL');
-      // Strip code+state from URL so Supabase SDK doesn't see it
       params.delete('code');
       params.delete('state');
       params.delete('scope');
@@ -529,106 +531,43 @@ body {
     }
   })();
 
-  function initAdmin() {
-    // Load Supabase SDK dynamically — only needed for admin
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0';
-    script.onload = function () {
-      // detectSessionInUrl: true — lets Supabase process its own OAuth callbacks.
-      // Google Calendar codes are already stripped above so they won't collide.
-      _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          detectSessionInUrl: true,
-          autoRefreshToken: true,
-          persistSession: true,
-        }
-      });
+  function initAuth() {
+    // CtrlAuth handles login modal, session, and the account dropdown
+    CtrlAuth.init({
+      supabaseUrl: SUPABASE_URL,
+      supabaseAnonKey: SUPABASE_ANON_KEY,
+      redirectTo: window.location.origin + '/calendar/',
+      adminEmails: [ADMIN_EMAIL],
+      mountTo: '#ctrl-auth-root',
+      skipUsername: true,
+    });
 
-      // Check for existing session
-      _supabase.auth.getSession().then(function (result) {
-        var session = result.data.session;
-        if (session && session.user && session.user.email === ADMIN_EMAIL) {
-          _adminSession = session;
-          OWNER_USER_ID = session.user.id;
-          state.isAdmin = true;
-          console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
-          showAdminBar();
-          checkGCalStatus();
-          // Process any pending Google Calendar OAuth code
-          handleGCalCallback();
-          // Reload slots with busy data
-          loadAndRenderSlots();
-        }
-      });
-
-      // Listen for auth changes (login/logout)
-      _supabase.auth.onAuthStateChange(function (event, session) {
-        if (event === 'SIGNED_IN' && session && session.user.email === ADMIN_EMAIL) {
-          _adminSession = session;
-          OWNER_USER_ID = session.user.id;
-          state.isAdmin = true;
-          console.log('[calendar] Admin signed in via auth change, owner ID:', OWNER_USER_ID);
-          // Clean ?admin=1 and any leftover params from URL
-          var cleanParams = new URLSearchParams(window.location.search);
-          if (cleanParams.has('admin') || cleanParams.has('code')) {
-            cleanParams.delete('admin');
-            cleanParams.delete('code');
-            var cleanUrl = window.location.pathname;
-            var remaining = cleanParams.toString();
-            if (remaining) cleanUrl += '?' + remaining;
-            cleanUrl += window.location.hash;
-            window.history.replaceState({}, '', cleanUrl);
-          }
-          showAdminBar();
-          checkGCalStatus();
-          handleGCalCallback();
-          loadAndRenderSlots();
-        } else if (event === 'SIGNED_OUT') {
-          _adminSession = null;
-          state.isAdmin = false;
-          hideAdminBar();
-        }
-      });
-    };
-    document.head.appendChild(script);
-
-    // Show admin login button (subtle, in header)
-    document.getElementById('adminLoginBtn').classList.remove('hidden');
-    document.getElementById('adminLoginBtn').addEventListener('click', function () {
-      if (_supabase) {
-        _supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: window.location.origin + '/calendar/?admin=1' }
-        });
+    // When user signs in, check if they're admin
+    document.addEventListener('ctrl:auth:signedin', function (e) {
+      var user = e.detail.user;
+      if (user && user.email === ADMIN_EMAIL) {
+        state.isAdmin = true;
+        OWNER_USER_ID = user.id;
+        console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
+        document.getElementById('adminBar').classList.remove('hidden');
+        checkGCalStatus();
+        handleGCalCallback();
+        loadAndRenderSlots();
       }
     });
 
-    document.getElementById('adminSignOutBtn').addEventListener('click', function () {
-      if (_supabase) {
-        _supabase.auth.signOut();
-      }
+    document.addEventListener('ctrl:auth:signedout', function () {
+      state.isAdmin = false;
+      document.getElementById('adminBar').classList.add('hidden');
     });
-  }
-
-  function showAdminBar() {
-    document.getElementById('adminBar').classList.remove('hidden');
-    document.getElementById('adminLoginBtn').classList.add('hidden');
-  }
-
-  function hideAdminBar() {
-    document.getElementById('adminBar').classList.add('hidden');
-    document.getElementById('adminLoginBtn').classList.remove('hidden');
   }
 
   function getAdminAccessToken() {
-    if (!_supabase) return Promise.resolve(null);
-    return _supabase.auth.getSession().then(function (result) {
+    var sb = CtrlAuth.getSupabaseClient();
+    if (!sb) return Promise.resolve(null);
+    return sb.auth.getSession().then(function (result) {
       var session = result.data.session;
-      if (session) {
-        _adminSession = session;
-        return session.access_token;
-      }
-      return null;
+      return session ? session.access_token : null;
     });
   }
 
@@ -1147,8 +1086,8 @@ body {
     renderSidebar();
     loadAndRenderSlots();
 
-    // Init admin auth (lazy-loaded, doesn't block page)
-    initAdmin();
+    // Init auth (CtrlAuth — standard ctrl.rodeo login dropdown)
+    initAuth();
 
     // Event listeners
     document.getElementById('prevWeek').addEventListener('click', function () {
