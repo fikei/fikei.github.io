@@ -9,7 +9,6 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
   <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
-  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,12 +17,7 @@
   <!-- CTRL Design System -->
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
-  <link rel="stylesheet" href="/auth/ctrl-auth.css">
 
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
-  <!-- Auth Module -->
-  <script src="/auth/ctrl-auth.js"></script>
   <!-- Add to Calendar Button -->
   <script src="https://cdn.jsdelivr.net/npm/add-to-calendar-button@2" defer></script>
 
@@ -49,53 +43,28 @@ body {
   align-items: start;
 }
 
-/* --- Auth Gate --- */
-.cal-auth-gate {
-  max-width: 400px;
-  margin: var(--space-16) auto;
-  padding: var(--space-6);
-  border: var(--border-thin) solid var(--border-subtle);
-  text-align: center;
-}
-
-.cal-auth-gate__title {
-  font-family: var(--font-mono);
-  font-size: var(--text-lg);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-widest);
-  margin-bottom: var(--space-4);
-}
-
-.cal-auth-gate__desc {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  margin-bottom: var(--space-6);
-}
-
-/* --- Admin Panel --- */
-.cal-admin {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: var(--border-thin) solid var(--border-subtle);
-}
-
-.cal-admin__status {
+/* --- Admin Bar --- */
+.cal-admin-bar {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
-  margin-bottom: var(--space-2);
+  color: var(--fg-subtle);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
 }
 
-.cal-admin__status--connected {
-  color: var(--color-success);
-}
-
-.cal-admin__status--disconnected {
+.cal-admin-bar__status {
   color: var(--color-error);
+}
+
+.cal-admin-bar__status--connected {
+  color: var(--color-success);
 }
 
 /* --- Sidebar --- */
@@ -362,9 +331,6 @@ body {
 </head>
 <body>
 
-  <!-- Auth mount point -->
-  <div id="ctrl-auth-root"></div>
-
   <!-- Page Header -->
   <header class="page-header">
     <div style="max-width:960px;margin:0 auto;padding:0 var(--space-4);display:flex;align-items:center;justify-content:space-between;height:var(--space-12);">
@@ -373,18 +339,21 @@ body {
         <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg-subtle);">/</span>
         <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--fg);text-transform:uppercase;letter-spacing:var(--tracking-widest);font-weight:700;">Schedule</span>
       </nav>
+      <button class="btn btn--ghost btn--sm hidden" id="adminLoginBtn" style="font-size:var(--text-2xs);">Admin</button>
     </div>
   </header>
 
-  <!-- Auth Gate (shown when not logged in) -->
-  <div id="authGate" class="cal-auth-gate">
-    <div class="cal-auth-gate__title">Schedule</div>
-    <div class="cal-auth-gate__desc">Sign in to book a time</div>
-    <button class="btn btn--filled" id="authLoginBtn">Sign In</button>
+  <!-- Admin Bar (only visible when admin is signed in) -->
+  <div id="adminBar" class="cal-admin-bar hidden">
+    <span>Google Calendar:</span>
+    <span class="cal-admin-bar__status" id="gcalStatus">checking...</span>
+    <button class="btn btn--ghost btn--sm" id="gcalConnectBtn" style="font-size:var(--text-2xs);">Connect</button>
+    <span style="flex:1;"></span>
+    <button class="btn btn--ghost btn--sm" id="adminSignOutBtn" style="font-size:var(--text-2xs);">Sign Out</button>
   </div>
 
-  <!-- Main Layout (shown when logged in) -->
-  <main class="cal-layout hidden" id="calMain">
+  <!-- Main Layout (always visible — no auth gate) -->
+  <main class="cal-layout" id="calMain">
 
     <!-- Sidebar -->
     <aside class="cal-sidebar">
@@ -402,13 +371,6 @@ body {
       <!-- Duration Selector -->
       <div class="cal-section-label">Duration</div>
       <div class="cal-token-row" id="durationTokens"></div>
-
-      <!-- Admin Panel (only for admin user) -->
-      <div id="adminPanel" class="cal-admin hidden">
-        <div class="cal-section-label">Google Calendar</div>
-        <div class="cal-admin__status" id="gcalStatus"></div>
-        <button class="btn btn--ghost btn--sm" id="gcalConnectBtn">Connect</button>
-      </div>
     </aside>
 
     <!-- Main Content -->
@@ -469,28 +431,8 @@ body {
 (function () {
   'use strict';
 
-  const VERSION = '1.2.0';
-  console.log('[calendar] v' + VERSION + ' - booking page with gcal integration');
-
-  // ============================================
-  // GOOGLE OAUTH CODE INTERCEPTION
-  // ============================================
-  // Google Calendar OAuth returns ?code=xxx&state=userId to this page.
-  // Supabase PKCE auth also returns ?code=xxx but with no state param.
-  // We must strip Google's code from the URL BEFORE Supabase initializes,
-  // otherwise Supabase tries to exchange it as a PKCE code and gets 401.
-  var _pendingGCalCode = null;
-  (function () {
-    var params = new URLSearchParams(window.location.search);
-    var code = params.get('code');
-    var gstate = params.get('state');
-    // Google OAuth codes have a state param (user ID); Supabase PKCE does not
-    if (code && gstate) {
-      _pendingGCalCode = code;
-      // Strip the Google code from URL so Supabase doesn't see it
-      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-    }
-  })();
+  const VERSION = '2.0.1';
+  console.log('[calendar] v' + VERSION + ' - public booking page');
 
   // ============================================
   // CONFIG
@@ -498,8 +440,12 @@ body {
   const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjc2MTAsImV4cCI6MjA1Mzk0MzYxMH0.gVAYsMniDFpm0JRgrI8JMIYFIbpYq9w7Ll9s0mj40Qs';
   const ADMIN_EMAIL = 'fike101@gmail.com';
-  // Owner user ID — set after first admin login, used for free-busy lookups
-  var OWNER_USER_ID = null;
+
+  // Hardcoded owner user ID — the Supabase user ID for the admin account.
+  // This is used for free-busy lookups and event creation without requiring
+  // the visitor to sign in. Set this after your first admin login by checking
+  // the console log or Supabase dashboard.
+  var OWNER_USER_ID = '0c55209d-05d8-430f-b072-07406de9f4bd';
 
   const CONFIG = {
     hostName: 'Ian F.',
@@ -547,7 +493,6 @@ body {
     selectedSlot: null,
     view: 'slots',
     booking: null,
-    currentUser: null,
     isAdmin: false,
     gcalConnected: false,
     busyPeriods: [],
@@ -555,88 +500,116 @@ body {
   };
 
   // ============================================
-  // AUTH
+  // ADMIN AUTH (only for Google Calendar setup)
   // ============================================
-  function initAuth() {
-    CtrlAuth.init({
-      supabaseUrl: SUPABASE_URL,
-      supabaseAnonKey: SUPABASE_ANON_KEY,
-      redirectTo: window.location.origin + '/calendar/',
-      adminEmails: [ADMIN_EMAIL],
-      mountTo: '#ctrl-auth-root',
-      skipUsername: true,
-    });
+  var _supabase = null;
+  var _adminSession = null;
 
-    document.getElementById('authLoginBtn').addEventListener('click', function () {
-      CtrlAuth.openLoginModal();
-    });
+  function initAdmin() {
+    // Load Supabase SDK dynamically — only needed for admin
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0';
+    script.onload = function () {
+      _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          detectSessionInUrl: false,
+          autoRefreshToken: true,
+          persistSession: true,
+        }
+      });
 
-    document.addEventListener('ctrl:auth:signedin', function (e) {
-      state.currentUser = e.detail.user;
-      state.isAdmin = (state.currentUser.email === ADMIN_EMAIL);
-      if (state.isAdmin) {
-        OWNER_USER_ID = state.currentUser.id;
+      // Check for existing session
+      _supabase.auth.getSession().then(function (result) {
+        var session = result.data.session;
+        if (session && session.user && session.user.email === ADMIN_EMAIL) {
+          _adminSession = session;
+          OWNER_USER_ID = session.user.id;
+          state.isAdmin = true;
+          console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
+          showAdminBar();
+          checkGCalStatus();
+          // Handle pending Google Calendar OAuth callback
+          handleGCalCallback();
+          // Reload slots with busy data
+          loadAndRenderSlots();
+        }
+      });
+
+      // Listen for auth changes (login/logout)
+      _supabase.auth.onAuthStateChange(function (event, session) {
+        if (event === 'SIGNED_IN' && session && session.user.email === ADMIN_EMAIL) {
+          _adminSession = session;
+          OWNER_USER_ID = session.user.id;
+          state.isAdmin = true;
+          console.log('[calendar] Admin signed in, owner ID:', OWNER_USER_ID);
+          showAdminBar();
+          checkGCalStatus();
+          handleGCalCallback();
+          loadAndRenderSlots();
+        } else if (event === 'SIGNED_OUT') {
+          _adminSession = null;
+          state.isAdmin = false;
+          hideAdminBar();
+        }
+      });
+    };
+    document.head.appendChild(script);
+
+    // Show admin login button (subtle, in header)
+    document.getElementById('adminLoginBtn').classList.remove('hidden');
+    document.getElementById('adminLoginBtn').addEventListener('click', function () {
+      if (_supabase) {
+        _supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin + '/calendar/?admin=1' }
+        });
       }
-      showApp();
     });
 
-    document.addEventListener('ctrl:auth:signedout', function () {
-      state.currentUser = null;
-      state.isAdmin = false;
-      hideApp();
+    document.getElementById('adminSignOutBtn').addEventListener('click', function () {
+      if (_supabase) {
+        _supabase.auth.signOut();
+      }
     });
   }
 
-  function showApp() {
-    document.getElementById('authGate').classList.add('hidden');
-    document.getElementById('calMain').classList.remove('hidden');
-
-    // Pre-fill name/email from auth profile
-    if (state.currentUser) {
-      var name = state.currentUser.user_metadata?.full_name || '';
-      var email = state.currentUser.email || '';
-      if (name) document.getElementById('fieldName').value = name;
-      if (email) document.getElementById('fieldEmail').value = email;
-    }
-
-    // Admin: show Google Calendar panel, check connection status
-    if (state.isAdmin) {
-      document.getElementById('adminPanel').classList.remove('hidden');
-      checkGCalStatus();
-    }
-
-    // Handle OAuth callback code from Google
-    handleOAuthCallback();
-
-    renderSidebar();
-    loadAndRenderSlots();
+  function showAdminBar() {
+    document.getElementById('adminBar').classList.remove('hidden');
+    document.getElementById('adminLoginBtn').classList.add('hidden');
   }
 
-  function hideApp() {
-    document.getElementById('authGate').classList.remove('hidden');
-    document.getElementById('calMain').classList.add('hidden');
+  function hideAdminBar() {
+    document.getElementById('adminBar').classList.add('hidden');
+    document.getElementById('adminLoginBtn').classList.remove('hidden');
   }
 
-  function getAccessToken() {
-    var stored = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
-    if (!stored) return null;
-    try { return JSON.parse(stored).access_token; } catch (e) { return null; }
+  function getAdminAccessToken() {
+    if (!_supabase) return Promise.resolve(null);
+    return _supabase.auth.getSession().then(function (result) {
+      var session = result.data.session;
+      if (session) {
+        _adminSession = session;
+        return session.access_token;
+      }
+      return null;
+    });
   }
 
   // ============================================
   // GOOGLE CALENDAR API
   // ============================================
   function callCalendarAPI(body) {
-    var token = getAccessToken();
-    return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),
-        'apikey': SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(body),
-    }).then(function (r) { return r.json(); });
+    return getAdminAccessToken().then(function (token) {
+      return fetch(SUPABASE_URL + '/functions/v1/calendar-api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify(body),
+      }).then(function (r) { return r.json(); });
+    });
   }
 
   function checkGCalStatus() {
@@ -646,12 +619,12 @@ body {
       var btnEl = document.getElementById('gcalConnectBtn');
       if (data.connected) {
         statusEl.textContent = 'Connected';
-        statusEl.className = 'cal-admin__status cal-admin__status--connected';
+        statusEl.className = 'cal-admin-bar__status cal-admin-bar__status--connected';
         btnEl.textContent = 'Reconnect';
       } else {
         statusEl.textContent = 'Not connected';
-        statusEl.className = 'cal-admin__status cal-admin__status--disconnected';
-        btnEl.textContent = 'Connect Google Calendar';
+        statusEl.className = 'cal-admin-bar__status';
+        btnEl.textContent = 'Connect';
       }
     });
   }
@@ -664,15 +637,20 @@ body {
     });
   }
 
-  function handleOAuthCallback() {
-    var code = _pendingGCalCode;
-    if (!code) return;
-    _pendingGCalCode = null;
+  function handleGCalCallback() {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code');
+    var gstate = params.get('state');
+    // Google Calendar OAuth has both code and state; admin login has code but no state
+    if (!code || !gstate) return;
+
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
 
     callCalendarAPI({ action: 'connect', code: code }).then(function (data) {
       if (data.connected) {
         state.gcalConnected = true;
-        if (state.isAdmin) checkGCalStatus();
+        checkGCalStatus();
         loadAndRenderSlots();
       } else {
         console.error('[calendar] OAuth connect failed:', data.error);
@@ -682,8 +660,6 @@ body {
 
   function fetchBusyPeriods(timeMin, timeMax) {
     if (!OWNER_USER_ID) {
-      // Try to find owner by looking up admin via profiles
-      // For now, use the hardcoded schedule without busy filtering
       return Promise.resolve([]);
     }
 
@@ -1097,13 +1073,6 @@ body {
     state.selectedSlot = null;
     state.booking = null;
     document.getElementById('bookingForm').reset();
-    // Re-fill name/email from auth
-    if (state.currentUser) {
-      var name = state.currentUser.user_metadata?.full_name || '';
-      var email = state.currentUser.email || '';
-      if (name) document.getElementById('fieldName').value = name;
-      if (email) document.getElementById('fieldEmail').value = email;
-    }
     setView('slots');
     loadAndRenderSlots();
   }
@@ -1122,8 +1091,12 @@ body {
 
     state.selectedDuration = activeProfile().durations[0];
 
-    // Init auth
-    initAuth();
+    // Render immediately — no auth required for visitors
+    renderSidebar();
+    loadAndRenderSlots();
+
+    // Init admin auth (lazy-loaded, doesn't block page)
+    initAdmin();
 
     // Event listeners
     document.getElementById('prevWeek').addEventListener('click', function () {
