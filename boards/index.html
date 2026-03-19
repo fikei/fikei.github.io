@@ -7788,8 +7788,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.31.0';
-  console.log('[boards] v' + VERSION + ' - Instagram reel embed fallback');
+  const VERSION = '2.31.1';
+  console.log('[boards] v' + VERSION + ' - save integration plan to pin metadata');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -12887,8 +12887,39 @@ Return JSON:
 
   // Stream integration plan from generate-intent-plan
   let _intentPlanAbortController = null;
+
+  function showSavedPlan(link) {
+    const meta = link.intent_metadata || {};
+    const output = $('terminalModalOutput');
+    const status = $('terminalModalStatus');
+    const abortBtn = $('terminalModalAbort');
+    const title = $('terminalModalTitle');
+    const footer = $('terminalModalFooter');
+    const visitBtn = $('terminalModalVisit');
+
+    if (!output || !status || !title) return;
+
+    title.textContent = (meta.tool_name || link.title || 'Tool') + ' — Integration Plan';
+    output.textContent = meta.integration_plan;
+    status.textContent = 'Saved ' + new Date(meta.integration_plan_at).toLocaleDateString();
+    abortBtn.style.display = 'none';
+    if (footer) footer.hidden = false;
+    if (visitBtn) {
+      visitBtn.href = link.url || '#';
+      visitBtn.textContent = 'Visit ' + (meta.tool_name || link.title || 'Tool');
+    }
+    $('terminalModal').hidden = false;
+  }
+
   async function streamIntentPlan(link) {
     const meta = link.intent_metadata || {};
+
+    // Show saved plan if available
+    if (meta.integration_plan) {
+      showSavedPlan(link);
+      return;
+    }
+
     const output = $('terminalModalOutput');
     const status = $('terminalModalStatus');
     const abortBtn = $('terminalModalAbort');
@@ -12972,6 +13003,21 @@ Return JSON:
           } catch (_) {
             // Ignore parse errors on partial chunks
           }
+        }
+      }
+
+      // Save the generated plan to the link
+      const planText = output.textContent;
+      if (planText) {
+        const data = load();
+        const savedLink = data.links.find(l => l.id === link.id);
+        if (savedLink) {
+          if (!savedLink.intent_metadata) savedLink.intent_metadata = {};
+          savedLink.intent_metadata.integration_plan = planText;
+          savedLink.intent_metadata.integration_plan_at = new Date().toISOString();
+          save(data);
+          syncLinkToSupabase(savedLink);
+          console.log('[INTENT] Integration plan saved for', link.title);
         }
       }
 
@@ -17324,7 +17370,11 @@ Return JSON:
       id: 'ai_tool',
       label: 'AI Tool',
       renderActions(link, meta) {
-        let html = `<button class="pin-overlay__action" data-action="intent:ai_tool:plan" data-link-id="${link.id}">Integration Plan</button>`;
+        const hasPlan = !!meta?.integration_plan;
+        let html = `<button class="pin-overlay__action" data-action="intent:ai_tool:plan" data-link-id="${link.id}">${hasPlan ? 'View Plan' : 'Integration Plan'}</button>`;
+        if (hasPlan) {
+          html += `<button class="pin-overlay__action" data-action="intent:ai_tool:regenerate" data-link-id="${link.id}">Regenerate</button>`;
+        }
         if (meta?.docs_url) {
           html += `<a href="${esc(meta.docs_url)}" target="_blank" rel="noopener" class="pin-overlay__action" data-action="intent:ai_tool:docs" data-link-id="${link.id}">Docs</a>`;
         }
@@ -17332,6 +17382,17 @@ Return JSON:
       },
       handleAction(action, link) {
         if (action === 'plan') {
+          streamIntentPlan(link);
+        } else if (action === 'regenerate') {
+          // Clear saved plan and regenerate
+          const data = load();
+          const savedLink = data.links.find(l => l.id === link.id);
+          if (savedLink?.intent_metadata) {
+            delete savedLink.intent_metadata.integration_plan;
+            delete savedLink.intent_metadata.integration_plan_at;
+            save(data);
+          }
+          link.intent_metadata = savedLink?.intent_metadata || link.intent_metadata;
           streamIntentPlan(link);
         } else if (action === 'docs') {
           const docsUrl = link.intent_metadata?.docs_url;
