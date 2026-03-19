@@ -13357,6 +13357,90 @@ Return JSON:
     }
   }
 
+  // One-time backfill: fix missing images/titles for YouTube Shorts and Instagram Reels
+  const MEDIA_BACKFILL_KEY = 'ctrl_media_backfill_v1';
+  function backfillReelsAndShorts() {
+    if (!currentUser) return;
+    if (localStorage.getItem(MEDIA_BACKFILL_KEY)) {
+      console.log('%c[MEDIA-BACKFILL] Already completed', 'color: #e91e63');
+      return;
+    }
+
+    const allLinks = getAllLinks();
+
+    // Find YouTube Shorts/Live/Embed pins missing images
+    const ytCandidates = allLinks.filter(l => {
+      if (!l.url) return false;
+      try {
+        const u = new URL(l.url);
+        const isYT = u.hostname.includes('youtube.com');
+        const isPathType = /^\/(shorts|live|embed)\//.test(u.pathname);
+        return isYT && isPathType && !l.image;
+      } catch { return false; }
+    });
+
+    // Find Instagram Reel pins with missing images or generic titles
+    const igCandidates = allLinks.filter(l => {
+      if (!l.url) return false;
+      try {
+        const u = new URL(l.url);
+        const isIG = u.hostname.includes('instagram.com');
+        const isReel = u.pathname.includes('/reel') || u.pathname.includes('/reels');
+        if (!isIG) return false;
+        // Include if it's a reel missing image or has generic/missing title
+        const missingImage = !l.image;
+        const genericTitle = !l.title || l.title === 'Instagram Reel' || l.title.startsWith('Instagram') || l.enrichment_failed;
+        return isReel && (missingImage || genericTitle);
+      } catch { return false; }
+    });
+
+    if (ytCandidates.length === 0 && igCandidates.length === 0) {
+      console.log('%c[MEDIA-BACKFILL] No pins need backfill', 'color: #e91e63');
+      localStorage.setItem(MEDIA_BACKFILL_KEY, Date.now().toString());
+      return;
+    }
+
+    console.log('%c[MEDIA-BACKFILL] Found ' + ytCandidates.length + ' YouTube Shorts + ' + igCandidates.length + ' Instagram Reels to backfill', 'color: #e91e63; font-weight: bold');
+
+    // Fix YouTube Shorts immediately — extract video ID and set thumbnail
+    let ytFixed = 0;
+    for (const link of ytCandidates) {
+      const videoId = link.url.match(/\/(?:shorts|live|embed)\/([^/?#]+)/)?.[1];
+      if (videoId) {
+        const imageUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        updateLink(link.id, { image: imageUrl });
+        ytFixed++;
+        console.log('%c[MEDIA-BACKFILL] YT fixed:', 'color: #e91e63', link.url, '→', imageUrl);
+
+        // Also queue server enrichment for full metadata (title, description)
+        queueServerEnrichment(link.id, link.url, link.title, link.description, {
+          category: link.category,
+          enrichWatch: true
+        });
+
+        // Sync updated image to Supabase
+        const data = load();
+        const updated = data.links.find(l => l.id === link.id);
+        if (updated) syncLinkToSupabase(updated);
+      }
+    }
+
+    // Queue Instagram Reels for server enrichment (ScrapeCreators may recover, or create-pin does best-effort)
+    let igQueued = 0;
+    for (const link of igCandidates) {
+      queueServerEnrichment(link.id, link.url, link.title, link.description, {
+        category: link.category || 'follow'
+      });
+      igQueued++;
+      console.log('%c[MEDIA-BACKFILL] IG queued:', 'color: #e91e63', link.url);
+    }
+
+    localStorage.setItem(MEDIA_BACKFILL_KEY, Date.now().toString());
+    console.log('%c[MEDIA-BACKFILL] Complete: ' + ytFixed + ' YT thumbnails set, ' + igQueued + ' IG reels queued for enrichment', 'color: #e91e63; font-weight: bold');
+
+    if (ytFixed > 0) renderGrid();
+  }
+
   // ============================================
   // URL Parser
   // ============================================
@@ -23579,6 +23663,9 @@ Return JSON:
 
     // Retry image resolution for items with null images
     retryFailedImages();
+
+    // One-time backfill: fix Reels + Shorts missing images/titles
+    backfillReelsAndShorts();
 
     // Check clipboard for URLs
     checkClipboardForUrls();
