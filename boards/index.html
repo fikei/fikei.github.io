@@ -7848,8 +7848,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.33.0';
-  console.log('[boards] v' + VERSION + ' - reel embed card styling');
+  const VERSION = '2.33.1';
+  console.log('[boards] v' + VERSION + ' - server-side soft-delete to fix pin resurrection bug');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -15246,9 +15246,15 @@ Return JSON:
     if (!token) return;
     for (const id of pending) {
       try {
+        // Soft-delete: set deleted_at instead of hard DELETE
         const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
-          method: 'DELETE',
-          headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ deleted_at: new Date().toISOString() })
         });
         if (res.ok || res.status === 404) {
           removePendingDelete(id);
@@ -15599,15 +15605,19 @@ Return JSON:
     }
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
+        // Soft-delete: set deleted_at instead of hard DELETE.
+        // This makes deletions durable across devices (no device-local tombstone needed).
         const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
-          method: 'DELETE',
+          method: 'PATCH',
           headers: {
+            'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken}`
-          }
+          },
+          body: JSON.stringify({ deleted_at: new Date().toISOString() })
         });
         if (res.ok) {
-          console.log('[sync] Deleted:', id);
+          console.log('[sync] Soft-deleted:', id);
           removePendingDelete(id);
           return;
         }
@@ -15675,7 +15685,7 @@ Return JSON:
 
       // Fetch all data in parallel using raw fetch
       const [linksRes, orderRes, expandedRes, boardMetaRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/links?user_id=eq.${currentUser.id}&select=*`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/links?user_id=eq.${currentUser.id}&deleted_at=is.null&select=*`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/link_order?user_id=eq.${currentUser.id}&select=order_ids&limit=1`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/expanded_cards?user_id=eq.${currentUser.id}&select=cards&limit=1`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/board_metadata?user_id=eq.${currentUser.id}&select=metadata&limit=1`, { headers })
