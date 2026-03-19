@@ -7410,7 +7410,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.27.0';
+  const VERSION = '2.27.1';
   console.log('[boards] v' + VERSION + ' - intent-driven pin actions');
 
   // ============================================
@@ -12423,6 +12423,83 @@ Return JSON:
       if (r.ok) console.log('%c[INTENT] Hypothesis fired', 'color: #e67e22');
       else console.warn('%c[INTENT] Hypothesis failed:', 'color: #e67e22', r.status);
     }).catch(e => console.warn('%c[INTENT] Hypothesis error:', 'color: #e67e22', e.message));
+  }
+
+  // One-time backfill: classify intent for existing pins that have content_type but no intent_type
+  const INTENT_BACKFILL_KEY = 'ctrl_intent_backfill_v1';
+  async function backfillIntentClassification() {
+    if (!currentUser) return;
+    if (localStorage.getItem(INTENT_BACKFILL_KEY)) {
+      console.log('%c[INTENT] Backfill already completed', 'color: #e67e22');
+      return;
+    }
+
+    const allLinks = getAllLinks();
+    const candidates = allLinks.filter(l =>
+      l.content_type && l.content_type !== 'unknown' && !l.intent_type
+    );
+
+    if (candidates.length === 0) {
+      console.log('%c[INTENT] No pins need backfill', 'color: #e67e22');
+      localStorage.setItem(INTENT_BACKFILL_KEY, Date.now().toString());
+      return;
+    }
+
+    console.log('%c[INTENT] Backfilling intent for ' + candidates.length + ' existing pins...', 'color: #e67e22; font-weight: bold');
+
+    let classified = 0;
+    let skipped = 0;
+    const BATCH_DELAY = 500; // ms between calls to avoid rate limits
+
+    for (let i = 0; i < candidates.length; i++) {
+      const link = candidates[i];
+      try {
+        // Build a minimal analysisResult from existing link data
+        const fakeAnalysis = {
+          content_type: link.content_type,
+          practical_tags: link.practical_tags || [],
+          taste_tags: link.taste_tags || [],
+          entities: link.entities || []
+        };
+
+        const result = await callIntentClassifyAPI(link, fakeAnalysis);
+
+        if (result && result.intent_type !== 'none') {
+          // Update local state
+          const data = load();
+          const localLink = data.links.find(l => l.id === link.id);
+          if (localLink) {
+            localLink.intent_type = result.intent_type;
+            localLink.intent_confidence = result.confidence;
+            localLink.intent_metadata = result.extracted_metadata;
+            localLink.intent_classified_at = new Date().toISOString();
+            save(data);
+          }
+          classified++;
+          console.log('%c[INTENT] Backfill ' + (i + 1) + '/' + candidates.length + ':', 'color: #e67e22',
+            link.title?.substring(0, 40), '→', result.intent_type, '@', result.confidence);
+        } else {
+          skipped++;
+        }
+      } catch (e) {
+        console.warn('%c[INTENT] Backfill error for', 'color: #e67e22', link.url, e.message);
+        skipped++;
+      }
+
+      // Throttle to avoid hammering the API
+      if (i < candidates.length - 1) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
+      }
+    }
+
+    // Mark backfill complete
+    localStorage.setItem(INTENT_BACKFILL_KEY, Date.now().toString());
+    console.log('%c[INTENT] Backfill complete: ' + classified + ' classified, ' + skipped + ' skipped/none', 'color: #e67e22; font-weight: bold');
+
+    // Re-render to show new intent action cards
+    if (classified > 0) {
+      renderGrid();
+    }
   }
 
   // Stream integration plan from generate-intent-plan
@@ -23116,6 +23193,9 @@ Return JSON:
 
     // Backfill enrichment for rich content categories (watch, read, etc.)
     backfillRichContent();
+
+    // One-time backfill: classify intent for pre-v2.27.0 pins
+    backfillIntentClassification();
 
     // Retry image resolution for items with null images
     retryFailedImages();
