@@ -6,7 +6,7 @@
 // Body: { url, title?, description?, linkId?, content_type?, category?,
 //         skipImage?, currentImage?, forceRefresh?,
 //         enrichWatch?, enrichBook?, enrichListen?, enrichRecipe? }
-const VERSION = '2.3.0'
+const VERSION = '2.3.1'
 console.log(`[create-pin] v${VERSION} - image proxy to Supabase Storage`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, hero_score, video?, book?, music?, recipe? }
 
@@ -1127,9 +1127,13 @@ interface YouTubeVideoData {
 function extractYouTubeVideoId(url: string): string | null {
   try {
     const parsed = new URL(url)
-    // youtube.com/watch?v=ID
     if (parsed.hostname.includes('youtube.com')) {
-      return parsed.searchParams.get('v')
+      // youtube.com/watch?v=ID
+      const v = parsed.searchParams.get('v')
+      if (v) return v
+      // youtube.com/shorts/ID, /live/ID, /embed/ID
+      const pathMatch = parsed.pathname.match(/^\/(shorts|live|embed)\/([^/?#]+)/)
+      if (pathMatch) return pathMatch[2]
     }
     // youtu.be/ID
     if (parsed.hostname.includes('youtu.be')) {
