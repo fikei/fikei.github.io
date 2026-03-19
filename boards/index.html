@@ -3604,7 +3604,7 @@ a:hover { color: var(--accent-cyan); }
 .terminal-modal {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3683,6 +3683,36 @@ a:hover { color: var(--accent-cyan); }
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--fg-muted);
+}
+.terminal-modal__footer {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.terminal-modal__footer[hidden] { display: none; }
+.terminal-modal__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: opacity 0.15s;
+}
+.terminal-modal__cta:hover { opacity: 0.85; }
+.terminal-modal__cta--primary {
+  background: var(--accent);
+  color: #000;
+}
+.terminal-modal__cta--secondary {
+  background: rgba(255,255,255,0.1);
+  color: var(--fg);
+  border: 1px solid rgba(255,255,255,0.2);
 }
 
 /* ============================================
@@ -7523,6 +7553,10 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
       </div>
       <pre class="terminal-modal__output" id="terminalModalOutput"></pre>
       <div class="terminal-modal__status" id="terminalModalStatus"></div>
+      <div class="terminal-modal__footer" id="terminalModalFooter" hidden>
+        <a class="terminal-modal__cta terminal-modal__cta--primary" id="terminalModalVisit" href="#" target="_blank" rel="noopener">Visit Tool</a>
+        <button class="terminal-modal__cta terminal-modal__cta--secondary" id="terminalModalCopyPlan">Copy Plan</button>
+      </div>
     </div>
   </div>
 
@@ -7579,7 +7613,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.29.0';
+  const VERSION = '2.29.1';
   console.log('[boards] v' + VERSION + ' - intent actions to overlay + CORS fix');
 
   // ============================================
@@ -12682,11 +12716,21 @@ Return JSON:
 
     if (!output || !status || !title) return;
 
+    const footer = $('terminalModalFooter');
+    const visitBtn = $('terminalModalVisit');
+
     title.textContent = (meta.tool_name || link.title || 'Tool') + ' — Integration Plan';
     output.textContent = '';
     status.textContent = 'Generating...';
+    if (footer) footer.hidden = true;
     $('terminalModal').hidden = false;
     abortBtn.style.display = '';
+
+    // Set visit CTA
+    if (visitBtn) {
+      visitBtn.href = link.url || '#';
+      visitBtn.textContent = 'Visit ' + (meta.tool_name || link.title || 'Tool');
+    }
 
     _intentPlanAbortController = new AbortController();
 
@@ -12753,6 +12797,7 @@ Return JSON:
 
       status.textContent = 'Done';
       abortBtn.style.display = 'none';
+      if (footer) footer.hidden = false;
     } catch (err) {
       if (err.name === 'AbortError') {
         status.textContent = 'Stopped';
@@ -20989,14 +21034,18 @@ Return JSON:
   };
 
   // Terminal Modal event wiring
-  $('terminalModalClose').onclick = function() { $('terminalModal').hidden = true; };
-  $('terminalModalBackdrop').onclick = function() { $('terminalModal').hidden = true; };
+  $('terminalModalClose').onclick = function() { $('terminalModal').hidden = true; $('terminalModalFooter').hidden = true; };
+  $('terminalModalBackdrop').onclick = function() { $('terminalModal').hidden = true; $('terminalModalFooter').hidden = true; };
   $('terminalModalAbort').onclick = function() {
     if (_intentPlanAbortController) _intentPlanAbortController.abort();
   };
   $('terminalModalCopy').onclick = function() {
     const text = $('terminalModalOutput').textContent;
     navigator.clipboard.writeText(text).then(() => toast('Copied')).catch(() => {});
+  };
+  $('terminalModalCopyPlan').onclick = function() {
+    const text = $('terminalModalOutput').textContent;
+    navigator.clipboard.writeText(text).then(() => toast('Plan copied')).catch(() => {});
   };
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
