@@ -6,7 +6,7 @@
 // POST /functions/v1/classify-intent
 // Body: { action: 'classify' | 'hypothesize', ...params }
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 console.log(`[classify-intent] v${VERSION} — intent classification pipeline`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -43,6 +43,9 @@ const AI_TOOL_TAGS = new Set([
   'ai', 'machine-learning', 'llm', 'api', 'developer-tool',
   'devtool', 'saas', 'automation', 'no-code', 'low-code',
   'coding', 'ide', 'framework', 'sdk', 'cli',
+  'prompt-library', 'skills', 'library', 'plugin', 'extension',
+  'agent', 'chatbot', 'model', 'fine-tuning', 'embeddings',
+  'mcp', 'tool-use', 'prompt-engineering',
 ])
 
 // --- Types ---
@@ -189,6 +192,23 @@ function classifyByRules(req: ClassifyRequest): IntentResult | null {
         category: 'tool',
       },
       reasoning: `Content type=${req.content_type} with AI entity detected`,
+    }
+  }
+
+  // Non-tool content types with strong AI signals (e.g. docs, libraries, skill pages)
+  const aiTagMatches = req.practical_tags?.filter(t => AI_TOOL_TAGS.has(t.toLowerCase())) || []
+  if (!isToolType && (aiTagMatches.length >= 2 || (hasAITags && hasAIEntity))) {
+    return {
+      intent_type: 'ai_tool',
+      confidence: 0.80,
+      extracted_metadata: {
+        tool_name: req.entities?.find(e => e.type === 'tool')?.name || req.title,
+        tagline: req.description?.slice(0, 120) || '',
+        docs_url: hasDocsSubdomain ? req.url : null,
+        github_url: req.url.includes('github.com') ? req.url : null,
+        category: aiTagMatches[0] || 'ai',
+      },
+      reasoning: `Strong AI signals despite content_type=${req.content_type}: tags=[${aiTagMatches.join(',')}], entity=${hasAIEntity}`,
     }
   }
 
