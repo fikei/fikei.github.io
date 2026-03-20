@@ -3013,6 +3013,46 @@ a:hover { color: var(--accent-cyan); }
   color: var(--accent-green);
 }
 
+/* Suggested next actions */
+.pin-overlay__suggestions {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  margin-top: var(--space-4);
+}
+
+.pin-overlay__suggestions-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+  margin-bottom: var(--space-2);
+}
+
+.pin-overlay__suggestions-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pin-overlay__suggestion-chip {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border: 1px dashed var(--border-subtle);
+  background: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: border-color var(--duration-normal), color var(--duration-normal);
+  white-space: nowrap;
+}
+
+.pin-overlay__suggestion-chip:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+  border-style: solid;
+}
+
 .pin-overlay__rich-meta {
   display: flex;
   flex-direction: column;
@@ -7848,8 +7888,8 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.33.1';
-  console.log('[boards] v' + VERSION + ' - server-side soft-delete to fix pin resurrection bug');
+  const VERSION = '2.34.0';
+  console.log('[boards] v' + VERSION + ' - AI suggested next actions for pins');
 
   // ============================================
   // Supabase Setup (shared auth module manages the client)
@@ -12945,6 +12985,125 @@ Return JSON:
     }
   }
 
+  // ============================================
+  // Suggest Actions API
+  // ============================================
+  async function callSuggestActionsAPI(link) {
+    if (!currentUser) return null;
+    try {
+      const payload = {
+        url: link.url,
+        title: link.title || '',
+        description: link.description || '',
+        domain: link.domain || '',
+        category: link.category || '',
+        content_type: link.content_type || null,
+        intent_type: link.intent_type || null,
+        intent_metadata: link.intent_metadata || null,
+        practical_tags: link.practical_tags || [],
+        taste_tags: link.taste_tags || [],
+        entities: link.entities || [],
+        content_structure: link.content_structure || null,
+        video: link.video || null,
+        music: link.music || null,
+        book: link.book || null,
+        recipe: link.recipe || null,
+        userId: currentUser.id,
+        linkId: link.id
+      };
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/suggest-actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        console.warn('%c[SUGGEST] suggest-actions returned', 'color: #8e44ad', response.status);
+        return null;
+      }
+
+      return await response.json();
+    } catch (e) {
+      console.warn('%c[SUGGEST] suggest-actions error:', 'color: #8e44ad', e.message);
+      return null;
+    }
+  }
+
+  // Suggested Actions — fire-and-forget (runs after intent classification)
+  function fireSuggestActions(link) {
+    if (!currentUser) return;
+
+    callSuggestActionsAPI(link).then(result => {
+      if (!result?.actions?.length) return;
+
+      const data = load();
+      const localLink = data.links.find(l => l.id === link.id);
+      if (localLink) {
+        localLink.suggested_actions = result.actions;
+        save(data);
+        syncLinkToSupabase(localLink);
+        // Re-render overlay if this pin is currently open
+        if (_overlayCurrentId === link.id) {
+          pinOverlayPanel.innerHTML = renderOverlayPanel(localLink);
+        }
+        console.log('%c[SUGGEST] Applied ' + result.actions.length + ' actions to', 'color: #8e44ad; font-weight: bold', link.title?.substring(0, 40));
+      }
+    }).catch(e => console.warn('%c[SUGGEST] Fire error:', 'color: #8e44ad', e.message));
+  }
+
+  // One-time backfill: suggest actions for pins that have content_type but no suggested_actions
+  const SUGGEST_ACTIONS_BACKFILL_KEY = 'ctrl_suggest_actions_backfill_v1';
+  async function backfillSuggestedActions() {
+    if (!currentUser) return;
+    if (localStorage.getItem(SUGGEST_ACTIONS_BACKFILL_KEY)) return;
+
+    const allLinks = getAllLinks();
+    const candidates = allLinks.filter(l =>
+      l.content_type && l.content_type !== 'unknown' && !l.suggested_actions
+    );
+
+    if (candidates.length === 0) {
+      localStorage.setItem(SUGGEST_ACTIONS_BACKFILL_KEY, Date.now().toString());
+      return;
+    }
+
+    console.log('%c[SUGGEST] Backfilling actions for ' + candidates.length + ' pins...', 'color: #8e44ad; font-weight: bold');
+
+    let filled = 0;
+    const BATCH_DELAY = 800;
+
+    for (let i = 0; i < Math.min(candidates.length, 50); i++) {
+      const link = candidates[i];
+      try {
+        const result = await callSuggestActionsAPI(link);
+        if (result?.actions?.length) {
+          const data = load();
+          const localLink = data.links.find(l => l.id === link.id);
+          if (localLink) {
+            localLink.suggested_actions = result.actions;
+            save(data);
+          }
+          filled++;
+          console.log('%c[SUGGEST] Backfill ' + (i + 1) + '/' + candidates.length + ':', 'color: #8e44ad', link.title?.substring(0, 40));
+        }
+      } catch (e) {
+        console.warn('%c[SUGGEST] Backfill error:', 'color: #8e44ad', link.url, e.message);
+      }
+
+      if (i < Math.min(candidates.length, 50) - 1) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
+      }
+    }
+
+    localStorage.setItem(SUGGEST_ACTIONS_BACKFILL_KEY, Date.now().toString());
+    console.log('%c[SUGGEST] Backfill complete: ' + filled + ' filled', 'color: #8e44ad; font-weight: bold');
+    if (filled > 0) renderGrid();
+  }
+
   // Stream integration plan from generate-intent-plan
   let _intentPlanAbortController = null;
 
@@ -13293,6 +13452,9 @@ Return JSON:
 
           // Step 1.5b: Fire hypothesis (Pass 2) — fire-and-forget
           fireIntentHypothesis(currentLinkForIntent, currentDataForIntent.links);
+
+          // Step 1.5c: Fire suggested actions — fire-and-forget
+          fireSuggestActions(currentLinkForIntent);
         }
       }
 
@@ -15504,7 +15666,9 @@ Return JSON:
         enrichment_failed_at: link.enrichment_failed_at || null,
         source: link.source || null,
         // Widget reference
-        widgetId: link.widgetId || null
+        widgetId: link.widgetId || null,
+        // AI suggested next actions
+        suggested_actions: link.suggested_actions || null
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
         method: 'POST',
@@ -18456,6 +18620,24 @@ Return JSON:
     });
   }
 
+  function renderSuggestedActionsHtml(link) {
+    const actions = link.suggested_actions;
+    if (!actions?.length) return '';
+
+    const chips = actions.map((a, idx) =>
+      `<button class="pin-overlay__suggestion-chip"
+        data-action="suggestion:${idx}"
+        data-link-id="${link.id}"
+        title="${esc(a.reason)}"
+      >${esc(a.icon)} ${esc(a.label)}</button>`
+    ).join('');
+
+    return `<div class="pin-overlay__suggestions">
+      <div class="pin-overlay__suggestions-label">Next steps</div>
+      <div class="pin-overlay__suggestions-chips">${chips}</div>
+    </div>`;
+  }
+
   function renderOverlayPanel(link) {
     const dateStr = new Date(link.addedAt).toLocaleDateString();
     const contentTypeDisplay = link.content_type && link.content_type !== 'unknown' ? cap(link.content_type) : '';
@@ -18611,6 +18793,7 @@ Return JSON:
           <div class="pin-overlay__details-body">
             ${desc && desc !== recipe.description ? `<p class="pin-overlay__description">${esc(desc)}</p>` : ''}
             <textarea class="pin-overlay__notes" placeholder="Add a note..." data-link-id="${link.id}">${esc(link.notes || '')}</textarea>
+            ${renderSuggestedActionsHtml(link)}
             <div class="pin-overlay__meta">
               <span class="pin-overlay__meta-item">${cap(link.category)}</span>
               ${contentTypeDisplay ? `<span class="pin-overlay__meta-item">${contentTypeDisplay}</span>` : ''}
@@ -18632,6 +18815,7 @@ Return JSON:
       ${desc ? `<p class="pin-overlay__description">${esc(desc)}</p>` : ''}
       ${richMetaHtml}
       <textarea class="pin-overlay__notes" placeholder="Add a note..." data-link-id="${link.id}">${esc(link.notes || '')}</textarea>
+      ${renderSuggestedActionsHtml(link)}
       <div class="pin-overlay__meta">
         <span class="pin-overlay__meta-item">${cap(link.category)}</span>
         ${contentTypeDisplay ? `<span class="pin-overlay__meta-item">${contentTypeDisplay}</span>` : ''}
@@ -18732,6 +18916,26 @@ Return JSON:
       const link = getAllLinks().find(l => l.id === linkId);
       const reg = INTENT_REGISTRY[intentType];
       if (link && reg) reg.handleAction(intentAction, link);
+      return;
+    }
+
+    if (action.startsWith('suggestion:')) {
+      const idx = parseInt(action.split(':')[1], 10);
+      const link = getAllLinks().find(l => l.id === linkId);
+      const suggestion = link?.suggested_actions?.[idx];
+      if (!suggestion) return;
+
+      if (suggestion.action_data?.url) {
+        window.open(suggestion.action_data.url, '_blank', 'noopener');
+        return;
+      }
+
+      if (suggestion.action_data?.query) {
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(suggestion.action_data.query)}`, '_blank', 'noopener');
+        return;
+      }
+
+      window.open(link.url, '_blank', 'noopener');
       return;
     }
   });
@@ -24291,6 +24495,9 @@ Return JSON:
 
     // One-time backfill: classify intent for pre-v2.27.0 pins
     backfillIntentClassification();
+
+    // One-time backfill: suggest actions for enriched pins
+    backfillSuggestedActions();
 
     // Retry image resolution for items with null images
     retryFailedImages();
