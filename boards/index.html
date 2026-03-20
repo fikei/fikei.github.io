@@ -2228,20 +2228,49 @@ a:hover { color: var(--accent-cyan); }
   opacity: 1;
 }
 
+.grid-item--embed {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}
+.grid-item__embed-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
 .grid-item__embed {
   display: block;
   width: 100%;
-  aspect-ratio: 9 / 16;
+  height: 260%;
   border: 0;
-  overflow: hidden;
-  border-radius: 4px 4px 0 0;
   pointer-events: none;
-}
-.grid-item--embed .grid-item__overlay {
-  display: none;
+  transform: scale(1.02);
+  transform-origin: top center;
 }
 .grid-item--embed .grid-item__initial {
   display: none;
+}
+.grid-item__reel-badge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  z-index: 2;
+}
+.grid-item__reel-badge::before {
+  content: '▶';
+  font-size: 8px;
 }
 
 .grid-item__overlay {
@@ -3225,6 +3254,18 @@ a:hover { color: var(--accent-cyan); }
   text-decoration: line-through;
   opacity: 0.4;
 }
+.pin-overlay__recipe-sub {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+  padding-left: 26px;
+  margin-top: 2px;
+}
+.pin-overlay__recipe-ingredient[data-checked="true"] .pin-overlay__recipe-sub {
+  opacity: 0.3;
+}
 .pin-overlay__recipe-instructions {
   padding-left: var(--space-5);
   margin: 0;
@@ -3688,35 +3729,42 @@ details[open] > .pin-overlay__details-toggle::before { content: '- '; }
    Intent Action Buttons (on pin cards)
    ============================================ */
 .grid-item__action--intent {
-  background: var(--accent);
+  background: var(--fg);
   color: var(--bg);
-  border: none;
-  font-size: 0.7rem;
+  border: 1px solid var(--fg);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
   font-family: var(--font-mono);
-  letter-spacing: 0.02em;
-  transition: opacity 0.15s;
+  transition: background var(--duration-normal), color var(--duration-normal);
 }
-.grid-item__action--intent:hover { opacity: 0.85; }
-.grid-item__action--intent-secondary {
-  background: rgba(255,255,255,0.15);
+.grid-item__action--intent:hover {
+  background: none;
   color: var(--fg);
-  border: 1px solid rgba(255,255,255,0.2);
-  font-size: 0.65rem;
-  padding: 3px 6px;
-  border-radius: 4px;
+}
+.grid-item__action--intent-secondary {
+  background: none;
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
   font-family: var(--font-mono);
-  transition: opacity 0.15s;
+  transition: background var(--duration-normal), color var(--duration-normal);
 }
-.grid-item__action--intent-secondary:hover { opacity: 0.85; }
+.grid-item__action--intent-secondary:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
 .grid-item__intent-price,
 .pin-overlay__intent-price {
-  font-size: 0.65rem;
-  color: var(--accent);
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
   font-weight: 600;
 }
@@ -3814,7 +3862,7 @@ details[open] > .pin-overlay__details-toggle::before { content: '- '; }
 }
 
 /* ============================================
-   AI Tool Plan Modal (Terminal Viewer)
+   AI Tool Plan Modal
    ============================================ */
 .terminal-modal {
   position: fixed;
@@ -3832,9 +3880,8 @@ details[open] > .pin-overlay__details-toggle::before { content: '- '; }
 }
 .terminal-modal__panel {
   position: relative;
-  background: #0d1117;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   max-width: 680px;
   width: 95%;
   max-height: 85vh;
@@ -3846,12 +3893,14 @@ details[open] > .pin-overlay__details-toggle::before { content: '- '; }
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .terminal-modal__title {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--accent);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
   font-weight: 600;
 }
 .terminal-modal__controls {
@@ -3859,25 +3908,29 @@ details[open] > .pin-overlay__details-toggle::before { content: '- '; }
   gap: var(--space-2);
 }
 .terminal-modal__btn {
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-3);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  border: 1px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.05);
-  color: var(--fg-muted);
-  transition: opacity 0.15s;
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  transition: background var(--duration-normal), color var(--duration-normal);
 }
-.terminal-modal__btn:hover { opacity: 0.85; color: var(--fg); }
+.terminal-modal__btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
 .terminal-modal__output {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-6);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.6;
-  color: #c9d1d9;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--fg);
   white-space: pre-wrap;
   word-wrap: break-word;
   margin: 0;
@@ -3887,47 +3940,54 @@ details[open] > .pin-overlay__details-toggle::before { content: '- '; }
   display: inline-block;
   width: 8px;
   height: 1em;
-  background: var(--accent);
+  background: var(--fg);
   animation: blink 1s step-end infinite;
   vertical-align: text-bottom;
 }
 @keyframes blink { 50% { opacity: 0; } }
 .terminal-modal__status {
   padding: var(--space-2) var(--space-4);
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--fg-muted);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .terminal-modal__footer {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid var(--border-subtle);
 }
 .terminal-modal__footer[hidden] { display: none; }
 .terminal-modal__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-2) var(--space-4);
   cursor: pointer;
   text-decoration: none;
-  border: none;
-  transition: opacity 0.15s;
+  transition: background var(--duration-normal), color var(--duration-normal);
 }
-.terminal-modal__cta:hover { opacity: 0.85; }
 .terminal-modal__cta--primary {
-  background: var(--accent);
-  color: #000;
+  background: var(--fg);
+  color: var(--bg);
+  border: 1px solid var(--fg);
+}
+.terminal-modal__cta--primary:hover {
+  background: none;
+  color: var(--fg);
 }
 .terminal-modal__cta--secondary {
-  background: rgba(255,255,255,0.1);
+  background: none;
   color: var(--fg);
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid var(--fg);
+}
+.terminal-modal__cta--secondary:hover {
+  background: var(--fg);
+  color: var(--bg);
 }
 
 /* ============================================
@@ -7828,7 +7888,7 @@ Paste one or many links. Notes are ignored." rows="6"></textarea>
   // ============================================
   // Version
   // ============================================
-  const VERSION = '2.32.0';
+  const VERSION = '2.34.0';
   console.log('[boards] v' + VERSION + ' - AI suggested next actions for pins');
 
   // ============================================
@@ -13645,6 +13705,9 @@ Return JSON:
             images: result.recipe.images?.length ? result.recipe.images : (existing.images || []),
             cuisine: result.recipe.cuisine || existing.cuisine || null,
             difficulty: result.recipe.difficulty || existing.difficulty || null,
+            substitutions: result.recipe.substitutions && typeof result.recipe.substitutions === 'object'
+              ? { ...(existing.substitutions || {}), ...result.recipe.substitutions }
+              : (existing.substitutions || null),
             source_name: result.recipe.source_name || existing.source_name || null,
             server_enriched_at: result.recipe.server_enriched_at || existing.server_enriched_at || null,
           };
@@ -15345,9 +15408,15 @@ Return JSON:
     if (!token) return;
     for (const id of pending) {
       try {
+        // Soft-delete: set deleted_at instead of hard DELETE
         const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
-          method: 'DELETE',
-          headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ deleted_at: new Date().toISOString() })
         });
         if (res.ok || res.status === 404) {
           removePendingDelete(id);
@@ -15520,6 +15589,12 @@ Return JSON:
   let syncRetryQueue = [];
 
   async function syncLinkToSupabase(link) {
+    // Never re-upload a tombstoned pin — this prevents zombie resurrection
+    const tombstones = getDeletedIds();
+    if (tombstones[link.id]) {
+      console.log('[sync] Skipping upload for tombstoned pin:', link.id);
+      return;
+    }
     if (!currentUser) {
       addPendingUpload(link.id);
       console.log('[sync] Upload queued (not logged in):', link.url);
@@ -15700,15 +15775,19 @@ Return JSON:
     }
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
+        // Soft-delete: set deleted_at instead of hard DELETE.
+        // This makes deletions durable across devices (no device-local tombstone needed).
         const res = await fetch(`${SUPABASE_URL}/rest/v1/links?id=eq.${id}&user_id=eq.${currentUser.id}`, {
-          method: 'DELETE',
+          method: 'PATCH',
           headers: {
+            'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken}`
-          }
+          },
+          body: JSON.stringify({ deleted_at: new Date().toISOString() })
         });
         if (res.ok) {
-          console.log('[sync] Deleted:', id);
+          console.log('[sync] Soft-deleted:', id);
           removePendingDelete(id);
           return;
         }
@@ -15776,7 +15855,7 @@ Return JSON:
 
       // Fetch all data in parallel using raw fetch
       const [linksRes, orderRes, expandedRes, boardMetaRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/links?user_id=eq.${currentUser.id}&select=*`, { headers }),
+        fetch(`${SUPABASE_URL}/rest/v1/links?user_id=eq.${currentUser.id}&deleted_at=is.null&select=*`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/link_order?user_id=eq.${currentUser.id}&select=order_ids&limit=1`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/expanded_cards?user_id=eq.${currentUser.id}&select=cards&limit=1`, { headers }),
         fetch(`${SUPABASE_URL}/rest/v1/board_metadata?user_id=eq.${currentUser.id}&select=metadata&limit=1`, { headers })
@@ -18273,7 +18352,7 @@ Return JSON:
         // For Instagram reels: if image fails, swap in embed iframe
         const reelSC = isInstagramContent(l.url) ? getInstagramShortcode(l.url) : null;
         const imgOnerror = reelSC
-          ? `this.style.display='none';var f=document.createElement('iframe');f.className='grid-item__embed';f.src='https://www.instagram.com/reel/${reelSC}/embed/';f.loading='lazy';f.allowTransparency=true;this.parentNode.classList.add('grid-item--embed');this.parentNode.insertBefore(f,this)`
+          ? `this.style.display='none';var w=document.createElement('div');w.className='grid-item__embed-wrap';var b=document.createElement('span');b.className='grid-item__reel-badge';b.textContent='Reel';w.appendChild(b);var f=document.createElement('iframe');f.className='grid-item__embed';f.src='https://www.instagram.com/reel/${reelSC}/embed/';f.loading='lazy';w.appendChild(f);this.parentNode.classList.add('grid-item--embed');this.parentNode.insertBefore(w,this)`
           : "this.style.opacity='0'";
 
         html += `<article class="grid-item${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
@@ -18296,7 +18375,7 @@ Return JSON:
         const reelShortcode = isInstagramContent(l.url) ? getInstagramShortcode(l.url) : null;
         const embedClass = reelShortcode ? ' grid-item--embed' : '';
         const embedHtml = reelShortcode
-          ? `<iframe class="grid-item__embed" src="https://www.instagram.com/reel/${reelShortcode}/embed/" loading="lazy" allowtransparency="true"></iframe>`
+          ? `<div class="grid-item__embed-wrap"><span class="grid-item__reel-badge">Reel</span><iframe class="grid-item__embed" src="https://www.instagram.com/reel/${reelShortcode}/embed/" loading="lazy" allowtransparency="true"></iframe></div>`
           : '';
 
         html += `<article class="grid-item grid-item--placeholder${embedClass}${categoryClass}${doneClass}${mergedClass}${newClass}${loadingClass}" data-id="${l.id}" draggable="true" tabindex="0">
@@ -18672,9 +18751,15 @@ Return JSON:
       ).join('')}</div>` : '';
 
       const ingredients = recipe.ingredients || [];
-      const ingredientsHtml = ingredients.map((raw, i) =>
-        `<li class="pin-overlay__recipe-ingredient" data-checked="false"><input type="checkbox" class="pin-overlay__recipe-check" data-idx="${i}"><span>${esc(scaleIngredient(raw, scaleFactor, useMetric))}</span></li>`
-      ).join('');
+      const subs = recipe.substitutions || {};
+      const subKeys = Object.keys(subs);
+      const ingredientsHtml = ingredients.map((raw, i) => {
+        const scaled = esc(scaleIngredient(raw, scaleFactor, useMetric));
+        const rawLower = raw.toLowerCase();
+        const matchKey = subKeys.find(k => rawLower.includes(k.toLowerCase()));
+        const subHint = matchKey ? `<span class="pin-overlay__recipe-sub">or use: ${esc(subs[matchKey])}</span>` : '';
+        return `<li class="pin-overlay__recipe-ingredient" data-checked="false"><input type="checkbox" class="pin-overlay__recipe-check" data-idx="${i}"><span>${scaled}</span>${subHint}</li>`;
+      }).join('');
 
       const instructions = recipe.instructions || [];
       const instructionsHtml = instructions.map(step =>

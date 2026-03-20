@@ -6,8 +6,8 @@
 // Body: { url, title?, description?, linkId?, content_type?, category?,
 //         skipImage?, currentImage?, forceRefresh?,
 //         enrichWatch?, enrichBook?, enrichListen?, enrichRecipe? }
-const VERSION = '2.3.1'
-console.log(`[create-pin] v${VERSION} - image proxy to Supabase Storage`)
+const VERSION = '2.4.0'
+console.log(`[create-pin] v${VERSION} - ingredient substitutions for obscure items`)
 // Returns: { content_type, type_confidence, type_source, image_url, image_source, hero_score, video?, book?, music?, recipe? }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -851,6 +851,12 @@ serve(async (req) => {
         aiResult = await enrichRecipeWithAI(url, title, description)
       } else {
         console.log('[create-pin] Recipe JSON-LD complete, skipping AI call')
+        // Still generate substitutions for obscure ingredients
+        const ingredients = jsonLdResult.ingredients || []
+        if (ingredients.length) {
+          const subs = await generateSubstitutions(ingredients)
+          if (subs) aiResult = { substitutions: subs }
+        }
       }
 
       // 3. Merge: JSON-LD is primary, AI fills gaps
@@ -867,6 +873,7 @@ serve(async (req) => {
           instructions: jsonLdResult?.instructions?.length ? jsonLdResult.instructions : (aiResult?.instructions || []),
           cuisine: jsonLdResult?.cuisine || aiResult?.cuisine || null,
           difficulty: aiResult?.difficulty || null,
+          substitutions: aiResult?.substitutions || null,
           images: jsonLdResult?.images || [],
           source_name: jsonLdResult?.source_name || domain,
           server_enriched_at: new Date().toISOString(),
@@ -1845,6 +1852,52 @@ async function extractRecipeJsonLd(url: string): Promise<Record<string, any> | n
 // ========================================
 // Recipe Enrichment using AI (fallback for sites without JSON-LD)
 // ========================================
+async function generateSubstitutions(ingredients: string[]): Promise<Record<string, string> | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!apiKey) return null
+
+  const prompt = `Given these recipe ingredients, identify any that are uncommon or specialty items a typical home cook might not have. For ONLY those ingredients, suggest a widely available substitute. Return JSON only — an object mapping ingredient name (without quantity) to its substitute. If all ingredients are common pantry staples, return {}. Max 5 entries.
+
+Ingredients:
+${ingredients.slice(0, 30).map(i => `- ${i}`).join('\n')}
+
+Return JSON only: {"ingredient name": "substitute"}`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (!response.ok) return null
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+    if (match) {
+      const result = JSON.parse(match[0])
+      if (typeof result === 'object' && !Array.isArray(result) && Object.keys(result).length > 0) {
+        return Object.fromEntries(
+          Object.entries(result)
+            .filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
+            .slice(0, 5)
+        )
+      }
+    }
+  } catch (e) {
+    console.error('[create-pin] Substitutions generation error:', e)
+  }
+  return null
+}
+
 async function enrichRecipeWithAI(url: string, title: string, description: string): Promise<Record<string, any> | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
@@ -1865,7 +1918,8 @@ Return JSON only:
   "cuisine": "cuisine type (e.g. Italian, Mexican, Japanese, American) or null",
   "difficulty": "easy|medium|hard or null",
   "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity"],
-  "instructions": ["step 1", "step 2"]
+  "instructions": ["step 1", "step 2"],
+  "substitutions": {"ingredient name": "common alternative"} — only for uncommon/specialty ingredients that a home cook might not have. Key = ingredient name as it appears in the ingredients list (without quantity). Value = widely available substitute. Omit common pantry staples. Max 5 entries.
 }`
 
   try {
@@ -1878,7 +1932,7 @@ Return JSON only:
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 800,
+        max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }]
       })
     })
@@ -1910,6 +1964,13 @@ Return JSON only:
         instructions: Array.isArray(result.instructions)
           ? result.instructions.filter((s: any) => typeof s === 'string').slice(0, 30)
           : [],
+        substitutions: result.substitutions && typeof result.substitutions === 'object' && !Array.isArray(result.substitutions)
+          ? Object.fromEntries(
+              Object.entries(result.substitutions)
+                .filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
+                .slice(0, 5)
+            )
+          : null,
       }
     }
   } catch (e) {
