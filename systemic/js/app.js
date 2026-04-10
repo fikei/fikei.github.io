@@ -12,6 +12,8 @@ class SystemicApp {
     this.supabaseUrl = SUPABASE_URL;
     this.supabaseKey = SUPABASE_ANON_KEY;
     this.crawler = null;
+    this.codeParser = null;
+    this.figmaParser = null;
     this.tokenMapper = new TokenMapper();
     this.componentConsolidator = new ComponentConsolidator();
     this.docGenerator = new DocGenerator({
@@ -19,8 +21,10 @@ class SystemicApp {
       supabaseUrl: SUPABASE_URL,
       supabaseKey: SUPABASE_ANON_KEY
     });
+    this.stateRenderer = new StateRenderer();
     this.viewer = null;
     this.variantAudit = null;
+    this.usageInspector = null;
     this.currentAudit = null;
     this.designSystems = [];
     this.debugMode = true; // Enable detailed logging
@@ -253,10 +257,15 @@ class SystemicApp {
     this.loadSavedSystems();
     this.initViewer();
     this.initVariantAudit();
+    this.initUsageInspector();
     // Connect viewer to audit so component stage can show QA controls
     if (this.viewer && this.variantAudit) {
       this.viewer.variantAudit = this.variantAudit;
     }
+    // Connect component filter to Usage Inspector
+    DOMUtils.$('#qa-component-filter')?.addEventListener('change', (e) => {
+      this._onQAComponentSelect(e.target.value);
+    });
     this.initRouter();
   }
 
@@ -726,6 +735,14 @@ class SystemicApp {
     this.scanUrlInput = DOMUtils.$('#scan-url-input');
     this.scanUrlSubmit = DOMUtils.$('#scan-url-submit');
     this.scanLocalBtn = DOMUtils.$('#scan-local-btn');
+
+    // Scan modal — new source tabs
+    this.scanFigmaUrl = DOMUtils.$('#scan-figma-url');
+    this.scanFigmaToken = DOMUtils.$('#scan-figma-token');
+    this.scanFigmaSubmit = DOMUtils.$('#scan-figma-submit');
+    this.scanGithubUrl = DOMUtils.$('#scan-github-url');
+    this.scanGithubToken = DOMUtils.$('#scan-github-token');
+    this.scanGithubSubmit = DOMUtils.$('#scan-github-submit');
   }
 
   /**
@@ -794,6 +811,45 @@ class SystemicApp {
     DOMUtils.$('#run-scan-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
       this.openScanModal();
+    });
+
+    // Scan modal — tab switching
+    this.scanModal?.addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-tab]');
+      if (!tab) return;
+      const targetTab = tab.dataset.tab;
+      this.scanModal.querySelectorAll('.scan-modal__tab').forEach(t => {
+        const active = t.dataset.tab === targetTab;
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-selected', String(active));
+      });
+      this.scanModal.querySelectorAll('.scan-modal__panel').forEach(p => {
+        const active = p.dataset.panel === targetTab;
+        p.classList.toggle('active', active);
+        p.hidden = !active;
+      });
+    });
+
+    // Figma scan submit
+    this.scanFigmaSubmit?.addEventListener('click', () => {
+      const url = this.scanFigmaUrl?.value?.trim();
+      const token = this.scanFigmaToken?.value?.trim();
+      if (!url) { this.showToast('Enter a Figma file URL', 'error'); return; }
+      if (!token) { this.showToast('A Figma Personal Access Token is required', 'error'); return; }
+      // Persist token for session
+      try { localStorage.setItem('systemic-figma-token', token); } catch {}
+      this.closeScanModal();
+      this.startFigmaScan(url, token);
+    });
+
+    // GitHub repo scan submit
+    this.scanGithubSubmit?.addEventListener('click', () => {
+      const url = this.scanGithubUrl?.value?.trim();
+      const token = this.scanGithubToken?.value?.trim() || null;
+      if (!url) { this.showToast('Enter a GitHub repo URL', 'error'); return; }
+      if (token) { try { localStorage.setItem('systemic-github-token', token); } catch {} }
+      this.closeScanModal();
+      this.startGitHubScan(url, token);
     });
   }
 
@@ -1147,11 +1203,51 @@ class SystemicApp {
   }
 
   /**
+   * Called when a component is selected in the QA component filter.
+   * Opens the Usage Inspector for that component.
+   */
+  _onQAComponentSelect(componentType) {
+    if (!this.usageInspector) return;
+    if (!componentType) {
+      this.usageInspector.hide();
+      return;
+    }
+    const ds = this.viewer?.designSystem;
+    if (!ds) return;
+    const component = ds.components?.find(c => c.type === componentType || c.name === componentType);
+    if (component) {
+      this.usageInspector.show(component);
+    } else {
+      this.usageInspector.hide();
+    }
+  }
+
+  /**
+   * Initialize the Usage Inspector
+   */
+  initUsageInspector() {
+    const mount = DOMUtils.$('#usage-inspector-mount');
+    if (mount) {
+      this.usageInspector = new UsageInspector({
+        container: mount,
+        onToast: (msg, type) => this.showToast(msg, type)
+      });
+    }
+  }
+
+  /**
    * Open the scan modal
    */
   openScanModal() {
     if (this.scanModal) {
       this.scanModal.classList.add('open');
+      // Restore saved tokens
+      try {
+        const ft = localStorage.getItem('systemic-figma-token');
+        const gt = localStorage.getItem('systemic-github-token');
+        if (ft && this.scanFigmaToken) this.scanFigmaToken.value = ft;
+        if (gt && this.scanGithubToken) this.scanGithubToken.value = gt;
+      } catch {}
       this.scanUrlInput?.focus();
     }
   }
@@ -1163,6 +1259,78 @@ class SystemicApp {
     if (this.scanModal) {
       this.scanModal.classList.remove('open');
       if (this.scanUrlInput) this.scanUrlInput.value = '';
+    }
+  }
+
+  /**
+   * Start a GitHub repo scan
+   */
+  async startGitHubScan(repoUrl, token) {
+    const name = repoUrl.replace(/^https?:\/\/github\.com\//i, '').split('/').slice(0, 2).join('/');
+    this.debugLog('GITHUB', `Starting GitHub scan: ${repoUrl}`);
+
+    this.navigateTo('audit');
+    await new Promise(r => setTimeout(r, 50)); // let view activate
+
+    this.auditFormSection.hidden = true;
+    this.auditProgressSection.hidden = false;
+    this.auditUrlDisplay.textContent = repoUrl;
+    this.auditStatusText.textContent = 'Connecting to GitHub...';
+    this.clearLog();
+
+    this.codeParser = new CodeParser({
+      token,
+      onLog: (log) => this.addLogEntry(log),
+      onProgress: (progress) => this.updateProgress(progress)
+    });
+
+    this.currentAudit = {
+      id: crypto.randomUUID(),
+      config: { url: repoUrl, name, source: 'github' },
+      startedAt: new Date().toISOString()
+    };
+
+    try {
+      const results = await this.codeParser.parse(repoUrl);
+      await this.onAuditComplete(results);
+    } catch (err) {
+      this.onAuditError(err);
+    }
+  }
+
+  /**
+   * Start a Figma file scan
+   */
+  async startFigmaScan(figmaUrl, token) {
+    const name = figmaUrl.replace(/\?.*/, '').split('/').pop()?.replace(/-/g, ' ') || 'Figma File';
+    this.debugLog('FIGMA', `Starting Figma scan: ${figmaUrl}`);
+
+    this.navigateTo('audit');
+    await new Promise(r => setTimeout(r, 50));
+
+    this.auditFormSection.hidden = true;
+    this.auditProgressSection.hidden = false;
+    this.auditUrlDisplay.textContent = figmaUrl;
+    this.auditStatusText.textContent = 'Connecting to Figma...';
+    this.clearLog();
+
+    this.figmaParser = new FigmaParser({
+      token,
+      onLog: (log) => this.addLogEntry(log),
+      onProgress: (progress) => this.updateProgress(progress)
+    });
+
+    this.currentAudit = {
+      id: crypto.randomUUID(),
+      config: { url: figmaUrl, name, source: 'figma' },
+      startedAt: new Date().toISOString()
+    };
+
+    try {
+      const results = await this.figmaParser.parse(figmaUrl);
+      await this.onAuditComplete(results);
+    } catch (err) {
+      this.onAuditError(err);
     }
   }
 
@@ -1463,6 +1631,14 @@ class SystemicApp {
     if (this.crawler) {
       this.crawler.stop();
       this.addLogEntry({ type: 'info', message: 'Audit cancelled by user' });
+    }
+    if (this.codeParser) {
+      this.codeParser.stop();
+      this.addLogEntry({ type: 'info', message: 'GitHub scan cancelled' });
+    }
+    if (this.figmaParser) {
+      this.figmaParser.stop();
+      this.addLogEntry({ type: 'info', message: 'Figma scan cancelled' });
     }
     this.resetAuditForm();
   }

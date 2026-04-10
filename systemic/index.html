@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/systemic.css">
   <link rel="stylesheet" href="css/viewer.css">
   <link rel="stylesheet" href="css/variant-audit.css">
+  <link rel="stylesheet" href="css/state-inspector.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -275,6 +276,9 @@
             <p class="qa-desc" id="qa-desc">Select a component to audit its variants.</p>
           </div>
 
+          <!-- Component Usage Inspector (mounted by usage-inspector.js) -->
+          <div id="usage-inspector-mount"></div>
+
           <div class="filter-bar">
             <select class="input select" id="qa-component-filter">
               <option value="">— Select component —</option>
@@ -323,16 +327,51 @@
           <button class="scan-modal__close" id="scan-modal-close">&times;</button>
         </div>
         <div class="scan-modal__body">
-          <div class="scan-modal__option">
-            <div class="scan-modal__option-label">Scan a website</div>
+          <!-- Source tabs -->
+          <div class="scan-modal__tabs" role="tablist">
+            <button class="scan-modal__tab active" role="tab" aria-selected="true"  data-tab="live"   id="tab-live">Live Page</button>
+            <button class="scan-modal__tab"        role="tab" aria-selected="false" data-tab="design" id="tab-design">Design File</button>
+            <button class="scan-modal__tab"        role="tab" aria-selected="false" data-tab="code"   id="tab-code">GitHub Repo</button>
+          </div>
+
+          <!-- Tab: Live Page -->
+          <div class="scan-modal__panel active" data-panel="live" role="tabpanel" aria-labelledby="tab-live">
+            <p class="scan-modal__hint">Crawl a live URL — discovers rendered components and tokens.</p>
             <div class="scan-modal__option-row">
               <input type="text" id="scan-url-input" class="input" placeholder="example.com">
               <button class="btn btn--filled" id="scan-url-submit">Scan</button>
             </div>
-          </div>
-          <div class="scan-modal__divider"><span>or</span></div>
-          <div class="scan-modal__option">
+            <div class="scan-modal__divider"><span>or</span></div>
             <button class="btn btn--ghost scan-modal__local-btn" id="scan-local-btn">Load local design system</button>
+          </div>
+
+          <!-- Tab: Design File -->
+          <div class="scan-modal__panel" data-panel="design" role="tabpanel" aria-labelledby="tab-design" hidden>
+            <p class="scan-modal__hint">Read components and tokens directly from a Figma file.</p>
+            <div class="form-group">
+              <label class="form-label" for="scan-figma-url">Figma file URL</label>
+              <input type="text" id="scan-figma-url" class="input" placeholder="https://www.figma.com/design/...">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="scan-figma-token">Personal Access Token</label>
+              <input type="text" id="scan-figma-token" class="input" placeholder="figd_..." autocomplete="off">
+              <span class="form-hint">Stored locally in this browser only. <a href="https://help.figma.com/hc/en-us/articles/8085703771159" target="_blank" rel="noopener">How to get a token</a></span>
+            </div>
+            <button class="btn btn--filled" id="scan-figma-submit">Analyze Figma File</button>
+          </div>
+
+          <!-- Tab: GitHub Repo -->
+          <div class="scan-modal__panel" data-panel="code" role="tabpanel" aria-labelledby="tab-code" hidden>
+            <p class="scan-modal__hint">Parse HTML and CSS statically — every instance gets file + line attribution.</p>
+            <div class="form-group">
+              <label class="form-label" for="scan-github-url">GitHub repo URL</label>
+              <input type="text" id="scan-github-url" class="input" placeholder="https://github.com/owner/repo">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="scan-github-token">GitHub token <span class="form-hint-inline">(optional — private repos &amp; higher rate limits)</span></label>
+              <input type="text" id="scan-github-token" class="input" placeholder="ghp_..." autocomplete="off">
+            </div>
+            <button class="btn btn--filled" id="scan-github-submit">Analyze Repository</button>
           </div>
         </div>
       </div>
@@ -348,6 +387,10 @@
   <script src="js/utils/material-tokens.js"></script>
   <script src="js/token-mapper.js"></script>
   <script src="js/crawler.js"></script>
+  <script src="js/code-parser.js"></script>
+  <script src="js/figma-parser.js"></script>
+  <script src="js/state-renderer.js"></script>
+  <script src="js/usage-inspector.js"></script>
   <script src="js/component-consolidator.js"></script>
   <script src="js/doc-generator.js"></script>
   <script src="js/viewer.js"></script>

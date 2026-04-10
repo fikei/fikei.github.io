@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-03-05 (Added Phase 13: Boards React Rewrite — 5 sub-phases, R1–R5)
+> **Last Updated**: 2026-04-10 (Added Systemic v2 epic to Backlog — 3 tracks, 16 stories)
 
 ---
 
@@ -31,11 +31,19 @@
 | [Phase 11: Instagram Import](./phase-11-instagram-import.md) | Pending | 0/73 |
 | [Phase 12: Lookback](./phase-12-lookback.md) | IN PROGRESS | 47/249 |
 | [Phase 13: Boards React Rewrite](./phase-13-react-rewrite.md) | Pending | 0/272 |
-| [Backlog](./backlog.md) | Future | 1/102 |
+| [Backlog](./backlog.md) | Future | 1/118 |
 
 ---
 
 ## Recent Milestones
+
+### Systemic v2 — Planned
+**Added: 2026-04-10** — 16 stories filed from [PRD: Systemic v2](/docs/strategy/prds/systemic-v2.md)
+
+- **Track 1 — Three Input Sources**: URL crawl (existing), Figma/Paper design files, and production code (GitHub repo or local path) as equal-weight entry points; file + line attribution for code source
+- **Track 2 — Lifelike Component State Rendering**: Multi-state examples (hover, focus, error, disabled, etc.) rendered side-by-side with contextual placeholder content; replaces the static "Examples" section
+- **Track 3 — Component Usage Inspector**: Drill-down view showing every instance of a component type across the source; right-side drawer with rendered preview, syntax-highlighted source, surrounding context, and variant classification
+- **Filed to**: Backlog (SystemicAI section, new Systemic v2 epics)
 
 ### Boards React Rewrite — Planned
 **Added: 2026-03-05** — Phase 13 filed from [PRD: Boards React Rewrite](/docs/strategy/prds/boards-react-rewrite.md)
@@ -146,8 +154,8 @@ See [Phase 3: AI Intelligence](./phase-3-ai-intelligence.md#epic-33-generative-w
 | Phase 11: Instagram Import | 0 | 0 | 73 | 0 |
 | Phase 12: Lookback | 47 | 0 | 197 | 5 |
 | Phase 13: React Rewrite | 0 | 0 | 272 | 0 |
-| Backlog | 1 | 0 | 100 | 0 |
-| **TOTAL** | **356** | **5** | **1497** | **9** |
+| Backlog | 1 | 0 | 116 | 0 |
+| **TOTAL** | **356** | **5** | **1513** | **9** |
 
 ---
 

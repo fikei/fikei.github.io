@@ -368,9 +368,40 @@ Making collections useful beyond the platform. Supports brand principle #5: **Ex
 
 ---
 
-## SystemicAI
+## Systemic v2
 
-Design system analyzer and documentation generator.
+Three-track upgrade to the design system analyzer. See [PRD: Systemic v2](../../strategy/prds/systemic-v2.md).
+
+### Epic: Track 1 — Three Input Sources
+
+| Story | Status |
+|-------|--------|
+| **Input source selection screen** — Replace single URL input with three-source entry screen (Live Page, Design File, Production Code) with distinct icons and descriptions | Pending |
+| **Code source: GitHub repo parser** — Fetch and statically parse HTML/CSS/JS from a GitHub repo URL via GitHub Contents API; extract component instances with file + line attribution | Pending |
+| **Code source: local path bridge** — Deno local bridge server + `systemic-crawl` edge function for reading files from a local filesystem path | Pending |
+| **Figma integration** — PAT-based auth, Figma REST API calls to fetch components, variants, published styles (design tokens), and frame names as location context | Pending |
+| **Paper canvas integration** — Read active Paper canvas via MCP context; same normalization output as Figma parser | Pending |
+| **Extend ComponentRecord shape** — Add `instances[]` array with location (file path + line, page URL, or Figma frame name), instance HTML, surrounding context, and thumbnail | Pending |
+
+### Epic: Track 2 — Lifelike Component State Rendering
+
+| Story | Status |
+|-------|--------|
+| **State renderer module** — Generate one rendered example per discovered CSS state rule; apply state styles inline to a static copy of the example HTML | Pending |
+| **State sets per component type** — Button (5 states), Input (5), Dropdown (4), Card (3), Navigation (3), Checkbox/Radio (4), Badge (variants), Toggle (3) | Pending |
+| **Contextual placeholder content** — Replace lorem ipsum with component-type-appropriate labels, field names, and body text via lookup table | Pending |
+| **State badges** — Small badge in top-right of each state example showing state name ("hover", "disabled", "error", etc.) | Pending |
+| **Replace Examples section** — Component docs view becomes the multi-state examples view; current "Examples" page is removed | Pending |
+
+### Epic: Track 3 — Component Usage Inspector
+
+| Story | Status |
+|-------|--------|
+| **Instance grid view** — Select a component type from dropdown; show all instances across source in a scrollable grid with thumbnail, location, and variant badge | Pending |
+| **Right-side drawer** — Click instance to open ~40% width drawer with rendered preview, syntax-highlighted source code block, surrounding context, and variant classification + confidence | Pending |
+| **Drawer navigation** — Previous/Next arrows inside drawer to cycle through instances without closing; keyboard Escape to dismiss | Pending |
+| **Filter controls** — Location path search and variant filter above instance grid; live count updates | Pending |
+| **Thumbnail generation** — Lazy client-side thumbnail rendering for instance grid using html2canvas; generated on scroll | Pending |
 
 ### Epic: Docs Viewer UX
 
