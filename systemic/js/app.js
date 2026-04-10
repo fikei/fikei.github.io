@@ -12,6 +12,8 @@ class SystemicApp {
     this.supabaseUrl = SUPABASE_URL;
     this.supabaseKey = SUPABASE_ANON_KEY;
     this.crawler = null;
+    this.codeParser = null;
+    this.figmaParser = null;
     this.tokenMapper = new TokenMapper();
     this.componentConsolidator = new ComponentConsolidator();
     this.docGenerator = new DocGenerator({
@@ -19,8 +21,14 @@ class SystemicApp {
       supabaseUrl: SUPABASE_URL,
       supabaseKey: SUPABASE_ANON_KEY
     });
+    this.stateRenderer = new StateRenderer();
+    this.principlesGenerator = new PrinciplesGenerator({
+      supabaseUrl: SUPABASE_URL,
+      supabaseKey: SUPABASE_ANON_KEY
+    });
     this.viewer = null;
     this.variantAudit = null;
+    this.usageInspector = null;
     this.currentAudit = null;
     this.designSystems = [];
     this.debugMode = true; // Enable detailed logging
@@ -253,10 +261,15 @@ class SystemicApp {
     this.loadSavedSystems();
     this.initViewer();
     this.initVariantAudit();
+    this.initUsageInspector();
     // Connect viewer to audit so component stage can show QA controls
     if (this.viewer && this.variantAudit) {
       this.viewer.variantAudit = this.variantAudit;
     }
+    // Connect component filter to Usage Inspector
+    DOMUtils.$('#qa-component-filter')?.addEventListener('change', (e) => {
+      this._onQAComponentSelect(e.target.value);
+    });
     this.initRouter();
   }
 
@@ -726,6 +739,14 @@ class SystemicApp {
     this.scanUrlInput = DOMUtils.$('#scan-url-input');
     this.scanUrlSubmit = DOMUtils.$('#scan-url-submit');
     this.scanLocalBtn = DOMUtils.$('#scan-local-btn');
+
+    // Scan modal — new source tabs
+    this.scanFigmaUrl = DOMUtils.$('#scan-figma-url');
+    this.scanFigmaToken = DOMUtils.$('#scan-figma-token');
+    this.scanFigmaSubmit = DOMUtils.$('#scan-figma-submit');
+    this.scanGithubUrl = DOMUtils.$('#scan-github-url');
+    this.scanGithubToken = DOMUtils.$('#scan-github-token');
+    this.scanGithubSubmit = DOMUtils.$('#scan-github-submit');
   }
 
   /**
@@ -794,6 +815,45 @@ class SystemicApp {
     DOMUtils.$('#run-scan-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
       this.openScanModal();
+    });
+
+    // Scan modal — tab switching
+    this.scanModal?.addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-tab]');
+      if (!tab) return;
+      const targetTab = tab.dataset.tab;
+      this.scanModal.querySelectorAll('.scan-modal__tab').forEach(t => {
+        const active = t.dataset.tab === targetTab;
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-selected', String(active));
+      });
+      this.scanModal.querySelectorAll('.scan-modal__panel').forEach(p => {
+        const active = p.dataset.panel === targetTab;
+        p.classList.toggle('active', active);
+        p.hidden = !active;
+      });
+    });
+
+    // Figma scan submit
+    this.scanFigmaSubmit?.addEventListener('click', () => {
+      const url = this.scanFigmaUrl?.value?.trim();
+      const token = this.scanFigmaToken?.value?.trim();
+      if (!url) { this.showToast('Enter a Figma file URL', 'error'); return; }
+      if (!token) { this.showToast('A Figma Personal Access Token is required', 'error'); return; }
+      // Persist token for session
+      try { localStorage.setItem('systemic-figma-token', token); } catch {}
+      this.closeScanModal();
+      this.startFigmaScan(url, token);
+    });
+
+    // GitHub repo scan submit
+    this.scanGithubSubmit?.addEventListener('click', () => {
+      const url = this.scanGithubUrl?.value?.trim();
+      const token = this.scanGithubToken?.value?.trim() || null;
+      if (!url) { this.showToast('Enter a GitHub repo URL', 'error'); return; }
+      if (token) { try { localStorage.setItem('systemic-github-token', token); } catch {} }
+      this.closeScanModal();
+      this.startGitHubScan(url, token);
     });
   }
 
@@ -886,8 +946,8 @@ class SystemicApp {
   handleRoute() {
     const route = this.parseHash();
 
-    // If navigating to docs/qa without a loaded system, try to restore the last-active one
-    if ((route.view === 'docs' || route.view === 'qa') && !this.viewer?.designSystem) {
+    // If navigating to docs/qa/principles without a loaded system, try to restore
+    if ((route.view === 'docs' || route.view === 'qa' || route.view === 'principles') && !this.viewer?.designSystem) {
       const restored = this.restoreActiveSystem();
       if (!restored) {
         // No system to restore — redirect to systems list
@@ -931,6 +991,11 @@ class SystemicApp {
     // Load systems list when switching to systems view
     if (route.view === 'systems') {
       this.renderSystemsList();
+    }
+
+    // Render principles view
+    if (route.view === 'principles') {
+      this.renderPrinciples();
     }
   }
 
@@ -979,6 +1044,21 @@ class SystemicApp {
             <a href="#docs/color" class="breadcrumb-link">${qaSystemName}</a>
             <span class="breadcrumb-sep">/</span>
             <span class="breadcrumb-current">Variant Audit</span>
+          </nav>
+          <span class="docs-nav__spacer"></span>
+        `;
+        break;
+      }
+
+      case 'principles': {
+        const pSystemName = this.viewer?.designSystem?.name || 'System';
+        this.appNav.innerHTML = `
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="#systems" class="breadcrumb-link">Systems</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="#docs/color" class="breadcrumb-link">${pSystemName}</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">Principles</span>
           </nav>
           <span class="docs-nav__spacer"></span>
         `;
@@ -1083,6 +1163,7 @@ class SystemicApp {
       <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
       <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
       <a href="#" class="docs-nav__link" data-section="examples">Examples</a>
+      <a href="#principles" class="docs-nav__link">Principles</a>
       <a href="#qa" class="docs-nav__link">QA</a>
       <span class="docs-nav__spacer"></span>
       <select class="docs-nav__select" id="component-select">
@@ -1147,11 +1228,51 @@ class SystemicApp {
   }
 
   /**
+   * Called when a component is selected in the QA component filter.
+   * Opens the Usage Inspector for that component.
+   */
+  _onQAComponentSelect(componentType) {
+    if (!this.usageInspector) return;
+    if (!componentType) {
+      this.usageInspector.hide();
+      return;
+    }
+    const ds = this.viewer?.designSystem;
+    if (!ds) return;
+    const component = ds.components?.find(c => c.type === componentType || c.name === componentType);
+    if (component) {
+      this.usageInspector.show(component);
+    } else {
+      this.usageInspector.hide();
+    }
+  }
+
+  /**
+   * Initialize the Usage Inspector
+   */
+  initUsageInspector() {
+    const mount = DOMUtils.$('#usage-inspector-mount');
+    if (mount) {
+      this.usageInspector = new UsageInspector({
+        container: mount,
+        onToast: (msg, type) => this.showToast(msg, type)
+      });
+    }
+  }
+
+  /**
    * Open the scan modal
    */
   openScanModal() {
     if (this.scanModal) {
       this.scanModal.classList.add('open');
+      // Restore saved tokens
+      try {
+        const ft = localStorage.getItem('systemic-figma-token');
+        const gt = localStorage.getItem('systemic-github-token');
+        if (ft && this.scanFigmaToken) this.scanFigmaToken.value = ft;
+        if (gt && this.scanGithubToken) this.scanGithubToken.value = gt;
+      } catch {}
       this.scanUrlInput?.focus();
     }
   }
@@ -1163,6 +1284,78 @@ class SystemicApp {
     if (this.scanModal) {
       this.scanModal.classList.remove('open');
       if (this.scanUrlInput) this.scanUrlInput.value = '';
+    }
+  }
+
+  /**
+   * Start a GitHub repo scan
+   */
+  async startGitHubScan(repoUrl, token) {
+    const name = repoUrl.replace(/^https?:\/\/github\.com\//i, '').split('/').slice(0, 2).join('/');
+    this.debugLog('GITHUB', `Starting GitHub scan: ${repoUrl}`);
+
+    this.navigateTo('audit');
+    await new Promise(r => setTimeout(r, 50)); // let view activate
+
+    this.auditFormSection.hidden = true;
+    this.auditProgressSection.hidden = false;
+    this.auditUrlDisplay.textContent = repoUrl;
+    this.auditStatusText.textContent = 'Connecting to GitHub...';
+    this.clearLog();
+
+    this.codeParser = new CodeParser({
+      token,
+      onLog: (log) => this.addLogEntry(log),
+      onProgress: (progress) => this.updateProgress(progress)
+    });
+
+    this.currentAudit = {
+      id: crypto.randomUUID(),
+      config: { url: repoUrl, name, source: 'github' },
+      startedAt: new Date().toISOString()
+    };
+
+    try {
+      const results = await this.codeParser.parse(repoUrl);
+      await this.onAuditComplete(results);
+    } catch (err) {
+      this.onAuditError(err);
+    }
+  }
+
+  /**
+   * Start a Figma file scan
+   */
+  async startFigmaScan(figmaUrl, token) {
+    const name = figmaUrl.replace(/\?.*/, '').split('/').pop()?.replace(/-/g, ' ') || 'Figma File';
+    this.debugLog('FIGMA', `Starting Figma scan: ${figmaUrl}`);
+
+    this.navigateTo('audit');
+    await new Promise(r => setTimeout(r, 50));
+
+    this.auditFormSection.hidden = true;
+    this.auditProgressSection.hidden = false;
+    this.auditUrlDisplay.textContent = figmaUrl;
+    this.auditStatusText.textContent = 'Connecting to Figma...';
+    this.clearLog();
+
+    this.figmaParser = new FigmaParser({
+      token,
+      onLog: (log) => this.addLogEntry(log),
+      onProgress: (progress) => this.updateProgress(progress)
+    });
+
+    this.currentAudit = {
+      id: crypto.randomUUID(),
+      config: { url: figmaUrl, name, source: 'figma' },
+      startedAt: new Date().toISOString()
+    };
+
+    try {
+      const results = await this.figmaParser.parse(figmaUrl);
+      await this.onAuditComplete(results);
+    } catch (err) {
+      this.onAuditError(err);
     }
   }
 
@@ -1464,6 +1657,14 @@ class SystemicApp {
       this.crawler.stop();
       this.addLogEntry({ type: 'info', message: 'Audit cancelled by user' });
     }
+    if (this.codeParser) {
+      this.codeParser.stop();
+      this.addLogEntry({ type: 'info', message: 'GitHub scan cancelled' });
+    }
+    if (this.figmaParser) {
+      this.figmaParser.stop();
+      this.addLogEntry({ type: 'info', message: 'Figma scan cancelled' });
+    }
     this.resetAuditForm();
   }
 
@@ -1692,6 +1893,136 @@ class SystemicApp {
 
     this.renderSystemsList();
     this.showToast('Design system deleted');
+  }
+
+  /**
+   * Render the Principles view.
+   * Calls PrinciplesGenerator, then renders global + per-component principles.
+   */
+  async renderPrinciples() {
+    const container = DOMUtils.$('#principles-container');
+    if (!container) return;
+
+    const ds = this.viewer?.designSystem;
+    if (!ds) {
+      container.innerHTML = `
+        <div class="principles-empty">
+          <div class="principles-empty__icon">◈</div>
+          <h3>No design system loaded</h3>
+          <p>Open a design system from <a href="#systems">My Systems</a> to generate its principles.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Show loading state
+    container.innerHTML = `
+      <div class="principles-loading">
+        <div class="principles-loading__spinner"></div>
+        <p>Analysing design system…</p>
+      </div>
+    `;
+
+    try {
+      const principles = await this.principlesGenerator.generate(ds);
+
+      // Cache on the design system object + persist
+      ds.principles = principles;
+      this.saveDesignSystem(ds, true);
+
+      container.innerHTML = this._buildPrinciplesHTML(ds, principles);
+
+      // Bind accordion toggles for component sections
+      container.querySelectorAll('.pcomp-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const section = header.closest('.pcomp-section');
+          section?.classList.toggle('open');
+          header.setAttribute('aria-expanded', String(section?.classList.contains('open')));
+        });
+      });
+
+      // Regenerate button — clears cache and re-runs
+      DOMUtils.$('#principles-regenerate')?.addEventListener('click', () => {
+        if (ds.principles) delete ds.principles.generatedAt;
+        this.renderPrinciples();
+      });
+
+    } catch (err) {
+      this.debugLog('PRINCIPLES', 'Error generating principles:', err);
+      container.innerHTML = `
+        <div class="principles-error">
+          <p>Failed to generate principles: ${err.message}</p>
+          <button class="btn btn--ghost btn--sm" id="principles-retry">Retry</button>
+        </div>
+      `;
+      DOMUtils.$('#principles-retry')?.addEventListener('click', () => this.renderPrinciples());
+    }
+  }
+
+  /**
+   * Build the full HTML for the Principles view from a principles result object.
+   */
+  _buildPrinciplesHTML(ds, p) {
+    const globalCards = (p.globalPrinciples || []).map(pr => `
+      <div class="principle-card">
+        <h4 class="principle-card__title">${this._escHtml(pr.title)}</h4>
+        <p class="principle-card__desc">${this._escHtml(pr.description)}</p>
+      </div>
+    `).join('');
+
+    const componentSections = Object.entries(p.componentPrinciples || {}).map(([type, rules]) => {
+      if (!rules?.length) return '';
+      const ruleItems = rules.map(r => `
+        <div class="pcomp-rule">
+          <div class="pcomp-rule__rule">${this._escHtml(r.rule)}</div>
+          <div class="pcomp-rule__rationale">${this._escHtml(r.rationale)}</div>
+        </div>
+      `).join('');
+      const label = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      return `
+        <div class="pcomp-section">
+          <button class="pcomp-header" aria-expanded="false">
+            <span class="pcomp-header__name">${this._escHtml(label)}</span>
+            <span class="pcomp-header__count">${rules.length} rule${rules.length !== 1 ? 's' : ''}</span>
+            <span class="pcomp-header__chevron">›</span>
+          </button>
+          <div class="pcomp-body">${ruleItems}</div>
+        </div>
+      `;
+    }).join('');
+
+    const aiLabel = p.generatedAt
+      ? `Generated ${new Date(p.generatedAt).toLocaleDateString()}`
+      : '';
+
+    return `
+      <div class="principles-header">
+        <h2 class="principles-title">${this._escHtml(ds.name)}</h2>
+        <p class="principles-philosophy">${this._escHtml(p.philosophyStatement || '')}</p>
+        ${aiLabel ? `<span class="principles-meta">${aiLabel}</span>` : ''}
+        <button class="btn btn--ghost btn--sm" id="principles-regenerate">Regenerate</button>
+      </div>
+
+      <section class="principles-section">
+        <h3 class="principles-section__heading">Global Principles</h3>
+        <div class="principles-grid">${globalCards}</div>
+      </section>
+
+      ${componentSections ? `
+      <section class="principles-section">
+        <h3 class="principles-section__heading">Component Principles</h3>
+        <div class="pcomp-list">${componentSections}</div>
+      </section>
+      ` : ''}
+    `;
+  }
+
+  _escHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   /**

@@ -877,6 +877,13 @@ class DesignSystemViewer {
       auditLogHtml = this.renderStageAuditLog(compName, variants, isTemplate);
     }
 
+    // Multi-state grid (StateRenderer)
+    let stateGridHtml = '';
+    if (typeof StateRenderer !== 'undefined') {
+      const renderer = new StateRenderer();
+      stateGridHtml = renderer.buildComponentStateGrid(component);
+    }
+
     // Create preview container
     this.componentPreview.innerHTML = `
       <div class="preview-main">
@@ -889,6 +896,7 @@ class DesignSystemViewer {
         </div>
       </div>
       ${galleryHtml}
+      ${stateGridHtml}
       ${auditLogHtml}
     `;
 
