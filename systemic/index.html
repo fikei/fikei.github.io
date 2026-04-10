@@ -229,6 +229,12 @@
                 <div id="states-list" class="states-list"></div>
               </div>
 
+              <div class="context-section" id="comp-principles-section" hidden>
+                <h4>Usage Principles</h4>
+                <ul id="comp-principles-list" class="comp-principles-list"></ul>
+                <a href="#principles" class="comp-principles-more" id="comp-principles-link">View all principles →</a>
+              </div>
+
             </div>
 
             <!-- Code Context -->
@@ -344,6 +350,7 @@
             <button class="scan-modal__tab active" role="tab" aria-selected="true"  data-tab="live"   id="tab-live">Live Page</button>
             <button class="scan-modal__tab"        role="tab" aria-selected="false" data-tab="design" id="tab-design">Design File</button>
             <button class="scan-modal__tab"        role="tab" aria-selected="false" data-tab="code"   id="tab-code">GitHub Repo</button>
+            <button class="scan-modal__tab"        role="tab" aria-selected="false" data-tab="paper"  id="tab-paper">Paper</button>
           </div>
 
           <!-- Tab: Live Page -->
@@ -385,6 +392,18 @@
             </div>
             <button class="btn btn--filled" id="scan-github-submit">Analyze Repository</button>
           </div>
+
+          <!-- Tab: Paper -->
+          <div class="scan-modal__panel" data-panel="paper" role="tabpanel" aria-labelledby="tab-paper" hidden>
+            <p class="scan-modal__hint">Import directly from your Paper canvas — extracted by the Claude Code agent.</p>
+            <div class="paper-import-status" id="paper-import-status">
+              <div class="paper-import-status__icon">◈</div>
+              <div class="paper-import-status__text">No Paper data ready</div>
+              <div class="paper-import-status__sub">Ask Claude Code to scan your Paper file: <code>"Scan my Paper file for Systemic"</code></div>
+            </div>
+            <button class="btn btn--filled" id="scan-paper-submit" disabled>Load from Paper</button>
+            <button class="btn btn--ghost" id="scan-paper-check" style="margin-left:var(--space-2)">Check for data</button>
+          </div>
         </div>
       </div>
     </div>
@@ -401,6 +420,7 @@
   <script src="js/crawler.js"></script>
   <script src="js/code-parser.js"></script>
   <script src="js/figma-parser.js"></script>
+  <script src="js/paper-parser.js"></script>
   <script src="js/state-renderer.js"></script>
   <script src="js/usage-inspector.js"></script>
   <script src="js/principles-generator.js"></script>
