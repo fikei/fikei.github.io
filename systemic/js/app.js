@@ -747,6 +747,11 @@ class SystemicApp {
     this.scanGithubUrl = DOMUtils.$('#scan-github-url');
     this.scanGithubToken = DOMUtils.$('#scan-github-token');
     this.scanGithubSubmit = DOMUtils.$('#scan-github-submit');
+
+    // Scan modal — Paper
+    this.scanPaperSubmit   = DOMUtils.$('#scan-paper-submit');
+    this.scanPaperCheck    = DOMUtils.$('#scan-paper-check');
+    this.paperImportStatus = DOMUtils.$('#paper-import-status');
   }
 
   /**
@@ -854,6 +859,15 @@ class SystemicApp {
       if (token) { try { localStorage.setItem('systemic-github-token', token); } catch {} }
       this.closeScanModal();
       this.startGitHubScan(url, token);
+    });
+
+    // Paper scan — check for agent-written data
+    this.scanPaperCheck?.addEventListener('click', () => this._checkPaperImport());
+    this.scanPaperSubmit?.addEventListener('click', () => {
+      const raw = this._readPaperImport();
+      if (!raw) { this.showToast('No Paper data found — ask Claude to scan your file first', 'error'); return; }
+      this.closeScanModal();
+      this.startPaperScan(raw);
     });
   }
 
@@ -1273,6 +1287,8 @@ class SystemicApp {
         if (ft && this.scanFigmaToken) this.scanFigmaToken.value = ft;
         if (gt && this.scanGithubToken) this.scanGithubToken.value = gt;
       } catch {}
+      // Auto-check for Paper data
+      this._checkPaperImport();
       this.scanUrlInput?.focus();
     }
   }
@@ -1356,6 +1372,87 @@ class SystemicApp {
       await this.onAuditComplete(results);
     } catch (err) {
       this.onAuditError(err);
+    }
+  }
+
+  /**
+   * Start a Paper canvas scan.
+   * @param {object} extract — PaperExtract from localStorage
+   */
+  async startPaperScan(extract) {
+    const name = extract.name || 'Paper File';
+    this.debugLog('PAPER', `Starting Paper scan: ${name}`);
+
+    this.navigateTo('audit');
+    await new Promise(r => setTimeout(r, 50));
+
+    this.auditFormSection.hidden = true;
+    this.auditProgressSection.hidden = false;
+    this.auditUrlDisplay.textContent = name;
+    this.auditStatusText.textContent = 'Parsing Paper canvas…';
+    this.clearLog();
+
+    this.paperParser = new PaperParser({
+      onLog: (log) => this.addLogEntry(log),
+      onProgress: (progress) => this.updateProgress(progress),
+    });
+
+    this.currentAudit = {
+      id: crypto.randomUUID(),
+      config: { url: null, name, source: 'paper' },
+      startedAt: new Date().toISOString(),
+    };
+
+    try {
+      const results = this.paperParser.parse(extract);
+      // Clear the import slot so stale data isn't reloaded
+      try { localStorage.removeItem('systemic-paper-import'); } catch {}
+      await this.onAuditComplete(results);
+    } catch (err) {
+      this.onAuditError(err);
+    }
+  }
+
+  /**
+   * Read Paper import data written by the agent.
+   * Returns the parsed object or null.
+   */
+  _readPaperImport() {
+    try {
+      const raw = localStorage.getItem('systemic-paper-import');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Check localStorage for agent-written Paper data and update the tab UI.
+   */
+  _checkPaperImport() {
+    const data = this._readPaperImport();
+    const statusEl = this.paperImportStatus;
+    const submitBtn = this.scanPaperSubmit;
+    if (!statusEl || !submitBtn) return;
+
+    if (data) {
+      const compCount = (data.components || []).length;
+      const ts = data.extractedAt ? new Date(data.extractedAt).toLocaleTimeString() : 'recently';
+      statusEl.innerHTML = `
+        <div class="paper-import-status__icon paper-import-status__icon--ready">✓</div>
+        <div class="paper-import-status__text">Paper data ready — ${data.name || 'Untitled'}</div>
+        <div class="paper-import-status__sub">${compCount} component type${compCount !== 1 ? 's' : ''} found · extracted ${ts}</div>
+      `;
+      submitBtn.disabled = false;
+      submitBtn.textContent = `Load "${data.name || 'Paper File'}"`;
+    } else {
+      statusEl.innerHTML = `
+        <div class="paper-import-status__icon">◈</div>
+        <div class="paper-import-status__text">No Paper data ready</div>
+        <div class="paper-import-status__sub">Ask Claude Code: <code>"Scan my Paper file for Systemic"</code></div>
+      `;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Load from Paper';
     }
   }
 
@@ -1664,6 +1761,10 @@ class SystemicApp {
     if (this.figmaParser) {
       this.figmaParser.stop();
       this.addLogEntry({ type: 'info', message: 'Figma scan cancelled' });
+    }
+    if (this.paperParser) {
+      this.paperParser.stop();
+      this.addLogEntry({ type: 'info', message: 'Paper scan cancelled' });
     }
     this.resetAuditForm();
   }

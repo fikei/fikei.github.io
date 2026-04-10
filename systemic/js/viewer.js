@@ -48,6 +48,8 @@ class DesignSystemViewer {
     this.accessibilityNotes = DOMUtils.$('#accessibility-notes', this.container);
     this.statesSection = DOMUtils.$('#states-section', this.container);
     this.statesList = DOMUtils.$('#states-list', this.container);
+    this.compPrinciplesSection = DOMUtils.$('#comp-principles-section', this.container);
+    this.compPrinciplesList = DOMUtils.$('#comp-principles-list', this.container);
 
     // Code view elements
     this.tokenList = DOMUtils.$('#token-list', this.container);
@@ -1208,9 +1210,43 @@ class DesignSystemViewer {
     // States section
     this.renderStatesSection(component);
 
+    // Component-level principles (from already-generated system principles)
+    this.renderComponentPrinciples(component);
+
     // Update code context
     this.updateTokenListForComponent(component);
     this.updateCodeBlocksForComponent(component);
+  }
+
+  /**
+   * Inject component-specific usage principles into the context sidebar.
+   * Reads from this.designSystem.principles.componentPrinciples[type].
+   */
+  renderComponentPrinciples(component) {
+    if (!this.compPrinciplesSection || !this.compPrinciplesList) return;
+
+    const rules = this.designSystem?.principles?.componentPrinciples?.[component.type];
+
+    if (rules && rules.length > 0) {
+      this.compPrinciplesList.innerHTML = rules.map(r => `
+        <li class="comp-principles-item">
+          <span class="comp-principles-item__rule">${this._escHtml(r.rule)}</span>
+          ${r.rationale ? `<span class="comp-principles-item__rationale">${this._escHtml(r.rationale)}</span>` : ''}
+        </li>
+      `).join('');
+      this.compPrinciplesSection.hidden = false;
+    } else {
+      this.compPrinciplesSection.hidden = true;
+    }
+  }
+
+  /** HTML-escape helper */
+  _escHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   /**
