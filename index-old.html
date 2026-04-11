@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ctrl.rodeo</title>
+  <meta name="description" content="ctrl.rodeo — Your likes. Your saves. Your life — organized.">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
+  <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
+  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
+
+  <!-- Space Grotesk Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Segment Analytics -->
+  <script>
+  !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var t=analytics.methods[e];analytics[t]=analytics.factory(t)}analytics.load=function(e,t){var n=document.createElement("script");n.type="text/javascript";n.async=!0;n.src="https://cdn.segment.com/analytics.js/v1/"+e+"/analytics.min.js";var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(n,a);analytics._loadOptions=t};analytics.SNIPPET_VERSION="4.1.0";
+  analytics.load("a31Hdp9TgZ37sNC2dbj1goOFgRJE8BDD");
+  analytics.page();
+  }}();
+  </script>
+
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-NMZZCTS');</script>
+
+  <style>
+/* ============================================
+   ctrl.rodeo — Main Page Styles
+   ============================================ */
+
+:root {
+  /* Typography - 10px base */
+  --font-primary: "Space Grotesk", sans-serif;
+  --font-mono: "Space Grotesk", sans-serif;
+  --font-serif: "Space Grotesk", sans-serif;
+  --font-size-xs: 10px;
+  --font-size-sm: 10px;
+  --font-size-base: 10px;
+  --font-size-lg: 12px;
+  --font-size-xl: 14px;
+  --font-size-2xl: 18px;
+  --font-size-3xl: 24px;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.6;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Dark mode (default) */
+  --bg: #000;
+  --fg: #fff;
+  --surface: #111;
+  --border: #fff;
+  --muted: #888;
+  --subtle: #333;
+}
+
+:root.light {
+  --bg: #fff;
+  --fg: #000;
+  --surface: #fafafa;
+  --border: #000;
+  --muted: #666;
+  --subtle: #e0e0e0;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--fg);
+  background: var(--bg);
+  transition: background 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  padding: var(--space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+
+.header__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Theme toggle */
+.theme-toggle {
+  width: 32px;
+  height: 18px;
+  background: transparent;
+  border: 1px solid var(--fg);
+  cursor: pointer;
+  padding: 2px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.theme-toggle__knob {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+:root.light .theme-toggle {
+  background: var(--fg);
+}
+
+:root.light .theme-toggle__knob {
+  background: var(--bg);
+  transform: translateX(14px);
+}
+
+/* Container */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.site-title {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Hero */
+.hero {
+  min-height: calc(100vh - 250px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.site-description {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.8;
+  max-width: 480px;
+}
+
+/* Section */
+.section {
+  padding-bottom: var(--space-16);
+}
+
+.section-title {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--subtle);
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 600px) {
+  .grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (min-width: 1200px) {
+  .grid { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* Grid Item */
+.grid-item {
+  position: relative;
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 1px solid var(--subtle);
+  text-decoration: none;
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-4);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.grid-item:hover {
+  border-color: var(--fg);
+  background: var(--bg);
+}
+
+.grid-item__name {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.grid-item__path {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: var(--space-1);
+}
+
+.grid-item__description {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* Footer */
+.footer {
+  padding: var(--space-6) 0 var(--space-16);
+  border-top: 1px solid var(--subtle);
+}
+
+.footer-text {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .hero {
+    min-height: calc(100vh - 50px);
+    min-height: calc(100svh - 50px);
+    justify-content: flex-start;
+    padding-top: 25vh;
+  }
+}
+  </style>
+</head>
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NMZZCTS"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header__inner">
+      <h1 class="site-title">ctrl.rodeo</h1>
+      <button class="theme-toggle" aria-label="Toggle theme">
+        <div class="theme-toggle__knob"></div>
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Hero -->
+    <div class="hero">
+      <p class="site-description">Your likes. Your saves. Your life — organized. Collect, curate, and build on everything that matters to you.</p>
+    </div>
+
+    <!-- Projects -->
+    <section class="section">
+      <h2 class="section-title">Projects</h2>
+      <div class="grid">
+        <a href="/boards/" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Board</h3>
+            <span class="grid-item__path">/boards</span>
+          </div>
+          <p class="grid-item__description">Personal link curation. Save URLs, auto-categorize, drag-and-drop grid.</p>
+        </a>
+
+        <a href="/soundscape/" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Soundscape</h3>
+            <span class="grid-item__path">/soundscape</span>
+          </div>
+          <p class="grid-item__description">Audio-reactive visualization. Mic input drives wave grid with themes.</p>
+        </a>
+
+        <a href="https://github.com/fikei/parking" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Parking</h3>
+            <span class="grid-item__path">iOS</span>
+          </div>
+          <p class="grid-item__description">iOS app for tracking where you parked. Location, photo, timer.</p>
+        </a>
+
+        <a href="https://github.com/fikei/add-to-calendar" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Add to Calendar</h3>
+            <span class="grid-item__path">Chrome Extension</span>
+          </div>
+          <p class="grid-item__description">Browser extension. Select text, create calendar event.</p>
+        </a>
+
+        <a href="/systemic/" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Systemic</h3>
+            <span class="grid-item__path">/systemic</span>
+          </div>
+          <p class="grid-item__description">Design system generator. Define tokens, export consistent styles.</p>
+        </a>
+
+        <a href="/favicon/" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Favicon</h3>
+            <span class="grid-item__path">/favicon</span>
+          </div>
+          <p class="grid-item__description">AI favicon generator. Prompt, emoji, or upload. Export deployment-ready package.</p>
+        </a>
+
+        <a href="/events/" target="_blank" rel="noopener" class="grid-item">
+          <div>
+            <h3 class="grid-item__name">Events</h3>
+            <span class="grid-item__path">/events</span>
+          </div>
+          <p class="grid-item__description">Aggregated events from multiple sources. Filter by city, venue, date.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="footer-text">Built by Ian Fike</p>
+    </footer>
+  </div>
+
+  <script>
+    // Theme toggle with persistence
+    const toggle = document.querySelector('.theme-toggle');
+    const root = document.documentElement;
+
+    // Load saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      root.classList.add('light');
+    }
+
+    toggle.addEventListener('click', () => {
+      root.classList.toggle('light');
+      localStorage.setItem('theme', root.classList.contains('light') ? 'light' : 'dark');
+    });
+  </script>
+</body>
+</html>
