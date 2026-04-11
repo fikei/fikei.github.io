@@ -273,10 +273,101 @@ class StateRenderer {
       </div>
     `).join('');
 
+    // State coverage audit — compare expected states against CSS evidence
+    const coverageHtml = this._buildStateCoverageAudit(component, type);
+
     return `
       <div class="component-state-grid">
         <h3 class="component-state-grid__title">States &amp; Variants</h3>
         ${rows}
+        ${coverageHtml}
+      </div>
+    `;
+  }
+
+  /**
+   * Compare the expected states for this component type against CSS evidence
+   * found by the crawler. Returns a coverage summary with missing-state warnings.
+   */
+  _buildStateCoverageAudit(component, normalizedType) {
+    const content = this.CONTENT[normalizedType];
+    if (!content?.states) return '';
+
+    const expectedStates = content.states;
+    const cssStates = component.cssStates || {};
+    const htmlStates = component.states || {};
+
+    // Map expected state names to CSS pseudo-class equivalents
+    const stateToCss = {
+      'default': null,              // always present
+      'hover':   'hover',
+      'active':  'active',
+      'focus':   'focus',
+      'focused': 'focus',
+      'disabled':'disabled',
+      'error':   'error',
+      'loading': null,              // can't detect via CSS
+      'filled':  null,
+      'visited': 'visited',
+      'checked': null,
+      'selected':null,
+      'open':    null,
+      'closed':  null,
+      'on':      null,
+      'off':     null,
+      'unchecked':null,
+      'indeterminate':null,
+      'success': 'success',
+      'warning': 'warning',
+      'info':    null,
+      'online':  null,
+      'offline': null,
+      'scrolled':null,
+      'submitting':null,
+      'striped': null,
+    };
+
+    // States that can be verified via CSS/HTML evidence
+    const verifiable = expectedStates.filter(s => stateToCss[s] !== undefined && stateToCss[s] !== null);
+    if (verifiable.length === 0) return '';
+
+    const implemented = [];
+    const missing = [];
+
+    verifiable.forEach(state => {
+      const cssKey = stateToCss[state];
+      const hasCss = cssKey && (cssStates[cssKey] || false);
+      const hasHtml = cssKey && htmlStates[`has${cssKey.charAt(0).toUpperCase() + cssKey.slice(1)}`];
+      if (hasCss || hasHtml) {
+        implemented.push(state);
+      } else {
+        missing.push(state);
+      }
+    });
+
+    if (missing.length === 0) return ''; // Full coverage — no warning needed
+
+    const total = verifiable.length;
+    const pct = Math.round((implemented.length / total) * 100);
+
+    const missingTags = missing.map(s =>
+      `<span class="state-coverage__tag state-coverage__tag--missing">${s}</span>`
+    ).join('');
+    const implTags = implemented.map(s =>
+      `<span class="state-coverage__tag state-coverage__tag--ok">${s}</span>`
+    ).join('');
+
+    return `
+      <div class="state-coverage">
+        <div class="state-coverage__header">
+          <span class="state-coverage__icon">⚠</span>
+          <span class="state-coverage__title">State coverage: ${pct}%</span>
+          <span class="state-coverage__sub">${missing.length} missing state style${missing.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="state-coverage__body">
+          ${implTags ? `<div class="state-coverage__group"><span class="state-coverage__label">Styled:</span>${implTags}</div>` : ''}
+          <div class="state-coverage__group"><span class="state-coverage__label">Missing:</span>${missingTags}</div>
+        </div>
       </div>
     `;
   }
@@ -304,16 +395,34 @@ class StateRenderer {
 
   _buildStateStrip(componentType, variant) {
     const states = this._getStates(componentType, variant);
-    const cards = states.map(state => `
+
+    // Render each state and track uniqueness
+    const rendered = states.map(state => ({
+      state,
+      html: this._renderState(componentType, variant, state),
+    }));
+
+    // Detect visual duplicates: strip data-state attrs and compare
+    const normalize = html => html.replace(/data-state="[^"]*"/g, '').replace(/\s+/g, ' ').trim();
+    const uniqueOutputs = new Set(rendered.map(r => normalize(r.html)));
+    const allIdentical = uniqueOutputs.size === 1 && states.length > 1;
+
+    const cards = rendered.map(({ state, html }) => `
       <div class="state-example">
         <div class="state-example__preview">
-          ${this._renderState(componentType, variant, state)}
+          ${html}
         </div>
         <div class="state-example__label">${state}</div>
       </div>
     `).join('');
 
-    return `<div class="state-strip">${cards}</div>`;
+    const warning = allIdentical
+      ? `<div class="state-strip__warning" title="All ${states.length} states render identically — this component may need unique state styles">
+           <span class="state-strip__warning-icon">◈</span> Identical output across ${states.length} states
+         </div>`
+      : '';
+
+    return `<div class="state-strip">${cards}</div>${warning}`;
   }
 
   /**
