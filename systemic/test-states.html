@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StateRenderer — Visual Test Suite</title>
+  <link rel="stylesheet" href="css/systemic.css">
+  <link rel="stylesheet" href="css/state-inspector.css">
+  <style>
+    body {
+      background: var(--bg, #0d0d0d);
+      color: var(--fg, #eee);
+      font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+      padding: 24px 32px;
+      margin: 0;
+    }
+    h1 { font-size: 20px; margin: 0 0 6px; font-weight: 600; }
+    .test-meta {
+      font-size: 12px; opacity: .5; margin-bottom: 28px;
+    }
+    .type-section {
+      margin-bottom: 32px;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .type-section__header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: rgba(255,255,255,.03);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .type-section__name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .type-section__badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.08);
+      opacity: .6;
+    }
+    .type-section__match {
+      font-size: 10px;
+      opacity: .35;
+      margin-left: auto;
+    }
+    .type-section__body {
+      padding: 16px;
+    }
+    /* Override state-strip for test page to wrap */
+    .state-strip {
+      flex-wrap: wrap !important;
+    }
+    .summary {
+      margin-top: 40px;
+      padding: 16px;
+      background: rgba(255,255,255,.03);
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .summary h3 { margin: 0 0 8px; font-size: 14px; }
+    .summary table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .summary td, .summary th {
+      text-align: left;
+      padding: 4px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      font-size: 12px;
+    }
+    .summary th { opacity: .5; font-weight: 500; }
+    .pass { color: #2d8; }
+    .warn { color: #da0; }
+  </style>
+</head>
+<body>
+  <h1>StateRenderer Visual Test Suite</h1>
+  <p class="test-meta">Every component type × every state. Scroll to audit rendering accuracy.</p>
+  <div id="test-output"></div>
+  <div id="summary-output"></div>
+
+  <script src="js/utils/dom-utils.js"></script>
+  <script src="js/state-renderer.js"></script>
+  <script>
+    const renderer = new StateRenderer();
+
+    // All types the crawler, CodeParser, FigmaParser, and PaperParser can produce.
+    // Group by canonical type so we also verify TYPE_ALIASES mapping.
+    const TEST_TYPES = [
+      // canonical type  |  alias variants to also test
+      { type: 'button',    aliases: ['btn'] },
+      { type: 'input',     aliases: ['text-input', 'field', 'textfield', 'textarea'] },
+      { type: 'select',    aliases: ['dropdown', 'menu', 'listbox', 'picker'] },
+      { type: 'card',      aliases: [] },
+      { type: 'checkbox',  aliases: [] },
+      { type: 'radio',     aliases: [] },
+      { type: 'toggle',    aliases: ['switch'] },
+      { type: 'badge',     aliases: ['chip', 'tag', 'label'] },
+      { type: 'nav',       aliases: ['navigation', 'navbar', 'header', 'sidebar'] },
+      { type: 'alert',     aliases: ['banner', 'toast', 'notification', 'snackbar'] },
+      { type: 'avatar',    aliases: ['profile-pic'] },
+      { type: 'progress',  aliases: [] },
+      { type: 'spinner',   aliases: ['loader', 'loading'] },
+      { type: 'link',      aliases: [] },
+      { type: 'tabs',      aliases: [] },
+      { type: 'modal',     aliases: ['dialog', 'drawer', 'sheet'] },
+      { type: 'table',     aliases: [] },
+      { type: 'form',      aliases: [] },
+      { type: 'image',     aliases: ['img'] },
+      { type: 'heading',   aliases: [] },
+      { type: 'icon',      aliases: [] },
+      { type: 'list',      aliases: [] },
+      { type: 'container', aliases: [] },
+      { type: 'tooltip',   aliases: [] },
+    ];
+
+    const output = document.getElementById('test-output');
+    const summaryRows = [];
+
+    TEST_TYPES.forEach(({ type, aliases }) => {
+      // Build a mock component for this type
+      const component = {
+        type,
+        name: type.charAt(0).toUpperCase() + type.slice(1),
+        variants: [
+          {
+            name: `${type} / default`,
+            html: `<div class="${type}">[${type}]</div>`,
+            classes: [type],
+            states: [],
+            usageCount: 3,
+          },
+        ],
+      };
+
+      const html = renderer.buildComponentStateGrid(component);
+      const normalizedType = renderer._normalizeType(type);
+      const content = renderer.CONTENT[normalizedType];
+      const stateCount = content?.states?.length || renderer.DEFAULT_STATES.length;
+
+      // Alias check — do all aliases map to the same canonical type?
+      const aliasResults = aliases.map(a => {
+        const mapped = renderer._normalizeType(a);
+        return { alias: a, mapped, ok: mapped === normalizedType };
+      });
+      const allAliasesOk = aliasResults.every(r => r.ok);
+
+      summaryRows.push({
+        type,
+        normalizedType,
+        stateCount,
+        aliasCount: aliases.length,
+        allAliasesOk,
+        hasContent: !!content,
+      });
+
+      // Render section
+      const section = document.createElement('div');
+      section.className = 'type-section';
+      const aliasStr = aliases.length > 0
+        ? aliases.map(a => {
+            const mapped = renderer._normalizeType(a);
+            const ok = mapped === normalizedType;
+            return `<span style="color:${ok ? '#2d8' : '#e44'}">${a}→${mapped}</span>`;
+          }).join(', ')
+        : '<span style="opacity:.3">none</span>';
+
+      section.innerHTML = `
+        <div class="type-section__header">
+          <span class="type-section__name">${type}</span>
+          <span class="type-section__badge">${stateCount} states</span>
+          <span class="type-section__match">Aliases: ${aliasStr}</span>
+        </div>
+        <div class="type-section__body">${html || '<div style="opacity:.3;font-size:12px">No output (empty variants?)</div>'}</div>
+      `;
+      output.appendChild(section);
+    });
+
+    // Summary table
+    const summaryEl = document.getElementById('summary-output');
+    const totalTypes = summaryRows.length;
+    const withContent = summaryRows.filter(r => r.hasContent).length;
+    const aliasOk = summaryRows.filter(r => r.allAliasesOk).length;
+    const totalStates = summaryRows.reduce((n, r) => n + r.stateCount, 0);
+
+    summaryEl.innerHTML = `
+      <div class="summary">
+        <h3>Test Summary</h3>
+        <p>${totalTypes} component types tested &middot; ${totalStates} total state cards rendered &middot; ${withContent}/${totalTypes} have CONTENT entries &middot; ${aliasOk}/${totalTypes} alias groups correct</p>
+        <table>
+          <tr><th>Type</th><th>Canonical</th><th>States</th><th>CONTENT</th><th>Aliases</th></tr>
+          ${summaryRows.map(r => `
+            <tr>
+              <td>${r.type}</td>
+              <td>${r.normalizedType}</td>
+              <td>${r.stateCount}</td>
+              <td class="${r.hasContent ? 'pass' : 'warn'}">${r.hasContent ? 'yes' : 'fallback'}</td>
+              <td class="${r.allAliasesOk ? 'pass' : 'warn'}">${r.aliasCount === 0 ? '-' : (r.allAliasesOk ? `${r.aliasCount} ok` : 'MISMATCH')}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    `;
+  </script>
+</body>
+</html>
