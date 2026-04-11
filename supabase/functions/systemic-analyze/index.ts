@@ -19,8 +19,8 @@ interface AnalyzeRequest {
   variants?: number;
   contextClues?: string[];
   contextUrls?: string[];
-  // Principles extraction (new)
-  action?: 'component' | 'principles';
+  // Principles extraction
+  action?: 'component' | 'principles' | 'descriptions';
   designSystemSummary?: DesignSystemSummary;
 }
 
@@ -104,6 +104,33 @@ Deno.serve(async (req) => {
 
       const principles = parsePrinciplesResponse(principlesText.text, body.designSystemSummary);
       return new Response(JSON.stringify(principles), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Descriptions generation ─────────────────────────────────────
+    if (body.action === 'descriptions') {
+      if (!body.designSystemSummary) {
+        return new Response(
+          JSON.stringify({ error: "designSystemSummary is required for action=descriptions" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const descPrompt = buildDescriptionsPrompt(body.designSystemSummary);
+      const descMsg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 3000,
+        messages: [{ role: "user", content: descPrompt }],
+      });
+
+      const descText = descMsg.content.find((c) => c.type === "text");
+      if (!descText || descText.type !== "text") {
+        throw new Error("No text response from AI");
+      }
+
+      const descriptions = parseDescriptionsResponse(descText.text, body.designSystemSummary);
+      return new Response(JSON.stringify(descriptions), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -492,4 +519,89 @@ function fallbackGlobalPrinciples(ds: DesignSystemSummary): Array<{ title: strin
   }
   principles.push({ title: "Accessible by Default", description: "Interactive components are designed with keyboard navigation and ARIA semantics from the start." });
   return principles;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Descriptions generation
+// ──────────────────────────────────────────────────────────────────
+
+function buildDescriptionsPrompt(ds: DesignSystemSummary): string {
+  const compList = ds.components.map(c =>
+    `- ${c.type}: ${c.variantCount} variants, ${c.totalUsage} uses, classes: [${c.sampleClasses.slice(0, 6).join(', ')}]${c.sampleHtml ? `, html: ${c.sampleHtml.slice(0, 100)}` : ''}`
+  ).join('\n');
+
+  return `You are a senior design systems expert writing concise, professional documentation for a design system viewer sidebar.
+
+DESIGN SYSTEM: ${ds.name}
+SOURCE: ${ds.sourceUrl || 'unknown'}
+
+TOKENS:
+- Colors: ${ds.tokens.colorCount} tokens, primary: ${ds.tokens.primaryColor || 'unknown'}
+- Typography: ${ds.tokens.fontPrimary || 'unknown'}
+- Spacing base: ${ds.tokens.spacingBase ? ds.tokens.spacingBase + 'px' : 'unknown'}
+- Elevation: ${ds.tokens.hasElevation ? 'yes' : 'no'}
+- CSS variables (sample): ${(ds.tokens.cssVariableNames || []).slice(0, 10).join(', ')}
+
+COMPONENTS (${ds.components.length} types):
+${compList}
+
+Generate descriptions for the sidebar context panel. For each foundation AND each component, write:
+- description: 1-2 sentences about what it is and how this system uses it
+- whenToUse: 3-4 short bullet points (for components only)
+- whenNotToUse: 2-3 short bullet points (for components only)
+- accessibility: 2-3 short bullet points (for components only)
+
+Respond ONLY in this exact JSON format — no markdown, no extra text:
+{
+  "foundations": {
+    "color": { "description": "..." },
+    "typography": { "description": "..." },
+    "spacing": { "description": "..." },
+    "elevation": { "description": "..." },
+    "examples": { "description": "..." }
+  },
+  "components": {
+    "<componentType>": {
+      "description": "...",
+      "whenToUse": ["...", "..."],
+      "whenNotToUse": ["...", "..."],
+      "accessibility": ["...", "..."]
+    }
+  }
+}
+
+Be specific to THIS system — reference actual token counts, font names, and component details. Keep descriptions concise and professional.
+Return ONLY the JSON object.`;
+}
+
+interface DescriptionsResponse {
+  foundations: Record<string, { description: string }>;
+  components: Record<string, {
+    description: string;
+    whenToUse?: string[];
+    whenNotToUse?: string[];
+    accessibility?: string[];
+  }>;
+  generatedAt: string;
+}
+
+function parseDescriptionsResponse(text: string, ds: DesignSystemSummary): DescriptionsResponse {
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        foundations: parsed.foundations || {},
+        components: parsed.components || {},
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  } catch (e) {
+    console.warn('Failed to parse descriptions response:', e);
+  }
+  return {
+    foundations: {},
+    components: {},
+    generatedAt: new Date().toISOString(),
+  };
 }

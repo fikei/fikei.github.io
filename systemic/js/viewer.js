@@ -251,6 +251,9 @@ class DesignSystemViewer {
       case 'examples':
         this.renderExamplesFoundation();
         break;
+      case 'principles':
+        this.renderPrinciplesFoundation();
+        break;
       default:
         this.componentPreview.innerHTML = '<div class="preview-placeholder"><p>Select a section</p></div>';
     }
@@ -788,6 +791,212 @@ class DesignSystemViewer {
   }
 
   /**
+   * Render principles as a foundation section inside the docs view
+   */
+  renderPrinciplesFoundation() {
+    const ds = this.designSystem;
+    if (!ds) {
+      this.componentPreview.innerHTML = '<div class="preview-placeholder"><p>No design system loaded</p></div>';
+      return;
+    }
+
+    const principles = ds.principles;
+
+    // If no principles yet, show loading and trigger generation
+    if (!principles) {
+      this.componentPreview.innerHTML = `
+        <div class="principles-loading">
+          <div class="principles-loading__spinner"></div>
+          <p>Analysing design system…</p>
+        </div>
+      `;
+      this._generateAndRenderPrinciples();
+      return;
+    }
+
+    this._renderPrinciplesContent(principles);
+  }
+
+  /**
+   * Generate principles via AI, save, then render
+   */
+  async _generateAndRenderPrinciples() {
+    const ds = this.designSystem;
+    if (!ds) return;
+
+    try {
+      const gen = new PrinciplesGenerator({
+        supabaseUrl: SUPABASE_URL,
+        supabaseKey: SUPABASE_ANON_KEY
+      });
+      const principles = await gen.generate(ds);
+      ds.principles = principles;
+      // Save via app reference
+      if (window.systemicApp) {
+        window.systemicApp.saveDesignSystem(ds, true);
+      }
+      // Only re-render if still on principles tab
+      if (this.currentSection === 'principles') {
+        this._renderPrinciplesContent(principles);
+      }
+    } catch (err) {
+      console.error('[Viewer] Principles generation failed:', err);
+      if (this.currentSection === 'principles') {
+        this.componentPreview.innerHTML = `
+          <div class="principles-error">
+            <p>Failed to generate principles: ${err.message}</p>
+            <button class="btn btn--ghost btn--sm" id="principles-retry-btn">Retry</button>
+          </div>
+        `;
+        DOMUtils.$('#principles-retry-btn')?.addEventListener('click', () => {
+          this.renderPrinciplesFoundation();
+        });
+      }
+    }
+  }
+
+  /**
+   * Render the principles HTML content into the stage
+   */
+  _renderPrinciplesContent(p) {
+    const ds = this.designSystem;
+
+    // Build global principles cards (editable)
+    const globalCards = (p.globalPrinciples || []).map((pr, i) => `
+      <div class="principle-card" data-principle-index="${i}">
+        <h4 class="principle-card__title editable-field" contenteditable="true" data-field="globalPrinciples.${i}.title">${this._escHtml(pr.title)}</h4>
+        <p class="principle-card__desc editable-field" contenteditable="true" data-field="globalPrinciples.${i}.description">${this._escHtml(pr.description)}</p>
+      </div>
+    `).join('');
+
+    // Build component principles sections
+    const componentSections = Object.entries(p.componentPrinciples || {}).map(([type, rules]) => {
+      if (!rules?.length) return '';
+      const ruleItems = rules.map((r, ri) => `
+        <div class="pcomp-rule">
+          <div class="pcomp-rule__rule editable-field" contenteditable="true" data-field="componentPrinciples.${type}.${ri}.rule">${this._escHtml(r.rule)}</div>
+          <div class="pcomp-rule__rationale editable-field" contenteditable="true" data-field="componentPrinciples.${type}.${ri}.rationale">${this._escHtml(r.rationale)}</div>
+        </div>
+      `).join('');
+      const label = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      return `
+        <div class="pcomp-section">
+          <button class="pcomp-header" aria-expanded="false">
+            <span class="pcomp-header__name">${this._escHtml(label)}</span>
+            <span class="pcomp-header__count">${rules.length} rule${rules.length !== 1 ? 's' : ''}</span>
+            <span class="pcomp-header__chevron">›</span>
+          </button>
+          <div class="pcomp-body">${ruleItems}</div>
+        </div>
+      `;
+    }).join('');
+
+    const aiLabel = p.generatedAt
+      ? `Generated ${new Date(p.generatedAt).toLocaleDateString()}`
+      : '';
+
+    let html = `
+      <div class="foundation-content principles-content">
+        <div class="principles-header">
+          <div class="principles-header__top">
+            <h2 class="principles-title">${this._escHtml(ds.name)}</h2>
+            <div class="principles-actions">
+              ${aiLabel ? `<span class="principles-meta">${aiLabel}</span>` : ''}
+              <button class="btn btn--ghost btn--sm" id="principles-regenerate">Regenerate</button>
+              <button class="btn btn--ghost btn--sm" id="principles-add-global">+ Add Principle</button>
+            </div>
+          </div>
+          <p class="principles-philosophy editable-field" contenteditable="true" data-field="philosophyStatement">${this._escHtml(p.philosophyStatement || '')}</p>
+        </div>
+
+        <section class="principles-section">
+          <h3 class="principles-section__heading">Global Principles</h3>
+          <div class="principles-grid" id="principles-grid">${globalCards}</div>
+        </section>
+
+        ${componentSections ? `
+        <section class="principles-section">
+          <h3 class="principles-section__heading">Component Principles</h3>
+          <div class="pcomp-list">${componentSections}</div>
+        </section>
+        ` : ''}
+      </div>
+    `;
+
+    this.componentPreview.innerHTML = html;
+    this.componentSpecs.hidden = true;
+
+    // Bind accordion toggles
+    this.componentPreview.querySelectorAll('.pcomp-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const section = header.closest('.pcomp-section');
+        section?.classList.toggle('open');
+        header.setAttribute('aria-expanded', String(section?.classList.contains('open')));
+      });
+    });
+
+    // Regenerate button
+    DOMUtils.$('#principles-regenerate', this.componentPreview)?.addEventListener('click', () => {
+      if (ds.principles) delete ds.principles.generatedAt;
+      this.componentPreview.innerHTML = `
+        <div class="principles-loading">
+          <div class="principles-loading__spinner"></div>
+          <p>Regenerating principles…</p>
+        </div>
+      `;
+      this._generateAndRenderPrinciples();
+    });
+
+    // Add new global principle
+    DOMUtils.$('#principles-add-global', this.componentPreview)?.addEventListener('click', () => {
+      if (!ds.principles) return;
+      ds.principles.globalPrinciples = ds.principles.globalPrinciples || [];
+      ds.principles.globalPrinciples.push({ title: 'New Principle', description: 'Describe this principle…' });
+      if (window.systemicApp) window.systemicApp.saveDesignSystem(ds, true);
+      this._renderPrinciplesContent(ds.principles);
+    });
+
+    // Bind editable fields — save on blur
+    this.componentPreview.querySelectorAll('.editable-field').forEach(el => {
+      el.addEventListener('blur', () => {
+        const field = el.dataset.field;
+        const value = el.textContent.trim();
+        this._updatePrinciplesField(field, value);
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          el.blur();
+        }
+      });
+    });
+  }
+
+  /**
+   * Update a principles field by dot-notation path and save
+   */
+  _updatePrinciplesField(fieldPath, value) {
+    const ds = this.designSystem;
+    if (!ds?.principles) return;
+
+    const parts = fieldPath.split('.');
+    let target = ds.principles;
+
+    for (let i = 0; i < parts.length - 1; i++) {
+      const key = isNaN(parts[i]) ? parts[i] : parseInt(parts[i]);
+      target = target[key];
+      if (!target) return;
+    }
+
+    const lastKey = isNaN(parts[parts.length - 1]) ? parts[parts.length - 1] : parseInt(parts[parts.length - 1]);
+    target[lastKey] = value;
+
+    if (window.systemicApp) {
+      window.systemicApp.saveDesignSystem(ds, true);
+    }
+  }
+
+  /**
    * Extract audit key (size) from a variant for audit lookups
    */
   getAuditSize(variant, isTemplate) {
@@ -1138,36 +1347,197 @@ class DesignSystemViewer {
   /**
    * Update context sidebar for foundation
    */
+  /**
+   * Render the description field as editable with save-on-blur.
+   * Shows a loader if AI description is being generated.
+   */
+  _renderEditableDescription(text, scope, key) {
+    const ds = this.designSystem;
+    const descEl = this.componentDescription;
+    if (!descEl) return;
+
+    const wrapper = descEl.parentElement;
+    // Replace the description paragraph with an editable version
+    wrapper.innerHTML = `
+      <h4>Description</h4>
+      <p id="component-description" class="editable-desc" contenteditable="true" data-scope="${scope}" data-key="${key}">${this._escHtml(text)}</p>
+    `;
+
+    // Re-bind reference
+    this.componentDescription = DOMUtils.$('#component-description', wrapper.parentElement) || wrapper.querySelector('#component-description');
+
+    // Save on blur
+    const editableP = wrapper.querySelector('.editable-desc');
+    editableP?.addEventListener('blur', () => {
+      const newValue = editableP.textContent.trim();
+      if (!ds) return;
+
+      // Save to userDescriptions on the design system
+      if (!ds.userDescriptions) ds.userDescriptions = {};
+      if (scope === 'foundation') {
+        if (!ds.userDescriptions.foundations) ds.userDescriptions.foundations = {};
+        ds.userDescriptions.foundations[key] = newValue;
+      } else {
+        if (!ds.userDescriptions.components) ds.userDescriptions.components = {};
+        if (!ds.userDescriptions.components[key]) ds.userDescriptions.components[key] = {};
+        ds.userDescriptions.components[key].description = newValue;
+      }
+      if (window.systemicApp) window.systemicApp.saveDesignSystem(ds, true);
+    });
+
+    editableP?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        editableP.blur();
+      }
+    });
+
+    // If no AI descriptions loaded yet, trigger background generation
+    if (!ds?.aiDescriptions?.generatedAt && !ds?._aiDescLoading) {
+      this._triggerAIDescriptions();
+    }
+  }
+
+  /**
+   * Generate AI descriptions for all foundations and components on initial load.
+   * Shows a loader indicator in the description field while generating.
+   */
+  async _triggerAIDescriptions() {
+    const ds = this.designSystem;
+    if (!ds || ds._aiDescLoading || ds.aiDescriptions?.generatedAt) return;
+
+    ds._aiDescLoading = true;
+
+    // Show subtle loading indicator next to description
+    const descEl = this.componentDescription;
+    if (descEl) {
+      const loader = document.createElement('span');
+      loader.className = 'desc-ai-loader';
+      loader.id = 'desc-ai-loader';
+      loader.textContent = ' generating…';
+      descEl.parentElement?.appendChild(loader);
+    }
+
+    try {
+      const gen = new PrinciplesGenerator({
+        supabaseUrl: SUPABASE_URL,
+        supabaseKey: SUPABASE_ANON_KEY
+      });
+      const summary = gen._buildSummary(ds);
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/systemic-analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'descriptions',
+          designSystemSummary: summary,
+        }),
+      });
+
+      if (res.ok) {
+        const descriptions = await res.json();
+        ds.aiDescriptions = descriptions;
+
+        // Save to localStorage
+        if (window.systemicApp) window.systemicApp.saveDesignSystem(ds, true);
+
+        // Re-render current context if still viewing the same section
+        if (this.currentSection && this.currentSection !== 'component') {
+          const userDesc = ds.userDescriptions?.foundations?.[this.currentSection];
+          if (!userDesc) {
+            const aiDesc = descriptions.foundations?.[this.currentSection]?.description;
+            if (aiDesc && this.componentDescription) {
+              this.componentDescription.textContent = aiDesc;
+            }
+          }
+        } else if (this.currentComponent) {
+          const userDesc = ds.userDescriptions?.components?.[this.currentComponent.type]?.description;
+          if (!userDesc) {
+            const aiDesc = descriptions.components?.[this.currentComponent.type];
+            if (aiDesc?.description && this.componentDescription) {
+              this.componentDescription.textContent = aiDesc.description;
+            }
+            // Update when to use / when not to use / accessibility
+            if (aiDesc?.whenToUse?.length > 0 && this.usageSection?.hidden) {
+              this.usageSection.hidden = false;
+              this.whenToUse.innerHTML = aiDesc.whenToUse.map(item => `<li>${item}</li>`).join('');
+            }
+            if (aiDesc?.whenNotToUse?.length > 0 && this.dontUseSection?.hidden) {
+              this.dontUseSection.hidden = false;
+              this.whenNotToUse.innerHTML = aiDesc.whenNotToUse.map(item => `<li>${item}</li>`).join('');
+            }
+            if (aiDesc?.accessibility?.length > 0 && this.a11ySection?.hidden) {
+              this.a11ySection.hidden = false;
+              this.accessibilityNotes.innerHTML = aiDesc.accessibility.map(item => `<li>${item}</li>`).join('');
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Viewer] AI description generation failed:', err);
+    } finally {
+      ds._aiDescLoading = false;
+      // Remove loader
+      DOMUtils.$('#desc-ai-loader')?.remove();
+    }
+  }
+
   updateContextForFoundation(section) {
-    const docs = this.designSystem?.documentation?.foundations?.[section];
+    const ds = this.designSystem;
+    const docs = ds?.documentation?.foundations?.[section];
+    const aiDescs = ds?.aiDescriptions?.foundations?.[section];
 
-    // Design context
-    this.componentDescription.textContent = docs?.description ||
-      `Documentation for ${this.formatName(section)} tokens.`;
+    // Design context — use AI description if available, else fallback
+    const descText = ds?.userDescriptions?.foundations?.[section]
+      || aiDescs?.description
+      || docs?.description
+      || `Documentation for ${this.formatName(section)} tokens.`;
 
-    // Hide component-specific sections
+    this._renderEditableDescription(descText, 'foundation', section);
+
+    // Hide component-specific sections for foundations
     this.usageSection.hidden = true;
     this.dontUseSection.hidden = true;
     this.a11ySection.hidden = true;
+    if (this.statesSection) this.statesSection.hidden = true;
+    if (this.compPrinciplesSection) this.compPrinciplesSection.hidden = true;
 
     // Code context - show token list
-    this.updateTokenList(section);
-    this.updateCodeBlocks(section);
+    if (section !== 'principles') {
+      this.updateTokenList(section);
+      this.updateCodeBlocks(section);
+    } else {
+      this.tokenList.innerHTML = '<p>No tokens for principles</p>';
+      if (this.cssCode) this.cssCode.textContent = '';
+      if (this.htmlCode) this.htmlCode.textContent = '';
+      if (this.reactCode) this.reactCode.textContent = '';
+    }
   }
 
   /**
    * Update context sidebar for component
    */
   updateContextForComponent(component) {
+    const ds = this.designSystem;
     const guidelines = component.guidelines || {};
+    const aiDesc = ds?.aiDescriptions?.components?.[component.type];
+    const userDesc = ds?.userDescriptions?.components?.[component.type];
 
-    // Design context
-    this.componentDescription.textContent = `${component.name} component extracted from the source website.`;
+    // Design context — description (editable)
+    const descText = userDesc?.description
+      || aiDesc?.description
+      || `${component.name} component extracted from the source website.`;
+    this._renderEditableDescription(descText, 'component', component.type);
 
-    // When to use
-    if (guidelines.whenToUse?.length > 0) {
+    // When to use — prefer AI-generated, then guidelines
+    const whenToUse = aiDesc?.whenToUse || guidelines.whenToUse;
+    if (whenToUse?.length > 0) {
       this.usageSection.hidden = false;
-      this.whenToUse.innerHTML = guidelines.whenToUse
+      this.whenToUse.innerHTML = whenToUse
         .map(item => `<li>${item}</li>`)
         .join('');
     } else {
@@ -1175,9 +1545,10 @@ class DesignSystemViewer {
     }
 
     // When not to use
-    if (guidelines.whenNotToUse?.length > 0) {
+    const whenNotToUse = aiDesc?.whenNotToUse || guidelines.whenNotToUse;
+    if (whenNotToUse?.length > 0) {
       this.dontUseSection.hidden = false;
-      this.whenNotToUse.innerHTML = guidelines.whenNotToUse
+      this.whenNotToUse.innerHTML = whenNotToUse
         .map(item => `<li>${item}</li>`)
         .join('');
     } else {
@@ -1185,9 +1556,10 @@ class DesignSystemViewer {
     }
 
     // Accessibility
-    if (component.accessibility?.length > 0) {
+    const a11y = aiDesc?.accessibility || component.accessibility;
+    if (a11y?.length > 0) {
       this.a11ySection.hidden = false;
-      this.accessibilityNotes.innerHTML = component.accessibility
+      this.accessibilityNotes.innerHTML = a11y
         .map(item => `<li>${item}</li>`)
         .join('');
     } else {

@@ -960,8 +960,14 @@ class SystemicApp {
   handleRoute() {
     const route = this.parseHash();
 
-    // If navigating to docs/qa/principles without a loaded system, try to restore
-    if ((route.view === 'docs' || route.view === 'qa' || route.view === 'principles') && !this.viewer?.designSystem) {
+    // Redirect legacy #principles to #docs/principles
+    if (route.view === 'principles') {
+      window.location.hash = 'docs/principles';
+      return;
+    }
+
+    // If navigating to docs/qa without a loaded system, try to restore
+    if ((route.view === 'docs' || route.view === 'qa') && !this.viewer?.designSystem) {
       const restored = this.restoreActiveSystem();
       if (!restored) {
         // No system to restore — redirect to systems list
@@ -979,7 +985,7 @@ class SystemicApp {
     // Handle sub-routes for docs view
     if (route.view === 'docs') {
       if (this.viewer?.designSystem && route.section) {
-        const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples'];
+        const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples', 'principles'];
         if (foundations.includes(route.section)) {
           this.viewer.selectFoundation(route.section);
         } else if (route.section === 'component' && route.detail) {
@@ -1010,10 +1016,6 @@ class SystemicApp {
       this.renderSystemsList();
     }
 
-    // Render principles view
-    if (route.view === 'principles') {
-      this.renderPrinciples();
-    }
   }
 
   /**
@@ -1051,21 +1053,6 @@ class SystemicApp {
           <span class="docs-nav__spacer"></span>
         `;
         break;
-
-      case 'principles': {
-        const pSystemName = this.viewer?.designSystem?.name || 'System';
-        this.appNav.innerHTML = `
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb-link">Systems</a>
-            <span class="breadcrumb-sep">/</span>
-            <a href="#docs/color" class="breadcrumb-link">${pSystemName}</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current">Principles</span>
-          </nav>
-          <span class="docs-nav__spacer"></span>
-        `;
-        break;
-      }
 
       case 'docs':
         this.renderDocsNav(route);
@@ -1160,7 +1147,7 @@ class SystemicApp {
         <span class="breadcrumb-current" id="breadcrumb-system-name">${systemName}</span>
       </nav>
       <span class="docs-nav__divider"></span>
-      <a href="#principles" class="docs-nav__link">Principles</a>
+      <a href="#" class="docs-nav__link" data-section="principles">Principles</a>
       <a href="#" class="docs-nav__link" data-section="color">Color</a>
       <a href="#" class="docs-nav__link" data-section="typography">Typography</a>
       <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
