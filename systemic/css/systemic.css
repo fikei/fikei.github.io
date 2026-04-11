@@ -162,6 +162,10 @@
   flex-shrink: 0;
 }
 
+.view-toggle[hidden] {
+  display: none;
+}
+
 .toggle-btn {
   flex: 1;
   padding: var(--space-2);

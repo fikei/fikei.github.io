@@ -3,27 +3,34 @@
    Uses CTRL Design System tokens + Systemic viewer grid
    ============================================ */
 
-/* QA View Layout */
-.qa-container {
+/* QA Inline Container (inside docs viewer-container) */
+.qa-inline {
+  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
 }
 
-.qa-header {
-  padding: var(--space-4) var(--space-6);
-  border-bottom: var(--border-thin) solid var(--border-subtle);
+.qa-inline[hidden] {
+  display: none;
+}
+
+/* QA Nav Controls (inline in docs nav bar) */
+.qa-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   flex-shrink: 0;
 }
 
-.qa-header h2 {
-  font-family: var(--font-primary);
-  font-size: var(--text-lg);
-  font-weight: normal;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  margin: 0 0 var(--space-1);
+.qa-nav-controls[hidden] {
+  display: none;
+}
+
+/* Mode toggle variant */
+.view-toggle--mode {
+  margin-left: var(--space-2);
 }
 
 .qa-desc {
@@ -34,6 +41,7 @@
 }
 
 /* Filter bar overrides (DS .filter-bar base in components.css) */
+.qa-inline .filter-bar,
 .qa-container .filter-bar {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-6);
@@ -41,6 +49,7 @@
   flex-shrink: 0;
 }
 
+.qa-inline .filter-bar select option,
 .qa-container .filter-bar select option {
   text-transform: none;
   letter-spacing: normal;
@@ -57,6 +66,7 @@
 }
 
 /* Active state for toggle buttons in filter bar */
+.qa-inline .filter-bar .btn.active,
 .qa-container .filter-bar .btn.active {
   background: var(--fg);
   color: var(--bg);
@@ -331,10 +341,12 @@
 }
 
 /* Audit log table overrides (DS .data-table base in components.css) */
+.qa-inline .data-table,
 .qa-container .data-table {
   margin-top: var(--space-4);
 }
 
+.qa-inline .data-table th,
 .qa-container .data-table th {
   font-weight: normal;
 }

@@ -18,6 +18,10 @@
   background: var(--bg);
 }
 
+.component-stage[hidden] {
+  display: none;
+}
+
 /* Showcase - widgets.html-style scrollable content area with grid texture */
 .showcase {
   flex: 1;
@@ -40,6 +44,10 @@
   display: flex;
   gap: var(--space-1);
   flex-shrink: 0;
+}
+
+.state-toggles[hidden] {
+  display: none;
 }
 
 .state-btn {
@@ -132,6 +140,10 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+}
+
+.context-sidebar[hidden] {
+  display: none;
 }
 
 

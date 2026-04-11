@@ -95,17 +95,14 @@ class DesignSystemViewer {
       });
     });
 
-    // Component dropdown
-    this.componentSelect?.addEventListener('change', (e) => {
-      const type = e.target.value;
-      if (!type) return;
-      const comp = this.designSystem?.components?.find(c => c.type === type);
-      if (comp) this.selectComponent(comp);
-    });
+    // Component dropdown — selection is handled by app.selectComponentGlobal()
+    // (wired in app.js after rebindNav)
 
-    // View toggle (Design / Code)
-    DOMUtils.$$('.toggle-btn', navElement).forEach(btn => {
-      btn.addEventListener('click', () => this.switchContext(btn.dataset.context));
+    // View toggle (Design / Code) — only bind buttons with data-context, not data-mode
+    DOMUtils.$$('.view-toggle:not(.view-toggle--mode) .toggle-btn', navElement).forEach(btn => {
+      if (btn.dataset.context) {
+        btn.addEventListener('click', () => this.switchContext(btn.dataset.context));
+      }
     });
 
     // State toggles
@@ -120,8 +117,10 @@ class DesignSystemViewer {
 
     // Restore active states
     if (this.currentContext) {
-      DOMUtils.$$('.toggle-btn', navElement).forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.context === this.currentContext);
+      DOMUtils.$$('.view-toggle:not(.view-toggle--mode) .toggle-btn', navElement).forEach(btn => {
+        if (btn.dataset.context) {
+          btn.classList.toggle('active', btn.dataset.context === this.currentContext);
+        }
       });
     }
     if (this.currentState) {

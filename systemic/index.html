@@ -271,6 +271,37 @@
               </div>
             </div>
           </aside>
+
+          <!-- QA Inline Container (shown when QA mode is active) -->
+          <div class="qa-inline" id="qa-inline" hidden>
+            <div id="usage-inspector-mount-inline"></div>
+
+            <p class="qa-desc" id="qa-desc" style="padding: var(--space-3) var(--space-6); margin: 0;">Select a component to audit its variants.</p>
+
+            <div class="qa-content" id="qa-content">
+              <div class="qa-variant-grid" id="qa-grid"></div>
+
+              <div id="qa-blocked-section" style="display:none;margin-top:var(--space-6)">
+                <button class="qa-blocked-toggle" id="qa-blocked-toggle"></button>
+                <div class="qa-variant-grid" id="qa-blocked-grid" style="display:none"></div>
+              </div>
+
+              <!-- Grid Test — widgets at different column counts -->
+              <div class="qa-grid-test-section" id="qa-grid-test-section" style="display:none;margin-top:var(--space-8)">
+                <h3 class="qa-log-heading">Grid Size Permutations</h3>
+                <p class="qa-desc">Same widget at its valid grid sizes. Toggle columns to test responsiveness.</p>
+                <div class="qa-grid-controls">
+                  <button class="active" data-cols="5">5 col</button>
+                  <button data-cols="4">4 col</button>
+                  <button data-cols="3">3 col</button>
+                  <button id="qa-grid-test-lines-btn">Grid lines</button>
+                </div>
+                <div class="qa-grid-test qa-grid-test--5col" id="qa-grid-test"></div>
+              </div>
+
+              <div id="qa-audit-output" style="margin-top:var(--space-8)"></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -282,55 +313,6 @@
             <div class="principles-empty__icon">◈</div>
             <h3>No design system loaded</h3>
             <p>Run a scan to generate design principles for your system.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- QA / Variant Audit View -->
-      <section class="view-panel" id="qa-view">
-        <div class="qa-container">
-          <div class="qa-header">
-            <h2>Variant Audit</h2>
-            <p class="qa-desc" id="qa-desc">Select a component to audit its variants.</p>
-          </div>
-
-          <!-- Component Usage Inspector (mounted by usage-inspector.js) -->
-          <div id="usage-inspector-mount"></div>
-
-          <div class="filter-bar">
-            <select class="input select" id="qa-component-filter">
-              <option value="">— Select component —</option>
-            </select>
-            <select class="input select" id="qa-variant-filter">
-              <option value="">All variants</option>
-            </select>
-            <button class="btn" id="qa-gridlines-btn">Grid lines</button>
-            <span class="filter-bar__spacer"></span>
-            <span class="filter-bar__stats" id="qa-stats"></span>
-          </div>
-
-          <div class="qa-content" id="qa-content">
-            <div class="qa-variant-grid" id="qa-grid"></div>
-
-            <div id="qa-blocked-section" style="display:none;margin-top:var(--space-6)">
-              <button class="qa-blocked-toggle" id="qa-blocked-toggle"></button>
-              <div class="qa-variant-grid" id="qa-blocked-grid" style="display:none"></div>
-            </div>
-
-            <!-- Grid Test — widgets at different column counts -->
-            <div class="qa-grid-test-section" id="qa-grid-test-section" style="display:none;margin-top:var(--space-8)">
-              <h3 class="qa-log-heading">Grid Size Permutations</h3>
-              <p class="qa-desc">Same widget at its valid grid sizes. Toggle columns to test responsiveness.</p>
-              <div class="qa-grid-controls">
-                <button class="active" data-cols="5">5 col</button>
-                <button data-cols="4">4 col</button>
-                <button data-cols="3">3 col</button>
-                <button id="qa-grid-test-lines-btn">Grid lines</button>
-              </div>
-              <div class="qa-grid-test qa-grid-test--5col" id="qa-grid-test"></div>
-            </div>
-
-            <div id="qa-audit-output" style="margin-top:var(--space-8)"></div>
           </div>
         </div>
       </section>

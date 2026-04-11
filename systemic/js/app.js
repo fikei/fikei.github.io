@@ -34,6 +34,10 @@ class SystemicApp {
     this.debugMode = true; // Enable detailed logging
     this.debugLogs = []; // Store all debug logs for export
 
+    // Unified component selection state
+    this.selectedComponentType = null;
+    this.componentViewMode = 'docs'; // 'docs' or 'qa'
+
     this.init();
   }
 
@@ -266,10 +270,6 @@ class SystemicApp {
     if (this.viewer && this.variantAudit) {
       this.viewer.variantAudit = this.variantAudit;
     }
-    // Connect component filter to Usage Inspector
-    DOMUtils.$('#qa-component-filter')?.addEventListener('change', (e) => {
-      this._onQAComponentSelect(e.target.value);
-    });
     this.initRouter();
   }
 
@@ -983,23 +983,26 @@ class SystemicApp {
         if (foundations.includes(route.section)) {
           this.viewer.selectFoundation(route.section);
         } else if (route.section === 'component' && route.detail) {
-          const comp = this.viewer.designSystem.components?.find(
-            c => c.type === route.detail
-          );
-          if (comp) {
-            this.viewer.selectComponent(comp);
-          }
+          this.selectComponentGlobal(route.detail);
         }
+      }
+      // Re-sync dropdown — viewer.selectFoundation clears it for foundation routes,
+      // but we need it to reflect the global component selection for QA mode
+      if (this.selectedComponentType) {
+        const cs = DOMUtils.$('#component-select', this.appNav);
+        if (cs) cs.value = this.selectedComponentType;
       }
     }
 
-    // Handle QA view
+    // Handle QA view — redirect to docs with QA mode
     if (route.view === 'qa') {
-      this.variantAudit?.init();
-      // Deep link to a specific component: #qa/component-name
-      if (route.section && this.variantAudit) {
-        this.variantAudit.show(route.section);
+      this.componentViewMode = 'qa';
+      if (route.section) {
+        this.selectedComponentType = route.section;
       }
+      const compPart = route.section ? `/component/${route.section}` : '';
+      window.location.hash = `docs${compPart}`;
+      return;
     }
 
     // Load systems list when switching to systems view
@@ -1048,21 +1051,6 @@ class SystemicApp {
           <span class="docs-nav__spacer"></span>
         `;
         break;
-
-      case 'qa': {
-        const qaSystemName = this.viewer?.designSystem?.name || 'System';
-        this.appNav.innerHTML = `
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb-link">Systems</a>
-            <span class="breadcrumb-sep">/</span>
-            <a href="#docs/color" class="breadcrumb-link">${qaSystemName}</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current">Variant Audit</span>
-          </nav>
-          <span class="docs-nav__spacer"></span>
-        `;
-        break;
-      }
 
       case 'principles': {
         const pSystemName = this.viewer?.designSystem?.name || 'System';
@@ -1178,7 +1166,6 @@ class SystemicApp {
       <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
       <a href="#" class="docs-nav__link" data-section="examples">Examples</a>
       <a href="#principles" class="docs-nav__link">Principles</a>
-      <a href="#qa" class="docs-nav__link">QA</a>
       <span class="docs-nav__spacer"></span>
       <select class="docs-nav__select" id="component-select">
         <option value="">Component...</option>
@@ -1197,12 +1184,77 @@ class SystemicApp {
         <button class="toggle-btn active" data-context="design">Design</button>
         <button class="toggle-btn" data-context="code">Code</button>
       </div>
+      <div class="qa-nav-controls" hidden>
+        <select class="docs-nav__select" id="qa-variant-filter-nav">
+          <option value="">All variants</option>
+        </select>
+        <button class="btn btn--sm" id="qa-gridlines-nav">Grid lines</button>
+        <span class="filter-bar__stats" id="qa-stats-nav"></span>
+      </div>
+      <div class="view-toggle view-toggle--mode">
+        <button class="toggle-btn${this.componentViewMode === 'docs' ? ' active' : ''}" data-mode="docs">Docs</button>
+        <button class="toggle-btn${this.componentViewMode === 'qa' ? ' active' : ''}" data-mode="qa">QA</button>
+      </div>
     `;
 
     // Rebind viewer events to the newly created nav elements
     if (this.viewer) {
       this.viewer.rebindNav(this.appNav);
     }
+
+    // Override component select to use global selection
+    const componentSelect = DOMUtils.$('#component-select', this.appNav);
+    if (componentSelect) {
+      componentSelect.addEventListener('change', (e) => {
+        this.selectComponentGlobal(e.target.value);
+      });
+    }
+
+    // Wire Docs|QA mode toggle
+    DOMUtils.$$('.view-toggle--mode .toggle-btn', this.appNav).forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.componentViewMode = btn.dataset.mode;
+        DOMUtils.$$('.view-toggle--mode .toggle-btn', this.appNav)
+          .forEach(b => b.classList.toggle('active', b === btn));
+        this.renderComponentViewMode();
+      });
+    });
+
+    // Wire QA nav controls to variant audit
+    DOMUtils.$('#qa-gridlines-nav', this.appNav)?.addEventListener('click', () => {
+      this.variantAudit?.toggleGridLines();
+    });
+    DOMUtils.$('#qa-variant-filter-nav', this.appNav)?.addEventListener('change', () => {
+      if (this.variantAudit) {
+        this.variantAudit.lastFilter = 'variant';
+        this.variantAudit.showVariants();
+      }
+    });
+
+    // Restore component selection
+    if (this.selectedComponentType && componentSelect) {
+      componentSelect.value = this.selectedComponentType;
+    } else {
+      // Try restoring from localStorage
+      const sysId = this.viewer?.designSystem?.id;
+      if (sysId) {
+        const saved = localStorage.getItem(`selected-component:${sysId}`);
+        if (saved && componentSelect) {
+          componentSelect.value = saved;
+          this.selectedComponentType = saved;
+        }
+        const savedMode = localStorage.getItem(`component-view-mode:${sysId}`);
+        if (savedMode === 'qa') {
+          this.componentViewMode = 'qa';
+          DOMUtils.$$('.view-toggle--mode .toggle-btn', this.appNav).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === 'qa');
+          });
+        }
+      }
+    }
+
+    // Apply current view mode
+    this.renderComponentViewMode();
 
     // Set active foundation link if applicable
     if (route.section) {
@@ -1225,19 +1277,13 @@ class SystemicApp {
    * Initialize the variant audit module
    */
   initVariantAudit() {
-    const qaContainer = DOMUtils.$('#qa-view');
+    const qaContainer = DOMUtils.$('#qa-inline');
     if (qaContainer) {
       this.variantAudit = new VariantAudit({
         container: qaContainer,
         systemId: 'default',
         onToast: (msg) => this.showToast(msg)
       });
-
-      // Wire blocked toggle button
-      const blockedToggle = DOMUtils.$('#qa-blocked-toggle');
-      if (blockedToggle) {
-        blockedToggle.addEventListener('click', () => this.variantAudit.toggleBlockedSection());
-      }
     }
   }
 
@@ -1270,10 +1316,98 @@ class SystemicApp {
   }
 
   /**
+   * Global component selection — single source of truth for both Docs and QA modes
+   */
+  selectComponentGlobal(componentType) {
+    this.selectedComponentType = componentType;
+
+    // Persist to localStorage
+    const sysId = this.viewer?.designSystem?.id;
+    if (sysId) {
+      localStorage.setItem(`selected-component:${sysId}`, componentType || '');
+    }
+
+    // Sync the dropdown
+    const select = DOMUtils.$('#component-select', this.appNav);
+    if (select && select.value !== componentType) {
+      select.value = componentType || '';
+    }
+
+    // Notify viewer
+    if (componentType && this.viewer?.designSystem) {
+      const comp = this.viewer.designSystem.components?.find(c => c.type === componentType);
+      if (comp) this.viewer.selectComponent(comp);
+    }
+
+    // Notify QA (if in QA mode, it will render; if not, it stores the selection)
+    if (componentType && this.variantAudit) {
+      this.variantAudit.setActiveComponent(componentType);
+      if (this.componentViewMode === 'qa') {
+        this.variantAudit.showVariants();
+      }
+    }
+
+    // Notify usage inspector
+    this._onQAComponentSelect(componentType);
+  }
+
+  /**
+   * Switch between Docs and QA modes within the docs view
+   */
+  renderComponentViewMode() {
+    // Sync dropdown with current selection
+    const componentSelect = DOMUtils.$('#component-select', this.appNav);
+    if (componentSelect && this.selectedComponentType && componentSelect.value !== this.selectedComponentType) {
+      componentSelect.value = this.selectedComponentType;
+    }
+
+    const stage = DOMUtils.$('#component-stage');
+    const sidebar = DOMUtils.$('#context-sidebar');
+    const qaInline = DOMUtils.$('#qa-inline');
+    const stateToggles = DOMUtils.$('.state-toggles', this.appNav);
+    const designCodeToggle = DOMUtils.$('.view-toggle:not(.view-toggle--mode)', this.appNav);
+    const variantSelect = DOMUtils.$('#variant-select', this.appNav);
+    const qaNavControls = DOMUtils.$('.qa-nav-controls', this.appNav);
+
+    if (this.componentViewMode === 'qa') {
+      if (stage) stage.hidden = true;
+      if (sidebar) sidebar.hidden = true;
+      if (qaInline) qaInline.hidden = false;
+      if (stateToggles) stateToggles.hidden = true;
+      if (designCodeToggle) designCodeToggle.hidden = true;
+      if (variantSelect) variantSelect.hidden = true;
+      if (qaNavControls) qaNavControls.hidden = false;
+
+      // Initialize QA if needed and render for current component
+      if (this.variantAudit) {
+        this.variantAudit.setContainer(qaInline);
+        this.variantAudit.init();
+        if (this.selectedComponentType) {
+          this.variantAudit.setActiveComponent(this.selectedComponentType);
+          this.variantAudit.showVariants();
+        }
+      }
+    } else {
+      if (stage) stage.hidden = false;
+      if (sidebar) sidebar.hidden = false;
+      if (qaInline) qaInline.hidden = true;
+      if (stateToggles) stateToggles.hidden = false;
+      if (designCodeToggle) designCodeToggle.hidden = false;
+      if (qaNavControls) qaNavControls.hidden = true;
+    }
+
+    // Persist mode
+    const sysId = this.viewer?.designSystem?.id;
+    if (sysId) {
+      localStorage.setItem(`component-view-mode:${sysId}`, this.componentViewMode);
+    }
+  }
+
+  /**
    * Initialize the Usage Inspector
    */
   initUsageInspector() {
-    const mount = DOMUtils.$('#usage-inspector-mount');
+    const mount = DOMUtils.$('#usage-inspector-mount-inline');
     if (mount) {
       this.usageInspector = new UsageInspector({
         container: mount,
