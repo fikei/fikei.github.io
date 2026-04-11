@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Field — Ian Fike</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../design-system/tokens.css">
+  <link rel="stylesheet" href="../design-system/components.css">
+  <link rel="stylesheet" href="../design-system/display.css">
+</head>
+<body class="d-page">
+
+<nav class="d-nav">
+  <a href="./" class="d-nav__name">CTRL.RODEO</a>
+  <ul class="d-nav__links">
+    <li><a href="./field.html" class="d-nav__link d-nav__link--active">Field</a></li>
+    <li><a href="./invoy.html" class="d-nav__link">Invoy</a></li>
+    <li><a href="./livongo.html" class="d-nav__link">Livongo</a></li>
+    <li><a href="./how-i-work.html" class="d-nav__link">How I Work</a></li>
+  </ul>
+</nav>
+
+<div class="d-subnav">
+  <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
+  <a href="#deliverable" class="d-subnav__link">Deliverable</a>
+  <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#impact" class="d-subnav__link">Impact</a>
+  <a href="#faq" class="d-subnav__link">FAQ</a>
+</div>
+
+<div class="d-contain">
+
+  <!-- Header — side by side -->
+  <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
+    <!-- Image placeholder -->
+    <div style="width: 400px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
+    <!-- Content -->
+    <div style="flex: 1;">
+      <span class="d-status d-status--dev">In Beta</span>
+      <p class="d-headline d-headline--xl" style="margin-top: 12px;">Field</p>
+      <p class="d-body" style="margin-top: 12px;">An app that turns spoken conversation into structured medical notes — built for first responders who can't stop treating a patient to write things down.</p>
+
+      <dl class="d-overview" style="margin-top: 24px;">
+        <dt>Role</dt>
+        <dd>Founder, sole designer</dd>
+        <dt>Timeline</dt>
+        <dd>March 2026 – Present (5 weeks)</dd>
+        <dt>Status</dt>
+        <dd>Beta with 2 outdoor ed programs, 3 guiding agencies</dd>
+        <dt>Key tech</dt>
+        <dd>On-device AI (Whisper, Llama 3.2), offline-first, GPS</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- FRAMING -->
+  <div id="framing" class="d-section">
+    <p class="d-label">Framing</p>
+    <p class="d-body">Search and rescue teams still use paper to document patient care. They write in the rain, in the dark, wearing gloves. Important details get lost. When they hand off a patient to a hospital, the notes are often incomplete or hard to read.</p>
+    <p class="d-body">Existing software was built for ambulances with Wi-Fi and keyboards. Nothing works for the backcountry — where there's <strong>no cell service, no keyboard, and no time to type.</strong></p>
+
+    <p class="d-label" style="margin-top: 32px;">Personas</p>
+    <div class="d-personas">
+      <div class="d-persona" style="border: 1px solid var(--border-subtle, #33332f);">
+        <span class="d-persona__role">Primary user</span>
+        <span class="d-persona__name">First Responder</span>
+        <ul class="d-persona__needs">
+          <li>Has to document while treating the patient. Wearing gloves, often in bad weather. Might be new — this could be their first real call.</li>
+        </ul>
+      </div>
+      <div class="d-persona" style="border: 1px solid var(--border-subtle, #33332f);">
+        <span class="d-persona__role">Receives the note</span>
+        <span class="d-persona__name">Professional EMS</span>
+        <ul class="d-persona__needs">
+          <li>Needs organized data, not handwritten paragraphs. Wants vitals and a treatment plan in standard format.</li>
+        </ul>
+      </div>
+      <div class="d-persona" style="border: 1px solid var(--border-subtle, #33332f);">
+        <span class="d-persona__role">Information source</span>
+        <span class="d-persona__name">Patient</span>
+        <ul class="d-persona__needs">
+          <li>Describes symptoms out loud, often while in pain. Gives information out of order.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELIVERABLE -->
+  <div id="deliverable" class="d-section">
+    <p class="d-label">Deliverable</p>
+    <p class="d-body" style="margin-bottom: 32px;">The responder talks to the patient. The app listens, logs all medical details, and creates a patient record and SOAP note automatically. When its time to handoff care, the patient record travels with the patient in a simple tap of your phone.</p>
+
+    <p class="d-label">How it works</p>
+    <div class="d-flow">
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">01</span>
+        <span class="d-flow__step-label">Voice</span>
+        <span class="d-flow__step-desc">Mic records the conversation</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">02</span>
+        <span class="d-flow__step-label">Transcribe</span>
+        <span class="d-flow__step-desc">Whisper converts speech to text on-device</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">03</span>
+        <span class="d-flow__step-label">Extract</span>
+        <span class="d-flow__step-desc">Llama finds medical details and sorts them</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">04</span>
+        <span class="d-flow__step-label">Review</span>
+        <span class="d-flow__step-desc">Responder confirms or edits each field</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">05</span>
+        <span class="d-flow__step-label">Hand off</span>
+        <span class="d-flow__step-desc">Send via Wallet, satellite, clipboard</span>
+      </div>
+    </div>
+
+    <!-- Provider Use Cases -->
+    <p class="d-label" style="margin-top: 48px;">Provider Use Cases</p>
+    <div class="d-gallery d-gallery--3" style="margin-top: 16px;">
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 1/1.8; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 1/1.8; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 1/1.8; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 1/1.8; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">Record & Respond — Mic records the conversation</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 1/1.8; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">Review — Mic records the conversation</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 1/1.8; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">Hand Off — Mic records the conversation</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Key Design Decisions</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Why does the AI fill in fields but still let the responder edit them?</p>
+        <p class="d-decision__a">Medical notes need human sign-off. The AI does the first pass — pulling a heart rate from the conversation, for example — but the responder has to confirm it. Faster than typing from scratch, safer than full automation.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why three colors for field status instead of just "done" or "not done"?</p>
+        <p class="d-decision__a">Green means confirmed. Amber means "check this before handoff." Red means conflicting data. Two states would hide the "probably right but double-check" category — the most common one.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why not use a regular keyboard for data entry?</p>
+        <p class="d-decision__a">Gloves make small buttons impossible. Large preset buttons at tailored intervals (ex. 60, 70, 80, 90, 100, 120 bpm for Heart Rate) and +1/-10 adjusters cover most cases in one or two taps.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPACT -->
+  <div id="impact" class="d-section">
+    <p class="d-label">Impact</p>
+    <div class="d-metrics" style="margin: 16px calc(-1 * clamp(20px, 5vw, 64px)) 0;">
+      <div class="d-metric">
+        <div class="d-metric__value">5</div>
+        <div class="d-metric__label">Beta partners</div>
+        <div class="d-metric__sub">2 outdoor ed, 1 SAR, 2 guiding agencies</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">2</div>
+        <div class="d-metric__label">Licensing conversations</div>
+        <div class="d-metric__sub">National outdoor ed organizations</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">27</div>
+        <div class="d-metric__label">Screens designed</div>
+        <div class="d-metric__sub">Full app, patient list to handoff</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div id="faq" class="d-section">
+    <p class="d-label">Frequently Asked Customer Questions</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Does it work offline?</p>
+        <p class="d-decision__a">Many rescue sites have no cell service. The app downloads two AI models and runs them locally. It works the same whether you're in town, in a canyon or 30 miles from the nearest cell tower.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Does the dictation actually work?</p>
+        <p class="d-decision__a">Our dictation model has been fine-tuned & tested using over 5000 clinical recordings. We carefully selected them for the situations you experience — high wind, rain, helicopter landings, ambient pain & multiple voices.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Is it compliant to the most recent privacy & data standards?</p>
+        <p class="d-decision__a">Field is compliant to most medical privacy & data standards (HIPAA, NEMSIS, FHIR R4, USCDI v3).</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">I am an EMT / Paramedic. Does it replace my patient care records (ePCR)?</p>
+        <p class="d-decision__a">Field works with your existing ePCR today. Its easy to send your records to your administrator to save their life easier — in a couple clicks they can add your Field Record to the right patient with all of the appropriate billing codes attached. Direct integrations are in our roadmap.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Do you support multiple casualty incidents (MCIs)?</p>
+        <p class="d-decision__a">Not yet. We are working with our search and rescue partners to follow FEMA command structures, following known best practices & participating in MCI scenarios to take the cognitive load off of all parties when managing patient care.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="d-footer d-contain">
+  <a href="./" class="d-next">← Overview</a>
+  <a href="./invoy.html" class="d-next">Invoy →</a>
+</footer>
+
+<script src="./portfolio.js"></script>
+</body>
+</html>
