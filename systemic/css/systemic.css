@@ -5,9 +5,9 @@
 /* CSS Custom Properties - Systemic specific */
 :root {
   --systemic-sidebar-width: 280px;
-  --systemic-header-height: 64px;
+  --systemic-header-height: 56px;
   --systemic-nav-width: 240px;
-  --systemic-context-width: 360px;
+  --systemic-context-width: 340px;
 }
 
 /* App Container */
@@ -28,7 +28,7 @@
   height: var(--systemic-header-height);
   padding: 0 var(--space-6);
   background: var(--bg-surface);
-  border-bottom: var(--border-thin) solid var(--border);
+  border-bottom: var(--border-thin) solid var(--border-subtle);
   flex-shrink: 0;
 }
 
