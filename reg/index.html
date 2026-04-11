@@ -673,13 +673,80 @@
   <a href="/" class="logo-mark">ctrl.rodeo</a>
   <div class="header-divider"></div>
   <div class="header-text">
-    <div class="header-title">Onboarding Flow Comparison</div>
-    <div class="header-subtitle">From data entry to data confirmation — fewer steps, less friction, same outcome.</div>
+    <div class="header-title">Product Configuration at Scale</div>
+    <div class="header-subtitle">From a 50×74 spreadsheet to a 6-step registration — Livongo / Teladoc Health</div>
   </div>
 </header>
 
 <!-- ────────────────────────────────────────── MAIN -->
 <main class="main">
+
+  <!-- ── CASE STUDY CONTEXT ── -->
+  <div class="section" style="margin-bottom: 48px;">
+    <div style="max-width: 720px; margin-bottom: 40px;">
+      <h1 style="font-size: 2rem; font-weight: 700; color: var(--gray-900); line-height: 1.2; margin-bottom: 12px;">From Spreadsheet to System</h1>
+      <p style="font-size: 1.0625rem; color: var(--gray-600); line-height: 1.7; margin-bottom: 24px;">Livongo offered 5 health programs — Diabetes, Hypertension, Weight Management, Diabetes Prevention, and Behavioral Health — sold standalone or bundled into "Whole Person" solutions. Each client purchased a different combination. Each combination changed which registration fields were shown, required, or hidden.</p>
+      <p style="font-size: 1.0625rem; color: var(--gray-600); line-height: 1.7;">The configuration lived in a spreadsheet: <strong style="color: var(--gray-900);">50 client configurations × 74 registration fields = 3,700 decision points.</strong> Operations managed this manually. New client onboarding required cross-referencing dozens of field visibility rules, qualification criteria, eligibility checks, and billing types.</p>
+    </div>
+
+    <!-- Architecture Pipeline -->
+    <div style="display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 0; align-items: stretch; margin-bottom: 40px;">
+      <!-- Salesforce -->
+      <div style="padding: 24px; background: var(--blue-light); border-radius: 12px 0 0 12px; border: 1px solid #BBDEFB;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: var(--blue); color: white; font-size: 0.6875rem; font-weight: 700;">SF</span>
+          <span style="font-size: 0.9375rem; font-weight: 700; color: #1565C0;">Salesforce Config</span>
+        </div>
+        <ul style="list-style: none; font-size: 0.8125rem; color: var(--gray-700); line-height: 1.8;">
+          <li>Program bundle selection</li>
+          <li>Pricing tier & enrollment caps</li>
+          <li>Eligibility rules & billing type</li>
+          <li>Field visibility (Show/Require/Skip)</li>
+        </ul>
+        <div style="margin-top: 16px; padding: 8px 12px; background: white; border-radius: 6px; font-size: 0.75rem; color: var(--gray-600);">50 configs × 74 fields</div>
+      </div>
+      <!-- Arrow -->
+      <div style="display: flex; align-items: center; padding: 0 8px; color: var(--gray-400); font-size: 1.5rem;">→</div>
+      <!-- API -->
+      <div style="padding: 24px; background: #F3E5F5; border: 1px solid #E1BEE7;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #7B1FA2; color: white; font-size: 0.6875rem; font-weight: 700;">API</span>
+          <span style="font-size: 0.9375rem; font-weight: 700; color: #6A1B9A;">Data Resolution</span>
+        </div>
+        <ul style="list-style: none; font-size: 0.8125rem; color: var(--gray-700); line-height: 1.8;">
+          <li>Employer HR → name, DOB, address</li>
+          <li>Health Records → diagnosis, A1C</li>
+          <li>Carrier Data → insurance, coverage</li>
+        </ul>
+        <div style="margin-top: 16px; padding: 8px 12px; background: white; border-radius: 6px; font-size: 0.75rem; color: var(--gray-600);">57% of fields sourced before first screen</div>
+      </div>
+      <!-- Arrow -->
+      <div style="display: flex; align-items: center; padding: 0 8px; color: var(--gray-400); font-size: 1.5rem;">→</div>
+      <!-- Registration -->
+      <div style="padding: 24px; background: var(--green-light); border-radius: 0 12px 12px 0; border: 1px solid #C8E6C9;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: var(--green); color: white; font-size: 0.6875rem; font-weight: 700;">UX</span>
+          <span style="font-size: 0.9375rem; font-weight: 700; color: #2E7D32;">Registration Flow</span>
+        </div>
+        <ul style="list-style: none; font-size: 0.8125rem; color: var(--gray-700); line-height: 1.8;">
+          <li>6 steps (down from 9)</li>
+          <li>Confirm, don't enter</li>
+          <li>Adapts per client config</li>
+          <li>~5 min saved per registration</li>
+        </ul>
+        <div style="margin-top: 16px; padding: 8px 12px; background: white; border-radius: 6px; font-size: 0.75rem; color: var(--gray-600);">Recognition over recall</div>
+      </div>
+    </div>
+
+    <!-- Design Principle -->
+    <div style="background: #FAFBFC; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: 24px 28px; display: flex; gap: 16px; align-items: flex-start;">
+      <span style="font-size: 1.25rem;">💡</span>
+      <div>
+        <div style="font-size: 0.875rem; font-weight: 700; color: var(--gray-900); margin-bottom: 4px;">The core design principle</div>
+        <div style="font-size: 0.8125rem; color: var(--gray-600); line-height: 1.6;">Shift the member experience from <strong>data entry</strong> to <strong>data confirmation</strong>. Three upstream services resolve member data before the first screen loads. The member validates what the system already knows rather than starting from blank forms.</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── IMPACT AT A GLANCE ── -->
   <div class="section">
@@ -1336,11 +1403,34 @@
     });
   </script>
 
+<!-- ── CPQ PARALLEL ── -->
+<div class="section" style="margin-top: 48px; margin-bottom: 0;">
+  <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: var(--radius-lg); padding: 40px 36px; color: white;">
+    <div class="section-label" style="color: rgba(255,255,255,0.5);">The Structural Parallel</div>
+    <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; color: white;">This is a CPQ problem</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-bottom: 24px;">
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 8px;">Configure</div>
+        <div style="font-size: 0.875rem; color: rgba(255,255,255,0.8); line-height: 1.6;">Client purchases a program bundle. Programs = SKUs. Each bundle defines which fields, qualifications, and billing rules apply.</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 8px;">Price</div>
+        <div style="font-size: 0.875rem; color: rgba(255,255,255,0.8); line-height: 1.6;">Qualification criteria determine eligibility. Pricing rules = field visibility rules. The "price" is which experience the member gets.</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 8px;">Quote</div>
+        <div style="font-size: 0.875rem; color: rgba(255,255,255,0.8); line-height: 1.6;">The registration flow is the "quote" — a personalized experience generated from configuration data. One of thousands of possible combinations.</div>
+      </div>
+    </div>
+    <p style="font-size: 0.8125rem; color: rgba(255,255,255,0.5); line-height: 1.6; max-width: 680px;">The spreadsheet that governed Livongo's registration is the same kind of artifact that Salesforce CPQ generates today — and the same kind of artifact that modern CPQ platforms are replacing with guided, automated configuration.</p>
+  </div>
+</div>
+
 </main>
 
 <!-- ────────────────────────────────────────── FOOTER -->
 <footer class="site-footer">
-  <div class="footer-note">Built for presentation purposes — mock data only</div>
+  <div class="footer-note">Ian Fike — Livongo / Teladoc Health</div>
   <div class="footer-hint">
     Use
     <span class="key-chip">←</span>

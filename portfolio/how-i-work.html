@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How I Work — Ian Fike</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../design-system/tokens.css">
+  <link rel="stylesheet" href="../design-system/components.css">
+  <link rel="stylesheet" href="../design-system/display.css">
+</head>
+<body class="d-page">
+
+<nav class="d-nav">
+  <a href="./" class="d-nav__name">Ian Fike</a>
+  <ul class="d-nav__links">
+    <li><a href="./field.html" class="d-nav__link">Field</a></li>
+    <li><a href="./invoy.html" class="d-nav__link">Invoy</a></li>
+    <li><a href="./livongo.html" class="d-nav__link">Livongo</a></li>
+    <li><a href="./how-i-work.html" class="d-nav__link d-nav__link--active">How I Work</a></li>
+  </ul>
+</nav>
+
+<div class="d-subnav">
+  <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
+  <a href="#stack" class="d-subnav__link">Stack</a>
+  <a href="#system" class="d-subnav__link">Design System</a>
+  <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#impact" class="d-subnav__link">Impact</a>
+</div>
+
+<div class="d-contain">
+
+  <!-- Header + Overview -->
+  <div style="padding: 48px 0 0;">
+    <span class="d-status d-status--active">Active</span>
+    <p class="d-headline d-headline--xl" style="margin-top: 12px;">How I Work</p>
+    <p class="d-body" style="margin-top: 12px;">I use a design system as the shared language between me and AI tools. The system defines the rules. The AI writes code that follows them. I review and ship.</p>
+
+    <dl class="d-overview">
+      <dt>Setup</dt>
+      <dd>Solo designer, no design team</dd>
+      <dt>Products</dt>
+      <dd>Boards, Events, Soundscape, Systemic, Favicon</dd>
+      <dt>Tools</dt>
+      <dd>CTRL Design System, Systemic (auditor), Claude Code</dd>
+      <dt>Output</dt>
+      <dd>5 products with consistent quality, shipped continuously</dd>
+    </dl>
+  </div>
+
+  <!-- FRAMING -->
+  <div id="framing" class="d-section">
+    <p class="d-label">Framing</p>
+    <p class="d-body">One person, five products, daily shipping. The challenge isn't design skill — it's <strong>maintaining consistency at speed without a team.</strong> The answer: make the design system do the enforcement so I can focus on decisions.</p>
+  </div>
+
+  <!-- STACK -->
+  <div id="stack" class="d-section">
+    <p class="d-label">Stack</p>
+    <div class="d-grid-3" style="margin-top: 16px;">
+      <div>
+        <p class="d-mono" style="margin-bottom: 8px;">CTRL DESIGN SYSTEM</p>
+        <p class="d-body" style="font-size: 12px;">CSS files that define colors, type, spacing, components, and AI widget templates. 48 tokens, 24 components, 11 widget types.</p>
+      </div>
+      <div>
+        <p class="d-mono" style="margin-bottom: 8px;">SYSTEMIC</p>
+        <p class="d-body" style="font-size: 12px;">A tool I built that crawls websites, extracts their design tokens, and checks them against the design system rules. Flags violations automatically.</p>
+      </div>
+      <div>
+        <p class="d-mono" style="margin-bottom: 8px;">CLAUDE CODE</p>
+        <p class="d-body" style="font-size: 12px;">AI that writes code. I give it a feature spec and the design system. It generates components that follow the system's rules. I review and ship.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESIGN SYSTEM -->
+  <div id="system" class="d-section">
+    <p class="d-label">Design System</p>
+    <p class="d-body">The system isn't a Figma library. It's four CSS files. Change the code, run a script, and every product picks up the update. No syncing, no handoff document.</p>
+
+    <div class="d-callout" style="margin-top: 24px; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--fg-muted, #8a8885); white-space: pre; line-height: 1.8; overflow-x: auto;">tokens.css       → colors, type, spacing
+components.css   → buttons, inputs, cards
+widgets.css      → AI-generated content templates
+display.css      → marketing and portfolio pages
+        ↓
+manifest.json    → auto-generated index
+        ↓
+Systemic         → automated QA checks</div>
+
+    <div class="d-grid-2" style="margin-top: 24px;">
+      <div>
+        <p class="d-body" style="font-size: 12px;"><strong>Four layers.</strong> All use the same tokens. All follow the same naming rules. display.css — the one rendering this page — is the newest addition.</p>
+      </div>
+      <div>
+        <p class="d-body" style="font-size: 12px;"><strong>11 widget templates.</strong> AI generates content that fits into defined layouts (lists, comparisons, stats, checklists, etc.). The AI picks the format; the system controls the look.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Process</p>
+
+    <div class="d-flow">
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">01</span>
+        <span class="d-flow__step-label">Intent</span>
+        <span class="d-flow__step-desc">I describe what I want to build</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">02</span>
+        <span class="d-flow__step-label">Design System</span>
+        <span class="d-flow__step-desc">Gives the AI rules to follow</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">03</span>
+        <span class="d-flow__step-label">Claude Code</span>
+        <span class="d-flow__step-desc">Writes the code within those rules</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">04</span>
+        <span class="d-flow__step-label">Systemic</span>
+        <span class="d-flow__step-desc">Checks the output against the system</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">05</span>
+        <span class="d-flow__step-label">Ship</span>
+        <span class="d-flow__step-desc">Push to GitHub Pages</span>
+      </div>
+    </div>
+
+    <p class="d-body" style="margin-top: 24px;">When I say "use --accent-cyan on the focus ring," the AI looks up the same token I defined. The design system is a shared vocabulary between me and the machine. It doesn't get stale because it's the live code — not a document about the code.</p>
+  </div>
+
+  <!-- IMPACT -->
+  <div id="impact" class="d-section">
+    <p class="d-label">Impact</p>
+    <div class="d-metrics" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
+      <div class="d-metric">
+        <div class="d-metric__value">5</div>
+        <div class="d-metric__label">Products</div>
+        <div class="d-metric__sub">Boards, Events, Soundscape, Systemic, Favicon</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">1</div>
+        <div class="d-metric__label">Designer</div>
+        <div class="d-metric__sub">Consistent quality across all five</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">4</div>
+        <div class="d-metric__label">CSS layers</div>
+        <div class="d-metric__sub">tokens → components → widgets → display</div>
+      </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 32px; border-left-color: var(--accent-cyan, #00fff7);">
+      <p class="d-callout__body">This portfolio is built with this system. display.css is a permanent part of the design system, not a one-off stylesheet. Every element on this page uses the same tokens as the products.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer class="d-footer d-contain">
+  <a href="./livongo.html" class="d-next">← Livongo</a>
+  <a href="./" class="d-next">Overview →</a>
+</footer>
+
+<script src="./portfolio.js"></script>
+</body>
+</html>

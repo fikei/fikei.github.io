@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Systems & Systemic — Ian Fike</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../design-system/tokens.css">
+  <link rel="stylesheet" href="../design-system/components.css">
+  <link rel="stylesheet" href="../design-system/display.css">
+</head>
+<body class="d-page">
+
+<nav class="d-nav">
+  <a href="./" class="d-nav__name">CTRL.RODEO</a>
+  <ul class="d-nav__links">
+    <li><a href="./field.html" class="d-nav__link">Field</a></li>
+    <li><a href="./invoy.html" class="d-nav__link">Invoy</a></li>
+    <li><a href="./livongo.html" class="d-nav__link">Livongo</a></li>
+    <li><a href="./design-systems.html" class="d-nav__link d-nav__link--active">Design Systems</a></li>
+    <li><a href="./how-i-work.html" class="d-nav__link">How I Work</a></li>
+  </ul>
+</nav>
+
+<div class="d-subnav">
+  <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
+  <a href="#deliverable" class="d-subnav__link">Deliverable</a>
+  <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#impact" class="d-subnav__link">Impact</a>
+</div>
+
+<div class="d-contain">
+
+  <!-- Header -->
+  <div style="padding: 48px 0 0;">
+    <span class="d-status d-status--active">Active</span>
+    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Systemic</p>
+    <p class="d-body" style="margin-top: 12px; font-size: 15px;">Design systems break the moment a human has to manually check if the code matches the spec. Systemic removes the human from that loop.</p>
+
+    <dl class="d-overview" style="margin-top: 24px;">
+      <dt>Role</dt>
+      <dd>Sole designer & developer</dd>
+      <dt>What</dt>
+      <dd>Automated design system auditor — crawls products, extracts tokens, checks compliance</dd>
+      <dt>Why</dt>
+      <dd>Every design system I've worked with drifted. This is the fix.</dd>
+      <dt>Status</dt>
+      <dd>In use across 5 products at ctrl.rodeo</dd>
+    </dl>
+  </div>
+
+  <!-- FRAMING -->
+  <div id="framing" class="d-section">
+    <p class="d-label">Framing</p>
+    <p class="d-body">Design systems have three failure modes. All three are about the gap between what the system says and what actually ships.</p>
+
+    <div class="d-decisions" style="margin-top: 24px;">
+      <div class="d-decision">
+        <p class="d-decision__q">Handoff drift</p>
+        <p class="d-decision__a">A designer specs a component in Figma. An engineer builds it in code. The padding is 14px instead of 16px. The border radius is wrong. Nobody catches it because the Figma file and the codebase are two separate artifacts that nobody cross-references after launch. Over six months, hundreds of these small gaps accumulate. The system becomes a suggestion.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Token sprawl</p>
+        <p class="d-decision__a">The system defines 8 grays. An engineer adds a 9th because the existing ones don't quite work for their feature. Another team adds a 10th. Nobody removes the old ones. A year later, the codebase has 23 gray values and the Figma library still shows 8. The system is technically "adopted" but practically ignored.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Agentic generation</p>
+        <p class="d-decision__a">AI writes code fast. It can generate a full page of components in minutes. But it doesn't know your system unless you tell it — and even when you do, it hallucinates token names, invents spacing values, and creates components that look right but don't match the spec. Now drift happens at machine speed instead of human speed. Without automated checking, AI-assisted design makes the governance problem worse, not better.</p>
+      </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 24px;">
+      <p class="d-callout__body">The common thread: design systems fail when compliance depends on people remembering to check. Compliance has to be automatic or it doesn't happen.</p>
+    </div>
+  </div>
+
+  <!-- DELIVERABLE -->
+  <div id="deliverable" class="d-section">
+    <p class="d-label">Deliverable</p>
+    <p class="d-body">Systemic is a tool that reads what's actually in your product and compares it to what your design system says should be there. It finds the gaps automatically.</p>
+
+    <p class="d-label" style="margin-top: 32px;">How it works</p>
+    <div class="d-flow">
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">01</span>
+        <span class="d-flow__step-label">Crawl</span>
+        <span class="d-flow__step-desc">Point at a URL or load a local manifest. Systemic fetches the CSS.</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">02</span>
+        <span class="d-flow__step-label">Extract</span>
+        <span class="d-flow__step-desc">Parse every color, font, spacing value, and component pattern in use.</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">03</span>
+        <span class="d-flow__step-label">Map</span>
+        <span class="d-flow__step-desc">Match findings to Material Design 3 semantic tokens and your system's manifest.</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">04</span>
+        <span class="d-flow__step-label">Audit</span>
+        <span class="d-flow__step-desc">Stoplight scoring. Green = matches. Yellow = close. Red = drifted.</span>
+      </div>
+    </div>
+
+    <!-- Screenshots -->
+    <div class="d-gallery d-gallery--2" style="margin-top: 32px;">
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 16/10; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">Systems view — saved design systems with token and component counts</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 16/10; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">Audit view — crawl progress, real-time log, export</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 16/10; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">QA view — stoplight variant audit with grid test</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 16/10; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+        <span class="d-gallery__caption">Docs view — generated documentation with design/code split</span>
+      </div>
+    </div>
+
+    <hr class="d-rule">
+
+    <p class="d-label">What it audits</p>
+    <p class="d-body">Systemic checks the CTRL Design System — 4 CSS layers consumed by 5 products.</p>
+
+    <div style="padding: 24px; border-left: 2px solid var(--border-subtle, #33332f); margin-top: 16px; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--fg-muted, #8a8885); white-space: pre; line-height: 1.8; overflow-x: auto;">tokens.css       → colors, type, spacing        (48 tokens)
+components.css   → buttons, inputs, cards        (24 components)
+widgets.css      → AI content templates          (11 templates)
+display.css      → marketing & portfolio         (this page)
+        ↓
+manifest.json    → auto-generated index
+        ↓
+Systemic         → crawl all 5 products → stoplight report</div>
+
+    <hr class="d-rule">
+
+    <p class="d-label">Design systems this thinking comes from</p>
+
+    <!-- Comparison table -->
+    <div style="margin-top: 16px; border: 1px solid var(--border-subtle, #33332f); font-family: var(--font-mono, monospace); font-size: 12px; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border-subtle, #33332f);">
+            <th style="padding: 12px 16px; text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle, #666560); font-weight: 600;"></th>
+            <th style="padding: 12px 16px; text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle, #666560); font-weight: 600;">Livongo</th>
+            <th style="padding: 12px 16px; text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle, #666560); font-weight: 600;">Invoy CIF</th>
+            <th style="padding: 12px 16px; text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle, #666560); font-weight: 600;">XP Health</th>
+            <th style="padding: 12px 16px; text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle, #666560); font-weight: 600;">CTRL</th>
+          </tr>
+        </thead>
+        <tbody style="color: var(--fg-muted, #8a8885);">
+          <tr style="border-bottom: 1px solid var(--border-subtle, #33332f);">
+            <td style="padding: 10px 16px; color: var(--fg-subtle, #666560); font-size: 10px; text-transform: uppercase;">Source of truth</td>
+            <td style="padding: 10px 16px;">Figma</td>
+            <td style="padding: 10px 16px;">Figma</td>
+            <td style="padding: 10px 16px;">Figma</td>
+            <td style="padding: 10px 16px;">CSS</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-subtle, #33332f);">
+            <td style="padding: 10px 16px; color: var(--fg-subtle, #666560); font-size: 10px; text-transform: uppercase;">Governance</td>
+            <td style="padding: 10px 16px;">Team review</td>
+            <td style="padding: 10px 16px;">Documented rules</td>
+            <td style="padding: 10px 16px;">Informal</td>
+            <td style="padding: 10px 16px;">Automated</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-subtle, #33332f);">
+            <td style="padding: 10px 16px; color: var(--fg-subtle, #666560); font-size: 10px; text-transform: uppercase;">Drift detection</td>
+            <td style="padding: 10px 16px;">Manual</td>
+            <td style="padding: 10px 16px;">Manual</td>
+            <td style="padding: 10px 16px;">None</td>
+            <td style="padding: 10px 16px;">Systemic</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 16px; color: var(--fg-subtle, #666560); font-size: 10px; text-transform: uppercase;">Result</td>
+            <td style="padding: 10px 16px;">Drifted over time</td>
+            <td style="padding: 10px 16px;">Held with effort</td>
+            <td style="padding: 10px 16px;">Never fully adopted</td>
+            <td style="padding: 10px 16px;">Enforced by machine</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Process</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Why make the source of truth CSS instead of Figma?</p>
+        <p class="d-decision__a">When an AI writes code, it can read a CSS file. It can't read a Figma file. If the system lives in the same language the code is written in, there's no translation step. No translation means no drift from translation.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why stoplight scoring instead of pass/fail?</p>
+        <p class="d-decision__a">Real products have gray areas. A component might use the right color but the wrong spacing. Pass/fail forces you to either accept it or reject it entirely. Stoplights let you triage: fix the reds now, address the yellows this sprint, leave the greens alone.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why crawl the live product instead of checking the source code?</p>
+        <p class="d-decision__a">Source code shows what you intended. The live product shows what actually shipped. CSS overrides, runtime styles, and third-party scripts all change what the user sees. Systemic checks what's real, not what's planned.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">How does this change when AI is generating the UI?</p>
+        <p class="d-decision__a">AI makes the governance problem urgent. A designer might introduce one off-spec component per week. An AI can introduce ten per day. Without automated checking, AI-assisted design accelerates drift instead of reducing it. Systemic closes that loop — the AI generates, Systemic checks, I fix the violations.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPACT -->
+  <div id="impact" class="d-section">
+    <p class="d-label">Impact</p>
+    <div class="d-metrics" style="margin: 16px calc(-1 * clamp(20px, 5vw, 64px)) 0;">
+      <div class="d-metric">
+        <div class="d-metric__value">5</div>
+        <div class="d-metric__label">Products audited</div>
+        <div class="d-metric__sub">Boards, Events, Soundscape, Systemic, Favicon</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">4</div>
+        <div class="d-metric__label">Systems informed the design</div>
+        <div class="d-metric__sub">Livongo, Invoy, XP Health, CTRL</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">0</div>
+        <div class="d-metric__label">Manual audits needed</div>
+        <div class="d-metric__sub">Systemic handles compliance checking</div>
+      </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 32px; border-left-color: var(--accent-cyan, #00fff7);">
+      <p class="d-callout__body">The page you're reading is rendered by display.css — the newest layer of the CTRL Design System. Systemic audits it the same way it audits every other product. The portfolio is inside the system, not outside it.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer class="d-footer d-contain">
+  <a href="./livongo.html" class="d-next">← Livongo</a>
+  <a href="./how-i-work.html" class="d-next">How I Work →</a>
+</footer>
+
+<script src="./portfolio.js"></script>
+</body>
+</html>
