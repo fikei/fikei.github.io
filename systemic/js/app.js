@@ -1255,7 +1255,15 @@ class SystemicApp {
     if (!ds) return;
     const component = ds.components?.find(c => c.type === componentType || c.name === componentType);
     if (component) {
-      this.usageInspector.show(component);
+      // Only open the Usage Inspector if the component has actual instances
+      // (from GitHub/Figma/Paper scans). Skip for live-crawl or local systems
+      // that don't populate variant.instances[].
+      const hasInstances = (component.variants || []).some(v => v.instances?.length > 0);
+      if (hasInstances) {
+        this.usageInspector.show(component);
+      } else {
+        this.usageInspector.hide();
+      }
     } else {
       this.usageInspector.hide();
     }
