@@ -171,7 +171,19 @@ class DesignSystemViewer {
    * Show default view
    */
   showDefaultView() {
-    // Show color foundation by default
+    // Respect current hash route if present (e.g. on page refresh)
+    const hash = window.location.hash.slice(1) || '';
+    const parts = hash.split('/');
+    if (parts[0] === 'docs' && parts[1]) {
+      const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples', 'principles'];
+      if (foundations.includes(parts[1])) {
+        this.selectFoundation(parts[1]);
+        return;
+      }
+      // Component route — let handleRoute deal with it
+      if (parts[1] === 'component') return;
+    }
+    // Default fallback
     this.selectFoundation('color');
   }
 
