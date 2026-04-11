@@ -105,11 +105,6 @@ class DesignSystemViewer {
       }
     });
 
-    // State toggles
-    DOMUtils.$$('.state-btn', navElement).forEach(btn => {
-      btn.addEventListener('click', () => this.switchState(btn.dataset.state));
-    });
-
     // Variant select
     this.variantSelect?.addEventListener('change', (e) => {
       this.selectVariant(e.target.value);
@@ -121,11 +116,6 @@ class DesignSystemViewer {
         if (btn.dataset.context) {
           btn.classList.toggle('active', btn.dataset.context === this.currentContext);
         }
-      });
-    }
-    if (this.currentState) {
-      DOMUtils.$$('.state-btn', navElement).forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.state === this.currentState);
       });
     }
   }
@@ -236,8 +226,7 @@ class DesignSystemViewer {
     // Update breadcrumb with system name
     this.renderBreadcrumb([
       { label: 'Systems', hash: '#systems' },
-      { label: this.designSystem?.name || 'System', hash: '#docs' },
-      { label: this.formatName(section) }
+      { label: this.designSystem?.name || 'System' }
     ]);
 
     // Hide variant select for foundations
@@ -295,8 +284,7 @@ class DesignSystemViewer {
     const totalUsage = component.totalUsage || 0;
     this.renderBreadcrumb([
       { label: 'Systems', hash: '#systems' },
-      { label: this.designSystem?.name || 'System', hash: '#docs' },
-      { label: component.name, meta: `${variantCount} variant${variantCount !== 1 ? 's' : ''} · ${totalUsage} usage${totalUsage !== 1 ? 's' : ''}` }
+      { label: this.designSystem?.name || 'System' }
     ]);
 
     // Show variant dropdown if multiple variants

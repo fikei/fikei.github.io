@@ -1160,12 +1160,12 @@ class SystemicApp {
         <span class="breadcrumb-current" id="breadcrumb-system-name">${systemName}</span>
       </nav>
       <span class="docs-nav__divider"></span>
+      <a href="#principles" class="docs-nav__link">Principles</a>
       <a href="#" class="docs-nav__link" data-section="color">Color</a>
       <a href="#" class="docs-nav__link" data-section="typography">Typography</a>
       <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
       <a href="#" class="docs-nav__link" data-section="elevation">Elevation</a>
       <a href="#" class="docs-nav__link" data-section="examples">Examples</a>
-      <a href="#principles" class="docs-nav__link">Principles</a>
       <span class="docs-nav__spacer"></span>
       <select class="docs-nav__select" id="component-select">
         <option value="">Component...</option>
@@ -1174,12 +1174,6 @@ class SystemicApp {
       <select class="docs-nav__select" id="variant-select" hidden>
         <option value="">Variant...</option>
       </select>
-      <div class="state-toggles" id="state-toggles">
-        <button class="state-btn active" data-state="default" title="Default">○</button>
-        <button class="state-btn" data-state="hover" title="Hover">◉</button>
-        <button class="state-btn" data-state="focus" title="Focus">◎</button>
-        <button class="state-btn" data-state="disabled" title="Disabled">◌</button>
-      </div>
       <div class="view-toggle">
         <button class="toggle-btn active" data-context="design">Design</button>
         <button class="toggle-btn" data-context="code">Code</button>
@@ -1364,7 +1358,6 @@ class SystemicApp {
     const stage = DOMUtils.$('#component-stage');
     const sidebar = DOMUtils.$('#context-sidebar');
     const qaInline = DOMUtils.$('#qa-inline');
-    const stateToggles = DOMUtils.$('.state-toggles', this.appNav);
     const designCodeToggle = DOMUtils.$('.view-toggle:not(.view-toggle--mode)', this.appNav);
     const variantSelect = DOMUtils.$('#variant-select', this.appNav);
     const qaNavControls = DOMUtils.$('.qa-nav-controls', this.appNav);
@@ -1373,7 +1366,6 @@ class SystemicApp {
       if (stage) stage.hidden = true;
       if (sidebar) sidebar.hidden = true;
       if (qaInline) qaInline.hidden = false;
-      if (stateToggles) stateToggles.hidden = true;
       if (designCodeToggle) designCodeToggle.hidden = true;
       if (variantSelect) variantSelect.hidden = true;
       if (qaNavControls) qaNavControls.hidden = false;
@@ -1391,7 +1383,6 @@ class SystemicApp {
       if (stage) stage.hidden = false;
       if (sidebar) sidebar.hidden = false;
       if (qaInline) qaInline.hidden = true;
-      if (stateToggles) stateToggles.hidden = false;
       if (designCodeToggle) designCodeToggle.hidden = false;
       if (qaNavControls) qaNavControls.hidden = true;
     }
