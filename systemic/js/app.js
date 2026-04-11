@@ -309,6 +309,14 @@ class SystemicApp {
       const designSystem = this.transformManifestToDesignSystem(manifest, registry, widgetRegistry);
       this.debugLog('LOCAL', `Transformed: ${designSystem.components?.length} components, first template HTML starts with: ${designSystem.components?.find(c => c.type?.startsWith('template-'))?.variants?.[0]?.html?.slice(0, 80)}...`);
 
+      // Preserve cached AI data (principles, descriptions) from previous save
+      const cached = this.loadDesignSystem(designSystem.id);
+      if (cached) {
+        if (cached.principles) designSystem.principles = cached.principles;
+        if (cached.aiDescriptions) designSystem.aiDescriptions = cached.aiDescriptions;
+        if (cached.userDescriptions) designSystem.userDescriptions = cached.userDescriptions;
+      }
+
       // Save it (update if already exists)
       const isUpdate = this.designSystems.some(ds => ds.id === designSystem.id);
       this.debugLog('LOCAL', `Saving (isUpdate: ${isUpdate})`);
@@ -318,7 +326,14 @@ class SystemicApp {
       this.setActiveSystem(designSystem);
 
       this.showToast('Local design system loaded');
-      this.navigateTo('docs/color');
+
+      // Preserve current hash route on refresh; default to docs/color for fresh loads
+      const currentHash = window.location.hash.slice(1) || '';
+      if (currentHash.startsWith('docs/') || currentHash.startsWith('qa/')) {
+        this.handleRoute();
+      } else {
+        this.navigateTo('docs/color');
+      }
 
     } catch (error) {
       this.debugLog('LOCAL', 'Error loading local design system:', error);
