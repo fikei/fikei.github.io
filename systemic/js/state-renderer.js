@@ -12,6 +12,37 @@
  */
 class StateRenderer {
   constructor() {
+    // Normalize crawler / parser type strings to canonical CONTENT keys.
+    // detectComponentType may return e.g. "text-input" while CONTENT uses "input".
+    this.TYPE_ALIASES = {
+      'text-input': 'input',
+      'textfield':  'input',
+      'field':      'input',
+      'textarea':   'input',
+      'btn':        'button',
+      'navigation': 'nav',
+      'navbar':     'nav',
+      'header':     'nav',
+      'sidebar':    'nav',
+      'dialog':     'modal',
+      'overlay':    'modal',
+      'drawer':     'modal',
+      'sheet':      'modal',
+      'snackbar':   'alert',
+      'notification': 'alert',
+      'toast':      'alert',
+      'chip':       'badge',
+      'tag':        'badge',
+      'label':      'badge',
+      'switch':     'toggle',
+      'loader':     'spinner',
+      'loading':    'spinner',
+      'dropdown':   'select',
+      'picker':     'select',
+      'listbox':    'select',
+      'profile-pic':'avatar',
+    };
+
     // Contextual placeholder content keyed by component type
     this.CONTENT = {
       button: {
@@ -123,6 +154,35 @@ class StateRenderer {
       spinner: {
         states: ['default']
       },
+      link: {
+        labels: ['View details', 'Learn more', 'Read article', 'Visit page'],
+        states: ['default', 'hover', 'visited', 'disabled']
+      },
+      tabs: {
+        items: ['Overview', 'Details', 'Reviews', 'Related'],
+        states: ['default', 'active', 'hover', 'disabled']
+      },
+      table: {
+        states: ['default', 'striped', 'hover']
+      },
+      form: {
+        states: ['default', 'submitting', 'error', 'success']
+      },
+      heading: {
+        states: ['default']
+      },
+      image: {
+        states: ['default', 'loading', 'error']
+      },
+      icon: {
+        states: ['default', 'active']
+      },
+      list: {
+        states: ['default']
+      },
+      container: {
+        states: ['default']
+      },
     };
 
     // Default state set when type is unknown
@@ -134,16 +194,27 @@ class StateRenderer {
   // ----------------------------------------------------------------
 
   /**
+   * Normalize a component type string to a canonical key that matches
+   * this.CONTENT and the switch cases in _renderState.
+   */
+  _normalizeType(rawType) {
+    const t = String(rawType || '').toLowerCase().trim();
+    return this.TYPE_ALIASES[t] || t;
+  }
+
+  /**
    * Build the full multi-state grid HTML for a component.
    * Rendered into the component stage preview area.
    */
   buildComponentStateGrid(component) {
     if (!component?.variants?.length) return '';
 
+    const type = this._normalizeType(component.type);
+
     const rows = component.variants.map(variant => `
       <div class="variant-state-row">
         <div class="variant-state-row__name">${this._escHtml(variant.name || 'Default')}</div>
-        ${this._buildStateStrip(component.type, variant)}
+        ${this._buildStateStrip(type, variant)}
       </div>
     `).join('');
 
@@ -202,6 +273,7 @@ class StateRenderer {
       case 'btn':
         return this._button(classes, state, c);
       case 'input':
+      case 'text-input':
       case 'field':
       case 'textfield':
       case 'textarea':
@@ -209,6 +281,8 @@ class StateRenderer {
       case 'select':
       case 'dropdown':
       case 'menu':
+      case 'listbox':
+      case 'picker':
         return this._select(classes, state, c);
       case 'card':
         return this._card(classes, state, c);
@@ -222,13 +296,19 @@ class StateRenderer {
       case 'badge':
       case 'chip':
       case 'tag':
+      case 'label':
         return this._badge(classes, type, state, c);
       case 'nav':
       case 'navigation':
       case 'navbar':
+      case 'header':
+      case 'sidebar':
         return this._nav(classes, state, c);
       case 'banner':
       case 'alert':
+      case 'toast':
+      case 'notification':
+      case 'snackbar':
         return this._alert(classes, state, c);
       case 'avatar':
         return this._avatar(classes, state, c);
@@ -236,7 +316,24 @@ class StateRenderer {
         return this._progress(state);
       case 'spinner':
       case 'loader':
+      case 'loading':
         return this._spinner(classes);
+      case 'link':
+        return this._link(classes, state, c);
+      case 'tabs':
+        return this._tabs(classes, state, c);
+      case 'modal':
+      case 'dialog':
+      case 'drawer':
+      case 'sheet':
+        return this._modal(classes, state, c);
+      case 'table':
+        return this._table(classes, state);
+      case 'form':
+        return this._form(classes, state);
+      case 'image':
+      case 'img':
+        return this._image(classes, state);
       default:
         return this._generic(variant?.html || '', state);
     }
@@ -384,6 +481,81 @@ class StateRenderer {
         <span style="font-size:12px;opacity:.6">Loading</span>
       </div>
     `;
+  }
+
+  _link(classes, state, c) {
+    const label = c.labels?.[0] || 'Learn more';
+    const style = [
+      'font-size:12px',
+      'text-decoration:underline',
+      'cursor:default',
+      'pointer-events:none',
+      state === 'hover' ? 'opacity:1' : '',
+      state === 'visited' ? 'opacity:.65' : '',
+      state === 'disabled' ? 'opacity:.35;text-decoration:none' : '',
+    ].filter(Boolean).join(';');
+    return `<a class="${classes}" data-state="${state}" style="${style}">${this._escHtml(label)}</a>`;
+  }
+
+  _tabs(classes, state, c) {
+    const items = c.items || ['Tab 1', 'Tab 2', 'Tab 3'];
+    const links = items.map((item, i) => {
+      const isActive = (state === 'active' && i === 0) || (state === 'hover' && i === 1);
+      const isDisabled = state === 'disabled' && i === items.length - 1;
+      const s = [
+        'font-size:12px', 'padding:6px 12px', 'cursor:default',
+        isActive ? 'border-bottom:2px solid var(--fg,#fff);font-weight:600' : 'border-bottom:2px solid transparent',
+        isDisabled ? 'opacity:.35' : '',
+      ].filter(Boolean).join(';');
+      return `<span style="${s}">${this._escHtml(item)}</span>`;
+    }).join('');
+    return `<div class="${classes}" data-state="${state}" style="display:flex;gap:2px;pointer-events:none">${links}</div>`;
+  }
+
+  _modal(classes, state, c) {
+    return `
+      <div class="${classes}" data-state="${state}" style="pointer-events:none;max-width:200px;padding:14px;background:var(--bg-surface,#1a1a1a);border:1px solid var(--border-subtle,#333);border-radius:6px">
+        <strong style="display:block;font-size:13px;margin-bottom:6px">${this._escHtml(c.title || 'Dialog Title')}</strong>
+        <p style="font-size:11px;opacity:.6;margin:0 0 10px;line-height:1.4">${this._escHtml(c.body || 'Dialog content goes here.')}</p>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button style="font-size:11px;padding:4px 10px;cursor:default;opacity:.6">Cancel</button>
+          <button style="font-size:11px;padding:4px 10px;cursor:default">Confirm</button>
+        </div>
+      </div>
+    `;
+  }
+
+  _table(classes, state) {
+    const headerRow = '<tr><th style="text-align:left;padding:4px 8px;font-size:10px;opacity:.5">Name</th><th style="text-align:left;padding:4px 8px;font-size:10px;opacity:.5">Status</th></tr>';
+    const rows = ['Alice — Active', 'Bob — Pending', 'Carol — Done'].map((row, i) => {
+      const [name, status] = row.split(' — ');
+      const bg = (state === 'striped' && i % 2 === 1) ? 'background:rgba(255,255,255,.03)' : '';
+      const hover = (state === 'hover' && i === 1) ? 'background:rgba(255,255,255,.06)' : '';
+      return `<tr style="${bg || hover}"><td style="padding:4px 8px;font-size:11px">${name}</td><td style="padding:4px 8px;font-size:11px;opacity:.65">${status}</td></tr>`;
+    }).join('');
+    return `<table class="${classes}" data-state="${state}" style="pointer-events:none;border-collapse:collapse;min-width:160px">${headerRow}${rows}</table>`;
+  }
+
+  _form(classes, state) {
+    const disabled = state === 'submitting' || state === 'success' ? 'opacity:.5' : '';
+    const btnLabel = state === 'submitting' ? 'Sending...' : state === 'success' ? 'Sent!' : state === 'error' ? 'Retry' : 'Submit';
+    return `
+      <div class="${classes}" data-state="${state}" style="pointer-events:none;display:flex;flex-direction:column;gap:6px;max-width:180px;${disabled}">
+        <input style="font-size:11px;padding:4px 8px;pointer-events:none" placeholder="Email" />
+        ${state === 'error' ? '<span style="font-size:10px;color:#e44">Please fill in all fields</span>' : ''}
+        <button style="font-size:11px;padding:4px 10px;cursor:default">${btnLabel}</button>
+      </div>
+    `;
+  }
+
+  _image(classes, state) {
+    if (state === 'loading') {
+      return `<div class="${classes}" data-state="${state}" style="width:120px;height:80px;background:var(--bg-elevated,#222);border-radius:4px;display:flex;align-items:center;justify-content:center;pointer-events:none"><span style="font-size:10px;opacity:.4">Loading…</span></div>`;
+    }
+    if (state === 'error') {
+      return `<div class="${classes}" data-state="${state}" style="width:120px;height:80px;background:var(--bg-elevated,#222);border:1px dashed rgba(255,255,255,.1);border-radius:4px;display:flex;align-items:center;justify-content:center;pointer-events:none"><span style="font-size:10px;opacity:.4">Failed</span></div>`;
+    }
+    return `<div class="${classes}" data-state="${state}" style="width:120px;height:80px;background:var(--bg-elevated,#222);border-radius:4px;display:flex;align-items:center;justify-content:center;pointer-events:none"><span style="font-size:10px;opacity:.3">IMG</span></div>`;
   }
 
   _generic(baseHtml, state) {
