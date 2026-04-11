@@ -153,7 +153,6 @@ class VariantAudit {
    */
   registerComponents(components) {
     this.components = components;
-    this.populateFilters();
   }
 
   /**
@@ -188,20 +187,24 @@ class VariantAudit {
           : null
       };
     });
-
-    this.populateFilters();
   }
 
-  populateFilters() {
-    var select = this.els.componentFilter;
-    if (!select) return;
-    select.innerHTML = '<option value="">— Select component —</option>';
-    this.components.forEach(comp => {
-      var opt = document.createElement('option');
-      opt.value = comp.name;
-      opt.textContent = comp.label || comp.name;
-      select.appendChild(opt);
-    });
+  /**
+   * Set active component by type name (called by app.selectComponentGlobal)
+   */
+  setActiveComponent(componentType) {
+    this.currentAuditName = componentType;
+    var comp = this.components.find(c => c.name === componentType);
+    this.currentComponent = comp || null;
+  }
+
+  /**
+   * Switch container (for inline vs standalone rendering)
+   */
+  setContainer(container) {
+    if (!container || this.container === container) return;
+    this.container = container;
+    this._initialized = false;
   }
 
   // ============================================
@@ -210,10 +213,12 @@ class VariantAudit {
 
   bindElements() {
     this.els = {
-      componentFilter: this.container.querySelector('#qa-component-filter'),
-      variantFilter: this.container.querySelector('#qa-variant-filter'),
-      gridLinesBtn: this.container.querySelector('#qa-gridlines-btn'),
-      stats: this.container.querySelector('#qa-stats'),
+      variantFilter: this.container.querySelector('#qa-variant-filter') ||
+                     this.container.querySelector('#qa-variant-filter-nav'),
+      gridLinesBtn: this.container.querySelector('#qa-gridlines-btn') ||
+                    this.container.querySelector('#qa-gridlines-nav'),
+      stats: this.container.querySelector('#qa-stats') ||
+             this.container.querySelector('#qa-stats-nav'),
       content: this.container.querySelector('#qa-content'),
       grid: this.container.querySelector('#qa-grid'),
       blockedSection: this.container.querySelector('#qa-blocked-section'),
@@ -263,24 +268,14 @@ class VariantAudit {
   init() {
     // Guard against duplicate init
     if (this._initialized) {
-      // Just refresh filters and data
-      this.populateFilters();
-      this.restoreFilterState();
       this.renderAuditTable();
       return;
     }
     this._initialized = true;
 
     this.bindElements();
-    this.populateFilters();
 
-    // Bind filter events
-    if (this.els.componentFilter) {
-      this.els.componentFilter.addEventListener('change', () => {
-        this.lastFilter = 'component';
-        this.showVariants();
-      });
-    }
+    // Bind filter events (variant filter only — component selection is handled by app.js)
     if (this.els.variantFilter) {
       this.els.variantFilter.addEventListener('change', () => {
         this.lastFilter = 'variant';
@@ -289,6 +284,9 @@ class VariantAudit {
     }
     if (this.els.gridLinesBtn) {
       this.els.gridLinesBtn.addEventListener('click', () => this.toggleGridLines());
+    }
+    if (this.els.blockedToggle) {
+      this.els.blockedToggle.addEventListener('click', () => this.toggleBlockedSection());
     }
 
     // Grid test controls
@@ -323,15 +321,14 @@ class VariantAudit {
   // ============================================
 
   showVariants() {
-    var componentVal = this.els.componentFilter?.value;
+    var componentVal = this.currentAuditName;
     var variantVal = this.els.variantFilter?.value;
 
     if (!componentVal) {
-      this.els.grid.innerHTML = '';
-      this.els.blockedSection.style.display = 'none';
-      this.els.desc.textContent = 'Select a component to audit its variants.';
+      if (this.els.grid) this.els.grid.innerHTML = '';
+      if (this.els.blockedSection) this.els.blockedSection.style.display = 'none';
+      if (this.els.desc) this.els.desc.textContent = 'Select a component to audit its variants.';
       this.currentComponent = null;
-      this.currentAuditName = null;
       this.populateGridTest(null);
       this.saveFilterState();
       return;
@@ -339,8 +336,8 @@ class VariantAudit {
 
     var comp = this.components.find(c => c.name === componentVal);
     if (!comp) {
-      this.els.grid.innerHTML = '<p class="qa-empty">Component not found.</p>';
-      this.els.blockedSection.style.display = 'none';
+      if (this.els.grid) this.els.grid.innerHTML = '<p class="qa-empty">Component not found.</p>';
+      if (this.els.blockedSection) this.els.blockedSection.style.display = 'none';
       return;
     }
 
@@ -813,7 +810,11 @@ class VariantAudit {
     if (stats.red > 0) parts.push(stats.red + ' blocked');
     if (stats.yellow > 0) parts.push(stats.yellow + ' to process');
     if (stats.orange > 0) parts.push(stats.orange + ' needs review');
-    if (this.els.stats) this.els.stats.textContent = parts.join(' · ');
+    var text = parts.join(' · ');
+    if (this.els.stats) this.els.stats.textContent = text;
+    // Also update nav bar stats (outside container)
+    var navStats = document.querySelector('#qa-stats-nav');
+    if (navStats) navStats.textContent = text;
   }
 
   // ============================================
@@ -997,7 +998,7 @@ class VariantAudit {
   saveFilterState() {
     try {
       localStorage.setItem(this.FILTER_KEY, JSON.stringify({
-        component: this.els.componentFilter?.value || '',
+        component: this.currentAuditName || '',
         variant: this.els.variantFilter?.value || '',
         lastFilter: this.lastFilter,
         blockedOpen: this.blockedSectionOpen
@@ -1010,10 +1011,10 @@ class VariantAudit {
       var saved = localStorage.getItem(this.FILTER_KEY);
       if (!saved) return;
       var state = JSON.parse(saved);
-      if (state.component && this.els.componentFilter) this.els.componentFilter.value = state.component;
       if (state.variant && this.els.variantFilter) this.els.variantFilter.value = state.variant;
       if (state.lastFilter) this.lastFilter = state.lastFilter;
-      if (state.component) {
+      if (state.component && !this.currentAuditName) {
+        this.setActiveComponent(state.component);
         this.showVariants();
         if (state.blockedOpen) this.toggleBlockedSection();
       }
@@ -1025,9 +1026,7 @@ class VariantAudit {
   // ============================================
 
   show(componentName) {
-    if (this.els.componentFilter) {
-      this.els.componentFilter.value = componentName;
-    }
+    this.setActiveComponent(componentName);
     this.showVariants();
   }
 }
