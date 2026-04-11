@@ -1492,10 +1492,14 @@ class DesignSystemViewer {
     const aiDescs = ds?.aiDescriptions?.foundations?.[section];
 
     // Design context — use AI description if available, else fallback
+    const defaultDesc = section === 'principles'
+      ? `Design principles and usage guidelines for ${ds?.name || 'this system'}.`
+      : `Documentation for ${this.formatName(section)} tokens.`;
+
     const descText = ds?.userDescriptions?.foundations?.[section]
       || aiDescs?.description
       || docs?.description
-      || `Documentation for ${this.formatName(section)} tokens.`;
+      || defaultDesc;
 
     this._renderEditableDescription(descText, 'foundation', section);
 
@@ -1506,15 +1510,17 @@ class DesignSystemViewer {
     if (this.statesSection) this.statesSection.hidden = true;
     if (this.compPrinciplesSection) this.compPrinciplesSection.hidden = true;
 
-    // Code context - show token list
-    if (section !== 'principles') {
-      this.updateTokenList(section);
-      this.updateCodeBlocks(section);
-    } else {
+    // Hide specs for principles
+    if (section === 'principles') {
+      this.componentSpecs.hidden = true;
       this.tokenList.innerHTML = '<p>No tokens for principles</p>';
       if (this.cssCode) this.cssCode.textContent = '';
       if (this.htmlCode) this.htmlCode.textContent = '';
       if (this.reactCode) this.reactCode.textContent = '';
+    } else {
+      // Code context - show token list
+      this.updateTokenList(section);
+      this.updateCodeBlocks(section);
     }
   }
 
