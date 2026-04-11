@@ -199,10 +199,62 @@ class StateRenderer {
   /**
    * Normalize a component type string to a canonical key that matches
    * this.CONTENT and the switch cases in _renderState.
+   *
+   * Resolution order:
+   *  1. Exact match in TYPE_ALIASES
+   *  2. Strip common prefixes (w-, widget-, template-) and re-check
+   *  3. Fuzzy: scan known CONTENT keys for a substring match
+   *  4. Infer from the type name using keyword patterns
+   *  5. Fall back to the raw (lowercased) string → hits _generic renderer
    */
   _normalizeType(rawType) {
     const t = String(rawType || '').toLowerCase().trim();
-    return this.TYPE_ALIASES[t] || t;
+
+    // 1. Exact alias
+    if (this.TYPE_ALIASES[t]) return this.TYPE_ALIASES[t];
+
+    // 2. Already a known CONTENT key
+    if (this.CONTENT[t]) return t;
+
+    // 3. Strip prefixes and retry
+    const stripped = t
+      .replace(/^(w-|widget-|template-|filter-)/, '')   // common prefixes
+      .replace(/^.*__/, '');                              // BEM element (user-menu__trigger → trigger)
+    if (this.TYPE_ALIASES[stripped]) return this.TYPE_ALIASES[stripped];
+    if (this.CONTENT[stripped]) return stripped;
+
+    // 4. Keyword scan — does the type contain a known component word?
+    const keywords = Object.keys(this.CONTENT);
+    for (const kw of keywords) {
+      // Match "icon-btn" → "button", "tag-group" → "badge", etc.
+      if (kw.length >= 3 && stripped.includes(kw)) return kw;
+    }
+    // Also check alias keys (catches "btn" inside "icon-btn", "loader" inside "w-loader")
+    for (const [alias, canonical] of Object.entries(this.TYPE_ALIASES)) {
+      if (alias.length >= 3 && stripped.includes(alias)) return canonical;
+    }
+
+    // 5. Structural inference — match on suffix so "account-section" → container, etc.
+    if (t.startsWith('template-') || t.startsWith('widget-')) return 'card';
+    const tail = stripped.split('-').pop(); // last segment: "account-section" → "section"
+    const suffixMap = {
+      'section': 'container', 'row': 'container', 'column': 'container',
+      'items': 'container', 'divider': 'container', 'group': 'container',
+      'grid': 'table',
+      'text': 'heading', 'headline': 'heading', 'label': 'heading', 'value': 'heading',
+      'trigger': 'button',
+      'option': 'list', 'item': 'list',
+      'stat': 'badge',
+      'axis': 'progress', 'bar': 'progress',
+      'range': 'input', 'filters': 'form',
+      'tab': 'tabs',
+      'img': 'image', 'photo': 'image',
+    };
+    if (suffixMap[tail]) return suffixMap[tail];
+    if (suffixMap[stripped]) return suffixMap[stripped];
+
+    // 6. Fallback — raw type, will hit _generic
+    return t;
   }
 
   /**
