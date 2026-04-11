@@ -960,8 +960,14 @@ class SystemicApp {
   handleRoute() {
     const route = this.parseHash();
 
-    // If navigating to docs/qa/principles without a loaded system, try to restore
-    if ((route.view === 'docs' || route.view === 'qa' || route.view === 'principles') && !this.viewer?.designSystem) {
+    // Redirect legacy #principles to #docs/principles
+    if (route.view === 'principles') {
+      window.location.hash = 'docs/principles';
+      return;
+    }
+
+    // If navigating to docs/qa without a loaded system, try to restore
+    if ((route.view === 'docs' || route.view === 'qa') && !this.viewer?.designSystem) {
       const restored = this.restoreActiveSystem();
       if (!restored) {
         // No system to restore — redirect to systems list
@@ -979,7 +985,7 @@ class SystemicApp {
     // Handle sub-routes for docs view
     if (route.view === 'docs') {
       if (this.viewer?.designSystem && route.section) {
-        const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples'];
+        const foundations = ['color', 'typography', 'spacing', 'elevation', 'examples', 'principles'];
         if (foundations.includes(route.section)) {
           this.viewer.selectFoundation(route.section);
         } else if (route.section === 'component' && route.detail) {
@@ -1010,10 +1016,6 @@ class SystemicApp {
       this.renderSystemsList();
     }
 
-    // Render principles view
-    if (route.view === 'principles') {
-      this.renderPrinciples();
-    }
   }
 
   /**
@@ -1051,21 +1053,6 @@ class SystemicApp {
           <span class="docs-nav__spacer"></span>
         `;
         break;
-
-      case 'principles': {
-        const pSystemName = this.viewer?.designSystem?.name || 'System';
-        this.appNav.innerHTML = `
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a href="#systems" class="breadcrumb-link">Systems</a>
-            <span class="breadcrumb-sep">/</span>
-            <a href="#docs/color" class="breadcrumb-link">${pSystemName}</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current">Principles</span>
-          </nav>
-          <span class="docs-nav__spacer"></span>
-        `;
-        break;
-      }
 
       case 'docs':
         this.renderDocsNav(route);
@@ -1160,7 +1147,7 @@ class SystemicApp {
         <span class="breadcrumb-current" id="breadcrumb-system-name">${systemName}</span>
       </nav>
       <span class="docs-nav__divider"></span>
-      <a href="#principles" class="docs-nav__link">Principles</a>
+      <a href="#" class="docs-nav__link" data-section="principles">Principles</a>
       <a href="#" class="docs-nav__link" data-section="color">Color</a>
       <a href="#" class="docs-nav__link" data-section="typography">Typography</a>
       <a href="#" class="docs-nav__link" data-section="spacing">Spacing</a>
@@ -2129,127 +2116,8 @@ class SystemicApp {
     this.showToast('Design system deleted');
   }
 
-  /**
-   * Render the Principles view.
-   * Calls PrinciplesGenerator, then renders global + per-component principles.
-   */
-  async renderPrinciples() {
-    const container = DOMUtils.$('#principles-container');
-    if (!container) return;
-
-    const ds = this.viewer?.designSystem;
-    if (!ds) {
-      container.innerHTML = `
-        <div class="principles-empty">
-          <div class="principles-empty__icon">◈</div>
-          <h3>No design system loaded</h3>
-          <p>Open a design system from <a href="#systems">My Systems</a> to generate its principles.</p>
-        </div>
-      `;
-      return;
-    }
-
-    // Show loading state
-    container.innerHTML = `
-      <div class="principles-loading">
-        <div class="principles-loading__spinner"></div>
-        <p>Analysing design system…</p>
-      </div>
-    `;
-
-    try {
-      const principles = await this.principlesGenerator.generate(ds);
-
-      // Cache on the design system object + persist
-      ds.principles = principles;
-      this.saveDesignSystem(ds, true);
-
-      container.innerHTML = this._buildPrinciplesHTML(ds, principles);
-
-      // Bind accordion toggles for component sections
-      container.querySelectorAll('.pcomp-header').forEach(header => {
-        header.addEventListener('click', () => {
-          const section = header.closest('.pcomp-section');
-          section?.classList.toggle('open');
-          header.setAttribute('aria-expanded', String(section?.classList.contains('open')));
-        });
-      });
-
-      // Regenerate button — clears cache and re-runs
-      DOMUtils.$('#principles-regenerate')?.addEventListener('click', () => {
-        if (ds.principles) delete ds.principles.generatedAt;
-        this.renderPrinciples();
-      });
-
-    } catch (err) {
-      this.debugLog('PRINCIPLES', 'Error generating principles:', err);
-      container.innerHTML = `
-        <div class="principles-error">
-          <p>Failed to generate principles: ${err.message}</p>
-          <button class="btn btn--ghost btn--sm" id="principles-retry">Retry</button>
-        </div>
-      `;
-      DOMUtils.$('#principles-retry')?.addEventListener('click', () => this.renderPrinciples());
-    }
-  }
-
-  /**
-   * Build the full HTML for the Principles view from a principles result object.
-   */
-  _buildPrinciplesHTML(ds, p) {
-    const globalCards = (p.globalPrinciples || []).map(pr => `
-      <div class="principle-card">
-        <h4 class="principle-card__title">${this._escHtml(pr.title)}</h4>
-        <p class="principle-card__desc">${this._escHtml(pr.description)}</p>
-      </div>
-    `).join('');
-
-    const componentSections = Object.entries(p.componentPrinciples || {}).map(([type, rules]) => {
-      if (!rules?.length) return '';
-      const ruleItems = rules.map(r => `
-        <div class="pcomp-rule">
-          <div class="pcomp-rule__rule">${this._escHtml(r.rule)}</div>
-          <div class="pcomp-rule__rationale">${this._escHtml(r.rationale)}</div>
-        </div>
-      `).join('');
-      const label = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      return `
-        <div class="pcomp-section">
-          <button class="pcomp-header" aria-expanded="false">
-            <span class="pcomp-header__name">${this._escHtml(label)}</span>
-            <span class="pcomp-header__count">${rules.length} rule${rules.length !== 1 ? 's' : ''}</span>
-            <span class="pcomp-header__chevron">›</span>
-          </button>
-          <div class="pcomp-body">${ruleItems}</div>
-        </div>
-      `;
-    }).join('');
-
-    const aiLabel = p.generatedAt
-      ? `Generated ${new Date(p.generatedAt).toLocaleDateString()}`
-      : '';
-
-    return `
-      <div class="principles-header">
-        <h2 class="principles-title">${this._escHtml(ds.name)}</h2>
-        <p class="principles-philosophy">${this._escHtml(p.philosophyStatement || '')}</p>
-        ${aiLabel ? `<span class="principles-meta">${aiLabel}</span>` : ''}
-        <button class="btn btn--ghost btn--sm" id="principles-regenerate">Regenerate</button>
-      </div>
-
-      <section class="principles-section">
-        <h3 class="principles-section__heading">Global Principles</h3>
-        <div class="principles-grid">${globalCards}</div>
-      </section>
-
-      ${componentSections ? `
-      <section class="principles-section">
-        <h3 class="principles-section__heading">Component Principles</h3>
-        <div class="pcomp-list">${componentSections}</div>
-      </section>
-      ` : ''}
-    `;
-  }
+  // Principles view is now rendered inside docs-view via viewer.renderPrinciplesFoundation()
+  // Old renderPrinciples() and _buildPrinciplesHTML() removed — see viewer.js
 
   _escHtml(str) {
     return String(str || '')

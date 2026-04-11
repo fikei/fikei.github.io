@@ -807,3 +807,63 @@
 .comp-principles-more:hover {
   color: var(--fg);
 }
+
+
+/* ============================================================
+   Editable fields (descriptions, principles)
+   ============================================================ */
+
+.editable-desc,
+.editable-field {
+  outline: none;
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background .15s, box-shadow .15s;
+  cursor: text;
+}
+
+.editable-desc:hover,
+.editable-field:hover {
+  background: var(--bg-elevated);
+}
+
+.editable-desc:focus,
+.editable-field:focus {
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.desc-ai-loader {
+  display: inline-block;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  font-style: italic;
+  margin-top: var(--space-1);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: .4; }
+  50% { opacity: 1; }
+}
+
+/* Principles rendered inside docs stage */
+.principles-content {
+  max-width: 900px;
+}
+
+.principles-header__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.principles-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
