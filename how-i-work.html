@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How I Work — Ian Fike</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/design-system/display.css">
+</head>
+<body class="d-page">
+
+<nav class="d-nav">
+  <a href="/" class="d-nav__name">Ian Fike</a>
+  <ul class="d-nav__links">
+    <li><a href="/field.html" class="d-nav__link">Field</a></li>
+    <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
+    <li><a href="/livongo.html" class="d-nav__link">Livongo</a></li>
+    <li><a href="/how-i-work.html" class="d-nav__link d-nav__link--active">How I Work</a></li>
+  </ul>
+</nav>
+
+<div class="d-subnav">
+  <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
+  <a href="#stack" class="d-subnav__link">Stack</a>
+  <a href="#system" class="d-subnav__link">Design System</a>
+  <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#map" class="d-subnav__link">Process Map</a>
+  <a href="#impact" class="d-subnav__link">Impact</a>
+</div>
+
+<div class="d-contain">
+
+  <!-- Header + Overview -->
+  <div style="padding: 48px 0 0;">
+    <span class="d-status d-status--active">Active</span>
+    <p class="d-headline d-headline--xl" style="margin-top: 12px;">How I Work</p>
+    <p class="d-body" style="margin-top: 12px;">I use a design system as the shared language between me and AI tools. The system defines the rules. The AI writes code that follows them. I review and ship.</p>
+
+    <dl class="d-overview">
+      <dt>Setup</dt>
+      <dd>Solo designer, no design team</dd>
+      <dt>Products</dt>
+      <dd>Boards, Events, Soundscape, Systemic, Favicon</dd>
+      <dt>Tools</dt>
+      <dd>CTRL Design System, Systemic (auditor), Claude Code</dd>
+      <dt>Output</dt>
+      <dd>5 products with consistent quality, shipped continuously</dd>
+    </dl>
+  </div>
+
+  <!-- FRAMING -->
+  <div id="framing" class="d-section">
+    <p class="d-label">Framing</p>
+    <p class="d-body">One person, five products, daily shipping. The challenge isn't design skill — it's <strong>maintaining consistency at speed without a team.</strong> The answer: make the design system do the enforcement so I can focus on decisions.</p>
+  </div>
+
+  <!-- STACK -->
+  <div id="stack" class="d-section">
+    <p class="d-label">Stack</p>
+    <div class="d-grid-3" style="margin-top: 16px;">
+      <div>
+        <p class="d-mono" style="margin-bottom: 8px;">CTRL DESIGN SYSTEM</p>
+        <p class="d-body" style="font-size: 12px;">CSS files that define colors, type, spacing, components, and AI widget templates. 48 tokens, 24 components, 11 widget types.</p>
+      </div>
+      <div>
+        <p class="d-mono" style="margin-bottom: 8px;">SYSTEMIC</p>
+        <p class="d-body" style="font-size: 12px;">A tool I built that crawls websites, extracts their design tokens, and checks them against the design system rules. Flags violations automatically.</p>
+      </div>
+      <div>
+        <p class="d-mono" style="margin-bottom: 8px;">CLAUDE CODE</p>
+        <p class="d-body" style="font-size: 12px;">AI that writes code. I give it a feature spec and the design system. It generates components that follow the system's rules. I review and ship.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESIGN SYSTEM -->
+  <div id="system" class="d-section">
+    <p class="d-label">Design System</p>
+    <p class="d-body">The system isn't a Figma library. It's four CSS files. Change the code, run a script, and every product picks up the update. No syncing, no handoff document.</p>
+
+    <div class="d-callout" style="margin-top: 24px; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--fg-muted, #8a8885); white-space: pre; line-height: 1.8; overflow-x: auto;">tokens.css       → colors, type, spacing
+components.css   → buttons, inputs, cards
+widgets.css      → AI-generated content templates
+display.css      → marketing and portfolio pages
+        ↓
+manifest.json    → auto-generated index
+        ↓
+Systemic         → automated QA checks</div>
+
+    <div class="d-grid-2" style="margin-top: 24px;">
+      <div>
+        <p class="d-body" style="font-size: 12px;"><strong>Four layers.</strong> All use the same tokens. All follow the same naming rules. display.css — the one rendering this page — is the newest addition.</p>
+      </div>
+      <div>
+        <p class="d-body" style="font-size: 12px;"><strong>11 widget templates.</strong> AI generates content that fits into defined layouts (lists, comparisons, stats, checklists, etc.). The AI picks the format; the system controls the look.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Process</p>
+
+    <div class="d-flow">
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">01</span>
+        <span class="d-flow__step-label">Intent</span>
+        <span class="d-flow__step-desc">I describe what I want to build</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">02</span>
+        <span class="d-flow__step-label">Design System</span>
+        <span class="d-flow__step-desc">Gives the AI rules to follow</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">03</span>
+        <span class="d-flow__step-label">Claude Code</span>
+        <span class="d-flow__step-desc">Writes the code within those rules</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">04</span>
+        <span class="d-flow__step-label">Systemic</span>
+        <span class="d-flow__step-desc">Checks the output against the system</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">05</span>
+        <span class="d-flow__step-label">Ship</span>
+        <span class="d-flow__step-desc">Push to GitHub Pages</span>
+      </div>
+    </div>
+
+    <p class="d-body" style="margin-top: 24px;">When I say "use --accent-cyan on the focus ring," the AI looks up the same token I defined. The design system is a shared vocabulary between me and the machine. It doesn't get stale because it's the live code — not a document about the code.</p>
+  </div>
+
+  <!-- PROCESS MAP -->
+  <div id="map" class="d-section">
+    <p class="d-label">Process Map</p>
+    <p class="d-body" style="margin-bottom: 32px;">Click any node for detail: why it exists, the rules the AI follows, and the goals it serves.</p>
+
+    <style>
+      .pm { display: flex; flex-direction: column; gap: 32px; }
+      .pm-layer { display: flex; flex-direction: column; gap: 2px; }
+      .pm-layer__label {
+        font-family: var(--font-mono, monospace);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg-subtle, #666560);
+        padding: 12px 0 8px;
+      }
+      .pm-layer__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--border-subtle, #33332f); }
+      .pm-card {
+        padding: 16px 20px;
+        background: var(--bg, #111110);
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .pm-card:hover { background: var(--bg-surface, #1a1a18); }
+      .pm-card--active { background: var(--bg-elevated, #22221f); border-left: 2px solid var(--accent-cyan, #00fff7); }
+      .pm-card__name {
+        font-family: var(--font-display, 'Space Grotesk', sans-serif);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg, #e8e6e3);
+        margin-bottom: 4px;
+      }
+      .pm-card__desc {
+        font-family: var(--font-mono, monospace);
+        font-size: 11px;
+        color: var(--fg-subtle, #666560);
+        line-height: 1.5;
+      }
+      .pm-panel {
+        position: fixed;
+        top: 0; right: 0; bottom: 0;
+        width: 420px;
+        max-width: 90vw;
+        background: var(--bg-surface, #1a1a18);
+        border-left: 1px solid var(--border-subtle, #33332f);
+        z-index: 200;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        overflow-y: auto;
+        padding: 32px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .pm-panel--open { transform: translateX(0); }
+      .pm-panel__close {
+        position: absolute; top: 16px; right: 16px;
+        background: none; border: none; cursor: pointer;
+        font-family: var(--font-mono, monospace);
+        font-size: 18px; color: var(--fg-subtle, #666560);
+      }
+      .pm-panel__close:hover { color: var(--fg, #e8e6e3); }
+      .pm-panel__name {
+        font-family: var(--font-display, 'Space Grotesk', sans-serif);
+        font-size: 20px; font-weight: 600;
+        color: var(--fg, #e8e6e3);
+      }
+      .pm-panel__layer {
+        font-family: var(--font-mono, monospace);
+        font-size: 10px; letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--fg-subtle, #666560);
+      }
+      .pm-panel__section-label {
+        font-family: var(--font-mono, monospace);
+        font-size: 10px; letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent-cyan, #00fff7);
+        margin-bottom: 6px;
+      }
+      .pm-panel__text {
+        font-family: var(--font-mono, monospace);
+        font-size: 13px; line-height: 1.7;
+        color: var(--fg-muted, #8a8885);
+      }
+      .pm-panel__text ul { list-style: none; padding: 0; }
+      .pm-panel__text li { padding-left: 16px; position: relative; margin-bottom: 4px; }
+      .pm-panel__text li::before { content: '—'; position: absolute; left: 0; color: var(--fg-subtle, #666560); }
+      .pm-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 199;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.2s;
+      }
+      .pm-overlay--open { opacity: 1; pointer-events: auto; }
+    </style>
+
+    <div class="pm">
+
+      <!-- TOOLS -->
+      <div class="pm-layer">
+        <div class="pm-layer__label">Tools</div>
+        <div class="pm-layer__cards">
+          <div class="pm-card" data-node="claude-code">
+            <div class="pm-card__name">Claude Code</div>
+            <div class="pm-card__desc">Primary execution environment for AI-assisted design</div>
+          </div>
+          <div class="pm-card" data-node="paper">
+            <div class="pm-card__name">Paper</div>
+            <div class="pm-card__desc">Visual source of truth, kept in sync with code</div>
+          </div>
+          <div class="pm-card" data-node="systemic">
+            <div class="pm-card__name">Systemic</div>
+            <div class="pm-card__desc">Generates structured design systems from existing code</div>
+          </div>
+          <div class="pm-card" data-node="obsidian">
+            <div class="pm-card__name">Obsidian</div>
+            <div class="pm-card__desc">Stable context as portable .md files</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTEXT -->
+      <div class="pm-layer">
+        <div class="pm-layer__label">Context</div>
+        <div class="pm-layer__cards">
+          <div class="pm-card" data-node="ecosystem">
+            <div class="pm-card__name">Ecosystem Context</div>
+            <div class="pm-card__desc">Business goals, founder vision, metrics, stakeholders</div>
+          </div>
+          <div class="pm-card" data-node="personas">
+            <div class="pm-card__name">Personas</div>
+            <div class="pm-card__desc">Semantic anchors for all UI generation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESIGN SYSTEM -->
+      <div class="pm-layer">
+        <div class="pm-layer__label">Design System</div>
+        <div class="pm-layer__cards">
+          <div class="pm-card" data-node="atomic">
+            <div class="pm-card__name">Atomic Hierarchy</div>
+            <div class="pm-card__desc">Particles → Atoms → Molecules → Organisms → Templates → Pages</div>
+          </div>
+          <div class="pm-card" data-node="philosophy">
+            <div class="pm-card__name">System Philosophy</div>
+            <div class="pm-card__desc">Intent behind decisions so AI can make judgment calls</div>
+          </div>
+          <div class="pm-card" data-node="ai-rules">
+            <div class="pm-card__name">Global AI Rules</div>
+            <div class="pm-card__desc">Constraints that prevent the most common failure modes</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUCT MAP & IA -->
+      <div class="pm-layer">
+        <div class="pm-layer__label">Product Map & IA</div>
+        <div class="pm-layer__cards">
+          <div class="pm-card" data-node="product-map">
+            <div class="pm-card__name">Product Map</div>
+            <div class="pm-card__desc">Surface inventory so AI doesn't conflict with existing structure</div>
+          </div>
+          <div class="pm-card" data-node="ia">
+            <div class="pm-card__name">IA & Workflow Architecture</div>
+            <div class="pm-card__desc">The highest-touch human step — page vs modal vs drawer</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESIGNING -->
+      <div class="pm-layer">
+        <div class="pm-layer__label">Designing</div>
+        <div class="pm-layer__cards">
+          <div class="pm-card" data-node="use">
+            <div class="pm-card__name">Use</div>
+            <div class="pm-card__desc">Design new flows using the existing system</div>
+          </div>
+          <div class="pm-card" data-node="extension">
+            <div class="pm-card__name">Extension</div>
+            <div class="pm-card__desc">When a new component is genuinely warranted</div>
+          </div>
+          <div class="pm-card" data-node="review">
+            <div class="pm-card__name">Review</div>
+            <div class="pm-card__desc">Quality gate before engineering handoff</div>
+          </div>
+          <div class="pm-card" data-node="auditing">
+            <div class="pm-card__name">Auditing</div>
+            <div class="pm-card__desc">Find where implementation diverged from spec</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXAMPLE -->
+      <div class="pm-layer">
+        <div class="pm-layer__label">Example in Practice</div>
+        <div class="pm-layer__cards">
+          <div class="pm-card" data-node="field-example">
+            <div class="pm-card__name">Field</div>
+            <div class="pm-card__desc">AI clinical documentation — extreme IA constraints in action</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /pm -->
+
+    <!-- Overlay -->
+    <div class="pm-overlay" id="pmOverlay"></div>
+
+    <!-- Detail Panel -->
+    <div class="pm-panel" id="pmPanel">
+      <button class="pm-panel__close" id="pmClose">×</button>
+      <div class="pm-panel__layer" id="pmLayer"></div>
+      <div class="pm-panel__name" id="pmName"></div>
+      <div>
+        <div class="pm-panel__section-label">Why</div>
+        <div class="pm-panel__text" id="pmWhy"></div>
+      </div>
+      <div>
+        <div class="pm-panel__section-label">Rules</div>
+        <div class="pm-panel__text" id="pmRules"></div>
+      </div>
+      <div>
+        <div class="pm-panel__section-label">Goals</div>
+        <div class="pm-panel__text" id="pmGoals"></div>
+      </div>
+    </div>
+
+    <script>
+    (function() {
+      var nodes = {
+        'claude-code': {
+          layer: 'Tools',
+          name: 'Claude Code',
+          why: 'The primary execution environment for all AI-assisted design work. Skills extend its capabilities for specific design tasks.',
+          rules: '<ul><li>Skills are invoked explicitly per task</li><li>Claude Code never invents values or component names not present in source</li><li>All output is scoped to what exists in the design system</li></ul>',
+          goals: 'Consistent, context-aware UI generation. Reduce manual translation between design intent and code.'
+        },
+        'paper': {
+          layer: 'Tools',
+          name: 'Paper (App + MCP)',
+          why: 'Visual source of truth for the design system. Lives alongside the code implementation and is kept in sync via prompts.',
+          rules: '<ul><li>Paper is never the final source — code is</li><li>Paper is the human-readable reference</li><li>Any divergence between Paper and code must be flagged and resolved before a feature ships</li></ul>',
+          goals: 'Give designers and engineers a shared visual reference. Make design system drift visible.'
+        },
+        'systemic': {
+          layer: 'Tools',
+          name: 'Systemic',
+          why: 'Solves the cold-start problem. Most teams have either no design system or an undocumented one. Systemic reads the existing codebase and generates a structured atomic design system with dummy copy for all components.',
+          rules: '<ul><li>Output follows strict atomic hierarchy: Particles → Atoms → Molecules → Organisms → Templates → Pages</li><li>No components are invented — everything is derived from what exists in source</li><li>Dummy copy is realistic but clearly placeholder</li></ul>',
+          goals: 'Give any team a documented, structured design system within hours. Make the AI-native process immediately applicable to existing codebases.'
+        },
+        'obsidian': {
+          layer: 'Tools',
+          name: 'Obsidian',
+          why: 'All stable context — personas, ecosystem docs, system philosophy — lives as .md files. This makes context portable, versionable, and injectable into any AI prompt.',
+          rules: '<ul><li>.md files are read-only inputs to design sessions</li><li>They are updated only through deliberate decisions, not as a byproduct of design work</li><li>If home-built, Skills are used to manage and query them</li></ul>',
+          goals: 'Persistent, structured context that survives across sessions and team members.'
+        },
+        'ecosystem': {
+          layer: 'Context',
+          name: 'Ecosystem Context',
+          why: 'AI-generated design without business context produces technically correct but strategically wrong output. This layer anchors every design decision to the product\'s actual goals.',
+          rules: '<ul><li>Must include: problem space, founder vision, business goals, metrics, ownership, stakeholders</li><li>AI may not make structural design decisions without this context present</li></ul>',
+          goals: 'Ensure all design work is in service of the actual product strategy, not just user needs in isolation.'
+        },
+        'personas': {
+          layer: 'Context',
+          name: 'Personas',
+          why: 'Personas are the semantic anchor for UI generation. They define who the interface is for, what constraints they operate under, and what success looks like for them.',
+          rules: '<ul><li>Personas are stable .md documents — they do not change per session</li><li>AI uses personas as constraints, not suggestions</li><li>If a design decision conflicts with a persona\'s known constraints, it must be flagged</li></ul>',
+          goals: 'Generate UI that is fit for the actual user, not a generic one. Prevent AI from optimizing for the wrong person.'
+        },
+        'atomic': {
+          layer: 'Design System',
+          name: 'Atomic Hierarchy',
+          why: 'Atomic design creates a shared vocabulary between designers, engineers, and AI. When everyone refers to the same named components at the same level of abstraction, drift is caught earlier.',
+          rules: '<ul><li>Particles (tokens) → Atoms → Molecules → Organisms → Templates → Pages</li><li>No skipping levels</li><li>AI may only compose upward — an Atom may not contain an Organism</li><li>Tokens are the only source for values; no hardcoded colors, spacing, or typography</li></ul>',
+          goals: 'A single composable system where every element traces back to a token. Makes AI-generated UI predictable and auditable.'
+        },
+        'philosophy': {
+          layer: 'Design System',
+          name: 'System Philosophy',
+          why: 'Rules without reasoning produce brittle systems. System philosophy documents the intent behind decisions so AI can make judgment calls consistent with the system\'s values.',
+          rules: '<ul><li>Must include: system intent, transactional rules, aesthetic principles, design principles in "Given [need], do [constraint]" format</li><li>Common tradeoffs and known gaps documented</li><li>AI references this before making any non-obvious design decision</li></ul>',
+          goals: 'Give AI enough context to make good novel decisions, not just pattern-match to existing components.'
+        },
+        'ai-rules': {
+          layer: 'Design System',
+          name: 'Global AI Rules',
+          why: 'Without explicit constraints, AI optimizes for plausibility, not correctness. These rules prevent the most common failure modes.',
+          rules: '<ul><li>Extract before you write: read the full design system before generating anything</li><li>No invented values: every value must come from a token</li><li>Pixel-match check after every component</li><li>Only what exists in source: no new patterns without explicit extension approval</li><li>Values come from tokens, not screenshots</li></ul>',
+          goals: 'Eliminate drift at the generation step, before review is needed.'
+        },
+        'product-map': {
+          layer: 'Product Map & IA',
+          name: 'Product Map',
+          why: 'AI needs to know where a feature lives before it can design it. The product map gives AI a surface inventory so it doesn\'t generate UI that conflicts with existing navigation or structure.',
+          rules: '<ul><li>Must document: all surfaces, navigation structure, entry points per persona, ownership</li><li>AI may not design a new surface without the product map being updated first</li><li>New surfaces require human approval</li></ul>',
+          goals: 'Prevent AI from generating features in a vacuum. Keep the product coherent as it grows.'
+        },
+        'ia': {
+          layer: 'Product Map & IA',
+          name: 'IA & Workflow Architecture',
+          why: 'This is the highest-touch human step in the process. Before any UI is generated, a human designer decides the structural approach: page vs modal vs drawer, flow sequence, where the user comes from and where they go next.',
+          rules: '<ul><li>IA decisions are documented in .md and appended to the Paper file before any feature-level design begins</li><li>AI may suggest IA options but may not select them</li><li>The human must make the final call</li><li>No feature design begins without an IA decision on record</li></ul>',
+          goals: 'Preserve human judgment at the structural level. Ensure AI operates within a deliberate information architecture, not one it inferred.'
+        },
+        'use': {
+          layer: 'Designing',
+          name: 'Use',
+          why: 'The most common mode. Using the existing system to design new flows without extending it.',
+          rules: '<ul><li>Feature is written as a story or requirements doc first</li><li>Design system and codebase context are both present in the prompt</li><li>AI generates UI constrained to existing components and tokens only</li><li>Any deviation is flagged — not auto-resolved</li></ul>',
+          goals: 'High-velocity feature design that stays within system bounds. Zero invented components.'
+        },
+        'extension': {
+          layer: 'Designing',
+          name: 'Extension',
+          why: 'Sometimes a new component is genuinely warranted. Extension mode handles this deliberately rather than letting it happen by accident.',
+          rules: '<ul><li>AI must explicitly name the proposed new component</li><li>Justify why no existing component can serve this need</li><li>Flag it as a review item</li><li>The new component does not enter the design system until it passes a dedicated review gate</li><li>No extension happens silently</li></ul>',
+          goals: 'Controlled system growth. Every new component is a deliberate decision, not a side effect.'
+        },
+        'review': {
+          layer: 'Designing',
+          name: 'Review',
+          why: 'Design review happens before handoff to engineering, not after. This is the quality gate.',
+          rules: '<ul><li>AI flags: spacing inconsistencies, typography violations, color deviations, visual hierarchy issues, component misuse</li><li>Human reviews in Paper</li><li>Nothing moves to engineering without sign-off</li><li>Review is not optional</li></ul>',
+          goals: 'Catch quality issues before they become engineering debt. Maintain the gap between "designed" and "shipped" as a quality buffer.'
+        },
+        'auditing': {
+          layer: 'Designing',
+          name: 'Auditing',
+          why: 'Drift accumulates silently. Auditing finds where the implemented product has diverged from the design system.',
+          rules: '<ul><li>Auditing compares implemented components against design system spec</li><li>All deviations are documented</li><li>Deviations categorized: acceptable tradeoff, known gap, or violation requiring remediation</li><li>Audit results feed back into system philosophy as known gaps</li></ul>',
+          goals: 'Make drift visible and addressable. Prevent the design system from becoming aspirational rather than actual.'
+        },
+        'field-example': {
+          layer: 'Example in Practice',
+          name: 'Field',
+          why: 'Field is an AI-assisted clinical documentation app for first responders. It illustrates the IA and workflow architecture phase because the design constraints are extreme: users operate in austere environments, under stress, with one hand, often in the dark.',
+          rules: '<ul><li>Personas were defined before any UI was generated</li><li>IA decisions were made with explicit reference to operational context (no modals in a moving vehicle)</li><li>Every flow was mapped before any screen was designed</li></ul>',
+          goals: 'Show how the methodology handles high-constraint design problems where getting the IA wrong has real consequences.'
+        }
+      };
+
+      var panel = document.getElementById('pmPanel');
+      var overlay = document.getElementById('pmOverlay');
+      var activeCard = null;
+
+      function openPanel(key) {
+        var d = nodes[key];
+        if (!d) return;
+        document.getElementById('pmLayer').textContent = d.layer;
+        document.getElementById('pmName').textContent = d.name;
+        document.getElementById('pmWhy').innerHTML = d.why;
+        document.getElementById('pmRules').innerHTML = d.rules;
+        document.getElementById('pmGoals').innerHTML = d.goals;
+        panel.classList.add('pm-panel--open');
+        overlay.classList.add('pm-overlay--open');
+        if (activeCard) activeCard.classList.remove('pm-card--active');
+        activeCard = document.querySelector('[data-node="' + key + '"]');
+        if (activeCard) activeCard.classList.add('pm-card--active');
+      }
+
+      function closePanel() {
+        panel.classList.remove('pm-panel--open');
+        overlay.classList.remove('pm-overlay--open');
+        if (activeCard) { activeCard.classList.remove('pm-card--active'); activeCard = null; }
+      }
+
+      document.querySelectorAll('.pm-card').forEach(function(card) {
+        card.addEventListener('click', function() { openPanel(card.dataset.node); });
+      });
+      document.getElementById('pmClose').addEventListener('click', closePanel);
+      overlay.addEventListener('click', closePanel);
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePanel(); });
+    })();
+    </script>
+  </div>
+
+  <!-- IMPACT -->
+  <div id="impact" class="d-section">
+    <p class="d-label">Impact</p>
+    <div class="d-metrics" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
+      <div class="d-metric">
+        <div class="d-metric__value">5</div>
+        <div class="d-metric__label">Products</div>
+        <div class="d-metric__sub">Boards, Events, Soundscape, Systemic, Favicon</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">1</div>
+        <div class="d-metric__label">Designer</div>
+        <div class="d-metric__sub">Consistent quality across all five</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">4</div>
+        <div class="d-metric__label">CSS layers</div>
+        <div class="d-metric__sub">tokens → components → widgets → display</div>
+      </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 32px; border-left-color: var(--accent-cyan, #00fff7);">
+      <p class="d-callout__body">This portfolio is built with this system. display.css is a permanent part of the design system, not a one-off stylesheet. Every element on this page uses the same tokens as the products.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer class="d-footer d-contain">
+  <a href="/livongo.html" class="d-next">← Livongo</a>
+  <a href="/" class="d-next">Overview →</a>
+</footer>
+
+<script src="/portfolio.js"></script>
+</body>
+</html>
