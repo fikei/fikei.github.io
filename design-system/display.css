@@ -70,7 +70,7 @@
   z-index: 49;
   display: flex;
   gap: 24px;
-  padding: 10px clamp(20px, 5vw, 64px);
+  padding: 16px clamp(20px, 5vw, 64px) 10px;
   background: var(--bg, #111110);
   border-bottom: 1px solid var(--border-subtle, #33332f);
 }
