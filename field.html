@@ -33,8 +33,32 @@
 
   <!-- Header — side by side -->
   <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
-    <!-- Image placeholder -->
-    <div style="width: 400px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
+    <!-- Animated phone — starts on scroll -->
+    <div id="fieldPhone" style="width: 294px; flex-shrink: 0;">
+      <iframe src="/portfolio/animations.html?paused" style="width: 294px; height: 660px; border: none; border-radius: 44px; overflow: hidden; pointer-events: none;" id="fieldAnim"></iframe>
+    </div>
+    <script>
+    (function() {
+      var started = false;
+      var el = document.getElementById('fieldPhone');
+      var iframe = document.getElementById('fieldAnim');
+      var observer = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !started) {
+          started = true;
+          // Wait for iframe to fully load before sending start
+          iframe.addEventListener('load', function() {
+            setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+          });
+          // If already loaded
+          if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+            setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+          }
+          observer.disconnect();
+        }
+      }, { threshold: 0.3 });
+      observer.observe(el);
+    })();
+    </script>
     <!-- Content -->
     <div style="flex: 1;">
       <span class="d-status d-status--dev">In Beta</span>

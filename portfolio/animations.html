@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field — Animated Screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A0A0A; font-family: "Inter", system-ui, sans-serif; display: flex; gap: 40px; padding: 60px; justify-content: center; -webkit-font-smoothing: antialiased; }
+
+  /* Phone frame */
+  .phone {
+    width: 294px;
+    background: #1C1C1E;
+    border-radius: 44px;
+    padding: 6px;
+    flex-shrink: 0;
+  }
+  .phone-inner {
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    width: 282px;
+    height: 611px;
+  }
+  .screen {
+    width: 390px;
+    height: 844px;
+    background: #0A0A0A;
+    position: absolute;
+    top: 0; left: 0;
+    transform: scale(0.7231);
+    transform-origin: top left;
+  }
+  .phone__label { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666560; margin-top: 16px; }
+
+  /* Field design tokens */
+  .ts-header { display: flex; align-items: center; padding: 12px 16px; gap: 16px; }
+  .ts-back { color: #A79EAF; font-size: 20px; width: 18px; }
+  .ts-id { color: #A79EAF; font-size: 14px; line-height: 1.5; }
+  .ts-date { color: #A79EAF; font-size: 11px; font-weight: 500; }
+  .ts-rec-pill { display: flex; align-items: center; gap: 5px; background: #DF1B41; border-radius: 20px; padding: 4px 11px; height: 22px; margin-left: auto; }
+  .ts-rec-pill span { color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ts-rec-dot { width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: pulse 1.5s infinite; }
+
+  .ts-tabs { display: flex; border-bottom: 1px solid #1C1C1E; }
+  .ts-tab { padding: 10px 20px; font-size: 12px; letter-spacing: 0.3px; color: #A79EAF; }
+  .ts-tab--active { color: #EEF8FE; font-weight: 700; border-bottom: 2.5px solid #EEF8FE; }
+
+  .ts-start { display: flex; justify-content: center; gap: 6px; padding: 16px 0 4px; color: #6B6877; font-size: 12px; }
+
+  .ts-body { display: flex; flex-direction: column; gap: 0; padding: 0 0 90px; overflow-y: auto; height: 620px; scroll-behavior: smooth; }
+  .ts-body::-webkit-scrollbar { display: none; }
+
+  /* Message */
+  .msg { display: none; gap: 10px; padding: 16px 20px 0; }
+  .msg.show { display: flex; animation: fadeUp 0.35s ease forwards; }
+  .msg-left { display: flex; align-items: center; gap: 5px; flex-shrink: 0; height: 21px; }
+  .msg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .msg-dot--if { background: #00A480; }
+  .msg-dot--mc { background: #F9CE86; }
+  .msg-dot--p2 { background: #009CC0; }
+  .msg-speaker { font-size: 10px; font-weight: 700; width: 22px; flex-shrink: 0; line-height: 21px; }
+  .msg-speaker--if { color: #00A480; }
+  .msg-speaker--mc { color: #F9CE86; }
+  .msg-speaker--p2 { color: #009CC0; }
+  .msg-content { flex: 1; min-width: 0; }
+  .msg-text { color: #EEF8FE; font-size: 14px; line-height: 1.5; }
+
+  /* Badge (collapsed extraction tag) */
+  .badge { display: none; align-items: center; gap: 6px; background: #161618; border: 1px solid #2C2C2E; border-radius: 8px; padding: 6px 10px; margin-top: 8px; cursor: pointer; width: fit-content; position: relative; overflow: hidden; }
+  .badge.show { display: inline-flex; animation: scaleIn 0.3s ease forwards; }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; flex-shrink: 0; }
+  .badge-text { color: #A79EAF; font-size: 11px; font-weight: 500; line-height: 14px; transition: opacity 0.3s; }
+
+  /* Loading state — shimmer before text resolves */
+  .badge.loading .badge-text { opacity: 0; }
+  .badge.loading .badge-dot { animation: dotFlash 0.6s infinite; }
+  .badge.loading::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 200%; height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(167,158,175,0.06) 40%, rgba(167,158,175,0.12) 50%, rgba(167,158,175,0.06) 60%, transparent 100%);
+    animation: shimmer 1.2s ease infinite;
+  }
+  @keyframes shimmer { to { transform: translateX(50%); } }
+  @keyframes dotFlash { 0%,100% { background: #3A3A3C; } 50% { background: #A79EAF; } }
+
+  /* Tap ripple */
+  .badge.tapping { animation: tapPulse 0.2s ease; }
+
+  /* Expanded extraction card */
+  .extract-card { background: #161618; border: 1px solid #2C2C2E; border-radius: 10px; margin-top: 8px; overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.4s ease, opacity 0.3s ease; }
+  .extract-card.open { max-height: 320px; opacity: 1; }
+  .extract-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #2C2C2E; }
+  .extract-header-left { display: flex; align-items: center; gap: 6px; }
+  .extract-header-dot { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; }
+  .extract-header-text { color: #A79EAF; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-chevron { color: #3A3A3C; font-size: 12px; transition: transform 0.3s; }
+  .extract-card.open .extract-chevron { transform: rotate(180deg); }
+  .extract-field { padding: 10px 12px; }
+  .extract-field-label { color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-field-value { color: #EBEBF5; font-size: 13px; line-height: 1.45; margin-top: 4px; }
+
+  /* Typing indicator */
+  .typing { display: none; gap: 10px; padding: 16px 20px 0; align-items: center; }
+  .typing.show { display: flex; animation: fadeUp 0.25s ease forwards; }
+  .typing-left { display: flex; gap: 5px; align-items: center; }
+  .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: #3A3A3C; }
+  .typing-speaker { font-size: 10px; font-weight: 700; width: 22px; color: #3A3A3C; }
+  .typing-dots { display: flex; gap: 4px; }
+  .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; }
+  .typing-dots span:nth-child(1) { animation: dotPulse 1s infinite 0s; }
+  .typing-dots span:nth-child(2) { animation: dotPulse 1s infinite 0.15s; }
+  .typing-dots span:nth-child(3) { animation: dotPulse 1s infinite 0.3s; }
+
+  /* Recording bar — floating pill */
+  .rec-bar { position: absolute; bottom: 28px; left: 16px; right: 16px; height: 52px; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+  .rec-bar-left { display: flex; align-items: center; gap: 10px; }
+  .rec-bar-dot { width: 8px; height: 8px; border-radius: 50%; background: #FF3B30; animation: pulse 1.5s infinite; }
+  .rec-bar-label { color: #fff; font-size: 12px; font-weight: 600; }
+  .rec-bar-time { color: #636366; font-size: 11px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .rec-bar-stop { width: 36px; height: 36px; border-radius: 50%; background: #2C2C2E; border: 1.5px solid #3A3A3C; display: flex; align-items: center; justify-content: center; }
+  .rec-bar-stop-inner { width: 13px; height: 13px; border-radius: 3px; background: #FF3B30; }
+
+  /* Mobile scaling */
+  @media (max-width: 480px) {
+    body { padding: 24px 0; }
+    .phone { transform: scale(0.85); transform-origin: top center; }
+  }
+  @media (max-width: 360px) {
+    .phone { transform: scale(0.75); transform-origin: top center; }
+  }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+  @keyframes dotPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.8; } }
+  @keyframes tapPulse { 0% { transform: scale(1); } 50% { transform: scale(0.95); background: #1C1C1E; } 100% { transform: scale(1); } }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="phone">
+    <div class="phone-inner">
+      <div class="screen">
+        <!-- Status bar -->
+        <div style="padding: 20px 24px 0; color: #E6E1E5; font-size: 15px; font-weight: 600;">9:41</div>
+
+        <!-- Header -->
+        <div class="ts-header">
+          <span class="ts-back">←</span>
+          <div>
+            <div class="ts-id">INC-2024-0847</div>
+            <div class="ts-date">Apr 2, 2026</div>
+          </div>
+          <div class="ts-rec-pill"><div class="ts-rec-dot"></div><span id="headerTime">03:12</span></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="ts-tabs">
+          <div class="ts-tab ts-tab--active">Transcript</div>
+          <div class="ts-tab">Health Record</div>
+          <div class="ts-tab">Handoff</div>
+        </div>
+
+        <!-- Messages -->
+        <div class="ts-body" id="tsBody">
+          <!-- Start marker (inside scroll container) -->
+          <div class="ts-start">
+            <span>Start of Interaction · 9:37</span>
+          </div>
+          <!-- Typing: IF -->
+          <div class="typing" id="typing-if-1">
+            <div class="typing-left"><div class="typing-dot" style="background:#00A480;"></div><div class="typing-speaker" style="color:#00A480;">IF</div></div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
+
+          <!-- 1: IF -->
+          <div class="msg" id="msg1">
+            <div class="msg-left"><div class="msg-dot msg-dot--if"></div><div class="msg-speaker msg-speaker--if">IF</div></div>
+            <div class="msg-content"><div class="msg-text">What's your name and how old are you?</div></div>
+          </div>
+
+          <!-- Typing: MC -->
+          <div class="typing" id="typing-mc-1">
+            <div class="typing-left"><div class="typing-dot" style="background:#F9CE86;"></div><div class="typing-speaker" style="color:#F9CE86;">MC</div></div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
+
+          <!-- 2: MC + badge -->
+          <div class="msg" id="msg2">
+            <div class="msg-left"><div class="msg-dot msg-dot--mc"></div><div class="msg-speaker msg-speaker--mc">MC</div></div>
+            <div class="msg-content">
+              <div class="msg-text">Marcus Chen, 28. Fell about fifteen feet off the south face.</div>
+              <div class="badge" id="badge1"><div class="badge-dot"></div><span class="badge-text">Added: Name, Age, MOI</span></div>
+            </div>
+          </div>
+
+          <!-- Typing: IF -->
+          <div class="typing" id="typing-if-2">
+            <div class="typing-left"><div class="typing-dot" style="background:#00A480;"></div><div class="typing-speaker" style="color:#00A480;">IF</div></div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
+
+          <!-- 3: IF -->
+          <div class="msg" id="msg3">
+            <div class="msg-left"><div class="msg-dot msg-dot--if"></div><div class="msg-speaker msg-speaker--if">IF</div></div>
+            <div class="msg-content"><div class="msg-text">Any loss of consciousness? Pain anywhere besides your ankle?</div></div>
+          </div>
+
+          <!-- Typing: MC -->
+          <div class="typing" id="typing-mc-2">
+            <div class="typing-left"><div class="typing-dot" style="background:#F9CE86;"></div><div class="typing-speaker" style="color:#F9CE86;">MC</div></div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
+
+          <!-- 4: MC + collapsible extraction card -->
+          <div class="msg" id="msg4">
+            <div class="msg-left"><div class="msg-dot msg-dot--mc"></div><div class="msg-speaker msg-speaker--mc">MC</div></div>
+            <div class="msg-content">
+              <div class="msg-text">No, awake the whole time. Left ankle and lower back.</div>
+              <!-- Badge that gets tapped to open card -->
+              <div class="badge" id="badge2"><div class="badge-dot"></div><span class="badge-text">Added: Chief Complaint, Traumas, +2</span></div>
+              <div class="extract-card" id="card1">
+                <div class="extract-header">
+                  <div class="extract-header-left"><div class="extract-header-dot"></div><span class="extract-header-text">Added: Chief Complaint, Traumas, +2</span></div>
+                  <span class="extract-chevron">∧</span>
+                </div>
+                <div class="extract-field"><div class="extract-field-label">SUBJECTIVE · CHIEF COMPLAINT</div><div class="extract-field-value">Fall from ~15ft while rock climbing. L ankle pain, lower back pain.</div></div>
+                <div class="extract-field"><div class="extract-field-label">OBJECTIVE · TRAUMA</div><div class="extract-field-value">Patient reported no head impact.</div></div>
+                <div class="extract-field"><div class="extract-field-label">OBJECTIVE · LEGS</div><div class="extract-field-value">Patient reported ankle pain.</div></div>
+                <div class="extract-field"><div class="extract-field-label">OBJECTIVE · BACK</div><div class="extract-field-value">Patient reported lower back pain.</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Typing: MC -->
+          <div class="typing" id="typing-mc-3">
+            <div class="typing-left"><div class="typing-dot" style="background:#F9CE86;"></div><div class="typing-speaker" style="color:#F9CE86;">MC</div></div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
+
+          <!-- 5: MC allergies + badge -->
+          <div class="msg" id="msg5">
+            <div class="msg-left"><div class="msg-dot msg-dot--mc"></div><div class="msg-speaker msg-speaker--mc">MC</div></div>
+            <div class="msg-content">
+              <div class="msg-text">Allergic to penicillin. No other meds.</div>
+              <div class="badge" id="badge3"><div class="badge-dot"></div><span class="badge-text">Added: Allergies, Medications</span></div>
+            </div>
+          </div>
+
+          <!-- Final typing -->
+          <div class="typing" id="typing-if-3">
+            <div class="typing-left"><div class="typing-dot" style="background:#00A480;"></div><div class="typing-speaker" style="color:#00A480;">IF</div></div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+
+        <!-- Recording bar -->
+        <div class="rec-bar">
+          <div class="rec-bar-left">
+            <div class="rec-bar-dot"></div>
+            <div>
+              <div class="rec-bar-label">Recording</div>
+              <div class="rec-bar-time" id="barTime">03:12</div>
+            </div>
+          </div>
+          <div class="rec-bar-stop"><div class="rec-bar-stop-inner"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="phone__label">01 — Voice to Trusted Data</p>
+</div>
+
+<script>
+(function() {
+  var headerTime = document.getElementById('headerTime');
+  var barTime = document.getElementById('barTime');
+  var startSeconds = 192; // 03:12
+  var currentSeconds = startSeconds;
+
+  // Sequence: [action, delay_after_in_ms]
+  // Actions: show-typing, hide-typing, show-msg, show-badge, tap-badge, open-card
+  var sequence = [
+    ['show', 'typing-if-1', 0],
+    ['hide', 'typing-if-1', 1200],
+    ['show', 'msg1', 0],
+
+    ['show', 'typing-mc-1', 1500],
+    ['hide', 'typing-mc-1', 2000],
+    ['show', 'msg2', 0],
+    ['show-loading', 'badge1', 800],
+    ['resolve', 'badge1', 1000],
+
+    ['show', 'typing-if-2', 1200],
+    ['hide', 'typing-if-2', 1800],
+    ['show', 'msg3', 0],
+
+    ['show', 'typing-mc-2', 2000],
+    ['hide', 'typing-mc-2', 2200],
+    ['show', 'msg4', 0],
+    ['show-loading', 'badge2', 600],
+    ['resolve', 'badge2', 1200],
+    ['tap', 'badge2', 1000],
+    ['open', 'card1', 300],
+
+    ['show', 'typing-mc-3', 3000],
+    ['hide', 'typing-mc-3', 1500],
+    ['show', 'msg5', 0],
+    ['show-loading', 'badge3', 700],
+    ['resolve', 'badge3', 1000],
+
+    ['show', 'typing-if-3', 2000],
+  ];
+
+  var i = 0;
+  function runNext() {
+    if (i >= sequence.length) return;
+    var step = sequence[i];
+    var action = step[0];
+    var id = step[1];
+    var delay = step[2];
+    i++;
+
+    setTimeout(function() {
+      var el = document.getElementById(id);
+      if (!el) { runNext(); return; }
+
+      var body = document.getElementById('tsBody');
+      function scrollToBottom() {
+        setTimeout(function() { body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' }); }, 80);
+        setTimeout(function() { body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' }); }, 400);
+      }
+
+      if (action === 'show') {
+        el.classList.add('show');
+        scrollToBottom();
+      } else if (action === 'show-loading') {
+        el.classList.add('show', 'loading');
+        scrollToBottom();
+      } else if (action === 'resolve') {
+        el.classList.remove('loading');
+      } else if (action === 'hide') {
+        el.classList.remove('show');
+      } else if (action === 'tap') {
+        el.classList.add('tapping');
+        setTimeout(function() { el.classList.remove('tapping'); }, 200);
+      } else if (action === 'open') {
+        var badge = el.previousElementSibling;
+        if (badge && badge.classList.contains('badge')) badge.style.display = 'none';
+        el.classList.add('open');
+        scrollToBottom();
+      }
+
+      runNext();
+    }, delay);
+  }
+
+  // Start: immediately if standalone, or wait for postMessage if embedded
+  var paused = window.location.search.indexOf('paused') > -1;
+
+  function startAnimation() {
+    if (timerStarted) return;
+    timerStarted = true;
+    // Start timer
+    setInterval(function() {
+      currentSeconds++;
+      var m = String(Math.floor(currentSeconds / 60)).padStart(2, '0');
+      var s = String(currentSeconds % 60).padStart(2, '0');
+      var t = m + ':' + s;
+      headerTime.textContent = t;
+      barTime.textContent = t;
+    }, 1000);
+    setTimeout(runNext, 800);
+  }
+
+  var timerStarted = false;
+
+  if (paused) {
+    window.addEventListener('message', function(e) {
+      if (e.data === 'start') startAnimation();
+    });
+  } else {
+    startAnimation();
+  }
+})();
+</script>
+
+</body>
+</html>
