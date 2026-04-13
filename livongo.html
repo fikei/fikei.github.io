@@ -89,24 +89,72 @@
     <p class="d-label">Deliverable</p>
 
     <p class="d-label" style="margin-top: 24px;">Architecture</p>
-    <p class="d-body" style="margin-bottom: 16px;">Three systems work together. Sales configures the deal. APIs resolve member data before the first screen loads. The registration flow adapts to show only what's needed.</p>
-    <div class="d-flow">
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">SF</span>
-        <span class="d-flow__step-label">Salesforce</span>
-        <span class="d-flow__step-desc">Bundle, pricing, eligibility rules, field visibility</span>
+    <p class="d-body" style="margin-bottom: 24px;">Configuration flows from Salesforce through a central API, consumed by every client-facing surface. Registration calls two additional APIs to create accounts and qualify members.</p>
+
+    <style>
+      .fc { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--fg-muted, #8a8885); }
+      .fc-row { display: flex; align-items: stretch; gap: 0; }
+      .fc-col { display: flex; flex-direction: column; gap: 1px; }
+      .fc-node { padding: 14px 16px; border: 1px solid var(--border-subtle, #33332f); display: flex; flex-direction: column; gap: 4px; }
+      .fc-node__label { font-family: var(--font-display, 'Space Grotesk', sans-serif); font-size: 13px; font-weight: 600; color: var(--fg, #e8e6e3); }
+      .fc-node__desc { font-size: 11px; color: var(--fg-subtle, #666560); line-height: 1.4; }
+      .fc-arrow { display: flex; align-items: center; justify-content: center; padding: 0 8px; color: var(--fg-subtle, #666560); font-size: 14px; }
+      .fc-arrow--down { padding: 6px 0; justify-content: flex-start; padding-left: 40px; }
+      .fc-branch { display: flex; gap: 1px; }
+      .fc-branch > * { flex: 1; }
+      .fc-highlight { border-color: var(--accent-cyan, #00fff7); background: rgba(0, 255, 247, 0.03); }
+      .fc-label { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle, #666560); padding: 8px 0 6px; }
+    </style>
+
+    <div class="fc">
+      <!-- Tier 1: Salesforce -->
+      <div class="fc-label">Source of Truth</div>
+      <div class="fc-node" style="max-width: 320px;">
+        <span class="fc-node__label">Salesforce Client Configuration</span>
+        <span class="fc-node__desc">Program bundle, pricing, eligibility rules, field visibility, billing type</span>
       </div>
-      <span class="d-flow__arrow">→</span>
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">API</span>
-        <span class="d-flow__step-label">Data Resolution</span>
-        <span class="d-flow__step-desc">Employer, health records, and insurance pre-fill fields</span>
+
+      <div class="fc-arrow fc-arrow--down">↓</div>
+
+      <!-- Tier 2: Client Config API -->
+      <div class="fc-label">Central API</div>
+      <div class="fc-node" style="max-width: 320px;">
+        <span class="fc-node__label">Client Configuration API</span>
+        <span class="fc-node__desc">Serves config to all surfaces. Which fields to show, require, or skip per client.</span>
       </div>
-      <span class="d-flow__arrow">→</span>
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">UX</span>
-        <span class="d-flow__step-label">Registration</span>
-        <span class="d-flow__step-desc">6 steps. Member confirms what the system already knows.</span>
+
+      <div class="fc-arrow fc-arrow--down">↓</div>
+
+      <!-- Tier 3: Consumers -->
+      <div class="fc-label">Consumers</div>
+      <div class="fc-branch">
+        <div class="fc-node fc-highlight">
+          <span class="fc-node__label">Registration</span>
+          <span class="fc-node__desc">Member enrollment flow. Calls config API to determine field visibility.</span>
+        </div>
+        <div class="fc-node">
+          <span class="fc-node__label">Web App</span>
+          <span class="fc-node__desc">Member dashboard. Program-specific content and features.</span>
+        </div>
+        <div class="fc-node">
+          <span class="fc-node__label">Mobile App</span>
+          <span class="fc-node__desc">iOS & Android. Coaching, check-ins, device pairing.</span>
+        </div>
+      </div>
+
+      <div class="fc-arrow fc-arrow--down">↓ from Registration</div>
+
+      <!-- Tier 4: Registration sub-APIs -->
+      <div class="fc-label">Registration APIs</div>
+      <div class="fc-branch" style="max-width: 640px;">
+        <div class="fc-node">
+          <span class="fc-node__label">Account Creation API</span>
+          <span class="fc-node__desc">Creates member account. Validates identity, sets credentials, provisions program access.</span>
+        </div>
+        <div class="fc-node">
+          <span class="fc-node__label">Qualification API</span>
+          <span class="fc-node__desc">Checks eligibility per program. Runs qualification rules (BMI, diagnosis, age, insurance).</span>
+        </div>
       </div>
     </div>
 
