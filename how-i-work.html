@@ -300,12 +300,8 @@ Systemic         → automated QA checks</div>
         <div class="pm-layer__label">Product Map & IA</div>
         <div class="pm-layer__cards">
           <div class="pm-card" data-node="product-map">
-            <div class="pm-card__name">Product Map</div>
-            <div class="pm-card__desc">Surface inventory so AI doesn't conflict with existing structure</div>
-          </div>
-          <div class="pm-card" data-node="ia">
-            <div class="pm-card__name">IA & Workflow Architecture</div>
-            <div class="pm-card__desc">The highest-touch human step — page vs modal vs drawer</div>
+            <div class="pm-card__name">Product Map & Information Architecture</div>
+            <div class="pm-card__desc">Surface inventory, navigation structure, feature registry</div>
           </div>
         </div>
       </div>
@@ -314,20 +310,28 @@ Systemic         → automated QA checks</div>
       <div class="pm-layer">
         <div class="pm-layer__label">Designing</div>
         <div class="pm-layer__cards">
-          <div class="pm-card" data-node="use">
-            <div class="pm-card__name">Use</div>
-            <div class="pm-card__desc">Design new flows using the existing system</div>
+          <div class="pm-card" data-node="define">
+            <div class="pm-card__name">Define</div>
+            <div class="pm-card__desc">Structural decisions before any UI is generated</div>
           </div>
-          <div class="pm-card" data-node="extension">
-            <div class="pm-card__name">Extension</div>
+          <div class="pm-card" data-node="design">
+            <div class="pm-card__name">Design</div>
+            <div class="pm-card__desc">Generate new flows using the existing system</div>
+          </div>
+          <div class="pm-card" data-node="refine" style="border: 1px solid var(--border-subtle, #33332f);">
+            <div class="pm-card__name">Refine</div>
+            <div class="pm-card__desc">Manual edits in Paper — the human hand in the loop</div>
+          </div>
+          <div class="pm-card" data-node="extend">
+            <div class="pm-card__name">Extend</div>
             <div class="pm-card__desc">When a new component is genuinely warranted</div>
           </div>
           <div class="pm-card" data-node="review">
             <div class="pm-card__name">Review</div>
-            <div class="pm-card__desc">Quality gate before engineering handoff</div>
+            <div class="pm-card__desc">Quality gate before shipping</div>
           </div>
-          <div class="pm-card" data-node="auditing">
-            <div class="pm-card__name">Auditing</div>
+          <div class="pm-card" data-node="audit">
+            <div class="pm-card__name">Audit</div>
             <div class="pm-card__desc">Find where implementation diverged from spec</div>
           </div>
         </div>
@@ -436,45 +440,52 @@ Systemic         → automated QA checks</div>
         },
         'product-map': {
           layer: 'Product Map & IA',
-          name: 'Product Map',
+          name: 'Product Map & Information Architecture',
           why: 'AI needs to know where a feature lives before it can design it. The product map gives AI a surface inventory so it doesn\'t generate UI that conflicts with existing navigation or structure.',
-          rules: '<ul><li>Must document: all surfaces, navigation structure, entry points per persona, ownership</li><li>AI may not design a new surface without the product map being updated first</li><li>New surfaces require human approval</li></ul>',
+          rules: '<ul><li>Document all surfaces, nav structure, entry points per persona</li><li>No new surfaces without updating the map first</li><li>New surfaces require human approval</li><li>Feature status tracked (shipped, in progress, planned)</li></ul>',
           goals: 'Prevent AI from generating features in a vacuum. Keep the product coherent as it grows.'
         },
-        'ia': {
-          layer: 'Product Map & IA',
-          name: 'IA & Workflow Architecture',
-          why: 'This is the highest-touch human step in the process. Before any UI is generated, a human designer decides the structural approach: page vs modal vs drawer, flow sequence, where the user comes from and where they go next.',
-          rules: '<ul><li>IA decisions are documented in .md and appended to the Paper file before any feature-level design begins</li><li>AI may suggest IA options but may not select them</li><li>The human must make the final call</li><li>No feature design begins without an IA decision on record</li></ul>',
-          goals: 'Preserve human judgment at the structural level. Ensure AI operates within a deliberate information architecture, not one it inferred.'
-        },
-        'use': {
+        'define': {
           layer: 'Designing',
-          name: 'Use',
-          why: 'The most common mode. Using the existing system to design new flows without extending it.',
-          rules: '<ul><li>Feature is written as a story or requirements doc first</li><li>Design system and codebase context are both present in the prompt</li><li>AI generates UI constrained to existing components and tokens only</li><li>Any deviation is flagged — not auto-resolved</li></ul>',
-          goals: 'High-velocity feature design that stays within system bounds. Zero invented components.'
+          name: 'Define',
+          why: 'The highest-touch human step. Before any UI is generated, a human decides the structural approach: page vs modal vs drawer, flow sequence, where the user comes from and where they go next.',
+          rules: '<ul><li>IA decisions documented in .md before design begins</li><li>AI may suggest options but may not select them</li><li>Human makes the final call</li><li>No feature design without an IA decision on record</li></ul>',
+          goals: 'Preserve human judgment at the structural level. AI operates within deliberate IA, not one it inferred.'
         },
-        'extension': {
+        'design': {
           layer: 'Designing',
-          name: 'Extension',
-          why: 'Sometimes a new component is genuinely warranted. Extension mode handles this deliberately rather than letting it happen by accident.',
-          rules: '<ul><li>AI must explicitly name the proposed new component</li><li>Justify why no existing component can serve this need</li><li>Flag it as a review item</li><li>The new component does not enter the design system until it passes a dedicated review gate</li><li>No extension happens silently</li></ul>',
-          goals: 'Controlled system growth. Every new component is a deliberate decision, not a side effect.'
+          name: 'Design',
+          why: 'The most common mode. Using existing components to build new features without extending the system.',
+          rules: '<ul><li>Feature written as a story or requirements doc first</li><li>Design system and codebase context both present</li><li>Existing components and tokens only</li><li>Any deviation flagged, not auto-resolved</li></ul>',
+          goals: 'High-velocity feature design within system bounds. Zero invented components.'
+        },
+        'refine': {
+          layer: 'Designing',
+          name: 'Refine',
+          why: 'AI generates 80% of the UI. The last 20% — spacing feel, visual rhythm, hierarchy nuance — requires a human eye and hand. This is where the designer opens Paper and adjusts directly.',
+          rules: '<ul><li>Edits happen in Paper, not in code</li><li>Changes must be synced back to code before ship</li><li>Refinements that create new patterns trigger Extend mode</li><li>Refinements within the system stay in Refine</li></ul>',
+          goals: 'Preserve craft quality. The AI does the heavy lifting; the designer does the taste-making.'
+        },
+        'extend': {
+          layer: 'Designing',
+          name: 'Extend',
+          why: 'Sometimes nothing in the system works. Extend handles this deliberately rather than letting new components appear by accident.',
+          rules: '<ul><li>AI names the proposed component</li><li>Justifies why nothing existing works</li><li>Flags as review item</li><li>Doesn\'t enter the system until review gate passes</li><li>No silent extensions</li></ul>',
+          goals: 'Controlled system growth. Every new component is a deliberate decision.'
         },
         'review': {
           layer: 'Designing',
           name: 'Review',
-          why: 'Design review happens before handoff to engineering, not after. This is the quality gate.',
-          rules: '<ul><li>AI flags: spacing inconsistencies, typography violations, color deviations, visual hierarchy issues, component misuse</li><li>Human reviews in Paper</li><li>Nothing moves to engineering without sign-off</li><li>Review is not optional</li></ul>',
-          goals: 'Catch quality issues before they become engineering debt. Maintain the gap between "designed" and "shipped" as a quality buffer.'
+          why: 'Review happens before shipping, not after. This can run concurrently with engineering or be done by an engineer. The point is nothing goes live without a quality check.',
+          rules: '<ul><li>AI flags: spacing, typography, color, hierarchy, component misuse</li><li>Human reviews in Paper</li><li>Nothing ships without sign-off</li><li>Not optional</li></ul>',
+          goals: 'Catch issues before they reach users. Can run alongside engineering, not as a sequential gate.'
         },
-        'auditing': {
+        'audit': {
           layer: 'Designing',
-          name: 'Auditing',
-          why: 'Drift accumulates silently. Auditing finds where the implemented product has diverged from the design system.',
-          rules: '<ul><li>Auditing compares implemented components against design system spec</li><li>All deviations are documented</li><li>Deviations categorized: acceptable tradeoff, known gap, or violation requiring remediation</li><li>Audit results feed back into system philosophy as known gaps</li></ul>',
-          goals: 'Make drift visible and addressable. Prevent the design system from becoming aspirational rather than actual.'
+          name: 'Audit',
+          why: 'Drift accumulates silently. Auditing finds where the shipped product diverged from the design system.',
+          rules: '<ul><li>Compare implemented vs spec</li><li>Document all deviations</li><li>Categorize: tradeoff, known gap, or violation</li><li>Feed results back as known gaps</li></ul>',
+          goals: 'Make drift visible. Prevent the system from becoming aspirational rather than actual.'
         },
         'field-example': {
           layer: 'Example in Practice',
