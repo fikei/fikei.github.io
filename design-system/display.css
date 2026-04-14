@@ -536,6 +536,48 @@
   max-width: 600px;
 }
 
+/* ── Why This Project ── */
+
+.d-why {
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.d-why__label {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 12px;
+}
+
+/* Color variants — match d-status */
+.d-why--dev  { background: rgba(255, 176, 0, 0.04); }
+.d-why--dev .d-why__label { color: var(--accent-amber, #ffb000); }
+
+.d-why--shipped { background: rgba(34, 197, 94, 0.04); }
+.d-why--shipped .d-why__label { color: var(--color-success, #22c55e); }
+
+.d-why--active { background: rgba(0, 255, 247, 0.04); }
+.d-why--active .d-why__label { color: var(--accent-cyan, #00fff7); }
+
+.d-why__headline {
+  font-family: var(--font-display, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg, #e8e6e3);
+  line-height: 1.5;
+}
+
+.d-why__body {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  color: #B8B8B8;
+  line-height: 1.7;
+}
+
 /* ── Status ── */
 
 .d-status {
