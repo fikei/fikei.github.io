@@ -207,7 +207,7 @@
 
     <!-- Zone 2: Typing — center (250, 1050) -->
     <div class="zone zone--2">
-      <div class="typing">
+      <div class="typing" id="typingEl" style="opacity: 0; transition: opacity 0.5s ease;">
         <div class="typing-dot" style="background: #F9CE86;"></div>
         <div class="typing-speaker" style="color: #F9CE86;">MC</div>
         <div class="typing-dots"><span></span><span></span><span></span></div>
@@ -300,18 +300,22 @@
     // Zone 3 (msgs):   (250, 1750)
 
     // ═══ BEAT 1: Tight on rec bar, tap stop button (0→2.5s) ═══
-    // Hold steady at 3× — no drift before transition
     centerOn(250, 250, 3.0, 0.01);
     setTimeout(function() { document.getElementById('tapRipple').classList.add('animate'); }, 600);
 
-    // ═══ BEAT 2: Hard pan to typing (2.5→5.5s) ═══
-    setTimeout(function() { centerOn(250, 1050, 4.0, 0.4); }, 2500);
-    setTimeout(function() { centerOn(250, 1050, 3.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 3000);
+    // ═══ BEAT 2: Pan to typing — slower pan, fade in/out (2.5→5.5s) ═══
+    setTimeout(function() { centerOn(250, 1050, 4.0, 0.8); }, 2500);
+    // Fade in typing after camera arrives
+    setTimeout(function() { document.getElementById('typingEl').style.opacity = '1'; }, 3200);
+    // Gentle drift
+    setTimeout(function() { centerOn(250, 1050, 3.5, 2.2, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 3400);
+    // Fade out typing before leaving
+    setTimeout(function() { document.getElementById('typingEl').style.opacity = '0'; }, 5200);
 
     // ═══ BEAT 3: Pan to messages at 1.2× (5.5→9s) ═══
     setTimeout(function() { document.getElementById('msg1').classList.add('show'); }, 5400);
     setTimeout(function() { document.getElementById('msg2').classList.add('show'); }, 5600);
-    setTimeout(function() { centerOn(250, 1750, 1.2, 0.5); }, 5500);
+    setTimeout(function() { centerOn(250, 1750, 1.2, 0.8); }, 5500);
 
     setTimeout(function() { document.getElementById('badge1').classList.add('show', 'loading'); }, 7000);
     setTimeout(function() { document.getElementById('badge1').classList.remove('loading'); }, 7800);
