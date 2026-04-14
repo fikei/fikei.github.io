@@ -279,14 +279,15 @@
     // Zone 2 (typing): (250, 1050)
     // Zone 3 (msgs):   (250, 1750)
 
-    // ═══ BEAT 1: Tight on stop button (0→2.5s) ═══
-    centerOn(390, 250, 5.0, 0.01);
+    // ═══ BEAT 1: Tight on rec bar, tap stop button (0→2.5s) ═══
+    // Rec bar centered at (250, 250). At 3× zoom, visible = 167×167px — shows full bar.
+    centerOn(250, 250, 3.0, 0.01);
     setTimeout(function() { document.getElementById('tapRipple').classList.add('animate'); }, 600);
-    setTimeout(function() { centerOn(340, 250, 4.0, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 1000);
+    setTimeout(function() { centerOn(250, 250, 2.5, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 1000);
 
     // ═══ BEAT 2: Hard pan to typing (2.5→5.5s) ═══
-    setTimeout(function() { centerOn(250, 1050, 5.5, 0.4); }, 2500);
-    setTimeout(function() { centerOn(250, 1050, 5.0, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 3000);
+    setTimeout(function() { centerOn(250, 1050, 4.0, 0.4); }, 2500);
+    setTimeout(function() { centerOn(250, 1050, 3.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 3000);
 
     // ═══ BEAT 3: Pan to messages at 1.2× (5.5→9s) ═══
     setTimeout(function() { document.getElementById('msg1').classList.add('show'); }, 5400);
