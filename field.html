@@ -149,9 +149,9 @@
             </div>
           </div>
           <!-- Layer 2: One Handed Entry placeholder -->
-          <div class="d-sticky-scroll__layer" data-step="2" style="background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+          <div class="d-sticky-scroll__layer" data-step="2" style="background: #0E0E0D;"></div>
           <!-- Layer 3: Offline Care Transfer placeholder -->
-          <div class="d-sticky-scroll__layer" data-step="3" style="background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+          <div class="d-sticky-scroll__layer" data-step="3" style="background: #0E0E0D;"></div>
         </div>
       </div>
 
@@ -248,17 +248,17 @@
 
     <div class="d-gallery d-gallery--3">
       <div class="d-gallery__item">
-        <div style="height: 280px; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: flex-end; padding: 12px;">
+        <div style="height: 280px; background: #0E0E0D; display: flex; align-items: flex-end; padding: 12px;">
           <span class="d-mono d-text--subtle" style="font-size: 11px;">Color System</span>
         </div>
       </div>
       <div class="d-gallery__item">
-        <div style="height: 280px; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: flex-end; padding: 12px;">
+        <div style="height: 280px; background: #0E0E0D; display: flex; align-items: flex-end; padding: 12px;">
           <span class="d-mono d-text--subtle" style="font-size: 11px;">Type & Spacing</span>
         </div>
       </div>
       <div class="d-gallery__item">
-        <div style="height: 280px; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: flex-end; padding: 12px;">
+        <div style="height: 280px; background: #0E0E0D; display: flex; align-items: flex-end; padding: 12px;">
           <span class="d-mono d-text--subtle" style="font-size: 11px;">Components</span>
         </div>
       </div>
@@ -360,8 +360,6 @@
     stickyPhone.style.top = CHROME + 'px';
   }
 
-  var layersBox = document.querySelector('.d-sticky-scroll__layers');
-
   var loaded = {}; // track which iframes have been loaded (src set)
 
   // Preload iframe (set src from data-src) without starting animation
@@ -410,22 +408,20 @@
       if (dist < minDist) { minDist = dist; closest = i; }
     }
 
-    // Fade in the phone background box as section enters viewport
+    // Check if section is in viewport for preloading/triggering
     var isVisible = false;
-    if (layersBox) {
+    if (stickyPhone) {
       var phoneRect = stickyPhone.getBoundingClientRect();
       var phoneCenter = phoneRect.top + phoneRect.height / 2;
       var distFromCenter = Math.abs(phoneCenter - vcenter);
       var viewH = window.innerHeight - CHROME;
       isVisible = distFromCenter < viewH * 0.6;
-      layersBox.classList.toggle('is-visible', isVisible);
-      // Preload all iframes when section becomes visible
       if (isVisible) {
         for (var k = 0; k < layers.length; k++) preloadIframe(k);
       }
     }
 
-    // Toggle active layer (crossfade) — only trigger animation when visible
+    // Toggle active layer (crossfade) + trigger animation
     if (closest !== activeStep) {
       activeStep = closest;
       for (var j = 0; j < layers.length; j++) {
@@ -433,7 +429,6 @@
       }
       if (isVisible) triggerIframe(closest);
     } else if (isVisible && !started[closest]) {
-      // First time section becomes visible — trigger current step
       triggerIframe(closest);
     }
   }
