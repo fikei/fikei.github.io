@@ -394,23 +394,27 @@
       if (dist < minDist) { minDist = dist; closest = i; }
     }
 
-    // Toggle active layer (crossfade)
-    if (closest !== activeStep) {
-      activeStep = closest;
-      for (var j = 0; j < layers.length; j++) {
-        layers[j].classList.toggle('is-active', j === closest);
-      }
-      triggerIframe(closest);
-    }
-
     // Fade in the phone background box as section enters viewport
+    var isVisible = false;
     if (layersBox) {
       var phoneRect = stickyPhone.getBoundingClientRect();
       var phoneCenter = phoneRect.top + phoneRect.height / 2;
       var distFromCenter = Math.abs(phoneCenter - vcenter);
       var viewH = window.innerHeight - CHROME;
-      // Visible when phone is within 60% of available viewport height from center
-      layersBox.classList.toggle('is-visible', distFromCenter < viewH * 0.6);
+      isVisible = distFromCenter < viewH * 0.6;
+      layersBox.classList.toggle('is-visible', isVisible);
+    }
+
+    // Toggle active layer (crossfade) — only trigger animation when visible
+    if (closest !== activeStep) {
+      activeStep = closest;
+      for (var j = 0; j < layers.length; j++) {
+        layers[j].classList.toggle('is-active', j === closest);
+      }
+      if (isVisible) triggerIframe(closest);
+    } else if (isVisible && !started[closest]) {
+      // First time section becomes visible — trigger current step
+      triggerIframe(closest);
     }
   }
 
@@ -426,8 +430,7 @@
   // Init
   sizePhones();
   setStickyTop();
-  triggerIframe(0); // load first animation immediately
-  onScroll(); // set initial opacities
+  onScroll(); // set initial opacities — iframes only load when visible
   window.addEventListener('resize', function() { sizePhones(); setStickyTop(); });
 })();
 </script>
