@@ -12,6 +12,7 @@
   color: var(--fg, #e8e6e3);
   -webkit-user-select: text;
   user-select: text;
+  overflow-x: hidden;
 }
 
 .d-contain {
@@ -141,11 +142,22 @@
 /* ── Sections ── */
 
 .d-section {
+  position: relative;
   padding: 64px 0;
-  border-bottom: 1px solid var(--border-subtle, #33332f);
 }
 
-.d-section:last-of-type { border-bottom: none; }
+.d-section::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  border-bottom: 1px solid var(--border-subtle, #33332f);
+  pointer-events: none;
+}
+
+.d-section:last-of-type::after { display: none; }
 
 .d-section--flush { padding: 0; border: none; }
 
@@ -621,7 +633,23 @@
 .d-mt-16 { margin-top: 64px; }
 .d-pt-8 { padding-top: 32px; }
 
-.d-rule { border: none; border-top: 1px solid var(--border-subtle, #33332f); margin: 32px 0; }
+.d-rule {
+  position: relative;
+  border: none;
+  margin: 32px 0;
+  height: 0;
+}
+
+.d-rule::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  border-top: 1px solid var(--border-subtle, #33332f);
+  pointer-events: none;
+}
 
 /* ── Project Modal ── */
 
