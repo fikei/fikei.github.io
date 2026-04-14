@@ -126,84 +126,91 @@
     </div>
   </div>
 
-  <!-- CORE EXPERIENCE -->
-  <div id="experience" class="d-section">
+  <!-- CORE EXPERIENCE — Sticky scroll parallax -->
+  <div id="experience" class="d-section" style="border-bottom: none;">
     <p class="d-label">Core Experience</p>
 
-    <!-- 01: Dictation to Trusted Data — with animation -->
-    <div style="display: flex; gap: 24px; padding: 32px 0; align-items: flex-start;">
-      <div class="d-anim-container" id="animContainer" style="width: 384px; aspect-ratio: 4/5; background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <div class="d-anim-phone" id="animPhone" style="overflow: hidden; border-radius: 48px;">
-          <iframe src="/animations/transcript.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="animFrame"></iframe>
+    <div class="d-sticky-scroll">
+      <!-- Sticky phone column -->
+      <div class="d-sticky-scroll__phone" id="stickyPhone">
+        <div class="d-sticky-scroll__layers">
+          <!-- Layer 0: Transcript animation -->
+          <div class="d-sticky-scroll__layer is-active" data-step="0">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/transcript.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="animFrame"></iframe>
+            </div>
+          </div>
+          <!-- Layer 1: SOAP note animation -->
+          <div class="d-sticky-scroll__layer" data-step="1">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/soap-note.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="soapFrame"></iframe>
+            </div>
+          </div>
+          <!-- Layer 2: One Handed Entry placeholder -->
+          <div class="d-sticky-scroll__layer" data-step="2" style="background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
+          <!-- Layer 3: Offline Care Transfer placeholder -->
+          <div class="d-sticky-scroll__layer" data-step="3" style="background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f);"></div>
         </div>
       </div>
-      <div style="flex: 1;">
-        <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
-        <p class="d-headline d-headline--md" style="margin-top: 4px;">Dictation to Trusted Data</p>
-        <p class="d-mono d-text--subtle" style="margin-top: 4px;">Keep treating, the note writes itself</p>
-        <p class="d-body" style="margin-top: 12px;">The provider talks to the patient. The app listens, identifies and organizes info compliant medical data in real time — all without touching the screen.</p>
-        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
-        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I can...</p>
-        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-          <li class="d-body" style="font-size: 12px;">• Capture information without distracting my care.</li>
-          <li class="d-body" style="font-size: 12px;">• Trust that the data is accurate & complete.</li>
-        </ul>
-      </div>
-    </div>
 
-    <!-- 02: Clinical Report, Not Form Fields — with animation -->
-    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: flex-start; flex-direction: row-reverse;">
-      <div class="d-anim-container" id="soapContainer" style="width: 384px; aspect-ratio: 4/5; background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <div class="d-anim-phone" id="soapPhone" style="overflow: hidden; border-radius: 48px;">
-          <iframe src="/animations/soap-note.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="soapFrame"></iframe>
+      <!-- Scrolling text column -->
+      <div class="d-sticky-scroll__text">
+        <!-- Step 0 -->
+        <div class="d-sticky-scroll__step is-active" data-step="0">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Dictation to Trusted Data</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Keep treating, the note writes itself</p>
+          <p class="d-body" style="margin-top: 12px;">The provider talks to the patient. The app listens, identifies and organizes info compliant medical data in real time — all without touching the screen.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I can...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Capture information without distracting my care.</li>
+            <li class="d-body" style="font-size: 12px;">• Trust that the data is accurate & complete.</li>
+          </ul>
         </div>
-      </div>
-      <div style="flex: 1;">
-        <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
-        <p class="d-headline d-headline--md" style="margin-top: 4px;">Clinical Report, Not Form Fields</p>
-        <p class="d-mono d-text--subtle" style="margin-top: 4px;">See your SOAP as you work</p>
-        <p class="d-body" style="margin-top: 12px;">A SOAP note, the standard format of capturing patient information, builds itself as the encounter unfolds. Completion counters show progress per section. Stoplight warnings flag values that need confirmation before handoff.</p>
-        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
-        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
-        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-          <li class="d-body" style="font-size: 12px;">• to see progress as I assess & treat the patient.</li>
-          <li class="d-body" style="font-size: 12px;">• clear warnings if unexpected data is captured.</li>
-          <li class="d-body" style="font-size: 12px;">• trust that my work is complete.</li>
-        </ul>
-      </div>
-    </div>
 
-    <!-- 03: One Handed Entry -->
-    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: flex-start;">
-      <div style="width: 384px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
-      <div style="flex: 1;">
-        <p class="d-mono" style="color: var(--fg-subtle, #666560);">03</p>
-        <p class="d-headline d-headline--md" style="margin-top: 4px;">One Handed Entry</p>
-        <p class="d-mono d-text--subtle" style="margin-top: 4px;">Your other hand is on the patient</p>
-        <p class="d-body" style="margin-top: 12px;">Capture vitals with cold hands, bad light, divided attention. Uses large preset chips and ±1/±10 buttons. No keyboard, no precision tapping.</p>
-        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
-        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
-        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-          <li class="d-body" style="font-size: 12px;">• to enter data one-handed in critical situations.</li>
-          <li class="d-body" style="font-size: 12px;">• input targets I can hit reliably while wearing gloves in the cold.</li>
-        </ul>
-      </div>
-    </div>
+        <!-- Step 1 -->
+        <div class="d-sticky-scroll__step" data-step="1">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Clinical Report, Not Form Fields</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">See your SOAP as you work</p>
+          <p class="d-body" style="margin-top: 12px;">A SOAP note, the standard format of capturing patient information, builds itself as the encounter unfolds. Completion counters show progress per section. Stoplight warnings flag values that need confirmation before handoff.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• to see progress as I assess & treat the patient.</li>
+            <li class="d-body" style="font-size: 12px;">• clear warnings if unexpected data is captured.</li>
+            <li class="d-body" style="font-size: 12px;">• trust that my work is complete.</li>
+          </ul>
+        </div>
 
-    <!-- 04: Offline Care Transfer -->
-    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: flex-start; flex-direction: row-reverse;">
-      <div style="width: 384px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
-      <div style="flex: 1;">
-        <p class="d-mono" style="color: var(--fg-subtle, #666560);">04</p>
-        <p class="d-headline d-headline--md" style="margin-top: 4px;">Offline Care Transfer</p>
-        <p class="d-mono d-text--subtle" style="margin-top: 4px;">Continuity of care in a single tap</p>
-        <p class="d-body" style="margin-top: 12px;">When the patient is transferred, the critical information goes with them — even offline. An automated clinical summary can be sent via Apple Wallet, satellite, or SMS. The receiving team gets the whole case — not a phone call from memory.</p>
-        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
-        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
-        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-          <li class="d-body" style="font-size: 12px;">• the patient record to travel with them in a format the receiving team can act on immediately.</li>
-          <li class="d-body" style="font-size: 12px;">• export options that work in remote terrain — Wallet, satellite, or clipboard.</li>
-        </ul>
+        <!-- Step 2 -->
+        <div class="d-sticky-scroll__step" data-step="2">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">03</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">One Handed Entry</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Your other hand is on the patient</p>
+          <p class="d-body" style="margin-top: 12px;">Capture vitals with cold hands, bad light, divided attention. Uses large preset chips and ±1/±10 buttons. No keyboard, no precision tapping.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• to enter data one-handed in critical situations.</li>
+            <li class="d-body" style="font-size: 12px;">• input targets I can hit reliably while wearing gloves in the cold.</li>
+          </ul>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="d-sticky-scroll__step" data-step="3">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">04</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Offline Care Transfer</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Continuity of care in a single tap</p>
+          <p class="d-body" style="margin-top: 12px;">When the patient is transferred, the critical information goes with them — even offline. An automated clinical summary can be sent via Apple Wallet, satellite, or SMS. The receiving team gets the whole case — not a phone call from memory.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• the patient record to travel with them in a format the receiving team can act on immediately.</li>
+            <li class="d-body" style="font-size: 12px;">• export options that work in remote terrain — Wallet, satellite, or clipboard.</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -312,23 +319,28 @@
   <a href="/invoy.html" class="d-next">Invoy →</a>
 </footer>
 
-<!-- Animation sizing + scroll triggers -->
+<!-- Sticky scroll: crossfade + phone sizing + animation triggers -->
 <script>
 (function() {
   var PHONE_W = 402, PHONE_H = 856;
+  var NAV_H = 49, SUBNAV_H = 45, CHROME = NAV_H + SUBNAV_H;
 
-  function sizeAll() {
+  var stickyPhone = document.getElementById('stickyPhone');
+  var layers = document.querySelectorAll('.d-sticky-scroll__layer');
+  var steps = document.querySelectorAll('.d-sticky-scroll__step');
+  var started = {}; // track which iframes have been triggered
+  var activeStep = 0;
+
+  // Size phones to fit their layer container
+  function sizePhones() {
     var phones = document.querySelectorAll('.d-anim-phone');
     for (var i = 0; i < phones.length; i++) {
-      var container = phones[i].parentElement;
-      var boxH = container.offsetHeight;
-      var boxW = container.offsetWidth;
-      // Scale phone to fit container
+      var layer = phones[i].parentElement;
+      var boxW = layer.offsetWidth;
+      var boxH = layer.offsetHeight;
       var scale = Math.min(boxW / PHONE_W, boxH / PHONE_H);
-      var w = PHONE_W * scale;
-      var h = PHONE_H * scale;
-      phones[i].style.width = w + 'px';
-      phones[i].style.height = h + 'px';
+      phones[i].style.width = (PHONE_W * scale) + 'px';
+      phones[i].style.height = (PHONE_H * scale) + 'px';
       phones[i].style.borderRadius = (48 * scale) + 'px';
       var iframe = phones[i].querySelector('iframe');
       if (iframe) {
@@ -337,27 +349,66 @@
       }
     }
   }
-  sizeAll();
-  window.addEventListener('resize', sizeAll);
 
-  function triggerOnScroll(containerId, iframeId) {
-    var started = false;
-    var el = document.getElementById(containerId);
-    var iframe = document.getElementById(iframeId);
-    if (!el || !iframe) return;
-    var observer = new IntersectionObserver(function(entries) {
-      if (entries[0].isIntersecting && !started) {
-        started = true;
-        function send() { setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500); }
-        iframe.addEventListener('load', send);
-        if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') send();
-        observer.disconnect();
-      }
-    }, { threshold: 0.3 });
-    observer.observe(el);
+  // Set sticky top for vertical centering
+  function setStickyTop() {
+    if (!stickyPhone) return;
+    var phoneH = stickyPhone.offsetHeight;
+    var top = CHROME + (window.innerHeight - CHROME - phoneH) / 2;
+    stickyPhone.style.top = Math.max(CHROME, top) + 'px';
   }
-  triggerOnScroll('animContainer', 'animFrame');
-  triggerOnScroll('soapContainer', 'soapFrame');
+
+  // Activate a step + layer, trigger iframe if needed
+  function activate(index) {
+    if (index === activeStep) return;
+    activeStep = index;
+    for (var i = 0; i < steps.length; i++) {
+      steps[i].classList.toggle('is-active', i === index);
+    }
+    for (var j = 0; j < layers.length; j++) {
+      layers[j].classList.toggle('is-active', j === index);
+    }
+    // Trigger iframe on first activation
+    if (!started[index]) {
+      var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+      if (iframe && iframe.dataset.src) {
+        started[index] = true;
+        iframe.src = iframe.dataset.src;
+        iframe.addEventListener('load', function() {
+          setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+        });
+      }
+    }
+  }
+
+  // Find which step center is closest to viewport center
+  function onScroll() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var closest = 0;
+    var minDist = Infinity;
+    for (var i = 0; i < steps.length; i++) {
+      var rect = steps[i].getBoundingClientRect();
+      var center = rect.top + rect.height / 2;
+      var dist = Math.abs(center - vcenter);
+      if (dist < minDist) { minDist = dist; closest = i; }
+    }
+    activate(closest);
+  }
+
+  // Throttle scroll with rAF
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(function() { onScroll(); ticking = false; });
+    }
+  }, { passive: true });
+
+  // Init
+  sizePhones();
+  setStickyTop();
+  activate(0); // load first animation immediately
+  window.addEventListener('resize', function() { sizePhones(); setStickyTop(); });
 })();
 </script>
 

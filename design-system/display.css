@@ -553,6 +553,56 @@
 
 .d-next:hover { color: var(--fg, #e8e6e3); }
 
+/* ── Sticky Scroll (parallax phone + text) ── */
+
+.d-sticky-scroll {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+.d-sticky-scroll__phone {
+  position: sticky;
+  flex-shrink: 0;
+  width: 384px;
+  z-index: 2;
+  /* top is set by JS for vertical centering */
+}
+
+.d-sticky-scroll__layers {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  background: #000;
+  overflow: hidden;
+}
+
+.d-sticky-scroll__layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.d-sticky-scroll__layer.is-active { opacity: 1; }
+
+.d-sticky-scroll__text {
+  flex: 1;
+}
+
+.d-sticky-scroll__step {
+  min-height: calc(100vh - 94px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 0;
+  opacity: 0.3;
+  transition: opacity 0.4s ease;
+}
+.d-sticky-scroll__step.is-active { opacity: 1; }
+
 /* ── Utilities ── */
 
 .d-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border-subtle, #33332f); }
