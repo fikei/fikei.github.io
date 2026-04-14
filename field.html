@@ -315,12 +315,12 @@
 <!-- Animation sizing + scroll triggers -->
 <script>
 (function() {
-  var PHONE_W = 402, PHONE_H = 856, PAD = 32, MIN_SCALE = 0.75;
+  var PHONE_W = 402, PHONE_H = 856, PAD = 32;
   var NAV_H = 49, SUBNAV_H = 45;
 
   function sizeAll() {
     var available = window.innerHeight - NAV_H - SUBNAV_H - PAD * 2;
-    var scale = Math.max(MIN_SCALE, Math.min(available / PHONE_H, 1));
+    var scale = Math.min(available / PHONE_H, 1);
     var w = PHONE_W * scale;
     var h = PHONE_H * scale;
     var r = 48 * scale;
