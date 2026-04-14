@@ -35,7 +35,6 @@
       '/field.html',
       '/invoy.html',
       '/livongo.html',
-      '/design-systems.html',
       '/how-i-work.html'
     ];
     const current = window.location.pathname;
@@ -72,6 +71,20 @@
       if (href && path.endsWith(href.replace('./', ''))) {
         link.classList.add('d-nav__link--active');
       }
+    });
+  }
+
+  // ── Nav accordion ──
+  function initNavAccordion() {
+    const groups = document.querySelectorAll('[data-nav-accordion]');
+    groups.forEach(group => {
+      const label = group.querySelector('.d-nav__group-label');
+      if (!label) return;
+
+      // Toggle on click
+      label.addEventListener('click', () => {
+        group.classList.toggle('d-nav__group--expanded');
+      });
     });
   }
 
@@ -243,5 +256,6 @@
     initKeyboard();
     initSmoothScroll();
     initNavHighlight();
+    initNavAccordion();
   });
 })();

@@ -14,11 +14,16 @@
 <nav class="d-nav">
   <a href="/" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
-    <li><a href="/field.html" class="d-nav__link">Field</a></li>
-    <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
-    <li><a href="/livongo.html" class="d-nav__link">Livongo</a></li>
-    <li><a href="/design-systems.html" class="d-nav__link">Design Systems</a></li>
-    <li><a href="/how-i-work.html" class="d-nav__link">How I Work</a></li>
+    <li class="d-nav__group" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field.html" class="d-nav__link">Field</a></li>
+        <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
+        <li><a href="/livongo.html" class="d-nav__link">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/how-i-work.html" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
   </ul>
 </nav>
 
@@ -37,39 +42,46 @@
     </div>
   </div>
 
-  <!-- Suggested for You -->
+  <!-- Case Studies -->
   <div class="d-section">
-    <p class="d-label">Suggested for you</p>
+    <p class="d-label">Case Studies</p>
     <div class="d-cards" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
       <a href="/field.html" class="d-card">
         <span class="d-card__tag">Solo Founder · AI · High Complexity</span>
-        <span class="d-card__title">Voice-First Clinical Documentation</span>
+        <span class="d-card__title">Field</span>
         <span class="d-card__desc">Voice-driven clinical documentation for first responders. On-device AI, offline-first</span>
         <span class="d-card__tag" style="margin-top: auto;">Beta</span>
       </a>
       <a href="/invoy.html" class="d-card">
-        <span class="d-card__tag">Behavior Change · Design System</span>
-        <span class="d-card__title">Engagement Loops & Weight Loss</span>
-        <span class="d-card__desc">Weekly behavioral coaching lifecycle. MVP design system.</span>
-        <span class="d-card__tag" style="margin-top: auto;">Shipped</span>
+        <span class="d-card__tag">Weight · Design System</span>
+        <span class="d-card__title">Invoy' Weekly Weight Loop</span>
+        <span class="d-card__desc">Creading</span>
+        <span class="d-card__tag" style="margin-top: auto; color: var(--color-success, #22c55e);">Shipped</span>
       </a>
       <a href="/livongo.html" class="d-card">
         <span class="d-card__tag">Infrastructure · B2B · Scale</span>
-        <span class="d-card__title">B2B Sales Configuration & End User Onboarding</span>
-        <span class="d-card__desc">Simplifying product configuration at enterprise scale.</span>
+        <span class="d-card__title">Livongo</span>
+        <span class="d-card__desc">Client configuration stability while growing</span>
       </a>
     </div>
   </div>
 
-  <!-- Utilities -->
+  <!-- Philosophies -->
   <div class="d-section">
-    <p class="d-label">Utilities</p>
-    <div class="d-cards" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
-      <a href="/how-i-work.html" class="d-card">
-        <span class="d-card__tag">AI · iOS · 0→1</span>
-        <span class="d-card__title">Design System Manager</span>
-        <span class="d-card__desc">Generate and manage your design system from Figma, Paper, Github or live code.</span>
-      </a>
+    <p class="d-label">Philosophies</p>
+  </div>
+
+  <!-- How I Work -->
+  <div class="d-section" style="background: var(--bg-surface, #1a1a18); margin: 0 calc(-1 * clamp(20px, 5vw, 64px)); padding: 64px clamp(20px, 5vw, 64px);">
+    <p class="d-label">How I Work</p>
+    <p class="d-headline d-headline--lg">Scaling Design with AI</p>
+    <p class="d-body" style="margin-top: 12px;">The design system is the source of truth, the constraint engine, and the AI's instruction set. Claude Code writes components constrained to the system. Systemic audits compliance. I govern.</p>
+  </div>
+
+  <!-- Personal Projects -->
+  <div class="d-section">
+    <p class="d-label">Personal Projects</p>
+    <div class="d-cards d-cards--2" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
       <a href="#" class="d-card">
         <span class="d-card__tag">Shipped · Mobile · Design System</span>
         <span class="d-card__title">Add to Calendar</span>
@@ -78,37 +90,26 @@
       <a href="#" class="d-card">
         <span class="d-card__tag">B2B · Configuration · Scale</span>
         <span class="d-card__title">Favicons</span>
+        <span class="d-card__desc">Generate a favicon from AI, Photo or Type. GUI or API.</span>
       </a>
     </div>
-  </div>
-
-  <!-- Personal Projects -->
-  <div class="d-section">
-    <p class="d-label">Personal Projects</p>
     <div class="d-cards" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
       <a href="#" class="d-card">
         <span class="d-card__tag">AI · iOS · 0→1</span>
         <span class="d-card__title">Boards</span>
-        <span class="d-card__desc">SF's Best events all in one place.</span>
+        <span class="d-card__desc">A link manager - Contextual, beautiful, actionable.</span>
       </a>
       <a href="#" class="d-card">
         <span class="d-card__tag">Shipped · Mobile · Design System</span>
         <span class="d-card__title">Events</span>
-        <span class="d-card__desc">SF's best events all in one place.</span>
+        <span class="d-card__desc">Curated local events. Personalized based on Boards.</span>
       </a>
       <a href="#" class="d-card">
         <span class="d-card__tag">B2B · Configuration · Scale</span>
         <span class="d-card__title">Soundscape</span>
+        <span class="d-card__desc">Visualizer that responds to your music.</span>
       </a>
     </div>
-  </div>
-
-  <!-- How I Work teaser -->
-  <div class="d-section">
-    <p class="d-label">How I Work</p>
-    <p class="d-headline d-headline--lg">One designer, five products, AI-assisted delivery.</p>
-    <p class="d-body" style="margin-top: 12px;">The design system is the source of truth, the constraint engine, and the AI's instruction set. Claude Code writes components constrained to the system. Systemic audits compliance. I govern.</p>
-    <a href="/how-i-work.html" class="d-next" style="display: inline-block; margin-top: 16px;">Read more →</a>
   </div>
 
 </div>

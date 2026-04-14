@@ -12,18 +12,24 @@
 <body class="d-page">
 
 <nav class="d-nav">
-  <a href="/" class="d-nav__name">Ian Fike</a>
+  <a href="/" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
-    <li><a href="/field.html" class="d-nav__link">Field</a></li>
-    <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
-    <li><a href="/livongo.html" class="d-nav__link d-nav__link--active">Livongo</a></li>
-    <li><a href="/how-i-work.html" class="d-nav__link">How I Work</a></li>
+    <li class="d-nav__group d-nav__group--expanded" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field.html" class="d-nav__link">Field</a></li>
+        <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
+        <li><a href="/livongo.html" class="d-nav__link d-nav__link--active">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/how-i-work.html" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
   </ul>
 </nav>
 
 <div class="d-subnav">
   <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
-  <a href="#deliverable" class="d-subnav__link">Deliverable</a>
+  <a href="#deliverable" class="d-subnav__link">Deliverables</a>
   <a href="#process" class="d-subnav__link">Process</a>
   <a href="#impact" class="d-subnav__link">Impact</a>
 </div>
@@ -34,19 +40,15 @@
   <div style="padding: 48px 0 0;">
     <span class="d-status d-status--shipped">Shipped</span>
     <p class="d-headline d-headline--xl" style="margin-top: 12px;">Livongo Config</p>
-    <p class="d-body" style="margin-top: 12px;">Livongo sold 5 health programs in dozens of combinations. Each combination changed which fields a member saw during registration. The rules lived in a spreadsheet. We turned it into a system.</p>
+    <p class="d-body" style="margin-top: 12px;">50 client configurations × 74 registration fields = 3,700 decisions managed in a spreadsheet. We turned it into a 6-step registration.</p>
 
     <dl class="d-overview">
       <dt>Role</dt>
-      <dd>Product designer, growth PM</dd>
-      <dt>Company</dt>
-      <dd>Livongo / Teladoc Health</dd>
+      <dd>Senior PM, Member Growth</dd>
       <dt>Scope</dt>
-      <dd>50 client configs × 74 fields = 3,700 decision points</dd>
+      <dd>50 configs × 74 fields = 3,700 decision points</dd>
       <dt>Platform</dt>
-      <dd>Web (registration flow), Salesforce (config), internal APIs</dd>
-      <dt>Status</dt>
-      <dd>Shipped to production</dd>
+      <dd>Web registration, Salesforce config, internal APIs</dd>
     </dl>
   </div>
 
@@ -61,24 +63,21 @@
         <span class="d-persona__role">Configures the deal</span>
         <span class="d-persona__name">Sales</span>
         <ul class="d-persona__needs">
-          <li>Picks program bundles in Salesforce</li>
-          <li>Doesn't think about what fields that affects</li>
+          <li>Picks bundles in Salesforce. Doesn't think about field implications.</li>
         </ul>
       </div>
       <div class="d-persona">
         <span class="d-persona__role">Sets up the flow</span>
         <span class="d-persona__name">Implementation</span>
         <ul class="d-persona__needs">
-          <li>Translates the deal into a registration config</li>
-          <li>Cross-references 74 columns for each client</li>
+          <li>Translates deal config into registration. Cross-references 74 columns.</li>
         </ul>
       </div>
       <div class="d-persona">
         <span class="d-persona__role">Registers</span>
         <span class="d-persona__name">Member</span>
         <ul class="d-persona__needs">
-          <li>Wants to sign up quickly</li>
-          <li>Should only see fields that matter to their program</li>
+          <li>Wants to sign up quickly. Only sees relevant fields.</li>
         </ul>
       </div>
     </div>

@@ -12,20 +12,28 @@
 <body class="d-page">
 
 <nav class="d-nav">
-  <a href="/" class="d-nav__name">Ian Fike</a>
+  <a href="/" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
-    <li><a href="/field.html" class="d-nav__link">Field</a></li>
-    <li><a href="/invoy.html" class="d-nav__link d-nav__link--active">Invoy</a></li>
-    <li><a href="/livongo.html" class="d-nav__link">Livongo</a></li>
-    <li><a href="/how-i-work.html" class="d-nav__link">How I Work</a></li>
+    <li class="d-nav__group d-nav__group--expanded" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field.html" class="d-nav__link">Field</a></li>
+        <li><a href="/invoy.html" class="d-nav__link d-nav__link--active">Invoy</a></li>
+        <li><a href="/livongo.html" class="d-nav__link">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/how-i-work.html" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
   </ul>
 </nav>
 
 <div class="d-subnav">
   <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
-  <a href="#deliverable" class="d-subnav__link">Deliverable</a>
+  <a href="#experience" class="d-subnav__link">Experience</a>
   <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#design-system" class="d-subnav__link">Design System</a>
   <a href="#impact" class="d-subnav__link">Impact</a>
+  <a href="#learnings" class="d-subnav__link">Learnings</a>
 </div>
 
 <div class="d-contain">
@@ -33,20 +41,18 @@
   <!-- Header + Overview -->
   <div style="padding: 48px 0 0;">
     <span class="d-status d-status--shipped">Shipped</span>
-    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy</p>
-    <p class="d-body" style="margin-top: 12px;">A weekly coaching system for metabolic health. Members plan their week, check in daily, review their progress, and adjust — with coach support when the data says they need it.</p>
+    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy's Weekly Plans</p>
+    <p class="d-body" style="margin-top: 12px;">A weekly coaching system for weight management. Members plan their week, check in daily, review progress, and adjust — with coach support when the data says they need it.</p>
 
     <dl class="d-overview">
       <dt>Role</dt>
-      <dd>Lead product designer</dd>
+      <dd>Lead product designer (Senior PM)</dd>
       <dt>Company</dt>
-      <dd>Livongo / Teladoc Health</dd>
-      <dt>Platform</dt>
-      <dd>iOS, Android</dd>
+      <dd>Invoy Health</dd>
       <dt>Scope</dt>
-      <dd>15+ sub-flows, 30-component design system, 100+ screens</dd>
+      <dd>Concept Design, Feature UI, Design System</dd>
       <dt>Status</dt>
-      <dd>Shipped to production</dd>
+      <dd>Shipped to production, ~CTR M3</dd>
     </dl>
   </div>
 
@@ -58,93 +64,126 @@
 
     <div class="d-personas">
       <div class="d-persona">
-        <span class="d-persona__role">Primary user</span>
-        <span class="d-persona__name">Member</span>
+        <span class="d-persona__role">Motivation: Structure</span>
+        <span class="d-persona__name">Direction Me</span>
         <ul class="d-persona__needs">
-          <li>Wants to know what to eat today based on their plan</li>
-          <li>Needs to see progress without reading charts</li>
-          <li>Wants to get back on track after a bad day without guilt</li>
+          <li>Decision fatigue is the enemy. Defaults to the easiest option without a clear plan. Needs to know what today looks like.</li>
         </ul>
+        <span class="d-mono" style="margin-top: 8px;">→ Week Planning, Daily Focus, Base Plan</span>
       </div>
       <div class="d-persona">
-        <span class="d-persona__role">Secondary user</span>
-        <span class="d-persona__name">Coach</span>
+        <span class="d-persona__role">Motivation: Support</span>
+        <span class="d-persona__name">"Don't Let Me Do This Alone"</span>
         <ul class="d-persona__needs">
-          <li>Manages 50+ members — needs to spot who needs help fast</li>
-          <li>Wants data-backed reasons to reach out</li>
-          <li>Needs to suggest specific plan changes</li>
+          <li>Knows their triggers. Struggles when unseen. Previous attempts failed not because the plan was wrong but because they were doing it alone.</li>
         </ul>
+        <span class="d-mono" style="margin-top: 8px;">→ Rebound flow, Coach triage, Score Drop CTA</span>
+      </div>
+      <div class="d-persona">
+        <span class="d-persona__role">Motivation: Understanding</span>
+        <span class="d-persona__name">"Help Me Understand Why"</span>
+        <ul class="d-persona__needs">
+          <li>Asks "why" before "what." Won't follow rules they don't understand. The moment the underlying logic is better motivating than any slogan.</li>
+        </ul>
+        <span class="d-mono" style="margin-top: 8px;">→ Review of Week, Score Factors, Trends</span>
       </div>
     </div>
   </div>
 
-  <!-- DELIVERABLE -->
-  <div id="deliverable" class="d-section">
-    <p class="d-label">Deliverable</p>
-
-    <p class="d-label" style="margin-top: 24px;">The weekly loop</p>
-    <div class="d-flow">
+  <!-- HOW IT WORKS -->
+  <div class="d-section">
+    <p class="d-label">How It works</p>
+    <p class="d-body">Description of how it works</p>
+    <div class="d-flow" style="margin-top: 24px;">
       <div class="d-flow__step">
         <span class="d-flow__step-num">01</span>
         <span class="d-flow__step-label">Plan</span>
-        <span class="d-flow__step-desc">Set goals. Flag upcoming events. The app picks one of 5 plan types.</span>
+        <span class="d-flow__step-desc">Set goals. Flag events. Connect to all plan types.</span>
       </div>
       <span class="d-flow__arrow">→</span>
       <div class="d-flow__step">
         <span class="d-flow__step-num">02</span>
-        <span class="d-flow__step-label">Execute</span>
-        <span class="d-flow__step-desc">Daily check-ins. Breath test, mood, meals, plan tracking.</span>
+        <span class="d-flow__step-label">Check In</span>
+        <span class="d-flow__step-desc">Daily data: AI, breath, food, mood, meals.</span>
       </div>
       <span class="d-flow__arrow">→</span>
       <div class="d-flow__step">
         <span class="d-flow__step-num">03</span>
-        <span class="d-flow__step-label">Reflect</span>
-        <span class="d-flow__step-desc">End-of-week review. Weight change, plan completion, trends.</span>
+        <span class="d-flow__step-label">Review</span>
+        <span class="d-flow__step-desc">End-of-week review. Weight, progress, trends.</span>
       </div>
       <span class="d-flow__arrow">→</span>
       <div class="d-flow__step">
         <span class="d-flow__step-num">04</span>
         <span class="d-flow__step-label">Adapt</span>
-        <span class="d-flow__step-desc">Coach reviews patterns. Next week's plan adjusts.</span>
+        <span class="d-flow__step-desc">Coach reviews. Adaption, loop adjustments.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPERIENCE -->
+  <div id="experience" class="d-section">
+    <p class="d-label">Core Experience</p>
+
+    <!-- Weekly Planning -->
+    <div class="d-grid-2" style="margin-top: 24px;">
+      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
+        <span class="d-mono">[screenshot]</span>
+      </div>
+      <div>
+        <p class="d-label">01</p>
+        <p class="d-headline d-headline--md">Weekly Planning</p>
+        <p class="d-mono" style="margin-top: 4px;">Your week, planned around real life</p>
+        <p class="d-body" style="margin-top: 16px;">"Any events this week?" routes into one of five plan variants. The member answers one question. The system does the branching.</p>
+        <div style="margin-top: 20px;">
+          <p class="d-label">Jobs to be done</p>
+          <ul class="d-persona__needs">
+            <li>As a member, I need my plan to account for travel and social events, so I'm not set up to fail.</li>
+            <li>As a member, I need lighter goals when life is busy, so I stay engaged instead of giving up.</li>
+            <li>As a member, I need a rebound plan activated automatically when I plan a cheat meal.</li>
+          </ul>
+        </div>
       </div>
     </div>
 
-    <div class="d-gallery d-gallery--4" style="margin-top: 32px;">
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Week Planning [screenshot]</span></div>
-        <span class="d-gallery__caption">Set intentions, flag events. 5 plan variants from one entry point.</span>
+    <!-- Week in Review -->
+    <div class="d-grid-2" style="margin-top: 24px;">
+      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
+        <span class="d-mono">[screenshot]</span>
       </div>
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Daily Focus [screenshot]</span></div>
-        <span class="d-gallery__caption">Daily check-in with score factors and nutrition tracking.</span>
-      </div>
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Review of Week [screenshot]</span></div>
-        <span class="d-gallery__caption">Weight change, progress bars, trend line, day-by-day activity grid.</span>
-      </div>
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Rebound [screenshot]</span></div>
-        <span class="d-gallery__caption">When the score drops: what happened, possible causes, next steps.</span>
+      <div>
+        <p class="d-label">02</p>
+        <p class="d-headline d-headline--md">Week in Review</p>
+        <p class="d-mono" style="margin-top: 4px;">See what worked without reading charts</p>
+        <p class="d-body" style="margin-top: 16px;">Weight delta, progress bars, sparkline, activity matrix, AI summary — one scroll. Every number reads without explanation.</p>
+        <div style="margin-top: 20px;">
+          <p class="d-label">Jobs to be done</p>
+          <ul class="d-persona__needs">
+            <li>As a member, I need to see whether my weight moved and why, so I connect actions to results.</li>
+            <li>As a member, I need a summary I can absorb in under a minute, even when the data is complex.</li>
+          </ul>
+        </div>
       </div>
     </div>
 
-    <hr class="d-rule">
-
-    <p class="d-label">Design System</p>
-    <p class="d-body">30 components with rules for when to use each one. The system tells the team which page template to start with, which button style means "go forward" vs "dismiss," and which card to show when the score drops vs. when it rises.</p>
-
-    <div class="d-decisions" style="margin-top: 16px;">
-      <div class="d-decision">
-        <p class="d-decision__q">Page/Title vs Page/Questions</p>
-        <p class="d-decision__a">Title pages explain what's coming. Questions pages collect data. A sub-flow always starts with a Title page — never a Questions page.</p>
+    <!-- Updated Checkin Flow -->
+    <div class="d-grid-2" style="margin-top: 24px;">
+      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
+        <span class="d-mono">[screenshot]</span>
       </div>
-      <div class="d-decision">
-        <p class="d-decision__q">Button hierarchy</p>
-        <p class="d-decision__a">Dark button = main action. Light button = alternative. Text-only = dismiss. Same rule on every screen in every flow.</p>
-      </div>
-      <div class="d-decision">
-        <p class="d-decision__q">Score → card mapping</p>
-        <p class="d-decision__a">Score drops get an amber card with "what we know" and a coach button. Score increases get a green card with encouragement. This is documented, not decided per screen.</p>
+      <div>
+        <p class="d-label">03</p>
+        <p class="d-headline d-headline--md">Updated Checkin Flow</p>
+        <p class="d-mono" style="margin-top: 4px;">Every day connects to the week</p>
+        <p class="d-body" style="margin-top: 16px;">Daily check-ins capture score, mood, meals, adherence — then feed into the weekly loop. Score drops trigger triage. Increases trigger reinforcement.</p>
+        <div style="margin-top: 20px;">
+          <p class="d-label">Jobs to be done</p>
+          <ul class="d-persona__needs">
+            <li>As a member, I need today's check-in to connect to what I planned this week, so each day feels purposeful.</li>
+            <li>As a member, I need to understand why my score dropped and what to do about it.</li>
+            <li>As a member, I need going off plan to lead to a recovery path, not a guilt message.</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -152,18 +191,42 @@
   <!-- PROCESS -->
   <div id="process" class="d-section">
     <p class="d-label">Process</p>
-    <div class="d-decisions">
+    <p class="d-label" style="margin-top: 16px;">01</p>
+    <p class="d-headline d-headline--md">Design Decisions</p>
+    <p class="d-mono" style="margin-top: 4px;">TBD</p>
+    <div class="d-decisions" style="margin-top: 16px;">
       <div class="d-decision">
-        <p class="d-decision__q">Why does one question ("any events this week?") split into 5 different flows?</p>
-        <p class="d-decision__a">Members shouldn't need to understand the system's logic. If they have a busy week, the app gives them a lighter plan with optional boosters. If they're planning a cheat meal, the rebound flow activates. The routing is automatic — one question does the work of a settings page.</p>
+        <p class="d-decision__q">Why does one question split into 5 different flows?</p>
+        <p class="d-decision__a">Members shouldn't need to understand the system's logic. "Any events this week?" routes automatically into Base, Busy Week, Cheat & Rebound, Edit Plan, or Accelerate.</p>
       </div>
       <div class="d-decision">
         <p class="d-decision__q">Why treat a bad day as a "rebound" instead of a failure?</p>
-        <p class="d-decision__a">Most health apps make you feel bad when you go off plan. Invoy built a dedicated recovery flow: it shows what happened, suggests why, and offers specific next steps like scheduling a coach call or adding a fasting boost. Members who see a path back stay engaged. Members who feel judged stop opening the app.</p>
+        <p class="d-decision__a">Members who see a path back stay engaged. Members who feel judged stop opening the app.</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">Why pack so much data into the weekly review screen?</p>
-        <p class="d-decision__a">People look at this once a week. It has to be complete and fast to scan. Weight change, three progress bars, a week-long trend line, a day-by-day activity grid, and an AI-written summary — all on one scroll. Every number is readable without explanation.</p>
+        <p class="d-decision__q">Why pack so much data into the weekly review?</p>
+        <p class="d-decision__a">People look at this once a week. It has to be complete and fast to scan.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESIGN SYSTEM -->
+  <div id="design-system" class="d-section">
+    <p class="d-label">02</p>
+    <p class="d-headline d-headline--md">Design Systems</p>
+    <p class="d-mono" style="margin-top: 4px;">TBD</p>
+    <div class="d-gallery d-gallery--3" style="margin-top: 24px;">
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 3/4; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">[screenshot]</span></div>
+        <span class="d-gallery__caption">Score classes</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 3/4; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">[screenshot]</span></div>
+        <span class="d-gallery__caption">Type & Options</span>
+      </div>
+      <div class="d-gallery__item">
+        <div style="aspect-ratio: 3/4; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">[screenshot]</span></div>
+        <span class="d-gallery__caption">Components</span>
       </div>
     </div>
   </div>
@@ -180,12 +243,12 @@
       <div class="d-metric">
         <div class="d-metric__value">↑</div>
         <div class="d-metric__label">Weight loss outcomes</div>
-        <div class="d-metric__sub">Closed loop between data, coaching, and plan adaptation</div>
+        <div class="d-metric__sub">Closed loop between data, coaching, adaptation</div>
       </div>
       <div class="d-metric">
         <div class="d-metric__value">30</div>
         <div class="d-metric__label">Components shipped</div>
-        <div class="d-metric__sub">Design system with documented governance rules</div>
+        <div class="d-metric__sub">With documented governance rules</div>
       </div>
     </div>
   </div>
