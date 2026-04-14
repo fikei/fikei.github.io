@@ -108,7 +108,7 @@
 /* Sub-nav */
 .d-subnav {
   position: sticky;
-  top: 49px;
+  top: 71px;
   z-index: 100;
   display: flex;
   gap: 24px;
@@ -571,7 +571,7 @@
 
 .d-sticky-scroll__layers {
   position: relative;
-  height: calc(100vh - 94px);
+  height: calc(100vh - 124px);
   background: #33332f;
   overflow: hidden;
   opacity: 0;
@@ -598,7 +598,7 @@
 }
 
 .d-sticky-scroll__step {
-  min-height: calc(100vh - 94px);
+  min-height: calc(100vh - 124px);
   display: flex;
   flex-direction: column;
   justify-content: center;
