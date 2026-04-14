@@ -108,7 +108,7 @@
 /* Sub-nav */
 .d-subnav {
   position: sticky;
-  top: 27px;
+  top: 71px; /* JS overrides with actual nav height */
   z-index: 100;
   display: flex;
   gap: 24px;

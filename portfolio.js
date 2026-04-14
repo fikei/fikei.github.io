@@ -279,6 +279,14 @@
     });
   }
 
+  // ── Lock subnav below primary nav ──
+  function initStickyOffsets() {
+    const nav = document.querySelector('.d-nav');
+    const subnav = document.querySelector('.d-subnav');
+    if (!nav || !subnav) return;
+    subnav.style.top = nav.offsetHeight + 'px';
+  }
+
   // ── Init ──
   document.addEventListener('DOMContentLoaded', () => {
     initSubnav();
@@ -287,5 +295,6 @@
     initNavHighlight();
     initNavAccordion();
     initModals();
+    initStickyOffsets();
   });
 })();
