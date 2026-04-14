@@ -39,25 +39,12 @@
 
 <div class="d-contain">
 
-  <!-- Header — animation left, text right, same height -->
-  <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: stretch;">
-    <!-- Hero animation — native 800×640, scaled to fit container width -->
-    <div id="heroBox" style="flex: 1; overflow: hidden; background: #0A0A0A; position: relative;">
-      <iframe src="/animations/hero.html" style="width: 800px; height: 900px; border: none; pointer-events: none; display: block; transform-origin: top left;" id="heroFrame"></iframe>
+  <!-- Header — side by side -->
+  <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
+    <!-- Hero animation — 500×500 square -->
+    <div style="width: 500px; height: 500px; flex-shrink: 0; overflow: hidden; background: #0A0A0A;">
+      <iframe src="/animations/hero.html" style="width: 500px; height: 500px; border: none; pointer-events: none; display: block;" id="heroFrame"></iframe>
     </div>
-    <script>
-    (function() {
-      var box = document.getElementById('heroBox');
-      var frame = document.getElementById('heroFrame');
-      var W = 800, H = 900;
-      function scaleHero() {
-        var s = box.offsetWidth / W;
-        frame.style.transform = 'scale(' + s + ')';
-      }
-      scaleHero();
-      window.addEventListener('resize', scaleHero);
-    })();
-    </script>
     <!-- Content -->
     <div style="flex: 1;">
       <span class="d-status d-status--dev">Beta</span>
