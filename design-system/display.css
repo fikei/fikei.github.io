@@ -31,7 +31,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px clamp(20px, 5vw, 64px);
+  height: 27px;
+  padding: 0 clamp(20px, 5vw, 64px);
   background: var(--bg, #111110);
   border-bottom: 1px solid var(--border-subtle, #33332f);
 }
@@ -108,11 +109,13 @@
 /* Sub-nav */
 .d-subnav {
   position: sticky;
-  top: 71px;
+  top: 27px;
   z-index: 100;
   display: flex;
   gap: 24px;
-  padding: 16px clamp(20px, 5vw, 64px) 10px;
+  height: 54px;
+  padding: 0 clamp(20px, 5vw, 64px);
+  align-items: center;
   background: var(--bg, #111110);
   border-bottom: 1px solid var(--border-subtle, #33332f);
 }
@@ -571,7 +574,7 @@
 
 .d-sticky-scroll__layers {
   position: relative;
-  height: calc(100vh - 124px);
+  height: calc(100vh - 81px);
   background: #33332f;
   overflow: hidden;
   opacity: 0;
@@ -598,7 +601,7 @@
 }
 
 .d-sticky-scroll__step {
-  min-height: calc(100vh - 124px);
+  min-height: calc(100vh - 81px);
   display: flex;
   flex-direction: column;
   justify-content: center;
