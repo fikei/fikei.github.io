@@ -132,7 +132,7 @@
 
     <!-- 01: Dictation to Trusted Data — with animation -->
     <div style="display: flex; gap: 24px; padding: 32px 0; align-items: flex-start;">
-      <div class="d-anim-container" id="animContainer" style="background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 32px; overflow: hidden;">
+      <div class="d-anim-container" id="animContainer" style="width: 384px; aspect-ratio: 4/5; background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
         <div class="d-anim-phone" id="animPhone" style="overflow: hidden; border-radius: 48px;">
           <iframe src="/animations/transcript.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="animFrame"></iframe>
         </div>
@@ -153,7 +153,7 @@
 
     <!-- 02: Clinical Report, Not Form Fields — with animation -->
     <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: flex-start; flex-direction: row-reverse;">
-      <div class="d-anim-container" id="soapContainer" style="background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 32px; overflow: hidden;">
+      <div class="d-anim-container" id="soapContainer" style="width: 384px; aspect-ratio: 4/5; background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
         <div class="d-anim-phone" id="soapPhone" style="overflow: hidden; border-radius: 48px;">
           <iframe src="/animations/soap-note.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="soapFrame"></iframe>
         </div>
@@ -315,30 +315,26 @@
 <!-- Animation sizing + scroll triggers -->
 <script>
 (function() {
-  var PHONE_W = 402, PHONE_H = 856, PAD = 32;
-  var NAV_H = 49, SUBNAV_H = 45;
+  var PHONE_W = 402, PHONE_H = 856;
 
   function sizeAll() {
-    var available = window.innerHeight - NAV_H - SUBNAV_H - PAD * 2;
-    var scale = Math.min(available / PHONE_H, 1);
-    var w = PHONE_W * scale;
-    var h = PHONE_H * scale;
-    var r = 48 * scale;
-
     var phones = document.querySelectorAll('.d-anim-phone');
-    var containers = document.querySelectorAll('.d-anim-container');
     for (var i = 0; i < phones.length; i++) {
+      var container = phones[i].parentElement;
+      var boxH = container.offsetHeight;
+      var boxW = container.offsetWidth;
+      // Scale phone to fit container
+      var scale = Math.min(boxW / PHONE_W, boxH / PHONE_H);
+      var w = PHONE_W * scale;
+      var h = PHONE_H * scale;
       phones[i].style.width = w + 'px';
       phones[i].style.height = h + 'px';
-      phones[i].style.borderRadius = r + 'px';
+      phones[i].style.borderRadius = (48 * scale) + 'px';
       var iframe = phones[i].querySelector('iframe');
       if (iframe) {
         iframe.style.transform = 'scale(' + scale + ')';
         iframe.style.transformOrigin = 'top left';
       }
-    }
-    for (var j = 0; j < containers.length; j++) {
-      containers[j].style.width = (w + PAD * 2) + 'px';
     }
   }
   sizeAll();
