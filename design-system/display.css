@@ -565,7 +565,7 @@
 .d-sticky-scroll__phone {
   position: sticky;
   flex-shrink: 0;
-  width: 384px;
+  width: 460px;
   z-index: 2;
   /* top is set by JS for vertical centering */
 }
@@ -573,7 +573,7 @@
 .d-sticky-scroll__layers {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  height: calc(100vh - 94px);
   background: #000;
   overflow: hidden;
   opacity: 0;

@@ -331,14 +331,16 @@
   var started = {}; // track which iframes have been triggered
   var activeStep = 0;
 
-  // Size phones to fit their layer container
+  var PAD = 36; // padding around phone inside the black box
+
+  // Size phones to fit their layer container minus padding
   function sizePhones() {
     var phones = document.querySelectorAll('.d-anim-phone');
     for (var i = 0; i < phones.length; i++) {
       var layer = phones[i].parentElement;
-      var boxW = layer.offsetWidth;
-      var boxH = layer.offsetHeight;
-      var scale = Math.min(boxW / PHONE_W, boxH / PHONE_H);
+      var availW = layer.offsetWidth - PAD * 2;
+      var availH = layer.offsetHeight - PAD * 2;
+      var scale = Math.min(availW / PHONE_W, availH / PHONE_H);
       phones[i].style.width = (PHONE_W * scale) + 'px';
       phones[i].style.height = (PHONE_H * scale) + 'px';
       phones[i].style.borderRadius = (48 * scale) + 'px';
@@ -350,12 +352,10 @@
     }
   }
 
-  // Set sticky top for vertical centering
+  // Pin sticky phone right below nav+subnav
   function setStickyTop() {
     if (!stickyPhone) return;
-    var phoneH = stickyPhone.offsetHeight;
-    var top = CHROME + (window.innerHeight - CHROME - phoneH) / 2;
-    stickyPhone.style.top = Math.max(CHROME, top) + 'px';
+    stickyPhone.style.top = CHROME + 'px';
   }
 
   var layersBox = document.querySelector('.d-sticky-scroll__layers');
