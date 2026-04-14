@@ -45,11 +45,22 @@
   .logo-card svg { width: 120px; height: 120px; }
 
   /* ═══════ SCENE 1: Recording Bar — top of canvas ═══════ */
-  .scene-rec {
+  /* Each scene zone fills 800×640 — same as the viewport.
+     Content is centered via flexbox, independent of scale. */
+  .scene-zone {
     position: absolute;
-    top: 280px;
-    left: 200px;
+    left: 0;
+    width: 800px;
+    height: 640px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
+  .scene-zone--rec { top: 0; }
+  .scene-zone--typing { top: 1000px; }
+  .scene-zone--msgs { top: 1800px; }
+
+  /* ═══════ Recording bar ═══════ */
   .rec-bar {
     width: 358px; height: 52px;
     background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 16px;
@@ -71,12 +82,7 @@
   }
   .tap-ripple.animate { animation: ripple 0.7s cubic-bezier(0, 0, 0.2, 1) forwards; }
 
-  /* ═══════ SCENE 2: Typing Indicator — far below ═══════ */
-  .scene-typing {
-    position: absolute;
-    top: 1000px;
-    left: 340px;
-  }
+  /* ═══════ Typing indicator ═══════ */
   .typing { display: flex; gap: 10px; align-items: center; }
   .typing-dot { width: 7px; height: 7px; border-radius: 50%; }
   .typing-speaker { font-size: 10px; font-weight: 700; width: 22px; }
@@ -86,13 +92,8 @@
   .typing-dots span:nth-child(2) { animation: dotPulse 1s infinite 0.15s; }
   .typing-dots span:nth-child(3) { animation: dotPulse 1s infinite 0.3s; }
 
-  /* ═══════ SCENE 3: Messages + Badge + Card — far below ═══════ */
-  .scene-msgs {
-    position: absolute;
-    top: 1800px;
-    left: 160px;
-    width: 440px;
-  }
+  /* ═══════ Messages area ═══════ */
+  .scene-msgs { width: 440px; }
   .msg { display: flex; gap: 10px; padding: 10px 0; opacity: 0; transform: translateY(10px); }
   .msg.show { opacity: 1; transform: translateY(0); transition: opacity 0.5s ease, transform 0.5s ease; }
   .msg-left { display: flex; align-items: center; gap: 5px; flex-shrink: 0; height: 21px; }
@@ -170,8 +171,8 @@
 <div class="camera">
   <div class="canvas" id="canvas">
 
-    <!-- SCENE 1: Recording bar (y ≈ 280) -->
-    <div class="scene-rec">
+    <!-- Zone 1: Recording bar — centered at (400, 320) -->
+    <div class="scene-zone scene-zone--rec">
       <div class="rec-bar">
         <div class="rec-bar-left">
           <div class="rec-bar-dot"></div>
@@ -187,8 +188,8 @@
       </div>
     </div>
 
-    <!-- SCENE 2: Typing indicator (y ≈ 1000) -->
-    <div class="scene-typing">
+    <!-- Zone 2: Typing indicator — centered at (400, 1320) -->
+    <div class="scene-zone scene-zone--typing">
       <div class="typing">
         <div class="typing-dot" style="background: #F9CE86;"></div>
         <div class="typing-speaker" style="color: #F9CE86;">MC</div>
@@ -196,8 +197,9 @@
       </div>
     </div>
 
-    <!-- SCENE 3: Messages + badge + card (y ≈ 1800) -->
-    <div class="scene-msgs">
+    <!-- Zone 3: Messages — centered at (400, 2120) -->
+    <div class="scene-zone scene-zone--msgs">
+      <div class="scene-msgs">
       <div class="msg" id="msg1">
         <div class="msg-left"><div class="msg-dot msg-dot--if"></div><div class="msg-speaker msg-speaker--if">IF</div></div>
         <div><div class="msg-text">Can you tell me what happened?</div></div>
@@ -243,6 +245,7 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
 
   </div>
@@ -278,34 +281,32 @@
   function start() {
     var timer = setInterval(tickTimer, 1000);
 
-    // ═══ BEAT 1: Extreme close-up on stop button (0→2.5s) ═══
-    // Stop button center: scene-rec at (200, 280), button at right side ≈ (520, 306)
-    centerOn(520, 306, 4.5, 0.01);
+    // Zone centers (flexbox-centered content within 800×640 zones):
+    // Zone 1 (rec):     (400, 320)
+    // Zone 2 (typing):  (400, 1320)
+    // Zone 3 (msgs):    (400, 2120)
 
-    // Tap at 0.6s
+    // ═══ BEAT 1: Extreme close-up on rec bar (0→2.5s) ═══
+    centerOn(400, 320, 4.5, 0.01);
+
     setTimeout(function() {
       document.getElementById('tapRipple').classList.add('animate');
     }, 600);
 
-    // Slow drift out
     setTimeout(function() {
-      centerOn(520, 306, 3.8, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
+      centerOn(400, 320, 3.8, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
     }, 1000);
 
-    // ═══ BEAT 2: Hard vertical pan DOWN to typing indicator (2.5→5.5s) ═══
-    // Typing center: (370, 1006). Zoom in tight: 5×
+    // ═══ BEAT 2: Hard vertical pan to typing indicator (2.5→5.5s) ═══
     setTimeout(function() {
-      centerOn(370, 1006, 5.0, 0.45);
+      centerOn(400, 1320, 5.0, 0.45);
     }, 2500);
 
-    // Hold — gentle drift for 3 seconds
     setTimeout(function() {
-      centerOn(370, 1006, 4.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
+      centerOn(400, 1320, 4.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
     }, 3100);
 
-    // ═══ BEAT 3: Hard vertical pan DOWN to messages (5.5→9s) ═══
-    // Messages top: (380, 1830). Zoom out to 1.4× to show full context
-    // Pre-show messages before arriving
+    // ═══ BEAT 3: Hard vertical pan to messages at 1.2× (5.5→9s) ═══
     setTimeout(function() {
       document.getElementById('msg1').classList.add('show');
     }, 5400);
@@ -314,14 +315,12 @@
     }, 5600);
 
     setTimeout(function() {
-      centerOn(380, 1870, 1.4, 0.5);
+      centerOn(400, 2120, 1.2, 0.5);
     }, 5500);
 
-    // Badge shimmers in
     setTimeout(function() {
       document.getElementById('badge1').classList.add('show', 'loading');
     }, 7000);
-    // Resolves
     setTimeout(function() {
       document.getElementById('badge1').classList.remove('loading');
     }, 7800);
@@ -334,16 +333,14 @@
     setTimeout(function() {
       document.getElementById('badge1').style.display = 'none';
       document.getElementById('card1').classList.add('open');
-      // Pan down slightly to keep card centered as it expands
-      centerOn(380, 1920, 1.4, 0.6);
+      // Drift down slightly as card expands
+      centerOn(400, 2160, 1.2, 0.6);
     }, 9000);
 
-    // Fields stagger in
     setTimeout(function() { document.getElementById('field1').classList.add('show'); }, 9500);
     setTimeout(function() { document.getElementById('field2').classList.add('show'); }, 10000);
     setTimeout(function() { document.getElementById('field3').classList.add('show'); }, 10500);
 
-    // More badges
     setTimeout(function() { document.getElementById('badge2').classList.add('show'); }, 11200);
     setTimeout(function() { document.getElementById('badge3').classList.add('show'); }, 11600);
 
