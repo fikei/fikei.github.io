@@ -568,3 +568,97 @@
 .d-pt-8 { padding-top: 32px; }
 
 .d-rule { border: none; border-top: 1px solid var(--border-subtle, #33332f); margin: 32px 0; }
+
+/* ── Project Modal ── */
+
+.d-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.d-modal-overlay--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.d-modal {
+  width: 960px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: var(--bg, #111110);
+  border: 1px solid var(--border-subtle, #33332f);
+  transform: translateY(12px);
+  transition: transform 0.2s ease;
+}
+
+.d-modal-overlay--open .d-modal {
+  transform: translateY(0);
+}
+
+.d-modal__hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 48px;
+}
+
+.d-modal__image {
+  width: 400px;
+  aspect-ratio: 4 / 5;
+  background: var(--bg-surface, #1a1a18);
+  border: 1px solid var(--border-subtle, #33332f);
+  flex-shrink: 0;
+}
+
+.d-modal__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.d-modal__tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-amber, #ffb000);
+}
+
+.d-modal__title {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--fg, #e8e6e3);
+  margin-top: 12px;
+}
+
+.d-modal__desc {
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--fg-muted, #8a8885);
+  margin-top: 12px;
+  max-width: 468px;
+}
+
+.d-modal__footer {
+  border-top: 1px solid var(--border-subtle, #33332f);
+  padding: 48px;
+}
+
+@media (max-width: 768px) {
+  .d-modal__hero { flex-direction: column; padding: 24px; }
+  .d-modal__image { width: 100%; }
+  .d-modal__title { font-size: 28px; }
+  .d-modal__footer { padding: 24px; }
+}

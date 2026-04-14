@@ -250,6 +250,35 @@
     }
   }
 
+  // ── Project Modals ──
+  function initModals() {
+    // Open modal on card click
+    document.querySelectorAll('[data-modal]').forEach(trigger => {
+      trigger.addEventListener('click', e => {
+        e.preventDefault();
+        const id = trigger.getAttribute('data-modal');
+        const overlay = document.getElementById(id);
+        if (overlay) overlay.classList.add('d-modal-overlay--open');
+      });
+    });
+
+    // Close on overlay click (not modal content)
+    document.querySelectorAll('.d-modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('d-modal-overlay--open');
+      });
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.d-modal-overlay--open').forEach(o => {
+          o.classList.remove('d-modal-overlay--open');
+        });
+      }
+    });
+  }
+
   // ── Init ──
   document.addEventListener('DOMContentLoaded', () => {
     initSubnav();
@@ -257,5 +286,6 @@
     initSmoothScroll();
     initNavHighlight();
     initNavAccordion();
+    initModals();
   });
 })();
