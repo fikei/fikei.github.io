@@ -127,10 +127,38 @@
     <p class="d-label">Core Experience</p>
 
     <!-- 01: Dictation to Trusted Data — with animation -->
-    <div style="display: flex; gap: 24px; padding: 32px 0; align-items: flex-start;">
-      <div id="animPhone" style="width: 294px; flex-shrink: 0;">
-        <iframe src="/portfolio/animations.html?paused" style="width: 294px; height: 660px; border: none; border-radius: 44px; overflow: hidden; pointer-events: none;" id="animFrame"></iframe>
+    <div style="display: flex; gap: 24px; padding: 32px 0; align-items: center;">
+      <div id="animContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+        <div id="animPhone" style="overflow: hidden; border-radius: 48px;">
+          <iframe src="/portfolio/animations.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="animFrame"></iframe>
+        </div>
       </div>
+      <script>
+      (function() {
+        var container = document.getElementById('animContainer');
+        var phone = document.getElementById('animPhone');
+        var pad = 20; // padding inside black box
+        function sizePhone() {
+          // nav(49) + subnav(45) + section label + card padding + breathing room
+          var chrome = 49 + 45 + 32 + 32 + 40;
+          var available = window.innerHeight - chrome;
+          var phoneH = 856;
+          var phoneW = 402;
+          var scale = Math.min(available / phoneH, 0.85); // cap at 85% to leave breathing room
+          var w = phoneW * scale;
+          var h = phoneH * scale;
+          phone.style.width = w + 'px';
+          phone.style.height = h + 'px';
+          phone.style.borderRadius = (48 * scale) + 'px';
+          var iframe = phone.querySelector('iframe');
+          iframe.style.transform = 'scale(' + scale + ')';
+          iframe.style.transformOrigin = 'top left';
+          container.style.width = (w + pad * 2) + 'px';
+        }
+        sizePhone();
+        window.addEventListener('resize', sizePhone);
+      })();
+      </script>
       <div style="flex: 1;">
         <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
         <p class="d-headline d-headline--md" style="margin-top: 4px;">Dictation to Trusted Data</p>
@@ -145,9 +173,55 @@
       </div>
     </div>
 
-    <!-- 02: Clinical Report, Not Form Fields -->
-    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: flex-start; flex-direction: row-reverse;">
-      <div style="width: 384px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
+    <!-- 02: Clinical Report, Not Form Fields — with animation -->
+    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: center; flex-direction: row-reverse;">
+      <div id="soapContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+        <div id="soapPhone" style="overflow: hidden; border-radius: 48px;">
+          <iframe src="/portfolio/animation-soap.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="soapFrame"></iframe>
+        </div>
+      </div>
+      <script>
+      (function() {
+        var container = document.getElementById('soapContainer');
+        var phone = document.getElementById('soapPhone');
+        var pad = 20;
+        function sizePhone() {
+          var chrome = 49 + 45 + 32 + 32 + 40;
+          var available = window.innerHeight - chrome;
+          var phoneH = 856;
+          var phoneW = 402;
+          var scale = Math.min(available / phoneH, 0.85);
+          var w = phoneW * scale;
+          var h = phoneH * scale;
+          phone.style.width = w + 'px';
+          phone.style.height = h + 'px';
+          phone.style.borderRadius = (48 * scale) + 'px';
+          var iframe = phone.querySelector('iframe');
+          iframe.style.transform = 'scale(' + scale + ')';
+          iframe.style.transformOrigin = 'top left';
+          container.style.width = (w + pad * 2) + 'px';
+        }
+        sizePhone();
+        window.addEventListener('resize', sizePhone);
+
+        // Scroll trigger
+        var started = false;
+        var iframe = document.getElementById('soapFrame');
+        var observer = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting && !started) {
+            started = true;
+            iframe.addEventListener('load', function() {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            });
+            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            }
+            observer.disconnect();
+          }
+        }, { threshold: 0.3 });
+        observer.observe(container);
+      })();
+      </script>
       <div style="flex: 1;">
         <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
         <p class="d-headline d-headline--md" style="margin-top: 4px;">Clinical Report, Not Form Fields</p>
