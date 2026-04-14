@@ -109,13 +109,12 @@
 .d-subnav {
   position: sticky;
   top: 49px;
-  z-index: 49;
+  z-index: 100;
   display: flex;
   gap: 24px;
   padding: 16px clamp(20px, 5vw, 64px) 10px;
   background: var(--bg, #111110);
   border-bottom: 1px solid var(--border-subtle, #33332f);
-  isolation: isolate; /* new stacking context above sticky scroll content */
 }
 
 .d-subnav__link {
@@ -572,12 +571,14 @@
 
 .d-sticky-scroll__layers {
   position: relative;
-  width: 100%;
   height: calc(100vh - 94px);
-  background: #000;
+  background: #33332f;
   overflow: hidden;
   opacity: 0;
   transition: opacity 0.6s ease;
+  /* Bleed to left edge of page */
+  width: calc(100% + var(--gutter-page, clamp(20px, 5vw, 64px)));
+  margin-left: calc(-1 * var(--gutter-page, clamp(20px, 5vw, 64px)));
 }
 .d-sticky-scroll__layers.is-visible { opacity: 1; }
 
