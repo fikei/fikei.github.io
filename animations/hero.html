@@ -13,11 +13,11 @@
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
     width: 800px;
-    height: 640px;
+    height: 900px;
   }
   body.embedded { background: transparent; }
 
-  .camera { width: 800px; height: 640px; overflow: hidden; position: relative; }
+  .camera { width: 800px; height: 900px; overflow: hidden; position: relative; }
   .canvas {
     position: absolute;
     width: 800px;
@@ -51,7 +51,7 @@
     position: absolute;
     left: 0;
     width: 800px;
-    height: 640px;
+    height: 900px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -257,14 +257,12 @@
   var paused = window.location.search.indexOf('paused') > -1;
   if (paused) document.body.classList.add('embedded');
 
-  // Viewport: 800 × 640
-  // At scale S, visible canvas area = 800/S × 640/S
-  // To center point (cx, cy): translate(-(cx - 400/S), -(cy - 320/S)) scale(S)
-  // Simplified: translate(-cx*S + 400, -cy*S + 320) scale(S)
+  // Viewport: 800 × 900
+  // Center: (400, 450)
 
   function centerOn(cx, cy, scale, duration, easing) {
     var tx = -cx * scale + 400;
-    var ty = -cy * scale + 320;
+    var ty = -cy * scale + 450;
     canvas.style.transition = 'transform ' + duration + 's ' + (easing || 'cubic-bezier(0.4, 0, 0.2, 1)');
     canvas.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
   }
@@ -281,29 +279,30 @@
   function start() {
     var timer = setInterval(tickTimer, 1000);
 
-    // Zone centers (flexbox-centered content within 800×640 zones):
-    // Zone 1 (rec):     (400, 320)
-    // Zone 2 (typing):  (400, 1320)
-    // Zone 3 (msgs):    (400, 2120)
+    // Zone centers (800×900 zones):
+    // Zone 1 (rec):     (400, 450)   — stop button at ~(561, 450)
+    // Zone 2 (typing):  (400, 1450)
+    // Zone 3 (msgs):    (400, 2250)
 
-    // ═══ BEAT 1: Extreme close-up on rec bar (0→2.5s) ═══
-    centerOn(400, 320, 4.5, 0.01);
+    // ═══ BEAT 1: Extreme close-up on STOP BUTTON (0→2.5s) ═══
+    centerOn(561, 450, 4.5, 0.01);
 
     setTimeout(function() {
       document.getElementById('tapRipple').classList.add('animate');
     }, 600);
 
+    // Drift to show more of the rec bar
     setTimeout(function() {
-      centerOn(400, 320, 3.8, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
+      centerOn(500, 450, 3.8, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
     }, 1000);
 
     // ═══ BEAT 2: Hard vertical pan to typing indicator (2.5→5.5s) ═══
     setTimeout(function() {
-      centerOn(400, 1320, 5.0, 0.45);
+      centerOn(400, 1450, 5.0, 0.45);
     }, 2500);
 
     setTimeout(function() {
-      centerOn(400, 1320, 4.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
+      centerOn(400, 1450, 4.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
     }, 3100);
 
     // ═══ BEAT 3: Hard vertical pan to messages at 1.2× (5.5→9s) ═══
@@ -315,7 +314,7 @@
     }, 5600);
 
     setTimeout(function() {
-      centerOn(400, 2120, 1.2, 0.5);
+      centerOn(400, 2250, 1.2, 0.5);
     }, 5500);
 
     setTimeout(function() {
@@ -333,8 +332,7 @@
     setTimeout(function() {
       document.getElementById('badge1').style.display = 'none';
       document.getElementById('card1').classList.add('open');
-      // Drift down slightly as card expands
-      centerOn(400, 2160, 1.2, 0.6);
+      centerOn(400, 2290, 1.2, 0.6);
     }, 9000);
 
     setTimeout(function() { document.getElementById('field1').classList.add('show'); }, 9500);
