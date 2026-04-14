@@ -9,86 +9,10 @@
   <link rel="stylesheet" href="/design-system/components.css">
   <link rel="stylesheet" href="/design-system/display.css">
   <style>
-    /* Scroll-based section fading — fade sections scrolled fully past */
-    .d-section {
-      transition: opacity 0.6s ease;
-    }
-    .d-section.faded {
-      opacity: 0.15;
-    }
-
-    /* Animation iframe container */
-    .anim-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      margin: 32px 0;
-    }
-    .anim-grid--three {
-      grid-template-columns: 1fr 1fr 1fr;
-    }
-    .anim-wrap {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      background: var(--bg, #111110);
-      border: 1px solid var(--border-subtle, #33332f);
-    }
-    .anim-wrap iframe {
-      width: 100%;
-      height: 520px;
-      border: none;
-      display: block;
-      transform: scale(0.85);
-      transform-origin: top center;
-    }
-    .anim-wrap--tall iframe {
-      height: 580px;
-    }
-    .anim-label {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 10px 14px;
-      background: linear-gradient(transparent, rgba(17,17,16,0.95));
-      font-family: var(--font-mono, monospace);
-      font-size: 11px;
-      color: var(--fg-dim, #666560);
-      z-index: 2;
-    }
-    .anim-label strong {
-      color: var(--fg, #e8e6e3);
-      font-weight: 600;
-    }
-
-    /* Side-by-side anim + narrative */
-    .anim-narrative {
-      display: flex;
-      gap: 32px;
-      align-items: flex-start;
-      margin: 32px 0;
-    }
-    .anim-narrative--reverse {
-      flex-direction: row-reverse;
-    }
-    .anim-narrative .anim-wrap {
-      flex: 1;
-      min-width: 0;
-    }
-    .anim-narrative .anim-text {
-      flex: 1;
-      padding-top: 16px;
-    }
-    .anim-narrative .anim-wrap iframe {
-      height: 480px;
-      transform: scale(0.82);
-    }
-
-    /* Drop-off bars */
-    .dropoff { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; }
-    .dropoff-row { display: flex; align-items: center; gap: 14px; }
-    .dropoff-label {
+    /* Drop-off funnel — shows remaining users, loss highlighted */
+    .funnel { display: flex; flex-direction: column; gap: 8px; margin: 24px 0; }
+    .funnel-row { display: flex; align-items: center; gap: 14px; }
+    .funnel-label {
       font-family: var(--font-mono, monospace);
       font-size: 11px;
       color: var(--fg-dim, #666560);
@@ -96,33 +20,40 @@
       text-align: right;
       flex-shrink: 0;
     }
-    .dropoff-label--highlight { color: var(--fg, #e8e6e3); }
-    .dropoff-bar {
+    .funnel-label--highlight { color: var(--fg, #e8e6e3); }
+    .funnel-bar {
       flex: 1;
-      height: 20px;
+      height: 22px;
       background: var(--bg-surface, #1a1a18);
       border-radius: 3px;
       position: relative;
       overflow: hidden;
     }
-    .dropoff-fill {
+    .funnel-remaining {
       position: absolute;
       left: 0; top: 0; bottom: 0;
-      border-radius: 3px 0 0 3px;
+      background: var(--fg-dim, #666560);
+      border-radius: 3px;
+      opacity: 0.35;
     }
-    .dropoff-fill--low { background: var(--fg-dim, #666560); }
-    .dropoff-fill--mid { background: #c0694a; }
-    .dropoff-fill--high { background: #c0443a; }
-    .dropoff-pct {
+    .funnel-loss {
+      position: absolute;
+      top: 0; bottom: 0;
+      border-radius: 0 3px 3px 0;
+    }
+    .funnel-loss--low { background: rgba(102, 101, 96, 0.5); }
+    .funnel-loss--mid { background: rgba(192, 105, 74, 0.7); }
+    .funnel-loss--high { background: rgba(192, 68, 58, 0.8); }
+    .funnel-pct {
       font-family: var(--font-mono, monospace);
       font-size: 12px;
       font-weight: 600;
-      width: 36px;
+      width: 50px;
       flex-shrink: 0;
     }
-    .dropoff-pct--low { color: var(--fg-dim, #666560); }
-    .dropoff-pct--mid { color: #c0694a; }
-    .dropoff-pct--high { color: #c0443a; }
+    .funnel-pct--low { color: var(--fg-dim, #666560); }
+    .funnel-pct--mid { color: #c0694a; }
+    .funnel-pct--high { color: #c0443a; }
 
     /* Inline metric pair */
     .metric-pair {
@@ -200,11 +131,14 @@
     .interactive-cta__link--dim { color: var(--fg-dim, #666560); }
     .interactive-cta__link--accent { color: var(--accent-cyan, #00fff7); }
 
+    /* Reg animation frame — no phone chrome, just scaled content */
+    .d-anim-reg {
+      overflow: hidden;
+      border-radius: 16px;
+      background: #fff;
+    }
+
     @media (max-width: 700px) {
-      .anim-grid { grid-template-columns: 1fr; }
-      .anim-grid--three { grid-template-columns: 1fr; }
-      .anim-narrative { flex-direction: column; }
-      .anim-narrative--reverse { flex-direction: column; }
       .metric-pair { flex-wrap: wrap; gap: 24px; }
       .interactive-cta { flex-direction: column; }
       .interactive-cta__links { padding-left: 0; border-left: none; border-top: 1px solid var(--border-subtle, #33332f); padding-top: 12px; }
@@ -214,12 +148,18 @@
 <body class="d-page">
 
 <nav class="d-nav">
-  <a href="/" class="d-nav__name">Ian Fike</a>
+  <a href="/" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
-    <li><a href="/field.html" class="d-nav__link">Field</a></li>
-    <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
-    <li><a href="/livongo.html" class="d-nav__link d-nav__link--active">Livongo</a></li>
-    <li><a href="/philosophy.html" class="d-nav__link">How I Work</a></li>
+    <li class="d-nav__group d-nav__group--expanded" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field.html" class="d-nav__link">Field</a></li>
+        <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
+        <li><a href="/livongo.html" class="d-nav__link d-nav__link--active">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/philosophy.html" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
   </ul>
 </nav>
 
@@ -259,31 +199,50 @@
 
     <p class="d-body" style="margin-top: 32px;">The data told the story. Every step bled members, but the reasons weren't what anyone expected.</p>
 
-    <div class="dropoff">
-      <div class="dropoff-row">
-        <span class="dropoff-label">Identity & Basic Info</span>
-        <div class="dropoff-bar"><div class="dropoff-fill dropoff-fill--low" style="width: 9%;"></div></div>
-        <span class="dropoff-pct dropoff-pct--low">9%</span>
+    <div class="funnel">
+      <!-- 100% start → 91% remain (9% loss) -->
+      <div class="funnel-row">
+        <span class="funnel-label">Identity & Basic Info</span>
+        <div class="funnel-bar">
+          <div class="funnel-remaining" style="width: 91%;"></div>
+          <div class="funnel-loss funnel-loss--low" style="left: 91%; right: 0;"></div>
+        </div>
+        <span class="funnel-pct funnel-pct--low">−9%</span>
       </div>
-      <div class="dropoff-row">
-        <span class="dropoff-label">Sponsor</span>
-        <div class="dropoff-bar"><div class="dropoff-fill dropoff-fill--mid" style="width: 22%;"></div></div>
-        <span class="dropoff-pct dropoff-pct--mid">22%</span>
+      <!-- 91% → 69% remain (22% loss) -->
+      <div class="funnel-row">
+        <span class="funnel-label">Sponsor</span>
+        <div class="funnel-bar">
+          <div class="funnel-remaining" style="width: 69%;"></div>
+          <div class="funnel-loss funnel-loss--mid" style="left: 69%; width: 22%;"></div>
+        </div>
+        <span class="funnel-pct funnel-pct--mid">−22%</span>
       </div>
-      <div class="dropoff-row">
-        <span class="dropoff-label">Insurance</span>
-        <div class="dropoff-bar"><div class="dropoff-fill dropoff-fill--high" style="width: 32%;"></div></div>
-        <span class="dropoff-pct dropoff-pct--high">32%</span>
+      <!-- 69% → 37% remain (32% loss) -->
+      <div class="funnel-row">
+        <span class="funnel-label">Insurance</span>
+        <div class="funnel-bar">
+          <div class="funnel-remaining" style="width: 37%;"></div>
+          <div class="funnel-loss funnel-loss--high" style="left: 37%; width: 32%;"></div>
+        </div>
+        <span class="funnel-pct funnel-pct--high">−32%</span>
       </div>
-      <div class="dropoff-row">
-        <span class="dropoff-label dropoff-label--highlight">Product Selection</span>
-        <div class="dropoff-bar"><div class="dropoff-fill dropoff-fill--high" style="width: 21%;"></div></div>
-        <span class="dropoff-pct dropoff-pct--high">21%</span>
+      <!-- 37% → 16% remain (21% loss) -->
+      <div class="funnel-row">
+        <span class="funnel-label funnel-label--highlight">Product Selection</span>
+        <div class="funnel-bar">
+          <div class="funnel-remaining" style="width: 16%;"></div>
+          <div class="funnel-loss funnel-loss--high" style="left: 16%; width: 21%;"></div>
+        </div>
+        <span class="funnel-pct funnel-pct--high">−21%</span>
       </div>
-      <div class="dropoff-row">
-        <span class="dropoff-label">Health Intake</span>
-        <div class="dropoff-bar"><div class="dropoff-fill dropoff-fill--mid" style="width: 18%;"></div></div>
-        <span class="dropoff-pct dropoff-pct--mid">18%</span>
+      <!-- 16% → ~0% remain (18% loss, but capped) -->
+      <div class="funnel-row">
+        <span class="funnel-label">Health Intake</span>
+        <div class="funnel-bar">
+          <div class="funnel-loss funnel-loss--mid" style="left: 0; width: 16%;"></div>
+        </div>
+        <span class="funnel-pct funnel-pct--mid">−18%</span>
       </div>
     </div>
 
@@ -314,60 +273,125 @@
   </div>
 
   <!-- DELIVERABLE -->
-  <div id="deliverable" class="d-section">
+  <div id="deliverable" class="d-section" style="border-bottom: none;">
     <p class="d-label">Deliverable</p>
     <p class="d-body">The redesigned flow went from 9 steps to 6. But the step count wasn't the point — what changed was what happened inside each step. The system now resolved data upstream and adapted the flow per client configuration.</p>
 
-    <!-- Step 1 + 2: Side by side -->
-    <div class="anim-grid" style="margin-top: 32px;">
-      <div class="anim-wrap">
-        <iframe src="/animations/reg/step1.html" loading="lazy"></iframe>
-        <div class="anim-label"><strong>Step 1</strong> — Identity reduced to 3 fields. Welcome banner names the employer.</div>
+    <div class="d-sticky-scroll">
+      <!-- Sticky animation column -->
+      <div class="d-sticky-scroll__phone" id="stickyReg">
+        <div class="d-sticky-scroll__layers">
+          <div class="d-sticky-scroll__layer is-active" data-step="0">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step1.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+          <div class="d-sticky-scroll__layer" data-step="1">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step2.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+          <div class="d-sticky-scroll__layer" data-step="2">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step3.html" style="width: 480px; height: 720px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+          <div class="d-sticky-scroll__layer" data-step="3">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step4.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+          <div class="d-sticky-scroll__layer" data-step="4">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step5.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+          <div class="d-sticky-scroll__layer" data-step="5">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step6.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="anim-wrap">
-        <iframe src="/animations/reg/step2.html" loading="lazy"></iframe>
-        <div class="anim-label"><strong>Step 2</strong> — Eligibility auto-confirmed. "We found you!" replaces 3 manual steps.</div>
+
+      <!-- Scrolling text column -->
+      <div class="d-sticky-scroll__text">
+        <div class="d-sticky-scroll__step is-active" data-step="0">
+          <p class="d-mono">01</p>
+          <p class="d-headline d-headline--md">Let's Get Started</p>
+          <p class="d-mono d-text--subtle">Identity reduced to 3 fields</p>
+          <p class="d-body">The welcome banner names the employer — the member knows the system already knows who they are. First name, last name, date of birth. Everything else resolved upstream.</p>
+          <p class="d-label">What changed</p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• 9 identity fields → 3</li>
+            <li class="d-body" style="font-size: 12px;">• Employer context shown immediately</li>
+          </ul>
+        </div>
+
+        <div class="d-sticky-scroll__step" data-step="1">
+          <p class="d-mono">02</p>
+          <p class="d-headline d-headline--md">Create Your Account</p>
+          <p class="d-mono d-text--subtle">"We found you!" replaces 3 manual steps</p>
+          <p class="d-body">Eligibility auto-confirmed. The system matched the member against employer HR data before they entered a single field. The green banner builds trust — you're already in, just set up your login.</p>
+          <p class="d-label">What changed</p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Sponsor & insurance steps eliminated</li>
+            <li class="d-body" style="font-size: 12px;">• Eligibility verified server-side</li>
+          </ul>
+        </div>
+
+        <div class="d-sticky-scroll__step" data-step="2">
+          <p class="d-mono">03</p>
+          <p class="d-headline d-headline--md">Set Up Your Program</p>
+          <p class="d-mono d-text--subtle">Pre-filled from health records</p>
+          <p class="d-body">Blue dots mark pre-filled fields — data sourced from health records and employer HR. The "From Your Records" accordion shows 7 fields the system already knows: diabetes type, diagnosis year, medications, exam dates. The member reviews and corrects. They don't re-enter.</p>
+          <p class="d-label">What changed</p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Product selection automated via Salesforce config</li>
+            <li class="d-body" style="font-size: 12px;">• 21% drop-off at this step → eliminated</li>
+          </ul>
+        </div>
+
+        <div class="d-sticky-scroll__step" data-step="3">
+          <p class="d-mono">04</p>
+          <p class="d-headline d-headline--md">Health History</p>
+          <p class="d-mono d-text--subtle">Confirm, don't enter</p>
+          <p class="d-body">Two banners — personal records and health records — show the member what the system already knows. Height, weight, and health conditions pre-filled with blue dot indicators. Checkboxes animate in as the system populates them.</p>
+          <p class="d-label">What changed</p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Pre-filled from upstream health data</li>
+            <li class="d-body" style="font-size: 12px;">• Source attribution builds trust</li>
+          </ul>
+        </div>
+
+        <div class="d-sticky-scroll__step" data-step="4">
+          <p class="d-mono">05</p>
+          <p class="d-headline d-headline--md">Receiving Your Device</p>
+          <p class="d-mono d-text--subtle">Shipping from employer HR</p>
+          <p class="d-body">Kit preview shows what's coming. Shipping address cascades in from employer HR data — name, street, city, state, zip, each field filling with a blue dot pop animation. The member confirms or corrects.</p>
+          <p class="d-label">What changed</p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Address pre-filled from HR records</li>
+            <li class="d-body" style="font-size: 12px;">• Kit preview sets expectations</li>
+          </ul>
+        </div>
+
+        <div class="d-sticky-scroll__step" data-step="5">
+          <p class="d-mono">06</p>
+          <p class="d-headline d-headline--md">You're In!</p>
+          <p class="d-mono d-text--subtle">Completion as a beginning</p>
+          <p class="d-body">The final screen reframes enrollment as the start of a relationship, not the end of a form. Three concrete next steps — download the app, meet your coach, set up your kit — bridge the gap between registration and first use. This is where the activation metric lives.</p>
+          <p class="d-label">What changed</p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Onboarding framed as partnership, not completion</li>
+            <li class="d-body" style="font-size: 12px;">• Clear next steps drive activation</li>
+          </ul>
+        </div>
       </div>
     </div>
 
-    <!-- Step 3: Full width with narrative -->
-    <div class="anim-narrative">
-      <div class="anim-wrap">
-        <iframe src="/animations/reg/step3.html" loading="lazy" style="height: 560px;"></iframe>
-      </div>
-      <div class="anim-text">
-        <p class="d-headline d-headline--md">Program setup with pre-filled records</p>
-        <p class="d-body" style="margin-top: 12px;">The blue dots mark pre-filled fields — data sourced from health records and employer HR. The "From Your Records" accordion shows 7 fields the system already knows: diabetes type, diagnosis year, medications, exam dates.</p>
-        <p class="d-body">The member reviews and corrects. They don't re-enter. This single change addressed the 21% product selection drop-off — the system now makes program decisions automatically based on the client's Salesforce configuration.</p>
-      </div>
-    </div>
-
-    <!-- Step 4 + 5: Side by side -->
-    <div class="anim-grid">
-      <div class="anim-wrap anim-wrap--tall">
-        <iframe src="/animations/reg/step4.html" loading="lazy"></iframe>
-        <div class="anim-label"><strong>Step 4</strong> — Health history pre-filled from records. Blue dots show sourced data.</div>
-      </div>
-      <div class="anim-wrap">
-        <iframe src="/animations/reg/step5.html" loading="lazy"></iframe>
-        <div class="anim-label"><strong>Step 5</strong> — Shipping address from employer HR. Confirm, don't enter.</div>
-      </div>
-    </div>
-
-    <!-- Step 6: Full width with narrative -->
-    <div class="anim-narrative anim-narrative--reverse">
-      <div class="anim-wrap">
-        <iframe src="/animations/reg/step6.html" loading="lazy" style="height: 540px;"></iframe>
-      </div>
-      <div class="anim-text">
-        <p class="d-headline d-headline--md">Completion as a beginning</p>
-        <p class="d-body" style="margin-top: 12px;">The final screen reframes enrollment as the start of a relationship, not the end of a form. Three concrete next steps — download, meet your coach, set up your kit — bridge the gap between registration and first use.</p>
-        <p class="d-body">This is where the activation metric lives. Everything in the flow is designed to get the member to this screen with enough trust and context to take the next step on their own.</p>
-      </div>
-    </div>
-
-    <!-- Interactive CTA -->
-    <div class="interactive-cta">
+    <!-- Interactive CTA — after sticky scroll -->
+    <div class="interactive-cta" style="margin-top: 48px;">
       <div class="interactive-cta__content">
         <div class="interactive-cta__title">Walk the full flow yourself</div>
         <div class="interactive-cta__body">Both the original 9-step flow and the optimized 6-step flow are interactive prototypes. Use arrow keys to navigate each step.</div>
@@ -436,31 +460,96 @@
 </footer>
 
 <script src="/portfolio.js"></script>
+<!-- Sticky scroll: crossfade + sizing + lazy load -->
 <script>
-// Scroll-based section fading — fade sections fully scrolled off-screen
 (function() {
-  const sections = document.querySelectorAll('.d-section');
-  if (!sections.length) return;
+  var REG_W = 480, REG_H = 640;
+  var NAV_H = 27, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H;
 
-  let ticking = false;
-  function update() {
-    sections.forEach(section => {
-      const rect = section.getBoundingClientRect();
-      if (rect.bottom < 0) {
-        section.classList.add('faded');
-      } else {
-        section.classList.remove('faded');
+  var stickyReg = document.getElementById('stickyReg');
+  var layers = document.querySelectorAll('.d-sticky-scroll__layer');
+  var steps = document.querySelectorAll('.d-sticky-scroll__step');
+  var loaded = {};
+  var activeStep = 0;
+  var PAD = 36;
+
+  function sizeFrames() {
+    var frames = document.querySelectorAll('.d-anim-reg');
+    for (var i = 0; i < frames.length; i++) {
+      var layer = frames[i].parentElement;
+      var availW = layer.offsetWidth - PAD * 2;
+      var availH = layer.offsetHeight - PAD * 2;
+      var iframe = frames[i].querySelector('iframe');
+      var iW = iframe ? parseInt(iframe.style.width) || REG_W : REG_W;
+      var iH = iframe ? parseInt(iframe.style.height) || REG_H : REG_H;
+      var scale = Math.min(availW / iW, availH / iH);
+      frames[i].style.width = (iW * scale) + 'px';
+      frames[i].style.height = (iH * scale) + 'px';
+      if (iframe) {
+        iframe.style.transform = 'scale(' + scale + ')';
+        iframe.style.transformOrigin = 'top left';
       }
-    });
-    ticking = false;
+    }
   }
 
-  window.addEventListener('scroll', () => {
-    if (!ticking) {
-      requestAnimationFrame(update);
-      ticking = true;
+  function setStickyTop() {
+    if (stickyReg) stickyReg.style.top = CHROME + 'px';
+  }
+
+  function preloadIframe(index) {
+    if (loaded[index]) return;
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (iframe && iframe.dataset.src) {
+      loaded[index] = true;
+      iframe.src = iframe.dataset.src;
     }
-  });
+  }
+
+  function onScroll() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var closest = 0;
+    var minDist = Infinity;
+
+    for (var i = 0; i < steps.length; i++) {
+      var rect = steps[i].getBoundingClientRect();
+      var center = rect.top + rect.height / 2;
+      var dist = Math.abs(center - vcenter);
+      var fadeRange = rect.height * 0.4;
+      var opacity = dist < fadeRange ? 1 : Math.max(0.15, 1 - (dist - fadeRange) / (rect.height * 0.3));
+      steps[i].style.opacity = opacity;
+      if (dist < minDist) { minDist = dist; closest = i; }
+    }
+
+    // Preload all iframes when section is visible
+    if (stickyReg) {
+      var phoneRect = stickyReg.getBoundingClientRect();
+      var phoneCenter = phoneRect.top + phoneRect.height / 2;
+      var viewH = window.innerHeight - CHROME;
+      if (Math.abs(phoneCenter - vcenter) < viewH * 0.6) {
+        for (var k = 0; k < layers.length; k++) preloadIframe(k);
+      }
+    }
+
+    if (closest !== activeStep) {
+      activeStep = closest;
+      for (var j = 0; j < layers.length; j++) {
+        layers[j].classList.toggle('is-active', j === closest);
+      }
+    }
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(function() { onScroll(); ticking = false; });
+    }
+  }, { passive: true });
+
+  sizeFrames();
+  setStickyTop();
+  onScroll();
+  window.addEventListener('resize', function() { sizeFrames(); setStickyTop(); });
 })();
 </script>
 </body>
