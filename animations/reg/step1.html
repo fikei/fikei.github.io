@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 1 — Let's Get Started</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  body.embedded { padding: 0; }
+
+  .card {
+    width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+
+  /* Progress bar */
+  .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
+  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
+  .progress-label--dim { color: #bbb; }
+  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; width: 0; animation: progressFill 1s 0.3s ease forwards; }
+  @keyframes progressFill { to { width: 50%; } }
+
+  /* Content */
+  .content { padding: 32px 28px 28px; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
+  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
+
+  /* Welcome banner */
+  .welcome {
+    background: #faf8f5;
+    border: 1px solid #ede8e1;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.5s ease forwards;
+  }
+  .welcome-greeting { font-size: 15px; font-weight: 600; color: #2d2a26; margin-bottom: 8px; }
+  .welcome-body { font-size: 13px; color: #4a4540; line-height: 1.6; }
+  .welcome-body strong { font-weight: 700; }
+
+  /* Form fields */
+  .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .form-group { flex: 1; display: flex; flex-direction: column; }
+  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group label .req { color: #d32f2f; }
+  .form-input {
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #bbb;
+    background: #fff;
+    transition: border-color 0.3s, color 0.3s;
+  }
+  .form-input.typing { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+
+  .field-1 { opacity: 0; animation: fadeUp 0.4s 0.7s ease forwards; }
+  .field-2 { opacity: 0; animation: fadeUp 0.4s 0.85s ease forwards; }
+  .field-3 { opacity: 0; animation: fadeUp 0.4s 1.0s ease forwards; }
+
+  /* Name typing animation */
+  .fname { animation: typeFname 6s 2s ease infinite; }
+  .lname { animation: typeLname 6s 2.4s ease infinite; }
+  .dob { animation: typeDob 6s 2.8s ease infinite; }
+
+  @keyframes typeFname {
+    0%, 5% { color: #bbb; border-color: #ddd; box-shadow: none; }
+    8% { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+    15%, 100% { color: #333; border-color: #ddd; box-shadow: none; }
+  }
+  @keyframes typeLname {
+    0%, 8% { color: #bbb; border-color: #ddd; box-shadow: none; }
+    12% { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+    20%, 100% { color: #333; border-color: #ddd; box-shadow: none; }
+  }
+  @keyframes typeDob {
+    0%, 15% { color: #bbb; border-color: #ddd; box-shadow: none; }
+    20% { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+    28%, 100% { color: #333; border-color: #ddd; box-shadow: none; }
+  }
+
+  /* CTA button */
+  .cta {
+    width: 100%;
+    padding: 14px;
+    background: #1976D2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Roboto', sans-serif;
+    cursor: pointer;
+    margin-top: 8px;
+    opacity: 0;
+    animation: fadeUp 0.4s 1.2s ease forwards;
+  }
+
+  /* Privacy footer */
+  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0; animation: fadeUp 0.3s 1.4s ease forwards; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Full animation loop — fade out and restart */
+  .card {
+    animation: cardLoop 8s ease infinite;
+  }
+  @keyframes cardLoop {
+    0%, 5% { opacity: 0; transform: translateY(12px); }
+    10%, 85% { opacity: 1; transform: translateY(0); }
+    95%, 100% { opacity: 0; transform: translateY(-4px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="progress">
+    <span class="progress-label">Sign Up</span>
+    <div class="progress-bar"><div class="progress-fill"></div></div>
+    <span class="progress-label--dim">About You</span>
+    <div class="progress-bar"></div>
+    <span class="progress-label--dim">Welcome</span>
+  </div>
+
+  <div class="content">
+    <div class="title">Let's Get Started</div>
+    <div class="subtitle">We just need your name and date of birth to confirm your enrollment.</div>
+
+    <div class="welcome">
+      <div class="welcome-greeting">👋 Welcome to Livongo</div>
+      <div class="welcome-body"><strong>Pilot Trucking LLC</strong> has enrolled you in Livongo to help manage your diabetes. We'll confirm your eligibility with the information you provide.</div>
+    </div>
+
+    <div class="form-row field-1">
+      <div class="form-group">
+        <label>Legal First Name <span class="req">*</span></label>
+        <div class="form-input fname">First name</div>
+      </div>
+      <div class="form-group">
+        <label>Legal Last Name <span class="req">*</span></label>
+        <div class="form-input lname">Last name</div>
+      </div>
+    </div>
+
+    <div class="form-row field-2">
+      <div class="form-group">
+        <label>Date of Birth <span class="req">*</span></label>
+        <div class="form-input dob">MM / DD / YYYY</div>
+      </div>
+    </div>
+
+    <button class="cta field-3">Next: Create Account</button>
+  </div>
+
+  <div class="privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
+</div>
+
+</body>
+</html>

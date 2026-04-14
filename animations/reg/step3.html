@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 3 — Set Up Your Diabetes Program</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  .card {
+    width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    animation: cardLoop 12s ease infinite;
+  }
+  @keyframes cardLoop {
+    0%, 3% { opacity: 0; transform: translateY(12px); }
+    7%, 85% { opacity: 1; transform: translateY(0); }
+    95%, 100% { opacity: 0; transform: translateY(-4px); }
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
+  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
+  .progress-label--dim { color: #bbb; }
+  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; }
+  .fill-full { width: 100%; }
+  .fill-grow { width: 0; animation: grow 0.8s 0.4s ease forwards; }
+  @keyframes grow { to { width: 30%; } }
+
+  .content { padding: 32px 28px 28px; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
+  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
+
+  /* Program value card */
+  .value-card {
+    background: #faf8f5;
+    border: 1px solid #ede8e1;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.5s ease forwards;
+  }
+  .value-greeting { font-size: 15px; font-weight: 600; color: #2d2a26; margin-bottom: 8px; }
+  .value-body { font-size: 13px; color: #4a4540; line-height: 1.6; }
+
+  /* Radio question */
+  .question { font-size: 14px; font-weight: 500; color: #333; margin-bottom: 10px; }
+  .radio-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .radio-card {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .radio-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #ccc; flex-shrink: 0; }
+
+  .q1 { opacity: 0; animation: fadeUp 0.4s 0.8s ease forwards; }
+
+  /* Pre-filled selects */
+  .section-label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group { display: flex; flex-direction: column; margin-bottom: 14px; }
+  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-input {
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #333;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .prefill-dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; }
+
+  .sel-1 { opacity: 0; animation: fadeUp 0.4s 1.0s ease forwards; }
+  .sel-2 { opacity: 0; animation: fadeUp 0.4s 1.15s ease forwards; }
+
+  /* Dot animations — staggered reveal */
+  .dot-1 { animation: dotPop 0.3s 1.8s ease forwards; }
+  .dot-2 { animation: dotPop 0.3s 2.1s ease forwards; }
+  @keyframes dotPop {
+    from { opacity: 0; transform: scale(0); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* From Your Records accordion */
+  .records {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 8px;
+    opacity: 0;
+    animation: fadeUp 0.4s 1.4s ease forwards;
+  }
+  .records-header {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    background: #fff;
+  }
+  .records-badge {
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: auto;
+  }
+  .records-chevron { color: #999; font-size: 12px; transition: transform 0.3s; }
+  .records-body {
+    border-top: 1px solid #e0e0e0;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    animation: accordionOpen 0.5s 2.8s ease forwards;
+  }
+  @keyframes accordionOpen {
+    to { max-height: 260px; padding: 16px; }
+  }
+
+  .records-source { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 10px; }
+  .record-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .record-item:last-child { border-bottom: none; }
+  .record-label { color: #777; width: 110px; flex-shrink: 0; }
+  .record-value { flex: 1; font-weight: 500; color: #333; }
+  .record-edit { font-size: 11px; color: #1976D2; padding: 3px 10px; border: 1px solid #d0e3f8; border-radius: 5px; background: #f5f9ff; cursor: pointer; }
+
+  .cta {
+    width: 100%;
+    padding: 14px;
+    background: #1976D2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Roboto', sans-serif;
+    margin-top: 16px;
+    opacity: 0;
+    animation: fadeUp 0.4s 1.6s ease forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="progress">
+    <span class="progress-label">Sign Up</span>
+    <div class="progress-bar"><div class="progress-fill fill-full"></div></div>
+    <span class="progress-label">About You</span>
+    <div class="progress-bar"><div class="progress-fill fill-grow"></div></div>
+    <span class="progress-label--dim">Welcome</span>
+  </div>
+
+  <div class="content">
+    <div class="title">Set Up Your Diabetes Program</div>
+    <div class="subtitle">Tell us about your current monitoring routine. This helps us personalize your program from day one.</div>
+
+    <div class="value-card">
+      <div class="value-greeting">✨ A program made for you.</div>
+      <div class="value-body">Your coach will use these answers to create a plan that fits your schedule, your goals, and your routine — backed by a connected meter and unlimited strips.</div>
+    </div>
+
+    <div class="q1">
+      <div class="question">Do you use a Continuous Glucose Monitor (CGM)?</div>
+      <div class="radio-row">
+        <div class="radio-card"><div class="radio-dot"></div> Yes</div>
+        <div class="radio-card"><div class="radio-dot"></div> No</div>
+      </div>
+    </div>
+
+    <div class="form-group sel-1">
+      <label>How often do you check your blood sugar?</label>
+      <div class="form-input">
+        <span>2 times per day</span>
+        <div class="prefill-dot dot-1"></div>
+      </div>
+    </div>
+
+    <div class="form-group sel-2">
+      <label>How often does your doctor recommend?</label>
+      <div class="form-input">
+        <span>3 times per day</span>
+        <div class="prefill-dot dot-2"></div>
+      </div>
+    </div>
+
+    <div class="records">
+      <div class="records-header">
+        <span>📋 From Your Records</span>
+        <span class="records-badge">7 Found</span>
+        <span class="records-chevron">▸</span>
+      </div>
+      <div class="records-body">
+        <div class="records-source">🏥 Health Records</div>
+        <div class="record-item">
+          <span class="record-label">Diabetes Type</span>
+          <span class="record-value">Type 2</span>
+          <span class="record-edit">Edit</span>
+        </div>
+        <div class="record-item">
+          <span class="record-label">Diagnosed</span>
+          <span class="record-value">2019</span>
+          <span class="record-edit">Edit</span>
+        </div>
+        <div class="record-item">
+          <span class="record-label">Medications</span>
+          <span class="record-value">Oral Medications</span>
+          <span class="record-edit">Edit</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="cta">Next: Health History</button>
+  </div>
+</div>
+
+</body>
+</html>
