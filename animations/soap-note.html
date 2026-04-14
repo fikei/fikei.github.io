@@ -424,13 +424,11 @@
       barTime.textContent = m + ':' + s;
     }, 1000);
 
-    // After 3 seconds, swipe to SOAP note
+    // After 0.5 seconds, swipe to SOAP note
     setTimeout(function() {
       var container = document.getElementById('swipeContainer');
       var tabTranscript = document.getElementById('tabTranscript');
       var tabHealth = document.getElementById('tabHealth');
-      var dot1 = document.getElementById('dot1');
-      var dot2 = document.getElementById('dot2');
 
       container.classList.add('swiped');
       var recBar = document.getElementById('recBar');
@@ -442,14 +440,21 @@
       tabHealth.style.color = '#EEF8FE';
       tabHealth.style.fontWeight = '700';
       tabHealth.style.borderBottom = '2.5px solid #EEF8FE';
-      // Auto-scroll the SOAP note after swipe settles
+
+      // Auto-scroll the SOAP note after swipe settles — stops if user scrolls
       setTimeout(function() {
         var soapBody = document.querySelectorAll('.soap-body')[0];
         if (!soapBody) return;
+        soapBody.style.pointerEvents = 'auto';
+        soapBody.style.touchAction = 'auto';
         var totalScroll = soapBody.scrollHeight - soapBody.clientHeight;
-        var duration = 8000; // 8 seconds to scroll through
+        var duration = 8000;
         var start = null;
+        var userScrolled = false;
+        soapBody.addEventListener('wheel', function() { userScrolled = true; }, { passive: true });
+        soapBody.addEventListener('touchstart', function() { userScrolled = true; }, { passive: true });
         function scrollStep(timestamp) {
+          if (userScrolled) return;
           if (!start) start = timestamp;
           var progress = (timestamp - start) / duration;
           if (progress > 1) progress = 1;
@@ -458,8 +463,8 @@
           if (progress < 1) requestAnimationFrame(scrollStep);
         }
         requestAnimationFrame(scrollStep);
-      }, 1000);
-    }, 3000);
+      }, 800);
+    }, 500);
   }
 
   if (paused) {
