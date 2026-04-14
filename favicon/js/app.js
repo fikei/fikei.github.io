@@ -15,7 +15,7 @@ class FaviconApp {
     // DOM Elements
     this.elements = {
       // Mode tabs
-      modeTabs: document.querySelectorAll('.mode-tab'),
+      modeTabs: document.querySelectorAll('.mode-tabs .token'),
       modePanels: document.querySelectorAll('.mode-panel'),
 
       // AI form
@@ -99,8 +99,10 @@ class FaviconApp {
       tab.addEventListener('click', () => this.switchMode(tab.dataset.mode));
     });
 
-    // Theme toggle
-    this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+    // Theme toggle (removed from UI — managed in /account/ settings)
+    if (this.elements.themeToggle) {
+      this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+    }
 
     // AI form
     this.elements.aiForm.addEventListener('submit', (e) => this.handleAiGenerate(e));
@@ -157,7 +159,7 @@ class FaviconApp {
     this.currentMode = mode;
 
     this.elements.modeTabs.forEach(tab => {
-      tab.classList.toggle('active', tab.dataset.mode === mode);
+      tab.classList.toggle('token--active', tab.dataset.mode === mode);
     });
 
     this.elements.modePanels.forEach(panel => {
