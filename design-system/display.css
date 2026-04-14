@@ -31,8 +31,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 27px;
-  padding: 0 clamp(20px, 5vw, 64px);
+  padding: 16px 36px;
   background: var(--bg, #111110);
   border-bottom: 1px solid var(--border-subtle, #33332f);
 }
