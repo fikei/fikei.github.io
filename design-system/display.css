@@ -63,6 +63,47 @@
   color: var(--fg, #e8e6e3);
 }
 
+/* Nav accordion — Case Studies expandable group */
+.d-nav__group {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.d-nav__group-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--fg, #e8e6e3);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.d-nav__group-items {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 25px;
+  list-style: none;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  padding-inline: 0;
+  transition: max-width 0.3s ease, opacity 0.2s ease, padding-inline 0.3s ease;
+}
+
+.d-nav__group--expanded .d-nav__group-items {
+  max-width: 300px;
+  opacity: 1;
+  padding-inline: 25px;
+}
+
+.d-nav__group-items .d-nav__link {
+  white-space: nowrap;
+}
+
 /* Sub-nav */
 .d-subnav {
   position: sticky;
@@ -180,7 +221,9 @@
   background: var(--border-subtle, #33332f);
 }
 
-@media (max-width: 768px) { .d-cards { grid-template-columns: 1fr; } }
+.d-cards--2 { grid-template-columns: repeat(2, 1fr); }
+
+@media (max-width: 768px) { .d-cards, .d-cards--2 { grid-template-columns: 1fr; } }
 
 .d-card {
   display: flex;
