@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field — SOAP Note Animation</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A0A0A; font-family: "Inter", system-ui, sans-serif; display: flex; gap: 40px; padding: 60px; justify-content: center; -webkit-font-smoothing: antialiased; }
+  body.embedded { padding: 0; background: transparent; }
+  body.embedded .phone__label { display: none; }
+
+  /* Mobile scaling — only standalone */
+  @media (max-width: 480px) {
+    body:not(.embedded) { padding: 24px 0; }
+    body:not(.embedded) .phone { transform: scale(0.85); transform-origin: top center; }
+  }
+
+  .phone { width: 402px; background: #1C1C1E; border-radius: 48px; padding: 6px; flex-shrink: 0; }
+  .phone-inner { border-radius: 42px; overflow: hidden; position: relative; width: 390px; height: 844px; }
+  .phone__label { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666560; margin-top: 16px; }
+
+  /* Swipe container — holds both screens side by side */
+  .swipe-container {
+    width: 780px; /* 2 × 390 */
+    height: 844px;
+    display: flex;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .swipe-container.swiped { transform: translateX(-390px); }
+
+  .screen { width: 390px; height: 844px; background: #0A0A0A; flex-shrink: 0; overflow: hidden; position: relative; }
+
+  /* ===== SHARED HEADER (stays fixed during swipe) ===== */
+  .fixed-header {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    background: #0A0A0A;
+  }
+
+  /* Tab styles */
+  .tabs { display: flex; border-bottom: 1px solid #1C1C1E; background: #0A0A0A; }
+  .tab { padding: 10px 16px; font-size: 12px; letter-spacing: 0.3px; color: #9E97B1; cursor: pointer; transition: color 0.3s; }
+  .tab--active { color: #EEF8FE; font-weight: 700; border-bottom: 2.5px solid #EEF8FE; }
+
+  /* ===== TRANSCRIPT SCREEN (last frame) ===== */
+  .ts-body { padding: 120px 0 90px; overflow-y: auto; height: 844px; }
+  .ts-body::-webkit-scrollbar { display: none; }
+
+  .msg { display: flex; gap: 10px; padding: 16px 20px 0; }
+  .msg-left { display: flex; align-items: center; gap: 5px; flex-shrink: 0; height: 21px; }
+  .msg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .msg-speaker { font-size: 10px; font-weight: 700; width: 22px; flex-shrink: 0; line-height: 21px; }
+  .msg-text { color: #EEF8FE; font-size: 14px; line-height: 1.5; flex: 1; }
+  .msg-content { flex: 1; min-width: 0; }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; background: #111112; border: 1px solid #2C2C2E; border-radius: 8px; padding: 6px 10px; margin-top: 8px; width: fit-content; }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; flex-shrink: 0; }
+  .badge-text { color: #A79EAF; font-size: 11px; font-weight: 500; line-height: 14px; }
+
+  /* Extraction card (open state) */
+  .extract-card { background: #111112; border: 1px solid #2C2C2E; border-radius: 10px; margin-top: 8px; overflow: hidden; }
+  .extract-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #2C2C2E; }
+  .extract-header-left { display: flex; align-items: center; gap: 6px; }
+  .extract-header-dot { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; }
+  .extract-header-text { color: #A79EAF; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-chevron { color: #3A3A3C; font-size: 12px; transform: rotate(180deg); }
+  .extract-field { padding: 10px 12px; }
+  .extract-field-label { color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-field-value { color: #EBEBF5; font-size: 13px; line-height: 1.45; margin-top: 4px; }
+
+  .typing { display: flex; gap: 10px; padding: 16px 20px 0; align-items: center; }
+  .typing-left { display: flex; gap: 5px; align-items: center; }
+  .typing-dots { display: flex; gap: 4px; }
+  .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; }
+  .typing-dots span:nth-child(1) { animation: dotPulse 1s infinite 0s; }
+  .typing-dots span:nth-child(2) { animation: dotPulse 1s infinite 0.15s; }
+  .typing-dots span:nth-child(3) { animation: dotPulse 1s infinite 0.3s; }
+
+  .rec-bar { position: absolute; bottom: 28px; left: 16px; right: 16px; height: 52px; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 10; }
+  .rec-bar-left { display: flex; align-items: center; gap: 10px; }
+  .rec-bar-dot { width: 8px; height: 8px; border-radius: 50%; background: #FF3B30; animation: pulse 1.5s infinite; }
+  .rec-bar-label { color: #fff; font-size: 12px; font-weight: 600; }
+  .rec-bar-time { color: #636366; font-size: 11px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .rec-bar-stop { width: 36px; height: 36px; border-radius: 50%; background: #2C2C2E; border: 1.5px solid #3A3A3C; display: flex; align-items: center; justify-content: center; }
+  .rec-bar-stop-inner { width: 13px; height: 13px; border-radius: 3px; background: #FF3B30; }
+
+  /* ===== SOAP NOTE SCREEN ===== */
+  .soap-body { padding: 134px 16px 90px; overflow-y: auto; height: 844px; display: flex; flex-direction: column; gap: 12px; }
+  .soap-body::-webkit-scrollbar { display: none; }
+
+  .soap-card { background: #111112; border-radius: 12px; padding: 14px 16px; }
+  .soap-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 6px; }
+  .soap-card-title { color: #7D788B; font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
+  .soap-counter { background: #222; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 600; color: #9E97B1; }
+  .soap-counter--green { background: #263027; color: #31B23C; }
+  .soap-counter--dim { color: #616161; }
+
+  .soap-bullet { display: flex; gap: 8px; padding-left: 6px; }
+  .soap-bullet-dot { color: #6B6877; font-size: 13px; margin-top: 1px; }
+  .soap-bullet-text { color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5; }
+  .soap-bullet-text--dim { color: #A79EAF; font-weight: 400; }
+
+  .soap-divider { border-top: 1px solid #232323; margin: 16px 0 8px; }
+  .soap-footer { display: flex; align-items: center; gap: 6px; padding: 6px 6px 0; }
+  .soap-footer-text { color: #9E97B1; font-size: 11px; font-weight: 500; opacity: 0.8; }
+  .soap-footer-btn { background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; color: #9E97B1; margin-left: auto; }
+
+  .soap-warn { display: flex; align-items: center; gap: 8px; background: #F9CE861F; border-radius: 8px; padding: 10px; margin-top: 16px; }
+  .soap-warn-icon { color: #F9CE86; font-size: 13px; }
+  .soap-warn-label { color: #F9CE86; font-size: 12px; font-weight: 500; }
+  .soap-warn-text { color: #F9CE86; font-size: 12px; font-weight: 300; }
+  .soap-warn-review { background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; color: #9E97B1; margin-left: auto; }
+
+  /* Vitals table */
+  .vitals-table { border-radius: 8px; overflow: hidden; margin-top: 8px; }
+  .vitals-header { display: flex; background: #1C1C1C; padding: 8px; }
+  .vitals-header span { flex: 1; text-align: center; color: #B0B0B0; font-size: 11px; font-weight: 600; }
+  .vitals-header span:first-child { flex-shrink: 0; width: 35px; text-align: left; }
+  .vitals-row { display: flex; align-items: center; padding: 3px 8px; min-height: 48px; }
+  .vitals-row:nth-child(odd) { background: #101010; }
+  .vitals-row:nth-child(even) { background: #1A1A1B; }
+  .vitals-row-time { flex-shrink: 0; width: 30px; color: #B0B0B0; font-size: 11px; }
+  .vitals-row-cells { display: flex; gap: 6px; flex: 1; }
+  .vital-cell { flex: 1; border-radius: 8px; padding: 8px; text-align: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vital-cell--normal { background: #101010; color: #AAA; }
+  .vital-cell--red { background: #411B1F; color: #FE1844; }
+  .vital-cell--amber { background: #363430; color: #F9CE86; }
+  .vital-cell--empty { color: rgba(255,255,255,0.2); font-family: monospace; font-size: 17px; }
+
+  .vitals-reminder { display: flex; align-items: center; gap: 8px; background: rgba(75,158,255,0.12); border-radius: 8px; padding: 10px; margin-bottom: 16px; }
+  .vitals-reminder-text { color: #4B9EFF; font-size: 12px; font-weight: 500; }
+
+  /* Swipe indicator */
+  .swipe-hint { position: absolute; bottom: 90px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; z-index: 5; opacity: 0; transition: opacity 0.5s; }
+  .swipe-hint.show { opacity: 1; }
+  .swipe-dot { width: 6px; height: 6px; border-radius: 50%; background: #3A3A3C; transition: background 0.3s; }
+  .swipe-dot--active { background: #EEF8FE; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes dotPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.8; } }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="phone">
+    <div class="phone-inner">
+
+      <!-- Fixed header (persists across swipe) -->
+      <div class="fixed-header">
+        <div style="padding: 14px 20px 0; color: #E6E1E5; font-size: 15px; font-weight: 600;">9:41</div>
+        <div style="display: flex; align-items: center; padding: 12px 16px; gap: 16px;">
+          <span style="color: #CAC4D0; font-size: 20px; width: 18px;">←</span>
+          <div>
+            <div style="color: #A79EAF; font-size: 14px;">INC-2024-0847</div>
+            <div style="color: #A79EAF; font-size: 11px; font-weight: 500;">Apr 2, 2026</div>
+          </div>
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 5px; background: #DF1B41; border-radius: 20px; padding: 4px 11px; height: 22px;">
+            <div style="width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: pulse 1.5s infinite;"></div>
+            <span id="headerTime" style="color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;">07:24</span>
+          </div>
+        </div>
+        <div class="tabs">
+          <div class="tab" id="tabTranscript" style="color: #EEF8FE; font-weight: 700; border-bottom: 2.5px solid #EEF8FE;">Transcript</div>
+          <div class="tab" id="tabHealth">Health Record</div>
+          <div class="tab" id="tabHandoff">Handoff</div>
+        </div>
+      </div>
+
+      <!-- Swipe container -->
+      <div class="swipe-container" id="swipeContainer">
+
+        <!-- SCREEN 1: Transcript (last frame — fully populated) -->
+        <div class="screen">
+          <div class="ts-body" style="padding-top: 130px;">
+            <div style="display: flex; justify-content: center; gap: 6px; padding: 16px 0 4px; color: #6B6877; font-size: 12px;">Start of Interaction · 9:37</div>
+
+            <div class="msg">
+              <div class="msg-left"><div class="msg-dot" style="background:#00A480;"></div><div class="msg-speaker" style="color:#00A480;">IF</div></div>
+              <div class="msg-text">What's your name and how old are you?</div>
+            </div>
+
+            <div class="msg">
+              <div class="msg-left"><div class="msg-dot" style="background:#F9CE86;"></div><div class="msg-speaker" style="color:#F9CE86;">MC</div></div>
+              <div class="msg-content">
+                <div class="msg-text">Marcus Chen, 28. Fell about fifteen feet off the south face.</div>
+                <div class="badge"><div class="badge-dot"></div><span class="badge-text">Added: Name, Age, MOI</span></div>
+              </div>
+            </div>
+
+            <div class="msg">
+              <div class="msg-left"><div class="msg-dot" style="background:#00A480;"></div><div class="msg-speaker" style="color:#00A480;">IF</div></div>
+              <div class="msg-text">Any loss of consciousness? Pain anywhere besides your ankle?</div>
+            </div>
+
+            <div class="msg">
+              <div class="msg-left"><div class="msg-dot" style="background:#F9CE86;"></div><div class="msg-speaker" style="color:#F9CE86;">MC</div></div>
+              <div class="msg-content">
+                <div class="msg-text">No, awake the whole time. Left ankle and lower back.</div>
+                <div class="extract-card">
+                  <div class="extract-header"><div class="extract-header-left"><div class="extract-header-dot"></div><span class="extract-header-text">Added: Chief Complaint, Traumas, +2</span></div><span class="extract-chevron">∧</span></div>
+                  <div class="extract-field"><div class="extract-field-label">SUBJECTIVE · CHIEF COMPLAINT</div><div class="extract-field-value">Fall from ~15ft while rock climbing. L ankle pain, lower back pain.</div></div>
+                  <div class="extract-field"><div class="extract-field-label">OBJECTIVE · TRAUMA</div><div class="extract-field-value">Patient reported no head impact.</div></div>
+                  <div class="extract-field"><div class="extract-field-label">OBJECTIVE · LEGS</div><div class="extract-field-value">Patient reported ankle pain.</div></div>
+                  <div class="extract-field"><div class="extract-field-label">OBJECTIVE · BACK</div><div class="extract-field-value">Patient reported lower back pain.</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg">
+              <div class="msg-left"><div class="msg-dot" style="background:#F9CE86;"></div><div class="msg-speaker" style="color:#F9CE86;">MC</div></div>
+              <div class="msg-content">
+                <div class="msg-text">Allergic to penicillin. No other meds.</div>
+                <div class="badge"><div class="badge-dot"></div><span class="badge-text">Added: Allergies, Medications</span></div>
+              </div>
+            </div>
+
+            <div class="typing">
+              <div class="typing-left"><div class="msg-dot" style="background:#3A3A3C;"></div><div class="msg-speaker" style="color:#3A3A3C; width:22px;">IF</div></div>
+              <div class="typing-dots"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 2: SOAP Note (from Paper JFT-0) -->
+        <div class="screen">
+          <div class="soap-body">
+            <!-- Subjective -->
+            <div class="soap-card">
+              <div class="soap-card-header">
+                <span class="soap-card-title">Subjective</span>
+                <span class="soap-counter">8/8</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+                <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Fall from 15ft onto rock slab</div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text soap-bullet-text--dim">MOI: Height impact onto rock surface</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text soap-bullet-text--dim">Activity: rock climbing</span></div>
+              </div>
+              <div class="soap-divider"></div>
+              <div class="soap-footer">
+                <span class="soap-footer-text">All Fields Complete</span>
+                <span class="soap-footer-btn">Edit</span>
+              </div>
+            </div>
+
+            <!-- Objective -->
+            <div class="soap-card">
+              <div class="soap-card-header">
+                <span class="soap-card-title">Objective</span>
+                <span class="soap-counter">8/8</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+                <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">PHYSICAL EXAM</div>
+                <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Injury to Left Leg & Back</div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Legs: Left Ankle Swollen, Heard Pop</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Back: Tenderness in Mid Back</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text soap-bullet-text--dim">No injuries to neck, head, torso or arms</span></div>
+                <div style="border-top: 1px solid #232323; margin: 6px 0;"></div>
+                <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">MEDICAL HISTORY</div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text soap-bullet-text--dim">Allergies: Penicillin</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text soap-bullet-text--dim">Medications: None reported</span></div>
+              </div>
+              <div class="soap-divider"></div>
+              <div style="display: flex; align-items: center; gap: 6px; padding: 6px 6px 0;">
+                <span style="color: #F9CE86; font-size: 13px;">⚠</span>
+                <span style="color: #F9CE86; font-size: 11px; font-weight: 500;">3 Fields Need Review</span>
+                <span style="flex: 1;"></span>
+                <span class="soap-warn-review">Review</span>
+              </div>
+            </div>
+
+            <!-- Vitals -->
+            <div class="soap-card">
+              <div class="soap-card-header">
+                <span class="soap-card-title">Vitals</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #F9CE86; font-size: 12px;">⚠</span>
+                  <span style="color: #F9CE86; font-size: 11px; font-weight: 500;">3:52 Remaining</span>
+                </div>
+              </div>
+              <div class="vitals-table">
+                <div class="vitals-header">
+                  <span style="width:35px; text-align:left;">Time</span>
+                  <span>LOR</span><span>HR</span><span>RR</span><span>SCTM</span><span style="width:48px;">Pulse</span>
+                </div>
+                <div class="vitals-row">
+                  <span class="vitals-row-time">9:38</span>
+                  <div class="vitals-row-cells">
+                    <div class="vital-cell vital-cell--normal">AO4</div>
+                    <div class="vital-cell vital-cell--red">142</div>
+                    <div class="vital-cell vital-cell--amber">22</div>
+                    <div class="vital-cell vital-cell--normal">PWD</div>
+                    <div class="vital-cell vital-cell--normal">S</div>
+                  </div>
+                </div>
+                <div class="vitals-row">
+                  <span class="vitals-row-time">9:53</span>
+                  <div class="vitals-row-cells">
+                    <div class="vital-cell vital-cell--normal">AO4</div>
+                    <div class="vital-cell vital-cell--amber">131</div>
+                    <div class="vital-cell vital-cell--amber">18</div>
+                    <div class="vital-cell vital-cell--normal">PWD</div>
+                    <div class="vital-cell vital-cell--normal">S</div>
+                  </div>
+                </div>
+                <div class="vitals-row">
+                  <span class="vitals-row-time">Now</span>
+                  <div class="vitals-row-cells">
+                    <div class="vital-cell vital-cell--empty">-</div>
+                    <div class="vital-cell vital-cell--empty">-</div>
+                    <div class="vital-cell vital-cell--empty">-</div>
+                    <div class="vital-cell vital-cell--empty">-</div>
+                    <div class="vital-cell vital-cell--empty">-</div>
+                  </div>
+                </div>
+              </div>
+              <div class="soap-divider"></div>
+              <div style="display: flex; align-items: center; padding: 8px 0;">
+                <div style="background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: flex; align-items: center; flex: 1; justify-content: center;">
+                  <span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Add Vitals</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Assessment -->
+            <div class="soap-card">
+              <div class="soap-card-header">
+                <span class="soap-card-title">Assessment</span>
+                <span class="soap-counter soap-counter--dim">3/4</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+                <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">CONCERNS</div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Acute ankle pain</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Lumbar pain</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text soap-bullet-text--dim">DDx: Ankle sprain, lumbar disc herniation</span></div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; padding: 16px 0 0;">
+                <span style="color: #F9CE86; font-size: 11px;">⚠</span>
+                <span style="color: #F9CE86; font-size: 12px; font-weight: 500;">Watch for:</span>
+                <span style="color: #F9CE86; font-size: 12px; font-weight: 300;">increased pain, reduced LOR</span>
+              </div>
+              <div class="soap-divider"></div>
+              <div style="display: flex; align-items: center; gap: 6px; padding: 6px 0;">
+                <span style="color: #F9CE86; font-size: 13px;">⚠</span>
+                <span style="color: #F9CE86; font-size: 11px; font-weight: 500;">1 Field Missing</span>
+                <span style="flex: 1;"></span>
+                <span class="soap-footer-btn">Edit</span>
+              </div>
+            </div>
+
+            <!-- Plan -->
+            <div class="soap-card">
+              <div class="soap-card-header">
+                <span class="soap-card-title">Plan</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+                <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 12px;">TREATMENT</div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Splint Left Ankle</span></div>
+                <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Ibuprofen 400 mg</span></div>
+                <div style="border-top: 1px solid #232323; margin: 6px 0;"></div>
+                <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 12px;">EVACUATION</div>
+                <div style="color: #B0B0B0; font-size: 11px; font-weight: 500; padding: 4px 0;">Add Evacuation Plan</div>
+              </div>
+              <div class="soap-divider"></div>
+              <div style="display: flex; align-items: center; gap: 6px; padding: 6px 0;">
+                <span style="color: #F9CE86; font-size: 13px;">⚠</span>
+                <span style="color: #F9CE86; font-size: 11px; font-weight: 500;">3 Fields Need Review</span>
+                <span style="flex: 1;"></span>
+                <span class="soap-warn-review">Review</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /swipe-container -->
+
+
+      <!-- Recording bar — animates out on swipe -->
+      <div class="rec-bar" id="recBar" style="transition: opacity 0.4s, transform 0.4s;">
+        <div class="rec-bar-left">
+          <div class="rec-bar-dot"></div>
+          <div>
+            <div class="rec-bar-label">Recording</div>
+            <div class="rec-bar-time" id="barTime">07:24</div>
+          </div>
+        </div>
+        <div class="rec-bar-stop"><div class="rec-bar-stop-inner"></div></div>
+      </div>
+
+    </div>
+  </div>
+  <p class="phone__label">02 — Clinical Report, Not Form Fields</p>
+</div>
+
+<script>
+(function() {
+  var headerTime = document.getElementById('headerTime');
+  var barTime = document.getElementById('barTime');
+  var startSeconds = 444; // 07:24
+  var currentSeconds = startSeconds;
+
+  var paused = window.location.search.indexOf('paused') > -1;
+  if (paused) document.body.classList.add('embedded');
+
+  var timerStarted = false;
+
+  function startAnimation() {
+    if (timerStarted) return;
+    timerStarted = true;
+
+    // Timer
+    setInterval(function() {
+      currentSeconds++;
+      var m = String(Math.floor(currentSeconds / 60)).padStart(2, '0');
+      var s = String(currentSeconds % 60).padStart(2, '0');
+      headerTime.textContent = m + ':' + s;
+      barTime.textContent = m + ':' + s;
+    }, 1000);
+
+    // After 3 seconds, swipe to SOAP note
+    setTimeout(function() {
+      var container = document.getElementById('swipeContainer');
+      var tabTranscript = document.getElementById('tabTranscript');
+      var tabHealth = document.getElementById('tabHealth');
+      var dot1 = document.getElementById('dot1');
+      var dot2 = document.getElementById('dot2');
+
+      container.classList.add('swiped');
+      var recBar = document.getElementById('recBar');
+      recBar.style.opacity = '0';
+      recBar.style.transform = 'translateY(20px)';
+      tabTranscript.style.color = '#9E97B1';
+      tabTranscript.style.fontWeight = '400';
+      tabTranscript.style.borderBottom = 'none';
+      tabHealth.style.color = '#EEF8FE';
+      tabHealth.style.fontWeight = '700';
+      tabHealth.style.borderBottom = '2.5px solid #EEF8FE';
+      // Auto-scroll the SOAP note after swipe settles
+      setTimeout(function() {
+        var soapBody = document.querySelectorAll('.soap-body')[0];
+        if (!soapBody) return;
+        var totalScroll = soapBody.scrollHeight - soapBody.clientHeight;
+        var duration = 8000; // 8 seconds to scroll through
+        var start = null;
+        function scrollStep(timestamp) {
+          if (!start) start = timestamp;
+          var progress = (timestamp - start) / duration;
+          if (progress > 1) progress = 1;
+          var ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+          soapBody.scrollTop = ease * totalScroll;
+          if (progress < 1) requestAnimationFrame(scrollStep);
+        }
+        requestAnimationFrame(scrollStep);
+      }, 1000);
+    }, 3000);
+  }
+
+  if (paused) {
+    window.addEventListener('message', function(e) {
+      if (e.data === 'start') startAnimation();
+    });
+  } else {
+    startAnimation();
+  }
+})();
+</script>
+
+</body>
+</html>
