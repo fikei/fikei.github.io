@@ -294,8 +294,9 @@
     // Zone 2 (typing): (250, 1050)
     // Zone 3 (msgs):   (250, 1750)
 
-    // ═══ BEAT 1: Tight on rec bar, tap stop button (0→2.5s) ═══
-    centerOn(250, 250, 3.0, 0.01);
+    // ═══ BEAT 1: Rec bar fully visible, tap stop button (0→2.5s) ═══
+    // Bar is 320px wide. At 1.4× zoom, visible = 357px — bar fits with breathing room.
+    centerOn(250, 250, 1.4, 0.01);
     setTimeout(function() { document.getElementById('tapRipple').classList.add('animate'); }, 600);
 
     // ═══ BEAT 2: Pan to typing — slower pan, fade in/out (2.5→5.5s) ═══
