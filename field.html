@@ -49,7 +49,7 @@
     <div style="flex: 1;">
       <span class="d-status d-status--dev">Beta</span>
       <p class="d-headline d-headline--xl" style="margin-top: 12px;">Field</p>
-      <p class="d-body" style="margin-top: 12px;">An app that turns spoken conversation into structured medical notes — built for first responders who can't stop treating a patient to write things down.</p>
+      <p class="d-body" style="margin-top: 12px;">Turning the voices of a complex on-scene interactions into structured medical notes - all offline.</p>
 
       <dl class="d-overview" style="margin-top: 24px;">
         <dt>Role</dt>
@@ -111,19 +111,25 @@
       <div class="d-flow__step">
         <span class="d-flow__step-num">02</span>
         <span class="d-flow__step-label">Transcribe</span>
-        <span class="d-flow__step-desc">Whisper, on-device</span>
+        <span class="d-flow__step-desc">MedASR Fine-Tuned, on-device</span>
       </div>
       <span class="d-flow__arrow">→</span>
       <div class="d-flow__step">
         <span class="d-flow__step-num">03</span>
-        <span class="d-flow__step-label">Extract &amp; Review</span>
-        <span class="d-flow__step-desc">Llama sorts into SOAP</span>
+        <span class="d-flow__step-label">Extract</span>
+        <span class="d-flow__step-desc">Llama formats into compliant data</span>
       </div>
       <span class="d-flow__arrow">→</span>
       <div class="d-flow__step">
         <span class="d-flow__step-num">04</span>
+        <span class="d-flow__step-label">Review &amp; Refine</span>
+        <span class="d-flow__step-desc">Update fields with low confidence</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">05</span>
         <span class="d-flow__step-label">Hand off</span>
-        <span class="d-flow__step-desc">Wallet, satellite, clipboard</span>
+        <span class="d-flow__step-desc">Offline record transfer</span>
       </div>
     </div>
   </div>
@@ -160,9 +166,9 @@
         <!-- Step 0 -->
         <div class="d-sticky-scroll__step is-active" data-step="0">
           <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Dictation to Trusted Data</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Dictation</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Keep treating, the note writes itself</p>
-          <p class="d-body" style="margin-top: 12px;">The provider talks to the patient. The app listens, identifies and organizes info compliant medical data in real time — all without touching the screen.</p>
+          <p class="d-body" style="margin-top: 12px;">The provider talks to the patient. The app listens, identifies and organizes into compliant medical data in real time — all without touching the screen.</p>
           <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
           <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I can...</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
@@ -174,8 +180,8 @@
         <!-- Step 1 -->
         <div class="d-sticky-scroll__step" data-step="1">
           <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Clinical Report, Not Form Fields</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">See your SOAP as you work</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Clinical Report</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">See a SOAP note as you work</p>
           <p class="d-body" style="margin-top: 12px;">A SOAP note, the standard format of capturing patient information, builds itself as the encounter unfolds. Completion counters show progress per section. Stoplight warnings flag values that need confirmation before handoff.</p>
           <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
           <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
@@ -189,9 +195,9 @@
         <!-- Step 2 -->
         <div class="d-sticky-scroll__step" data-step="2">
           <p class="d-mono" style="color: var(--fg-subtle, #666560);">03</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">One Handed Entry</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Your other hand is on the patient</p>
-          <p class="d-body" style="margin-top: 12px;">Capture vitals with cold hands, bad light, divided attention. Uses large preset chips and ±1/±10 buttons. No keyboard, no precision tapping.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Manual Entry</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Always one hand on the patient</p>
+          <p class="d-body" style="margin-top: 12px;">Sometimes, data needs to be entered by hand. Capture vitals with cold hands, bad light, divided attention. No keyboard, no precision tapping.</p>
           <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
           <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
@@ -205,7 +211,7 @@
           <p class="d-mono" style="color: var(--fg-subtle, #666560);">04</p>
           <p class="d-headline d-headline--md" style="margin-top: 4px;">Offline Care Transfer</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Continuity of care in a single tap</p>
-          <p class="d-body" style="margin-top: 12px;">When the patient is transferred, the critical information goes with them — even offline. An automated clinical summary can be sent via Apple Wallet, satellite, or SMS. The receiving team gets the whole case — not a phone call from memory.</p>
+          <p class="d-body" style="margin-top: 12px;">When the patient is transferred, the critical information goes with them — even offline. An anonymized clinical summary can be sent via Apple Wallet, satellite, or SMS. The receiving team gets the whole case — not a phone call from memory.</p>
           <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
           <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">

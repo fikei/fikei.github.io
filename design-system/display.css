@@ -576,6 +576,7 @@
   height: calc(100vh - 81px);
   background: #0E0E0D;
   overflow: hidden;
+  opacity: 1;
   /* Bleed to left edge of page */
   width: calc(100% + var(--gutter-page, clamp(20px, 5vw, 64px)));
   margin-left: calc(-1 * var(--gutter-page, clamp(20px, 5vw, 64px)));
