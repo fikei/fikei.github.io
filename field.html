@@ -362,16 +362,30 @@
 
   var layersBox = document.querySelector('.d-sticky-scroll__layers');
 
-  // Trigger iframe on first activation
-  function triggerIframe(index) {
-    if (started[index]) return;
+  var loaded = {}; // track which iframes have been loaded (src set)
+
+  // Preload iframe (set src from data-src) without starting animation
+  function preloadIframe(index) {
+    if (loaded[index]) return;
     var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
     if (iframe && iframe.dataset.src) {
-      started[index] = true;
+      loaded[index] = true;
       iframe.src = iframe.dataset.src;
-      iframe.addEventListener('load', function() {
-        setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
-      });
+    }
+  }
+
+  // Start animation on iframe that's already loaded
+  function triggerIframe(index) {
+    if (started[index]) return;
+    started[index] = true;
+    preloadIframe(index); // ensure loaded
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (!iframe) return;
+    function send() { iframe.contentWindow.postMessage('start', '*'); }
+    if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+      send();
+    } else {
+      iframe.addEventListener('load', send);
     }
   }
 
@@ -403,6 +417,10 @@
       var viewH = window.innerHeight - CHROME;
       isVisible = distFromCenter < viewH * 0.6;
       layersBox.classList.toggle('is-visible', isVisible);
+      // Preload all iframes when section becomes visible
+      if (isVisible) {
+        for (var k = 0; k < layers.length; k++) preloadIframe(k);
+      }
     }
 
     // Toggle active layer (crossfade) — only trigger animation when visible
