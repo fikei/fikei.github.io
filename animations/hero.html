@@ -217,11 +217,6 @@
     <!-- Zone 3: Messages — center (250, 1750) -->
     <div class="zone zone--3">
       <div class="msgs">
-        <div class="msg" id="msg1">
-          <div class="msg-dot msg-dot--if"></div>
-          <div class="msg-speaker msg-speaker--if">IF</div>
-          <div><div class="msg-text">Can you tell me what happened?</div></div>
-        </div>
         <div class="msg" id="msg2">
           <div class="msg-dot msg-dot--mc"></div>
           <div class="msg-speaker msg-speaker--mc">MC</div>
@@ -313,7 +308,6 @@
     setTimeout(function() { document.getElementById('typingEl').style.opacity = '0'; }, 5200);
 
     // ═══ BEAT 3: Pan to messages at 1.2× (5.5→9s) ═══
-    setTimeout(function() { document.getElementById('msg1').classList.add('show'); }, 5400);
     setTimeout(function() { document.getElementById('msg2').classList.add('show'); }, 5600);
     setTimeout(function() { centerOn(250, 1750, 1.2, 0.8); }, 5500);
 
@@ -325,10 +319,6 @@
     setTimeout(function() {
       document.getElementById('badge1').style.display = 'none';
       document.getElementById('card1').classList.add('open');
-      // Fade out the IF message
-      var m1 = document.getElementById('msg1');
-      m1.style.transition = 'opacity 0.4s ease';
-      m1.style.opacity = '0';
       centerOn(250, 1790, 1.2, 0.6);
     }, 9000);
 
