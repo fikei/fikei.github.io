@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Livongo Config — Ian Fike</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../design-system/tokens.css">
+  <link rel="stylesheet" href="../design-system/components.css">
+  <link rel="stylesheet" href="../design-system/display.css">
+</head>
+<body class="d-page">
+
+<nav class="d-nav">
+  <a href="./" class="d-nav__name">Ian Fike</a>
+  <ul class="d-nav__links">
+    <li><a href="./field.html" class="d-nav__link">Field</a></li>
+    <li><a href="./invoy.html" class="d-nav__link">Invoy</a></li>
+    <li><a href="./livongo.html" class="d-nav__link d-nav__link--active">Livongo</a></li>
+    <li><a href="./philosophy.html" class="d-nav__link">How I Work</a></li>
+  </ul>
+</nav>
+
+<div class="d-subnav">
+  <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
+  <a href="#deliverable" class="d-subnav__link">Deliverable</a>
+  <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#impact" class="d-subnav__link">Impact</a>
+</div>
+
+<div class="d-contain">
+
+  <!-- Header + Overview -->
+  <div style="padding: 48px 0 0;">
+    <span class="d-status d-status--shipped">Shipped</span>
+    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Livongo Config</p>
+    <p class="d-body" style="margin-top: 12px;">Livongo sold 5 health programs in dozens of combinations. Each combination changed which fields a member saw during registration. The rules lived in a spreadsheet. We turned it into a system.</p>
+
+    <dl class="d-overview">
+      <dt>Role</dt>
+      <dd>Product designer, growth PM</dd>
+      <dt>Company</dt>
+      <dd>Livongo / Teladoc Health</dd>
+      <dt>Scope</dt>
+      <dd>50 client configs × 74 fields = 3,700 decision points</dd>
+      <dt>Platform</dt>
+      <dd>Web (registration flow), Salesforce (config), internal APIs</dd>
+      <dt>Status</dt>
+      <dd>Shipped to production</dd>
+    </dl>
+  </div>
+
+  <!-- FRAMING -->
+  <div id="framing" class="d-section">
+    <p class="d-label">Framing</p>
+    <p class="d-body">Every time Livongo signed a new client, someone on the operations team opened a 74-column spreadsheet and figured out which registration fields to show, require, or hide for that client's program bundle. A standalone diabetes client got one set of fields. A "Whole Person" bundle with diabetes, hypertension, and weight management got a different set. <strong>The spreadsheet was the product's truth table.</strong></p>
+    <p class="d-body">This was slow, error-prone, and didn't scale. New client launches took days of manual setup. Mistakes meant members saw the wrong fields or couldn't register at all.</p>
+
+    <div class="d-personas">
+      <div class="d-persona">
+        <span class="d-persona__role">Configures the deal</span>
+        <span class="d-persona__name">Sales</span>
+        <ul class="d-persona__needs">
+          <li>Picks program bundles in Salesforce</li>
+          <li>Doesn't think about what fields that affects</li>
+        </ul>
+      </div>
+      <div class="d-persona">
+        <span class="d-persona__role">Sets up the flow</span>
+        <span class="d-persona__name">Implementation</span>
+        <ul class="d-persona__needs">
+          <li>Translates the deal into a registration config</li>
+          <li>Cross-references 74 columns for each client</li>
+        </ul>
+      </div>
+      <div class="d-persona">
+        <span class="d-persona__role">Registers</span>
+        <span class="d-persona__name">Member</span>
+        <ul class="d-persona__needs">
+          <li>Wants to sign up quickly</li>
+          <li>Should only see fields that matter to their program</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELIVERABLE -->
+  <div id="deliverable" class="d-section">
+    <p class="d-label">Deliverable</p>
+
+    <p class="d-label" style="margin-top: 24px;">Architecture</p>
+    <p class="d-body" style="margin-bottom: 16px;">Three systems work together. Sales configures the deal. APIs resolve member data before the first screen loads. The registration flow adapts to show only what's needed.</p>
+    <div class="d-flow">
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">SF</span>
+        <span class="d-flow__step-label">Salesforce</span>
+        <span class="d-flow__step-desc">Bundle, pricing, eligibility rules, field visibility</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">API</span>
+        <span class="d-flow__step-label">Data Resolution</span>
+        <span class="d-flow__step-desc">Employer, health records, and insurance pre-fill fields</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">UX</span>
+        <span class="d-flow__step-label">Registration</span>
+        <span class="d-flow__step-desc">6 steps. Member confirms what the system already knows.</span>
+      </div>
+    </div>
+
+    <hr class="d-rule">
+
+    <p class="d-label">Before and after</p>
+    <div class="d-grid-2" style="margin-top: 16px;">
+      <div>
+        <p class="d-body"><strong>Before: 9 steps.</strong> Enter name, address, search for coverage, verify insurance, enter health info, set up coaching, complete profile. Everything typed from scratch.</p>
+      </div>
+      <div>
+        <p class="d-body"><strong>After: 6 steps.</strong> Confirm identity, create account, review program details from records, confirm health history, confirm shipping address, done. Coverage handled server-side. Coaching deferred to first use.</p>
+      </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 32px;">
+      <p class="d-callout__body">The full comparison with a filterable breakdown of all 35 fields is at <a href="/reg/" style="color: var(--color-link, #00fff7);">ctrl.rodeo/reg/</a></p>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Process</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Why show pre-filled fields instead of blank forms?</p>
+        <p class="d-decision__a">Three services pull the member's data before they see a single screen: employer HR for name and address, health records for diagnosis, carrier data for insurance. The member confirms what's already there instead of typing it in. Faster, fewer errors.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why remove the coverage steps entirely?</p>
+        <p class="d-decision__a">If the employer sponsors the member, coverage is already verified. Asking the member to search for their employer, wait for verification, and enter insurance details added 3 steps and about 2 minutes for information the system already had.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why not ask about coaching preferences during registration?</p>
+        <p class="d-decision__a">People can't set meaningful preferences for a product they haven't used yet. We moved coaching setup to after the first use — when the member has context for what the questions mean.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPACT -->
+  <div id="impact" class="d-section">
+    <p class="d-label">Impact</p>
+    <div class="d-metrics" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
+      <div class="d-metric">
+        <div class="d-metric__value">57%</div>
+        <div class="d-metric__label">Fields pre-populated</div>
+        <div class="d-metric__sub">20 of 35 fields sourced from upstream data</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">↓</div>
+        <div class="d-metric__label">Registration errors</div>
+        <div class="d-metric__sub">Pre-filled data eliminated manual entry mistakes</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">↓</div>
+        <div class="d-metric__label">Admin setup time</div>
+        <div class="d-metric__sub">Reduced manual configuration and dev work per client</div>
+      </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 32px; border-left-color: var(--accent-cyan, #00fff7);">
+      <p class="d-callout__body"><strong>This is the same problem as CPQ.</strong> Programs are SKUs. Qualification rules are pricing rules. The registration flow is the quote. The spreadsheet is the same artifact that CPQ platforms replace with automated configuration.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer class="d-footer d-contain">
+  <a href="./livongo.html" class="d-next">← Livongo Registration</a>
+  <a href="./philosophy.html" class="d-next">How I Work →</a>
+</footer>
+
+<script src="./portfolio.js"></script>
+</body>
+</html>
