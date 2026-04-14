@@ -374,19 +374,21 @@
     }
   }
 
-  // Start animation on iframe that's already loaded
+  // Start animation — handles both already-loaded and still-loading iframes
   function triggerIframe(index) {
     if (started[index]) return;
     started[index] = true;
-    preloadIframe(index); // ensure loaded
+    preloadIframe(index);
     var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
     if (!iframe) return;
-    function send() { iframe.contentWindow.postMessage('start', '*'); }
-    if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-      send();
-    } else {
-      iframe.addEventListener('load', send);
+    function send() {
+      try { iframe.contentWindow.postMessage('start', '*'); } catch(e) {}
     }
+    // If already loaded, send now AND on next load (in case it reloads)
+    // If not loaded yet, wait for load
+    iframe.addEventListener('load', send);
+    // Also try sending now in case load already fired
+    setTimeout(send, 50);
   }
 
   // Update step opacities + active layer based on scroll position
