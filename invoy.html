@@ -39,21 +39,26 @@
 <div class="d-contain">
 
   <!-- Header + Overview -->
-  <div style="padding: 48px 0 0;">
-    <span class="d-status d-status--shipped">Shipped</span>
-    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy's Weekly Plans</p>
-    <p class="d-body" style="margin-top: 12px;">A weekly coaching system for weight management. Members plan their week, check in daily, review progress, and adjust — with coach support when the data says they need it.</p>
+  <div style="padding: 48px 0 0; display: flex; gap: 48px; align-items: flex-start;">
+    <div style="width: 400px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+      <span class="d-mono">[hero image]</span>
+    </div>
+    <div style="flex: 1;">
+      <span class="d-status d-status--shipped">Shipped</span>
+      <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy's Weekly Plans</p>
+      <p class="d-body" style="margin-top: 12px;">A weekly coaching system for weight management. Members plan their week, check in daily, review progress, and adjust — with coach support when the data says they need it.</p>
 
-    <dl class="d-overview">
-      <dt>Role</dt>
-      <dd>Lead product designer (Senior PM)</dd>
-      <dt>Company</dt>
-      <dd>Invoy Health</dd>
-      <dt>Scope</dt>
-      <dd>Concept Design, Feature UI, Design System</dd>
-      <dt>Status</dt>
-      <dd>Shipped to production, ~CTR M3</dd>
-    </dl>
+      <dl class="d-overview">
+        <dt>Role</dt>
+        <dd>Lead product designer (Senior PM)</dd>
+        <dt>Company</dt>
+        <dd>Invoy Health</dd>
+        <dt>Scope</dt>
+        <dd>Concept Design, Feature UI, Design System</dd>
+        <dt>Status</dt>
+        <dd>Shipped to production, ~17K MAU</dd>
+      </dl>
+    </div>
   </div>
 
   <!-- FRAMING -->
@@ -116,8 +121,12 @@
       <div class="d-flow__step">
         <span class="d-flow__step-num">04</span>
         <span class="d-flow__step-label">Adapt</span>
-        <span class="d-flow__step-desc">Coach reviews. Adaption, loop adjustments.</span>
+        <span class="d-flow__step-desc">Coach reviews. Next week adjusts. Loop restarts.</span>
       </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; margin-top: 16px;">
+      <span class="d-mono" style="white-space: nowrap;">← Back to Plan</span>
+      <div style="flex: 1; height: 1px; background: var(--fg-subtle, #666560);"></div>
     </div>
   </div>
 
@@ -194,7 +203,7 @@
     <p class="d-label" style="margin-top: 16px;">01</p>
     <p class="d-headline d-headline--md">Design Decisions</p>
     <p class="d-mono" style="margin-top: 4px;">TBD</p>
-    <div class="d-decisions" style="margin-top: 16px;">
+    <div class="d-decisions" style="margin-top: 16px; padding-left: 48px;">
       <div class="d-decision">
         <p class="d-decision__q">Why does one question split into 5 different flows?</p>
         <p class="d-decision__a">Members shouldn't need to understand the system's logic. "Any events this week?" routes automatically into Base, Busy Week, Cheat & Rebound, Edit Plan, or Accelerate.</p>
