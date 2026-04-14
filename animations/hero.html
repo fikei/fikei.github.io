@@ -321,6 +321,10 @@
     setTimeout(function() {
       document.getElementById('badge1').style.display = 'none';
       document.getElementById('card1').classList.add('open');
+      // Fade out the IF message
+      var m1 = document.getElementById('msg1');
+      m1.style.transition = 'opacity 0.4s ease';
+      m1.style.opacity = '0';
       centerOn(250, 1790, 1.2, 0.6);
     }, 9000);
 
