@@ -17,38 +17,26 @@
   }
   body.embedded { background: transparent; }
 
-  /* ── Camera ── */
-  .camera {
-    width: 800px;
-    height: 640px;
-    overflow: hidden;
-    position: relative;
-  }
+  .camera { width: 800px; height: 640px; overflow: hidden; position: relative; }
   .canvas {
     position: absolute;
-    width: 2000px;
-    height: 1800px;
+    width: 800px;
+    height: 3200px;
     transform-origin: 0 0;
-    /* transition set by JS per shot */
   }
 
-  /* ── Vignette ── */
   .vignette {
     position: absolute; inset: 0;
     pointer-events: none; z-index: 100;
-    background: radial-gradient(ellipse at center, transparent 35%, #0A0A0A 95%);
+    background: radial-gradient(ellipse at center, transparent 30%, #0A0A0A 92%);
   }
-  body.embedded .vignette { background: radial-gradient(ellipse at center, transparent 35%, var(--bg, #111110) 95%); }
+  body.embedded .vignette { background: radial-gradient(ellipse at center, transparent 30%, var(--bg, #111110) 92%); }
 
-  /* ── Logo end card ── */
+  /* Logo endcard */
   .logo-card {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    opacity: 0;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50; opacity: 0;
     transition: opacity 1.2s ease;
     background: #0A0A0A;
     pointer-events: none;
@@ -56,47 +44,38 @@
   .logo-card.show { opacity: 1; }
   .logo-card svg { width: 120px; height: 120px; }
 
-  /* ═══════ SCENE 1: Recording Bar ═══════ */
+  /* ═══════ SCENE 1: Recording Bar — top of canvas ═══════ */
   .scene-rec {
     position: absolute;
-    top: 300px;
+    top: 280px;
     left: 200px;
   }
   .rec-bar {
     width: 358px; height: 52px;
-    background: #1C1C1E;
-    border: 1px solid #2C2C2E;
-    border-radius: 16px;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 16px;
+    background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 16px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
   }
   .rec-bar-left { display: flex; align-items: center; gap: 10px; }
   .rec-bar-dot { width: 8px; height: 8px; border-radius: 50%; background: #FF3B30; animation: pulse 1.5s infinite; }
   .rec-bar-label { color: #fff; font-size: 12px; font-weight: 600; }
   .rec-bar-time { color: #636366; font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
   .rec-bar-stop {
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: #2C2C2E;
-    border: 1.5px solid #3A3A3C;
-    display: flex; align-items: center; justify-content: center;
-    position: relative;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #2C2C2E; border: 1.5px solid #3A3A3C;
+    display: flex; align-items: center; justify-content: center; position: relative;
   }
   .rec-bar-stop-inner { width: 13px; height: 13px; border-radius: 3px; background: #FF3B30; }
   .tap-ripple {
-    position: absolute;
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: rgba(255, 59, 48, 0.35);
-    transform: scale(0); opacity: 0;
+    position: absolute; width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255, 59, 48, 0.35); transform: scale(0); opacity: 0;
   }
   .tap-ripple.animate { animation: ripple 0.7s cubic-bezier(0, 0, 0.2, 1) forwards; }
 
-  /* ═══════ SCENE 2: Typing Indicator ═══════ */
+  /* ═══════ SCENE 2: Typing Indicator — far below ═══════ */
   .scene-typing {
     position: absolute;
-    top: 500px;
-    left: 250px;
+    top: 1000px;
+    left: 340px;
   }
   .typing { display: flex; gap: 10px; align-items: center; }
   .typing-dot { width: 7px; height: 7px; border-radius: 50%; }
@@ -107,12 +86,12 @@
   .typing-dots span:nth-child(2) { animation: dotPulse 1s infinite 0.15s; }
   .typing-dots span:nth-child(3) { animation: dotPulse 1s infinite 0.3s; }
 
-  /* ═══════ SCENE 3: Messages + Badge + Card ═══════ */
+  /* ═══════ SCENE 3: Messages + Badge + Card — far below ═══════ */
   .scene-msgs {
     position: absolute;
-    top: 650px;
-    left: 200px;
-    width: 400px;
+    top: 1800px;
+    left: 160px;
+    width: 440px;
   }
   .msg { display: flex; gap: 10px; padding: 10px 0; opacity: 0; transform: translateY(10px); }
   .msg.show { opacity: 1; transform: translateY(0); transition: opacity 0.5s ease, transform 0.5s ease; }
@@ -125,13 +104,11 @@
   .msg-speaker--mc { color: #F9CE86; }
   .msg-text { color: #EEF8FE; font-size: 14px; line-height: 1.5; }
 
-  /* Badge */
   .badge {
     display: inline-flex; align-items: center; gap: 6px;
     background: #161618; border: 1px solid #2C2C2E; border-radius: 8px;
     padding: 6px 10px; margin-top: 8px; width: fit-content;
-    position: relative; overflow: hidden;
-    opacity: 0; transform: scale(0.9);
+    position: relative; overflow: hidden; opacity: 0; transform: scale(0.9);
   }
   .badge.show { opacity: 1; transform: scale(1); transition: opacity 0.3s ease, transform 0.3s ease; }
   .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: #00A480; flex-shrink: 0; }
@@ -145,11 +122,9 @@
   }
   .badge.tapping { animation: tapPulse 0.2s ease; }
 
-  /* Extraction card */
   .extract-card {
     background: #161618; border: 1px solid #2C2C2E; border-radius: 10px;
-    margin-top: 8px; overflow: hidden;
-    max-height: 0; opacity: 0;
+    margin-top: 8px; overflow: hidden; max-height: 0; opacity: 0;
     transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
   }
   .extract-card.open { max-height: 400px; opacity: 1; }
@@ -180,8 +155,6 @@
 <body>
 
 <div class="vignette"></div>
-
-<!-- Logo end card -->
 <div class="logo-card" id="logoCard">
   <svg width="500" height="500" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M409.388 287H90.612C89.6947 287 89.2614 285.868 89.9441 285.256L173.618 210.182C179.489 204.914 187.1 202 194.988 202H305.012C312.9 202 320.511 204.914 326.382 210.182L410.056 285.256C410.739 285.868 410.305 287 409.388 287Z" fill="url(#paint0_linear)"/>
@@ -197,7 +170,7 @@
 <div class="camera">
   <div class="canvas" id="canvas">
 
-    <!-- SCENE 1: Recording bar -->
+    <!-- SCENE 1: Recording bar (y ≈ 280) -->
     <div class="scene-rec">
       <div class="rec-bar">
         <div class="rec-bar-left">
@@ -214,7 +187,7 @@
       </div>
     </div>
 
-    <!-- SCENE 2: Typing indicator -->
+    <!-- SCENE 2: Typing indicator (y ≈ 1000) -->
     <div class="scene-typing">
       <div class="typing">
         <div class="typing-dot" style="background: #F9CE86;"></div>
@@ -223,7 +196,7 @@
       </div>
     </div>
 
-    <!-- SCENE 3: Messages + badge + card -->
+    <!-- SCENE 3: Messages + badge + card (y ≈ 1800) -->
     <div class="scene-msgs">
       <div class="msg" id="msg1">
         <div class="msg-left"><div class="msg-dot msg-dot--if"></div><div class="msg-speaker msg-speaker--if">IF</div></div>
@@ -281,14 +254,16 @@
   var paused = window.location.search.indexOf('paused') > -1;
   if (paused) document.body.classList.add('embedded');
 
-  /*
-   * Camera shots: translate + scale on the canvas.
-   * Higher scale = more zoomed in. Translate positions the focal point.
-   * The canvas transform-origin is 0 0, so we translate to move the "camera".
-   */
-  function moveTo(x, y, scale, duration, easing) {
+  // Viewport: 800 × 640
+  // At scale S, visible canvas area = 800/S × 640/S
+  // To center point (cx, cy): translate(-(cx - 400/S), -(cy - 320/S)) scale(S)
+  // Simplified: translate(-cx*S + 400, -cy*S + 320) scale(S)
+
+  function centerOn(cx, cy, scale, duration, easing) {
+    var tx = -cx * scale + 400;
+    var ty = -cy * scale + 320;
     canvas.style.transition = 'transform ' + duration + 's ' + (easing || 'cubic-bezier(0.4, 0, 0.2, 1)');
-    canvas.style.transform = 'translate(' + x + 'px, ' + y + 'px) scale(' + scale + ')';
+    canvas.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
   }
 
   // Timer
@@ -303,71 +278,76 @@
   function start() {
     var timer = setInterval(tickTimer, 1000);
 
-    // ═══════ BEAT 1: Extreme close-up on recording button (0 → 2.5s) ═══════
-    // Tight crop: zoomed 3.5x, centered on the stop button
-    moveTo(-1420, -820, 3.5, 0.01);
+    // ═══ BEAT 1: Extreme close-up on stop button (0→2.5s) ═══
+    // Stop button center: scene-rec at (200, 280), button at right side ≈ (520, 306)
+    centerOn(520, 306, 4.5, 0.01);
 
-    // Tap ripple at 0.6s
+    // Tap at 0.6s
     setTimeout(function() {
       document.getElementById('tapRipple').classList.add('animate');
     }, 600);
 
-    // Slow drift zoom out slightly while holding
+    // Slow drift out
     setTimeout(function() {
-      moveTo(-1350, -780, 3.0, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
+      centerOn(520, 306, 3.8, 1.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
     }, 1000);
 
-    // ═══════ BEAT 2: Hard pan to typing indicator (2.5 → 5.5s) ═══════
-    // Fast diagonal pan + zoom change — dramatic shift
+    // ═══ BEAT 2: Hard vertical pan DOWN to typing indicator (2.5→5.5s) ═══
+    // Typing center: (370, 1006). Zoom in tight: 5×
     setTimeout(function() {
-      moveTo(-400, -880, 4.0, 0.4, 'cubic-bezier(0.4, 0, 0.2, 1)');
+      centerOn(370, 1006, 5.0, 0.45);
     }, 2500);
 
-    // Hold on typing — slow gentle drift for 3 seconds
+    // Hold — gentle drift for 3 seconds
     setTimeout(function() {
-      moveTo(-380, -860, 3.6, 2.5, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
-    }, 3000);
+      centerOn(370, 1006, 4.5, 2.8, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)');
+    }, 3100);
 
-    // ═══════ BEAT 3: Pan to messages area, zoom out to see context (5.5 → 8.5s) ═══════
+    // ═══ BEAT 3: Hard vertical pan DOWN to messages (5.5→9s) ═══
+    // Messages top: (380, 1830). Zoom out to 1.4× to show full context
+    // Pre-show messages before arriving
     setTimeout(function() {
-      moveTo(-200, -700, 2.2, 0.8, 'cubic-bezier(0.4, 0, 0.2, 1)');
+      document.getElementById('msg1').classList.add('show');
+    }, 5400);
+    setTimeout(function() {
+      document.getElementById('msg2').classList.add('show');
+    }, 5600);
+
+    setTimeout(function() {
+      centerOn(380, 1870, 1.4, 0.5);
     }, 5500);
-
-    // Messages fade in
-    setTimeout(function() { document.getElementById('msg1').classList.add('show'); }, 6000);
-    setTimeout(function() { document.getElementById('msg2').classList.add('show'); }, 6800);
 
     // Badge shimmers in
     setTimeout(function() {
       document.getElementById('badge1').classList.add('show', 'loading');
-    }, 7500);
+    }, 7000);
     // Resolves
     setTimeout(function() {
       document.getElementById('badge1').classList.remove('loading');
-    }, 8200);
+    }, 7800);
 
-    // ═══════ BEAT 4: Tap badge → card opens, fields flow in (8.5 → 12.5s) ═══════
+    // ═══ BEAT 4: Tap badge → card opens, fields flow (8.5→12.5s) ═══
     setTimeout(function() {
       document.getElementById('badge1').classList.add('tapping');
-    }, 9000);
+    }, 8800);
 
     setTimeout(function() {
-      // Zoom in on the extraction area
-      moveTo(-200, -780, 2.0, 0.6);
       document.getElementById('badge1').style.display = 'none';
       document.getElementById('card1').classList.add('open');
-    }, 9200);
+      // Pan down slightly to keep card centered as it expands
+      centerOn(380, 1920, 1.4, 0.6);
+    }, 9000);
 
     // Fields stagger in
-    setTimeout(function() { document.getElementById('field1').classList.add('show'); }, 9700);
-    setTimeout(function() { document.getElementById('field2').classList.add('show'); }, 10200);
-    setTimeout(function() { document.getElementById('field3').classList.add('show'); }, 10700);
+    setTimeout(function() { document.getElementById('field1').classList.add('show'); }, 9500);
+    setTimeout(function() { document.getElementById('field2').classList.add('show'); }, 10000);
+    setTimeout(function() { document.getElementById('field3').classList.add('show'); }, 10500);
 
-    // More badges flow in below
-    setTimeout(function() { document.getElementById('badge2').classList.add('show'); }, 11300);
-    setTimeout(function() { document.getElementById('badge3').classList.add('show'); }, 11700);
+    // More badges
+    setTimeout(function() { document.getElementById('badge2').classList.add('show'); }, 11200);
+    setTimeout(function() { document.getElementById('badge3').classList.add('show'); }, 11600);
 
-    // ═══════ BEAT 5: Fade to logo (12.5 → 14s) ═══════
+    // ═══ BEAT 5: Fade to logo (13s) ═══
     setTimeout(function() {
       clearInterval(timer);
       document.getElementById('logoCard').classList.add('show');
