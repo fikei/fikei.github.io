@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field — Hero</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111110;
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    width: 800px;
+    height: 640px;
+    position: relative;
+  }
+  body.embedded { background: transparent; }
+
+  /* ── Floating UI panels ── */
+  .panel {
+    position: absolute;
+    background: #0A0A0A;
+    border-radius: 16px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(30px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .panel.show {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Panel 1: Waveform + Recording bar — large, background left */
+  .panel-rec {
+    width: 360px;
+    height: 200px;
+    left: 20px;
+    top: 60px;
+  }
+  .panel-rec.show { transition-delay: 0.3s; }
+
+  /* Panel 2: Transcript messages — center, overlapping */
+  .panel-transcript {
+    width: 340px;
+    height: 380px;
+    left: 230px;
+    top: 130px;
+    z-index: 2;
+  }
+  .panel-transcript.show { transition-delay: 1.2s; }
+
+  /* Panel 3: SOAP cards — right, overlapping transcript */
+  .panel-soap {
+    width: 320px;
+    height: 420px;
+    right: 20px;
+    top: 80px;
+    z-index: 3;
+  }
+  .panel-soap.show { transition-delay: 2.2s; }
+
+  /* Extraction badge — floats above transcript */
+  .panel-badge {
+    width: 200px;
+    height: auto;
+    left: 210px;
+    top: 100px;
+    z-index: 4;
+    background: #161618;
+    border-radius: 10px;
+    border: 1px solid #2C2C2E;
+    padding: 10px 14px;
+  }
+  .panel-badge.show { transition-delay: 2.8s; }
+
+  /* ── Recording panel contents ── */
+  .rec-inner { padding: 20px; height: 100%; display: flex; flex-direction: column; }
+  .rec-top { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #FF3B30; animation: pulse 1.5s infinite; }
+  .rec-label { color: #fff; font-size: 13px; font-weight: 600; }
+  .rec-time { color: #636366; font-size: 12px; font-variant-numeric: tabular-nums; margin-left: auto; }
+
+  .waveform {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .wave-bar {
+    width: 2.5px;
+    border-radius: 1.5px;
+    background: #00A480;
+    opacity: 0.5;
+    transition: height 0.15s ease;
+  }
+
+  .rec-bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+  .rec-stop { width: 32px; height: 32px; border-radius: 50%; background: #2C2C2E; border: 1.5px solid #3A3A3C; display: flex; align-items: center; justify-content: center; }
+  .rec-stop-sq { width: 10px; height: 10px; border-radius: 2px; background: #FF3B30; }
+  .rec-speakers { display: flex; gap: 6px; }
+  .rec-speaker-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Transcript panel contents ── */
+  .ts-inner { padding: 16px 0; height: 100%; }
+  .ts-header { padding: 0 16px 10px; border-bottom: 1px solid #1C1C1E; }
+  .ts-header-tabs { display: flex; gap: 0; }
+  .ts-h-tab { padding: 6px 12px; font-size: 11px; color: #9E97B1; letter-spacing: 0.03em; }
+  .ts-h-tab--active { color: #EEF8FE; font-weight: 700; border-bottom: 2px solid #EEF8FE; }
+
+  .ts-msgs { padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .ts-msg { display: flex; gap: 8px; padding: 6px 0; }
+  .ts-msg-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .ts-msg-dot--if { background: #00A480; }
+  .ts-msg-dot--mc { background: #F9CE86; }
+  .ts-msg-dot--p2 { background: #009CC0; }
+  .ts-msg-speaker { font-size: 9px; font-weight: 700; width: 18px; margin-top: 2px; flex-shrink: 0; }
+  .ts-msg-speaker--if { color: #00A480; }
+  .ts-msg-speaker--mc { color: #F9CE86; }
+  .ts-msg-speaker--p2 { color: #009CC0; }
+  .ts-msg-text { color: #EEF8FE; font-size: 13px; line-height: 1.5; }
+
+  .ts-badge-inline { display: inline-flex; align-items: center; gap: 5px; background: #161618; border: 1px solid #2C2C2E; border-radius: 6px; padding: 4px 8px; margin-top: 6px; }
+  .ts-badge-dot { width: 4px; height: 4px; border-radius: 50%; }
+  .ts-badge-dot--green { background: #00A480; }
+  .ts-badge-text { color: #A79EAF; font-size: 10px; font-weight: 500; }
+
+  /* ── SOAP panel contents ── */
+  .soap-inner { padding: 16px 0; height: 100%; overflow: hidden; }
+  .soap-h { padding: 0 16px 10px; border-bottom: 1px solid #1C1C1E; }
+  .soap-h-tabs { display: flex; gap: 0; }
+  .soap-h-tab { padding: 6px 12px; font-size: 11px; color: #9E97B1; }
+  .soap-h-tab--active { color: #EEF8FE; font-weight: 700; border-bottom: 2px solid #EEF8FE; }
+
+  .soap-cards { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .soap-card { background: #111112; border-radius: 10px; padding: 12px 14px; }
+  .soap-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .soap-card-title { color: #7D788B; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+  .soap-counter { font-size: 10px; font-weight: 600; border-radius: 12px; padding: 2px 8px; }
+  .soap-counter--green { background: #263027; color: #31B23C; }
+  .soap-counter--amber { background: #363430; color: #F9CE86; }
+  .soap-primary { color: #EEF8FE; font-size: 13px; font-weight: 700; line-height: 1.5; }
+  .soap-dim { color: #A79EAF; font-size: 12px; line-height: 1.45; margin-top: 2px; }
+  .soap-sub { color: #6B6877; font-size: 9px; font-weight: 600; letter-spacing: 0.06em; margin-top: 8px; margin-bottom: 2px; }
+
+  .vitals-mini { display: flex; gap: 4px; margin-top: 6px; }
+  .vital-chip { flex: 1; border-radius: 4px; padding: 4px; text-align: center; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vital-chip--normal { background: #101010; color: #AAA; }
+  .vital-chip--red { background: #411B1F; color: #FE1844; }
+  .vital-chip--amber { background: #363430; color: #F9CE86; }
+
+  /* ── Floating badge panel ── */
+  .badge-inner { }
+  .badge-title { color: #A79EAF; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+  .badge-title-dot { width: 5px; height: 5px; border-radius: 50%; background: #00A480; }
+  .badge-field { margin-top: 6px; }
+  .badge-field-label { color: #6B6571; font-size: 9px; font-weight: 600; letter-spacing: 0.05em; }
+  .badge-field-value { color: #EBEBF5; font-size: 12px; line-height: 1.4; margin-top: 2px; }
+
+  /* ── Subtle gradient overlay at edges ── */
+  .vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 50%, #111110 100%);
+    z-index: 10;
+  }
+  body.embedded .vignette {
+    background: radial-gradient(ellipse at center, transparent 50%, var(--bg, #111110) 100%);
+  }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+</style>
+</head>
+<body>
+
+<div class="vignette"></div>
+
+<!-- Panel 1: Recording / Waveform -->
+<div class="panel panel-rec" id="panelRec">
+  <div class="rec-inner">
+    <div class="rec-top">
+      <div class="rec-dot"></div>
+      <span class="rec-label">Recording</span>
+      <span class="rec-time" id="recTime">07:24</span>
+    </div>
+    <div class="waveform" id="waveform"></div>
+    <div class="rec-bottom-bar">
+      <div class="rec-speakers">
+        <div class="rec-speaker-dot" style="background: #00A480;"></div>
+        <div class="rec-speaker-dot" style="background: #F9CE86;"></div>
+        <div class="rec-speaker-dot" style="background: #009CC0;"></div>
+      </div>
+      <div class="rec-stop"><div class="rec-stop-sq"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel 2: Transcript -->
+<div class="panel panel-transcript" id="panelTranscript">
+  <div class="ts-inner">
+    <div class="ts-header">
+      <div class="ts-header-tabs">
+        <div class="ts-h-tab ts-h-tab--active">Transcript</div>
+        <div class="ts-h-tab">Health Record</div>
+        <div class="ts-h-tab">Handoff</div>
+      </div>
+    </div>
+    <div class="ts-msgs">
+      <div class="ts-msg">
+        <div class="ts-msg-dot ts-msg-dot--if"></div>
+        <span class="ts-msg-speaker ts-msg-speaker--if">IF</span>
+        <div>
+          <div class="ts-msg-text">Can you tell me what happened?</div>
+        </div>
+      </div>
+      <div class="ts-msg">
+        <div class="ts-msg-dot ts-msg-dot--mc"></div>
+        <span class="ts-msg-speaker ts-msg-speaker--mc">MC</span>
+        <div>
+          <div class="ts-msg-text">I fell about 15 feet onto a rock slab. My left leg is killing me.</div>
+          <div class="ts-badge-inline">
+            <div class="ts-badge-dot ts-badge-dot--green"></div>
+            <span class="ts-badge-text">Chief Complaint</span>
+          </div>
+        </div>
+      </div>
+      <div class="ts-msg">
+        <div class="ts-msg-dot ts-msg-dot--if"></div>
+        <span class="ts-msg-speaker ts-msg-speaker--if">IF</span>
+        <div>
+          <div class="ts-msg-text">OK. Can you wiggle your toes?</div>
+        </div>
+      </div>
+      <div class="ts-msg">
+        <div class="ts-msg-dot ts-msg-dot--mc"></div>
+        <span class="ts-msg-speaker ts-msg-speaker--mc">MC</span>
+        <div>
+          <div class="ts-msg-text">Yeah, but it hurts a lot.</div>
+        </div>
+      </div>
+      <div class="ts-msg">
+        <div class="ts-msg-dot ts-msg-dot--p2"></div>
+        <span class="ts-msg-speaker ts-msg-speaker--p2">P2</span>
+        <div>
+          <div class="ts-msg-text">Pulse is strong at the ankle.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel 3: SOAP Note -->
+<div class="panel panel-soap" id="panelSoap">
+  <div class="soap-inner">
+    <div class="soap-h">
+      <div class="soap-h-tabs">
+        <div class="soap-h-tab">Transcript</div>
+        <div class="soap-h-tab soap-h-tab--active">Health Record</div>
+        <div class="soap-h-tab">Handoff</div>
+      </div>
+    </div>
+    <div class="soap-cards">
+      <div class="soap-card">
+        <div class="soap-card-head">
+          <span class="soap-card-title">Subjective</span>
+          <span class="soap-counter soap-counter--green">Complete</span>
+        </div>
+        <div class="soap-primary">Fall from 15ft onto rock slab</div>
+        <div class="soap-dim">• Pain in left leg, difficulty moving toes</div>
+        <div class="soap-dim">• No loss of consciousness</div>
+      </div>
+      <div class="soap-card">
+        <div class="soap-card-head">
+          <span class="soap-card-title">Objective</span>
+          <span class="soap-counter soap-counter--amber">3 to Review</span>
+        </div>
+        <div class="soap-sub">PHYSICAL EXAM</div>
+        <div class="soap-primary">Injury to Left Leg & Back</div>
+        <div class="soap-dim">• Distal pulse present bilaterally</div>
+        <div class="soap-sub">VITALS</div>
+        <div class="vitals-mini">
+          <div class="vital-chip vital-chip--red">HR 142</div>
+          <div class="vital-chip vital-chip--normal">SpO₂ 98</div>
+          <div class="vital-chip vital-chip--amber">RR 22</div>
+        </div>
+      </div>
+      <div class="soap-card">
+        <div class="soap-card-head">
+          <span class="soap-card-title">Assessment</span>
+          <span class="soap-counter soap-counter--green">Complete</span>
+        </div>
+        <div class="soap-dim">• Suspected left tib-fib fracture</div>
+        <div class="soap-dim">• Elevated HR — monitor for shock</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating extraction badge -->
+<div class="panel panel-badge" id="panelBadge">
+  <div class="badge-inner">
+    <div class="badge-title">
+      <div class="badge-title-dot"></div>
+      CHIEF COMPLAINT
+    </div>
+    <div class="badge-field">
+      <div class="badge-field-label">MECHANISM</div>
+      <div class="badge-field-value">Fall from 15ft onto rock slab</div>
+    </div>
+    <div class="badge-field">
+      <div class="badge-field-label">PRIMARY</div>
+      <div class="badge-field-value">Left leg pain, limited ROM toes</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Generate waveform
+  var wf = document.getElementById('waveform');
+  for (var i = 0; i < 100; i++) {
+    var bar = document.createElement('div');
+    bar.className = 'wave-bar';
+    bar.style.height = (3 + Math.random() * 60) + 'px';
+    wf.appendChild(bar);
+  }
+
+  var bars = wf.querySelectorAll('.wave-bar');
+  function animateWave() {
+    bars.forEach(function(b) {
+      b.style.height = (3 + Math.random() * 60) + 'px';
+      b.style.opacity = 0.3 + Math.random() * 0.7;
+    });
+  }
+
+  var paused = window.location.search.indexOf('paused') > -1;
+  if (paused) document.body.classList.add('embedded');
+
+  function start() {
+    // Staggered reveals — editorial pacing
+    setTimeout(function() { document.getElementById('panelRec').classList.add('show'); setInterval(animateWave, 180); }, 300);
+    setTimeout(function() { document.getElementById('panelTranscript').classList.add('show'); }, 1200);
+    setTimeout(function() { document.getElementById('panelBadge').classList.add('show'); }, 2400);
+    setTimeout(function() { document.getElementById('panelSoap').classList.add('show'); }, 3000);
+  }
+
+  if (paused) {
+    window.addEventListener('message', function(e) { if (e.data === 'start') start(); });
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>

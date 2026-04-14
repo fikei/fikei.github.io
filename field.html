@@ -41,8 +41,10 @@
 
   <!-- Header — side by side -->
   <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
-    <!-- Hero image placeholder -->
-    <div style="width: 400px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
+    <!-- Hero animation -->
+    <div style="width: 400px; aspect-ratio: 4/5; flex-shrink: 0; overflow: hidden;">
+      <iframe src="/animations/hero.html?paused" style="width: 800px; height: 640px; border: none; pointer-events: none; display: block; transform: scale(0.5); transform-origin: top left;" id="heroFrame"></iframe>
+    </div>
     <!-- Content -->
     <div style="flex: 1;">
       <span class="d-status d-status--dev">Beta</span>
@@ -430,6 +432,18 @@
 })();
 </script>
 
+<!-- Hero animation trigger -->
+<script>
+(function() {
+  var hero = document.getElementById('heroFrame');
+  if (!hero) return;
+  // Start immediately on load
+  hero.addEventListener('load', function() {
+    setTimeout(function() { hero.contentWindow.postMessage('start', '*'); }, 300);
+  });
+  hero.src = hero.src; // force load if cached
+})();
+</script>
 <script src="/portfolio.js"></script>
 </body>
 </html>
