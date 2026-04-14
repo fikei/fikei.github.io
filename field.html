@@ -358,41 +358,58 @@
     stickyPhone.style.top = Math.max(CHROME, top) + 'px';
   }
 
-  // Activate a step + layer, trigger iframe if needed
-  function activate(index) {
-    if (index === activeStep) return;
-    activeStep = index;
-    for (var i = 0; i < steps.length; i++) {
-      steps[i].classList.toggle('is-active', i === index);
-    }
-    for (var j = 0; j < layers.length; j++) {
-      layers[j].classList.toggle('is-active', j === index);
-    }
-    // Trigger iframe on first activation
-    if (!started[index]) {
-      var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
-      if (iframe && iframe.dataset.src) {
-        started[index] = true;
-        iframe.src = iframe.dataset.src;
-        iframe.addEventListener('load', function() {
-          setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
-        });
-      }
+  var layersBox = document.querySelector('.d-sticky-scroll__layers');
+
+  // Trigger iframe on first activation
+  function triggerIframe(index) {
+    if (started[index]) return;
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (iframe && iframe.dataset.src) {
+      started[index] = true;
+      iframe.src = iframe.dataset.src;
+      iframe.addEventListener('load', function() {
+        setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+      });
     }
   }
 
-  // Find which step center is closest to viewport center
+  // Update step opacities + active layer based on scroll position
   function onScroll() {
     var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
     var closest = 0;
     var minDist = Infinity;
+
+    // Set each step's opacity based on distance from viewport center
     for (var i = 0; i < steps.length; i++) {
       var rect = steps[i].getBoundingClientRect();
       var center = rect.top + rect.height / 2;
       var dist = Math.abs(center - vcenter);
+      // Fade starts at 0.4x step height from center → hits 0.15 at edges
+      var fadeRange = rect.height * 0.4;
+      var opacity = dist < fadeRange ? 1 : Math.max(0.15, 1 - (dist - fadeRange) / (rect.height * 0.3));
+      steps[i].style.opacity = opacity;
+
       if (dist < minDist) { minDist = dist; closest = i; }
     }
-    activate(closest);
+
+    // Toggle active layer (crossfade)
+    if (closest !== activeStep) {
+      activeStep = closest;
+      for (var j = 0; j < layers.length; j++) {
+        layers[j].classList.toggle('is-active', j === closest);
+      }
+      triggerIframe(closest);
+    }
+
+    // Fade in the phone background box as section enters viewport
+    if (layersBox) {
+      var phoneRect = stickyPhone.getBoundingClientRect();
+      var phoneCenter = phoneRect.top + phoneRect.height / 2;
+      var distFromCenter = Math.abs(phoneCenter - vcenter);
+      var viewH = window.innerHeight - CHROME;
+      // Visible when phone is within 60% of available viewport height from center
+      layersBox.classList.toggle('is-visible', distFromCenter < viewH * 0.6);
+    }
   }
 
   // Throttle scroll with rAF
@@ -407,7 +424,8 @@
   // Init
   sizePhones();
   setStickyTop();
-  activate(0); // load first animation immediately
+  triggerIframe(0); // load first animation immediately
+  onScroll(); // set initial opacities
   window.addEventListener('resize', function() { sizePhones(); setStickyTop(); });
 })();
 </script>

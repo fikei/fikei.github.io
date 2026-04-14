@@ -115,6 +115,7 @@
   padding: 16px clamp(20px, 5vw, 64px) 10px;
   background: var(--bg, #111110);
   border-bottom: 1px solid var(--border-subtle, #33332f);
+  isolation: isolate; /* new stacking context above sticky scroll content */
 }
 
 .d-subnav__link {
@@ -575,7 +576,10 @@
   aspect-ratio: 4 / 5;
   background: #000;
   overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.6s ease;
 }
+.d-sticky-scroll__layers.is-visible { opacity: 1; }
 
 .d-sticky-scroll__layer {
   position: absolute;
@@ -598,10 +602,9 @@
   flex-direction: column;
   justify-content: center;
   padding: 48px 0;
-  opacity: 0.3;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.3s ease;
+  /* opacity set by JS based on distance from viewport center */
 }
-.d-sticky-scroll__step.is-active { opacity: 1; }
 
 /* ── Utilities ── */
 
