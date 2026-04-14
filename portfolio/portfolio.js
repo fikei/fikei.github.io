@@ -35,7 +35,7 @@
       '/portfolio/field.html',
       '/portfolio/invoy.html',
       '/portfolio/livongo.html',
-      '/portfolio/how-i-work.html'
+      '/portfolio/philosophy.html'
     ];
     const current = window.location.pathname;
     const idx = pages.findIndex(p => current.endsWith(p) || current.endsWith(p.replace('.html', '')));
