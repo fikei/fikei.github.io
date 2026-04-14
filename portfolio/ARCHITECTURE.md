@@ -14,7 +14,7 @@ portfolio/
   field.html              # Case study: Field
   invoy.html              # Case study: Invoy (lifecycle + DS)
   livongo.html            # Case study: Livongo Config
-  how-i-work.html         # Process: stack, design system, AI workflow
+  philosophy.html         # Process: stack, design system, AI workflow
   portfolio.css           # Portfolio-specific styles (extends ctrl DS)
   portfolio.js            # Nav, scroll behavior, keyboard controls
   case-study-copy.md      # Content source
@@ -110,7 +110,7 @@ CASE STUDY CARDS (3)
   Livongo — thumbnail + tags + one-liner → livongo.html
 
 HOW I WORK TEASER
-  Pipeline strip + one paragraph → how-i-work.html
+  Pipeline strip + one paragraph → philosophy.html
 
 CONTACT
 ```
