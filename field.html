@@ -453,10 +453,30 @@
     }
   }, { passive: true });
 
+  // Scroll snap — nudge to center the active step when scrolling settles
+  var snapTimer = null;
+  var SNAP_THRESHOLD = 80; // px from center to trigger snap
+  function snapToStep() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var step = steps[activeStep];
+    if (!step) return;
+    var rect = step.getBoundingClientRect();
+    var stepCenter = rect.top + rect.height / 2;
+    var offset = stepCenter - vcenter;
+    if (Math.abs(offset) > 10 && Math.abs(offset) < SNAP_THRESHOLD) {
+      window.scrollBy({ top: offset, behavior: 'smooth' });
+    }
+  }
+
+  window.addEventListener('scroll', function() {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(snapToStep, 200);
+  }, { passive: true });
+
   // Init
   sizePhones();
   setStickyTop();
-  onScroll(); // set initial opacities — iframes only load when visible
+  onScroll();
   window.addEventListener('resize', function() { sizePhones(); setStickyTop(); });
 })();
 </script>
