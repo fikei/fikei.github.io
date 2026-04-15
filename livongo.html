@@ -137,10 +137,11 @@
       border-radius: 16px;
     }
 
-    /* Match animation background (white cards) */
+    /* Match animation background (white cards), centered in viewport */
     .d-sticky-scroll__layers {
       background: #fff;
       border-radius: 16px;
+      height: calc(100vh - 81px - 48px);  /* viewport minus chrome minus bottom breathing room */
     }
 
     /* Extra breathing room around animation frames */
@@ -531,7 +532,7 @@
 <script>
 (function() {
   var REG_W = 480, REG_H = 640;
-  var NAV_H = 27, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H;
+  var NAV_H = 71, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H;
 
   var stickyReg = document.getElementById('stickyReg');
   var layers = document.querySelectorAll('.d-sticky-scroll__layer');
@@ -560,7 +561,12 @@
   }
 
   function setStickyTop() {
-    if (stickyReg) stickyReg.style.top = CHROME + 'px';
+    if (!stickyReg) return;
+    var pad = 24; // breathing room above and below
+    var availH = window.innerHeight - CHROME - pad * 2;
+    var layersEl = stickyReg.querySelector('.d-sticky-scroll__layers');
+    if (layersEl) layersEl.style.height = availH + 'px';
+    stickyReg.style.top = (CHROME + pad) + 'px';
   }
 
   function preloadIframe(index) {
