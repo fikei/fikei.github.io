@@ -215,16 +215,10 @@
 
       </div>
 
-      <!-- Export overlay -->
-      <div class="export-overlay" id="exportOverlay"></div>
-
-      <!-- Export sheet -->
-      <div class="export-sheet" id="exportSheet">
-        <div class="export-handle"></div>
-
-        <!-- Nearby -->
+      <!-- Nearby panel — floats at top, slides down -->
+      <div id="nearbyPanel" style="position: absolute; top: 0; left: 0; right: 0; z-index: 25; background: #0A0A0A; padding: 16px 16px 12px; border-radius: 42px 42px 0 0; transform: translateY(-100%); transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column;">
         <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 0 12px;">Nearby</div>
-        <div style="display: flex; align-items: center; background: #161618; border-radius: 10px; padding: 14px 16px; gap: 10px; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; background: #161618; border-radius: 10px; padding: 14px 16px; gap: 10px; margin-bottom: 8px;">
           <div style="display: flex; flex-direction: column; gap: 3px;">
             <span style="color: #EEF8FE; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;">Nadia Allendes</span>
             <div style="display: flex; gap: 0; align-items: center;">
@@ -238,7 +232,7 @@
             <span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Send</span>
           </div>
         </div>
-        <div style="display: flex; align-items: center; background: #161618; border-radius: 10px; padding: 14px 16px; gap: 10px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; background: #161618; border-radius: 10px; padding: 14px 16px; gap: 10px;">
           <div style="display: flex; flex-direction: column; gap: 3px;">
             <span style="color: #EEF8FE; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;">Steven Smith</span>
             <div style="display: flex; gap: 0; align-items: center;">
@@ -252,6 +246,14 @@
             <span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Send</span>
           </div>
         </div>
+      </div>
+
+      <!-- Export overlay -->
+      <div class="export-overlay" id="exportOverlay"></div>
+
+      <!-- Export sheet -->
+      <div class="export-sheet" id="exportSheet">
+        <div class="export-handle"></div>
 
         <!-- Share options -->
         <div class="export-label">SHARE SUMMARY</div>
@@ -313,9 +315,11 @@
     tap(document.getElementById('shareBtn'));
     await wait(400);
 
-    // Open export sheet
+    // Open export sheet + nearby panel slides down from top
     document.getElementById('exportOverlay').classList.add('show');
     document.getElementById('exportSheet').classList.add('show');
+    await wait(200);
+    document.getElementById('nearbyPanel').style.transform = 'translateY(0)';
 
     await wait(1500);
 

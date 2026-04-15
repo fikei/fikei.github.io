@@ -445,97 +445,96 @@
 
     // ── 1. LOR (null state) ──
     await openDrawer('Level of Responsiveness (LOR)', lorHTML, 1);
-    await wait(800);
+    await wait(1000);
     // Tap Alert + Oriented
     selectRow('lor-ao');
     tap(document.getElementById('lor-ao'));
-    // Show orientation chips
-    await wait(400);
+    await wait(600);
     document.getElementById('lor-chips').style.display = 'flex';
-    await wait(400);
+    await wait(600);
     // Tap Person
     selectChip('lor-person');
-    await wait(300);
+    await wait(500);
     // Tap Place
     selectChip('lor-place');
-    await wait(300);
+    await wait(500);
     // Tap Time
     selectChip('lor-time');
-    await wait(300);
+    await wait(500);
     // Tap Event
     selectChip('lor-event');
-    await wait(500);
+    await wait(700);
     // Save → swap to HR
     tap(saveBtn);
     fillCell('cell-lor', 'AO4', 'vital-cell--normal');
-    await wait(400);
+    await wait(600);
 
     // ── 2. Heart Rate (swap in-place) ──
     await swapDrawer('Heart Rate', hrHTML, 2);
-    await wait(500);
+    await wait(700);
     // Tap 120 preset
     tap(document.getElementById('pre-120'));
     document.getElementById('pre-120').classList.add('tapped');
     document.getElementById('hr-value').textContent = '120';
-    await wait(400);
+    await wait(600);
     // +1, +1
     tap(document.getElementById('hr-p1'));
-    await wait(200);
+    await wait(400);
     document.getElementById('hr-value').textContent = '121';
     tap(document.getElementById('hr-p1'));
-    await wait(200);
+    await wait(400);
     document.getElementById('hr-value').textContent = '122';
-    await wait(500);
+    await wait(700);
     tap(saveBtn);
     fillCell('cell-hr', '122', 'vital-cell--red');
-    await wait(400);
+    await wait(600);
 
     // ── 3. Respiratory Rate (swap in-place) ──
     await swapDrawer('Respiratory Rate', rrHTML, 3);
-    await wait(500);
+    await wait(700);
     tap(document.getElementById('rr-p1'));
-    await wait(200);
+    await wait(400);
     document.getElementById('rr-value').textContent = '17';
     tap(document.getElementById('rr-p1'));
-    await wait(200);
+    await wait(400);
     document.getElementById('rr-value').textContent = '18';
-    await wait(500);
+    await wait(700);
     tap(saveBtn);
     fillCell('cell-rr', '18', 'vital-cell--amber');
-    await wait(400);
+    await wait(600);
 
     // ── 4. Skin / SCTM (swap in-place, null state) ──
     await swapDrawer('Skin / SCTM', sctmHTML, 4);
-    await wait(500);
+    await wait(700);
     // Tap Pink
     selectChip('sc-pink');
-    await wait(300);
+    await wait(500);
     // Tap Warm
     selectChip('st-warm');
-    await wait(300);
+    await wait(500);
     // Tap Dry
     selectChip('sm-dry');
-    await wait(300);
+    await wait(500);
     // Show summary
     var summary = document.getElementById('sctm-summary');
     document.getElementById('sctm-title').textContent = 'Pink / Warm / Dry';
     document.getElementById('sctm-desc').textContent = 'Normal perfusion';
     summary.style.opacity = '1';
-    await wait(500);
+    await wait(700);
     tap(saveBtn);
     fillCell('cell-sctm', 'PWD', 'vital-cell--normal');
-    await wait(400);
+    await wait(600);
 
     // ── 5. Pulse (swap in-place, null state) ──
     await swapDrawer('Pulse', pulseHTML, 5);
-    await wait(600);
+    await wait(800);
     // Tap Normal
     selectRow('pulse-normal');
     tap(document.getElementById('pulse-normal'));
-    await wait(500);
+    await wait(700);
     tap(saveBtn);
     fillCell('cell-pulse', 'S', 'vital-cell--normal');
-    await wait(300);
+    await wait(400);
 
     // Close drawer
     await closeDrawer();
