@@ -649,7 +649,7 @@
 
 .d-sticky-scroll__layers {
   position: relative;
-  height: calc(100vh - 200px);
+  height: calc(100vh - 125px);
   background: #0E0E0D;
   overflow: hidden;
   opacity: 1;
@@ -674,7 +674,7 @@
 }
 
 .d-sticky-scroll__step {
-  min-height: calc(100vh - 81px);
+  min-height: calc(100vh - 125px);
   display: flex;
   flex-direction: column;
   justify-content: center;

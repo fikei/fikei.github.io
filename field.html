@@ -162,8 +162,12 @@
               <iframe data-src="/animations/soap-note.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="soapFrame"></iframe>
             </div>
           </div>
-          <!-- Layer 2: One Handed Entry placeholder -->
-          <div class="d-sticky-scroll__layer" data-step="2" style="background: #0E0E0D;"></div>
+          <!-- Layer 2: Manual Entry animation -->
+          <div class="d-sticky-scroll__layer" data-step="2">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/manual-entry.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="entryFrame"></iframe>
+            </div>
+          </div>
           <!-- Layer 3: Offline Care Transfer placeholder -->
           <div class="d-sticky-scroll__layer" data-step="3" style="background: #0E0E0D;"></div>
         </div>
@@ -339,7 +343,7 @@
 <script>
 (function() {
   var PHONE_W = 402, PHONE_H = 856;
-  var NAV_H = 27, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H; // 81px
+  var NAV_H = 71, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H; // 125px
 
   var stickyPhone = document.getElementById('stickyPhone');
   var layers = document.querySelectorAll('.d-sticky-scroll__layer');
@@ -374,33 +378,27 @@
     stickyPhone.style.top = CHROME + 'px';
   }
 
-  var loaded = {}; // track which iframes have been loaded (src set)
-
-  // Preload iframe (set src from data-src) without starting animation
-  function preloadIframe(index) {
-    if (loaded[index]) return;
+  // Reset an iframe by reloading its src — restarts the animation from scratch
+  function resetIframe(index) {
+    started[index] = false;
     var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
     if (iframe && iframe.dataset.src) {
-      loaded[index] = true;
-      iframe.src = iframe.dataset.src;
+      iframe.src = ''; // clear
     }
   }
 
-  // Start animation — handles both already-loaded and still-loading iframes
+  // Load and trigger an iframe animation
   function triggerIframe(index) {
     if (started[index]) return;
     started[index] = true;
-    preloadIframe(index);
     var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
-    if (!iframe) return;
+    if (!iframe || !iframe.dataset.src) return;
     function send() {
       try { iframe.contentWindow.postMessage('start', '*'); } catch(e) {}
     }
-    // If already loaded, send now AND on next load (in case it reloads)
-    // If not loaded yet, wait for load
     iframe.addEventListener('load', send);
-    // Also try sending now in case load already fired
-    setTimeout(send, 50);
+    iframe.src = iframe.dataset.src;
+    setTimeout(send, 100);
   }
 
   // Update step opacities + active layer based on scroll position
@@ -422,7 +420,7 @@
       if (dist < minDist) { minDist = dist; closest = i; }
     }
 
-    // Check if section is in viewport for preloading/triggering
+    // Check if section is in viewport
     var isVisible = false;
     if (stickyPhone) {
       var phoneRect = stickyPhone.getBoundingClientRect();
@@ -430,13 +428,12 @@
       var distFromCenter = Math.abs(phoneCenter - vcenter);
       var viewH = window.innerHeight - CHROME;
       isVisible = distFromCenter < viewH * 0.6;
-      if (isVisible) {
-        for (var k = 0; k < layers.length; k++) preloadIframe(k);
-      }
     }
 
-    // Toggle active layer (crossfade) + trigger animation
+    // Toggle active layer — reset old, trigger new
     if (closest !== activeStep) {
+      // Reset the animation that's being scrolled away from
+      resetIframe(activeStep);
       activeStep = closest;
       for (var j = 0; j < layers.length; j++) {
         layers[j].classList.toggle('is-active', j === closest);
