@@ -15,12 +15,6 @@
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    animation: cardLoop 16s ease infinite;
-  }
-  @keyframes cardLoop {
-    0%, 3% { opacity: 0; transform: translateY(12px); }
-    6%, 87% { opacity: 1; transform: translateY(0); }
-    95%, 100% { opacity: 0; transform: translateY(-4px); }
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
@@ -29,12 +23,11 @@
   .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
   .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; }
   .progress-fill--full { width: 100%; }
-  .progress-fill--partial { width: 0; animation: progressFill 0.8s 0.5s ease forwards; }
-  @keyframes progressFill { to { width: 60%; } }
+  .progress-fill--partial { width: 60%; }
 
   .content { padding: 32px 28px 28px; }
 
-  /* Banner — starts visible immediately */
+  /* Banner */
   .verified {
     background: #f5f9f9;
     border: 1px solid #d3d9d9;
@@ -44,25 +37,15 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    opacity: 0;
-    transform: translateY(12px) scale(0.95);
-    animation: verifiedPop 0.7s 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  }
-  @keyframes verifiedPop {
-    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   .verified-icon { font-size: 20px; flex-shrink: 0; }
   .verified-text { font-size: 13px; color: #333; line-height: 1.6; }
   .verified-text strong { font-weight: 700; }
   .verified-check {
     display: inline-block; color: #2e7d32; font-weight: 700;
-    opacity: 0; transform: scale(0);
-    animation: checkPop 0.3s 1.0s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
-  @keyframes checkPop { to { opacity: 1; transform: scale(1); } }
 
-  /* Rest of content hidden until after banner */
-  .below-banner { opacity: 0; transform: translateY(12px); animation: fadeUp 0.5s 1.4s ease forwards; }
+  .below-banner { }
 
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
   .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
@@ -134,12 +117,7 @@
   }
   .cta.visible { opacity: 1; }
 
-  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0; animation: fadeUp 0.3s 1.8s ease forwards; }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 </style>
 </head>
 <body>
