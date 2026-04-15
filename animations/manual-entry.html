@@ -59,10 +59,13 @@
   .drawer.show { transform: translateY(0); }
 
   .drawer-handle { width: 36px; height: 5px; border-radius: 3px; background: #3A3A3C; margin: 8px auto 12px; }
-  .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 24px; }
+  .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 12px; }
   .drawer-skip { color: #B0B0B0; font-size: 14px; font-weight: 500; }
   .drawer-title { color: #9E99AD; font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
-  .drawer-spacer { width: 34px; }
+  .drawer-step { color: #6B6571; font-size: 11px; font-weight: 500; text-align: right; width: 40px; }
+
+  /* Content crossfade */
+  #drawerContent { transition: opacity 0.2s ease; }
 
   /* Option rows */
   .opt-row { display: flex; align-items: center; background: #1A1A1A; border-radius: 12px; min-height: 56px; padding: 10px 16px; margin-bottom: 8px; opacity: 0.4; transition: background 0.15s, opacity 0.15s; }
@@ -189,8 +192,8 @@
           <div class="soap-card-header" style="padding-bottom: 12px;">
             <span class="soap-card-title">Vitals</span>
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="color: #A79EAF; font-size: 12px;">⚠</span>
-              <span style="color: #A79EAF; font-size: 12px;">3:52 Remaining</span>
+              <span style="color: #FE1844; font-size: 12px;">⚠</span>
+              <span style="color: #FE1844; font-size: 12px;">Vitals Due</span>
             </div>
           </div>
           <div class="vitals-table">
@@ -299,9 +302,9 @@
       <div class="drawer" id="drawer">
         <div class="drawer-handle"></div>
         <div class="drawer-header">
-          <span class="drawer-skip">Skip</span>
+          <span class="drawer-skip" id="drawerSkip">Skip</span>
           <span class="drawer-title" id="drawerTitle">Level of Responsiveness (LOR)</span>
-          <div class="drawer-spacer"></div>
+          <span class="drawer-step" id="drawerStep">1 of 5</span>
         </div>
         <div id="drawerContent"></div>
         <div class="save-btn" id="saveBtn">Save</div>
@@ -322,36 +325,47 @@
   var overlay = document.getElementById('drawerOverlay');
   var drawerTitle = document.getElementById('drawerTitle');
   var drawerContent = document.getElementById('drawerContent');
+  var drawerStep = document.getElementById('drawerStep');
   var saveBtn = document.getElementById('saveBtn');
   var addBtn = document.getElementById('addVitalsBtn');
 
-  // Utility: wait
   function wait(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-  // Show drawer
-  function openDrawer(title, html) {
+  // Open drawer (first time only)
+  function openDrawer(title, html, step) {
     drawerTitle.textContent = title;
+    drawerStep.textContent = step + ' of 5';
     drawerContent.innerHTML = html;
     overlay.classList.add('show');
     drawer.classList.add('show');
     return wait(400);
   }
 
-  // Close drawer
+  // Swap drawer content in-place with crossfade
+  function swapDrawer(title, html, step) {
+    drawerContent.style.opacity = '0';
+    return wait(200).then(function() {
+      drawerTitle.textContent = title;
+      drawerStep.textContent = step + ' of 5';
+      drawerContent.innerHTML = html;
+      drawerContent.style.opacity = '1';
+      return wait(300);
+    });
+  }
+
+  // Close drawer (final)
   function closeDrawer() {
     drawer.classList.remove('show');
     overlay.classList.remove('show');
     return wait(400);
   }
 
-  // Simulate tap on element
   function tap(el) {
     if (!el) return;
     el.classList.add('tapped');
     setTimeout(function() { el.classList.remove('tapped'); }, 150);
   }
 
-  // Fill a vitals cell
   function fillCell(id, value, colorClass) {
     var cell = document.getElementById(id);
     if (!cell) return;
@@ -361,13 +375,13 @@
     else cell.style.cssText = 'background: #101010; color: #A79EAF; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; border-radius: 8px; padding: 8px; flex: 1;';
   }
 
-  // ═══════ DRAWER CONTENT TEMPLATES ═══════
+  // ═══════ TEMPLATES — all start from NULL state ═══════
 
-  var lorHTML = '<div class="opt-row opt-row--active" id="lor-ao"><div><div class="opt-name">Alert + Oriented</div><div class="opt-desc">Awake, eyes open</div></div></div>' +
-    '<div class="sub-chips"><div class="sub-chip sub-chip--active" id="lor-person"><span class="sub-chip-text sub-chip-text--active">Person</span></div><div class="sub-chip sub-chip--active" id="lor-place"><span class="sub-chip-text sub-chip-text--active">Place</span></div><div class="sub-chip" id="lor-time"><span class="sub-chip-text">Time</span></div><div class="sub-chip" id="lor-event"><span class="sub-chip-text">Event</span></div></div>' +
-    '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Verbal</div><div class="opt-desc" style="font-size:11px;">Responds to voice</div></div></div>' +
-    '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Pain</div><div class="opt-desc" style="font-size:11px;">Responds to pain</div></div></div>' +
-    '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Unresponsive</div><div class="opt-desc" style="font-size:11px;">No response</div></div></div>';
+  var lorHTML = '<div class="opt-row" id="lor-ao"><div><div class="opt-name" style="font-size:13px;">Alert + Oriented</div><div class="opt-desc" style="font-size:11px;">Awake, eyes open</div></div></div>' +
+    '<div class="sub-chips" id="lor-chips" style="display:none;"><div class="sub-chip" id="lor-person"><span class="sub-chip-text">Person</span></div><div class="sub-chip" id="lor-place"><span class="sub-chip-text">Place</span></div><div class="sub-chip" id="lor-time"><span class="sub-chip-text">Time</span></div><div class="sub-chip" id="lor-event"><span class="sub-chip-text">Event</span></div></div>' +
+    '<div class="opt-row" id="lor-verbal"><div><div class="opt-name" style="font-size:13px;">Verbal</div><div class="opt-desc" style="font-size:11px;">Responds to voice</div></div></div>' +
+    '<div class="opt-row" id="lor-pain"><div><div class="opt-name" style="font-size:13px;">Pain</div><div class="opt-desc" style="font-size:11px;">Responds to pain</div></div></div>' +
+    '<div class="opt-row" id="lor-unresp"><div><div class="opt-name" style="font-size:13px;">Unresponsive</div><div class="opt-desc" style="font-size:11px;">No response</div></div></div>';
 
   var hrHTML = '<div class="stepper-value"><span class="stepper-num" id="hr-value">88</span><span class="stepper-unit">bpm</span></div>' +
     '<div class="stepper-btns"><div class="stepper-btn" id="hr-m10">-10</div><div class="stepper-btn" id="hr-m1">-1</div><div class="stepper-btn" id="hr-p1">+1</div><div class="stepper-btn" id="hr-p10">+10</div></div>' +
@@ -377,60 +391,91 @@
     '<div class="stepper-btns"><div class="stepper-btn" id="rr-m10">-10</div><div class="stepper-btn" id="rr-m1">-1</div><div class="stepper-btn" id="rr-p1">+1</div><div class="stepper-btn" id="rr-p10">+10</div></div>' +
     '<div class="presets"><div class="preset" id="rr-pre-12">12</div><div class="preset" id="rr-pre-16">16</div><div class="preset" id="rr-pre-20">20</div><div class="preset" id="rr-pre-24">24</div></div>';
 
-  var sctmHTML = '<div class="sctm-section"><div class="sctm-label">Color</div><div class="sctm-chips"><div class="sctm-chip sctm-chip--active" id="sc-pink"><span class="sctm-chip-text sctm-chip-text--active">Pink</span></div><div class="sctm-chip" id="sc-pale"><span class="sctm-chip-text">Pale</span></div><div class="sctm-chip" id="sc-flush"><span class="sctm-chip-text">Flushed</span></div><div class="sctm-chip" id="sc-cyan"><span class="sctm-chip-text">Cyan</span></div></div></div>' +
-    '<div class="sctm-section"><div class="sctm-label">Temperature</div><div class="sctm-chips"><div class="sctm-chip sctm-chip--active" id="st-warm"><span class="sctm-chip-text sctm-chip-text--active">Warm</span></div><div class="sctm-chip" id="st-cool"><span class="sctm-chip-text">Cool</span></div><div class="sctm-chip" id="st-hot"><span class="sctm-chip-text">Hot</span></div><div class="sctm-chip" id="st-cold"><span class="sctm-chip-text">Cold</span></div></div></div>' +
-    '<div class="sctm-section"><div class="sctm-label">Moisture</div><div class="sctm-chips"><div class="sctm-chip sctm-chip--active" id="sm-dry"><span class="sctm-chip-text sctm-chip-text--active">Dry</span></div><div class="sctm-chip" id="sm-moist"><span class="sctm-chip-text">Moist</span></div><div class="sctm-chip" id="sm-wet"><span class="sctm-chip-text">Wet</span></div></div></div>' +
-    '<div class="sctm-summary"><div class="sctm-summary-title">Pink / Warm / Dry</div><div class="sctm-summary-desc">Normal perfusion</div></div>';
+  var sctmHTML = '<div class="sctm-section"><div class="sctm-label">Color</div><div class="sctm-chips"><div class="sctm-chip" id="sc-pink"><span class="sctm-chip-text">Pink</span></div><div class="sctm-chip" id="sc-pale"><span class="sctm-chip-text">Pale</span></div><div class="sctm-chip" id="sc-flush"><span class="sctm-chip-text">Flushed</span></div><div class="sctm-chip" id="sc-cyan"><span class="sctm-chip-text">Cyan</span></div></div></div>' +
+    '<div class="sctm-section"><div class="sctm-label">Temperature</div><div class="sctm-chips"><div class="sctm-chip" id="st-warm"><span class="sctm-chip-text">Warm</span></div><div class="sctm-chip" id="st-cool"><span class="sctm-chip-text">Cool</span></div><div class="sctm-chip" id="st-hot"><span class="sctm-chip-text">Hot</span></div><div class="sctm-chip" id="st-cold"><span class="sctm-chip-text">Cold</span></div></div></div>' +
+    '<div class="sctm-section"><div class="sctm-label">Moisture</div><div class="sctm-chips"><div class="sctm-chip" id="sm-dry"><span class="sctm-chip-text">Dry</span></div><div class="sctm-chip" id="sm-moist"><span class="sctm-chip-text">Moist</span></div><div class="sctm-chip" id="sm-wet"><span class="sctm-chip-text">Wet</span></div></div></div>' +
+    '<div class="sctm-summary" id="sctm-summary" style="opacity:0;"><div class="sctm-summary-title" id="sctm-title"></div><div class="sctm-summary-desc" id="sctm-desc"></div></div>';
 
-  var pulseHTML = '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Bounding</div><div class="opt-desc" style="font-size:11px;">Pounding, easy to feel</div></div></div>' +
-    '<div class="opt-row opt-row--active" id="pulse-normal"><div><div class="opt-name">Normal</div><div class="opt-desc">Steady beat at the wrist</div></div></div>' +
-    '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Weak</div><div class="opt-desc" style="font-size:11px;">Faint, hard to keep track of</div></div></div>' +
-    '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Thready</div><div class="opt-desc" style="font-size:11px;">Barely there, comes and goes</div></div></div>' +
-    '<div class="opt-row opt-row--dim"><div><div class="opt-name" style="font-size:13px;">Absent</div><div class="opt-desc" style="font-size:11px;">Can\'t feel anything</div></div></div>';
+  var pulseHTML = '<div class="opt-row" id="pulse-bounding"><div><div class="opt-name" style="font-size:13px;">Bounding</div><div class="opt-desc" style="font-size:11px;">Pounding, easy to feel</div></div></div>' +
+    '<div class="opt-row" id="pulse-normal"><div><div class="opt-name" style="font-size:13px;">Normal</div><div class="opt-desc" style="font-size:11px;">Steady beat at the wrist</div></div></div>' +
+    '<div class="opt-row" id="pulse-weak"><div><div class="opt-name" style="font-size:13px;">Weak</div><div class="opt-desc" style="font-size:11px;">Faint, hard to keep track of</div></div></div>' +
+    '<div class="opt-row" id="pulse-thready"><div><div class="opt-name" style="font-size:13px;">Thready</div><div class="opt-desc" style="font-size:11px;">Barely there, comes and goes</div></div></div>' +
+    '<div class="opt-row" id="pulse-absent"><div><div class="opt-name" style="font-size:13px;">Absent</div><div class="opt-desc" style="font-size:11px;">Can\'t feel anything</div></div></div>';
+
+  // Select an opt-row and dim others
+  function selectRow(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var rows = el.parentElement.querySelectorAll('.opt-row');
+    rows.forEach(function(r) { r.classList.remove('opt-row--active'); r.classList.add('opt-row--dim'); });
+    el.classList.remove('opt-row--dim');
+    el.classList.add('opt-row--active');
+    el.querySelector('.opt-name').style.fontSize = '14px';
+    el.querySelector('.opt-desc').style.fontSize = '12px';
+  }
+
+  // Select a chip (works for both sctm-chip and sub-chip)
+  function selectChip(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.classList.contains('sub-chip')) {
+      el.classList.add('sub-chip--active');
+      var t = el.querySelector('.sub-chip-text');
+      if (t) { t.classList.add('sub-chip-text--active'); }
+    } else {
+      el.classList.add('sctm-chip--active');
+      var t2 = el.querySelector('.sctm-chip-text');
+      if (t2) { t2.classList.add('sctm-chip-text--active'); }
+    }
+  }
 
   // ═══════ ANIMATION SEQUENCE ═══════
 
   async function startAnimation() {
-    // Scroll to show Add Vitals button
-    await wait(800);
-    var vitalsCard = document.getElementById('vitalsCard');
-    vitalsCard.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    await wait(1200);
+    // Scroll so Add Vitals is centered
+    await wait(400);
+    var addBtnRect = addBtn.getBoundingClientRect();
+    var scrollTarget = soapBody.scrollTop + addBtnRect.top - 390; // center in 844px screen
+    soapBody.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    await wait(1000);
 
     // Tap Add Vitals
     tap(addBtn);
     await wait(300);
 
-    // ── LOR ──
-    await openDrawer('Level of Responsiveness (LOR)', lorHTML);
-    await wait(600);
-    // Tap Alert + Oriented (already selected, show the tap)
+    // ── 1. LOR (null state) ──
+    await openDrawer('Level of Responsiveness (LOR)', lorHTML, 1);
+    await wait(800);
+    // Tap Alert + Oriented
+    selectRow('lor-ao');
     tap(document.getElementById('lor-ao'));
+    // Show orientation chips
     await wait(400);
-    // Tap Time chip
-    var timeChip = document.getElementById('lor-time');
-    timeChip.classList.add('sub-chip--active');
-    timeChip.querySelector('.sub-chip-text').className = 'sub-chip-text sub-chip-text--active';
+    document.getElementById('lor-chips').style.display = 'flex';
     await wait(400);
-    // Tap Event chip
-    var eventChip = document.getElementById('lor-event');
-    eventChip.classList.add('sub-chip--active');
-    eventChip.querySelector('.sub-chip-text').className = 'sub-chip-text sub-chip-text--active';
-    await wait(500);
-    // Tap Save
-    tap(saveBtn);
-    await wait(200);
-    await closeDrawer();
-    fillCell('cell-lor', 'AO4', 'vital-cell--normal');
+    // Tap Person
+    selectChip('lor-person');
     await wait(300);
+    // Tap Place
+    selectChip('lor-place');
+    await wait(300);
+    // Tap Time
+    selectChip('lor-time');
+    await wait(300);
+    // Tap Event
+    selectChip('lor-event');
+    await wait(500);
+    // Save → swap to HR
+    tap(saveBtn);
+    fillCell('cell-lor', 'AO4', 'vital-cell--normal');
+    await wait(400);
 
-    // ── Heart Rate ──
-    await openDrawer('Heart Rate', hrHTML);
+    // ── 2. Heart Rate (swap in-place) ──
+    await swapDrawer('Heart Rate', hrHTML, 2);
     await wait(500);
     // Tap 120 preset
-    var pre120 = document.getElementById('pre-120');
-    tap(pre120);
-    pre120.classList.add('tapped');
+    tap(document.getElementById('pre-120'));
+    document.getElementById('pre-120').classList.add('tapped');
     document.getElementById('hr-value').textContent = '120';
     await wait(400);
     // +1, +1
@@ -440,54 +485,63 @@
     tap(document.getElementById('hr-p1'));
     await wait(200);
     document.getElementById('hr-value').textContent = '122';
-    await wait(400);
-    tap(saveBtn);
-    await wait(200);
-    await closeDrawer();
-    fillCell('cell-hr', '122', 'vital-cell--red');
-    await wait(300);
-
-    // ── Respiratory Rate ──
-    await openDrawer('Respiratory Rate', rrHTML);
     await wait(500);
-    // Already at 16, tap +1 twice
+    tap(saveBtn);
+    fillCell('cell-hr', '122', 'vital-cell--red');
+    await wait(400);
+
+    // ── 3. Respiratory Rate (swap in-place) ──
+    await swapDrawer('Respiratory Rate', rrHTML, 3);
+    await wait(500);
     tap(document.getElementById('rr-p1'));
     await wait(200);
     document.getElementById('rr-value').textContent = '17';
     tap(document.getElementById('rr-p1'));
     await wait(200);
     document.getElementById('rr-value').textContent = '18';
-    await wait(400);
+    await wait(500);
     tap(saveBtn);
-    await wait(200);
-    await closeDrawer();
     fillCell('cell-rr', '18', 'vital-cell--amber');
-    await wait(300);
-
-    // ── Skin / SCTM ──
-    await openDrawer('Skin / SCTM', sctmHTML);
-    await wait(800);
-    // Already selected Pink/Warm/Dry — just tap Save
-    tap(saveBtn);
-    await wait(200);
-    await closeDrawer();
-    fillCell('cell-sctm', 'PWD', 'vital-cell--normal');
-    await wait(300);
-
-    // ── Pulse ──
-    await openDrawer('Pulse', pulseHTML);
-    await wait(500);
-    // Tap Normal (already selected)
-    tap(document.getElementById('pulse-normal'));
     await wait(400);
-    tap(saveBtn);
-    await wait(200);
-    await closeDrawer();
-    fillCell('cell-pulse', 'S', 'vital-cell--normal');
 
-    // Done — vitals row is complete
+    // ── 4. Skin / SCTM (swap in-place, null state) ──
+    await swapDrawer('Skin / SCTM', sctmHTML, 4);
     await wait(500);
-    // Update "Now" to show time
+    // Tap Pink
+    selectChip('sc-pink');
+    await wait(300);
+    // Tap Warm
+    selectChip('st-warm');
+    await wait(300);
+    // Tap Dry
+    selectChip('sm-dry');
+    await wait(300);
+    // Show summary
+    var summary = document.getElementById('sctm-summary');
+    document.getElementById('sctm-title').textContent = 'Pink / Warm / Dry';
+    document.getElementById('sctm-desc').textContent = 'Normal perfusion';
+    summary.style.opacity = '1';
+    await wait(500);
+    tap(saveBtn);
+    fillCell('cell-sctm', 'PWD', 'vital-cell--normal');
+    await wait(400);
+
+    // ── 5. Pulse (swap in-place, null state) ──
+    await swapDrawer('Pulse', pulseHTML, 5);
+    await wait(600);
+    // Tap Normal
+    selectRow('pulse-normal');
+    tap(document.getElementById('pulse-normal'));
+    await wait(500);
+    tap(saveBtn);
+    fillCell('cell-pulse', 'S', 'vital-cell--normal');
+    await wait(300);
+
+    // Close drawer
+    await closeDrawer();
+
+    // Update timestamp
+    await wait(300);
     document.querySelector('#nowRow .vitals-row-time').textContent = '10:05';
   }
 
