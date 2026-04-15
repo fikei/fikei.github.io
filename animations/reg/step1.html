@@ -3,12 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reg Step 1 — Let's Get Started</title>
+<title>Reg Step 1 — Eligibility Confirmation</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
-  body.embedded { padding: 0; }
 
   .card {
     width: 480px;
@@ -16,9 +15,14 @@
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    animation: cardLoop 12s ease infinite;
+  }
+  @keyframes cardLoop {
+    0%, 4% { opacity: 0; transform: translateY(12px); }
+    8%, 85% { opacity: 1; transform: translateY(0); }
+    95%, 100% { opacity: 0; transform: translateY(-4px); }
   }
 
-  /* Progress bar */
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
   .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
   .progress-label--dim { color: #bbb; }
@@ -26,12 +30,10 @@
   .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; width: 0; animation: progressFill 1s 0.3s ease forwards; }
   @keyframes progressFill { to { width: 50%; } }
 
-  /* Content */
   .content { padding: 32px 28px 28px; }
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
   .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
 
-  /* Welcome banner */
   .welcome {
     background: #faf8f5;
     border: 1px solid #ede8e1;
@@ -45,7 +47,6 @@
   .welcome-body { font-size: 13px; color: #4a4540; line-height: 1.6; }
   .welcome-body strong { font-weight: 700; }
 
-  /* Form fields */
   .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
   .form-group { flex: 1; display: flex; flex-direction: column; }
   .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -58,35 +59,52 @@
     color: #bbb;
     background: #fff;
     transition: border-color 0.3s, color 0.3s;
+    position: relative;
+    overflow: hidden;
   }
-  .form-input.typing { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
 
   .field-1 { opacity: 0; animation: fadeUp 0.4s 0.7s ease forwards; }
   .field-2 { opacity: 0; animation: fadeUp 0.4s 0.85s ease forwards; }
   .field-3 { opacity: 0; animation: fadeUp 0.4s 1.0s ease forwards; }
 
-  /* Name typing animation */
-  .fname { animation: typeFname 6s 2s ease infinite; }
-  .lname { animation: typeLname 6s 2.4s ease infinite; }
-  .dob { animation: typeDob 6s 2.8s ease infinite; }
+  /* Typing animation — placeholder fades out, value types in */
+  .form-input .placeholder { display: inline; }
+  .form-input .value { display: none; color: #333; }
 
-  @keyframes typeFname {
-    0%, 5% { color: #bbb; border-color: #ddd; box-shadow: none; }
-    8% { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
-    15%, 100% { color: #333; border-color: #ddd; box-shadow: none; }
-  }
-  @keyframes typeLname {
-    0%, 8% { color: #bbb; border-color: #ddd; box-shadow: none; }
-    12% { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
-    20%, 100% { color: #333; border-color: #ddd; box-shadow: none; }
-  }
-  @keyframes typeDob {
-    0%, 15% { color: #bbb; border-color: #ddd; box-shadow: none; }
-    20% { color: #333; border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
-    28%, 100% { color: #333; border-color: #ddd; box-shadow: none; }
+  .fname .placeholder { animation: hidePlaceholder 0.01s 2.0s forwards; }
+  .fname .value { animation: showValue 0.01s 2.0s forwards; }
+  .fname { animation: typeField 0.6s 2.0s ease forwards; }
+
+  .lname .placeholder { animation: hidePlaceholder 0.01s 2.8s forwards; }
+  .lname .value { animation: showValue 0.01s 2.8s forwards; }
+  .lname { animation: typeField 0.6s 2.8s ease forwards; }
+
+  .dob .placeholder { animation: hidePlaceholder 0.01s 3.6s forwards; }
+  .dob .value { animation: showValue 0.01s 3.6s forwards; }
+  .dob { animation: typeField 0.6s 3.6s ease forwards; }
+
+  @keyframes hidePlaceholder { to { display: none; visibility: hidden; font-size: 0; } }
+  @keyframes showValue { to { display: inline; } }
+  @keyframes typeField {
+    0% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); color: #333; }
+    80% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); color: #333; }
+    100% { border-color: #ddd; box-shadow: none; color: #333; }
   }
 
-  /* CTA button */
+  /* Cursor blink in active field */
+  .fname::after, .lname::after, .dob::after {
+    content: "|";
+    color: #1976D2;
+    font-weight: 300;
+    opacity: 0;
+    animation: none;
+  }
+  .fname::after { animation: cursor 0.5s 2.0s step-end 3, hideCursor 0.01s 2.6s forwards; }
+  .lname::after { animation: cursor 0.5s 2.8s step-end 3, hideCursor 0.01s 3.4s forwards; }
+  .dob::after { animation: cursor 0.5s 3.6s step-end 3, hideCursor 0.01s 4.2s forwards; }
+  @keyframes cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  @keyframes hideCursor { to { display: none; opacity: 0; } }
+
   .cta {
     width: 100%;
     padding: 14px;
@@ -103,22 +121,11 @@
     animation: fadeUp 0.4s 1.2s ease forwards;
   }
 
-  /* Privacy footer */
   .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0; animation: fadeUp 0.3s 1.4s ease forwards; }
 
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Full animation loop — fade out and restart */
-  .card {
-    animation: cardLoop 8s ease infinite;
-  }
-  @keyframes cardLoop {
-    0%, 5% { opacity: 0; transform: translateY(12px); }
-    10%, 85% { opacity: 1; transform: translateY(0); }
-    95%, 100% { opacity: 0; transform: translateY(-4px); }
   }
 </style>
 </head>
@@ -145,22 +152,22 @@
     <div class="form-row field-1">
       <div class="form-group">
         <label>Legal First Name <span class="req">*</span></label>
-        <div class="form-input fname">First name</div>
+        <div class="form-input fname"><span class="placeholder">First name</span><span class="value">Sarah</span></div>
       </div>
       <div class="form-group">
         <label>Legal Last Name <span class="req">*</span></label>
-        <div class="form-input lname">Last name</div>
+        <div class="form-input lname"><span class="placeholder">Last name</span><span class="value">Chen</span></div>
       </div>
     </div>
 
     <div class="form-row field-2">
       <div class="form-group">
         <label>Date of Birth <span class="req">*</span></label>
-        <div class="form-input dob">MM / DD / YYYY</div>
+        <div class="form-input dob"><span class="placeholder">MM / DD / YYYY</span><span class="value">04 / 15 / 1988</span></div>
       </div>
     </div>
 
-    <button class="cta field-3">Next: Create Account</button>
+    <button class="cta field-3">Confirm my identity</button>
   </div>
 
   <div class="privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>

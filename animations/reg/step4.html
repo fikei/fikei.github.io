@@ -77,6 +77,18 @@
   .check-box.animate-check::after { opacity: 0; animation: showCheck 0.1s 2.7s ease forwards; }
   @keyframes showCheck { to { opacity: 1; } }
 
+  /* Weight field typing animation */
+  .wt-placeholder { animation: hideEl 0.01s 3.0s forwards; }
+  .wt-value { animation: showEl 0.01s 3.0s forwards; }
+  .weight-field { animation: typeHighlight 0.8s 3.0s ease forwards; }
+  @keyframes hideEl { to { display: none; visibility: hidden; font-size: 0; } }
+  @keyframes showEl { to { display: inline !important; } }
+  @keyframes typeHighlight {
+    0% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+    80% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+    100% { border-color: #ddd; box-shadow: none; }
+  }
+
   .cta { width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif; margin-top: 16px; opacity: 0; animation: fu 0.4s 1.7s ease forwards; }
 
   @keyframes fu { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -117,7 +129,7 @@
     <div class="form-row f2">
       <div class="form-group">
         <label>Weight (lbs)</label>
-        <div class="fi" style="color: #bbb;">e.g. 185</div>
+        <div class="fi weight-field"><span class="wt-placeholder" style="color: #bbb;">e.g. 185</span><span class="wt-value" style="display:none; color:#333;">192</span></div>
       </div>
     </div>
 
@@ -132,7 +144,7 @@
       <div class="check-pre"><div class="dot dot-3"></div></div>
     </div>
 
-    <button class="cta">Next: Receiving Your Device</button>
+    <button class="cta">Confirm my health info</button>
   </div>
 </div>
 </body>
