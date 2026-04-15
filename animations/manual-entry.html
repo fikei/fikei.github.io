@@ -137,9 +137,54 @@
       </div>
 
       <!-- SOAP body (scrollable) -->
-      <div class="soap-body" id="soapBody">
+      <div class="soap-body" id="soapBody" style="border-top: 1px solid rgba(255,255,255,0.1);">
 
-        <!-- Vitals card (this is what we start scrolled to) -->
+        <!-- Subjective -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 12px;">
+            <span class="soap-card-title">Subjective</span>
+            <span class="soap-counter">8/8</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Fall from 15ft onto rock slab</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">MOI: Height impact onto rock surface</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">Activity: rock climbing</span></div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 24px 0 8px;"></div>
+          <div style="display: flex; align-items: center; gap: 6px; padding-left: 6px; padding-top: 6px;">
+            <span style="color: #A79EAF; font-size: 11px; font-weight: 500;">All Fields Complete</span>
+            <span style="flex: 1;"></span>
+            <span class="soap-footer-btn">Edit</span>
+          </div>
+        </div>
+
+        <!-- Objective -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 6px;">
+            <span class="soap-card-title">Objective</span>
+            <span class="soap-counter">8/8</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">PHYSICAL EXAM</div>
+            <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Injury to Left Leg & Back</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Ankle: Acute Pain (Left), Non-weight bearing</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Back: Tenderness in Lumbar</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">No injuries to neck, head, torso or arms</span></div>
+            <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">MEDICAL HISTORY</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">Allergies: Penicillin</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Medications: None reported</span></div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+          <div style="display: flex; align-items: center; gap: 6px; padding: 12px 6px 6px;">
+            <span style="color: #F9CE86; font-size: 13px; width: 9px;">⚠</span>
+            <span style="color: #A79EAF; font-size: 11px; font-weight: 500;">3 Fields Need Review</span>
+            <span style="flex: 1;"></span>
+            <span class="soap-footer-btn">Review</span>
+          </div>
+        </div>
+
+        <!-- Vitals card (animation scrolls to this) -->
         <div class="soap-card" id="vitalsCard">
           <div class="soap-card-header" style="padding-bottom: 12px;">
             <span class="soap-card-title">Vitals</span>
@@ -188,6 +233,60 @@
           <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
           <div style="padding: 16px 6px 6px;">
             <div class="add-vitals-btn" id="addVitalsBtn">Add Vitals</div>
+          </div>
+        </div>
+
+        <!-- Assessment -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 8px;">
+            <span class="soap-card-title" style="color: #615D6D;">Assessment</span>
+            <span class="soap-counter">3/4</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">CONCERNS</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Acute ankle pain</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Lumbar pain</span></div>
+            <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">POSSIBLE PROGRESSIONS</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Spinal Injury,</span></div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+          <div style="display: flex; align-items: center; gap: 6px; padding: 6px 6px 0;">
+            <span style="color: #A79EAF; font-size: 11px; font-weight: 500;">All Fields Complete</span>
+            <span style="flex: 1;"></span>
+            <span class="soap-footer-btn">Edit</span>
+          </div>
+        </div>
+
+        <!-- Plan -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 8px;">
+            <span class="soap-card-title" style="color: #6B6571;">Plan</span>
+            <span class="soap-counter">4/6</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 12px;">TREATMENT</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Splint Left Ankle</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Ibuprofen 400 mg</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Monitoring for Spinal Injury</span></div>
+            <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 12px;">EVACUATION</div>
+            <div style="background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: inline-flex; align-items: center;">
+              <span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Add Evacuation Plan</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Watch for (standalone) -->
+        <div style="background: #FFF3E02E; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: #F9CE86; font-size: 11px; font-weight: 600; width: 11px;">⚠</span>
+            <span style="color: #F9CE86; font-size: 12px; font-weight: 500;">Watch for:</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 16px;">
+            <div style="display: flex; gap: 8px;"><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">•</span><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">Signs of increased pain</span></div>
+            <div style="display: flex; gap: 8px;"><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">•</span><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">Heart Rate Rebound</span></div>
+            <div style="display: flex; gap: 8px;"><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">•</span><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">Reduce Responsiveness</span></div>
           </div>
         </div>
 
