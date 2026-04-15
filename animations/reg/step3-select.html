@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
   .card {
@@ -15,32 +16,24 @@
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    animation: cardLoop 14s ease infinite;
-  }
-  @keyframes cardLoop {
-    0%, 3% { opacity: 0; transform: translateY(12px); }
-    7%, 85% { opacity: 1; transform: translateY(0); }
-    95%, 100% { opacity: 0; transform: translateY(-4px); }
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
-  .progress-label--dim { color: #bbb; }
-  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; }
-  .fill-full { width: 100%; }
-  .fill-half { width: 50%; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
-  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
-  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 24px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 24px; }
 
   .source-banner {
     background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px;
     padding: 12px 16px; margin-bottom: 20px;
     display: flex; align-items: center; gap: 10px;
     font-size: 13px; color: #2e7d32; font-weight: 500;
-    opacity: 0; animation: fadeUp 0.5s 0.5s ease forwards;
   }
   .source-banner__icon { font-size: 16px; }
   .source-banner__sub { font-size: 11px; color: #558b2f; font-weight: 400; margin-top: 2px; }
@@ -51,12 +44,8 @@
     border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 20px;
     display: flex; align-items: center; gap: 14px;
     transition: border-color 0.3s, background 0.3s;
-    opacity: 0;
   }
   .program.selected { border-color: #1976D2; background: #f5f9ff; }
-  .prog-1 { animation: fadeUp 0.4s 0.7s ease forwards; }
-  .prog-2 { animation: fadeUp 0.4s 0.9s ease forwards; }
-  .prog-3 { animation: fadeUp 0.4s 1.1s ease forwards; }
 
   .program__check {
     width: 24px; height: 24px; border-radius: 50%; border: 2px solid #ddd;
@@ -80,16 +69,10 @@
   .cta {
     width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none;
     border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif;
-    margin-top: 20px; opacity: 0; animation: fadeUp 0.4s 1.3s ease forwards;
+    margin-top: 20px;
   }
   .help-text {
     font-size: 11px; color: #999; text-align: center; margin-top: 12px;
-    opacity: 0; animation: fadeUp 0.3s 1.5s ease forwards;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 </style>
 </head>
@@ -97,11 +80,11 @@
 
 <div class="card">
   <div class="progress">
-    <span class="progress-label">Sign Up</span>
-    <div class="progress-bar"><div class="progress-fill fill-full"></div></div>
-    <span class="progress-label">About You</span>
-    <div class="progress-bar"><div class="progress-fill fill-half"></div></div>
-    <span class="progress-label--dim">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:25%"></div></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
 
   <div class="content">
@@ -156,12 +139,17 @@
     setTimeout(function() { document.getElementById('prog1').classList.add('selected'); }, 2000);
     setTimeout(function() { document.getElementById('prog2').classList.add('selected'); }, 2800);
     // prog3 stays unselected (optional)
+    // t=4s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+    }, 4000);
   }
 
   setTimeout(run, 0);
 
   setInterval(function() {
     document.querySelectorAll('.program').forEach(function(p) { p.classList.remove('selected'); });
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(run, 500);
   }, 14000);
 })();

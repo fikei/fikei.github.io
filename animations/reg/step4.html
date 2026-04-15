@@ -7,34 +7,28 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; -webkit-font-smoothing: antialiased; }
 
   .card {
     width: 480px; background: #fff; border-radius: 16px; overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    animation: cardLoop 13s ease infinite;
-  }
-  @keyframes cardLoop {
-    0%, 4% { opacity: 0; transform: translateY(12px); }
-    8%, 85% { opacity: 1; transform: translateY(0); }
-    95%, 100% { opacity: 0; transform: translateY(-4px); }
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .p-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
-  .p-label--on { color: #1976D2; } .p-label--off { color: #bbb; }
-  .p-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .p-fill { height: 100%; background: #1976D2; border-radius: 2px; }
-  .p-full { width: 100%; } .p-grow { width: 0; animation: g 0.8s 0.4s ease forwards; }
-  @keyframes g { to { width: 70%; } }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
-  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fu 0.5s 0.2s ease forwards; }
-  .sub { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; opacity: 0; animation: fu 0.5s 0.35s ease forwards; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
+  .sub { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
 
-  .banner { border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px; opacity: 0; }
-  .banner--warm { background: #faf8f5; border: 1px solid #ede8e1; animation: fu 0.5s 0.5s ease forwards; }
-  .banner--blue { background: #f0f7ff; border: 1px solid #d0e3f8; border-left: 3px solid #1976D2; animation: fu 0.5s 0.7s ease forwards; }
+  .banner { border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px; }
+  .banner--warm { background: #faf8f5; border: 1px solid #ede8e1; }
+  .banner--blue { background: #f0f7ff; border: 1px solid #d0e3f8; border-left: 3px solid #1976D2; }
   .banner-icon { font-size: 18px; flex-shrink: 0; }
   .banner-text { font-size: 13px; color: #444; line-height: 1.6; }
   .banner-text strong { font-weight: 600; }
@@ -53,12 +47,9 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: all 0.3s; }
   .dot.visible { opacity: 1; }
 
-  .f1 { opacity: 0; animation: fu 0.4s 0.9s ease forwards; }
-  .f2 { opacity: 0; animation: fu 0.4s 1.05s ease forwards; }
+  .section-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 10px; }
 
-  .section-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 10px; opacity: 0; animation: fu 0.4s 1.2s ease forwards; }
-
-  .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #333; opacity: 0; }
+  .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #333; }
   .check-box {
     width: 18px; height: 18px; border: 1.5px solid #ccc; border-radius: 4px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
@@ -68,22 +59,17 @@
   .check-box.checked::after { content: "✓"; color: #fff; font-size: 11px; font-weight: 700; }
   .check-pre { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 10px; color: #1976D2; }
 
-  .c1 { animation: fu 0.4s 1.4s ease forwards; }
-  .c2 { animation: fu 0.4s 1.55s ease forwards; }
-
-  .cta { width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif; margin-top: 16px; opacity: 0; animation: fu 0.4s 1.7s ease forwards; }
-
-  @keyframes fu { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .cta { width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif; margin-top: 16px; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="progress">
-    <span class="p-label p-label--on">Sign Up</span>
-    <div class="p-bar"><div class="p-fill p-full"></div></div>
-    <span class="p-label p-label--on">About You</span>
-    <div class="p-bar"><div class="p-fill p-grow"></div></div>
-    <span class="p-label p-label--off">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:60%"></div></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
   <div class="content">
     <div class="title">Health History</div>
@@ -167,6 +153,11 @@
       document.getElementById('check2').classList.add('checked');
       document.getElementById('dot3').classList.add('visible');
     }, 4200);
+
+    // t=5.5s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    }, 5500);
   }
 
   setTimeout(run, 0);
@@ -178,6 +169,7 @@
     var wt = document.getElementById('weight-text');
     wt.textContent = 'e.g. 185';
     wt.style.color = '#bbb';
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(run, 500);
   }, 13000);
 })();

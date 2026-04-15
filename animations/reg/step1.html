@@ -15,24 +15,18 @@
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    animation: cardLoop 12s ease infinite;
-  }
-  @keyframes cardLoop {
-    0%, 4% { opacity: 0; transform: translateY(12px); }
-    8%, 85% { opacity: 1; transform: translateY(0); }
-    95%, 100% { opacity: 0; transform: translateY(-4px); }
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
-  .progress-label--dim { color: #bbb; }
-  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; width: 0; animation: progressFill 1s 0.3s ease forwards; }
-  @keyframes progressFill { to { width: 50%; } }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
-  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
-  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
 
   .welcome {
     background: #faf8f5;
@@ -40,8 +34,6 @@
     border-radius: 10px;
     padding: 16px 20px;
     margin-bottom: 24px;
-    opacity: 0;
-    animation: fadeUp 0.5s 0.5s ease forwards;
   }
   .welcome-greeting { font-size: 15px; font-weight: 600; color: #2d2a26; margin-bottom: 8px; }
   .welcome-body { font-size: 13px; color: #4a4540; line-height: 1.6; }
@@ -72,10 +64,6 @@
     box-shadow: none;
   }
 
-  .field-1 { opacity: 0; animation: fadeUp 0.4s 0.7s ease forwards; }
-  .field-2 { opacity: 0; animation: fadeUp 0.4s 0.85s ease forwards; }
-  .field-3 { opacity: 0; animation: fadeUp 0.4s 1.0s ease forwards; }
-
   .cta {
     width: 100%;
     padding: 14px;
@@ -88,27 +76,20 @@
     font-family: 'Roboto', sans-serif;
     cursor: pointer;
     margin-top: 8px;
-    opacity: 0;
-    animation: fadeUp 0.4s 1.2s ease forwards;
   }
 
-  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0; animation: fadeUp 0.3s 1.4s ease forwards; }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 </style>
 </head>
 <body>
 
 <div class="card">
   <div class="progress">
-    <span class="progress-label">Sign Up</span>
-    <div class="progress-bar"><div class="progress-fill"></div></div>
-    <span class="progress-label--dim">About You</span>
-    <div class="progress-bar"></div>
-    <span class="progress-label--dim">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:50%"></div></div>
+    <span class="pl pl--off">About You</span>
+    <div class="pb"></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
 
   <div class="content">
