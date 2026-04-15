@@ -250,16 +250,24 @@
 
     <div class="d-decisions">
       <div class="d-decision">
-        <p class="d-decision__q">Why does the AI fill in fields but still let the responder edit them?</p>
-        <p class="d-decision__a">Medical notes need human sign-off. The AI does the first pass but the responder confirms. Faster than scratch, safer than full automation.</p>
+        <p class="d-decision__q">Why is voice the right model?</p>
+        <p class="d-decision__a">Your hands are on the patient, not a keyboard. Field listens to the conversation and writes the documentation. We fine-tuned speech recognition for medical terminology and outdoor noise so it works where it's actually needed.</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">Why three colors for field status?</p>
-        <p class="d-decision__a">Green = confirmed. Amber = check before handoff. Red = conflicting data. Two states hide the most common category.</p>
+        <p class="d-decision__q">Why allow manual entry?</p>
+        <p class="d-decision__a">Even with our fine-tuned models, AI misses things — a vital gets taken silently, some fields are never spoken aloud. Field provides glove-friendly manual input for every gap. Type into the narrative and structured fields auto-populate below.</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">Why no keyboard for data entry?</p>
-        <p class="d-decision__a">Gloves. Large preset buttons and +1/-10 adjusters cover most cases in one or two taps.</p>
+        <p class="d-decision__q">How do you trust AI output?</p>
+        <p class="d-decision__a">Every AI-extracted value shows where it came from. Grey means confident, amber means check it, red means missing. Each value traces to the exact moment in the transcript. The provider always knows what to trust.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why not let AI decide?</p>
+        <p class="d-decision__a">When it comes to suggesting what to do with a patient, Field shows recommendations but never pre-selects. The provider makes every clinical call. This keeps us on the right side of FDA regulation and keeps humans in charge of decisions where terrain, weather, and context matter more than data.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why does it need to work offline?</p>
+        <p class="d-decision__a">No cell service on a mountainside. Everything runs on-device. When connectivity returns, Field exports a standards-compliant file into the reporting systems agencies already use. It doesn't replace existing software — it replaces the paper and memory that come before it.</p>
       </div>
     </div>
 
