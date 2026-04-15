@@ -15,7 +15,7 @@
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    animation: cardLoop 12s ease infinite;
+    animation: cardLoop 14s ease infinite;
   }
   @keyframes cardLoop {
     0%, 3% { opacity: 0; transform: translateY(12px); }
@@ -36,141 +36,74 @@
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
   .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
 
-  /* Program value card */
   .value-card {
-    background: #faf8f5;
-    border: 1px solid #ede8e1;
-    border-radius: 10px;
-    padding: 16px 20px;
-    margin-bottom: 24px;
-    opacity: 0;
-    animation: fadeUp 0.5s 0.5s ease forwards;
+    background: #faf8f5; border: 1px solid #ede8e1; border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 24px;
+    opacity: 0; animation: fadeUp 0.5s 0.5s ease forwards;
   }
   .value-greeting { font-size: 15px; font-weight: 600; color: #2d2a26; margin-bottom: 8px; }
   .value-body { font-size: 13px; color: #4a4540; line-height: 1.6; }
 
-  /* Radio question */
   .question { font-size: 14px; font-weight: 500; color: #333; margin-bottom: 10px; }
   .radio-row { display: flex; gap: 10px; margin-bottom: 20px; }
   .radio-card {
-    flex: 1;
-    padding: 12px 16px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 14px;
-    color: #333;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; color: #333; display: flex; align-items: center; gap: 8px;
+    transition: border-color 0.3s, background 0.3s;
   }
-  .radio-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #ccc; flex-shrink: 0; }
+  .radio-card.selected { border-color: #1976D2; background: #f5f9ff; }
+  .radio-dot {
+    width: 16px; height: 16px; border-radius: 50%; border: 2px solid #ccc; flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .radio-card.selected .radio-dot {
+    border-color: #1976D2; background: #1976D2; box-shadow: inset 0 0 0 3px #fff;
+  }
 
   .q1 { opacity: 0; animation: fadeUp 0.4s 0.8s ease forwards; }
 
-  /* Pre-filled selects */
   .section-label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
   .form-group { display: flex; flex-direction: column; margin-bottom: 14px; }
   .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
   .form-input {
-    padding: 12px 14px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 14px;
-    color: #333;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; color: #333; background: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    min-height: 42px;
   }
-  .prefill-dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; }
+  .prefill-dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: all 0.3s; }
+  .prefill-dot.visible { opacity: 1; }
 
   .sel-1 { opacity: 0; animation: fadeUp 0.4s 1.0s ease forwards; }
   .sel-2 { opacity: 0; animation: fadeUp 0.4s 1.15s ease forwards; }
 
-  /* Dot animations — staggered reveal */
-  .dot-1 { animation: dotPop 0.3s 1.8s ease forwards; }
-  .dot-2 { animation: dotPop 0.3s 2.1s ease forwards; }
-  @keyframes dotPop {
-    from { opacity: 0; transform: scale(0); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  /* Radio selection animation */
-  .radio-card--select {
-    animation: radioSelect 0.3s 2.4s ease forwards;
-  }
-  @keyframes radioSelect {
-    to { border-color: #1976D2; background: #f5f9ff; }
-  }
-  .radio-dot--fill {
-    animation: dotFill 0.3s 2.4s ease forwards;
-  }
-  @keyframes dotFill {
-    to { border-color: #1976D2; background: #1976D2; box-shadow: inset 0 0 0 3px #fff; }
-  }
-
-  /* From Your Records accordion */
   .records {
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 8px;
-    opacity: 0;
-    animation: fadeUp 0.4s 1.4s ease forwards;
+    border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; margin-top: 8px;
+    opacity: 0; animation: fadeUp 0.4s 1.4s ease forwards;
   }
   .records-header {
-    padding: 14px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #555;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    background: #fff;
+    padding: 14px 16px; font-size: 13px; font-weight: 600; color: #555;
+    display: flex; align-items: center; gap: 8px; background: #fff;
   }
-  .records-badge {
-    background: #e8f5e9;
-    color: #2e7d32;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 10px;
-    margin-left: auto;
-  }
+  .records-badge { background: #e8f5e9; color: #2e7d32; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-left: auto; }
   .records-chevron { color: #999; font-size: 12px; transition: transform 0.3s; }
   .records-body {
-    border-top: 1px solid #e0e0e0;
-    padding: 0;
-    max-height: 0;
-    overflow: hidden;
-    animation: accordionOpen 0.5s 2.8s ease forwards;
+    border-top: 1px solid #e0e0e0; padding: 0; max-height: 0; overflow: hidden;
+    transition: max-height 0.5s ease, padding 0.5s ease;
   }
-  @keyframes accordionOpen {
-    to { max-height: 260px; padding: 16px; }
-  }
+  .records-body.open { max-height: 260px; padding: 16px; }
 
   .records-source { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 10px; }
   .record-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
   .record-item:last-child { border-bottom: none; }
   .record-label { color: #777; width: 110px; flex-shrink: 0; }
   .record-value { flex: 1; font-weight: 500; color: #333; }
-  .record-edit { font-size: 11px; color: #1976D2; padding: 3px 10px; border: 1px solid #d0e3f8; border-radius: 5px; background: #f5f9ff; cursor: pointer; }
+  .record-edit { font-size: 11px; color: #1976D2; padding: 3px 10px; border: 1px solid #d0e3f8; border-radius: 5px; background: #f5f9ff; }
 
   .cta {
-    width: 100%;
-    padding: 14px;
-    background: #1976D2;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: 'Roboto', sans-serif;
-    margin-top: 16px;
-    opacity: 0;
-    animation: fadeUp 0.4s 1.6s ease forwards;
+    width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif;
+    margin-top: 16px; opacity: 0; animation: fadeUp 0.4s 1.6s ease forwards;
   }
 
   @keyframes fadeUp {
@@ -202,8 +135,8 @@
     <div class="q1">
       <div class="question">Do you use a Continuous Glucose Monitor (CGM)?</div>
       <div class="radio-row">
-        <div class="radio-card"><div class="radio-dot"></div> Yes</div>
-        <div class="radio-card radio-card--select"><div class="radio-dot radio-dot--fill"></div> No</div>
+        <div class="radio-card" id="radio-yes"><div class="radio-dot"></div> Yes</div>
+        <div class="radio-card" id="radio-no"><div class="radio-dot"></div> No</div>
       </div>
     </div>
 
@@ -211,7 +144,7 @@
       <label>How often do you check your blood sugar?</label>
       <div class="form-input">
         <span>2 times per day</span>
-        <div class="prefill-dot dot-1"></div>
+        <div class="prefill-dot" id="dot1"></div>
       </div>
     </div>
 
@@ -219,7 +152,7 @@
       <label>How often does your doctor recommend?</label>
       <div class="form-input">
         <span>3 times per day</span>
-        <div class="prefill-dot dot-2"></div>
+        <div class="prefill-dot" id="dot2"></div>
       </div>
     </div>
 
@@ -227,9 +160,9 @@
       <div class="records-header">
         <span>📋 From Your Records</span>
         <span class="records-badge">7 Found</span>
-        <span class="records-chevron">▸</span>
+        <span class="records-chevron" id="chevron">▸</span>
       </div>
-      <div class="records-body">
+      <div class="records-body" id="records-body">
         <div class="records-source">🏥 Health Records</div>
         <div class="record-item">
           <span class="record-label">Diabetes Type</span>
@@ -253,5 +186,36 @@
   </div>
 </div>
 
+<script>
+(function() {
+  function run() {
+    // t=2s: select "No" radio
+    setTimeout(function() {
+      document.getElementById('radio-no').classList.add('selected');
+    }, 2000);
+
+    // t=2.8s: pre-fill dots appear
+    setTimeout(function() { document.getElementById('dot1').classList.add('visible'); }, 2800);
+    setTimeout(function() { document.getElementById('dot2').classList.add('visible'); }, 3100);
+
+    // t=3.8s: accordion opens
+    setTimeout(function() {
+      document.getElementById('records-body').classList.add('open');
+      document.getElementById('chevron').style.transform = 'rotate(90deg)';
+    }, 3800);
+  }
+
+  setTimeout(run, 0);
+
+  setInterval(function() {
+    document.getElementById('radio-no').classList.remove('selected');
+    document.getElementById('dot1').classList.remove('visible');
+    document.getElementById('dot2').classList.remove('visible');
+    document.getElementById('records-body').classList.remove('open');
+    document.getElementById('chevron').style.transform = '';
+    setTimeout(run, 500);
+  }, 14000);
+})();
+</script>
 </body>
 </html>

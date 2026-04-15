@@ -58,52 +58,23 @@
     font-size: 14px;
     color: #bbb;
     background: #fff;
-    transition: border-color 0.3s, color 0.3s;
-    position: relative;
-    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    min-height: 42px;
+  }
+  .form-input.typing {
+    color: #333;
+    border-color: #1976D2;
+    box-shadow: 0 0 0 3px rgba(25,118,210,0.1);
+  }
+  .form-input.filled {
+    color: #333;
+    border-color: #ddd;
+    box-shadow: none;
   }
 
   .field-1 { opacity: 0; animation: fadeUp 0.4s 0.7s ease forwards; }
   .field-2 { opacity: 0; animation: fadeUp 0.4s 0.85s ease forwards; }
   .field-3 { opacity: 0; animation: fadeUp 0.4s 1.0s ease forwards; }
-
-  /* Typing animation — placeholder fades out, value types in */
-  .form-input .placeholder { display: inline; }
-  .form-input .value { display: none; color: #333; }
-
-  .fname .placeholder { animation: hidePlaceholder 0.01s 2.0s forwards; }
-  .fname .value { animation: showValue 0.01s 2.0s forwards; }
-  .fname { animation: typeField 0.6s 2.0s ease forwards; }
-
-  .lname .placeholder { animation: hidePlaceholder 0.01s 2.8s forwards; }
-  .lname .value { animation: showValue 0.01s 2.8s forwards; }
-  .lname { animation: typeField 0.6s 2.8s ease forwards; }
-
-  .dob .placeholder { animation: hidePlaceholder 0.01s 3.6s forwards; }
-  .dob .value { animation: showValue 0.01s 3.6s forwards; }
-  .dob { animation: typeField 0.6s 3.6s ease forwards; }
-
-  @keyframes hidePlaceholder { to { display: none; visibility: hidden; font-size: 0; } }
-  @keyframes showValue { to { display: inline; } }
-  @keyframes typeField {
-    0% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); color: #333; }
-    80% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); color: #333; }
-    100% { border-color: #ddd; box-shadow: none; color: #333; }
-  }
-
-  /* Cursor blink in active field */
-  .fname::after, .lname::after, .dob::after {
-    content: "|";
-    color: #1976D2;
-    font-weight: 300;
-    opacity: 0;
-    animation: none;
-  }
-  .fname::after { animation: cursor 0.5s 2.0s step-end 3, hideCursor 0.01s 2.6s forwards; }
-  .lname::after { animation: cursor 0.5s 2.8s step-end 3, hideCursor 0.01s 3.4s forwards; }
-  .dob::after { animation: cursor 0.5s 3.6s step-end 3, hideCursor 0.01s 4.2s forwards; }
-  @keyframes cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-  @keyframes hideCursor { to { display: none; opacity: 0; } }
 
   .cta {
     width: 100%;
@@ -152,18 +123,18 @@
     <div class="form-row field-1">
       <div class="form-group">
         <label>Legal First Name <span class="req">*</span></label>
-        <div class="form-input fname"><span class="placeholder">First name</span><span class="value">Sarah</span></div>
+        <div class="form-input" id="fname">First name</div>
       </div>
       <div class="form-group">
         <label>Legal Last Name <span class="req">*</span></label>
-        <div class="form-input lname"><span class="placeholder">Last name</span><span class="value">Chen</span></div>
+        <div class="form-input" id="lname">Last name</div>
       </div>
     </div>
 
     <div class="form-row field-2">
       <div class="form-group">
         <label>Date of Birth <span class="req">*</span></label>
-        <div class="form-input dob"><span class="placeholder">MM / DD / YYYY</span><span class="value">04 / 15 / 1988</span></div>
+        <div class="form-input" id="dob">MM / DD / YYYY</div>
       </div>
     </div>
 
@@ -173,5 +144,60 @@
   <div class="privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
 </div>
 
+<script>
+(function() {
+  var fields = [
+    { id: 'fname', value: 'Sarah', delay: 2000 },
+    { id: 'lname', value: 'Chen', delay: 3200 },
+    { id: 'dob', value: '04 / 15 / 1988', delay: 4400 }
+  ];
+
+  function typeField(el, value, callback) {
+    el.classList.add('typing');
+    el.textContent = '';
+    var i = 0;
+    var interval = setInterval(function() {
+      el.textContent = value.slice(0, i + 1);
+      i++;
+      if (i >= value.length) {
+        clearInterval(interval);
+        setTimeout(function() {
+          el.classList.remove('typing');
+          el.classList.add('filled');
+          if (callback) callback();
+        }, 300);
+      }
+    }, 60);
+  }
+
+  function runSequence() {
+    fields.forEach(function(f) {
+      setTimeout(function() {
+        var el = document.getElementById(f.id);
+        if (el) typeField(el, f.value);
+      }, f.delay);
+    });
+  }
+
+  // Run on load and repeat with card loop (12s)
+  setTimeout(runSequence, 0);
+  setInterval(function() {
+    fields.forEach(function(f) {
+      var el = document.getElementById(f.id);
+      if (el) {
+        el.classList.remove('typing', 'filled');
+        el.style.color = '';
+      }
+    });
+    document.getElementById('fname').textContent = 'First name';
+    document.getElementById('fname').style.color = '#bbb';
+    document.getElementById('lname').textContent = 'Last name';
+    document.getElementById('lname').style.color = '#bbb';
+    document.getElementById('dob').textContent = 'MM / DD / YYYY';
+    document.getElementById('dob').style.color = '#bbb';
+    setTimeout(runSequence, 500);
+  }, 12000);
+})();
+</script>
 </body>
 </html>

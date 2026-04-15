@@ -12,7 +12,7 @@
   .card {
     width: 480px; background: #fff; border-radius: 16px; overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-    animation: cardLoop 11s ease infinite;
+    animation: cardLoop 13s ease infinite;
   }
   @keyframes cardLoop {
     0%, 4% { opacity: 0; transform: translateY(12px); }
@@ -42,52 +42,34 @@
   .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
   .form-group { flex: 1; display: flex; flex-direction: column; }
   .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .fi { padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; color: #333; background: #fff; display: flex; align-items: center; justify-content: space-between; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; }
+  .fi {
+    padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; color: #333; background: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    min-height: 42px; transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .fi.typing { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+  .fi.filled { border-color: #ddd; box-shadow: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: all 0.3s; }
+  .dot.visible { opacity: 1; }
 
   .f1 { opacity: 0; animation: fu 0.4s 0.9s ease forwards; }
   .f2 { opacity: 0; animation: fu 0.4s 1.05s ease forwards; }
 
-  .dot-1 { animation: dp 0.3s 1.8s ease forwards; }
-  .dot-2 { animation: dp 0.3s 2.0s ease forwards; }
-  .dot-3 { animation: dp 0.3s 2.2s ease forwards; }
-  @keyframes dp { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
-
   .section-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 10px; opacity: 0; animation: fu 0.4s 1.2s ease forwards; }
 
   .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #333; opacity: 0; }
-  .check-box { width: 18px; height: 18px; border: 1.5px solid #ccc; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .check-box--on { background: #1976D2; border-color: #1976D2; }
-  .check-box--on::after { content: "✓"; color: #fff; font-size: 11px; font-weight: 700; }
+  .check-box {
+    width: 18px; height: 18px; border: 1.5px solid #ccc; border-radius: 4px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s;
+  }
+  .check-box.checked { background: #1976D2; border-color: #1976D2; }
+  .check-box.checked::after { content: "✓"; color: #fff; font-size: 11px; font-weight: 700; }
   .check-pre { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 10px; color: #1976D2; }
 
   .c1 { animation: fu 0.4s 1.4s ease forwards; }
   .c2 { animation: fu 0.4s 1.55s ease forwards; }
-
-  /* Pre-select animation */
-  .check-box.animate-check {
-    animation: checkPop 0.3s 2.5s ease forwards;
-    background: transparent; border-color: #ccc;
-  }
-  @keyframes checkPop {
-    0% { background: transparent; border-color: #ccc; }
-    50% { transform: scale(1.15); }
-    100% { background: #1976D2; border-color: #1976D2; transform: scale(1); }
-  }
-  .check-box.animate-check::after { opacity: 0; animation: showCheck 0.1s 2.7s ease forwards; }
-  @keyframes showCheck { to { opacity: 1; } }
-
-  /* Weight field typing animation */
-  .wt-placeholder { animation: hideEl 0.01s 3.0s forwards; }
-  .wt-value { animation: showEl 0.01s 3.0s forwards; }
-  .weight-field { animation: typeHighlight 0.8s 3.0s ease forwards; }
-  @keyframes hideEl { to { display: none; visibility: hidden; font-size: 0; } }
-  @keyframes showEl { to { display: inline !important; } }
-  @keyframes typeHighlight {
-    0% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
-    80% { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
-    100% { border-color: #ddd; box-shadow: none; }
-  }
 
   .cta { width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif; margin-top: 16px; opacity: 0; animation: fu 0.4s 1.7s ease forwards; }
 
@@ -119,33 +101,86 @@
     <div class="form-row f1">
       <div class="form-group">
         <label>Height — Feet</label>
-        <div class="fi"><span>5</span><div class="dot dot-1"></div></div>
+        <div class="fi"><span>5</span><div class="dot" id="dot1"></div></div>
       </div>
       <div class="form-group">
         <label>Height — Inches</label>
-        <div class="fi"><span>10</span><div class="dot dot-2"></div></div>
+        <div class="fi"><span>10</span><div class="dot" id="dot2"></div></div>
       </div>
     </div>
     <div class="form-row f2">
       <div class="form-group">
         <label>Weight (lbs)</label>
-        <div class="fi weight-field"><span class="wt-placeholder" style="color: #bbb;">e.g. 185</span><span class="wt-value" style="display:none; color:#333;">192</span></div>
+        <div class="fi" id="weight-field"><span id="weight-text" style="color: #bbb;">e.g. 185</span></div>
       </div>
     </div>
 
     <div class="section-label">Your Health Background</div>
     <div class="check-row c1">
-      <div class="check-box"></div>
+      <div class="check-box" id="check1"></div>
       <span>High Cholesterol</span>
     </div>
     <div class="check-row c2">
-      <div class="check-box check-box--on animate-check"><span style="opacity:0;">✓</span></div>
+      <div class="check-box" id="check2"></div>
       <span>High Blood Pressure (Hypertension)</span>
-      <div class="check-pre"><div class="dot dot-3"></div></div>
+      <div class="check-pre"><div class="dot" id="dot3"></div></div>
     </div>
 
     <button class="cta">Confirm my health info</button>
   </div>
 </div>
+
+<script>
+(function() {
+  function typeText(el, value, parentFi, callback) {
+    if (parentFi) parentFi.classList.add('typing');
+    el.style.color = '#333';
+    el.textContent = '';
+    var i = 0;
+    var interval = setInterval(function() {
+      el.textContent = value.slice(0, i + 1);
+      i++;
+      if (i >= value.length) {
+        clearInterval(interval);
+        setTimeout(function() {
+          if (parentFi) { parentFi.classList.remove('typing'); parentFi.classList.add('filled'); }
+          if (callback) callback();
+        }, 200);
+      }
+    }, 80);
+  }
+
+  function run() {
+    // t=2s: pre-fill dots on height fields
+    setTimeout(function() { document.getElementById('dot1').classList.add('visible'); }, 2000);
+    setTimeout(function() { document.getElementById('dot2').classList.add('visible'); }, 2300);
+
+    // t=3s: type weight
+    setTimeout(function() {
+      var wt = document.getElementById('weight-text');
+      var fi = document.getElementById('weight-field');
+      typeText(wt, '192', fi);
+    }, 3000);
+
+    // t=4s: hypertension checkbox + dot
+    setTimeout(function() {
+      document.getElementById('check2').classList.add('checked');
+      document.getElementById('dot3').classList.add('visible');
+    }, 4200);
+  }
+
+  setTimeout(run, 0);
+
+  setInterval(function() {
+    document.querySelectorAll('.dot').forEach(function(d) { d.classList.remove('visible'); });
+    document.querySelectorAll('.check-box').forEach(function(c) { c.classList.remove('checked'); });
+    document.querySelectorAll('.fi').forEach(function(f) { f.classList.remove('typing', 'filled'); });
+    var wt = document.getElementById('weight-text');
+    wt.textContent = 'e.g. 185';
+    wt.style.color = '#bbb';
+    setTimeout(run, 500);
+  }, 13000);
+})();
+</script>
 </body>
 </html>
