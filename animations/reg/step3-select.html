@@ -35,138 +35,56 @@
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.5s 0.2s ease forwards; }
   .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 24px; opacity: 0; animation: fadeUp 0.5s 0.35s ease forwards; }
 
-  /* Source banner */
   .source-banner {
-    background: #e8f5e9;
-    border: 1px solid #c8e6c9;
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    color: #2e7d32;
-    font-weight: 500;
-    opacity: 0;
-    animation: fadeUp 0.5s 0.5s ease forwards;
+    background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: #2e7d32; font-weight: 500;
+    opacity: 0; animation: fadeUp 0.5s 0.5s ease forwards;
   }
   .source-banner__icon { font-size: 16px; }
   .source-banner__sub { font-size: 11px; color: #558b2f; font-weight: 400; margin-top: 2px; }
 
-  /* Program cards */
   .programs { display: flex; flex-direction: column; gap: 12px; }
 
   .program {
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    position: relative;
+    border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px;
     transition: border-color 0.3s, background 0.3s;
+    opacity: 0;
   }
-  .program--selected {
-    border-color: #1976D2;
-    background: #f5f9ff;
-  }
+  .program.selected { border-color: #1976D2; background: #f5f9ff; }
+  .prog-1 { animation: fadeUp 0.4s 0.7s ease forwards; }
+  .prog-2 { animation: fadeUp 0.4s 0.9s ease forwards; }
+  .prog-3 { animation: fadeUp 0.4s 1.1s ease forwards; }
 
   .program__check {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid #ddd;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%; border: 2px solid #ddd;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     transition: all 0.3s;
   }
-  .program--selected .program__check {
-    border-color: #1976D2;
-    background: #1976D2;
-  }
+  .program.selected .program__check { border-color: #1976D2; background: #1976D2; }
   .program__checkmark {
-    color: #fff;
-    font-size: 14px;
-    font-weight: 700;
-    opacity: 0;
-    transform: scale(0);
+    color: #fff; font-size: 14px; font-weight: 700;
+    opacity: 0; transform: scale(0); transition: all 0.3s;
   }
-  .program--selected .program__checkmark {
-    opacity: 1;
-    transform: scale(1);
-    transition: all 0.3s;
-  }
+  .program.selected .program__checkmark { opacity: 1; transform: scale(1); }
 
   .program__info { flex: 1; }
   .program__name { font-size: 15px; font-weight: 600; color: #222; }
   .program__desc { font-size: 12px; color: #777; margin-top: 2px; line-height: 1.4; }
-  .program__badge {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: 10px;
-    flex-shrink: 0;
-  }
-  .program__badge--qualified {
-    background: #e8f5e9;
-    color: #2e7d32;
-  }
-  .program__badge--optional {
-    background: #fff3e0;
-    color: #e65100;
-  }
-
-  /* Staggered program appearance */
-  .prog-1 { opacity: 0; animation: fadeUp 0.4s 0.7s ease forwards; }
-  .prog-2 { opacity: 0; animation: fadeUp 0.4s 0.9s ease forwards; }
-  .prog-3 { opacity: 0; animation: fadeUp 0.4s 1.1s ease forwards; }
-
-  /* Auto-select animation — programs get checked one by one */
-  .prog-1 { animation: fadeUp 0.4s 0.7s ease forwards, selectProg 0.4s 1.8s ease forwards; }
-  .prog-2 { animation: fadeUp 0.4s 0.9s ease forwards, selectProg 0.4s 2.3s ease forwards; }
-  /* prog-3 stays unselected (optional) */
-
-  @keyframes selectProg {
-    to { border-color: #1976D2; background: #f5f9ff; }
-  }
-  .prog-1 .program__check { animation: checkFill 0.3s 1.8s ease forwards; }
-  .prog-1 .program__checkmark { animation: checkPop 0.3s 1.9s ease forwards; }
-  .prog-2 .program__check { animation: checkFill 0.3s 2.3s ease forwards; }
-  .prog-2 .program__checkmark { animation: checkPop 0.3s 2.4s ease forwards; }
-
-  @keyframes checkFill {
-    to { border-color: #1976D2; background: #1976D2; }
-  }
-  @keyframes checkPop {
-    from { opacity: 0; transform: scale(0); }
-    to { opacity: 1; transform: scale(1); }
-  }
+  .program__badge { font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 10px; flex-shrink: 0; }
+  .program__badge--qualified { background: #e8f5e9; color: #2e7d32; }
+  .program__badge--optional { background: #fff3e0; color: #e65100; }
 
   .cta {
-    width: 100%;
-    padding: 14px;
-    background: #1976D2;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: 'Roboto', sans-serif;
-    margin-top: 20px;
-    opacity: 0;
-    animation: fadeUp 0.4s 1.3s ease forwards;
+    width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif;
+    margin-top: 20px; opacity: 0; animation: fadeUp 0.4s 1.3s ease forwards;
   }
-
   .help-text {
-    font-size: 11px;
-    color: #999;
-    text-align: center;
-    margin-top: 12px;
-    opacity: 0;
-    animation: fadeUp 0.3s 1.5s ease forwards;
+    font-size: 11px; color: #999; text-align: center; margin-top: 12px;
+    opacity: 0; animation: fadeUp 0.3s 1.5s ease forwards;
   }
 
   @keyframes fadeUp {
@@ -199,7 +117,7 @@
     </div>
 
     <div class="programs">
-      <div class="program prog-1">
+      <div class="program prog-1" id="prog1">
         <div class="program__check"><span class="program__checkmark">✓</span></div>
         <div class="program__info">
           <div class="program__name">Diabetes Management</div>
@@ -208,7 +126,7 @@
         <span class="program__badge program__badge--qualified">Qualified</span>
       </div>
 
-      <div class="program prog-2">
+      <div class="program prog-2" id="prog2">
         <div class="program__check"><span class="program__checkmark">✓</span></div>
         <div class="program__info">
           <div class="program__name">Hypertension</div>
@@ -217,7 +135,7 @@
         <span class="program__badge program__badge--qualified">Qualified</span>
       </div>
 
-      <div class="program prog-3">
+      <div class="program prog-3" id="prog3">
         <div class="program__check"><span class="program__checkmark">✓</span></div>
         <div class="program__info">
           <div class="program__name">Weight Management</div>
@@ -232,5 +150,21 @@
   </div>
 </div>
 
+<script>
+(function() {
+  function run() {
+    setTimeout(function() { document.getElementById('prog1').classList.add('selected'); }, 2000);
+    setTimeout(function() { document.getElementById('prog2').classList.add('selected'); }, 2800);
+    // prog3 stays unselected (optional)
+  }
+
+  setTimeout(run, 0);
+
+  setInterval(function() {
+    document.querySelectorAll('.program').forEach(function(p) { p.classList.remove('selected'); });
+    setTimeout(run, 500);
+  }, 14000);
+})();
+</script>
 </body>
 </html>
