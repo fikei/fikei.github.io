@@ -96,6 +96,20 @@
     to { opacity: 1; transform: scale(1); }
   }
 
+  /* Radio selection animation */
+  .radio-card--select {
+    animation: radioSelect 0.3s 2.4s ease forwards;
+  }
+  @keyframes radioSelect {
+    to { border-color: #1976D2; background: #f5f9ff; }
+  }
+  .radio-dot--fill {
+    animation: dotFill 0.3s 2.4s ease forwards;
+  }
+  @keyframes dotFill {
+    to { border-color: #1976D2; background: #1976D2; box-shadow: inset 0 0 0 3px #fff; }
+  }
+
   /* From Your Records accordion */
   .records {
     border: 1px solid #e0e0e0;
@@ -189,7 +203,7 @@
       <div class="question">Do you use a Continuous Glucose Monitor (CGM)?</div>
       <div class="radio-row">
         <div class="radio-card"><div class="radio-dot"></div> Yes</div>
-        <div class="radio-card"><div class="radio-dot"></div> No</div>
+        <div class="radio-card radio-card--select"><div class="radio-dot radio-dot--fill"></div> No</div>
       </div>
     </div>
 
@@ -235,7 +249,7 @@
       </div>
     </div>
 
-    <button class="cta">Next: Health History</button>
+    <button class="cta">Looks right, continue</button>
   </div>
 </div>
 
