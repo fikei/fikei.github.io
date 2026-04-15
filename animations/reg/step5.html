@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; -webkit-font-smoothing: antialiased; }
 
   .card {
@@ -16,11 +17,10 @@
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
   .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
-  .pl--on { color: #1976D2; } .pl--off { color: #bbb; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
   .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
   .pf { height: 100%; background: #1976D2; border-radius: 2px; }
-  .pf-full { width: 100%; }
-  .pf-grow { width: 85%; }
 
   .content { padding: 32px 28px 28px; }
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
@@ -65,9 +65,9 @@
 <div class="card">
   <div class="progress">
     <span class="pl pl--on">Sign Up</span>
-    <div class="pb"><div class="pf pf-full"></div></div>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
     <span class="pl pl--on">About You</span>
-    <div class="pb"><div class="pf pf-grow"></div></div>
+    <div class="pb"><div class="pf" style="width:85%"></div></div>
     <span class="pl pl--off">Welcome</span>
   </div>
   <div class="content">
@@ -124,6 +124,11 @@
   ];
 
   function run() {
+    // t=4.5s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 80, behavior: 'smooth' });
+    }, 4500);
+
     fills.forEach(function(f) {
       setTimeout(function() {
         var el = document.getElementById(f.textId);
@@ -149,6 +154,7 @@
       fi.style.color = '';
       document.getElementById(f.dotId).classList.remove('visible');
     });
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(run, 500);
   }, 12000);
 })();

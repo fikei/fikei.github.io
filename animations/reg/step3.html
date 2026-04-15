@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
   .card {
@@ -18,12 +19,11 @@
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
-  .progress-label--dim { color: #bbb; }
-  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; }
-  .fill-full { width: 100%; }
-  .fill-grow { width: 30%; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
@@ -99,11 +99,11 @@
 
 <div class="card">
   <div class="progress">
-    <span class="progress-label">Sign Up</span>
-    <div class="progress-bar"><div class="progress-fill fill-full"></div></div>
-    <span class="progress-label">About You</span>
-    <div class="progress-bar"><div class="progress-fill fill-grow"></div></div>
-    <span class="progress-label--dim">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:40%"></div></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
 
   <div class="content">
@@ -186,6 +186,11 @@
       document.getElementById('records-body').classList.add('open');
       document.getElementById('chevron').style.transform = 'rotate(90deg)';
     }, 3800);
+
+    // t=5s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 240, behavior: 'smooth' });
+    }, 5000);
   }
 
   setTimeout(run, 0);
@@ -196,6 +201,7 @@
     document.getElementById('dot2').classList.remove('visible');
     document.getElementById('records-body').classList.remove('open');
     document.getElementById('chevron').style.transform = '';
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(run, 500);
   }, 14000);
 })();

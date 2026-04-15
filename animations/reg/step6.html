@@ -15,10 +15,11 @@
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; color: #1976D2; }
-  .pb { flex: 1; height: 3px; background: #1976D2; border-radius: 2px; }
-  .pb-grow { background: #e8e8e8; overflow: hidden; }
-  .pb-fill { height: 100%; background: #1976D2; border-radius: 2px; width: 100%; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 28px 28px 24px; }
 
@@ -68,12 +69,11 @@
 <body>
 <div class="card">
   <div class="progress">
-    <span class="pl">Sign Up</span>
-    <div class="pb"></div>
-    <span class="pl">About You</span>
-    <div class="pb"></div>
-    <span class="pl">Welcome</span>
-    <div class="pb-grow"><div class="pb-fill"></div></div>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">Welcome</span>
   </div>
   <div class="content">
     <div class="hero">

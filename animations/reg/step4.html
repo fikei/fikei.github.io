@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; -webkit-font-smoothing: antialiased; }
 
   .card {
@@ -15,11 +16,11 @@
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .p-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
-  .p-label--on { color: #1976D2; } .p-label--off { color: #bbb; }
-  .p-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .p-fill { height: 100%; background: #1976D2; border-radius: 2px; }
-  .p-full { width: 100%; } .p-grow { width: 70%; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
@@ -64,11 +65,11 @@
 <body>
 <div class="card">
   <div class="progress">
-    <span class="p-label p-label--on">Sign Up</span>
-    <div class="p-bar"><div class="p-fill p-full"></div></div>
-    <span class="p-label p-label--on">About You</span>
-    <div class="p-bar"><div class="p-fill p-grow"></div></div>
-    <span class="p-label p-label--off">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:60%"></div></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
   <div class="content">
     <div class="title">Health History</div>
@@ -152,6 +153,11 @@
       document.getElementById('check2').classList.add('checked');
       document.getElementById('dot3').classList.add('visible');
     }, 4200);
+
+    // t=5.5s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    }, 5500);
   }
 
   setTimeout(run, 0);
@@ -163,6 +169,7 @@
     var wt = document.getElementById('weight-text');
     wt.textContent = 'e.g. 185';
     wt.style.color = '#bbb';
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(run, 500);
   }, 13000);
 })();

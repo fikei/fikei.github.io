@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
   .card {
@@ -18,12 +19,11 @@
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
-  .progress-label--dim { color: #bbb; }
-  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; }
-  .progress-fill--full { width: 100%; }
-  .progress-fill--partial { width: 60%; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
 
@@ -124,11 +124,11 @@
 
 <div class="card">
   <div class="progress">
-    <span class="progress-label">Sign Up</span>
-    <div class="progress-bar"><div class="progress-fill progress-fill--full"></div></div>
-    <span class="progress-label">About You</span>
-    <div class="progress-bar"><div class="progress-fill progress-fill--partial"></div></div>
-    <span class="progress-label--dim">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--off">About You</span>
+    <div class="pb"></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
 
   <div class="content">
@@ -251,18 +251,24 @@
       document.getElementById('rule3').classList.add('passed');
     }, 7200);
 
-    // t=7.5s: terms + checkbox
+    // t=2.2s: terms visible
     setTimeout(function() {
       document.getElementById('terms').classList.add('visible');
     }, 2200);
+    // t=2.4s: CTA visible
+    setTimeout(function() {
+      document.getElementById('cta-btn').classList.add('visible');
+    }, 2400);
+
+    // t=7.8s: checkbox checked
     setTimeout(function() {
       document.getElementById('checkbox').classList.add('checked');
     }, 7800);
 
-    // t=8s: CTA
+    // t=8.5s: scroll down to reveal CTA button
     setTimeout(function() {
-      document.getElementById('cta-btn').classList.add('visible');
-    }, 2400);
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+    }, 8500);
   }
 
   setTimeout(runSequence, 0);
@@ -281,6 +287,7 @@
     document.getElementById('checkbox').classList.remove('checked');
     document.getElementById('terms').classList.remove('visible');
     document.getElementById('cta-btn').classList.remove('visible');
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(runSequence, 500);
   }, 16000);
 })();

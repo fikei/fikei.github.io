@@ -18,10 +18,11 @@
   }
 
   .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
-  .progress-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1976D2; white-space: nowrap; }
-  .progress-label--dim { color: #bbb; }
-  .progress-bar { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: #1976D2; border-radius: 2px; width: 50%; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
   .content { padding: 32px 28px 28px; }
   .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
@@ -84,11 +85,11 @@
 
 <div class="card">
   <div class="progress">
-    <span class="progress-label">Sign Up</span>
-    <div class="progress-bar"><div class="progress-fill"></div></div>
-    <span class="progress-label--dim">About You</span>
-    <div class="progress-bar"></div>
-    <span class="progress-label--dim">Welcome</span>
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:50%"></div></div>
+    <span class="pl pl--off">About You</span>
+    <div class="pb"></div>
+    <span class="pl pl--off">Welcome</span>
   </div>
 
   <div class="content">
