@@ -138,6 +138,11 @@
       background: #fff;
     }
 
+    /* Extra breathing room around animation frames */
+    .d-sticky-scroll__layer {
+      padding: 48px 40px;
+    }
+
     @media (max-width: 700px) {
       .metric-pair { flex-wrap: wrap; gap: 24px; }
       .interactive-cta { flex-direction: column; }
@@ -293,20 +298,25 @@
           </div>
           <div class="d-sticky-scroll__layer" data-step="2">
             <div class="d-anim-reg">
-              <iframe data-src="/animations/reg/step3.html" style="width: 480px; height: 720px; border: none; pointer-events: none; display: block;"></iframe>
+              <iframe data-src="/animations/reg/step3-select.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
             </div>
           </div>
           <div class="d-sticky-scroll__layer" data-step="3">
             <div class="d-anim-reg">
-              <iframe data-src="/animations/reg/step4.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+              <iframe data-src="/animations/reg/step3.html" style="width: 480px; height: 720px; border: none; pointer-events: none; display: block;"></iframe>
             </div>
           </div>
           <div class="d-sticky-scroll__layer" data-step="4">
             <div class="d-anim-reg">
-              <iframe data-src="/animations/reg/step5.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+              <iframe data-src="/animations/reg/step4.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
             </div>
           </div>
           <div class="d-sticky-scroll__layer" data-step="5">
+            <div class="d-anim-reg">
+              <iframe data-src="/animations/reg/step5.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
+            </div>
+          </div>
+          <div class="d-sticky-scroll__layer" data-step="6">
             <div class="d-anim-reg">
               <iframe data-src="/animations/reg/step6.html" style="width: 480px; height: 640px; border: none; pointer-events: none; display: block;"></iframe>
             </div>
@@ -318,44 +328,121 @@
       <div class="d-sticky-scroll__text">
         <div class="d-sticky-scroll__step is-active" data-step="0">
           <p class="d-mono">01</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Identity</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Show the member we already know them</p>
-          <p class="d-body">The welcome banner names the employer — the system already knows who they are. First name, last name, date of birth. Everything else resolved upstream. Nine identity fields became three.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Eligibility Confirmation</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Confirm membership before they ask</p>
+          <p class="d-body" style="margin-top: 12px;">The welcome banner names the employer — the system already matched the member against HR data before they entered a single field. Sponsor and insurance questions eliminated. Nine identity fields became three: first name, last name, date of birth.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Employer name and sponsorship status from HR feed</li>
+            <li class="d-body" style="font-size: 12px;">• Eligibility verified server-side before page load</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Welcome banner names their employer — "we know who you are"</li>
+            <li class="d-body" style="font-size: 12px;">• Privacy footer with encryption disclosure</li>
+          </ul>
         </div>
 
         <div class="d-sticky-scroll__step" data-step="1">
           <p class="d-mono">02</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Eligibility</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Confirm membership before they ask</p>
-          <p class="d-body">The system matched the member against employer HR data before they entered a single field. "We found you!" replaces three manual verification steps. Sponsor and insurance questions eliminated — eligibility verified server-side.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Account Creation</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Use contact points that make sense for this member</p>
+          <p class="d-body" style="margin-top: 12px;">Employer data gave us email and phone — but not always the right ones. Work emails and desk phones don't help a member manage diabetes at home. The account step lets members confirm or replace contact info with personal channels they'll actually check.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Email and phone pre-filled from employer HR data</li>
+            <li class="d-body" style="font-size: 12px;">• Member can override with personal contact info</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Pre-fill shows we have their data — editing shows we respect their choice</li>
+            <li class="d-body" style="font-size: 12px;">• Password creation gives ownership over the account</li>
+          </ul>
         </div>
 
         <div class="d-sticky-scroll__step" data-step="2">
           <p class="d-mono">03</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Program Setup</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Program Selection</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Let the system make the product decisions</p>
-          <p class="d-body">Blue dots mark pre-filled fields — data sourced from health records and employer HR. The "From Your Records" accordion shows 7 fields the system already knows. The member reviews and corrects. They don't re-enter. This single change addressed the 21% product selection drop-off.</p>
+          <p class="d-body" style="margin-top: 12px;">The old flow asked members to choose programs from a list they didn't understand. The redesign auto-selects qualified programs based on employer benefits and health records. Optional programs are clearly marked. This addressed the 21% product selection drop-off.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Program eligibility from employer benefit config</li>
+            <li class="d-body" style="font-size: 12px;">• Health record matching for condition-specific programs</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Source banner attributes selections to employer benefits</li>
+            <li class="d-body" style="font-size: 12px;">• "Qualified" vs "Optional" badges set clear expectations</li>
+          </ul>
         </div>
 
         <div class="d-sticky-scroll__step" data-step="3">
           <p class="d-mono">04</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Health History</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Show your sources, earn their trust</p>
-          <p class="d-body">Two banners — personal records and health records — show the member what the system already knows. Height, weight, and health conditions pre-filled with source attribution. The member confirms what's there rather than entering from scratch.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Program Setup</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Personalize without interrogating</p>
+          <p class="d-body" style="margin-top: 12px;">Blue dots mark pre-filled fields — data sourced from health records and employer HR. The "From Your Records" accordion shows 7 fields the system already knows. The member reviews and corrects. They don't re-enter.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Monitoring frequency from health records</li>
+            <li class="d-body" style="font-size: 12px;">• Diagnosis type, date, and medications pre-filled</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Blue dots visually distinguish pre-filled from manual entry</li>
+            <li class="d-body" style="font-size: 12px;">• "From Your Records" accordion with edit controls</li>
+          </ul>
         </div>
 
         <div class="d-sticky-scroll__step" data-step="4">
           <p class="d-mono">05</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Shipping</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Set expectations for what arrives</p>
-          <p class="d-body">Kit preview shows what's coming. Shipping address cascades in from employer HR data. The member confirms or corrects. Every field that auto-fills is one fewer reason to drop off.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Health History</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Show your sources, earn their trust</p>
+          <p class="d-body" style="margin-top: 12px;">Two banners — personal records and health records — show the member what the system already knows. Height, weight, and health conditions pre-filled with source attribution. The member confirms what's there rather than entering from scratch.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Height, weight, and conditions from health records</li>
+            <li class="d-body" style="font-size: 12px;">• Personal profile data from employer HR feed</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Source attribution on every pre-filled value</li>
+            <li class="d-body" style="font-size: 12px;">• Separate banners distinguish personal vs clinical data</li>
+          </ul>
         </div>
 
         <div class="d-sticky-scroll__step" data-step="5">
           <p class="d-mono">06</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Activation</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Shipping</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Set expectations for what arrives</p>
+          <p class="d-body" style="margin-top: 12px;">Kit preview shows what's coming. Shipping address cascades in from employer HR data. The member confirms or corrects. Every field that auto-fills is one fewer reason to drop off.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Mailing address from employer HR feed</li>
+            <li class="d-body" style="font-size: 12px;">• Kit contents determined by selected programs</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Visual kit preview shows exactly what arrives</li>
+            <li class="d-body" style="font-size: 12px;">• Editable address gives the member final say</li>
+          </ul>
+        </div>
+
+        <div class="d-sticky-scroll__step" data-step="6">
+          <p class="d-mono">07</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Next Steps</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Bridge the gap between signup and first use</p>
-          <p class="d-body">The final screen reframes enrollment as the start of a relationship. Three concrete next steps — download the app, meet your coach, set up your kit. This is where the activation metric lives. Everything in the flow is designed to get the member here with enough trust to take the next step.</p>
+          <p class="d-body" style="margin-top: 12px;">The final screen reframes enrollment as the start of a relationship. Three concrete actions — download the app, meet your coach, set up your kit. This is where the activation metric lives. Everything in the flow is designed to get the member here with enough trust to take the next step.</p>
+          <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Coach assignment based on program and language</li>
+            <li class="d-body" style="font-size: 12px;">• App download link personalized to device</li>
+          </ul>
+          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Concrete next steps replace vague "you're done" messaging</li>
+            <li class="d-body" style="font-size: 12px;">• Named coach creates a human connection before first use</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -441,7 +528,7 @@
   var steps = document.querySelectorAll('.d-sticky-scroll__step');
   var loaded = {};
   var activeStep = 0;
-  var PAD = 36;
+  var PAD = 48;
 
   function sizeFrames() {
     var frames = document.querySelectorAll('.d-anim-reg');
