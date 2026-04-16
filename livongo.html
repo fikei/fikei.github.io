@@ -210,8 +210,8 @@
   <!-- FRAMING -->
   <div id="framing" class="d-section">
     <p class="d-label">Framing</p>
-    <p class="d-body">Livongo sold five chronic condition programs — diabetes, hypertension, weight management, behavioral health, and musculoskeletal — in dozens of combinations. Every combination changed which registration fields a member saw. The rules for 50 client configurations across 74 possible fields lived in a spreadsheet that operations cross-referenced manually for every new launch.</p>
-    <p class="d-body">The registration flow was built as if every member was starting from scratch. Nine steps. Thirty-five questions. No awareness of what the system already knew about the person signing up.</p>
+    <p class="d-body">Livongo, a chronic conditions management company, was in growing pains. In 2 years, it grown from a one to five health programs sold in dozens of combinations. Every combination changed which registration fields a member saw. The rules for 50 unique client configurations lived in a spreadsheet that operations cross-referenced manually for every new launch. Complexity ballooned & metrics suffered.</p>
+    <p class="d-body">No where was the downstream product pain felt more than during onboarding members. The registration flow grew from 20 standard questions to 74 possible fields.</p>
 
     <p class="d-body" style="margin-top: 32px;">The data told the story. Every step bled members, but the reasons weren't what anyone expected.</p>
 
@@ -262,7 +262,8 @@
       </div>
     </div>
 
-    <p class="d-body"><strong>Product selection was the most surprising</strong> — 21% drop-off at a step where the system already knew which programs the member qualified for. The product was asking people to make decisions the system had already made.</p>
+    <p class="d-body">The program steps were one unsurprising culprit — historically, 11% dropoff this had balloned to more than 33% drop-off for our multi-program members. Moreover, people werent signing up for all of the program they were offered. At a step where the system already knew which programs the member qualified for, The product was overoptimizing for choice. This left revenue, but more importantly, benefits on the table for people who already enrolled.</p>
+    <p class="d-body" style="margin-top: 16px;">How could we reduce the friction in registration? How could we minimize what we asked?</p>
   </div>
 
   <!-- THE SHIFT -->
@@ -291,7 +292,8 @@
   <!-- DELIVERABLE -->
   <div id="deliverable" class="d-section" style="border-bottom: none;">
     <p class="d-label">Deliverable</p>
-    <p class="d-body">The redesigned flow went from 9 steps to 6. But the step count wasn't the point — what changed was what happened inside each step. The system now resolved data upstream and adapted the flow per client configuration.</p>
+    <p class="d-body">At its core, the solution was simple, but a large technical lift. Due to the nature of our client relationships, We had information upstream about members - demographics, health conditions, even specific health data.</p>
+    <p class="d-body" style="margin-top: 16px;">This led us to build a system that, given member verification, would allow us prefill, confirm or skip the information we needed during onboarding. The art was keeping the member in control & maintaining transparency so the process built trust rather than eroded it.</p>
 
     <div class="d-sticky-scroll">
       <!-- Sticky animation column -->
@@ -339,26 +341,27 @@
       <div class="d-sticky-scroll__text">
         <div class="d-sticky-scroll__step is-active" data-step="0">
           <p class="d-mono">01</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Eligibility Confirmation</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Confirm membership before they ask</p>
-          <p class="d-body" style="margin-top: 12px;">The welcome banner names the employer — the system already matched the member against HR data before they entered a single field. Sponsor and insurance questions eliminated. Nine identity fields became three: first name, last name, date of birth.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Verification</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Confirm membership & identity</p>
+          <p class="d-body" style="margin-top: 12px;">To prefill information, we needed to know with high confidence that the person. We passed this through assets, but we needed to verify with confidence to reduce the risk of PII leakage</p>
           <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
             <li class="d-body" style="font-size: 12px;">• Employer name and sponsorship status from HR feed</li>
             <li class="d-body" style="font-size: 12px;">• Eligibility verified server-side before page load</li>
           </ul>
-          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <p class="d-label" style="margin-top: 16px;">What changed</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-            <li class="d-body" style="font-size: 12px;">• Welcome banner names their employer — "we know who you are"</li>
+            <li class="d-body" style="font-size: 12px;">• Reduced data to the minimum needed to PII match a member</li>
+            <li class="d-body" style="font-size: 12px;">• Build trust eary by surfacing employer — "we know who you are"</li>
             <li class="d-body" style="font-size: 12px;">• Privacy footer with encryption disclosure</li>
           </ul>
         </div>
 
         <div class="d-sticky-scroll__step" data-step="1">
           <p class="d-mono">02</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Account Creation</p>
-          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Use contact points that make sense for this member</p>
-          <p class="d-body" style="margin-top: 12px;">Employer data gave us email and phone — but not always the right ones. Work emails and desk phones don't help a member manage diabetes at home. The account step lets members confirm or replace contact info with personal channels they'll actually check.</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Account</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Shifting control to the member</p>
+          <p class="d-body" style="margin-top: 12px;">Employer data gave us email and phone — but not always the right ones. Work emails and desk phones don't help a member manage diabetes at home. The account step introduced the independent relationship with Livongo, but enforced that their employer was a partner</p>
           <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
             <li class="d-body" style="font-size: 12px;">• Email and phone pre-filled from employer HR data</li>
@@ -373,17 +376,17 @@
 
         <div class="d-sticky-scroll__step" data-step="2">
           <p class="d-mono">03</p>
-          <p class="d-headline d-headline--md" style="margin-top: 4px;">Program Selection</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Programs</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Let the system make the product decisions</p>
-          <p class="d-body" style="margin-top: 12px;">The old flow asked members to choose programs from a list they didn't understand. The redesign auto-selects qualified programs based on employer benefits and health records. Optional programs are clearly marked. This addressed the 21% product selection drop-off.</p>
+          <p class="d-body" style="margin-top: 12px;">The old flow asked members to choose programs from a list they didn't understand. The redesign reframed their offering as a unified plan for all programs we know they qualified for. In some cases, we would let people opt in explicitly when we didn't have enough data to make a determination.</p>
           <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
             <li class="d-body" style="font-size: 12px;">• Program eligibility from employer benefit config</li>
             <li class="d-body" style="font-size: 12px;">• Health record matching for condition-specific programs</li>
           </ul>
-          <p class="d-label" style="margin-top: 16px;">Trust Signals</p>
+          <p class="d-label" style="margin-top: 16px;">What changed</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-            <li class="d-body" style="font-size: 12px;">• Source banner attributes selections to employer benefits</li>
+            <li class="d-body" style="font-size: 12px;">• Reframed as a unified program for all eligible programs.</li>
             <li class="d-body" style="font-size: 12px;">• "Qualified" vs "Optional" badges set clear expectations</li>
           </ul>
         </div>
@@ -392,7 +395,7 @@
           <p class="d-mono">04</p>
           <p class="d-headline d-headline--md" style="margin-top: 4px;">Program Setup</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Personalize without interrogating</p>
-          <p class="d-body" style="margin-top: 12px;">Blue dots mark pre-filled fields — data sourced from health records and employer HR. The "From Your Records" accordion shows 7 fields the system already knows. The member reviews and corrects. They don't re-enter.</p>
+          <p class="d-body" style="margin-top: 12px;">Historically a growing drop off, Blue dots mark pre-filled fields — data sourced from health records and employer HR. The "From Your Records" accordion set a pattern for trust - showing what system already knows and how it knows it. Members always had the ability edit or change information.</p>
           <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
             <li class="d-body" style="font-size: 12px;">• Monitoring frequency from health records</li>
@@ -443,7 +446,7 @@
           <p class="d-mono">07</p>
           <p class="d-headline d-headline--md" style="margin-top: 4px;">Next Steps</p>
           <p class="d-mono d-text--subtle" style="margin-top: 4px;">Bridge the gap between signup and first use</p>
-          <p class="d-body" style="margin-top: 12px;">The final screen reframes enrollment as the start of a relationship. Three concrete actions — download the app, meet your coach, set up your kit. This is where the activation metric lives. Everything in the flow is designed to get the member here with enough trust to take the next step.</p>
+          <p class="d-body" style="margin-top: 12px;">The final screen reframes enrollment as the start of a relationship. Three concrete actions — download the app, meet your coach, set up your kit. Everything in the flow is designed to get the member here with enough trust to take the next step.</p>
           <p class="d-label" style="margin-top: 20px;">Data Sourced</p>
           <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
             <li class="d-body" style="font-size: 12px;">• Coach assignment based on program and language</li>
