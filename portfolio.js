@@ -32,10 +32,10 @@
   function initKeyboard() {
     const pages = [
       '/',
-      '/field.html',
-      '/invoy.html',
-      '/livongo.html',
-      '/philosophy.html'
+      '/field/',
+      '/invoy/',
+      '/livongo/',
+      '/philosophy/'
     ];
     const current = window.location.pathname;
     const idx = pages.findIndex(p => current.endsWith(p) || current.endsWith(p.replace('.html', '')));
