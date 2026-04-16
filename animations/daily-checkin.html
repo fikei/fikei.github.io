@@ -14,29 +14,23 @@
   .phone-inner { border-radius: 42px; overflow: hidden; position: relative; width: 390px; height: 844px; background: white; }
   .phone__label { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666560; margin-top: 16px; }
 
-  .screen { position: absolute; inset: 0; width: 390px; height: 844px; background: white; opacity: 0; pointer-events: none; display: flex; flex-direction: column; overflow: hidden; }
-  .screen.active { opacity: 1; pointer-events: auto; z-index: 2; }
-  .screen.slide-up { animation: slideUp 0.5s cubic-bezier(0.32,0.72,0,1) forwards; }
-  .screen.slide-down { animation: slideDown 0.5s cubic-bezier(0.32,0.72,0,1) forwards; }
+  /* iOS status bar */
+  .ios-status { position: absolute; top: 0; left: 0; right: 0; z-index: 20; background: white; height: 44px; padding: 14px 26px 0; display: flex; align-items: center; justify-content: space-between; }
+  .ios-status__time { font-family: 'SF Pro', system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #191919; letter-spacing: -0.2px; }
+  .ios-status__icons { display: flex; align-items: center; gap: 6px; }
+  .ios-status__signal { font-family: 'SF Pro', system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #191919; letter-spacing: 1px; }
+  .ios-status__wifi { font-family: 'SF Pro', system-ui, sans-serif; font-size: 14px; color: #191919; }
+  .ios-status__battery { width: 24px; height: 11px; border-radius: 3px; background: #191919; }
 
-  @keyframes slideUp { from { opacity: 1; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes slideDown { from { opacity: 1; transform: translateY(0); } to { opacity: 1; transform: translateY(100%); } }
+  .screen { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; background: white; display: flex; flex-direction: column; overflow: hidden; }
 
-  /* Status bar — light blue gradient from Paper */
-  .status-bar { background: linear-gradient(180deg, oklab(92.4% -0.009 -0.014) 0%, oklab(95% -0.007 -0.008) 100%); border-radius: 30px 30px 0 0; height: 100px; padding: 12px 26px 0; display: flex; flex-direction: column; flex-shrink: 0; }
-  .status-top { display: flex; justify-content: space-between; align-items: center; }
-  .status-time { font-family: "SF Pro", system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #191919; }
-  .status-icons { font-family: "SF Pro", system-ui, sans-serif; font-size: 12px; color: #191919; }
-  .breath-row { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; }
+  /* Analyzing header */
+  .analyze-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 26px 0; flex-shrink: 0; }
   .breath-dot { width: 24px; height: 24px; border-radius: 12px; background: #2A3C56; flex-shrink: 0; }
 
   /* Card */
-  .card { flex: 1; background: white; border-radius: 20px 20px 0 0; margin-top: -8px; box-shadow: 0 -2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 20px; padding: 24px 36px; overflow-y: auto; scroll-behavior: smooth; }
+  .card { flex: 1; background: white; display: flex; flex-direction: column; gap: 20px; padding: 24px 36px; overflow-y: auto; scroll-behavior: smooth; }
   .card::-webkit-scrollbar { display: none; }
-  .card-fade-out { animation: cardFadeOut 0.35s ease forwards; }
-  .card-fade-in { animation: cardFadeIn 0.35s ease forwards; }
-  @keyframes cardFadeOut { from { opacity: 1; } to { opacity: 0; } }
-  @keyframes cardFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
   /* Nav */
   .nav { display: flex; justify-content: space-between; align-items: center; }
@@ -70,21 +64,8 @@
   .cta { background: #2A3C56; border-radius: 26px; padding: 16px; text-align: center; }
   .cta-text { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.41px; line-height: 22px; color: white; }
 
-  /* Likert dots */
-  .likert-row { display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 8px; }
-  .likert-dots { display: flex; gap: 20px; }
-  .likert-dot { width: 54px; height: 54px; border-radius: 27px; flex-shrink: 0; transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
-  .likert-dot.selected { transform: scale(1.1); box-shadow: 0 0 0 3px rgba(42,60,86,0.3); }
-
-  /* Animated elements */
-  .anim { opacity: 0; transform: translateY(10px); }
-  .anim.show { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease; }
-
   @keyframes tapPulse { 0% { transform: scale(1); } 50% { transform: scale(0.96); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
   .pulse { animation: tapPulse 0.3s ease; }
-
-  /* Home styles */
-  .home-content { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; flex: 1; padding: 0 40px; }
 
   @media (max-width: 480px) {
     body:not(.embedded) { padding: 24px 0; }
@@ -98,66 +79,94 @@
   <div class="phone">
     <div class="phone-inner">
 
-      <!-- SCREEN 0: Home -->
-      <div class="screen active" id="screen0" style="background:white;border-radius:30px;">
-        <div style="display:flex;flex-direction:column;flex-shrink:0;padding:14px 26px 0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:15px;font-weight:600;color:#191919;">9:41</span>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:12px;font-weight:600;color:#191919;">||||</span>
-              <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:14px;color:#191919;">▲</span>
-              <div style="width:24px;height:11px;border-radius:3px;background:#191919;"></div>
-            </div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;">
-            <div style="width:28px;height:28px;border-radius:14px;background:#2A3C56;position:relative;">
-              <div style="width:8px;height:8px;border-radius:4px;background:#6FCC9F;border:2px solid white;position:absolute;right:-2px;top:-2px;"></div>
-            </div>
-            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:17px;font-weight:600;color:#191919;letter-spacing:-0.41px;">Home</span>
-            <div style="width:36px;height:36px;border-radius:18px;border:2px solid #2A3C56;display:flex;align-items:center;justify-content:center;">
-              <div style="width:12px;height:12px;border-radius:6px;border:1.5px solid #2A3C56;"></div>
-            </div>
-          </div>
+      <!-- iOS status bar -->
+      <div class="ios-status">
+        <span class="ios-status__time">9:41</span>
+        <div class="ios-status__icons">
+          <span class="ios-status__signal">||||</span>
+          <span class="ios-status__wifi">▲</span>
+          <div class="ios-status__battery"></div>
         </div>
-        <div class="home-content">
-          <div style="width:220px;height:220px;border-radius:110px;background:#FAF5EB;display:flex;flex-direction:column;align-items:center;overflow:hidden;position:relative;">
-            <div style="width:90px;height:45px;border-radius:45px 45px 0 0;background:#E8A830;position:absolute;top:82px;"></div>
-            <div style="width:4px;height:18px;border-radius:2px;background:#E8A830;position:absolute;top:58px;left:108px;"></div>
-            <div style="width:4px;height:14px;border-radius:2px;background:#E8A830;position:absolute;top:62px;left:88px;transform:rotate(-25deg);"></div>
-            <div style="width:4px;height:14px;border-radius:2px;background:#E8A830;position:absolute;top:62px;left:128px;transform:rotate(25deg);"></div>
-            <div style="display:flex;flex-direction:column;gap:8px;align-items:center;position:absolute;top:132px;">
-              <div style="width:130px;height:5px;border-radius:3px;background:#A8D4E2;"></div>
-              <div style="width:100px;height:5px;border-radius:3px;background:#BEE0EC;"></div>
-              <div style="width:70px;height:5px;border-radius:3px;background:#D0EAF2;"></div>
+      </div>
+
+      <!-- Reflect on Yesterday -->
+      <div class="screen" id="reflect">
+        <div class="analyze-row">
+          <div style="display:flex;align-items:center;gap:8px;"><div class="breath-dot"></div><span style="font-family:'SF Pro Text',sans-serif;font-size:17px;color:#191919;letter-spacing:-0.41px;">Analyzing...</span></div>
+          <span style="font-family:'SF Pro Text',sans-serif;font-size:17px;color:#191919;letter-spacing:-0.41px;">1:45</span>
+        </div>
+        <div class="card" id="reflectCard">
+          <div class="nav"><span>←</span><span>×</span></div>
+          <div class="heading">Reflect on Yesterday</div>
+
+          <!-- Carbohydrate Intake -->
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="label-bold">Plan: Carbohydrate Intake</span>
+              <span style="color:#B2B2B2;font-family:'SF Pro Text',sans-serif;font-size:20px;">⋮</span>
+            </div>
+            <span class="text-sub">How many carbs did you eat?</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:20px;padding:16px 0;">
+            <div class="seg-bar">
+              <div id="seg1"></div>
+              <div id="seg2"></div>
+              <div id="seg3"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span class="text-sm" style="flex:1;">Less than 20 g</span>
+              <span class="text-sm" style="flex:1;">About 20g</span>
+              <span class="text-sm" style="flex:1;">Greater than 20 g</span>
             </div>
           </div>
-          <span style="font-family:'SF Pro Display',system-ui,sans-serif;font-size:34px;font-weight:600;line-height:41px;text-align:center;color:#191919;">Good morning, Charlie.</span>
-          <div class="cta" style="padding:18px 56px;border-radius:30px;" id="homeCta">
-            <span class="cta-text">Let's check-in</span>
+          <div class="callout callout-warm">
+            <div class="callout-icon">i</div>
+            <span style="font-family:'SF Pro Text',sans-serif;font-size:15px;color:#191919;letter-spacing:-0.41px;">Your goal is less than 20 carbs</span>
           </div>
-          <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:17px;color:#191919;letter-spacing:-0.41px;">Yesterday, you got:</span>
-          <div style="display:flex;gap:32px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:44px;height:44px;border-radius:22px;background:#ECEAE6;display:flex;align-items:center;justify-content:center;"><span style="font-size:18px;">🔥</span></div>
+
+          <!-- Daily Focus -->
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="section-title">Daily Focus</span>
+              <span style="color:#B2B2B2;font-family:'SF Pro Text',sans-serif;font-size:20px;">⋮</span>
+            </div>
+            <span class="text-sub">More ways to score high</span>
+          </div>
+          <div class="checklist-item">
+            <div class="checklist-left">
+              <div class="checklist-dot" style="background:#FAB52A;"></div>
+              <span class="text-item">Add 1 Serving Greens</span>
+            </div>
+            <div class="checklist-check" id="check1"></div>
+          </div>
+
+          <!-- Weekly Boosts -->
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span class="section-title">Weekly Boosts</span>
+            <span class="text-sub">Ways to boost your week</span>
+          </div>
+          <div class="checklist-item">
+            <div class="checklist-left">
+              <div class="checklist-dot" style="background:#F68C50;"></div>
               <div style="display:flex;flex-direction:column;gap:2px;">
-                <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:26px;font-weight:700;color:#191919;letter-spacing:-0.5px;line-height:28px;">5.9</span>
-                <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:15px;color:#B2B2B2;letter-spacing:-0.41px;">Fat Burn</span>
+                <span class="text-item">30-min Exercise</span>
+                <span class="text-sub">1/3 Completed</span>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:44px;height:44px;border-radius:22px;background:#ECEAE6;display:flex;align-items:center;justify-content:center;"><span style="font-family:'SF Pro Text',sans-serif;font-size:18px;color:#5A7080;">✓</span></div>
+            <div class="checklist-check" id="check2"></div>
+          </div>
+          <div class="checklist-item">
+            <div class="checklist-left">
+              <div class="checklist-dot" style="background:#F68C50;"></div>
               <div style="display:flex;flex-direction:column;gap:2px;">
-                <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:26px;font-weight:700;color:#191919;letter-spacing:-0.5px;line-height:28px;">4 days</span>
-                <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:15px;color:#B2B2B2;letter-spacing:-0.41px;">Check-in Streak</span>
+                <span class="text-item">Intermittent Fasting</span>
+                <span class="text-sub">/1 Completed</span>
               </div>
             </div>
+            <div class="checklist-check" id="check3"></div>
           </div>
-        </div>
-        <div style="display:flex;justify-content:space-around;align-items:flex-start;padding:10px 0 28px;border-top:1px solid #F0F0F0;flex-shrink:0;">
-          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-family:'SF Pro Text',sans-serif;font-size:20px;color:#2A3C56;">⌂</span><span style="font-family:'SF Pro Text',sans-serif;font-size:10px;font-weight:600;color:#2A3C56;">Home</span></div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-family:'SF Pro Text',sans-serif;font-size:20px;color:#B2B2B2;">📊</span><span style="font-family:'SF Pro Text',sans-serif;font-size:10px;color:#B2B2B2;">Journey</span></div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-family:'SF Pro Text',sans-serif;font-size:20px;color:#B2B2B2;">🍴</span><span style="font-family:'SF Pro Text',sans-serif;font-size:10px;color:#B2B2B2;">Food</span></div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-family:'SF Pro Text',sans-serif;font-size:20px;color:#B2B2B2;">💬</span><span style="font-family:'SF Pro Text',sans-serif;font-size:10px;color:#B2B2B2;">Support</span></div>
+
+          <div class="cta" id="submitCta"><span class="cta-text">Submit Check-in</span></div>
         </div>
       </div>
 
@@ -171,8 +180,22 @@
   function wait(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
   async function runAnimation() {
-    await wait(2500);
-    document.getElementById('homeCta').classList.add('pulse');
+    await wait(1200);
+    // Select first segment (less than 20g)
+    document.getElementById('seg1').style.background = '#78A8C8';
+    await wait(800);
+    // Check greens
+    document.getElementById('check1').classList.add('checked');
+    await wait(600);
+    // Check exercise
+    document.getElementById('check2').classList.add('checked');
+    await wait(600);
+    // Scroll down
+    var card = document.getElementById('reflectCard');
+    card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
+    await wait(1000);
+    // Tap submit
+    document.getElementById('submitCta').classList.add('pulse');
   }
 
   var paused = window.location.search.indexOf('paused') > -1;
